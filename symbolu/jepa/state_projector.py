@@ -37,10 +37,17 @@ class SovereignStateProjector(nn.Module):
 
     Structure (32D):
         [0:12]  - 12 Bhavas (Ontological Aspects) - Softmax normalized
-        [12:17] - 5 Koshas (Consciousness Sheaths) - Softmax normalized
+        [12:17] - 5 Koshas (Consciousness Sheaths) - Softmax OR Sigmoid (v2.2.5)
         [17:22] - 5 Vrittis (Mental Modifications) - Softmax normalized
         [22:28] - 6 Gunas/Dynamics (Energy States) - Sigmoid independent
         [28:32] - 4 Reserved (Toroidal Feedback) - Tanh bounded
+
+    v2.2.5 Geometric Expansion Mode:
+        When kosha_mode='sigmoid', Koshas are treated as INDEPENDENT sheaths
+        (not mutually exclusive classes). This allows the model to be:
+        - HIGH Physical AND HIGH Intellectual simultaneously
+        - Proper ontological modeling (sheaths coexist, not compete)
+        - Compatible with Gemini's v2.2.4 threshold design (0.75 trap_threshold)
 
     This MLP architecture provides higher capacity than simple linear projection,
     matching the JEPA design specification for unified projector architecture.
@@ -51,6 +58,7 @@ class SovereignStateProjector(nn.Module):
         intermediate_dim: Intermediate MLP dimension (default hidden_dim // 2)
         dropout: Dropout probability
         use_layer_norm: Whether to apply LayerNorm before projection
+        kosha_mode: 'softmax' (legacy, zero-sum) or 'sigmoid' (v2.2.5, independent)
     """
 
     # Dimension ranges for component normalization
@@ -67,12 +75,17 @@ class SovereignStateProjector(nn.Module):
         intermediate_dim: Optional[int] = None,
         dropout: float = 0.1,
         use_layer_norm: bool = True,
+        kosha_mode: str = 'sigmoid',  # v2.2.5: 'sigmoid' for independent sheaths, 'softmax' for legacy
     ):
         super().__init__()
 
         self.hidden_dim = hidden_dim
         self.state_dim = state_dim
         self.intermediate_dim = intermediate_dim or (hidden_dim // 2)
+        self.kosha_mode = kosha_mode
+
+        if kosha_mode not in ('softmax', 'sigmoid'):
+            raise ValueError(f"kosha_mode must be 'softmax' or 'sigmoid', got '{kosha_mode}'")
 
         # Optional pre-normalization
         self.layer_norm = nn.LayerNorm(hidden_dim) if use_layer_norm else nn.Identity()
@@ -139,9 +152,17 @@ class SovereignStateProjector(nn.Module):
         """
         Apply normalization constraints per component group.
 
-        - Bhavas/Koshas/Vrittis: Softmax (probability distribution)
+        - Bhavas: Softmax (probability distribution)
+        - Koshas: Sigmoid (v2.2.5 independent) or Softmax (legacy zero-sum)
+        - Vrittis: Softmax (probability distribution)
         - Gunas: Sigmoid (independent activations [0, 1])
         - Reserved: Tanh (bounded [-1, 1])
+
+        v2.2.5 Geometric Expansion:
+            When kosha_mode='sigmoid', Koshas become independent [0,1] activations.
+            This allows "Full-Spectrum" awareness where model can be:
+            - HIGH Physical AND HIGH Intellectual simultaneously
+            - Enables Gemini's v2.2.4 threshold design (trap=0.75, gate=0.30)
         """
         # Extract component ranges
         bhava = raw[..., 0:12]
@@ -152,7 +173,15 @@ class SovereignStateProjector(nn.Module):
 
         # Apply constraints
         bhava_norm = torch.softmax(bhava, dim=-1)
-        kosha_norm = torch.softmax(kosha, dim=-1)
+
+        # v2.2.5: Kosha normalization mode
+        if self.kosha_mode == 'sigmoid':
+            # Independent sheaths - can all be high/low simultaneously
+            kosha_norm = torch.sigmoid(kosha)
+        else:
+            # Legacy softmax - zero-sum competition between sheaths
+            kosha_norm = torch.softmax(kosha, dim=-1)
+
         vritti_norm = torch.softmax(vritti, dim=-1)
         guna_norm = torch.sigmoid(guna)
         reserved_norm = torch.tanh(reserved)

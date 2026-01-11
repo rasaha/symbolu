@@ -1,21 +1,40 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.1)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.5)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
-Key Features:
-- Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
-- Vital Momentum: Dynamic gain based on Pranamaya energy
-- Temporal Grounding: Physical history over 3-token window
-- Vijnana Gate: Intellectual verification before state transitions
-- Diagonal Opposition: Mental <-> Intellect, Physical <-> Blissful
+Key Features (v2.2.5 - Geometric Expansion with VICReg):
+- Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
+- Physical Gate (Strict): Prerequisites for Intellectual activation (no bypass)
+- Hard ReLU Rip: Reality Reversal when trapped with gate closed
+- Two-Path Loss: intellect_path + rip_signal for distinct behaviors
+- VICReg variance regularization: Prevents sigmoid collapse
+- Golden Ratio trap threshold: trap=0.618 (φ), gate=0.30, balance=0.25
 
-v2.2.1 Dynamic Weight Scheduler:
-- base_gain (0.15): Gentle observation when PPL > 100
-- max_gain (3.0): Strict enforcement when PPL approaches 30
-- Prevents "Aphasia" (model afraid to repeat valid tokens early in training)
+v2.2.5 Geometric Expansion (Sigmoid Mode):
+- Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
+- Each Kosha can reach [0, 1] independently
+- Model can be HIGH Physical AND HIGH Intellectual simultaneously
+- Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
+- VICReg variance term prevents all Koshas collapsing to same value
+
+v2.2.4 "Pressure Relief Valve" Architecture:
+- Damping manages the "volume" of Mental state
+- Ripping acts as "pressure relief valve" forcing hard shift to Physical grounding
+- Model cannot "reason" in a vacuum - must be grounded in manifest data first
+
+Three-Stage Internal Process:
+1. Mental Dominance (Damper): High Mental → Blissful activation diluted
+2. Physical Gate (Prerequisite): Intellect blocked unless Physical history saturated
+3. Reality Rip (Reversal): Trap + Gate Closed → ReLU shock forces re-grounding
+
+Previous Versions:
+- v2.2.4.1: Softmax threshold calibration (workaround, superseded by sigmoid)
+- v2.2.4: Three-Stage Hybrid Logic (correct design, wrong normalization)
+- v2.2.3.1: Soft-threshold damping (gate bypass approach - deprecated)
+- v2.2.1: Dynamic Weight Scheduler (PPL-based gain ramping - retained)
 
 R-T Quadrant Geometry:
 - Physical  (+,+): Manifest, Past
@@ -25,7 +44,7 @@ R-T Quadrant Geometry:
 - Vital: Energy/Momentum (not mapped to quadrant)
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.1
+- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.4
 - Taittiriya Upanishad (Pancha Kosha model)
 - Yoga Sutras of Patanjali (Dharana concept)
 """
@@ -40,13 +59,25 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.1).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.5).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
-    v2.2.1 adds Dynamic Weight Scheduler to prevent "Aphasia" during early training.
+    v2.2.5 Geometric Expansion (Sigmoid Mode):
+    - Koshas are INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
+    - Each Kosha can reach [0, 1] independently
+    - Model can be HIGH Physical AND HIGH Intellectual simultaneously
+    - Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
+    - VICReg variance term prevents sigmoid collapse
+
+    v2.2.4 Three-Stage Hybrid Logic:
+    1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
+    2. Physical Gate (Strict): Intellect requires Physical grounding (no bypass!)
+    3. Hard ReLU Rip: Reality Reversal when trapped + gate closed
+
+    v2.2.1 Dynamic Weight Scheduler retained for PPL-based gain ramping.
     """
 
     # === INVERTED CURRICULUM ===
@@ -61,10 +92,46 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # Trap detection thresholds
-    trap_threshold: float = 0.75         # Kosha saturation point
-    gate_threshold: float = 0.30         # Minimum for gate activation
-    balance_target: float = 0.25         # Required opposite activation
+    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+    # Per-Kosha thresholds based on Fibonacci retracement levels and ontological roles
+    # Each Kosha has its own threshold reflecting its unique function in consciousness
+    #
+    # Fibonacci Levels: 23.6%, 38.2%, 50.0%, 61.8%, 78.6%
+    #
+    # | Kosha     | Fib Level | Role       | Trigger Action                          |
+    # |-----------|-----------|------------|-----------------------------------------|
+    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
+    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
+    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
+    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
+    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
+    #
+    threshold_mental: float = 0.382      # Warning level - engage Bliss Damper
+    threshold_physical: float = 0.382    # Support level - required to open Vijnana Gate
+    threshold_intellect: float = 0.500   # Pivot level - target for "Right Knowledge"
+    threshold_vital: float = 0.786       # Resistance level - trigger momentum reset
+    threshold_bliss: float = 0.236       # Spark level - below this, release damping
+
+    # Legacy: single trap_threshold (kept for backward compatibility)
+    trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
+    gate_threshold: float = 0.30         # Minimum for gate activation (Gemini v2.2.4)
+    balance_target: float = 0.25         # Required opposite activation (Gemini v2.2.4)
+
+    # === VICREG VARIANCE REGULARIZATION (v2.2.5) ===
+    # Prevents sigmoid collapse where all Koshas go to same value
+    vicreg_variance_weight: float = 0.1  # Weight for variance loss term
+    vicreg_target_std: float = 0.25      # Target std dev per Kosha across batch
+
+    # === THREE-STAGE HYBRID LOGIC (v2.2.4) ===
+    # Damper steepness controls how aggressively Bliss is diluted
+    damper_steepness: float = 5.0        # Sigmoid steepness for bliss damper
+    # Gate steepness controls how sharp the Physical gate transition is
+    gate_steepness: float = 5.0          # Sigmoid steepness for gate
+    # Rip multiplier for Reality Reversal (hard shock when trapped + gate closed)
+    rip_multiplier: float = 2.0          # Multiplier for rip_signal loss
+
+    # Legacy: steepness (deprecated in v2.2.4, split into damper/gate steepness)
+    steepness: float = 5.0               # Kept for backward compatibility
 
     # === DYNAMIC WEIGHT SCHEDULER (v2.2.1) ===
     base_gain: float = 0.15              # Gentle observation (PPL > 100)
@@ -88,14 +155,12 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.1).
+    Vijnana-Gated Kosha Balance Loss (v2.2.5) - Geometric Expansion with VICReg.
 
-    Implements homeostatic regulation with:
-    - Dynamic Weight Scheduler: PPL-based gain ramping (NEW in v2.2.1)
-    - Diagonal transitions: Mental <-> Intellect, Physical <-> Blissful
-    - Vijnana Gate: Intellectual verification before state transitions
-    - Vital Momentum: Dynamic gain based on Pranamaya energy
-    - Temporal Grounding: Physical history over 3-token window
+    Implements homeostatic regulation with the "Pressure Relief Valve" architecture:
+    1. Bliss Damper (Sigmoid): Dilutes Bliss during Mental dominance
+    2. Physical Gate (Strict): Prerequisites for Intellect (no bypass!)
+    3. Hard ReLU Rip: Reality Reversal on pathological loops
 
     The loss enforces balance across the R-T quadrant geometry:
 
@@ -112,11 +177,33 @@ class KoshaGyroscopicLoss(nn.Module):
             |
         - (FUTURE)
 
-    Diagonal pairs are polar opposites:
-    - Mental (looping) <-> Intellect (structure)
-    - Physical (inertia) <-> Blissful (expansion)
+    v2.2.4 Three-Stage Internal Process:
 
-    Dynamic Weight Scheduler (v2.2.1):
+    Stage 1 - BLISS DAMPER (Mental Dominance Regulation):
+        As Manomaya (Mental) increases, Anandamaya (Bliss) is mathematically diluted.
+        This prevents the model from "hallucinating" or jumping to creative tangents
+        while caught in a pattern loop.
+        Formula: bliss_damper = 1.0 - sigmoid((mental - threshold) * steepness)
+
+    Stage 2 - PHYSICAL GATE (Intellectual Prerequisite):
+        Unlike v2.2.3.1's bypass approach, the gate is now a STRICT requirement.
+        Intellect remains "starved" of gradient flow unless Physical history is active.
+        This stops "fake reasoning" - model learns that expressing structure
+        requires providing factual grounding first.
+        Formula: phys_gate = sigmoid((phys_history - threshold) * steepness)
+
+    Stage 3 - REALITY RIP (Hard Reversal):
+        If model stays in high-Mental state without Physical gate opening,
+        the ReLU Rip fires. This creates a discontinuous gradient "shock"
+        that smashes the current latent trajectory and forces re-grounding.
+        Formula: rip_signal = mental_trap * (1.0 - phys_gate)
+
+    Two-Path Loss Architecture:
+        - intellect_path: Flows when gate is OPEN (grounded reasoning)
+        - rip_signal: Fires when gate is CLOSED (reality reversal)
+        Combined: axis1_loss = (intellect_path + rip_signal * rip_multiplier).mean()
+
+    Dynamic Weight Scheduler (v2.2.1 - retained):
     - Phase A (PPL > 100): Gentle observation at base_gain (0.15)
     - Phase B (PPL 100 -> 30): Linear ramp to max_gain (3.0)
     - Phase C (PPL < 30): Gyroscope disengages, gain ramps to 0
@@ -124,10 +211,23 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        trap_threshold: float = 0.75,
-        gate_threshold: float = 0.30,
-        balance_target: float = 0.25,
+        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+        threshold_mental: float = 0.382,     # Warning - engage Bliss Damper
+        threshold_physical: float = 0.382,   # Support - required to open Vijnana Gate
+        threshold_intellect: float = 0.500,  # Pivot - target for "Right Knowledge"
+        threshold_vital: float = 0.786,      # Resistance - trigger momentum reset
+        threshold_bliss: float = 0.236,      # Spark - below this, release damping
+        # Legacy thresholds (backward compatibility)
+        trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
+        gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
+        balance_target: float = 0.25,   # v2.2.5: Gemini's original (sigmoid mode)
         gate_temperature: float = 10.0,
+        # Three-Stage Hybrid Logic (v2.2.4)
+        damper_steepness: float = 5.0,
+        gate_steepness: float = 5.0,
+        rip_multiplier: float = 2.0,
+        # Legacy: steepness (deprecated, use damper_steepness/gate_steepness)
+        steepness: float = 5.0,
         # Dynamic Weight Scheduler (v2.2.1)
         base_gain: float = 0.15,
         max_gain: float = 3.0,
@@ -139,15 +239,33 @@ class KoshaGyroscopicLoss(nn.Module):
         temporal_window: int = 3,
         vital_momentum_enabled: bool = True,
         vital_momentum_range: Tuple[float, float] = (0.5, 1.5),
+        # VICReg variance regularization (v2.2.5)
+        vicreg_variance_weight: float = 0.1,
+        vicreg_target_std: float = 0.25,
     ):
         """
-        Initialize the Kosha Gyroscopic Loss.
+        Initialize the Kosha Gyroscopic Loss (v2.2.5).
+
+        v2.2.5 Geometric Expansion (Sigmoid Mode):
+        Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum).
+        Each Kosha can reach [0, 1] independently, allowing "Full-Spectrum" awareness.
+        Thresholds restored to Gemini's v2.2.4 design.
 
         Args:
-            trap_threshold: Activation level above which a Kosha is "trapped"
-            gate_threshold: Minimum activation for gate to be considered open
-            balance_target: Target activation level for the opposite Kosha
+            trap_threshold: Activation level above which a Kosha is "trapped".
+                           Default 0.618 (Golden Ratio φ) - natural equilibrium point.
+            gate_threshold: Minimum activation for gate to be considered open.
+                           Default 0.30 for sigmoid (Gemini's v2.2.4 design).
+            balance_target: Target activation level for the opposite Kosha.
+                           Default 0.25 for sigmoid (Gemini's v2.2.4 design).
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
+            damper_steepness: Sigmoid steepness for Bliss damper (v2.2.4)
+                              Controls how aggressively Bliss is diluted during Mental dominance
+            gate_steepness: Sigmoid steepness for Physical gate (v2.2.4)
+                            Controls sharpness of the grounding prerequisite
+            rip_multiplier: Multiplier for Reality Rip signal (v2.2.4)
+                            Higher = stronger "circuit breaker" effect
+            steepness: Legacy parameter (deprecated, use damper_steepness/gate_steepness)
             base_gain: Starting gain when PPL > ppl_ceiling (gentle observation)
             max_gain: Maximum gain when PPL approaches target_ppl (strict enforcement)
             ppl_ceiling: PPL above which gain stays at base_gain
@@ -158,10 +276,27 @@ class KoshaGyroscopicLoss(nn.Module):
             vital_momentum_range: (min, max) range for momentum scaler
         """
         super().__init__()
+
+        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+        self.threshold_mental = threshold_mental
+        self.threshold_physical = threshold_physical
+        self.threshold_intellect = threshold_intellect
+        self.threshold_vital = threshold_vital
+        self.threshold_bliss = threshold_bliss
+
+        # Legacy thresholds (backward compatibility)
         self.trap_threshold = trap_threshold
         self.gate_threshold = gate_threshold
         self.balance_target = balance_target
         self.gate_temperature = gate_temperature
+
+        # Three-Stage Hybrid Logic (v2.2.4)
+        self.damper_steepness = damper_steepness
+        self.gate_steepness = gate_steepness
+        self.rip_multiplier = rip_multiplier
+
+        # Legacy: steepness (fallback for backward compatibility)
+        self.steepness = steepness
 
         # Dynamic Weight Scheduler (v2.2.1)
         self.base_gain = base_gain
@@ -175,6 +310,10 @@ class KoshaGyroscopicLoss(nn.Module):
         self.temporal_window = temporal_window
         self.vital_momentum_enabled = vital_momentum_enabled
         self.vital_min, self.vital_max = vital_momentum_range
+
+        # VICReg variance regularization (v2.2.5)
+        self.vicreg_variance_weight = vicreg_variance_weight
+        self.vicreg_target_std = vicreg_target_std
 
         # Kosha indices in the 5D projection
         self.PHYSICAL_IDX = 0   # Annamaya (+,+)
@@ -248,6 +387,100 @@ class KoshaGyroscopicLoss(nn.Module):
 
         return momentum_scaler
 
+    def _compute_vicreg_variance_loss(
+        self,
+        kosha_states: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Compute VICReg-style variance regularization loss (v2.2.5).
+
+        Prevents sigmoid collapse where all Koshas converge to the same value.
+        Encourages each Kosha dimension to maintain variance across the batch.
+
+        The variance loss is:
+            L_var = sum_d max(0, target_std - std(x_d))^2
+
+        This penalizes dimensions with variance below the target.
+
+        Args:
+            kosha_states: [batch, seq, 5] Kosha activations
+
+        Returns:
+            Scalar variance loss
+        """
+        if self.vicreg_variance_weight <= 0:
+            return torch.tensor(0.0, device=kosha_states.device)
+
+        # Flatten batch and seq dimensions for variance computation
+        # Shape: [batch * seq, 5]
+        flat_koshas = kosha_states.reshape(-1, 5)
+
+        # Compute std for each Kosha dimension across samples
+        # Shape: [5]
+        kosha_std = flat_koshas.std(dim=0)
+
+        # Variance loss: penalize dimensions with std below target
+        # Using hinge loss: max(0, target - actual)^2
+        variance_loss = F.relu(self.vicreg_target_std - kosha_std).pow(2).mean()
+
+        return variance_loss * self.vicreg_variance_weight
+
+    def _soft_threshold(
+        self,
+        x: torch.Tensor,
+        threshold: float
+    ) -> torch.Tensor:
+        """
+        Soft threshold with shifted sigmoid (v2.2.3.1).
+
+        Provides smooth transition at threshold while preserving "clean zero"
+        property below threshold. Unlike raw sigmoid which outputs ~0.5 at
+        threshold and never reaches 0, this shifted version:
+        - Outputs 0 when x <= threshold
+        - Smoothly ramps to 1.0 as x exceeds threshold
+        - Has continuous gradients everywhere (no "Reality Rips")
+
+        The shift maps sigmoid(0) -> 0 instead of sigmoid(0) -> 0.5:
+            shifted = clamp(2.0 * (sigmoid(z) - 0.5), min=0)
+
+        Args:
+            x: Input tensor of activations
+            threshold: Activation level to detect crossing
+
+        Returns:
+            Soft threshold output in range [0, 1]
+        """
+        z = (x - threshold) * self.steepness
+        raw_sigmoid = torch.sigmoid(z)
+        # Shift: sigmoid(0)=0.5 -> 0, sigmoid(inf)=1.0 -> 1.0
+        # clamp ensures we don't go negative when x << threshold
+        return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+
+    def _soft_deficit(
+        self,
+        x: torch.Tensor,
+        target: float
+    ) -> torch.Tensor:
+        """
+        Soft deficit detection with shifted sigmoid (v2.2.3.1).
+
+        Detects how far below target an activation is, with smooth transitions.
+        Like _soft_threshold but inverted:
+        - Outputs 0 when x >= target (no deficit)
+        - Smoothly ramps to 1.0 as x falls below target
+        - Has continuous gradients everywhere
+
+        Args:
+            x: Input tensor of activations
+            target: Target activation level
+
+        Returns:
+            Soft deficit output in range [0, 1]
+        """
+        z = (target - x) * self.steepness
+        raw_sigmoid = torch.sigmoid(z)
+        return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+
     def get_dynamic_gain(self, current_ppl: Optional[float] = None) -> float:
         """
         Compute dynamic gain based on current PPL (v2.2.1).
@@ -283,7 +516,8 @@ class KoshaGyroscopicLoss(nn.Module):
         self,
         kosha_states: torch.Tensor,
         current_ppl: Optional[float] = None,
-        return_components: bool = False
+        return_components: bool = False,
+        authority_factor: Optional[float] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
         Compute the Kosha Gyroscopic Loss.
@@ -299,6 +533,12 @@ class KoshaGyroscopicLoss(nn.Module):
             current_ppl: Current validation PPL for dynamic gain (v2.2.1).
                         If None, uses static fallback gain.
             return_components: If True, also return diagnostic components
+            authority_factor: External authority factor from PIDv2 controller (v2.2.4).
+                             When provided, modulates the effective gain:
+                             - 1.0 = full gain (normal operation)
+                             - 0.5 = half gain (PID backing off)
+                             - None = no modulation (use PPL-based gain only)
+                             This enables integration with --controller pidv2.
 
         Returns:
             If return_components=False: Scalar loss value
@@ -319,60 +559,201 @@ class KoshaGyroscopicLoss(nn.Module):
         # Dynamic gain based on energy level
         momentum_scaler = self._compute_vital_momentum(vital)
 
-        # --- AXIS 1: Mental -> Intellect (via Physical) ---
-        # Transition path: Mental (loop) -> Physical (ground) -> Intellect (structure)
+        # =======================================================================
+        # AXIS 1: Mental -> Intellect (via Physical) - v2.2.4 Three-Stage Hybrid
+        # =======================================================================
         #
-        # This axis handles the "Titus Titus Titus" problem:
-        # - High Mental = repetitive pattern detected
-        # - Low Intellect = no logical structure justifying the pattern
-        # - Physical Gate = check if model is grounded in manifest reality
+        # This axis handles the "Titus Titus Titus" problem with three mechanisms:
         #
-        # If Mental HIGH + Intellect LOW + Physical grounded -> PUNISH (break the loop)
-        # If Mental HIGH + Intellect HIGH -> ALLOW (valid focus, Dharana)
+        # STAGE 1 - BLISS DAMPER (Mental Dominance Regulation):
+        #   As Mental increases, Bliss is mathematically diluted.
+        #   Prevents "hallucinating" or jumping to creative tangents during loops.
+        #
+        # STAGE 2 - PHYSICAL GATE (Intellectual Prerequisite):
+        #   Intellect is "starved" unless Physical history is active.
+        #   This is STRICT - no bypass! Model must ground before reasoning.
+        #
+        # STAGE 3 - REALITY RIP (Hard Reversal):
+        #   If trapped + gate closed → ReLU shock forces re-grounding.
+        #   This "smashes" the loop trajectory back to Physical quadrant.
 
-        mental_trap = F.relu(mental - self.trap_threshold)
-        phys_gate = torch.sigmoid(
-            self.gate_temperature * (phys_history - self.gate_threshold)
-        )
+        # === FIBONACCI PENTAD LOGIC (v2.2.5) ===
+        # Each Kosha now has its own threshold based on its ontological role
+
+        # Stage 1: BLISS DAMPER - dilutes creative expansion during Mental dominance
+        # When Mental > threshold_mental (38.2%), bliss_damper approaches 0
+        bliss_damper = 1.0 - torch.sigmoid((mental - self.threshold_mental) * self.damper_steepness)
+
+        # BLISS SPARK RELEASE: If Bliss < threshold_bliss (23.6%), release damping for creativity
+        # This allows creative expansion when Bliss is starved
+        bliss_spark = (bliss < self.threshold_bliss).float()
+        bliss_damper = bliss_damper + bliss_spark * 0.5  # Partial release when Bliss is low
+
+        # Stage 2: PHYSICAL GATE - strict prerequisite for Intellect (NO BYPASS!)
+        # Gate only opens when Physical history is above threshold_physical (38.2%)
+        phys_gate = torch.sigmoid((phys_history - self.threshold_physical) * self.gate_steepness)
+
+        # VITAL RESISTANCE: High Vital (>78.6%) dampens momentum (model is "overheating")
+        vital_resistance = torch.sigmoid((vital - self.threshold_vital) * self.gate_steepness)
+        # Apply resistance as momentum damper
+        vital_momentum_damper = 1.0 - vital_resistance * 0.5  # Max 50% reduction at high Vital
+
+        # Stage 3: REALITY RIP - Hard ReLU for "circuit breaker" effect
+        # Uses ReLU (not sigmoid) for discontinuous gradient shock
+        # Now uses threshold_mental (38.2%) - fires earlier than legacy 61.8%
+        mental_trap = F.relu(mental - self.threshold_mental)
+
+        # Rip signal fires when trapped AND gate is CLOSED
+        # This forces model back to Physical/Manifest quadrant
+        rip_signal = mental_trap * (1.0 - phys_gate)
+
+        # Intellectual path - only flows when gate is OPEN (grounded reasoning)
         missing_intellect = F.relu(self.balance_target - intellect)
-        axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
+        intellect_path = mental_trap * phys_gate * missing_intellect
 
-        # --- AXIS 2: Physical -> Blissful (via Mental) ---
-        # Transition path: Physical (inertia) -> Mental (abstraction) -> Bliss (expansion)
+        # TWO-PATH LOSS: Grounded path + Reality reversal
+        # rip_signal gets multiplied by rip_multiplier for stronger "shock"
+        axis1_loss = (intellect_path + rip_signal * self.rip_multiplier).mean()
+
+        # =======================================================================
+        # AXIS 2: Physical -> Blissful (via Mental) - v2.2.4 Three-Stage Hybrid
+        # =======================================================================
         #
-        # This axis handles the "just copying tokens" problem:
+        # This axis handles the "just copying tokens" problem symmetrically:
         # - High Physical = raw data regurgitation
         # - Low Bliss = no creative expansion
         # - Mental Gate = check if model has abstracted the pattern
         #
-        # If Physical HIGH + Bliss LOW + Mental abstracted -> PUNISH (force creativity)
+        # Same three-stage logic applied to Physical → Bliss transition
 
-        physical_trap = F.relu(physical - self.trap_threshold)
-        mental_gate = torch.sigmoid(
-            self.gate_temperature * (mental - self.gate_threshold)
-        )
+        # Stage 1: PHYSICAL DAMPER - dilutes grounding during Physical dominance
+        # (Prevents over-grounding that blocks creativity)
+        # Uses threshold_physical (38.2%) from Fibonacci Pentad
+        physical_damper = 1.0 - torch.sigmoid((physical - self.threshold_physical) * self.damper_steepness)
+
+        # Stage 2: MENTAL GATE - strict prerequisite for Bliss (NO BYPASS!)
+        # Uses threshold_mental (38.2%) for gate requirement
+        mental_gate = torch.sigmoid((mental - self.threshold_mental) * self.gate_steepness)
+
+        # Stage 3: REALITY RIP - Hard ReLU for Physical trap
+        # Uses threshold_physical (38.2%) from Fibonacci Pentad
+        physical_trap = F.relu(physical - self.threshold_physical)
+
+        # Rip signal fires when physically trapped AND mental gate is CLOSED
+        rip_signal_axis2 = physical_trap * (1.0 - mental_gate)
+
+        # Bliss path - only flows when mental gate is OPEN (abstracted)
         missing_bliss = F.relu(self.balance_target - bliss)
-        axis2_loss = (physical_trap * mental_gate * missing_bliss).mean()
+        bliss_path = physical_trap * mental_gate * missing_bliss
 
-        # === Total Loss with Dynamic Gain (v2.2.1) ===
+        # TWO-PATH LOSS: Abstracted path + Reality reversal
+        axis2_loss = (bliss_path + rip_signal_axis2 * self.rip_multiplier).mean()
+
+        # === Total Loss with Dynamic Gain (v2.2.1) + Authority Modulation (v2.2.4) ===
         # Get PPL-based dynamic gain
-        effective_gain = self.get_dynamic_gain(current_ppl)
-        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
+        base_dynamic_gain = self.get_dynamic_gain(current_ppl)
+
+        # Apply authority factor from PIDv2 controller if provided
+        # This enables real-time feedback control when --controller pidv2 is used
+        if authority_factor is not None:
+            effective_gain = base_dynamic_gain * authority_factor
+        else:
+            effective_gain = base_dynamic_gain
+
+        # === VICReg Variance Regularization (v2.2.5) ===
+        # Prevents sigmoid collapse where all Koshas converge to same value
+        vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
+
+        # === FIBONACCI PENTAD: Vital Resistance Dampening ===
+        # High Vital (>78.6%) dampens the loss to prevent "overheating"
+        vital_damper_scalar = vital_momentum_damper.mean()
+
+        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * vital_damper_scalar + vicreg_variance_loss
 
         if return_components:
+            # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
+
+            # Rip signal metrics (Reality Reversal detection)
+            rip_signal_mean = rip_signal.mean().item()
+            rip_signal_max = rip_signal.max().item()
+            rip_signal_axis2_mean = rip_signal_axis2.mean().item()
+
+            # Damper metrics (Mental/Physical dominance regulation)
+            bliss_damper_mean = bliss_damper.mean().item()
+            physical_damper_mean = physical_damper.mean().item()
+
+            # Gate-locked detection (trapped with gate closed)
+            gate_locked_axis1 = ((mental_trap > 0) & (phys_gate < 0.5)).float().mean().item()
+            gate_locked_axis2 = ((physical_trap > 0) & (mental_gate < 0.5)).float().mean().item()
+
+            # Path flow metrics (which path is active)
+            intellect_path_mean = intellect_path.mean().item()
+            bliss_path_mean = bliss_path.mean().item()
+
             components = {
+                # Loss breakdown
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
+                'vicreg_variance_loss': vicreg_variance_loss.item(),  # v2.2.5
                 'effective_gain': effective_gain,
+                'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
+                'authority_factor': authority_factor if authority_factor is not None else 1.0,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
-                'mental_trap_mean': mental_trap.mean().item(),
-                'physical_trap_mean': physical_trap.mean().item(),
+
+                # v2.2.5 VICReg metrics
+                'vicreg_target_std': self.vicreg_target_std,
+                'vicreg_variance_weight': self.vicreg_variance_weight,
+
+                # v2.2.5 FIBONACCI PENTAD METRICS
+                'threshold_mental': self.threshold_mental,
+                'threshold_physical': self.threshold_physical,
+                'threshold_intellect': self.threshold_intellect,
+                'threshold_vital': self.threshold_vital,
+                'threshold_bliss': self.threshold_bliss,
+                'vital_resistance_mean': vital_resistance.mean().item(),
+                'vital_damper_scalar': vital_damper_scalar.item() if torch.is_tensor(vital_damper_scalar) else vital_damper_scalar,
+                'bliss_spark_mean': bliss_spark.mean().item(),
+
+                # v2.2.4 THREE-STAGE HYBRID METRICS
+                # Stage 1: Damper metrics
+                'bliss_damper_mean': bliss_damper_mean,
+                'physical_damper_mean': physical_damper_mean,
+
+                # Stage 2: Gate metrics (strict, no bypass)
                 'phys_gate_mean': phys_gate.mean().item(),
                 'mental_gate_mean': mental_gate.mean().item(),
+
+                # Stage 3: Rip signal metrics (Reality Reversal)
+                'rip_signal_mean': rip_signal_mean,
+                'rip_signal_max': rip_signal_max,
+                'rip_signal_axis2_mean': rip_signal_axis2_mean,
+
+                # Gate-locked states (trapped + gate closed = RIP firing)
+                'gate_locked_axis1': gate_locked_axis1,
+                'gate_locked_axis2': gate_locked_axis2,
+
+                # Path flow (grounded vs reversal)
+                'intellect_path_mean': intellect_path_mean,
+                'bliss_path_mean': bliss_path_mean,
+
+                # Trap detection (ReLU-based)
+                'mental_trap_mean': mental_trap.mean().item(),
+                'physical_trap_mean': physical_trap.mean().item(),
+
+                # Target deficit
                 'missing_intellect_mean': missing_intellect.mean().item(),
                 'missing_bliss_mean': missing_bliss.mean().item(),
+
+                # Energy level
                 'vital_mean': vital.mean().item(),
+
+                # v2.2.4 config
+                'damper_steepness': self.damper_steepness,
+                'gate_steepness': self.gate_steepness,
+                'rip_multiplier': self.rip_multiplier,
+
+                # Kosha state summary
                 'kosha_means': {
                     'physical': physical.mean().item(),
                     'vital': vital.mean().item(),
@@ -795,11 +1176,32 @@ class KoshaPhaseCorrectorConfig:
     - Training: Indirect (loss gradients) → Model LEARNS balance
     - Inference: Direct (phase rotation) → Runtime GUARDRAILS
 
+    v2.2.5 Fibonacci Pentad: Per-Kosha thresholds based on ontological roles.
+    Each Kosha has its own overactive threshold reflecting its unique function.
+    Koshas are independent [0,1] activations (not softmax zero-sum).
+
     Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
-    # Imbalance detection thresholds
-    overactive_threshold: float = 0.75   # Kosha > this triggers correction
+    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
+    # Per-Kosha overactive thresholds based on Fibonacci retracement levels
+    #
+    # | Kosha     | Fib Level | Role       | Inference Trigger                       |
+    # |-----------|-----------|------------|-----------------------------------------|
+    # | Mental    | 38.2%     | Warning    | Phase correct to Intellect/Physical    |
+    # | Physical  | 38.2%     | Support    | Allow - needed for grounding            |
+    # | Intellect | 50.0%     | Pivot      | Allow - balanced reasoning              |
+    # | Vital     | 78.6%     | Resistance | Phase correct to avoid overheating      |
+    # | Bliss     | 23.6%     | Spark      | Allow - creativity needs low threshold  |
+    #
+    overactive_mental: float = 0.382     # Mental > 38.2% triggers correction
+    overactive_physical: float = 0.618   # Physical > 61.8% - allow more grounding
+    overactive_intellect: float = 0.618  # Intellect > 61.8% - allow reasoning
+    overactive_vital: float = 0.786      # Vital > 78.6% triggers correction (overheating)
+    overactive_bliss: float = 0.618      # Bliss > 61.8% - allow creativity
+
+    # Legacy thresholds (backward compatibility)
+    overactive_threshold: float = 0.618  # Default fallback (Golden Ratio φ)
     underactive_threshold: float = 0.15  # Kosha < this is considered deficient
 
     # Correction strength
@@ -899,7 +1301,14 @@ class KoshaPhaseCorrector(nn.Module):
         kosha_states: torch.Tensor,
     ) -> Tuple[bool, Optional[str], Dict[str, float]]:
         """
-        Detect if any Kosha is overactive.
+        Detect if any Kosha is overactive using Fibonacci Pentad thresholds.
+
+        v2.2.5: Each Kosha has its own threshold reflecting its ontological role:
+        - Mental: 38.2% (low - trigger correction early for loops)
+        - Physical: 61.8% (allow grounding)
+        - Intellect: 61.8% (allow reasoning)
+        - Vital: 78.6% (high - only correct when overheating)
+        - Bliss: 61.8% (allow creativity)
 
         Args:
             kosha_states: [B, 5] or [B, N, 5] Kosha activations
@@ -921,16 +1330,29 @@ class KoshaPhaseCorrector(nn.Module):
             for i, name in enumerate(self.KOSHA_NAMES)
         }
 
-        # Find overactive Kosha
+        # Fibonacci Pentad: per-Kosha thresholds
+        # Kosha order: Physical(0), Vital(1), Mental(2), Intellect(3), Bliss(4)
+        threshold_map = {
+            'Physical': self.config.overactive_physical,
+            'Vital': self.config.overactive_vital,
+            'Mental': self.config.overactive_mental,
+            'Intellect': self.config.overactive_intellect,
+            'Bliss': self.config.overactive_bliss,
+        }
+
+        # Find overactive Kosha (check each against its own threshold)
         overactive_kosha = None
-        max_activation = 0.0
+        max_excess = 0.0  # How much activation exceeds threshold
 
         for i, name in enumerate(self.KOSHA_NAMES):
             activation = avg_koshas[i].item()
-            if activation > self.config.overactive_threshold:
-                if activation > max_activation:
-                    max_activation = activation
-                    overactive_kosha = name
+            threshold = threshold_map.get(name, self.config.overactive_threshold)
+            excess = activation - threshold
+
+            # Check if this Kosha exceeds its threshold AND is most urgent
+            if excess > 0 and excess > max_excess:
+                max_excess = excess
+                overactive_kosha = name
 
         is_imbalanced = overactive_kosha is not None
 
@@ -980,6 +1402,9 @@ class KoshaPhaseCorrector(nn.Module):
         """
         Apply correction to full 32D sovereign state.
 
+        v2.2.5: Uses sigmoid clamping instead of softmax re-normalization.
+        This maintains independent sheath activations.
+
         Args:
             sovereign_state: [B, 32] full state
             correction: [B, 5] Kosha correction
@@ -992,10 +1417,11 @@ class KoshaPhaseCorrector(nn.Module):
         # Apply correction to Kosha slice [12:17]
         corrected[:, self.KOSHA_SLICE] = corrected[:, self.KOSHA_SLICE] + correction
 
-        # Re-normalize Koshas to sum to 1 (softmax-like)
+        # v2.2.5: Clamp Koshas to [0, 1] (sigmoid mode - independent sheaths)
+        # Unlike softmax, this preserves independence between Koshas
         kosha_corrected = corrected[:, self.KOSHA_SLICE]
-        kosha_normalized = F.softmax(kosha_corrected, dim=-1)
-        corrected[:, self.KOSHA_SLICE] = kosha_normalized
+        kosha_clamped = torch.clamp(kosha_corrected, min=0.0, max=1.0)
+        corrected[:, self.KOSHA_SLICE] = kosha_clamped
 
         return corrected
 

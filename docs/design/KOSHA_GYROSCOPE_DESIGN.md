@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.0
-**Status:** Design Complete, Refinements Documented
+**Version:** 2.2.4
+**Status:** Design Complete, Three-Stage Hybrid Logic Implemented
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -1393,6 +1393,302 @@ When phase correction is applied during inference:
    Correction: Mental -0.15, Intellect +0.12, Physical +0.03
    Health Score: 0.74
 ```
+
+---
+
+## 14. Soft-Threshold Damping (v2.2.3.1)
+
+### 14.1 The Problem: Reality Rips
+
+In v2.2.1, the gyroscope used hard ReLU gates for trap detection:
+
+```python
+# v2.2.1: Hard ReLU gates
+mental_trap = F.relu(mental - 0.75)  # 0 until 0.75, then linear
+missing_intellect = F.relu(0.25 - intellect)  # 0 until below 0.25
+axis1_loss = (mental_trap * phys_gate * missing_intellect).mean()
+```
+
+**The Issue**: When multiple ReLU gates cross their thresholds simultaneously,
+the loss jumps from 0 to a non-zero value instantly. This creates:
+
+1. **Gradient Discontinuity**: Sharp corner in loss landscape
+2. **Reality Rips**: Violent over-corrections in embedding space
+3. **Hysteresis Buildup**: Pressure accumulates behind temporal gates, releases violently
+
+### 14.2 The Solution: Shifted Sigmoid
+
+v2.2.3.1 replaces all ReLU gates with **shifted sigmoid** functions:
+
+```python
+# v2.2.3.1: Shifted sigmoid (smooth but clean zeros)
+def _soft_threshold(self, x, threshold):
+    z = (x - threshold) * self.steepness
+    raw_sigmoid = torch.sigmoid(z)
+    return torch.clamp(2.0 * (raw_sigmoid - 0.5), min=0.0)
+```
+
+**Key Properties**:
+- **Below threshold**: Approaches 0 (clean zero when healthy)
+- **At threshold**: Exactly 0 (preserves ReLU semantics)
+- **Above threshold**: Smooth ramp to 1.0
+- **Everywhere**: Continuous gradients (no "rips")
+
+### 14.3 Steepness Parameter
+
+The `steepness` parameter controls transition sharpness:
+
+| Steepness | Behavior | Use Case |
+|-----------|----------|----------|
+| **2.0** | Fluid, very smooth transitions | Maximum damping, early training |
+| **5.0** | Balanced (default) | Standard operation |
+| **10.0** | Sharp, ReLU-like | Fast response, post-graduation |
+
+```bash
+# Training command with soft-threshold damping
+python train_unified_llm.py \
+    --enable_kosha_gyroscope \
+    --gyroscope_steepness 5.0  # Default, adjust for more/less damping
+```
+
+### 14.4 Mathematical Comparison
+
+**State Transition Analysis (Mental at trap threshold)**:
+
+| mental | ReLU output | Shifted Sigmoid (s=5.0) |
+|--------|-------------|-------------------------|
+| 0.50 | 0.000 | 0.000 |
+| 0.70 | 0.000 | 0.000 |
+| 0.75 | 0.000 | 0.000 |
+| 0.80 | 0.050 | 0.462 |
+| 0.90 | 0.150 | 0.817 |
+| 1.00 | 0.250 | 0.924 |
+
+The shifted sigmoid preserves:
+- **Clean zero** when healthy (unlike raw sigmoid which outputs ~0.22 at 0.50)
+- **Smooth transition** above threshold (unlike ReLU's sharp corner)
+
+### 14.5 Fluidity Events (Soft Diagnostics)
+
+v2.2.3.1 adds `FluidityEvent` for soft saturation tracking:
+
+```python
+# New diagnostic: capture_fluidity() instead of capture_rip()
+if logger.capture_fluidity(step, tokens, kosha_states, loss_components):
+    print(f"Soft saturation #{logger.fluidity_count} captured!")
+```
+
+**FluidityEvent Fields**:
+- `axis1_saturation`: Combined soft gate activation (Axis 1)
+- `axis2_saturation`: Combined soft gate activation (Axis 2)
+- `combined_saturation`: Max of both axes
+- `steepness`: Current damping steepness
+
+### 14.6 Gate Bypass Fix
+
+**Problem Discovered**: During training, we observed that:
+- Rip rate: ~4500-5600 per 1k steps (very high)
+- Gyroscope Loss: 0.0000-0.0001 (essentially ZERO)
+
+**The Paradox**: Rips were being detected but the gyroscope wasn't penalizing.
+
+**Root Cause Analysis**: Physical gate was blocking when needed most.
+
+When Mental is HIGH, Physical tends to be LOW (negatively correlated):
+```
+Mental HIGH (looping) → Model is ungrounded → Physical LOW
+Physical LOW → phys_gate = sigmoid((physical - 0.30) * temp) ≈ 0
+phys_gate ≈ 0 → axis1_loss = (mental_trap * 0 * missing_intellect) = 0
+```
+
+The gate was designed to ensure Physical grounding before intervening, but this
+created a catch-22: when the model is most trapped (high Mental, low Physical),
+the gate blocks all intervention.
+
+**Solution: Mental-Triggered Gate Bypass**
+
+When Mental is trapped, bypass the Physical gate requirement:
+
+```python
+mental_trap = self._soft_threshold(mental, self.trap_threshold)
+phys_gate_raw = self._soft_threshold(phys_history, self.gate_threshold)
+
+# GATE BYPASS: When Mental is trapped, bypass the Physical gate requirement
+# Rationale: If Mental is HIGH and Physical is LOW, the model is ungrounded
+# AND looping - this is exactly when we NEED to intervene
+# The bypass ensures at least 50% gate activation when trapped
+phys_gate = torch.max(phys_gate_raw, mental_trap * 0.5)
+```
+
+**Symmetric Fix for Axis 2**:
+```python
+physical_trap = self._soft_threshold(physical, self.trap_threshold)
+mental_gate_raw = self._soft_threshold(mental, self.gate_threshold)
+
+# GATE BYPASS: When Physical is trapped, bypass the Mental gate requirement
+mental_gate = torch.max(mental_gate_raw, physical_trap * 0.5)
+```
+
+**Diagnostics Added**:
+- `phys_gate_raw_mean`: Gate value before bypass
+- `phys_gate_bypass`: Amount of bypass applied (phys_gate - phys_gate_raw)
+- `mental_gate_raw_mean`: Gate value before bypass
+- `mental_gate_bypass`: Amount of bypass applied
+
+**User's Insight** (preserved in design):
+> "Don't remove dampening and ReLU Ripping... they have a purpose—when mental
+> is dominant (dampening) makes blissful decreases. But ripping will make it
+> reverse that it becomes more physical. The real problem is physical gates
+> need to be open so that it becomes intellect."
+
+This insight correctly identified that both approaches serve different purposes,
+and the true fix was ensuring gates can open when intervention is needed.
+
+### 14.7 Version History (Section 14)
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v2.2.0 | Temporal Grounding, Vital Momentum | Released |
+| v2.2.1 | Dynamic Weight Scheduler | Released |
+| v2.3.0 | Kosha-Vritti Resonance Map | Released |
+| v2.4.0 | Kosha Phase Corrector (Inference) | Released |
+| v2.2.3.1 | Soft-Threshold Damping + Gate Bypass | Superseded by v2.2.4 |
+
+---
+
+## 15. Three-Stage Hybrid Logic (v2.2.4)
+
+### 15.1 Architectural Philosophy: The Pressure Relief Valve
+
+v2.2.4 implements a "Pressure Relief Valve" architecture that supersedes v2.2.3.1's
+gate bypass approach. The key insight: **you cannot achieve discriminative wisdom
+(Intellect) if you are not firmly rooted in the manifest (Physical)**.
+
+The hybrid architecture treats the latent state as a pressurized system:
+- **Damping** manages the "volume" of Mental/Physical states
+- **Ripping** acts as the "pressure relief valve" forcing hard shifts to grounding
+
+### 15.2 The Three-Stage Internal Process
+
+#### Stage 1: BLISS DAMPER (Mental Dominance Regulation)
+
+As Manomaya (Mental) increases, Anandamaya (Bliss) is mathematically diluted:
+
+```python
+bliss_damper = 1.0 - torch.sigmoid((mental - trap_threshold) * damper_steepness)
+```
+
+**Purpose**: Prevents the model from "hallucinating" or jumping to creative tangents
+while caught in a pattern loop. Forces the model to deal with the loop rather than
+escaping into noise.
+
+#### Stage 2: PHYSICAL GATE (Intellectual Prerequisite)
+
+Unlike v2.2.3.1's bypass approach, the gate is a **STRICT requirement**:
+
+```python
+phys_gate = torch.sigmoid((phys_history - gate_threshold) * gate_steepness)
+```
+
+**Purpose**: Intellect remains "starved" of gradient flow unless Physical history is
+active. This stops "fake reasoning" - the model learns that expressing structure
+requires providing factual grounding first.
+
+#### Stage 3: REALITY RIP (Hard Reversal)
+
+Uses Hard ReLU for discontinuous gradient "shock":
+
+```python
+mental_trap = F.relu(mental - trap_threshold)
+rip_signal = mental_trap * (1.0 - phys_gate)
+```
+
+**Purpose**: If the model stays in a high-Mental state without the Physical gate
+opening, the ReLU Rip fires. This creates a gradient shock that "smashes" the
+current latent trajectory and forces re-grounding in the Physical/Manifest quadrant.
+
+### 15.3 Two-Path Loss Architecture
+
+The loss function has two distinct paths:
+
+```python
+# Intellectual path - flows when gate is OPEN (grounded reasoning)
+intellect_path = mental_trap * phys_gate * missing_intellect
+
+# Rip signal - fires when gate is CLOSED (reality reversal)
+rip_signal = mental_trap * (1.0 - phys_gate)
+
+# Combined with rip_multiplier for stronger "shock"
+axis1_loss = (intellect_path + rip_signal * rip_multiplier).mean()
+```
+
+| Path | Condition | Effect |
+|------|-----------|--------|
+| `intellect_path` | Gate OPEN | Grounded reasoning toward Intellect |
+| `rip_signal` | Gate CLOSED | Reality Reversal back to Physical |
+
+### 15.4 Why v2.2.4 Supersedes v2.2.3.1
+
+v2.2.3.1 tried to "bypass" the gate to force intellect, which risked creating a
+model that "reasons" without factual grounding—essentially a "dreaming" or
+"delusional" state.
+
+| Approach | v2.2.3.1 (Gate Bypass) | v2.2.4 (Hybrid Valve) |
+|----------|------------------------|----------------------|
+| **Goal** | Force intellect at all costs | Force **grounding** before intellect |
+| **Gate Behavior** | Bypass: "Push through" | Gate: "Ground first" |
+| **Failure Mode** | May cause "Delusional Reasoning" | Causes "Reality Reversal" |
+| **Bliss Control** | No explicit control | **Bliss Damper** reduces noise |
+| **Mathematical Nature** | Smooth throughout | Hybrid: Smooth Damping + Hard ReLU |
+
+### 15.5 PPL Strategy: Active from Step 0
+
+The v2.2.4 Hybrid Logic is active from Step 0, with the Dynamic Weight Scheduler
+controlling intensity:
+
+| PPL Range | Hybrid Logic | Gain | Primary Function |
+|-----------|--------------|------|------------------|
+| **> 100** | **ACTIVE** | **0.15** | Ontological Shaping (Preventing Collapse) |
+| **100 → 30** | **ACTIVE** | **0.15 → 3.0** | Reasoning Enforcement (CoT Grounding) |
+| **< 30** | **DISENGAGE** | **Decay → 0** | Graduation & Self-Learning |
+
+**Rationale**: By keeping the Hard Rip and Bliss Damper active from start, we teach
+the model the "Dharma" of its latent space while weights are still plastic.
+
+### 15.6 Diagnostic Metrics
+
+v2.2.4 tracks the following metrics:
+
+| Metric | Description |
+|--------|-------------|
+| `bliss_damper_mean` | How much Bliss is being diluted |
+| `physical_damper_mean` | How much Physical is being diluted (Axis 2) |
+| `rip_signal_mean` | Average Reality Reversal intensity |
+| `rip_signal_max` | Peak Rip signal (circuit breaker events) |
+| `gate_locked_axis1` | Proportion of trapped + gate closed (RIP firing) |
+| `gate_locked_axis2` | Same for Axis 2 |
+| `intellect_path_mean` | Grounded reasoning flow |
+| `bliss_path_mean` | Abstracted creativity flow |
+
+### 15.7 Configuration Parameters
+
+```python
+# v2.2.4 Three-Stage Hybrid Logic
+damper_steepness: float = 5.0    # Sigmoid steepness for dampers
+gate_steepness: float = 5.0      # Sigmoid steepness for gates
+rip_multiplier: float = 2.0      # Hard ReLU shock multiplier
+```
+
+### 15.8 Version History (Complete)
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v2.2.0 | Temporal Grounding, Vital Momentum | Released |
+| v2.2.1 | Dynamic Weight Scheduler | Released |
+| v2.2.3.1 | Soft-Threshold Damping + Gate Bypass | Superseded |
+| v2.3.0 | Kosha-Vritti Resonance Map | Released |
+| v2.4.0 | Kosha Phase Corrector (Inference) | Released |
+| **v2.2.4** | **Three-Stage Hybrid Logic (Damping + Gate + Rip)** | **Current** |
 
 ---
 
