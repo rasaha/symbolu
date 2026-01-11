@@ -11503,10 +11503,16 @@ def train(config: UnifiedTrainingConfig):
                         if kosha_states_for_gyro is not None:
                             # Compute gyroscope loss with dynamic gain based on current PPL
                             current_ppl = best_ppl if best_ppl < float('inf') else None
+
+                            # v2.2.4: Get authority factor from PIDv2 controller if available
+                            # This enables real-time feedback control of gyroscope gain
+                            auth_factor = authority_controller.A if authority_controller is not None else None
+
                             gyro_loss, gyroscope_components = kosha_gyroscope(
                                 kosha_states_for_gyro,
                                 current_ppl=current_ppl,
-                                return_components=True
+                                return_components=True,
+                                authority_factor=auth_factor,
                             )
 
                             # Apply warmup scaling
@@ -11518,6 +11524,8 @@ def train(config: UnifiedTrainingConfig):
                             # Log gyroscope metrics
                             metrics['gyroscope_loss'] = gyroscope_loss.item()
                             metrics['gyroscope_effective_gain'] = gyroscope_components.get('effective_gain', 0.0)
+                            metrics['gyroscope_base_gain'] = gyroscope_components.get('base_dynamic_gain', 0.0)
+                            metrics['gyroscope_authority_factor'] = gyroscope_components.get('authority_factor', 1.0)
                             metrics['gyroscope_axis1_loss'] = gyroscope_components.get('axis1_loss', 0.0)
                             metrics['gyroscope_axis2_loss'] = gyroscope_components.get('axis2_loss', 0.0)
                             metrics['gyroscope_warmup_scale'] = warmup_scale
@@ -12104,6 +12112,8 @@ def train(config: UnifiedTrainingConfig):
                 if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
                     gyro_loss = metrics.get('gyroscope_loss', 0.0)
                     gyro_gain = metrics.get('gyroscope_effective_gain', 0.0)
+                    gyro_base_gain = metrics.get('gyroscope_base_gain', 0.0)
+                    gyro_auth = metrics.get('gyroscope_authority_factor', 1.0)
                     gyro_scale = metrics.get('gyroscope_warmup_scale', 1.0)
                     # Show graduation status
                     if kosha_graduated:
@@ -12112,7 +12122,11 @@ def train(config: UnifiedTrainingConfig):
                         gyro_status = f"⏳{gyro_scale*100:.0f}%"
                     else:
                         gyro_status = "⚖️ON"
-                    log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | PPL→{config.gyroscope_target_ppl:.0f}"
+                    # v2.2.4: Show PID authority factor when controller is active
+                    if authority_controller is not None:
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}) | PPL→{config.gyroscope_target_ppl:.0f}"
+                    else:
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | PPL→{config.gyroscope_target_ppl:.0f}"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
                 if vritti_resonance is not None and 'vritti_alignment' in metrics:

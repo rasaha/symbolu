@@ -404,7 +404,8 @@ class KoshaGyroscopicLoss(nn.Module):
         self,
         kosha_states: torch.Tensor,
         current_ppl: Optional[float] = None,
-        return_components: bool = False
+        return_components: bool = False,
+        authority_factor: Optional[float] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
         Compute the Kosha Gyroscopic Loss.
@@ -420,6 +421,12 @@ class KoshaGyroscopicLoss(nn.Module):
             current_ppl: Current validation PPL for dynamic gain (v2.2.1).
                         If None, uses static fallback gain.
             return_components: If True, also return diagnostic components
+            authority_factor: External authority factor from PIDv2 controller (v2.2.4).
+                             When provided, modulates the effective gain:
+                             - 1.0 = full gain (normal operation)
+                             - 0.5 = half gain (PID backing off)
+                             - None = no modulation (use PPL-based gain only)
+                             This enables integration with --controller pidv2.
 
         Returns:
             If return_components=False: Scalar loss value
@@ -513,9 +520,17 @@ class KoshaGyroscopicLoss(nn.Module):
         # TWO-PATH LOSS: Abstracted path + Reality reversal
         axis2_loss = (bliss_path + rip_signal_axis2 * self.rip_multiplier).mean()
 
-        # === Total Loss with Dynamic Gain (v2.2.1) ===
+        # === Total Loss with Dynamic Gain (v2.2.1) + Authority Modulation (v2.2.4) ===
         # Get PPL-based dynamic gain
-        effective_gain = self.get_dynamic_gain(current_ppl)
+        base_dynamic_gain = self.get_dynamic_gain(current_ppl)
+
+        # Apply authority factor from PIDv2 controller if provided
+        # This enables real-time feedback control when --controller pidv2 is used
+        if authority_factor is not None:
+            effective_gain = base_dynamic_gain * authority_factor
+        else:
+            effective_gain = base_dynamic_gain
+
         total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
 
         if return_components:
@@ -543,6 +558,8 @@ class KoshaGyroscopicLoss(nn.Module):
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
                 'effective_gain': effective_gain,
+                'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
+                'authority_factor': authority_factor if authority_factor is not None else 1.0,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
 
