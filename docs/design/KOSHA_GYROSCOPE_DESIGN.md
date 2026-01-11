@@ -1962,5 +1962,237 @@ class KoshaGyroscopicLoss(nn.Module):
 | Q18 | Temporal Grounding stable | ⬜ Pending | |
 | Q19 | Graduation Stability validated | ⬜ Pending | |
 | Q20 | Contrastive Divergence accurate | ⬜ Pending | |
+| Q21 | Dynamic Weight Scheduler prevents Aphasia | ⬜ Pending | |
+| Q22 | PPL-based gain ramping is smoother than static | ⬜ Pending | |
 
-**Updated Success Criteria**: ≥16/20 questions answered positively indicates the system works as designed.
+**Updated Success Criteria**: ≥18/22 questions answered positively indicates the system works as designed.
+
+---
+
+### E.9 Dynamic Weight Scheduler (v2.2.1)
+
+**Source**: Gemini design review discussion
+
+#### E.9.1 The Problem: Over-Steering Risk ("Aphasia")
+
+The v2.2.0 implementation uses a **static gain of 2.0**. This creates a critical risk:
+
+> **The Aphasia Problem**: If gain is too high while the model is still learning basic grammar (PPL > 100), the model becomes "terrified" of repeating ANY token, including necessary ones like "the", "and", "is".
+
+| Static Gain | PPL Range | Risk |
+|-------------|-----------|------|
+| 2.0 | > 100 | **HIGH**: Model avoids valid repetition |
+| 2.0 | 30-100 | **MEDIUM**: May break valid patterns |
+| 2.0 | < 30 | **LOW**: But gyroscope should be disengaging anyway |
+
+#### E.9.2 The Solution: PPL-Based Gain Ramping
+
+Instead of static gain, use **dynamic gain** that increases as PPL decreases:
+
+```
+gain(PPL) = base_gain + progress × (max_gain - base_gain)
+
+where:
+  progress = (100 - PPL) / (100 - target_ppl)
+  progress = clamp(progress, 0.0, 1.0)
+```
+
+| PPL | Progress | Dynamic Gain (0.15 → 3.0) |
+|-----|----------|---------------------------|
+| 150 | 0.0 | 0.15 (gentle observation) |
+| 100 | 0.0 | 0.15 |
+| 65 | 0.5 | 1.575 (moderate discipline) |
+| 30 | 1.0 | 3.0 (strict enforcement) |
+| 20 | 1.0 | 3.0 (capped, but disengaging) |
+
+#### E.9.3 Three Training Phases
+
+The Dynamic Weight Scheduler creates three distinct training behaviors:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    DYNAMIC WEIGHT SCHEDULER PHASES                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  PPL 1000      PPL 100         PPL 65          PPL 30          PPL 15   │
+│     │             │               │               │               │     │
+│     ▼             ▼               ▼               ▼               ▼     │
+│  ═══════════════════════════════════════════════════════════════════    │
+│  │  PHASE A     │      PHASE B: INCREASING      │   PHASE C:      │    │
+│  │  OBSERVATION │          DISCIPLINE           │  INTERNALIZED   │    │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                                                                          │
+│  Gain: 0.15 ──────────────────────────────────────► 3.0 ───► rampdown  │
+│                                                                          │
+│  Behavior:                                                               │
+│  • Phase A: Learn grammar without gyroscope interference               │
+│  • Phase B: Vijnana Gate forces reasoning path; CoT emerges            │
+│  • Phase C: Gyroscope disengages; balance is internalized              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### E.9.4 Proposed Implementation
+
+```python
+class KoshaGyroscopicLoss(nn.Module):
+    def __init__(
+        self,
+        base_gain: float = 0.15,      # Starting weight (gentle)
+        max_gain: float = 3.0,        # Maximum weight (strict)
+        ppl_ceiling: float = 100.0,   # PPL above which gain stays at base
+        target_ppl: float = 30.0,     # PPL at which gain reaches max
+        # ... other params ...
+    ):
+        super().__init__()
+        self.base_gain = base_gain
+        self.max_gain = max_gain
+        self.ppl_ceiling = ppl_ceiling
+        self.target_ppl = target_ppl
+        # ...
+
+    def get_dynamic_gain(self, current_ppl: float) -> float:
+        """
+        Ramps gain from base_gain to max_gain as PPL drops.
+
+        Args:
+            current_ppl: Current validation perplexity
+
+        Returns:
+            Dynamic gain value
+        """
+        if current_ppl >= self.ppl_ceiling:
+            return self.base_gain
+
+        # Linear interpolation
+        progress = (self.ppl_ceiling - current_ppl) / (self.ppl_ceiling - self.target_ppl)
+        progress = max(0.0, min(1.0, progress))
+
+        return self.base_gain + (progress * (self.max_gain - self.base_gain))
+
+    def forward(
+        self,
+        kosha_states: torch.Tensor,
+        current_ppl: Optional[float] = None,
+        return_components: bool = False
+    ) -> torch.Tensor:
+        """
+        Args:
+            kosha_states: [B, N, 5] Kosha activations
+            current_ppl: Current validation PPL for dynamic gain
+            return_components: Whether to return diagnostic info
+        """
+        # ... existing extraction and computation ...
+
+        # Dynamic gain based on training progress
+        if current_ppl is not None:
+            effective_gain = self.get_dynamic_gain(current_ppl)
+        else:
+            effective_gain = self.base_gain  # Fallback to base
+
+        # Vital Momentum still applies on top
+        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
+
+        return total_loss
+```
+
+#### E.9.5 API Change
+
+The `forward()` method now accepts an optional `current_ppl` parameter:
+
+```python
+# v2.2.0 (static gain)
+loss = gyro_loss(kosha_states)
+
+# v2.2.1 (dynamic gain)
+loss = gyro_loss(kosha_states, current_ppl=last_val_ppl)
+```
+
+**Backward Compatibility**: If `current_ppl` is not provided, falls back to `base_gain`.
+
+#### E.9.6 Weight Impact Analysis
+
+| Weight | Mode | Impact on Coherence |
+|--------|------|---------------------|
+| **0.15** | Observation | Model loops occasionally; logic is loose |
+| **0.30** | Light Regulation | Loops broken slowly; reasoning patterns begin |
+| **1.5** | Moderate Discipline | Clear CoT structure emerges |
+| **3.0** | Strict Enforcement | Pathological loops impossible; model "locked" into R-T phase space |
+
+#### E.9.7 Integration with Existing Refinements
+
+The Dynamic Weight Scheduler combines with other v2.2.0 refinements:
+
+```python
+# Effective loss computation (v2.2.1)
+effective_gain = get_dynamic_gain(current_ppl)      # E.9: PPL-based
+momentum_scaler = 1.5 - vital.mean()                 # E.1: Vital Momentum
+phys_history = temporal_avg(physical, window=3)      # E.2: Temporal Grounding
+
+total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
+```
+
+#### E.9.8 Validation Benchmarks
+
+**Q21: Dynamic Weight Scheduler Prevents Aphasia**
+
+- [ ] At PPL > 100, model can repeat "the", "and", "is" freely
+- [ ] At PPL ~50, looping is discouraged but valid patterns preserved
+- [ ] No training collapse due to excessive gain early
+- [ ] Fibonacci/quote tests (ST-01, ST-05) pass throughout training
+
+**Q22: PPL-Based Gain Ramping Is Smoother Than Static**
+
+- [ ] Loss curves are smoother with dynamic gain vs static gain=2.0
+- [ ] Fewer "Reality Rips" in early training (gain is gentler)
+- [ ] Rip frequency increases naturally as gain increases
+- [ ] Final model quality is equivalent or better
+
+---
+
+### E.10 Updated Version Summary
+
+| Version | Key Changes |
+|---------|-------------|
+| **v1.0** | Initial design with naive gyroscope |
+| **v2.0** | Inverted Curriculum (Gyroscope from step 0) |
+| **v2.1** | 32D Dimensional Hierarchy (PRIMARY vs EMERGENT) |
+| **v2.2.0** | Vital Momentum, Temporal Grounding, Graduation Stability |
+| **v2.2.1** | **Dynamic Weight Scheduler** (PPL-based gain ramping) |
+
+---
+
+### E.11 Recommended Training Configuration (v2.2.1)
+
+```python
+@dataclass
+class KoshaGyroscopeConfigV221:
+    """Full configuration for Kosha Gyroscope v2.2.1."""
+
+    # === DYNAMIC WEIGHT SCHEDULER (NEW) ===
+    base_gain: float = 0.15           # Gentle observation (PPL > 100)
+    max_gain: float = 3.0             # Strict enforcement (PPL → 30)
+    ppl_ceiling: float = 100.0        # PPL above which gain stays at base
+    target_ppl: float = 30.0          # PPL at which gain reaches max
+
+    # === INVERTED CURRICULUM ===
+    enable_gyroscope: bool = True
+    gyroscope_disengage_ppl: float = 30.0
+    gyroscope_warmup_steps: int = 100
+    gain_rampdown_steps: int = 500
+
+    # === VIJNANA GATE ===
+    trap_threshold: float = 0.75
+    gate_threshold: float = 0.30
+    balance_target: float = 0.25
+    gate_temperature: float = 10.0
+
+    # === REFINEMENTS ===
+    temporal_window: int = 3          # Physical history window
+    vital_momentum_enabled: bool = True
+    vital_momentum_range: tuple = (0.5, 1.5)
+
+    # === GRADUATION ===
+    graduation_stability_window: int = 10
+    graduation_variance_threshold: float = 1.5
+```

@@ -223,6 +223,26 @@ except ImportError:
     COMPUTE_S_DRIFT_AVAILABLE = False
     compute_s_drift = None
 
+# Import Kosha Gyroscope (v2.2.1) - Homeostatic Self-Regulation
+try:
+    from symbolu.losses import (
+        KoshaGyroscopicLoss,
+        KoshaGyroscopeConfig,
+        InvertedCurriculumController,
+    )
+    from symbolu.monitors import (
+        GraduationMonitor,
+        GraduationConfig,
+    )
+    from symbolu.diagnostics import (
+        SovereignDiagnosticLogger,
+        RipEvent,
+    )
+    KOSHA_GYROSCOPE_AVAILABLE = True
+except ImportError as e:
+    KOSHA_GYROSCOPE_AVAILABLE = False
+    print(f"Warning: Kosha Gyroscope modules not available: {e}")
+
 # Import CSR Phoneme Provider for phoneme-ontological grounding
 try:
     from csr_phoneme_provider import (
@@ -7324,6 +7344,34 @@ class UnifiedTrainingConfig:
     kosha_steering_warmup: int = 100         # Steps before steering activates
     kosha_steering_layer: int = 9            # V9.7.0: Layer 9 = O9_WITNESSES (consciousness/awareness alignment)
 
+    # ==========================================================================
+    # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
+    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # ==========================================================================
+    enable_kosha_gyroscope: bool = False     # Master toggle for Kosha Gyroscope system
+    # Dynamic Weight Scheduler (v2.2.1 - prevents "Aphasia")
+    gyroscope_base_gain: float = 0.15        # Gentle observation when PPL > 100
+    gyroscope_max_gain: float = 3.0          # Strict enforcement when PPL -> 30
+    gyroscope_ppl_ceiling: float = 100.0     # PPL above which gain stays at base
+    gyroscope_target_ppl: float = 30.0       # PPL at which gain reaches max (disengage threshold)
+    # Trap detection thresholds
+    gyroscope_trap_threshold: float = 0.75   # Kosha saturation point
+    gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
+    gyroscope_balance_target: float = 0.25   # Required opposite activation
+    gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
+    # Refinements (v2.2.0)
+    gyroscope_temporal_window: int = 3       # Physical history window size
+    gyroscope_vital_momentum: bool = True    # Enable dynamic gain via Vital
+    gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
+    gyroscope_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
+    # Graduation criteria (Inverted Curriculum)
+    gyroscope_graduation_ppl: float = 30.0   # PPL threshold for graduation (mean)
+    gyroscope_graduation_variance: float = 1.5  # Max PPL variance for stability
+    gyroscope_graduation_window: int = 10    # Window for stability check
+    # Diagnostic logging
+    enable_rip_logger: bool = False          # Enable Reality Rip diagnostic logging
+    rip_logger_dir: str = "diagnostics/rips" # Directory for rip event files
+
     # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     enable_onto_bridge: bool = False         # Enable 12D ontological projection at Layer 4
     onto_bridge_lambda: float = 0.1          # Weight for ontological bridge loss
@@ -10479,6 +10527,84 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Layer: {config.kosha_steering_layer} ({layer_desc})")
         print(f"     ⚠️  WITNESS POINT - consciousness/awareness alignment")
 
+    # ==========================================================================
+    # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
+    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # ==========================================================================
+    kosha_gyroscope = None
+    kosha_graduation_monitor = None
+    kosha_rip_logger = None
+    kosha_curriculum_controller = None
+    kosha_graduated = False  # Track graduation state
+
+    if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
+        # Initialize KoshaGyroscopicLoss with Dynamic Weight Scheduler (v2.2.1)
+        kosha_gyroscope = KoshaGyroscopicLoss(
+            trap_threshold=config.gyroscope_trap_threshold,
+            gate_threshold=config.gyroscope_gate_threshold,
+            balance_target=config.gyroscope_balance_target,
+            gate_temperature=config.gyroscope_gate_temperature,
+            # Dynamic Weight Scheduler (v2.2.1)
+            base_gain=config.gyroscope_base_gain,
+            max_gain=config.gyroscope_max_gain,
+            ppl_ceiling=config.gyroscope_ppl_ceiling,
+            target_ppl=config.gyroscope_target_ppl,
+            # Refinements (v2.2.0)
+            temporal_window=config.gyroscope_temporal_window,
+            vital_momentum_enabled=config.gyroscope_vital_momentum,
+        ).to(device)
+
+        # Initialize Graduation Monitor (PPL stability check)
+        kosha_graduation_monitor = GraduationMonitor(
+            target_ppl=config.gyroscope_graduation_ppl,
+            stability_window=config.gyroscope_graduation_window,
+            variance_threshold=config.gyroscope_graduation_variance,
+        )
+
+        # Initialize Inverted Curriculum Controller
+        gyro_config = KoshaGyroscopeConfig(
+            enable_gyroscope=True,
+            gyroscope_disengage_ppl=config.gyroscope_target_ppl,
+            gyroscope_warmup_steps=config.gyroscope_warmup_steps,
+            gain_rampdown_steps=config.gyroscope_rampdown_steps,
+            trap_threshold=config.gyroscope_trap_threshold,
+            gate_threshold=config.gyroscope_gate_threshold,
+            balance_target=config.gyroscope_balance_target,
+            base_gain=config.gyroscope_base_gain,
+            max_gain=config.gyroscope_max_gain,
+            ppl_ceiling=config.gyroscope_ppl_ceiling,
+            target_ppl=config.gyroscope_target_ppl,
+        )
+        kosha_curriculum_controller = InvertedCurriculumController(config=gyro_config)
+
+        # Initialize Reality Rip Logger (diagnostic)
+        if config.enable_rip_logger:
+            kosha_rip_logger = SovereignDiagnosticLogger(
+                log_dir=config.rip_logger_dir,
+                mental_threshold=0.8,  # "Insanity" detection threshold
+                intellect_threshold=0.2,
+            )
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  KOSHA GYROSCOPE v2.2.1: Homeostatic Self-Regulation ENABLED     ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Dynamic Weight Scheduler:                                       ║")
+        print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
+        print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
+        print(f"  ║  Trap Detection:                                                 ║")
+        print(f"  ║    Threshold: {config.gyroscope_trap_threshold:.2f}  Gate: {config.gyroscope_gate_threshold:.2f}  Balance: {config.gyroscope_balance_target:.2f}          ║")
+        print(f"  ║  Refinements:                                                    ║")
+        print(f"  ║    Temporal Window: {config.gyroscope_temporal_window}  Vital Momentum: {'ON' if config.gyroscope_vital_momentum else 'OFF'}              ║")
+        print(f"  ║  Graduation Criteria:                                            ║")
+        print(f"  ║    Mean PPL < {config.gyroscope_graduation_ppl:.1f}  AND  σ < {config.gyroscope_graduation_variance:.1f}  (window: {config.gyroscope_graduation_window})          ║")
+        if config.enable_rip_logger:
+            print(f"  ║  Reality Rip Logger: ENABLED → {config.rip_logger_dir}")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+
+    elif config.enable_kosha_gyroscope and not KOSHA_GYROSCOPE_AVAILABLE:
+        print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
+        print(f"      Check: symbolu/losses/kosha_gyroscope.py exists and imports correctly")
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n", flush=True)
@@ -11310,6 +11436,77 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [KOSHA STEERING] Error: {e}")
 
+            # =====================================================================
+            # v2.2.1: KOSHA GYROSCOPE - Homeostatic Self-Regulation Loss
+            # Enforces balance across Kosha dimensions to prevent pathological states
+            # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+            # =====================================================================
+            gyroscope_loss = 0.0
+            gyroscope_components = {}
+            if kosha_gyroscope is not None and not kosha_graduated:
+                try:
+                    # Get warmup scale (ramps from 0 to 1 over warmup_steps)
+                    if kosha_curriculum_controller is not None:
+                        warmup_scale = kosha_curriculum_controller.get_gyroscope_scale(global_step)
+                    else:
+                        warmup_scale = min(1.0, global_step / config.gyroscope_warmup_steps)
+
+                    if warmup_scale > 0:
+                        # Extract Kosha states from model outputs
+                        kosha_states_for_gyro = None
+
+                        if config.model_type in ("ontological", "ontological_hybrid"):
+                            sovereign_state = outputs.get('state', None) if isinstance(outputs, dict) else None
+                            if sovereign_state is not None:
+                                # Extract Kosha [12:17] from 32D sovereign state
+                                # Shape: [batch, seq, 32] -> [batch, seq, 5]
+                                kosha_states_for_gyro = sovereign_state[:, :, KOSHA_SLICE]
+
+                        if kosha_states_for_gyro is not None:
+                            # Compute gyroscope loss with dynamic gain based on current PPL
+                            current_ppl = best_ppl if best_ppl < float('inf') else None
+                            gyro_loss, gyroscope_components = kosha_gyroscope(
+                                kosha_states_for_gyro,
+                                current_ppl=current_ppl,
+                                return_components=True
+                            )
+
+                            # Apply warmup scaling
+                            gyroscope_loss = gyro_loss * warmup_scale
+
+                            # Add to total loss
+                            loss = loss + gyroscope_loss
+
+                            # Log gyroscope metrics
+                            metrics['gyroscope_loss'] = gyroscope_loss.item()
+                            metrics['gyroscope_effective_gain'] = gyroscope_components.get('effective_gain', 0.0)
+                            metrics['gyroscope_axis1_loss'] = gyroscope_components.get('axis1_loss', 0.0)
+                            metrics['gyroscope_axis2_loss'] = gyroscope_components.get('axis2_loss', 0.0)
+                            metrics['gyroscope_warmup_scale'] = warmup_scale
+
+                            # Capture Reality Rips for diagnostic logging
+                            if kosha_rip_logger is not None:
+                                rip_captured = kosha_rip_logger.capture_rip(
+                                    step=global_step,
+                                    tokens=x,
+                                    kosha_states=kosha_states_for_gyro,
+                                    loss_value=gyroscope_loss.item(),
+                                    loss_components=gyroscope_components,
+                                )
+                                if rip_captured and global_step % 100 == 0:
+                                    status = kosha_rip_logger.format_status_line()
+                                    print(f"  ⚡ [REALITY RIP] {status}")
+
+                            # Log activation periodically
+                            if global_step == config.gyroscope_warmup_steps:
+                                print(f"\n  ⚖️ [KOSHA GYROSCOPE] Fully active at step {global_step}")
+                                print(f"     Dynamic Gain: {gyroscope_components.get('effective_gain', 0):.3f}")
+                                print(f"     PPL: {current_ppl if current_ppl else 'N/A'}")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [KOSHA GYROSCOPE] Error: {e}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -11994,6 +12191,41 @@ def train(config: UnifiedTrainingConfig):
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
                 current_coh = val_metrics.get('coherence', 0.75)
 
+                # v2.2.1: Kosha Gyroscope Graduation Check
+                # Model graduates when PPL is stable below threshold
+                if kosha_graduation_monitor is not None and not kosha_graduated:
+                    if kosha_graduation_monitor.check(val_ppl, global_step):
+                        kosha_graduated = True
+                        if kosha_curriculum_controller is not None:
+                            kosha_curriculum_controller.check_graduation(val_ppl, global_step)
+
+                        # Graduation ceremony!
+                        print(f"\n  {'='*60}")
+                        print(f"  🎓 KOSHA GYROSCOPE GRADUATION at step {global_step}")
+                        print(f"     Mean PPL: {kosha_graduation_monitor.mean_ppl:.2f} < {config.gyroscope_graduation_ppl}")
+                        print(f"     PPL σ:    {kosha_graduation_monitor.variance:.3f} < {config.gyroscope_graduation_variance}")
+                        print(f"     Model has learned to self-regulate!")
+                        print(f"     Gyroscope transitioning to ramp-down phase...")
+                        print(f"  {'='*60}\n")
+
+                        # Save rip logger summary if enabled
+                        if kosha_rip_logger is not None:
+                            summary_path = kosha_rip_logger.save_session_summary()
+                            health, health_msg = kosha_rip_logger.get_health_assessment()
+                            print(f"  📊 Rip Statistics: {kosha_rip_logger.format_status_line()}")
+                            print(f"     Health: {health.upper()} - {health_msg}")
+                            print(f"     Summary saved: {summary_path}")
+
+                        # TensorBoard logging for graduation
+                        if tb_writer is not None:
+                            tb_writer.add_scalar("gyro/graduated", 1.0, global_step)
+                            tb_writer.add_scalar("gyro/graduation_step", global_step, global_step)
+
+                    # TensorBoard logging for gyroscope during training
+                    if tb_writer is not None and not kosha_graduated:
+                        tb_writer.add_scalar("gyro/mean_ppl", kosha_graduation_monitor.mean_ppl, global_step)
+                        tb_writer.add_scalar("gyro/ppl_variance", kosha_graduation_monitor.variance, global_step)
+
                 # Curriculum Controller Update - check for phase transitions
                 if curriculum_controller is not None:
                     transition_msg = curriculum_controller.update(val_ppl, global_step)
@@ -12014,8 +12246,9 @@ def train(config: UnifiedTrainingConfig):
                     # Log curriculum status periodically
                     if global_step % (config.eval_every * 5) == 0:
                         status = curriculum_controller.get_status()
+                        avg_ppl_str = f"{status['avg_recent_ppl']:.2f}" if status['avg_recent_ppl'] else "N/A"
                         print(f"  📚 [CURRICULUM] Phase: {status['phase']} | "
-                              f"Avg PPL: {status['avg_recent_ppl']:.2f if status['avg_recent_ppl'] else 'N/A'} | "
+                              f"Avg PPL: {avg_ppl_str} | "
                               f"Steps in phase: {status['steps_in_phase']}")
 
                 # PIDv2 Controller Update (V9.4.4)
@@ -12883,6 +13116,55 @@ def main():
                        help="Steps before steering activates (default: 100)")
     parser.add_argument("--kosha_steering_layer", type=int, default=9,
                        help="Layer for phase steering (9=O9_WITNESSES consciousness, default: 9)")
+
+    # ==========================================================================
+    # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
+    # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
+    # ==========================================================================
+    parser.add_argument("--enable_kosha_gyroscope", action="store_true",
+                       help="Enable Kosha Gyroscope homeostatic self-regulation loss")
+    # Dynamic Weight Scheduler (v2.2.1)
+    parser.add_argument("--gyroscope_base_gain", type=float, default=0.15,
+                       help="Base gain when PPL > ceiling (gentle observation)")
+    parser.add_argument("--gyroscope_max_gain", type=float, default=3.0,
+                       help="Max gain when PPL approaches target (strict enforcement)")
+    parser.add_argument("--gyroscope_ppl_ceiling", type=float, default=100.0,
+                       help="PPL above which gain stays at base")
+    parser.add_argument("--gyroscope_target_ppl", type=float, default=30.0,
+                       help="PPL at which gain reaches max (graduation threshold)")
+    # Trap detection thresholds
+    parser.add_argument("--gyroscope_trap_threshold", type=float, default=0.75,
+                       help="Kosha activation above this is 'trapped'")
+    parser.add_argument("--gyroscope_gate_threshold", type=float, default=0.30,
+                       help="Minimum activation for gate to be open")
+    parser.add_argument("--gyroscope_balance_target", type=float, default=0.25,
+                       help="Required opposite activation to avoid punishment")
+    parser.add_argument("--gyroscope_gate_temperature", type=float, default=10.0,
+                       help="Gate sigmoid temperature (higher = sharper)")
+    # Refinements
+    parser.add_argument("--gyroscope_temporal_window", type=int, default=3,
+                       help="Physical history window size for temporal grounding")
+    parser.add_argument("--gyroscope_vital_momentum", action="store_true", default=True,
+                       help="Enable dynamic gain via Vital (Pranamaya) energy")
+    parser.add_argument("--disable_gyroscope_vital_momentum", action="store_true",
+                       help="Disable Vital momentum for gyroscope")
+    parser.add_argument("--gyroscope_warmup_steps", type=int, default=100,
+                       help="Steps before gyroscope fully active")
+    parser.add_argument("--gyroscope_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp gain to 0 at graduation")
+    # Graduation criteria
+    parser.add_argument("--gyroscope_graduation_ppl", type=float, default=30.0,
+                       help="PPL threshold for graduation (mean)")
+    parser.add_argument("--gyroscope_graduation_variance", type=float, default=1.5,
+                       help="Max PPL variance for stability check")
+    parser.add_argument("--gyroscope_graduation_window", type=int, default=10,
+                       help="Window for graduation stability check")
+    # Diagnostic logging
+    parser.add_argument("--enable_rip_logger", action="store_true",
+                       help="Enable Reality Rip diagnostic logging")
+    parser.add_argument("--rip_logger_dir", type=str, default="diagnostics/rips",
+                       help="Directory for rip event files")
+
     # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
     parser.add_argument("--enable_onto_bridge", action="store_true",
                        help="Enable 12D ontological projection at Layer 4 (foundational grounding)")
@@ -13437,6 +13719,25 @@ def main():
         kosha_steering_force=args.kosha_steering_force,
         kosha_steering_warmup=args.kosha_steering_warmup,
         kosha_steering_layer=args.kosha_steering_layer,
+        # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation
+        enable_kosha_gyroscope=args.enable_kosha_gyroscope,
+        gyroscope_base_gain=args.gyroscope_base_gain,
+        gyroscope_max_gain=args.gyroscope_max_gain,
+        gyroscope_ppl_ceiling=args.gyroscope_ppl_ceiling,
+        gyroscope_target_ppl=args.gyroscope_target_ppl,
+        gyroscope_trap_threshold=args.gyroscope_trap_threshold,
+        gyroscope_gate_threshold=args.gyroscope_gate_threshold,
+        gyroscope_balance_target=args.gyroscope_balance_target,
+        gyroscope_gate_temperature=args.gyroscope_gate_temperature,
+        gyroscope_temporal_window=args.gyroscope_temporal_window,
+        gyroscope_vital_momentum=args.gyroscope_vital_momentum and not args.disable_gyroscope_vital_momentum,
+        gyroscope_warmup_steps=args.gyroscope_warmup_steps,
+        gyroscope_rampdown_steps=args.gyroscope_rampdown_steps,
+        gyroscope_graduation_ppl=args.gyroscope_graduation_ppl,
+        gyroscope_graduation_variance=args.gyroscope_graduation_variance,
+        gyroscope_graduation_window=args.gyroscope_graduation_window,
+        enable_rip_logger=args.enable_rip_logger,
+        rip_logger_dir=args.rip_logger_dir,
         # V9.7.0: Ontological Bridge (Layer 4 - Foundational Structure)
         enable_onto_bridge=args.enable_onto_bridge,
         onto_bridge_lambda=args.onto_bridge_lambda,
