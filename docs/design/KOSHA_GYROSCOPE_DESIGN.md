@@ -1,7 +1,7 @@
 # Kosha Gyroscope: Homeostatic Self-Regulation System
 
-**Version:** 2.2.4
-**Status:** Design Complete, Three-Stage Hybrid Logic Implemented
+**Version:** 2.2.5
+**Status:** Design Complete, Gradient Throttle + WikiText Cleaner Added
 **Date:** 2026-01-11
 **Origin:** Vedic Kosha Theory + Control Theory + Constitutional AI
 **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30)
@@ -50,6 +50,11 @@ The architecture implements:
 9. [Inverted Curriculum: Instructor → Self-Learner](#9-inverted-curriculum-instructor--self-learner)
 10. [32D Dimensional Hierarchy: Primary vs Emergent](#10-32d-dimensional-hierarchy-primary-vs-emergent)
 11. [Relationship to Industry Approaches](#11-relationship-to-industry-approaches)
+12. [Kosha-Vritti Resonance Map](#12-kosha-vritti-resonance-map-v230)
+13. [Kosha Phase Corrector](#13-kosha-phase-corrector---inference-time-guardrail-v240)
+14. [Soft-Threshold Damping](#14-soft-threshold-damping-v2231)
+15. [Three-Stage Hybrid Logic](#15-three-stage-hybrid-logic-v224)
+16. [Gradient Norm Throttle: Physical Safety Layer](#16-gradient-norm-throttle-physical-safety-layer-v225)
 
 ---
 
@@ -2806,3 +2811,1059 @@ class KoshaGyroscopeConfigV221:
     graduation_stability_window: int = 10
     graduation_variance_threshold: float = 1.5
 ```
+
+---
+
+## 16. Gradient Norm Throttle: Physical Safety Layer (v2.2.5)
+
+### 16.1 The Problem: Gradient Explosions During Training
+
+While the Kosha Gyroscope regulates cognitive state balance, it operates on the **semantic level** (Kosha distributions). However, training instabilities can occur at the **physical level** - gradient explosions that cause destructive weight updates before the Gyroscope can respond.
+
+**Observed Symptoms:**
+- PPL spikes (e.g., 118 → 143 in single step)
+- VRAM critical events (99.3% usage)
+- Token repetition loops ("Caesar Caesar Caesar")
+- Batch size oscillations (32 → 36 → 28)
+
+These are **physical training failures**, not cognitive state imbalances.
+
+### 16.2 The Solution: Two-Layer Safety Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TRAINING SAFETY STACK                     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 2: KOSHA GYROSCOPE (Semantic)                        │
+│    - Regulates Kosha balance (Mental/Physical/Bliss/etc)    │
+│    - Operates on hidden state geometry                      │
+│    - Dense per-token feedback                               │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 1: GRADIENT THROTTLE (Physical) ← NEW                │
+│    - Monitors raw gradient L2 norm                          │
+│    - Reduces LR when gradients spike > 2x baseline          │
+│    - Prevents destructive weight updates                    │
+│    - Acts BEFORE optimizer.step()                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The Gradient Throttle ensures the mathematical foundation (gradients) remains stable, allowing the Kosha Gyroscope to operate on a solid platform.
+
+### 16.3 GradientNormThrottle Implementation
+
+**Location:** `symbolu/training/trainers/gradient_throttle.py`
+
+```python
+class GradientNormThrottle:
+    """
+    Stabilizes training by reducing LR when gradient norms spike.
+    Acts as the physical safety layer for the Sovereign Architecture.
+    """
+    def __init__(
+        self,
+        ema_decay: float = 0.99,       # Slow adaptation to baseline
+        spike_threshold: float = 2.0,   # Trigger if norm > 2x average
+        min_factor: float = 0.3,        # Never reduce LR below 30%
+        warmup_steps: int = 100,        # Skip throttling during warmup
+    ):
+        self.ema_grad_norm = None
+        self.ema_decay = ema_decay
+        self.spike_threshold = spike_threshold
+        self.min_factor = min_factor
+        self.warmup_steps = warmup_steps
+
+    def step(self, model, optimizer, base_lr, precomputed_norm=None):
+        """
+        Check gradient norm and apply throttling if needed.
+
+        Returns:
+            (throttle_factor, current_grad_norm)
+        """
+        # Compute or reuse gradient norm
+        total_norm = precomputed_norm or self.compute_grad_norm(model)
+
+        # Initialize EMA on first step
+        if self.ema_grad_norm is None:
+            self.ema_grad_norm = total_norm
+            return 1.0, total_norm
+
+        # Detect spike
+        ratio = total_norm / (self.ema_grad_norm + 1e-8)
+
+        factor = 1.0
+        if ratio > self.spike_threshold:
+            # Throttle proportionally: 5x spike → 0.2x LR
+            factor = max(self.ema_grad_norm / total_norm, self.min_factor)
+
+        # Apply to optimizer
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = base_lr * factor
+
+        # Update EMA
+        self.ema_grad_norm = (
+            self.ema_decay * self.ema_grad_norm +
+            (1 - self.ema_decay) * total_norm
+        )
+
+        return factor, total_norm
+```
+
+### 16.4 Integration with Training Loop
+
+The throttle is injected after `loss.backward()` and before `optimizer.step()`:
+
+```python
+# In train_unified_llm.py
+
+# 1. Initialize (after other controllers)
+gradient_throttle = GradientNormThrottle(
+    ema_decay=0.99,
+    spike_threshold=2.0,
+    min_factor=0.3,
+    warmup_steps=config.warmup_steps,
+)
+
+# 2. In training loop, after loss.backward():
+raw_grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+
+# Apply throttle BEFORE gradient clipping
+throttle_factor, _ = gradient_throttle.step(
+    model, optimizer, config.learning_rate,
+    precomputed_norm=raw_grad_norm,
+)
+if throttle_factor < 1.0:
+    print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+# Then gradient clipping
+torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
+
+# Then optimizer.step()
+optimizer.step()
+```
+
+### 16.5 Interaction with Kosha Gyroscope
+
+| Scenario | Gradient Throttle | Kosha Gyroscope | Combined Effect |
+|----------|-------------------|-----------------|-----------------|
+| Normal training | LR×1.0 | Balance penalty | Standard learning |
+| Mental trap | LR×1.0 | Bliss injection | Cognitive rebalance |
+| Gradient spike | LR×0.3 | (reduced effect) | Physical stabilization first |
+| Spike + trap | LR×0.3 | Bliss injection (reduced) | Stabilize, then rebalance |
+
+**Key Principle:** Physical stability enables cognitive regulation. When gradients spike, the Gyroscope's gradients are also affected - throttling first ensures the Gyroscope can operate effectively.
+
+### 16.6 TensorBoard Metrics
+
+```python
+# Logged every eval step:
+tb_writer.add_scalar("throttle/factor", throttle_stats['last_factor'], global_step)
+tb_writer.add_scalar("throttle/grad_norm", throttle_stats['last_grad_norm'], global_step)
+tb_writer.add_scalar("throttle/ema_norm", throttle_stats['ema_grad_norm'], global_step)
+tb_writer.add_scalar("throttle/events_total", throttle_stats['throttle_events'], global_step)
+```
+
+### 16.7 WikiText Artifact Cleaner
+
+Also added in v2.2.5, the WikiText cleaner removes Moses tokenization artifacts from quality sample logs:
+
+**Location:** `symbolu/training/text_utils.py`
+
+```python
+def clean_wikitext_artifacts(text: str) -> str:
+    """
+    Clean Moses tokenization artifacts from WikiText-103.
+    - @-@ → - (hyphens)
+    - @.@ → . (periods)
+    - @,@ → , (commas)
+    """
+    text = re.sub(r'\s*@-@\s*', '-', text)
+    text = re.sub(r'\s*@\.@\s*', '.', text)
+    text = re.sub(r'\s*@,@\s*', ',', text)
+    return text
+```
+
+**Before:** `"1 @,@ 000 metres from the @-@ 100 year old"`
+**After:** `"1,000 metres from the-100 year old"`
+
+### 16.8 Configuration (v2.2.5)
+
+```python
+@dataclass
+class GradientThrottleConfig:
+    """Configuration for Gradient Norm Throttle."""
+
+    # === THROTTLE PARAMETERS ===
+    ema_decay: float = 0.99           # Slow adaptation (99% history retention)
+    spike_threshold: float = 2.0       # Trigger at 2x normal gradient
+    min_factor: float = 0.3            # Floor LR at 30%
+    warmup_steps: int = 100            # Skip during warmup
+
+    # === INTEGRATION ===
+    enabled: bool = True               # Auto-enabled when available
+```
+
+### 16.9 Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.3.0** | **2026-01-11** | **Complete Harmonic Pentad (Floor/Ceiling for all 5 Koshas)** |
+| 2.2.6 | 2026-01-11 | Bliss Ceiling Clamp (φ = 61.8%) |
+| 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
+| 2.2.4 | 2026-01-10 | Three-Stage Hybrid Logic |
+| 2.2.3 | 2026-01-09 | Soft-Threshold Damping |
+| 2.2.1 | 2026-01-08 | Dynamic Weight Scheduler |
+| 2.2.0 | 2026-01-07 | Refinements (Vital Momentum, Temporal Grounding) |
+| 2.0.0 | 2026-01-05 | Inverted Curriculum + Vijnana Gate |
+
+---
+
+## 17. Complete Harmonic Pentad (v2.3.0)
+
+### 17.1 Motivation: The "Blissful Ignorance" Problem
+
+In v2.2.5, we observed Bliss consistently exceeding its 23.6% threshold (often at 40-60%), indicating the model was generating fluent but meaningless text—"blissful ignorance." The model learned to produce smooth, confident outputs without genuine understanding.
+
+v2.2.6 introduced a Bliss Ceiling Clamp at φ (61.8%), but this addressed only one Kosha. The Complete Harmonic Pentad extends this principle to ALL 5 Koshas with bidirectional regulation:
+
+- **Floor (Push):** When a Kosha falls BELOW its healthy range, add loss pressure to push it UP
+- **Ceiling (Clamp):** When a Kosha rises ABOVE its healthy range, reduce gain to clamp it DOWN
+
+### 17.2 The Sattvic Band Concept
+
+Each Kosha has a **Sattvic Band**—an optimal operating range where healthy learning occurs. Based on Fibonacci ratios:
+
+| Kosha | Floor | Ceiling | Sattvic Band | Priority |
+|-------|-------|---------|--------------|----------|
+| **Mental (M)** | 23.6% | 38.2% | Pattern recognition sweet spot | ×1.0 |
+| **Physical (P)** | 38.2% | 61.8% | Grounding foundation | ×3.0 (Foundation) |
+| **Intellect (I)** | 25.0% | 61.8% | Discriminative reasoning | ×1.5 (Hubris Tax) |
+| **Vital (V)** | 23.6% | 78.6% | Momentum/energy flow | Momentum Control |
+| **Bliss (B)** | 23.6% | 61.8% | Unified awareness | ×1.0 |
+
+### 17.3 Floor Actions (Push Mechanisms)
+
+When a Kosha falls BELOW its floor, we apply corrective pressure:
+
+#### Mental Floor (23.6%): Pattern Deficit Push
+```python
+mental_below_floor = F.relu(self.floor_mental - mental)
+mental_floor_loss = mental_below_floor.mean()  # Loss pressure to push UP
+```
+**Interpretation:** Low Mental indicates insufficient pattern recognition. Push to develop basic representational capacity.
+
+#### Physical Floor (38.2%): Grounding Foundation Push — THE FOUNDATION
+```python
+physical_below_floor = F.relu(self.floor_physical - physical)
+physical_floor_loss = physical_below_floor.mean() * 3.0  # HIGH priority (×3.0)
+```
+**Interpretation:** Physical is the foundation of the Kosha hierarchy. Without grounding, other Koshas cannot function properly. This gets the HIGHEST priority weight.
+
+#### Intellect Floor (25.0%): Reasoning Deficit Push — Hubris Tax
+```python
+intellect_below_floor = F.relu(self.floor_intellect - intellect)
+intellect_floor_loss = intellect_below_floor.mean() * 1.5  # Moderate priority (×1.5)
+```
+**Interpretation:** Low Intellect indicates superficial processing without discrimination. The "Hubris Tax" prevents the model from being overconfident without genuine understanding.
+
+#### Vital Floor (23.6%): Wake-up Momentum Boost
+```python
+vital_below_floor = F.relu(self.floor_vital - vital)
+vital_momentum_boost = torch.where(
+    vital_below_floor.mean() > 0,
+    torch.tensor(1.5),   # Boost momentum by 50%
+    torch.tensor(1.0)    # Normal momentum
+)
+```
+**Interpretation:** Low Vital indicates sluggish learning. Instead of loss pressure, we boost momentum to energize the optimization process.
+
+#### Bliss Floor (23.6%): Integration Deficit Push
+```python
+bliss_below_floor = F.relu(self.floor_bliss - bliss)
+bliss_floor_loss = bliss_below_floor.mean()  # Loss pressure to push UP
+```
+**Interpretation:** Low Bliss indicates fragmented processing without integration. Push to develop unified awareness.
+
+### 17.4 Ceiling Actions (Clamp Mechanisms)
+
+When a Kosha rises ABOVE its ceiling, we apply multiplicative damping:
+
+#### Mental Ceiling (38.2%): Pattern Trap Clamp
+Mental above 38.2% indicates over-reliance on memorized patterns. Clamp to encourage generalization.
+
+#### Physical Ceiling (61.8%): Over-Grounding Clamp
+Physical above 61.8% indicates excessive focus on literal/concrete representations. Clamp to allow abstract reasoning.
+
+#### Intellect Ceiling (61.8%): Over-Thinking Clamp
+Intellect above 61.8% indicates analysis paralysis or overthinking. Clamp to maintain practical coherence.
+
+#### Vital Ceiling (78.6%): Momentum Brake
+```python
+vital_above_ceiling = F.relu(vital - self.ceiling_vital)
+vital_momentum_brake = torch.where(
+    vital_above_ceiling.mean() > 0,
+    torch.tensor(0.5),   # Reduce momentum by 50%
+    torch.tensor(1.0)    # Normal momentum
+)
+```
+**Interpretation:** High Vital indicates chaotic, unstable optimization. Apply momentum brake to stabilize.
+
+#### Bliss Ceiling (61.8%): Blissful Ignorance Clamp
+Bliss above φ (61.8%) indicates "blissful ignorance"—fluent gibberish without substance. Clamp to ground outputs in meaning.
+
+### 17.5 Ceiling Clamp Scalar
+
+All ceiling violations contribute to a single multiplicative clamp:
+
+```python
+# Count total ceiling violations
+ceiling_violations = sum([
+    (mental > ceiling_mental).float(),
+    (physical > ceiling_physical).float(),
+    (intellect > ceiling_intellect).float(),
+    (vital > ceiling_vital).float(),
+    (bliss > ceiling_bliss).float()
+])
+
+# Multiplicative reduction: 0.5^N where N = number of violations
+ceiling_clamp_scalar = ceiling_clamp_factor ** ceiling_violations_count
+# 0 violations → 1.0 (full gain)
+# 1 violation  → 0.5 (half gain)
+# 2 violations → 0.25 (quarter gain)
+# etc.
+```
+
+### 17.6 Log Format (v2.3.0)
+
+The training logs show Kosha status with indicators:
+
+```
+[PENTAD] M:35%✓ P:45%✓ I:40%✓ V:50%✓ B:30%✓
+```
+
+| Symbol | Meaning |
+|--------|---------|
+| `✓` | In Sattvic Band (healthy) |
+| `_` | Below Floor (being pushed UP) |
+| `!` | Above Ceiling (being clamped DOWN) |
+
+**Example interpretations:**
+- `M:20%_` → Mental at 20%, below 23.6% floor, push active
+- `P:70%!` → Physical at 70%, above 61.8% ceiling, clamp active
+- `I:50%✓` → Intellect at 50%, within 25%-61.8% Sattvic band
+
+### 17.7 Configuration (v2.3.0)
+
+```python
+@dataclass
+class KoshaGyroscopeConfig:
+    """Configuration for Kosha Gyroscope v2.3.0."""
+
+    # === SATTVIC BANDS (Floor/Ceiling for each Kosha) ===
+
+    # Mental: Pattern recognition sweet spot
+    floor_mental: float = 0.236       # 23.6% (Fibonacci)
+    ceiling_mental: float = 0.382     # 38.2% (Fibonacci)
+
+    # Physical: Grounding foundation (THE FOUNDATION)
+    floor_physical: float = 0.382     # 38.2% (Fibonacci)
+    ceiling_physical: float = 0.618   # 61.8% (φ Golden Ratio)
+
+    # Intellect: Discriminative reasoning
+    floor_intellect: float = 0.250    # 25.0% (quarter point)
+    ceiling_intellect: float = 0.618  # 61.8% (φ Golden Ratio)
+
+    # Vital: Momentum/energy flow
+    floor_vital: float = 0.236        # 23.6% (Fibonacci)
+    ceiling_vital: float = 0.786      # 78.6% (Fibonacci)
+
+    # Bliss: Unified awareness
+    floor_bliss: float = 0.236        # 23.6% (Fibonacci)
+    ceiling_bliss: float = 0.618      # 61.8% (φ Golden Ratio)
+
+    # === CORRECTIVE FACTORS ===
+    floor_push_factor: float = 0.5    # Loss weight for floor violations
+    ceiling_clamp_factor: float = 0.5 # Multiplicative clamp per ceiling violation
+
+    # === PRIORITY WEIGHTS ===
+    # Physical: ×3.0 (Foundation)
+    # Intellect: ×1.5 (Hubris Tax)
+    # Others: ×1.0 (Standard)
+```
+
+### 17.8 Command-Line Arguments
+
+```bash
+# Floor thresholds
+--gyroscope-floor-mental 0.236
+--gyroscope-floor-physical 0.382
+--gyroscope-floor-intellect 0.250
+--gyroscope-floor-vital 0.236
+--gyroscope-floor-bliss 0.236
+
+# Ceiling thresholds
+--gyroscope-ceiling-mental 0.382
+--gyroscope-ceiling-physical 0.618
+--gyroscope-ceiling-intellect 0.618
+--gyroscope-ceiling-vital 0.786
+--gyroscope-ceiling-bliss 0.618
+
+# Corrective factors
+--gyroscope-floor-push-factor 0.5
+--gyroscope-ceiling-clamp-factor 0.5
+```
+
+### 17.9 Startup Banner
+
+```
+[GYRO] Kosha Gyroscope v2.3.0: Complete Harmonic Pentad
+       Sattvic Bands: M[23.6-38.2%] P[38.2-61.8%] I[25-61.8%] V[23.6-78.6%] B[23.6-61.8%]
+       Push Factor: 0.5 | Clamp Factor: 0.5
+       Priority: Physical(×3.0) Intellect(×1.5)
+```
+
+### 17.10 Design Philosophy
+
+The Complete Harmonic Pentad embodies the Yogic principle that each Kosha has its natural range:
+
+1. **Too Low (Tamas):** Sluggishness, deficiency, under-activation → Push UP with loss pressure
+2. **Sattvic Band (Sattva):** Balanced, healthy, optimal → No intervention
+3. **Too High (Rajas):** Over-activity, excess, instability → Clamp DOWN with gain reduction
+
+The priority weights reflect the Kosha hierarchy:
+- **Physical (×3.0):** The foundation must be stable before higher Koshas can develop
+- **Intellect (×1.5):** Prevents intellectual arrogance without grounding
+- **Vital (Momentum):** Energy regulation through optimization dynamics, not loss pressure
+
+This creates a self-regulating homeostatic system where the model naturally finds its Sattvic equilibrium across all five sheaths.
+
+---
+
+## 18. Reflexive Domain Morph (v2.3.2)
+
+### 18.1 Motivation: Domain-Adaptive Sattvic Bands
+
+The v2.3.0 Complete Harmonic Pentad provides static thresholds optimized for natural language. However, different domains require different operating ranges:
+
+| Domain | Physical Floor | Bliss Ceiling | Why |
+|--------|---------------|---------------|-----|
+| **Language/Prose** | 38.2% | 61.8% | Creative flexibility, varied expression |
+| **Math/Logic** | 50.0% | 38.2% | Strict structure, no hallucinations |
+| **Code/Syntax** | 50.0% | 38.2% | Exact syntax, deterministic output |
+
+The challenge: How does the model know which domain it's in without explicit labeling?
+
+### 18.2 The Reflexive Solution
+
+v2.3.2 introduces the **Reflexive Domain Morph**—a zero-training mechanism that detects domain and adjusts thresholds automatically using two signals:
+
+1. **External Signal (Token Heuristics):** Pattern detection in input text
+2. **Internal Signal (Kosha State):** The model's own Kosha readings
+
+These combine into a **Morph Factor** μ ∈ [0, 1]:
+- μ = 0.0: Pure Language Mode (creative/prose)
+- μ = 1.0: Pure Logic Mode (code/math)
+
+### 18.3 DomainDetector: Token Heuristics
+
+The `DomainDetector` class uses pattern matching to detect code and math domains:
+
+```python
+class DomainDetector:
+    CODE_PATTERNS = {'{', '}', 'def ', 'class ', 'import ', '==', '!=', ...}
+    MATH_PATTERNS = {'\\frac', '\\sum', '∑', '∫', '≤', '≥', 'theorem', ...}
+
+    def detect(self, text: str) -> Tuple[str, float]:
+        # Count pattern matches, normalize by text length
+        # Apply EMA smoothing to prevent oscillation
+        return (domain_label, morph_factor)
+```
+
+**Key Features:**
+- Zero training required
+- EMA smoothing prevents rapid oscillation between modes
+- Returns both label (LANG/MATH/CODE) and continuous morph factor
+
+### 18.4 Internal Signal: Kosha State
+
+The model's own Kosha readings provide a "self-aware" domain signal:
+
+```python
+# High Physical + High Intellect = Logic territory
+mean_phys = physical.mean().item()
+mean_int = intellect.mean().item()
+internal_morph = (mean_phys + mean_int) / 2.0
+# Shift: Logic signal activates when internal > 0.4, saturates at 0.7
+internal_morph = clamp((internal_morph - 0.4) / 0.3, 0.0, 1.0)
+```
+
+**Interpretation:**
+- When Physical AND Intellect are both elevated, the model is performing structured, logical operations
+- This "internal feeling" confirms or augments the external token signal
+
+### 18.5 Combined Morph Factor
+
+The final morph factor combines both signals with configurable weights:
+
+```python
+morph = (
+    external_weight * external_morph +
+    internal_weight * internal_morph
+) / (external_weight + internal_weight)
+```
+
+Default weights: 50% external, 50% internal (equal contribution).
+
+### 18.6 Morphed Thresholds
+
+As μ increases from 0 to 1, thresholds morph via linear interpolation:
+
+| Threshold | Language (μ=0) | Logic (μ=1) | Morphing Formula |
+|-----------|----------------|-------------|------------------|
+| **Physical Floor** | 38.2% | 50.0% | `38.2% + μ × 11.8%` |
+| **Bliss Ceiling** | 61.8% | 38.2% | `61.8% - μ × 23.6%` |
+| **Grounding Push** | ×3.0 | ×5.0 | `3.0 + μ × 2.0` |
+
+### 18.7 Log Format (v2.3.2)
+
+The training logs now include MODE and morph factor:
+
+```
+[PENTAD] MODE:LANG (μ:12%) | M:30%✓ P:45%✓ I:35%✓ V:55%✓ B:40%✓
+[PENTAD] MODE:CODE (μ:85%) | M:25%✓ P:52%✓ I:48%✓ V:60%✓ B:22%✓
+```
+
+**Example interpretations:**
+- `MODE:LANG (μ:12%)` → Prose mode, thresholds near base values
+- `MODE:CODE (μ:85%)` → Code mode, Physical Floor elevated to ~48%, Bliss Ceiling dropped to ~42%
+
+### 18.8 Configuration (v2.3.2)
+
+```python
+# Enable/disable domain morphing
+gyroscope_domain_morph_enabled: bool = True
+
+# EMA decay for token heuristics (higher = slower response)
+gyroscope_domain_morph_ema_decay: float = 0.9
+
+# Signal weights
+gyroscope_domain_morph_internal_weight: float = 0.5  # Kosha state
+gyroscope_domain_morph_external_weight: float = 0.5  # Token patterns
+```
+
+### 18.9 Command-Line Arguments
+
+```bash
+# Enable (default) or disable domain morphing
+--gyroscope_domain_morph_enabled  # Enable (default True)
+--disable_gyroscope_domain_morph  # Disable
+
+# EMA decay (0.5 = fast, 0.9 = slow)
+--gyroscope_domain_morph_ema_decay 0.9
+
+# Signal weights
+--gyroscope_domain_morph_internal_weight 0.5
+--gyroscope_domain_morph_external_weight 0.5
+```
+
+### 18.10 Why Reflexive > Trained Probe
+
+| Feature | Trained Probe | **Reflexive Morph** |
+|---------|---------------|---------------------|
+| **Setup Cost** | Labeled data + training | **Zero** |
+| **Stability** | Risks "probe drift" | **Inherently stable** |
+| **Logic** | "I think this is code" | "I am performing code-like logic" |
+| **VRAM** | Minor overhead | **Negligible** |
+| **Generalization** | Limited to training distribution | **Emergent from patterns** |
+
+The Reflexive approach is superior because it uses what the model is *already doing*—no separate classification task.
+
+### 18.11 Design Philosophy: The Homeostatic Loop
+
+The Reflexive Domain Morph completes the homeostatic vision:
+
+1. **External Stimulus:** Input text contains domain-specific patterns
+2. **Internal Response:** Kosha readings shift based on content type
+3. **Adaptive Thresholds:** Sattvic Bands morph to match domain requirements
+4. **Corrective Action:** Floor push and ceiling clamp adjust accordingly
+
+This creates a **closed-loop feedback system** where the model organically adjusts its regulatory parameters based on both what it sees (tokens) and what it feels (Kosha state).
+
+### 18.12 Version History Update
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.3.2** | **2026-01-11** | **Reflexive Domain Morph (Token Heuristics + Kosha State)** |
+| 2.3.0 | 2026-01-11 | Complete Harmonic Pentad (Floor/Ceiling for all 5 Koshas) |
+| 2.2.6 | 2026-01-11 | Bliss Ceiling Clamp (φ = 61.8%) |
+| 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
+
+---
+
+## 19. Training Usage Guide (v2.3.2)
+
+This section provides practical guidance for using the Kosha Gyroscope during training.
+
+### 19.1 Quick Start - Default Configuration
+
+The Kosha Gyroscope is enabled by default with sensible defaults. Simply run training:
+
+```bash
+python train_unified_llm.py --enable_gyroscope
+```
+
+This activates:
+- Complete Harmonic Pentad (v2.3.0) with Fibonacci Sattvic Bands
+- Reflexive Domain Morph (v2.3.2) for automatic domain adaptation
+- Dynamic Weight Scheduler (v2.2.1) for PPL-based gain ramping
+- Three-Stage Hybrid Logic (v2.2.4) for trap detection and correction
+
+### 19.2 Complete Configuration Reference
+
+#### Core Gyroscope Settings
+
+```bash
+# Enable/disable the gyroscope
+--enable_gyroscope                    # Enable (recommended)
+--disable_gyroscope                   # Disable completely
+
+# Dynamic Weight Scheduler (PPL-based gain ramping)
+--gyroscope_base_gain 0.15            # Gentle observation when PPL > 100
+--gyroscope_max_gain 3.0              # Strict enforcement as PPL → 30
+--gyroscope_ppl_ceiling 100.0         # PPL above which gain stays at base
+--gyroscope_target_ppl 30.0           # PPL at which gain reaches max
+```
+
+#### v2.3.0: Complete Harmonic Pentad - Sattvic Bands
+
+Each Kosha has a Floor (push when below) and Ceiling (clamp when above):
+
+```bash
+# Mental (23.6% - 38.2%): Pattern recognition
+--gyroscope_floor_mental 0.236        # Spark Abstraction
+--gyroscope_ceiling_mental 0.382      # Bliss Damper / Reality Rip
+
+# Physical (38.2% - 61.8%): Grounding foundation [×3.0 priority]
+--gyroscope_floor_physical 0.382      # Grounding Push (THE FOUNDATION)
+--gyroscope_ceiling_physical 0.618    # Data Trap
+
+# Intellect (25.0% - 61.8%): Discriminative reasoning [×1.5 priority]
+--gyroscope_floor_intellect 0.250     # Logic Pressure
+--gyroscope_ceiling_intellect 0.618   # Hubris Tax
+
+# Vital (23.6% - 78.6%): Momentum/energy [uses momentum control]
+--gyroscope_floor_vital 0.236         # Wake-up Boost (1.5× momentum)
+--gyroscope_ceiling_vital 0.786       # Momentum Brake (0.5× momentum)
+
+# Bliss (23.6% - 61.8%): Unified awareness
+--gyroscope_floor_bliss 0.236         # Spark Creativity
+--gyroscope_ceiling_bliss 0.618       # Delusion Tether
+```
+
+#### v2.3.0: Correction Factors
+
+```bash
+# How strongly to correct deviations
+--gyroscope_floor_push_factor 0.5     # Loss weight for floor violations
+--gyroscope_ceiling_clamp_factor 0.5  # Gain reduction per ceiling violation
+```
+
+#### v2.3.2: Reflexive Domain Morph
+
+Automatically adapts Sattvic Bands based on domain (language vs code/math):
+
+```bash
+# Enable/disable domain morphing
+--gyroscope_domain_morph_enabled      # Enable (default: True)
+--disable_gyroscope_domain_morph      # Disable for pure language training
+
+# EMA decay for token heuristics (higher = slower, more stable)
+--gyroscope_domain_morph_ema_decay 0.9    # Default: 0.9 (slow)
+# Use 0.5-0.7 for faster response to domain changes
+
+# Signal weights (must sum to positive)
+--gyroscope_domain_morph_internal_weight 0.5  # Weight for Kosha state signal
+--gyroscope_domain_morph_external_weight 0.5  # Weight for token pattern signal
+```
+
+**Domain Morph Effects:**
+- Language Mode (μ=0): Physical Floor=38.2%, Bliss Ceiling=61.8%, Push=×3.0
+- Logic Mode (μ=1): Physical Floor=50.0%, Bliss Ceiling=38.2%, Push=×5.0
+
+#### v2.2.4: Three-Stage Hybrid Logic
+
+Fine-tune the trap detection and correction mechanisms:
+
+```bash
+# Damper/Gate steepness (higher = sharper transitions)
+--gyroscope_damper_steepness 5.0      # Bliss/Physical damper sigmoid
+--gyroscope_gate_steepness 5.0        # Physical/Mental gate sigmoid
+
+# Reality Rip strength (circuit breaker for severe traps)
+--gyroscope_rip_multiplier 2.0        # Multiplier for rip signal loss
+```
+
+#### Temporal and Momentum Settings
+
+```bash
+# Physical history window (tokens) for temporal grounding
+--gyroscope_temporal_window 3         # Smooth Physical over N tokens
+
+# Vital momentum (dynamic gain via energy level)
+--gyroscope_vital_momentum            # Enable (default: True)
+--disable_gyroscope_vital_momentum    # Disable
+```
+
+#### Graduation Criteria (Inverted Curriculum)
+
+```bash
+# When to disengage gyroscope (model has "graduated")
+--gyroscope_graduation_ppl 30.0       # Target PPL for graduation
+--gyroscope_graduation_variance 1.5   # Max PPL variance for stability
+--gyroscope_graduation_window 10      # Steps to check stability
+
+# Warmup and rampdown
+--gyroscope_warmup_steps 100          # Steps before gyroscope fully active
+--gyroscope_rampdown_steps 500        # Steps to ramp gain to 0 at graduation
+```
+
+### 19.3 Recommended Configurations
+
+#### For WikiText/Language Training (Default)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_base_gain 0.15 \
+  --gyroscope_max_gain 3.0
+```
+
+#### For Code/Math Training (Strict Logic Mode)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_domain_morph_external_weight 0.7 \
+  --gyroscope_domain_morph_internal_weight 0.3 \
+  --gyroscope_floor_physical 0.45 \
+  --gyroscope_ceiling_bliss 0.45
+```
+
+#### For Mixed Domain Training (Code + Language)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_domain_morph_ema_decay 0.7 \
+  --gyroscope_domain_morph_external_weight 0.6 \
+  --gyroscope_domain_morph_internal_weight 0.4
+```
+
+#### For Pure Language (Disable Domain Morph)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --disable_gyroscope_domain_morph
+```
+
+#### For Aggressive Grounding (Fix "Blissful Ignorance")
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_floor_physical 0.45 \
+  --gyroscope_ceiling_bliss 0.50 \
+  --gyroscope_floor_push_factor 0.7 \
+  --gyroscope_ceiling_clamp_factor 0.6
+```
+
+### 19.4 Understanding Training Logs
+
+The gyroscope produces detailed logs showing Kosha states and corrections:
+
+```
+⚖️ON [GYRO] Loss:0.0234 | Gain:1.50 (Base:0.15×A:1.00) 🔒×0.50
+     [PENTAD] MODE:LANG (μ:15%) | M:30%✓ P:45%✓ I:35%✓ V:55%✓ B:40%✓
+```
+
+**Interpreting the log:**
+
+| Element | Meaning |
+|---------|---------|
+| `⚖️ON` | Gyroscope is active |
+| `🎓GRAD` | Model has graduated (gyroscope disengaging) |
+| `⏳75%` | Warmup in progress (75% complete) |
+| `Loss:0.0234` | Current gyroscope loss |
+| `Gain:1.50` | Effective gain (after PPL scaling) |
+| `🔒×0.50` | Ceiling clamp active (gain reduced to 50%) |
+| `MODE:LANG` | Domain detected as Language |
+| `(μ:15%)` | Morph factor (15% toward Logic mode) |
+| `M:30%✓` | Mental at 30%, in Sattvic band |
+| `P:45%_` | Physical at 45%, below floor (being pushed) |
+| `I:70%!` | Intellect at 70%, above ceiling (being clamped) |
+
+**Status Indicators:**
+- `✓` = In Sattvic Band (healthy, no correction)
+- `_` = Below Floor (push loss active)
+- `!` = Above Ceiling (clamp active)
+
+### 19.5 Monitoring Domain Morph
+
+When domain morphing is active, watch for:
+
+1. **MODE transitions**: `LANG` → `CODE` → `MATH` as content changes
+2. **μ factor**: Should smoothly transition, not oscillate rapidly
+3. **Physical Floor elevation**: In code mode, Physical should be higher
+4. **Bliss Ceiling tightening**: In code mode, Bliss should be lower
+
+**Healthy behavior:**
+```
+[PENTAD] MODE:LANG (μ:8%)  | M:28%✓ P:42%✓ I:32%✓ V:52%✓ B:45%✓  # Prose
+[PENTAD] MODE:LANG (μ:22%) | M:30%✓ P:48%✓ I:38%✓ V:58%✓ B:38%✓  # Some structure
+[PENTAD] MODE:CODE (μ:78%) | M:25%✓ P:55%✓ I:52%✓ V:62%✓ B:28%✓  # Code block
+```
+
+**Unhealthy oscillation (increase EMA decay):**
+```
+[PENTAD] MODE:CODE (μ:85%) | ...
+[PENTAD] MODE:LANG (μ:12%) | ...  # Too fast!
+[PENTAD] MODE:CODE (μ:90%) | ...
+```
+
+### 19.6 Troubleshooting
+
+| Problem | Symptom | Solution |
+|---------|---------|----------|
+| "Blissful Ignorance" | B consistently >60%, fluent gibberish | Lower `--gyroscope_ceiling_bliss 0.50` |
+| Weak Grounding | P consistently <30% | Raise `--gyroscope_floor_physical 0.45` |
+| Over-Intellectualization | I consistently >60% | Lower `--gyroscope_ceiling_intellect 0.55` |
+| Sluggish Learning | V consistently <25% | Check Vital momentum is enabled |
+| Domain Oscillation | MODE flipping rapidly | Increase `--gyroscope_domain_morph_ema_decay 0.95` |
+| Wrong Domain Detection | CODE detected on prose | Increase internal weight, decrease external |
+| Gain Too Aggressive | High loss spikes | Lower `--gyroscope_max_gain 2.0` |
+| Gain Too Passive | Corrections not working | Raise `--gyroscope_floor_push_factor 0.7` |
+
+### 19.7 TensorBoard Metrics
+
+The following metrics are logged for monitoring:
+
+```python
+# Core metrics
+gyroscope/loss                 # Total gyroscope loss
+gyroscope/effective_gain       # Current gain (after PPL scaling)
+gyroscope/axis1_loss           # Mental→Intellect axis loss
+gyroscope/axis2_loss           # Physical→Bliss axis loss
+
+# Kosha values
+gyroscope/mental_val           # Mental Kosha saturation
+gyroscope/physical_val         # Physical Kosha saturation
+gyroscope/intellect_val        # Intellect Kosha saturation
+gyroscope/vital_val            # Vital Kosha saturation
+gyroscope/bliss_val            # Bliss Kosha saturation
+
+# v2.3.0 Harmonic Pentad
+gyroscope/floor_violations     # Count of Koshas below floor
+gyroscope/ceiling_violations   # Count of Koshas above ceiling
+gyroscope/ceiling_clamp_scalar # Multiplicative clamp factor
+gyroscope/floor_push_loss      # Loss from floor violations
+
+# v2.3.2 Domain Morph
+gyroscope/morph_factor         # Current μ (0=Language, 1=Logic)
+gyroscope/curr_phys_floor      # Current (morphed) Physical floor
+gyroscope/curr_bliss_ceil      # Current (morphed) Bliss ceiling
+gyroscope/curr_push_weight     # Current (morphed) push weight
+```
+
+### 19.8 Best Practices
+
+1. **Start with defaults**: The default configuration is well-tuned for most use cases.
+
+2. **Enable domain morph for mixed data**: If your dataset contains code, math, and prose, keep domain morphing enabled.
+
+3. **Disable domain morph for pure language**: If training on pure prose (no code/math), disable for slightly faster training.
+
+4. **Watch the PENTAD log**: The `_` and `!` indicators tell you which corrections are active.
+
+5. **Adjust one parameter at a time**: When tuning, change one threshold and observe the effect over several hundred steps.
+
+6. **Use graduation**: Let the model graduate naturally when PPL stabilizes below 30.
+
+7. **Monitor domain transitions**: Healthy training shows smooth μ transitions, not rapid oscillation.
+
+
+## 20. 32D Sovereign State Regularizer (v2.3.3)
+
+### 20.1 The Problem: Sheath Collapse
+
+**Training Log Symptom:**
+```
+🔱 [32D] Bhava:UNI(100%)>EXE(0%)>COG(0%) 🟢 | Sheath:VIT(100%)>BLI(100%) 🔴 | Vritti:ERROR
+```
+
+The 5D Kosha Gyroscope operates on **extracted projections** from the 32D Sovereign State. When the underlying 32D state saturates (VIT→100%, BLI→100%), the gyroscope cannot fix it because:
+
+1. **Sigmoid Saturation**: With independent sigmoid activations (v2.2.5), each Kosha dimension can reach 100% independently
+2. **Weak Gradient Signal**: At sigmoid(x) ≈ 1.0, the derivative σ'(x) → 0, starving the learning process
+3. **Representation Collapse**: All Vital/Bliss outputs converge, destroying information diversity
+
+### 20.2 The Solution: Direct 32D Regularization
+
+v2.3.3 introduces the **SovereignStateRegularizer**—a direct loss applied to the 32D state layer before extraction:
+
+```
+                ┌─────────────────────────────┐
+                │   32D Sovereign State       │
+                │   [Bhava][Kosha][Vritti]...│
+                └───────────┬─────────────────┘
+                            │
+          ┌─────────────────┴─────────────────┐
+          │                                   │
+          ▼                                   ▼
+   ┌─────────────┐                   ┌─────────────────┐
+   │ 5D Kosha    │                   │ 32D Regularizer │ ← NEW (v2.3.3)
+   │ Gyroscope   │                   │ Anti-Saturation │
+   └─────────────┘                   │ + VICReg        │
+                                     └─────────────────┘
+```
+
+### 20.3 Components
+
+#### Anti-Saturation Loss
+
+Prevents dimensions from approaching 0% or 100%:
+
+```
+penalty_high = softplus((activation - 0.95) / margin)
+penalty_low  = softplus((0.05 - activation) / margin)
+L_sat = mean(penalty_high + penalty_low)
+```
+
+- **Smooth**: Uses softplus for continuous gradients
+- **Margin-based**: Only penalizes near extremes (0.05 and 0.95)
+- **Per-dimension weights**: VIT and BLI get 1.5× penalty (prone to saturation)
+
+#### Variance Maintenance (VICReg-style)
+
+Prevents all dimensions from collapsing to the same value:
+
+```
+L_var = mean(max(0, target_std - std(x_d))^2)
+```
+
+- **Hinge loss**: Only activates when std falls below target
+- **Per-group targets**: Kosha: 0.15, Vritti: 0.15, Guna: 0.20
+- **Maintains diversity**: Ensures each dimension contributes unique information
+
+### 20.4 Configuration
+
+```python
+@dataclass
+class SovereignStateRegularizerConfig:
+    # Anti-Saturation
+    anti_saturation_weight: float = 0.5       # Overall weight
+    saturation_threshold_high: float = 0.95   # Penalize above this
+    saturation_threshold_low: float = 0.05    # Penalize below this
+    saturation_margin: float = 0.15           # Soft margin
+
+    # Variance Maintenance
+    variance_weight: float = 0.2              # VICReg weight
+    target_std_kosha: float = 0.15            # Target std for Koshas
+    target_std_vritti: float = 0.15           # Target std for Vrittis
+    target_std_guna: float = 0.20             # Target std for Gunas
+
+    # Per-Kosha Weights
+    kosha_weights: Tuple = (
+        1.0,   # MATERIAL (Physical)
+        1.5,   # VITAL - HIGH (prone to saturation)
+        1.0,   # MENTAL
+        1.0,   # INTELLECTUAL
+        1.5,   # BLISSFUL - HIGH (prone to saturation)
+    )
+```
+
+### 20.5 CLI Arguments
+
+```bash
+# Enable 32D regularizer
+--enable_state_regularizer
+
+# Anti-saturation weight (default: 0.5)
+--state_reg_anti_sat_weight 0.5
+
+# Variance weight (default: 0.2)
+--state_reg_variance_weight 0.2
+
+# Saturation thresholds (default: 0.95 / 0.05)
+--state_reg_sat_thresh_high 0.95
+--state_reg_sat_thresh_low 0.05
+
+# Target Kosha std (default: 0.15)
+--state_reg_target_std_kosha 0.15
+
+# Per-Kosha weights for VIT and BLI (default: 1.5)
+--state_reg_vital_weight 1.5
+--state_reg_bliss_weight 1.5
+```
+
+### 20.6 Usage
+
+**Basic Usage (recommended for VIT/BLI collapse):**
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_kosha_gyroscope \
+    --enable_state_regularizer \
+    ... other args
+```
+
+**Aggressive Anti-Saturation (severe collapse):**
+```bash
+python train_unified_llm.py \
+    --model_type ontological \
+    --enable_kosha_gyroscope \
+    --enable_state_regularizer \
+    --state_reg_anti_sat_weight 1.0 \
+    --state_reg_vital_weight 2.0 \
+    --state_reg_bliss_weight 2.0 \
+    ... other args
+```
+
+### 20.7 Diagnostics
+
+The regularizer logs the following metrics:
+
+```python
+# Core metrics
+state_reg/loss                 # Total regularization loss
+state_reg/anti_sat_kosha       # Anti-saturation loss for Koshas
+state_reg/variance_kosha       # Variance loss for Koshas
+state_reg/saturation_alerts    # List of saturated dimensions
+
+# Status line format
+"32D:VIT(95%)>BLI(92%) ⚠️"     # Warning: approaching saturation
+"32D:OK"                        # Healthy: no dimensions near extremes
+```
+
+### 20.8 When to Use
+
+| Symptom | 5D Gyroscope | 32D Regularizer |
+|---------|--------------|-----------------|
+| Kosha imbalance (one dominates) | ✓ | Not needed |
+| VIT→100% or BLI→100% collapse | Limited effect | **Required** |
+| All Koshas converging to same value | Partial | ✓ |
+| Vritti ERROR state | Not directly | ✓ (prevents upstream collapse) |
+| "Blissful Ignorance" | ✓ (ceiling) | ✓ (prevents ceiling bypass) |
+
+### 20.9 Version History Update
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.3.3** | **2026-01-11** | **32D Sovereign State Regularizer (Anti-Saturation + VICReg)** |
+| 2.3.2 | 2026-01-11 | Reflexive Domain Morph (Token Heuristics + Kosha State) |
+| 2.3.0 | 2026-01-10 | Complete Harmonic Pentad with Floor/Ceiling |
+| 2.2.5 | 2026-01-09 | Geometric Expansion (Sigmoid + VICReg) |
+| 2.2.4 | 2026-01-08 | Three-Stage Hybrid Logic |
+| 2.2.1 | 2026-01-07 | Dynamic Weight Scheduler |

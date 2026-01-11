@@ -51,26 +51,144 @@ References:
 
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
+import re
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
+# =============================================================================
+# v2.3.2: DOMAIN DETECTOR - Zero-Training Heuristic Classification
+# =============================================================================
+
+class DomainDetector:
+    """
+    Zero-training domain detection using token-type heuristics.
+    No probe, no hidden states, no labeled data needed.
+
+    Returns a "morph factor" μ ∈ [0, 1]:
+    - μ = 0.0: Pure language mode (creative/prose)
+    - μ = 1.0: Pure logic mode (code/math)
+
+    The morph factor adjusts Sattvic Bands:
+    - Physical Floor: 38.2% → 50.0% as μ increases
+    - Bliss Ceiling: 61.8% → 38.2% as μ decreases
+    """
+
+    # Token patterns for domain detection
+    CODE_PATTERNS = {
+        '{', '}', '();', '[]', 'def ', 'class ', 'import ', 'return ',
+        'function', 'const ', 'let ', 'var ', '==', '!=', '&&', '||',
+        '#!/', '#include', 'public ', 'private ', '->', '=>', '::',
+        'if (', 'for (', 'while (', 'switch ', 'case ', 'break;',
+        'try:', 'except:', 'raise ', 'async ', 'await ', 'yield ',
+        '.py', '.js', '.ts', '.cpp', '.java', '.rs', '.go',
+    }
+
+    MATH_PATTERNS = {
+        '\\frac', '\\sum', '\\int', '\\sqrt', '\\pi', '\\theta',
+        '\\alpha', '\\beta', '\\gamma', '\\delta', '\\epsilon',
+        '\\infty', '\\partial', '\\nabla', '\\lim', '\\log', '\\exp',
+        '∑', '∫', '√', 'π', '∞', '≤', '≥', '≠', '∈', '∀', '∃',
+        '×', '÷', '±', '∂', '∇', '→', '⇒', '⇔', '∧', '∨', '¬',
+        'theorem', 'proof', 'lemma', 'corollary', 'Q.E.D.',
+    }
+
+    def __init__(self, ema_decay: float = 0.9):
+        """
+        Initialize domain detector with EMA smoothing.
+
+        Args:
+            ema_decay: Decay factor for exponential moving average.
+                      Higher = more smoothing, slower response.
+        """
+        self.ema_decay = ema_decay
+        self.ema_code = 0.0
+        self.ema_math = 0.0
+        self._last_domain = 'LANG'
+        self._last_morph = 0.0
+
+    def detect(self, text: str) -> Tuple[str, float]:
+        """
+        Detect domain from text and return (domain_label, morph_factor).
+
+        Args:
+            text: Input text to analyze
+
+        Returns:
+            Tuple of (domain_label, morph_factor):
+            - domain_label: 'LANG', 'MATH', or 'CODE'
+            - morph_factor: 0.0 (language) to 1.0 (logic)
+        """
+        if not text:
+            return self._last_domain, self._last_morph
+
+        # Count pattern matches
+        text_lower = text.lower()
+        code_score = sum(1 for p in self.CODE_PATTERNS if p.lower() in text_lower)
+        math_score = sum(1 for p in self.MATH_PATTERNS if p.lower() in text_lower)
+
+        # Additional heuristics
+        # Brackets/braces density (code indicator)
+        bracket_count = text.count('{') + text.count('}') + text.count('(') + text.count(')')
+        code_score += bracket_count / max(len(text) / 50, 1)
+
+        # Digit density (math indicator)
+        digit_count = sum(1 for c in text if c.isdigit())
+        math_score += digit_count / max(len(text) / 30, 1)
+
+        # Normalize by text length
+        text_len = max(len(text), 1)
+        code_density = code_score / (text_len / 100)
+        math_density = math_score / (text_len / 100)
+
+        # EMA smoothing (prevents oscillation)
+        self.ema_code = self.ema_decay * self.ema_code + (1 - self.ema_decay) * code_density
+        self.ema_math = self.ema_decay * self.ema_math + (1 - self.ema_decay) * math_density
+
+        # Determine domain and morph factor
+        logic_signal = self.ema_code + self.ema_math
+
+        if self.ema_code > 0.5:
+            domain = 'CODE'
+            morph = min(1.0, self.ema_code)
+        elif self.ema_math > 0.3:
+            domain = 'MATH'
+            morph = min(1.0, self.ema_math * 1.5)
+        else:
+            domain = 'LANG'
+            morph = max(0.0, logic_signal * 0.5)
+
+        # Clamp morph to [0, 1]
+        morph = max(0.0, min(1.0, morph))
+
+        self._last_domain = domain
+        self._last_morph = morph
+
+        return domain, morph
+
+    def reset(self):
+        """Reset EMA state."""
+        self.ema_code = 0.0
+        self.ema_math = 0.0
+        self._last_domain = 'LANG'
+        self._last_morph = 0.0
+
+
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.5).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.3.0).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
-    v2.2.5 Geometric Expansion (Sigmoid Mode):
-    - Koshas are INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
-    - Each Kosha can reach [0, 1] independently
-    - Model can be HIGH Physical AND HIGH Intellectual simultaneously
-    - Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
-    - VICReg variance term prevents sigmoid collapse
+    v2.3.0 Complete Harmonic Pentad:
+    - Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+    - Deviations outside these bands trigger automated corrective forces
+    - Floor violations add loss pressure to push toward Sattvic band
+    - Ceiling violations reduce gain to clamp toward Sattvic band
 
     v2.2.4 Three-Stage Hybrid Logic:
     1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
@@ -92,25 +210,58 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-    # Per-Kosha thresholds based on Fibonacci retracement levels and ontological roles
-    # Each Kosha has its own threshold reflecting its unique function in consciousness
+    # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+    # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+    # ┌───────────┬─────────────────────────┬─────────────────────┬─────────────────────────┐
+    # | Kosha     | Floor (Push)            | Sattvic Band        | Ceiling (Clamp)         |
+    # ├───────────┼─────────────────────────┼─────────────────────┼─────────────────────────┤
+    # | Mental    | 23.6%: Spark Abstraction| 23.6% - 38.2%       | 38.2%: Bliss Damper/Rip |
+    # | Physical  | 38.2%: Grounding Push   | 38.2% - 61.8%       | 61.8%: Data Trap        |
+    # | Intellect | 25.0%: Logic Pressure   | 25.0% - 61.8%       | 61.8%: Hubris Tax       |
+    # | Vital     | 23.6%: Wake-up Boost    | 23.6% - 78.6%       | 78.6%: Momentum Brake   |
+    # | Bliss     | 23.6%: Spark Creativity | 23.6% - 61.8%       | 61.8%: Delusion Tether  |
+    # └───────────┴─────────────────────────┴─────────────────────┴─────────────────────────┘
+    # Mental thresholds
+    floor_mental: float = 0.236         # Spark Abstraction - below this, push toward abstraction
+    ceiling_mental: float = 0.382       # Bliss Damper / Reality Rip
+    # Physical thresholds
+    floor_physical: float = 0.382       # Grounding Push - below this, push toward grounding
+    ceiling_physical: float = 0.618     # Data Trap - above this, dilute raw data copying
+    # Intellect thresholds
+    floor_intellect: float = 0.250      # Logic Pressure - below this, push toward reasoning
+    ceiling_intellect: float = 0.618    # Hubris Tax - above this, penalize over-intellectualization
+    # Vital thresholds
+    floor_vital: float = 0.236          # Wake-up Boost - below this, increase momentum
+    ceiling_vital: float = 0.786        # Momentum Brake - above this, dampen overheating
+    # Bliss thresholds
+    floor_bliss: float = 0.236          # Spark Creativity - below this, release damping
+    ceiling_bliss: float = 0.618        # Delusion Tether - above this, reduce gain
+    # Clamp/Push factors (how strongly to correct deviations)
+    floor_push_factor: float = 0.5      # Loss weight for floor violations
+    ceiling_clamp_factor: float = 0.5   # Gain reduction for ceiling violations
+
+    # === v2.3.2: REFLEXIVE DOMAIN MORPH ===
+    # Combines external signal (token heuristics) with internal signal (Kosha state)
+    # to create a morph factor μ ∈ [0, 1] that adjusts Sattvic Bands in real-time.
     #
-    # Fibonacci Levels: 23.6%, 38.2%, 50.0%, 61.8%, 78.6%
+    # μ = 0.0: Language Mode (creative/prose)
+    #   - Physical Floor: 38.2% (Fibonacci)
+    #   - Bliss Ceiling: 61.8% (φ Golden Ratio)
+    #   - Grounding Push: 3.0×
     #
-    # | Kosha     | Fib Level | Role       | Trigger Action                          |
-    # |-----------|-----------|------------|-----------------------------------------|
-    # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
-    # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
-    # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
-    # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
-    # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
-    #
-    threshold_mental: float = 0.382      # Warning level - engage Bliss Damper
-    threshold_physical: float = 0.382    # Support level - required to open Vijnana Gate
-    threshold_intellect: float = 0.500   # Pivot level - target for "Right Knowledge"
-    threshold_vital: float = 0.786       # Resistance level - trigger momentum reset
-    threshold_bliss: float = 0.236       # Spark level - below this, release damping
+    # μ = 1.0: Logic Mode (code/math)
+    #   - Physical Floor: 50.0% (Fibonacci Pivot)
+    #   - Bliss Ceiling: 38.2% (Fibonacci)
+    #   - Grounding Push: 5.0×
+    domain_morph_enabled: bool = True       # Enable reflexive domain morphing
+    domain_morph_ema_decay: float = 0.9     # EMA decay for token heuristics
+    domain_morph_internal_weight: float = 0.5  # Weight for internal (Kosha) signal
+    domain_morph_external_weight: float = 0.5  # Weight for external (token) signal
+    # Morph ranges for Physical Floor and Bliss Ceiling
+    domain_morph_phys_floor_range: Tuple[float, float] = (0.382, 0.500)  # 38.2% → 50.0%
+    domain_morph_bliss_ceil_range: Tuple[float, float] = (0.618, 0.382)  # 61.8% → 38.2%
+    # Morph range for Grounding Push priority
+    domain_morph_push_weight_range: Tuple[float, float] = (3.0, 5.0)     # 3.0× → 5.0×
 
     # Legacy: single trap_threshold (kept for backward compatibility)
     trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
@@ -211,12 +362,26 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-        threshold_mental: float = 0.382,     # Warning - engage Bliss Damper
-        threshold_physical: float = 0.382,   # Support - required to open Vijnana Gate
-        threshold_intellect: float = 0.500,  # Pivot - target for "Right Knowledge"
-        threshold_vital: float = 0.786,      # Resistance - trigger momentum reset
-        threshold_bliss: float = 0.236,      # Spark - below this, release damping
+        # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+        # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+        # Mental: Sattvic Band 23.6% - 38.2%
+        floor_mental: float = 0.236,         # Spark Abstraction - push toward abstraction
+        ceiling_mental: float = 0.382,       # Bliss Damper / Reality Rip
+        # Physical: Sattvic Band 38.2% - 61.8%
+        floor_physical: float = 0.382,       # Grounding Push - push toward grounding
+        ceiling_physical: float = 0.618,     # Data Trap - dilute raw data copying
+        # Intellect: Sattvic Band 25.0% - 61.8%
+        floor_intellect: float = 0.250,      # Logic Pressure - push toward reasoning
+        ceiling_intellect: float = 0.618,    # Hubris Tax - penalize over-intellectualization
+        # Vital: Sattvic Band 23.6% - 78.6%
+        floor_vital: float = 0.236,          # Wake-up Boost - increase momentum
+        ceiling_vital: float = 0.786,        # Momentum Brake - dampen overheating
+        # Bliss: Sattvic Band 23.6% - 61.8%
+        floor_bliss: float = 0.236,          # Spark Creativity - release damping
+        ceiling_bliss: float = 0.618,        # Delusion Tether - reduce gain
+        # Correction factors
+        floor_push_factor: float = 0.5,      # Loss weight for floor violations
+        ceiling_clamp_factor: float = 0.5,   # Gain reduction for ceiling violations
         # Legacy thresholds (backward compatibility)
         trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
         gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
@@ -242,9 +407,17 @@ class KoshaGyroscopicLoss(nn.Module):
         # VICReg variance regularization (v2.2.5)
         vicreg_variance_weight: float = 0.1,
         vicreg_target_std: float = 0.25,
+        # v2.3.2: Reflexive Domain Morph
+        domain_morph_enabled: bool = True,
+        domain_morph_ema_decay: float = 0.9,
+        domain_morph_internal_weight: float = 0.5,
+        domain_morph_external_weight: float = 0.5,
+        domain_morph_phys_floor_range: Tuple[float, float] = (0.382, 0.500),
+        domain_morph_bliss_ceil_range: Tuple[float, float] = (0.618, 0.382),
+        domain_morph_push_weight_range: Tuple[float, float] = (3.0, 5.0),
     ):
         """
-        Initialize the Kosha Gyroscopic Loss (v2.2.5).
+        Initialize the Kosha Gyroscopic Loss (v2.3.2).
 
         v2.2.5 Geometric Expansion (Sigmoid Mode):
         Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum).
@@ -277,12 +450,22 @@ class KoshaGyroscopicLoss(nn.Module):
         """
         super().__init__()
 
-        # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
-        self.threshold_mental = threshold_mental
-        self.threshold_physical = threshold_physical
-        self.threshold_intellect = threshold_intellect
-        self.threshold_vital = threshold_vital
-        self.threshold_bliss = threshold_bliss
+        # === v2.3.0: COMPLETE HARMONIC PENTAD ===
+        # Floors (Push actions when below)
+        self.floor_mental = floor_mental
+        self.floor_physical = floor_physical
+        self.floor_intellect = floor_intellect
+        self.floor_vital = floor_vital
+        self.floor_bliss = floor_bliss
+        # Ceilings (Clamp actions when above)
+        self.ceiling_mental = ceiling_mental
+        self.ceiling_physical = ceiling_physical
+        self.ceiling_intellect = ceiling_intellect
+        self.ceiling_vital = ceiling_vital
+        self.ceiling_bliss = ceiling_bliss
+        # Correction factors
+        self.floor_push_factor = floor_push_factor
+        self.ceiling_clamp_factor = ceiling_clamp_factor
 
         # Legacy thresholds (backward compatibility)
         self.trap_threshold = trap_threshold
@@ -314,6 +497,19 @@ class KoshaGyroscopicLoss(nn.Module):
         # VICReg variance regularization (v2.2.5)
         self.vicreg_variance_weight = vicreg_variance_weight
         self.vicreg_target_std = vicreg_target_std
+
+        # v2.3.2: Reflexive Domain Morph
+        self.domain_morph_enabled = domain_morph_enabled
+        self.domain_morph_internal_weight = domain_morph_internal_weight
+        self.domain_morph_external_weight = domain_morph_external_weight
+        self.domain_morph_phys_floor_min, self.domain_morph_phys_floor_max = domain_morph_phys_floor_range
+        self.domain_morph_bliss_ceil_max, self.domain_morph_bliss_ceil_min = domain_morph_bliss_ceil_range
+        self.domain_morph_push_weight_min, self.domain_morph_push_weight_max = domain_morph_push_weight_range
+        # Create domain detector for external (token) signal
+        self.domain_detector = DomainDetector(ema_decay=domain_morph_ema_decay)
+        # Track current morph state for logging
+        self._current_morph = 0.0
+        self._current_domain = 'LANG'
 
         # Kosha indices in the 5D projection
         self.PHYSICAL_IDX = 0   # Annamaya (+,+)
@@ -518,14 +714,25 @@ class KoshaGyroscopicLoss(nn.Module):
         current_ppl: Optional[float] = None,
         return_components: bool = False,
         authority_factor: Optional[float] = None,
+        input_text: Optional[str] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
-        Compute the Kosha Gyroscopic Loss.
+        Compute the Kosha Gyroscopic Loss (v2.3.2 Reflexive Domain Morph).
 
         The loss fires when:
         1. A Kosha is "trapped" (above trap_threshold)
         2. The grounding gate is open (adjacent Kosha above gate_threshold)
         3. The diagonal opposite is missing (below balance_target)
+
+        v2.3.2 Reflexive Domain Morph:
+        The Sattvic Bands are dynamically adjusted based on:
+        - External signal: Token heuristics (code/math patterns in input_text)
+        - Internal signal: Current Kosha state (Physical + Intellect saturation)
+
+        The morph factor μ ∈ [0, 1] adjusts:
+        - Physical Floor: 38.2% → 50.0% as μ increases
+        - Bliss Ceiling: 61.8% → 38.2% as μ increases
+        - Grounding Push: 3.0× → 5.0× as μ increases
 
         Args:
             kosha_states: [batch, seq, 5] Kosha activations normalized to [0, 1]
@@ -539,6 +746,8 @@ class KoshaGyroscopicLoss(nn.Module):
                              - 0.5 = half gain (PID backing off)
                              - None = no modulation (use PPL-based gain only)
                              This enables integration with --controller pidv2.
+            input_text: Optional text for domain detection (v2.3.2).
+                       If provided, enables external signal for domain morphing.
 
         Returns:
             If return_components=False: Scalar loss value
@@ -550,6 +759,62 @@ class KoshaGyroscopicLoss(nn.Module):
         mental = kosha_states[:, :, self.MENTAL_IDX]       # (-,+) Unmanifest, Past
         intellect = kosha_states[:, :, self.INTELLECT_IDX] # (+,-) Manifest, Future
         bliss = kosha_states[:, :, self.BLISS_IDX]         # (-,-) Unmanifest, Future
+
+        # =======================================================================
+        # v2.3.2: REFLEXIVE DOMAIN MORPH
+        # =======================================================================
+        # Compute morph factor μ from external (tokens) + internal (Kosha) signals.
+        # μ = 0.0: Language Mode | μ = 1.0: Logic Mode
+        #
+        # Morphed thresholds:
+        # - Physical Floor: 38.2% → 50.0% as μ increases
+        # - Bliss Ceiling: 61.8% → 38.2% as μ increases
+        # - Grounding Push: 3.0× → 5.0× as μ increases
+
+        if self.domain_morph_enabled:
+            # External signal: Token heuristics
+            if input_text is not None:
+                domain_label, external_morph = self.domain_detector.detect(input_text)
+            else:
+                domain_label = self._current_domain
+                external_morph = 0.0
+
+            # Internal signal: Kosha state (High Physical + Intellect = Logic Mode)
+            # When Physical and Intellect are both elevated, we're in "logic" territory
+            mean_phys = physical.mean().item()
+            mean_int = intellect.mean().item()
+            internal_morph = (mean_phys + mean_int) / 2.0
+            # Shift: Logic signal activates when internal > 0.4, saturates at 0.7
+            internal_morph = max(0.0, min(1.0, (internal_morph - 0.4) / 0.3))
+
+            # Combined morph factor (weighted average of external and internal)
+            morph = (
+                self.domain_morph_external_weight * external_morph +
+                self.domain_morph_internal_weight * internal_morph
+            ) / (self.domain_morph_external_weight + self.domain_morph_internal_weight)
+            morph = max(0.0, min(1.0, morph))
+
+            # Morphed thresholds (linear interpolation)
+            curr_phys_floor = self.domain_morph_phys_floor_min + morph * (
+                self.domain_morph_phys_floor_max - self.domain_morph_phys_floor_min
+            )
+            curr_bliss_ceil = self.domain_morph_bliss_ceil_max - morph * (
+                self.domain_morph_bliss_ceil_max - self.domain_morph_bliss_ceil_min
+            )
+            curr_push_weight = self.domain_morph_push_weight_min + morph * (
+                self.domain_morph_push_weight_max - self.domain_morph_push_weight_min
+            )
+
+            # Store for logging
+            self._current_morph = morph
+            self._current_domain = domain_label
+        else:
+            # No morphing - use base thresholds
+            curr_phys_floor = self.floor_physical
+            curr_bliss_ceil = self.ceiling_bliss
+            curr_push_weight = 3.0  # Default Physical push weight
+            morph = 0.0
+            domain_label = 'LANG'
 
         # === REFINEMENT 1: Temporal Grounding ===
         # Use Physical history, not just current token
@@ -577,67 +842,141 @@ class KoshaGyroscopicLoss(nn.Module):
         #   If trapped + gate closed → ReLU shock forces re-grounding.
         #   This "smashes" the loop trajectory back to Physical quadrant.
 
-        # === FIBONACCI PENTAD LOGIC (v2.2.5) ===
-        # Each Kosha now has its own threshold based on its ontological role
+        # =======================================================================
+        # v2.3.0: COMPLETE HARMONIC PENTAD
+        # =======================================================================
+        # Each Kosha has a Floor (Push) and Ceiling (Clamp) defining the Sattvic Band
+        # Deviations outside these bands trigger automated corrective forces
 
-        # Stage 1: BLISS DAMPER - dilutes creative expansion during Mental dominance
-        # When Mental > threshold_mental (38.2%), bliss_damper approaches 0
-        bliss_damper = 1.0 - torch.sigmoid((mental - self.threshold_mental) * self.damper_steepness)
+        # === FLOOR VIOLATIONS: Push toward Sattvic Band ===
+        # Priority weights per Gemini's Control Theory guidance:
+        # - Physical (Foundation): 3.0-5.0 (HIGH - morphed by domain)
+        # - Intellect (Logic): 1.5 (MEDIUM)
+        # - Mental (Insight): 1.0 (LOW)
+        # - Bliss (Creativity): 1.0 (LOW)
+        # - Vital: Uses momentum boost instead of loss
+        #
+        # v2.3.2: Physical Floor and Push Weight are MORPHED by domain:
+        # - Language Mode (μ=0): Floor=38.2%, Push=3.0×
+        # - Logic Mode (μ=1): Floor=50.0%, Push=5.0×
 
-        # BLISS SPARK RELEASE: If Bliss < threshold_bliss (23.6%), release damping for creativity
-        # This allows creative expansion when Bliss is starved
-        bliss_spark = (bliss < self.threshold_bliss).float()
+        # Mental Floor (23.6%): Spark Abstraction - push toward abstraction when too low
+        mental_below_floor = F.relu(self.floor_mental - mental)
+        mental_floor_loss = mental_below_floor.mean() * 1.0  # LOW priority
+
+        # Physical Floor (38.2%-50.0%): Grounding Push - THE FOUNDATION
+        # v2.3.2: Floor and push weight are morphed by domain
+        # This is the most critical floor - model MUST ground before anything else
+        physical_below_floor = F.relu(curr_phys_floor - physical)  # MORPHED floor
+        physical_floor_loss = physical_below_floor.mean() * curr_push_weight  # MORPHED weight
+
+        # Intellect Floor (25.0%): Logic Pressure - push toward reasoning when too low
+        intellect_below_floor = F.relu(self.floor_intellect - intellect)
+        intellect_floor_loss = intellect_below_floor.mean() * 1.5  # MEDIUM priority
+
+        # Vital Floor (23.6%): Wake-up Boost - boost momentum when too low
+        # Vital uses MOMENTUM control, not loss pressure
+        vital_below_floor = F.relu(self.floor_vital - vital)
+        vital_floor_active = vital.mean() < self.floor_vital
+        # Per Gemini: Boost = 1.5 if vit < 0.236
+        vital_momentum_boost = torch.where(
+            vital_below_floor.mean() > 0,
+            torch.tensor(1.5),
+            torch.tensor(1.0)
+        )
+
+        # Bliss Floor (23.6%): Spark Creativity - release damping when too low
+        bliss_below_floor = F.relu(self.floor_bliss - bliss)
+        bliss_floor_loss = bliss_below_floor.mean() * 1.0  # LOW priority
+        bliss_spark = (bliss < self.floor_bliss).float()
+
+        # Combined floor push loss (weighted by priority)
+        floor_push_loss = (
+            mental_floor_loss +
+            physical_floor_loss +  # 3.0x weight already applied
+            intellect_floor_loss +  # 1.5x weight already applied
+            bliss_floor_loss
+        ) * self.floor_push_factor
+
+        # === CEILING VIOLATIONS: Clamp toward Sattvic Band ===
+        # Ceiling weights per Gemini's Control Theory guidance:
+        # - Intellect (Hubris Tax): 1.5 (MEDIUM - penalize over-intellectualization)
+        # - Others use sigmoid-based viscosity damping
+
+        # Mental Ceiling (38.2%): Bliss Damper / Reality Rip
+        bliss_damper = 1.0 - torch.sigmoid((mental - self.ceiling_mental) * self.damper_steepness)
         bliss_damper = bliss_damper + bliss_spark * 0.5  # Partial release when Bliss is low
+        mental_trap = F.relu(mental - self.ceiling_mental)
+        mental_ceiling_active = mental.mean() > self.ceiling_mental
 
-        # Stage 2: PHYSICAL GATE - strict prerequisite for Intellect (NO BYPASS!)
-        # Gate only opens when Physical history is above threshold_physical (38.2%)
-        phys_gate = torch.sigmoid((phys_history - self.threshold_physical) * self.gate_steepness)
+        # Physical Ceiling (61.8%): Data Trap - dilute raw data copying
+        physical_damper = 1.0 - torch.sigmoid((physical - self.ceiling_physical) * self.damper_steepness)
+        physical_trap = F.relu(physical - self.ceiling_physical)
+        physical_ceiling_active = physical.mean() > self.ceiling_physical
 
-        # VITAL RESISTANCE: High Vital (>78.6%) dampens momentum (model is "overheating")
-        vital_resistance = torch.sigmoid((vital - self.threshold_vital) * self.gate_steepness)
-        # Apply resistance as momentum damper
+        # Intellect Ceiling (61.8%): Hubris Tax - penalize over-intellectualization
+        # Per Gemini: L_i = ReLU(int - 0.618) * 1.5
+        intellect_above_ceiling = F.relu(intellect - self.ceiling_intellect)
+        intellect_hubris_loss = intellect_above_ceiling.mean() * 1.5  # MEDIUM priority
+        intellect_ceiling_active = intellect.mean() > self.ceiling_intellect
+
+        # Vital Ceiling (78.6%): Momentum Brake - dampen overheating
+        vital_resistance = torch.sigmoid((vital - self.ceiling_vital) * self.gate_steepness)
         vital_momentum_damper = 1.0 - vital_resistance * 0.5  # Max 50% reduction at high Vital
+        vital_ceiling_active = vital.mean() > self.ceiling_vital
 
-        # Stage 3: REALITY RIP - Hard ReLU for "circuit breaker" effect
-        # Uses ReLU (not sigmoid) for discontinuous gradient shock
-        # Now uses threshold_mental (38.2%) - fires earlier than legacy 61.8%
-        mental_trap = F.relu(mental - self.threshold_mental)
+        # Bliss Ceiling (61.8%-38.2%): Delusion Tether - reduce gain to force grounding
+        # v2.3.2: Ceiling is MORPHED by domain - tighter in Logic Mode
+        # - Language Mode (μ=0): Ceiling=61.8%
+        # - Logic Mode (μ=1): Ceiling=38.2%
+        bliss_above_ceiling = F.relu(bliss - curr_bliss_ceil)  # MORPHED ceiling
+        bliss_delusion_loss = bliss_above_ceiling.mean()
+        bliss_ceiling_active = bliss.mean() > curr_bliss_ceil  # MORPHED check
 
-        # Rip signal fires when trapped AND gate is CLOSED
-        # This forces model back to Physical/Manifest quadrant
+        # Combined ceiling clamp scalar (multiplicative reduction)
+        # Each ceiling violation compounds the gain reduction
+        ceiling_violations_count = (
+            (1.0 if mental_ceiling_active else 0.0) +
+            (1.0 if physical_ceiling_active else 0.0) +
+            (1.0 if intellect_ceiling_active else 0.0) +
+            (1.0 if vital_ceiling_active else 0.0) +
+            (1.0 if bliss_ceiling_active else 0.0)
+        )
+        # Each violation reduces gain by ceiling_clamp_factor (compounding)
+        ceiling_clamp_scalar = self.ceiling_clamp_factor ** ceiling_violations_count
+
+        # Floor violations count (for logging)
+        # v2.3.2: Physical floor uses MORPHED threshold
+        mental_floor_active = mental.mean() < self.floor_mental
+        physical_floor_active = physical.mean() < curr_phys_floor  # MORPHED
+        intellect_floor_active = intellect.mean() < self.floor_intellect
+        bliss_floor_active = bliss.mean() < self.floor_bliss
+        floor_violations_count = (
+            (1.0 if mental_floor_active else 0.0) +
+            (1.0 if physical_floor_active else 0.0) +
+            (1.0 if intellect_floor_active else 0.0) +
+            (1.0 if vital_floor_active else 0.0) +
+            (1.0 if bliss_floor_active else 0.0)
+        )
+
+        # === AXIS 1: Mental -> Intellect (via Physical Gate) ===
+        # Physical Gate: Physical must be in Sattvic Band (38.2%-50.0% to 61.8%) to open
+        # v2.3.2: Gate threshold uses MORPHED Physical Floor
+        phys_gate = torch.sigmoid((phys_history - curr_phys_floor) * self.gate_steepness)  # MORPHED
+
+        # Rip signal fires when mentally trapped AND gate is CLOSED
         rip_signal = mental_trap * (1.0 - phys_gate)
 
         # Intellectual path - only flows when gate is OPEN (grounded reasoning)
         missing_intellect = F.relu(self.balance_target - intellect)
         intellect_path = mental_trap * phys_gate * missing_intellect
 
-        # TWO-PATH LOSS: Grounded path + Reality reversal
-        # rip_signal gets multiplied by rip_multiplier for stronger "shock"
+        # Axis 1 Loss
         axis1_loss = (intellect_path + rip_signal * self.rip_multiplier).mean()
 
-        # =======================================================================
-        # AXIS 2: Physical -> Blissful (via Mental) - v2.2.4 Three-Stage Hybrid
-        # =======================================================================
-        #
-        # This axis handles the "just copying tokens" problem symmetrically:
-        # - High Physical = raw data regurgitation
-        # - Low Bliss = no creative expansion
-        # - Mental Gate = check if model has abstracted the pattern
-        #
-        # Same three-stage logic applied to Physical → Bliss transition
-
-        # Stage 1: PHYSICAL DAMPER - dilutes grounding during Physical dominance
-        # (Prevents over-grounding that blocks creativity)
-        # Uses threshold_physical (38.2%) from Fibonacci Pentad
-        physical_damper = 1.0 - torch.sigmoid((physical - self.threshold_physical) * self.damper_steepness)
-
-        # Stage 2: MENTAL GATE - strict prerequisite for Bliss (NO BYPASS!)
-        # Uses threshold_mental (38.2%) for gate requirement
-        mental_gate = torch.sigmoid((mental - self.threshold_mental) * self.gate_steepness)
-
-        # Stage 3: REALITY RIP - Hard ReLU for Physical trap
-        # Uses threshold_physical (38.2%) from Fibonacci Pentad
-        physical_trap = F.relu(physical - self.threshold_physical)
+        # === AXIS 2: Physical -> Bliss (via Mental Gate) ===
+        # Mental Gate: Mental must be in Sattvic Band (23.6% - 38.2%) to open
+        mental_gate = torch.sigmoid((mental - self.floor_mental) * self.gate_steepness)
 
         # Rip signal fires when physically trapped AND mental gate is CLOSED
         rip_signal_axis2 = physical_trap * (1.0 - mental_gate)
@@ -646,29 +985,39 @@ class KoshaGyroscopicLoss(nn.Module):
         missing_bliss = F.relu(self.balance_target - bliss)
         bliss_path = physical_trap * mental_gate * missing_bliss
 
-        # TWO-PATH LOSS: Abstracted path + Reality reversal
+        # Axis 2 Loss
         axis2_loss = (bliss_path + rip_signal_axis2 * self.rip_multiplier).mean()
 
-        # === Total Loss with Dynamic Gain (v2.2.1) + Authority Modulation (v2.2.4) ===
-        # Get PPL-based dynamic gain
+        # === Combined Momentum Scaler (Vital Floor Boost + Vital Ceiling Brake) ===
+        combined_vital_momentum = vital_momentum_damper * vital_momentum_boost
+
+        # === Total Loss with Dynamic Gain + Authority + Ceiling Clamp ===
         base_dynamic_gain = self.get_dynamic_gain(current_ppl)
 
         # Apply authority factor from PIDv2 controller if provided
-        # This enables real-time feedback control when --controller pidv2 is used
         if authority_factor is not None:
             effective_gain = base_dynamic_gain * authority_factor
         else:
             effective_gain = base_dynamic_gain
 
+        # Apply ceiling clamp (reduces gain when Koshas exceed ceilings)
+        effective_gain = effective_gain * ceiling_clamp_scalar
+
         # === VICReg Variance Regularization (v2.2.5) ===
         # Prevents sigmoid collapse where all Koshas converge to same value
         vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
 
-        # === FIBONACCI PENTAD: Vital Resistance Dampening ===
-        # High Vital (>78.6%) dampens the loss to prevent "overheating"
-        vital_damper_scalar = vital_momentum_damper.mean()
+        # === v2.3.0: Combined Vital Momentum (Boost when low, Brake when high) ===
+        combined_vital_scalar = combined_vital_momentum.mean() if torch.is_tensor(combined_vital_momentum) else combined_vital_momentum
 
-        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * vital_damper_scalar + vicreg_variance_loss
+        # === v2.3.0: TOTAL LOSS with Harmonic Pentad ===
+        # Components:
+        # 1. Axis losses (scaled by gain, momentum, vital)
+        # 2. Floor push loss (push koshas into Sattvic band)
+        # 3. Intellect hubris loss (penalize over-intellectualization)
+        # 4. VICReg variance loss (prevent sigmoid collapse)
+        axis_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler * combined_vital_scalar
+        total_loss = axis_loss + floor_push_loss + intellect_hubris_loss * effective_gain + vicreg_variance_loss
 
         if return_components:
             # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
@@ -694,25 +1043,61 @@ class KoshaGyroscopicLoss(nn.Module):
                 # Loss breakdown
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
-                'vicreg_variance_loss': vicreg_variance_loss.item(),  # v2.2.5
+                'floor_push_loss': floor_push_loss.item() if torch.is_tensor(floor_push_loss) else floor_push_loss,
+                'intellect_hubris_loss': intellect_hubris_loss.item() if torch.is_tensor(intellect_hubris_loss) else intellect_hubris_loss,
+                'vicreg_variance_loss': vicreg_variance_loss.item(),
                 'effective_gain': effective_gain,
-                'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
+                'base_dynamic_gain': base_dynamic_gain,
                 'authority_factor': authority_factor if authority_factor is not None else 1.0,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
 
-                # v2.2.5 VICReg metrics
+                # v2.3.0 HARMONIC PENTAD: Floor violations (below Sattvic band)
+                'floor_mental': self.floor_mental,
+                'floor_physical': self.floor_physical,
+                'floor_intellect': self.floor_intellect,
+                'floor_vital': self.floor_vital,
+                'floor_bliss': self.floor_bliss,
+                'mental_floor_active': mental_floor_active.item() if torch.is_tensor(mental_floor_active) else mental_floor_active,
+                'physical_floor_active': physical_floor_active.item() if torch.is_tensor(physical_floor_active) else physical_floor_active,
+                'intellect_floor_active': intellect_floor_active.item() if torch.is_tensor(intellect_floor_active) else intellect_floor_active,
+                'vital_floor_active': vital_floor_active.item() if torch.is_tensor(vital_floor_active) else vital_floor_active,
+                'bliss_floor_active': bliss_floor_active.item() if torch.is_tensor(bliss_floor_active) else bliss_floor_active,
+                'floor_violations_count': floor_violations_count,
+
+                # v2.3.0 HARMONIC PENTAD: Ceiling violations (above Sattvic band)
+                'ceiling_mental': self.ceiling_mental,
+                'ceiling_physical': self.ceiling_physical,
+                'ceiling_intellect': self.ceiling_intellect,
+                'ceiling_vital': self.ceiling_vital,
+                'ceiling_bliss': self.ceiling_bliss,
+                'mental_ceiling_active': mental_ceiling_active.item() if torch.is_tensor(mental_ceiling_active) else mental_ceiling_active,
+                'physical_ceiling_active': physical_ceiling_active.item() if torch.is_tensor(physical_ceiling_active) else physical_ceiling_active,
+                'intellect_ceiling_active': intellect_ceiling_active.item() if torch.is_tensor(intellect_ceiling_active) else intellect_ceiling_active,
+                'vital_ceiling_active': vital_ceiling_active.item() if torch.is_tensor(vital_ceiling_active) else vital_ceiling_active,
+                'bliss_ceiling_active': bliss_ceiling_active.item() if torch.is_tensor(bliss_ceiling_active) else bliss_ceiling_active,
+                'ceiling_violations_count': ceiling_violations_count,
+                'ceiling_clamp_scalar': ceiling_clamp_scalar,
+
+                # v2.3.0 Vital momentum (boost + brake combined)
+                'vital_momentum_boost': vital_momentum_boost.item() if torch.is_tensor(vital_momentum_boost) else vital_momentum_boost,
+                'vital_momentum_damper': vital_momentum_damper.mean().item() if torch.is_tensor(vital_momentum_damper) else vital_momentum_damper,
+                'combined_vital_scalar': combined_vital_scalar.item() if torch.is_tensor(combined_vital_scalar) else combined_vital_scalar,
+
+                # VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
                 'vicreg_variance_weight': self.vicreg_variance_weight,
 
-                # v2.2.5 FIBONACCI PENTAD METRICS
-                'threshold_mental': self.threshold_mental,
-                'threshold_physical': self.threshold_physical,
-                'threshold_intellect': self.threshold_intellect,
-                'threshold_vital': self.threshold_vital,
-                'threshold_bliss': self.threshold_bliss,
+                # v2.3.2 REFLEXIVE DOMAIN MORPH metrics
+                'domain_morph_enabled': self.domain_morph_enabled,
+                'domain_label': domain_label,
+                'morph_factor': morph,
+                'curr_phys_floor': curr_phys_floor,
+                'curr_bliss_ceil': curr_bliss_ceil,
+                'curr_push_weight': curr_push_weight,
+
+                # Legacy compatibility
                 'vital_resistance_mean': vital_resistance.mean().item(),
-                'vital_damper_scalar': vital_damper_scalar.item() if torch.is_tensor(vital_damper_scalar) else vital_damper_scalar,
                 'bliss_spark_mean': bliss_spark.mean().item(),
 
                 # v2.2.4 THREE-STAGE HYBRID METRICS
@@ -1613,3 +1998,385 @@ class InferenceGuardrail(nn.Module):
         # Combined score
         health = (balance_score * 0.4 + alignment_score * 0.4 + (1 - domination_penalty) * 0.2)
         return max(0.0, min(1.0, health))
+
+
+# =============================================================================
+# v2.3.3: SOVEREIGN STATE REGULARIZER - 32D Anti-Saturation
+# =============================================================================
+
+@dataclass
+class SovereignStateRegularizerConfig:
+    """
+    Configuration for 32D Sovereign State Regularizer (v2.3.3).
+
+    The Kosha Gyroscope operates on 5D projections, but the underlying 32D
+    Sovereign State can saturate (all dimensions → 100%) causing representation
+    collapse. This regularizer prevents saturation at the source.
+
+    Training Log Symptom:
+        🔱 [32D] ... Sheath:VIT(100%)>BLI(100%) 🔴
+
+    The 5D Gyroscope can't fix this because it operates on extracted projections.
+    This regularizer adds direct pressure to the 32D layer.
+
+    Components:
+    1. Anti-Saturation Loss: Penalizes dimensions approaching 0% or 100%
+    2. Variance Maintenance: Prevents all dimensions collapsing to same value
+    3. Decorrelation (optional): Encourages orthogonality between dimensions
+    4. Per-Component Targeting: Different regularization for Bhava/Kosha/Vritti/Guna
+    """
+
+    # === ANTI-SATURATION ===
+    # Penalizes dimensions that approach extreme values (0 or 1 for sigmoid)
+    anti_saturation_weight: float = 0.5       # Overall weight
+    saturation_threshold_high: float = 0.95   # Penalize above this (too hot)
+    saturation_threshold_low: float = 0.05    # Penalize below this (too cold)
+    saturation_margin: float = 0.15           # Soft margin for smooth penalty
+
+    # === VARIANCE MAINTENANCE (VICReg-style) ===
+    # Prevents dimensions from collapsing to same value
+    variance_weight: float = 0.2              # Weight for variance loss
+    target_std_kosha: float = 0.15            # Target std for Kosha dimensions
+    target_std_vritti: float = 0.15           # Target std for Vritti dimensions
+    target_std_guna: float = 0.20             # Target std for Guna dimensions
+
+    # === DECORRELATION (optional) ===
+    # Encourages orthogonality between dimensions
+    decorrelation_weight: float = 0.0         # 0 = disabled (often not needed)
+    decorrelation_groups: bool = True         # Apply within groups (Kosha, Vritti, etc.)
+
+    # === TARGETING ===
+    # Which 32D components to regularize
+    regularize_kosha: bool = True             # [12:17] - Most critical (VIT/BLI collapse)
+    regularize_vritti: bool = True            # [17:22] - Epistemological states
+    regularize_guna: bool = True              # [22:28] - Energy dynamics
+    regularize_bhava: bool = False            # [0:12] - Usually stable (softmax)
+
+    # === KOSHA-SPECIFIC OVERRIDES ===
+    # Per-Kosha penalty multipliers (0=no penalty, 1=full penalty)
+    kosha_weights: Tuple[float, float, float, float, float] = (
+        1.0,  # MATERIAL (Physical) - moderate
+        1.5,  # VITAL - HIGH (prone to saturation)
+        1.0,  # MENTAL - moderate
+        1.0,  # INTELLECTUAL - moderate
+        1.5,  # BLISSFUL - HIGH (prone to saturation)
+    )
+
+
+class SovereignStateRegularizer(nn.Module):
+    """
+    32D Sovereign State Regularizer (v2.3.3) - Prevents Sheath Collapse.
+
+    Problem: The 5D Kosha Gyroscope operates on extracted projections.
+    When the underlying 32D state has VIT(100%)/BLI(100%), the gyroscope
+    can't fix it because it only sees the 5D projection.
+
+    Solution: Add regularization directly to the 32D state layer:
+    1. Anti-Saturation: Soft penalty when dimensions approach 0% or 100%
+    2. Variance: VICReg-style penalty when dimensions collapse to same value
+    3. Decorrelation: Optional penalty for correlated dimensions
+
+    Usage:
+        regularizer = SovereignStateRegularizer()
+        sovereign_state = model.compute_sovereign_state(hidden_states)
+        reg_loss, reg_diag = regularizer(sovereign_state)
+        total_loss = ce_loss + gyroscope_loss + reg_loss
+
+    Design Rationale:
+    The Kosha dimensions (VITAL, BLISSFUL) saturate because:
+    1. Sigmoid activation has no competition (unlike softmax)
+    2. Model learns to push activations to extremes for confidence
+    3. Once saturated, gradient signal is weak (sigmoid derivative → 0)
+
+    This regularizer provides gradient signal BEFORE saturation occurs,
+    keeping dimensions in the "healthy gradient zone" of sigmoid.
+    """
+
+    # 32D State component slices
+    BHAVA_SLICE = slice(0, 12)
+    KOSHA_SLICE = slice(12, 17)
+    VRITTI_SLICE = slice(17, 22)
+    GUNA_SLICE = slice(22, 28)
+    RESERVED_SLICE = slice(28, 32)
+
+    # Kosha names for diagnostics
+    KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+
+    def __init__(self, config: Optional[SovereignStateRegularizerConfig] = None):
+        """
+        Initialize the Sovereign State Regularizer.
+
+        Args:
+            config: Configuration dataclass. Uses defaults if None.
+        """
+        super().__init__()
+        self.config = config or SovereignStateRegularizerConfig()
+
+        # Register Kosha weights as buffer for device compatibility
+        self.register_buffer(
+            'kosha_weights',
+            torch.tensor(self.config.kosha_weights, dtype=torch.float32)
+        )
+
+        # Tracking for diagnostics
+        self._last_diagnostics: Dict[str, Any] = {}
+
+    def _compute_anti_saturation_loss(
+        self,
+        activations: torch.Tensor,
+        weights: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Compute anti-saturation loss for a set of activations.
+
+        Uses smooth hinge loss that:
+        - Is zero when activation is in healthy range [low_thresh, high_thresh]
+        - Increases smoothly as activation approaches 0 or 1
+        - Has continuous gradients (no hard boundaries)
+
+        The penalty function:
+            penalty_high = softplus((activation - high_thresh) / margin)
+            penalty_low = softplus((low_thresh - activation) / margin)
+            total = penalty_high + penalty_low
+
+        Args:
+            activations: [B, D] or [B, S, D] activations in [0, 1]
+            weights: Optional per-dimension weights [D]
+
+        Returns:
+            Scalar anti-saturation loss
+        """
+        high_thresh = self.config.saturation_threshold_high
+        low_thresh = self.config.saturation_threshold_low
+        margin = self.config.saturation_margin
+
+        # Flatten to [N, D] if needed
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        # Soft penalty for approaching 1 (too hot)
+        penalty_high = F.softplus((activations - high_thresh) / margin)
+
+        # Soft penalty for approaching 0 (too cold)
+        penalty_low = F.softplus((low_thresh - activations) / margin)
+
+        # Combined penalty
+        total_penalty = penalty_high + penalty_low
+
+        # Apply per-dimension weights if provided
+        if weights is not None:
+            weights = weights.unsqueeze(0).expand_as(total_penalty)
+            total_penalty = total_penalty * weights
+
+        return total_penalty.mean()
+
+    def _compute_variance_loss(
+        self,
+        activations: torch.Tensor,
+        target_std: float,
+    ) -> torch.Tensor:
+        """
+        Compute VICReg-style variance maintenance loss.
+
+        Penalizes when the standard deviation of activations falls below
+        the target. This prevents dimension collapse where all values
+        converge to the same number.
+
+        Formula:
+            L_var = sum_d max(0, target_std - std(x_d))^2
+
+        Args:
+            activations: [B, D] or [B, S, D] activations
+            target_std: Target standard deviation per dimension
+
+        Returns:
+            Scalar variance loss
+        """
+        # Flatten to [N, D]
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        # Compute std for each dimension across samples
+        dim_std = activations.std(dim=0)
+
+        # Hinge loss: penalize when std < target
+        variance_loss = F.relu(target_std - dim_std).pow(2).mean()
+
+        return variance_loss
+
+    def _compute_decorrelation_loss(
+        self,
+        activations: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute decorrelation loss (off-diagonal penalty).
+
+        Encourages orthogonality between dimensions by penalizing
+        off-diagonal elements of the correlation matrix.
+
+        Args:
+            activations: [B, D] or [B, S, D] activations
+
+        Returns:
+            Scalar decorrelation loss
+        """
+        # Flatten to [N, D]
+        if activations.dim() == 3:
+            B, S, D = activations.shape
+            activations = activations.reshape(B * S, D)
+
+        N, D = activations.shape
+
+        # Center the activations
+        centered = activations - activations.mean(dim=0, keepdim=True)
+
+        # Compute correlation matrix
+        cov = (centered.T @ centered) / max(N - 1, 1)
+        std = activations.std(dim=0, keepdim=True) + 1e-8
+        corr = cov / (std.T @ std)
+
+        # Off-diagonal penalty (correlation between different dimensions)
+        eye = torch.eye(D, device=activations.device)
+        off_diag = corr * (1 - eye)
+
+        return off_diag.pow(2).sum() / max(D * (D - 1), 1)
+
+    def forward(
+        self,
+        sovereign_state: torch.Tensor,
+        return_components: bool = False,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Compute 32D Sovereign State regularization loss.
+
+        Args:
+            sovereign_state: [B, 32] or [B, S, 32] full 32D state
+            return_components: If True, return detailed component breakdown
+
+        Returns:
+            Tuple of (total_loss, diagnostics_dict)
+        """
+        diagnostics = {
+            'anti_saturation': {},
+            'variance': {},
+            'decorrelation': 0.0,
+            'total': 0.0,
+            'saturation_alerts': [],
+        }
+
+        total_loss = torch.tensor(0.0, device=sovereign_state.device)
+
+        # === KOSHA REGULARIZATION (Most Critical) ===
+        if self.config.regularize_kosha:
+            kosha = sovereign_state[..., self.KOSHA_SLICE]
+
+            # Anti-saturation with per-Kosha weights
+            kosha_sat_loss = self._compute_anti_saturation_loss(
+                kosha, weights=self.kosha_weights
+            )
+            diagnostics['anti_saturation']['kosha'] = kosha_sat_loss.item()
+            total_loss = total_loss + kosha_sat_loss * self.config.anti_saturation_weight
+
+            # Variance maintenance
+            kosha_var_loss = self._compute_variance_loss(
+                kosha, self.config.target_std_kosha
+            )
+            diagnostics['variance']['kosha'] = kosha_var_loss.item()
+            total_loss = total_loss + kosha_var_loss * self.config.variance_weight
+
+            # Check for saturation alerts
+            kosha_mean = kosha.mean(dim=0) if kosha.dim() == 2 else kosha.mean(dim=(0, 1))
+            for i, (name, val) in enumerate(zip(self.KOSHA_NAMES, kosha_mean.tolist())):
+                if val > self.config.saturation_threshold_high:
+                    diagnostics['saturation_alerts'].append(
+                        f"{name}({val:.0%})>HIGH"
+                    )
+                elif val < self.config.saturation_threshold_low:
+                    diagnostics['saturation_alerts'].append(
+                        f"{name}({val:.0%})<LOW"
+                    )
+
+            # Decorrelation (optional)
+            if self.config.decorrelation_weight > 0:
+                kosha_decorr = self._compute_decorrelation_loss(kosha)
+                diagnostics['decorrelation'] += kosha_decorr.item()
+                total_loss = total_loss + kosha_decorr * self.config.decorrelation_weight
+
+        # === VRITTI REGULARIZATION ===
+        if self.config.regularize_vritti:
+            vritti = sovereign_state[..., self.VRITTI_SLICE]
+
+            vritti_sat_loss = self._compute_anti_saturation_loss(vritti)
+            diagnostics['anti_saturation']['vritti'] = vritti_sat_loss.item()
+            total_loss = total_loss + vritti_sat_loss * self.config.anti_saturation_weight * 0.5
+
+            vritti_var_loss = self._compute_variance_loss(
+                vritti, self.config.target_std_vritti
+            )
+            diagnostics['variance']['vritti'] = vritti_var_loss.item()
+            total_loss = total_loss + vritti_var_loss * self.config.variance_weight * 0.5
+
+        # === GUNA REGULARIZATION ===
+        if self.config.regularize_guna:
+            guna = sovereign_state[..., self.GUNA_SLICE]
+
+            guna_sat_loss = self._compute_anti_saturation_loss(guna)
+            diagnostics['anti_saturation']['guna'] = guna_sat_loss.item()
+            total_loss = total_loss + guna_sat_loss * self.config.anti_saturation_weight * 0.3
+
+            guna_var_loss = self._compute_variance_loss(
+                guna, self.config.target_std_guna
+            )
+            diagnostics['variance']['guna'] = guna_var_loss.item()
+            total_loss = total_loss + guna_var_loss * self.config.variance_weight * 0.3
+
+        # === BHAVA REGULARIZATION (usually not needed - softmax normalized) ===
+        if self.config.regularize_bhava:
+            bhava = sovereign_state[..., self.BHAVA_SLICE]
+
+            bhava_sat_loss = self._compute_anti_saturation_loss(bhava)
+            diagnostics['anti_saturation']['bhava'] = bhava_sat_loss.item()
+            total_loss = total_loss + bhava_sat_loss * self.config.anti_saturation_weight * 0.2
+
+        diagnostics['total'] = total_loss.item()
+        self._last_diagnostics = diagnostics
+
+        if return_components:
+            return total_loss, diagnostics
+        return total_loss, diagnostics
+
+    def get_summary(self, sovereign_state: torch.Tensor) -> str:
+        """
+        Get a human-readable summary of 32D state health.
+
+        Args:
+            sovereign_state: [B, 32] current state
+
+        Returns:
+            String summary like "32D:VIT(95%)>BLI(92%) ⚠️"
+        """
+        kosha = sovereign_state[..., self.KOSHA_SLICE]
+        kosha_mean = kosha.mean(dim=0) if kosha.dim() == 2 else kosha.mean(dim=(0, 1))
+
+        parts = []
+        alerts = []
+        for i, (name, val) in enumerate(zip(self.KOSHA_NAMES, kosha_mean.tolist())):
+            short_name = name[:3]  # MAT, VIT, MEN, INT, BLI
+            if val > 0.9:
+                parts.append(f"{short_name}({val:.0%})")
+                alerts.append(short_name)
+            elif val > 0.75:
+                parts.append(f"{short_name}({val:.0%})")
+
+        if not parts:
+            return "32D:OK"
+
+        status = "🔴" if len(alerts) >= 2 else "⚠️" if alerts else "🟢"
+        return f"32D:{'>'.join(parts)} {status}"
+
+    @property
+    def last_diagnostics(self) -> Dict[str, Any]:
+        """Return diagnostics from last forward pass."""
+        return self._last_diagnostics
