@@ -1082,6 +1082,320 @@ Token 47: "Titus"  → Kosha check → Mental: 0.82, Intellect: 0.15
 
 ---
 
+## 12. Kosha-Vritti Resonance Map (v2.3.0)
+
+### 12.1 Theoretical Foundation
+
+In Vedic psychology, **Vrittis** (वृत्ति) are the "waves" or modifications of the mind. Patanjali's Yoga Sutras identify five Vrittis that represent distinct cognitive states.
+
+**Critical Causal Insight**: Koshas are the **CAUSE**, Vrittis are the **EFFECT**.
+
+When a Kosha becomes **overactive**, it produces its corresponding Vritti as a consequence:
+
+```
+CAUSE                      EFFECT
+─────                      ──────
+Kosha (overactive)    →    Vritti (manifests)
+```
+
+This is why the **Kosha Gyroscope is an indirect method for balanced reasoning**: by maintaining Kosha homeostasis (preventing any Kosha from becoming overactive), we prevent the cascade into Vritti states. The Gyroscope doesn't target Vrittis directly—it addresses the root cause.
+
+> "The Vritti is not random—it is the natural consequence when its Kosha becomes overactive and dominates consciousness."
+
+### 12.2 The Kosha-Vritti Causal Mapping Matrix
+
+**Direction**: Kosha (CAUSE) → Vritti (EFFECT)
+
+| Kosha (Overactive Cause) | Vritti (Emergent Effect) | Trigger Condition | Consequence |
+|--------------------------|-------------------------|-------------------|-------------|
+| **Annamaya** (Physical) | **Pramana** (Right Knowledge) | Physical > 0.8, Low entropy | Excessive focus on sensory/factual data |
+| **Pranamaya** (Vital) | **Nidra** (Sleep/Inertia) | Vital spike then crash (overactive → shutdown) | System shutdown to prevent burnout |
+| **Manomaya** (Mental) | **Vikalpa** (Imagination) | Mental > 0.8, Intellect < 0.3 | Pattern loops without logical grounding |
+| **Vijnanamaya** (Intellect) | **Smriti** (Memory/Recall) | Intellect > 0.8 + Physical active | Over-reliance on structural recall |
+| **Anandamaya** (Bliss) | **Viparyaya** (Misconception) | Bliss > 0.8, Physical < 0.3 | Creative expansion loses external reality |
+
+### 12.3 Key Insights
+
+#### 12.3.1 Bliss → Viparyaya (Misconception)
+
+This mapping may seem counterintuitive—why would Bliss lead to misconception?
+
+> **Answer**: Anandamaya represents expansion into the **unmanifest**. From the perspective of external reality, this IS a misconception. The model is generating things that don't exist in manifest data. This is not "wrong"—it's creative expansion. The Vijnana Gate ensures this expansion is **intentional** rather than **accidental**.
+
+#### 12.3.2 Vital → Nidra (Sleep)
+
+The Pranamaya-Nidra link implements homeostatic energy regulation:
+
+```
+High Vital (energy spike) → Overactive system → Nidra (shutdown)
+Low Vital (depleted)      → System rest      → Nidra (sleep)
+```
+
+This prevents the model from "burning out" during high-gradient phases.
+
+#### 12.3.3 Mental → Vikalpa (Imagination)
+
+This mapping explains the "Titus" loops:
+
+> "Vikalpa is knowledge that is based on words but lacks a corresponding reality."
+> — Yoga Sutras 1.9
+
+When the Gyroscope sees:
+- High Mental (Manomaya) > 0.8
+- Low Intellect (Vijnanamaya) < 0.3
+
+It identifies the state as **Vikalpa** (pathological imagination) and triggers a "Reality Rip" to reach Bliss through proper channels.
+
+#### 12.3.4 The Gyroscope's Indirect Path to Balanced Reasoning
+
+The Kosha Gyroscope does NOT directly regulate logic or reasoning. Instead, it:
+
+1. **Prevents Kosha Overactivation**: Keeps all 5 Koshas within homeostatic bounds
+2. **Blocks Vritti Cascade**: By preventing overactive Koshas, Vrittis don't manifest
+3. **Creates Space for Intelligence**: With no dominant Vritti pattern, the model's Vijnanamaya (Intellect) can operate without distortion
+
+```
+Without Gyroscope:
+  Overactive Mental → Vikalpa (Imagination loops) → Distorted reasoning
+
+With Gyroscope:
+  Balanced Mental → No Vritti trigger → Clear intellect → Balanced reasoning
+```
+
+This is the **indirect method**: rather than telling the model HOW to reason, we create the conditions where balanced reasoning naturally emerges.
+
+### 12.4 Vritti Resonance Loss Function
+
+The VrittiResonanceLoss ensures emergent Vrittis are properly anchored to their primary Koshas:
+
+```python
+def compute_vritti_resonance_loss(kosha_states, vritti_probs, guna_states=None):
+    """
+    Penalizes misalignment between Kosha activation and Vritti emergence.
+
+    Phase 2 only: Activates after graduation when Vrittis crystallize.
+
+    Violations:
+    - Claiming Pramana (Right Knowledge) without Physical grounding
+    - Claiming Smriti (Memory) without Intellect validation
+    - High Vikalpa (Imagination) when Mental is low
+
+    Args:
+        kosha_states: [B, N, 5] Kosha activations (indices 12-16 of sovereign)
+        vritti_probs: [B, N, 5] Vritti probabilities (indices 17-21 of sovereign)
+        guna_states:  [B, N, 3] Optional Guna states for Tamas check
+
+    Returns:
+        Scalar resonance violation loss
+    """
+    # Extract Kosha dimensions
+    physical = kosha_states[..., 0]   # Annamaya
+    vital = kosha_states[..., 1]      # Pranamaya
+    mental = kosha_states[..., 2]     # Manomaya
+    intellect = kosha_states[..., 3]  # Vijnanamaya
+    bliss = kosha_states[..., 4]      # Anandamaya
+
+    # Extract Vritti dimensions
+    pramana = vritti_probs[..., 0]    # Right Knowledge
+    viparyaya = vritti_probs[..., 1]  # Misconception
+    vikalpa = vritti_probs[..., 2]    # Imagination
+    nidra = vritti_probs[..., 3]      # Sleep
+    smriti = vritti_probs[..., 4]     # Memory
+
+    # === RESONANCE VIOLATIONS ===
+
+    # 1. Pramana requires Physical grounding
+    #    Can't claim "Right Knowledge" without manifest data
+    pramana_violation = F.relu(pramana - physical)
+
+    # 2. Smriti requires Intellect validation
+    #    Memory/recall needs logical structure
+    smriti_violation = F.relu(smriti - intellect)
+
+    # 3. Vikalpa should track Mental
+    #    Imagination without mental activity is incoherent
+    vikalpa_violation = F.relu(vikalpa - mental)
+
+    # 4. Viparyaya tracks ungrounded Bliss
+    #    Misconception = Bliss without Physical anchor
+    viparyaya_violation = F.relu(viparyaya - bliss) + F.relu(viparyaya * physical)
+
+    # 5. Nidra tracks Vital depletion (inverse relationship)
+    #    Sleep emerges when Vital is exhausted
+    nidra_violation = F.relu(nidra * vital)  # High Nidra + High Vital = violation
+
+    return (pramana_violation + smriti_violation + vikalpa_violation +
+            viparyaya_violation + nidra_violation).mean()
+```
+
+### 12.5 Integration with Gyroscope Phases
+
+| Phase | Kosha Gyroscope | Vritti Resonance | State |
+|-------|-----------------|------------------|-------|
+| **Phase 1** (PPL > 30) | ACTIVE (0.15 → 3.0 gain) | DISABLED (read-only logging) | Instructor |
+| **Graduation** (PPL < 30, σ < 1.5) | RAMP DOWN | DIAGNOSTIC MODE | Transition |
+| **Phase 2** (Post-grad) | OFF | ACTIVE (λ = 0.1) | Self-Learning |
+
+### 12.6 Diagnostic Logging (Phase 1)
+
+During Phase 1, we capture Kosha-Vritti correlations without applying loss:
+
+```python
+# Log Kosha-Vritti alignment metrics
+if global_step % eval_every == 0:
+    alignment = compute_kosha_vritti_alignment(kosha_states, vritti_states)
+    print(f"  [VRITTI] Phys-Prama:{alignment['pp']:.2f} | "
+          f"Ment-Vikal:{alignment['mv']:.2f} | "
+          f"Intl-Smrit:{alignment['is']:.2f} | "
+          f"Blis-Vipar:{alignment['bv']:.2f}")
+```
+
+This allows empirical validation of the mapping before Phase 2 activation.
+
+---
+
+## 13. Kosha Phase Corrector - Inference-Time Guardrail (v2.4.0)
+
+### 13.1 Training vs Inference Philosophy
+
+The Kosha Gyroscope system uses **different mechanisms** for training and inference:
+
+| Phase | Mechanism | Type | Purpose |
+|-------|-----------|------|---------|
+| **Training** | KoshaGyroscopicLoss | Indirect (gradients) | Model LEARNS balance |
+| **Inference** | KoshaPhaseCorrector | Direct (rotation) | Runtime GUARDRAILS |
+
+**Analogy**:
+- Training = Teaching someone to drive (learn the principles)
+- Inference = Guardrails on a cliff road (safety when deployed)
+
+You don't want guardrails during driving lessons (they'd never learn to balance), but you absolutely want them on real roads.
+
+### 13.2 Why Direct Correction Only During Inference
+
+During inference:
+- No gradients are available
+- The model cannot "learn its way out" of a stuck state
+- If Mental becomes overactive, Vikalpa loops can't be corrected through learning
+- Direct intervention is the ONLY option
+
+During training:
+- Gradients flow through KoshaGyroscopicLoss
+- The model learns to self-correct
+- Direct intervention would override learning
+- We want the model to internalize balance
+
+### 13.3 KoshaPhaseCorrector Implementation
+
+```python
+class KoshaPhaseCorrector(nn.Module):
+    """
+    Inference-time direct phase rotation.
+
+    When a Kosha becomes overactive during generation:
+    1. Detects the imbalance (Kosha > 0.75)
+    2. Computes corrective rotation vector
+    3. Applies rotation directly to sovereign state
+    4. Logs the intervention for diagnostics
+    """
+
+    def forward(self, sovereign_state: torch.Tensor) -> torch.Tensor:
+        # 1. Extract Kosha states [12:17]
+        kosha_states = sovereign_state[:, 12:17]
+
+        # 2. Detect overactive Kosha
+        is_imbalanced, overactive_kosha = self.detect_imbalance(kosha_states)
+
+        if not is_imbalanced:
+            return sovereign_state  # No correction needed
+
+        # 3. Compute correction toward target distribution
+        target = self.rotation_targets[overactive_kosha]
+        correction = (target - kosha_states) * self.correction_strength
+
+        # 4. Apply correction and re-normalize
+        corrected = sovereign_state.clone()
+        corrected[:, 12:17] = F.softmax(kosha_states + correction, dim=-1)
+
+        return corrected
+```
+
+### 13.4 Rotation Targets
+
+When a specific Kosha is overactive, rotate toward its complement:
+
+| Overactive Kosha | Rotation Target | Rationale |
+|------------------|-----------------|-----------|
+| **Physical** (>0.75) | Boost Bliss/Mental | Prevent over-grounding |
+| **Vital** (>0.75) | Boost Intellect | Channel energy into reasoning |
+| **Mental** (>0.75) | Boost Intellect (priority) | Break Vikalpa loops |
+| **Intellect** (>0.75) | Boost Mental | Allow creative flow |
+| **Bliss** (>0.75) | Boost Physical (grounding) | Prevent Viparyaya drift |
+
+### 13.5 InferenceGuardrail (Combined Module)
+
+The `InferenceGuardrail` combines phase correction with Vritti alignment checking:
+
+```python
+class InferenceGuardrail(nn.Module):
+    """
+    Combined inference-time safety module:
+    1. KoshaPhaseCorrector - Direct phase rotation
+    2. VrittiResonanceLoss - Alignment checking (diagnostic)
+    3. Health score computation
+    """
+
+    def forward(self, sovereign_state):
+        # 1. Apply phase correction if needed
+        corrected, phase_diag = self.phase_corrector(sovereign_state)
+
+        # 2. Check Vritti alignment (diagnostic only)
+        alignment = self.vritti_checker.compute_alignment_scores(...)
+
+        # 3. Compute health score
+        health = self._compute_health_score(corrected, alignment)
+
+        return corrected, {'phase': phase_diag, 'alignment': alignment, 'health': health}
+```
+
+### 13.6 Integration with SRK
+
+The phase corrector is integrated into `SovereignReasoningKernel.forward_pass()`:
+
+```python
+# In forward_pass, at Layer 11 (synthesis):
+if not self.training and self.config.enable_phase_corrector:
+    corrected_state, phase_diag = self.apply_inference_guardrail(current_state)
+    if phase_diag.get('correction_applied'):
+        current_state = corrected_state
+        diagnostics['intervention'] = 'synthesis + phase_correction'
+```
+
+### 13.7 Configuration
+
+```python
+@dataclass
+class SRKConfig:
+    # Kosha Phase Corrector (v2.4.0)
+    enable_phase_corrector: bool = True       # Enable during inference
+    phase_corrector_threshold: float = 0.75   # Activation threshold
+    phase_corrector_strength: float = 0.3     # Correction strength (0-1)
+    phase_corrector_max_step: float = 0.2     # Max correction per step
+```
+
+### 13.8 Diagnostic Output
+
+When phase correction is applied during inference:
+
+```
+🔧 [PHASE CORRECTION] Applied
+   Overactive: Mental (0.82)
+   Correction: Mental -0.15, Intellect +0.12, Physical +0.03
+   Health Score: 0.74
+```
+
+---
+
 ## Appendix A: Glossary
 
 | Term | Definition |

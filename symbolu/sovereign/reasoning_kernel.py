@@ -2,7 +2,7 @@
 Sovereign Reasoning Kernel (SRK) - State-Persistent AGI Architecture
 =====================================================================
 
-Version: 9.8.0
+Version: 9.9.0
 Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md
 
 The SRK implements Recursive Ontological Intelligence (ROI) by managing
@@ -19,10 +19,15 @@ Components:
 - SynthesisGate: Layer 11 final edit
 - VrittiGate: Epistemological witness for self-correction
 - KoshaShiftController: Depth-scaling through 5 consciousness layers
+- KoshaPhaseCorrector: Inference-time direct phase rotation (v2.4.0)
 
 The SRK ensures that when the model learns mathematical rigor (O7 Reasoning)
 in one domain, that same rigor is structurally preserved when switching
 to another domain via Isomorphic Mapping.
+
+Training vs Inference:
+- Training: Uses KoshaGyroscopicLoss (indirect, gradient-based)
+- Inference: Uses KoshaPhaseCorrector (direct, guardrail-based)
 """
 
 from dataclasses import dataclass, field
@@ -133,6 +138,12 @@ class SRKConfig:
     opb_unlock_threshold: float = 0.3  # Activation threshold to unlock dimension
     opb_lock_decay: float = 0.95       # Per-step decay for locked dimensions (slow release)
     opb_blend_factor: float = 0.6      # How much locked state influences new state
+
+    # Kosha Phase Corrector (Inference-Time Guardrail) - v2.4.0
+    enable_phase_corrector: bool = True       # Enable direct phase correction during inference
+    phase_corrector_threshold: float = 0.75   # Kosha activation threshold for correction
+    phase_corrector_strength: float = 0.3     # Correction strength (0-1)
+    phase_corrector_max_step: float = 0.2     # Max correction per step
 
     # Training parameters
     warmup_steps: int = 5000
@@ -1554,6 +1565,11 @@ class SovereignReasoningKernel(nn.Module):
             blend_factor=self.config.opb_blend_factor,
         )
 
+        # Kosha Phase Corrector (Inference-Time Guardrail) - v2.4.0
+        # Lazy import to avoid circular dependency
+        self._phase_corrector = None
+        self._phase_corrector_initialized = False
+
         # State projector for hidden → 32D extraction
         self.state_projector = nn.Sequential(
             nn.Linear(self.config.hidden_dim, self.config.hidden_dim // 2),
@@ -1570,6 +1586,61 @@ class SovereignReasoningKernel(nn.Module):
             self.karma_state[0, 12] = 0.8
             # FACT (index 17): Verified truth
             self.karma_state[0, 17] = 0.3
+
+    def _get_phase_corrector(self):
+        """
+        Lazy-load the KoshaPhaseCorrector to avoid circular imports.
+
+        The phase corrector is only used during inference, so we defer
+        initialization until first use.
+        """
+        if not self._phase_corrector_initialized:
+            if self.config.enable_phase_corrector:
+                try:
+                    from symbolu.losses.kosha_gyroscope import (
+                        KoshaPhaseCorrector,
+                        KoshaPhaseCorrectorConfig,
+                    )
+                    self._phase_corrector = KoshaPhaseCorrector(
+                        config=KoshaPhaseCorrectorConfig(
+                            overactive_threshold=self.config.phase_corrector_threshold,
+                            correction_strength=self.config.phase_corrector_strength,
+                            max_correction_per_step=self.config.phase_corrector_max_step,
+                        )
+                    )
+                except ImportError:
+                    # Kosha gyroscope module not available
+                    self._phase_corrector = None
+            self._phase_corrector_initialized = True
+        return self._phase_corrector
+
+    def apply_inference_guardrail(
+        self,
+        sovereign_state: torch.Tensor,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Apply inference-time phase correction guardrail.
+
+        This method is called during inference (model.eval()) to prevent
+        stuck states by directly rotating the phase when Kosha imbalance
+        is detected.
+
+        Args:
+            sovereign_state: [B, 32] current sovereign state
+
+        Returns:
+            corrected_state: [B, 32] with phase correction applied if needed
+            diagnostics: Dict with correction details
+        """
+        phase_corrector = self._get_phase_corrector()
+
+        if phase_corrector is None or self.training:
+            # No correction during training or if not available
+            return sovereign_state, {'phase_correction_available': False}
+
+        # Apply phase correction
+        corrected_state, diagnostics = phase_corrector(sovereign_state)
+        return corrected_state, diagnostics
 
     def get_karma(self, batch_size: int = 1) -> torch.Tensor:
         """Get karma state expanded for batch."""
@@ -1754,6 +1825,20 @@ class SovereignReasoningKernel(nn.Module):
                 diagnostics['opb_newly_locked'] = self._opb_diagnostics.get('newly_locked', [])
                 diagnostics['opb_newly_unlocked'] = self._opb_diagnostics.get('newly_unlocked', [])
 
+        # --- INFERENCE GUARDRAIL: Direct Phase Correction (v2.4.0) ---
+        # Only apply during inference (not training) at the final synthesis layer
+        if (not self.training and
+            self.config.enable_phase_corrector and
+            layer_idx == self.config.synthesis_layer and
+            current_state is not None):
+
+            corrected_state, phase_diag = self.apply_inference_guardrail(current_state)
+            diagnostics['phase_correction'] = phase_diag
+
+            if phase_diag.get('correction_applied', False):
+                current_state = corrected_state
+                diagnostics['intervention'] = 'synthesis + phase_correction'
+
         return {
             'hidden_states': hidden_states,
             'diagnostics': diagnostics,
@@ -1815,7 +1900,7 @@ class SovereignReasoningKernel(nn.Module):
         """
         checkpoint = {
             # Version for migration compatibility
-            'srk_version': '9.8.0',
+            'srk_version': '9.9.0',
             'state_dim': self.config.state_dim,
             'hidden_dim': self.config.hidden_dim,
 

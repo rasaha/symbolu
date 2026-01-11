@@ -223,12 +223,14 @@ except ImportError:
     COMPUTE_S_DRIFT_AVAILABLE = False
     compute_s_drift = None
 
-# Import Kosha Gyroscope (v2.2.1) - Homeostatic Self-Regulation
+# Import Kosha Gyroscope (v2.2.1) and Vritti Resonance (v2.3.0) - Homeostatic Self-Regulation
 try:
     from symbolu.losses import (
         KoshaGyroscopicLoss,
         KoshaGyroscopeConfig,
         InvertedCurriculumController,
+        VrittiResonanceLoss,
+        VrittiResonanceConfig,
     )
     from symbolu.monitors import (
         GraduationMonitor,
@@ -10528,7 +10530,7 @@ def train(config: UnifiedTrainingConfig):
         print(f"     ⚠️  WITNESS POINT - consciousness/awareness alignment")
 
     # ==========================================================================
-    # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation Loss
+    # v2.3.0: Kosha Gyroscope + Vritti Resonance - Homeostatic Self-Regulation
     # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
     # ==========================================================================
     kosha_gyroscope = None
@@ -10536,6 +10538,7 @@ def train(config: UnifiedTrainingConfig):
     kosha_rip_logger = None
     kosha_curriculum_controller = None
     kosha_graduated = False  # Track graduation state
+    vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
         # Initialize KoshaGyroscopicLoss with Dynamic Weight Scheduler (v2.2.1)
@@ -10586,7 +10589,7 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.2.1: Homeostatic Self-Regulation ENABLED     ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.3.0: Homeostatic Self-Regulation ENABLED     ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
@@ -10600,6 +10603,17 @@ def train(config: UnifiedTrainingConfig):
         if config.enable_rip_logger:
             print(f"  ║  Reality Rip Logger: ENABLED → {config.rip_logger_dir}")
         print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+
+        # v2.3.0: Initialize Vritti Resonance Loss (Phase 2 only - activates at graduation)
+        vritti_resonance = VrittiResonanceLoss(
+            config=VrittiResonanceConfig(
+                resonance_lambda=0.1,       # Weight for resonance loss
+                require_graduation=True,     # Only activate after graduation
+            )
+        ).to(device)
+        print(f"  🔱 [VRITTI RESONANCE] Initialized (dormant until graduation)")
+        print(f"     Phase 1: Diagnostic logging only (Kosha-Vritti alignment)")
+        print(f"     Phase 2: Loss active at λ=0.1 after PPL < {config.gyroscope_graduation_ppl}")
 
     elif config.enable_kosha_gyroscope and not KOSHA_GYROSCOPE_AVAILABLE:
         print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
@@ -11459,8 +11473,13 @@ def train(config: UnifiedTrainingConfig):
                             sovereign_state = outputs.get('state', None) if isinstance(outputs, dict) else None
                             if sovereign_state is not None:
                                 # Extract Kosha [12:17] from 32D sovereign state
-                                # Shape: [batch, seq, 32] -> [batch, seq, 5]
-                                kosha_states_for_gyro = sovereign_state[:, :, KOSHA_SLICE]
+                                # Handle both 2D [batch, 32] and 3D [batch, seq, 32] shapes
+                                if sovereign_state.dim() == 2:
+                                    # Shape: [batch, 32] -> [batch, 1, 5]
+                                    kosha_states_for_gyro = sovereign_state[:, KOSHA_SLICE].unsqueeze(1)
+                                else:
+                                    # Shape: [batch, seq, 32] -> [batch, seq, 5]
+                                    kosha_states_for_gyro = sovereign_state[:, :, KOSHA_SLICE]
 
                         if kosha_states_for_gyro is not None:
                             # Compute gyroscope loss with dynamic gain based on current PPL
@@ -11502,6 +11521,33 @@ def train(config: UnifiedTrainingConfig):
                                 print(f"\n  ⚖️ [KOSHA GYROSCOPE] Fully active at step {global_step}")
                                 print(f"     Dynamic Gain: {gyroscope_components.get('effective_gain', 0):.3f}")
                                 print(f"     PPL: {current_ppl if current_ppl else 'N/A'}")
+
+                            # v2.3.0: Compute Vritti Resonance (Phase 2 loss + Phase 1 diagnostics)
+                            if vritti_resonance is not None:
+                                # Extract Vritti states from 32D sovereign state [17:22]
+                                vritti_states_for_res = None
+                                if sovereign_state is not None:
+                                    if sovereign_state.dim() == 2:
+                                        vritti_states_for_res = sovereign_state[:, VRITTI_SLICE].unsqueeze(1)
+                                    else:
+                                        vritti_states_for_res = sovereign_state[:, :, VRITTI_SLICE]
+
+                                if vritti_states_for_res is not None:
+                                    # Compute Kosha-Vritti alignment (diagnostic logging)
+                                    alignment = vritti_resonance.compute_alignment_scores(
+                                        kosha_states_for_gyro, vritti_states_for_res
+                                    )
+                                    metrics['vritti_alignment'] = alignment
+
+                                    # Phase 2: Apply resonance loss if graduated
+                                    if vritti_resonance.active:
+                                        res_loss, res_components = vritti_resonance(
+                                            kosha_states_for_gyro, vritti_states_for_res,
+                                            return_components=True
+                                        )
+                                        loss = loss + res_loss
+                                        metrics['vritti_resonance_loss'] = res_loss.item()
+                                        metrics['vritti_components'] = res_components
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -12035,6 +12081,26 @@ def train(config: UnifiedTrainingConfig):
                     csr_pct = int(rss_weights['csr'] * 100)
                     log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
+                # v2.2.1: Kosha Gyroscope Status (Homeostatic Self-Regulation)
+                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
+                    gyro_loss = metrics.get('gyroscope_loss', 0.0)
+                    gyro_gain = metrics.get('gyroscope_effective_gain', 0.0)
+                    gyro_scale = metrics.get('gyroscope_warmup_scale', 1.0)
+                    # Show graduation status
+                    if kosha_graduated:
+                        gyro_status = "🎓GRAD"
+                    elif gyro_scale < 1.0:
+                        gyro_status = f"⏳{gyro_scale*100:.0f}%"
+                    else:
+                        gyro_status = "⚖️ON"
+                    log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} | PPL→{config.gyroscope_target_ppl:.0f}"
+
+                # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
+                if vritti_resonance is not None and 'vritti_alignment' in metrics:
+                    align = metrics['vritti_alignment']
+                    res_status = "🎓ACT" if vritti_resonance.active else "👁️OBS"
+                    log_msg += f"\n    {res_status} [VRITTI] P-Pram:{align.get('physical_pramana', 0):.2f} | M-Vikal:{align.get('mental_vikalpa', 0):.2f} | I-Smrit:{align.get('intellect_smriti', 0):.2f}"
+
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
@@ -12206,6 +12272,12 @@ def train(config: UnifiedTrainingConfig):
                         print(f"     PPL σ:    {kosha_graduation_monitor.variance:.3f} < {config.gyroscope_graduation_variance}")
                         print(f"     Model has learned to self-regulate!")
                         print(f"     Gyroscope transitioning to ramp-down phase...")
+
+                        # v2.3.0: Activate Vritti Resonance Loss for Phase 2
+                        if vritti_resonance is not None:
+                            vritti_resonance.activate()
+                            print(f"  🔱 [VRITTI RESONANCE] Activated for Phase 2!")
+                            print(f"     Loss will now enforce Kosha-Vritti alignment")
                         print(f"  {'='*60}\n")
 
                         # Save rip logger summary if enabled

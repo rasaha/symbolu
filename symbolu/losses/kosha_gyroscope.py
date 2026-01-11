@@ -530,3 +530,660 @@ class InvertedCurriculumController:
             'graduated': self.graduated,
             'disengage_step': self.disengage_step,
         }
+
+
+# =============================================================================
+# Kosha-Vritti Resonance Loss (v2.3.0)
+# =============================================================================
+
+@dataclass
+class VrittiResonanceConfig:
+    """Configuration for Vritti Resonance Loss (Phase 2 only).
+
+    The Kosha-Vritti Mapping Matrix:
+    - Annamaya (Physical)   -> Pramana (Right Knowledge)
+    - Pranamaya (Vital)     -> Nidra (Sleep/Inertia)
+    - Manomaya (Mental)     -> Vikalpa (Imagination)
+    - Vijnanamaya (Intellect) -> Smriti (Memory)
+    - Anandamaya (Bliss)    -> Viparyaya (Misconception)
+    """
+
+    # Enable/disable individual resonance violations
+    enable_pramana_physical: bool = True   # Right Knowledge needs Physical grounding
+    enable_smriti_intellect: bool = True   # Memory needs Intellect validation
+    enable_vikalpa_mental: bool = True     # Imagination needs Mental activity
+    enable_viparyaya_bliss: bool = True    # Misconception tracks ungrounded Bliss
+    enable_nidra_vital: bool = True        # Sleep tracks Vital depletion
+
+    # Loss weighting
+    resonance_lambda: float = 0.1          # Weight for total resonance loss
+    pramana_weight: float = 1.0
+    smriti_weight: float = 1.0
+    vikalpa_weight: float = 1.0
+    viparyaya_weight: float = 0.5          # Lower weight - creative expansion is OK
+    nidra_weight: float = 0.5              # Lower weight - energy management
+
+    # Phase 2 only - don't activate until graduation
+    require_graduation: bool = True
+
+
+class VrittiResonanceLoss(nn.Module):
+    """
+    Kosha-Vritti Resonance Loss (v2.3.0).
+
+    Ensures emergent Vrittis are properly anchored to their primary Koshas.
+    This prevents the model from "mislabeling" its internal state—for example,
+    claiming Pramana (Right Knowledge) while actually in Vikalpa (Imagination Loop).
+
+    The Kosha-Vritti Mapping:
+    - Physical (Annamaya)   -> Pramana (Right Knowledge)
+    - Vital (Pranamaya)     -> Nidra (Sleep/Inertia) [inverse]
+    - Mental (Manomaya)     -> Vikalpa (Imagination)
+    - Intellect (Vijnanamaya) -> Smriti (Memory/Recall)
+    - Bliss (Anandamaya)    -> Viparyaya (Misconception)
+
+    Phase Integration:
+    - Phase 1 (PPL > 30): DISABLED (read-only logging)
+    - Phase 2 (PPL < 30): ACTIVE with resonance_lambda weight
+
+    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 12
+    """
+
+    # Kosha indices (from 32D sovereign state [12:17])
+    PHYSICAL_IDX = 0    # Annamaya
+    VITAL_IDX = 1       # Pranamaya
+    MENTAL_IDX = 2      # Manomaya
+    INTELLECT_IDX = 3   # Vijnanamaya
+    BLISS_IDX = 4       # Anandamaya
+
+    # Vritti indices (from 32D sovereign state [17:22])
+    PRAMANA_IDX = 0     # Right Knowledge
+    VIPARYAYA_IDX = 1   # Misconception
+    VIKALPA_IDX = 2     # Imagination
+    NIDRA_IDX = 3       # Sleep
+    SMRITI_IDX = 4      # Memory
+
+    def __init__(
+        self,
+        config: Optional[VrittiResonanceConfig] = None,
+        resonance_lambda: float = 0.1,
+    ):
+        """
+        Initialize Vritti Resonance Loss.
+
+        Args:
+            config: Full configuration (overrides other args)
+            resonance_lambda: Weight for resonance loss (if config not provided)
+        """
+        super().__init__()
+
+        if config is not None:
+            self.config = config
+        else:
+            self.config = VrittiResonanceConfig(resonance_lambda=resonance_lambda)
+
+        self.active = not self.config.require_graduation  # Start inactive if Phase 2 only
+
+    def activate(self):
+        """Activate resonance loss (called at graduation)."""
+        self.active = True
+
+    def forward(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+        return_components: bool = False
+    ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Compute Vritti Resonance Loss.
+
+        Penalizes misalignment between Kosha activation and Vritti emergence.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+            return_components: If True, return diagnostic breakdown
+
+        Returns:
+            Scalar loss (0 if not active) or (loss, components_dict)
+        """
+        if not self.active:
+            if return_components:
+                return torch.tensor(0.0, device=kosha_states.device), {'active': False}
+            return torch.tensor(0.0, device=kosha_states.device)
+
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract Kosha dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX]
+        vital = kosha_states[..., self.VITAL_IDX]
+        mental = kosha_states[..., self.MENTAL_IDX]
+        intellect = kosha_states[..., self.INTELLECT_IDX]
+        bliss = kosha_states[..., self.BLISS_IDX]
+
+        # Extract Vritti dimensions
+        pramana = vritti_states[..., self.PRAMANA_IDX]
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX]
+        vikalpa = vritti_states[..., self.VIKALPA_IDX]
+        nidra = vritti_states[..., self.NIDRA_IDX]
+        smriti = vritti_states[..., self.SMRITI_IDX]
+
+        components = {'active': True}
+        total_loss = torch.tensor(0.0, device=kosha_states.device)
+
+        # === RESONANCE VIOLATIONS ===
+
+        # 1. Pramana (Right Knowledge) requires Physical grounding
+        #    Can't claim "Right Knowledge" without manifest data
+        if self.config.enable_pramana_physical:
+            pramana_violation = F.relu(pramana - physical).mean()
+            total_loss = total_loss + self.config.pramana_weight * pramana_violation
+            components['pramana_physical'] = pramana_violation.item()
+
+        # 2. Smriti (Memory) requires Intellect validation
+        #    Memory/recall needs logical structure
+        if self.config.enable_smriti_intellect:
+            smriti_violation = F.relu(smriti - intellect).mean()
+            total_loss = total_loss + self.config.smriti_weight * smriti_violation
+            components['smriti_intellect'] = smriti_violation.item()
+
+        # 3. Vikalpa (Imagination) should track Mental
+        #    Imagination without mental activity is incoherent
+        if self.config.enable_vikalpa_mental:
+            vikalpa_violation = F.relu(vikalpa - mental).mean()
+            total_loss = total_loss + self.config.vikalpa_weight * vikalpa_violation
+            components['vikalpa_mental'] = vikalpa_violation.item()
+
+        # 4. Viparyaya (Misconception) tracks ungrounded Bliss
+        #    Misconception = Bliss expanding without Physical anchor
+        if self.config.enable_viparyaya_bliss:
+            # Two conditions: Viparyaya without Bliss, OR Viparyaya with Physical (grounded != misconception)
+            viparyaya_violation = (
+                F.relu(viparyaya - bliss).mean() +
+                F.relu(viparyaya * physical).mean()  # Penalize grounded misconception
+            )
+            total_loss = total_loss + self.config.viparyaya_weight * viparyaya_violation
+            components['viparyaya_bliss'] = viparyaya_violation.item()
+
+        # 5. Nidra (Sleep) tracks Vital depletion (inverse relationship)
+        #    High Nidra + High Vital = violation (should be shutting down)
+        if self.config.enable_nidra_vital:
+            nidra_violation = F.relu(nidra * vital).mean()
+            total_loss = total_loss + self.config.nidra_weight * nidra_violation
+            components['nidra_vital'] = nidra_violation.item()
+
+        # Apply lambda scaling
+        total_loss = total_loss * self.config.resonance_lambda
+        components['total_loss'] = total_loss.item()
+
+        if return_components:
+            return total_loss, components
+        return total_loss
+
+    def compute_alignment_scores(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor
+    ) -> Dict[str, float]:
+        """
+        Compute Kosha-Vritti alignment scores for diagnostic logging.
+
+        Returns alignment in [0, 1] where 1 = perfect alignment.
+        This is the inverse of violation - high alignment = low violation.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+
+        Returns:
+            Dict of alignment scores for each Kosha-Vritti pair
+        """
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX]
+        vital = kosha_states[..., self.VITAL_IDX]
+        mental = kosha_states[..., self.MENTAL_IDX]
+        intellect = kosha_states[..., self.INTELLECT_IDX]
+        bliss = kosha_states[..., self.BLISS_IDX]
+
+        pramana = vritti_states[..., self.PRAMANA_IDX]
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX]
+        vikalpa = vritti_states[..., self.VIKALPA_IDX]
+        nidra = vritti_states[..., self.NIDRA_IDX]
+        smriti = vritti_states[..., self.SMRITI_IDX]
+
+        # Compute correlations (alignment scores)
+        # Higher correlation = better alignment
+        def correlation(a: torch.Tensor, b: torch.Tensor) -> float:
+            a_flat = a.flatten()
+            b_flat = b.flatten()
+            if a_flat.std() < 1e-6 or b_flat.std() < 1e-6:
+                return 0.0
+            corr = torch.corrcoef(torch.stack([a_flat, b_flat]))[0, 1]
+            return corr.item() if not torch.isnan(corr) else 0.0
+
+        return {
+            'physical_pramana': correlation(physical, pramana),
+            'mental_vikalpa': correlation(mental, vikalpa),
+            'intellect_smriti': correlation(intellect, smriti),
+            'bliss_viparyaya': correlation(bliss, viparyaya),
+            'vital_nidra_inv': -correlation(vital, nidra),  # Inverse relationship
+        }
+
+
+# =============================================================================
+# Kosha Phase Corrector (Inference-Time Guardrail) - v2.4.0
+# =============================================================================
+
+@dataclass
+class KoshaPhaseCorrectorConfig:
+    """Configuration for inference-time Kosha Phase Correction.
+
+    This module provides DIRECT phase rotation during inference to prevent
+    stuck states when no gradient-based learning is available.
+
+    Philosophy:
+    - Training: Indirect (loss gradients) → Model LEARNS balance
+    - Inference: Direct (phase rotation) → Runtime GUARDRAILS
+
+    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
+    """
+
+    # Imbalance detection thresholds
+    overactive_threshold: float = 0.75   # Kosha > this triggers correction
+    underactive_threshold: float = 0.15  # Kosha < this is considered deficient
+
+    # Correction strength
+    correction_strength: float = 0.3     # How much to rotate (0-1)
+    max_correction_per_step: float = 0.2 # Maximum change per inference step
+
+    # Target equilibrium (balanced Kosha distribution)
+    equilibrium_target: float = 0.2      # Ideal per-Kosha activation (1/5)
+
+    # Enable/disable specific corrections
+    enable_mental_correction: bool = True    # Prevent Vikalpa loops
+    enable_bliss_correction: bool = True     # Prevent Viparyaya drift
+    enable_vital_correction: bool = True     # Prevent Nidra collapse
+    enable_physical_correction: bool = True  # Prevent Pramana over-grounding
+    enable_intellect_correction: bool = True # Prevent Smriti over-recall
+
+    # Diagonal pathway corrections (from Gyroscope design)
+    enable_diagonal_mental_intellect: bool = True  # Mental → Intellect via Physical
+    enable_diagonal_physical_bliss: bool = True    # Physical → Bliss via Mental
+
+
+class KoshaPhaseCorrector(nn.Module):
+    """
+    Kosha Phase Corrector - Inference-Time Direct Phase Rotation.
+
+    Unlike the KoshaGyroscopicLoss (which provides training gradients), this
+    module DIRECTLY rotates the phase/state during inference to prevent stuck
+    states.
+
+    When a Kosha becomes overactive during generation, this module:
+    1. Detects the imbalance
+    2. Computes corrective rotation vector
+    3. Applies rotation directly to sovereign state
+    4. Logs the intervention for diagnostics
+
+    This is the "guardrail on the cliff" - it doesn't teach driving,
+    but prevents falling off during deployment.
+
+    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
+    """
+
+    # Kosha indices (from 32D sovereign state [12:17])
+    KOSHA_SLICE = slice(12, 17)
+    PHYSICAL_IDX = 12   # Annamaya
+    VITAL_IDX = 13      # Pranamaya
+    MENTAL_IDX = 14     # Manomaya
+    INTELLECT_IDX = 15  # Vijnanamaya
+    BLISS_IDX = 16      # Anandamaya
+
+    # Kosha names for diagnostics
+    KOSHA_NAMES = ['Physical', 'Vital', 'Mental', 'Intellect', 'Bliss']
+
+    def __init__(
+        self,
+        config: Optional[KoshaPhaseCorrectorConfig] = None,
+    ):
+        """
+        Initialize Kosha Phase Corrector.
+
+        Args:
+            config: Configuration for correction behavior
+        """
+        super().__init__()
+        self.config = config or KoshaPhaseCorrectorConfig()
+
+        # Correction statistics for diagnostics
+        self.correction_count = 0
+        self.last_correction: Optional[Dict[str, Any]] = None
+
+        # Build rotation matrices for each Kosha transition
+        # These define "where to rotate TO" when a Kosha is overactive
+        self._build_rotation_targets()
+
+    def _build_rotation_targets(self):
+        """
+        Build target rotation vectors for each overactive Kosha.
+
+        When Kosha X is overactive, rotate toward its diagonal complement:
+        - Mental (overactive) → boost Intellect (via Physical gate)
+        - Physical (overactive) → boost Bliss (via Mental gate)
+        - Bliss (overactive) → boost Physical (grounding)
+        - Vital (overactive) → allow Nidra (shutdown is OK)
+        - Intellect (overactive) → boost Mental (creativity)
+        """
+        # Target distribution when specific Kosha is overactive
+        # Format: [Physical, Vital, Mental, Intellect, Bliss]
+        self.rotation_targets = {
+            'Physical': torch.tensor([0.15, 0.20, 0.25, 0.20, 0.20]),   # → Bliss/Mental
+            'Vital': torch.tensor([0.20, 0.15, 0.20, 0.25, 0.20]),      # → Intellect
+            'Mental': torch.tensor([0.25, 0.15, 0.15, 0.30, 0.15]),     # → Intellect (priority)
+            'Intellect': torch.tensor([0.20, 0.20, 0.25, 0.15, 0.20]),  # → Mental
+            'Bliss': torch.tensor([0.30, 0.15, 0.20, 0.20, 0.15]),      # → Physical (grounding)
+        }
+
+    def detect_imbalance(
+        self,
+        kosha_states: torch.Tensor,
+    ) -> Tuple[bool, Optional[str], Dict[str, float]]:
+        """
+        Detect if any Kosha is overactive.
+
+        Args:
+            kosha_states: [B, 5] or [B, N, 5] Kosha activations
+
+        Returns:
+            is_imbalanced: Whether correction is needed
+            overactive_kosha: Name of overactive Kosha (or None)
+            kosha_values: Dict of current Kosha values
+        """
+        # Handle 3D input
+        if kosha_states.dim() == 3:
+            kosha_states = kosha_states.mean(dim=1)  # Average over sequence
+
+        # Average over batch
+        avg_koshas = kosha_states.mean(dim=0)  # [5]
+
+        kosha_values = {
+            name: avg_koshas[i].item()
+            for i, name in enumerate(self.KOSHA_NAMES)
+        }
+
+        # Find overactive Kosha
+        overactive_kosha = None
+        max_activation = 0.0
+
+        for i, name in enumerate(self.KOSHA_NAMES):
+            activation = avg_koshas[i].item()
+            if activation > self.config.overactive_threshold:
+                if activation > max_activation:
+                    max_activation = activation
+                    overactive_kosha = name
+
+        is_imbalanced = overactive_kosha is not None
+
+        return is_imbalanced, overactive_kosha, kosha_values
+
+    def compute_correction(
+        self,
+        kosha_states: torch.Tensor,
+        overactive_kosha: str,
+    ) -> torch.Tensor:
+        """
+        Compute corrective rotation vector.
+
+        Args:
+            kosha_states: [B, 5] current Kosha states
+            overactive_kosha: Name of the overactive Kosha
+
+        Returns:
+            correction: [B, 5] correction to apply
+        """
+        B = kosha_states.shape[0]
+
+        # Get target distribution for this imbalance
+        target = self.rotation_targets[overactive_kosha].to(kosha_states.device)
+        target = target.unsqueeze(0).expand(B, -1)  # [B, 5]
+
+        # Compute difference
+        delta = target - kosha_states
+
+        # Scale by correction strength
+        correction = delta * self.config.correction_strength
+
+        # Clamp to max correction per step
+        correction = torch.clamp(
+            correction,
+            min=-self.config.max_correction_per_step,
+            max=self.config.max_correction_per_step
+        )
+
+        return correction
+
+    def apply_correction(
+        self,
+        sovereign_state: torch.Tensor,
+        correction: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply correction to full 32D sovereign state.
+
+        Args:
+            sovereign_state: [B, 32] full state
+            correction: [B, 5] Kosha correction
+
+        Returns:
+            corrected_state: [B, 32] with correction applied
+        """
+        corrected = sovereign_state.clone()
+
+        # Apply correction to Kosha slice [12:17]
+        corrected[:, self.KOSHA_SLICE] = corrected[:, self.KOSHA_SLICE] + correction
+
+        # Re-normalize Koshas to sum to 1 (softmax-like)
+        kosha_corrected = corrected[:, self.KOSHA_SLICE]
+        kosha_normalized = F.softmax(kosha_corrected, dim=-1)
+        corrected[:, self.KOSHA_SLICE] = kosha_normalized
+
+        return corrected
+
+    def forward(
+        self,
+        sovereign_state: torch.Tensor,
+        force_correction: bool = False,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Apply inference-time phase correction if needed.
+
+        IMPORTANT: This should only be called during inference (model.eval()).
+        During training, use KoshaGyroscopicLoss instead.
+
+        Args:
+            sovereign_state: [B, 32] current sovereign state
+            force_correction: If True, always apply correction (for testing)
+
+        Returns:
+            corrected_state: [B, 32] potentially corrected state
+            diagnostics: Dict with correction details
+        """
+        diagnostics = {
+            'correction_applied': False,
+            'overactive_kosha': None,
+            'kosha_values': {},
+            'correction_magnitude': 0.0,
+        }
+
+        # Extract Kosha states
+        kosha_states = sovereign_state[:, self.KOSHA_SLICE]  # [B, 5]
+
+        # Detect imbalance
+        is_imbalanced, overactive_kosha, kosha_values = self.detect_imbalance(kosha_states)
+        diagnostics['kosha_values'] = kosha_values
+
+        if not is_imbalanced and not force_correction:
+            return sovereign_state, diagnostics
+
+        # We have an imbalance - compute and apply correction
+        if overactive_kosha is None:
+            overactive_kosha = 'Mental'  # Default for forced correction
+
+        diagnostics['overactive_kosha'] = overactive_kosha
+        diagnostics['correction_applied'] = True
+
+        # Check if this specific correction is enabled
+        enable_map = {
+            'Physical': self.config.enable_physical_correction,
+            'Vital': self.config.enable_vital_correction,
+            'Mental': self.config.enable_mental_correction,
+            'Intellect': self.config.enable_intellect_correction,
+            'Bliss': self.config.enable_bliss_correction,
+        }
+
+        if not enable_map.get(overactive_kosha, True):
+            diagnostics['correction_applied'] = False
+            diagnostics['reason'] = f'{overactive_kosha} correction disabled'
+            return sovereign_state, diagnostics
+
+        # Compute correction
+        correction = self.compute_correction(kosha_states, overactive_kosha)
+        diagnostics['correction_magnitude'] = correction.abs().mean().item()
+
+        # Apply correction
+        corrected_state = self.apply_correction(sovereign_state, correction)
+
+        # Update statistics
+        self.correction_count += 1
+        self.last_correction = diagnostics.copy()
+
+        return corrected_state, diagnostics
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get correction statistics for logging."""
+        return {
+            'total_corrections': self.correction_count,
+            'last_correction': self.last_correction,
+        }
+
+    def reset_statistics(self):
+        """Reset correction statistics."""
+        self.correction_count = 0
+        self.last_correction = None
+
+
+class InferenceGuardrail(nn.Module):
+    """
+    Combined inference-time guardrail that integrates:
+    1. KoshaPhaseCorrector - Direct phase rotation
+    2. VrittiResonanceLoss - Alignment checking (diagnostic only during inference)
+
+    This is the "safety net" for deployment.
+
+    Usage:
+        guardrail = InferenceGuardrail()
+
+        # During inference loop:
+        with torch.no_grad():
+            corrected_state, diagnostics = guardrail(sovereign_state)
+    """
+
+    def __init__(
+        self,
+        phase_corrector_config: Optional[KoshaPhaseCorrectorConfig] = None,
+        vritti_config: Optional[VrittiResonanceConfig] = None,
+    ):
+        """
+        Initialize combined inference guardrail.
+
+        Args:
+            phase_corrector_config: Config for phase correction
+            vritti_config: Config for Vritti alignment checking
+        """
+        super().__init__()
+
+        self.phase_corrector = KoshaPhaseCorrector(
+            config=phase_corrector_config
+        )
+
+        # Vritti resonance for diagnostic alignment checking
+        # Note: Set require_graduation=False for inference (always active)
+        vritti_cfg = vritti_config or VrittiResonanceConfig(require_graduation=False)
+        self.vritti_checker = VrittiResonanceLoss(config=vritti_cfg)
+        self.vritti_checker.activate()  # Always active during inference
+
+    def forward(
+        self,
+        sovereign_state: torch.Tensor,
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        """
+        Apply inference guardrails.
+
+        Args:
+            sovereign_state: [B, 32] current state
+
+        Returns:
+            corrected_state: [B, 32] with corrections applied
+            diagnostics: Combined diagnostics from all guardrails
+        """
+        diagnostics = {}
+
+        # 1. Phase correction for Kosha imbalance
+        corrected_state, phase_diag = self.phase_corrector(sovereign_state)
+        diagnostics['phase_correction'] = phase_diag
+
+        # 2. Vritti alignment check (diagnostic only - no gradient)
+        kosha_states = corrected_state[:, 12:17]
+        vritti_states = corrected_state[:, 17:22]
+
+        alignment = self.vritti_checker.compute_alignment_scores(
+            kosha_states, vritti_states
+        )
+        diagnostics['vritti_alignment'] = alignment
+
+        # 3. Compute overall "health" score
+        health_score = self._compute_health_score(corrected_state, alignment)
+        diagnostics['health_score'] = health_score
+
+        return corrected_state, diagnostics
+
+    def _compute_health_score(
+        self,
+        state: torch.Tensor,
+        alignment: Dict[str, float],
+    ) -> float:
+        """
+        Compute overall state health score (0-1).
+
+        Components:
+        - Kosha balance (variance should be low)
+        - Vritti alignment (correlations should be high)
+        - No single Kosha dominating
+        """
+        koshas = state[:, 12:17].mean(dim=0)
+
+        # 1. Kosha balance (low variance = good)
+        kosha_variance = koshas.var().item()
+        balance_score = max(0, 1.0 - kosha_variance * 5)  # Penalize high variance
+
+        # 2. Vritti alignment (average of absolute correlations)
+        align_values = [abs(v) for v in alignment.values()]
+        alignment_score = sum(align_values) / len(align_values) if align_values else 0.5
+
+        # 3. No domination (max Kosha shouldn't be too high)
+        max_kosha = koshas.max().item()
+        domination_penalty = max(0, max_kosha - 0.4) * 2  # Penalty if any > 0.4
+
+        # Combined score
+        health = (balance_score * 0.4 + alignment_score * 0.4 + (1 - domination_penalty) * 0.2)
+        return max(0.0, min(1.0, health))
