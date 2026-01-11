@@ -11,13 +11,13 @@ Key Features (v2.2.5 - Geometric Expansion with VICReg):
 - Hard ReLU Rip: Reality Reversal when trapped with gate closed
 - Two-Path Loss: intellect_path + rip_signal for distinct behaviors
 - VICReg variance regularization: Prevents sigmoid collapse
-- Original Gemini thresholds restored: trap=0.75, gate=0.30, balance=0.25
+- Golden Ratio trap threshold: trap=0.618 (φ), gate=0.30, balance=0.25
 
 v2.2.5 Geometric Expansion (Sigmoid Mode):
 - Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
 - Each Kosha can reach [0, 1] independently
 - Model can be HIGH Physical AND HIGH Intellectual simultaneously
-- Thresholds restored to Gemini's v2.2.4 design (0.75/0.30/0.25)
+- Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
 - VICReg variance term prevents all Koshas collapsing to same value
 
 v2.2.4 "Pressure Relief Valve" Architecture:
@@ -69,7 +69,7 @@ class KoshaGyroscopeConfig:
     - Koshas are INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
     - Each Kosha can reach [0, 1] independently
     - Model can be HIGH Physical AND HIGH Intellectual simultaneously
-    - Thresholds restored to Gemini's v2.2.4 design (0.75/0.30/0.25)
+    - Trap threshold uses Golden Ratio φ=0.618 (natural equilibrium point)
     - VICReg variance term prevents sigmoid collapse
 
     v2.2.4 Three-Stage Hybrid Logic:
@@ -92,10 +92,10 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # Trap detection thresholds (v2.2.5: Gemini's original design for sigmoid mode)
+    # Trap detection thresholds (v2.2.5: Golden Ratio design for sigmoid mode)
     # With sigmoid Koshas, each sheath is independent [0, 1]
-    # trap_threshold=0.75 fires when a Kosha is highly activated
-    trap_threshold: float = 0.75         # Kosha saturation point (Gemini v2.2.4)
+    # trap_threshold=0.618 (φ) fires at golden ratio - natural equilibrium point
+    trap_threshold: float = 0.618        # Kosha saturation point (Golden Ratio φ)
     gate_threshold: float = 0.30         # Minimum for gate activation (Gemini v2.2.4)
     balance_target: float = 0.25         # Required opposite activation (Gemini v2.2.4)
 
@@ -193,9 +193,9 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        trap_threshold: float = 0.75,  # v2.2.5: Gemini's original (sigmoid mode)
-        gate_threshold: float = 0.30,  # v2.2.5: Gemini's original (sigmoid mode)
-        balance_target: float = 0.25,  # v2.2.5: Gemini's original (sigmoid mode)
+        trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
+        gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
+        balance_target: float = 0.25,   # v2.2.5: Gemini's original (sigmoid mode)
         gate_temperature: float = 10.0,
         # Three-Stage Hybrid Logic (v2.2.4)
         damper_steepness: float = 5.0,
@@ -228,7 +228,7 @@ class KoshaGyroscopicLoss(nn.Module):
 
         Args:
             trap_threshold: Activation level above which a Kosha is "trapped".
-                           Default 0.75 for sigmoid (Gemini's v2.2.4 design).
+                           Default 0.618 (Golden Ratio φ) - natural equilibrium point.
             gate_threshold: Minimum activation for gate to be considered open.
                            Default 0.30 for sigmoid (Gemini's v2.2.4 design).
             balance_target: Target activation level for the opposite Kosha.
@@ -1117,8 +1117,8 @@ class KoshaPhaseCorrectorConfig:
     Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
-    # Imbalance detection thresholds (v2.2.5: Gemini's design for sigmoid mode)
-    overactive_threshold: float = 0.75   # Kosha > this triggers correction (Gemini v2.2.4)
+    # Imbalance detection thresholds (v2.2.5: Golden Ratio design for sigmoid mode)
+    overactive_threshold: float = 0.618  # Kosha > this triggers correction (Golden Ratio φ)
     underactive_threshold: float = 0.15  # Kosha < this is considered deficient
 
     # Correction strength
