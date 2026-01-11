@@ -3396,3 +3396,299 @@ This creates a **closed-loop feedback system** where the model organically adjus
 | 2.3.0 | 2026-01-11 | Complete Harmonic Pentad (Floor/Ceiling for all 5 Koshas) |
 | 2.2.6 | 2026-01-11 | Bliss Ceiling Clamp (φ = 61.8%) |
 | 2.2.5 | 2026-01-11 | Added GradientNormThrottle + WikiText cleaner |
+
+---
+
+## 19. Training Usage Guide (v2.3.2)
+
+This section provides practical guidance for using the Kosha Gyroscope during training.
+
+### 19.1 Quick Start - Default Configuration
+
+The Kosha Gyroscope is enabled by default with sensible defaults. Simply run training:
+
+```bash
+python train_unified_llm.py --enable_gyroscope
+```
+
+This activates:
+- Complete Harmonic Pentad (v2.3.0) with Fibonacci Sattvic Bands
+- Reflexive Domain Morph (v2.3.2) for automatic domain adaptation
+- Dynamic Weight Scheduler (v2.2.1) for PPL-based gain ramping
+- Three-Stage Hybrid Logic (v2.2.4) for trap detection and correction
+
+### 19.2 Complete Configuration Reference
+
+#### Core Gyroscope Settings
+
+```bash
+# Enable/disable the gyroscope
+--enable_gyroscope                    # Enable (recommended)
+--disable_gyroscope                   # Disable completely
+
+# Dynamic Weight Scheduler (PPL-based gain ramping)
+--gyroscope_base_gain 0.15            # Gentle observation when PPL > 100
+--gyroscope_max_gain 3.0              # Strict enforcement as PPL → 30
+--gyroscope_ppl_ceiling 100.0         # PPL above which gain stays at base
+--gyroscope_target_ppl 30.0           # PPL at which gain reaches max
+```
+
+#### v2.3.0: Complete Harmonic Pentad - Sattvic Bands
+
+Each Kosha has a Floor (push when below) and Ceiling (clamp when above):
+
+```bash
+# Mental (23.6% - 38.2%): Pattern recognition
+--gyroscope_floor_mental 0.236        # Spark Abstraction
+--gyroscope_ceiling_mental 0.382      # Bliss Damper / Reality Rip
+
+# Physical (38.2% - 61.8%): Grounding foundation [×3.0 priority]
+--gyroscope_floor_physical 0.382      # Grounding Push (THE FOUNDATION)
+--gyroscope_ceiling_physical 0.618    # Data Trap
+
+# Intellect (25.0% - 61.8%): Discriminative reasoning [×1.5 priority]
+--gyroscope_floor_intellect 0.250     # Logic Pressure
+--gyroscope_ceiling_intellect 0.618   # Hubris Tax
+
+# Vital (23.6% - 78.6%): Momentum/energy [uses momentum control]
+--gyroscope_floor_vital 0.236         # Wake-up Boost (1.5× momentum)
+--gyroscope_ceiling_vital 0.786       # Momentum Brake (0.5× momentum)
+
+# Bliss (23.6% - 61.8%): Unified awareness
+--gyroscope_floor_bliss 0.236         # Spark Creativity
+--gyroscope_ceiling_bliss 0.618       # Delusion Tether
+```
+
+#### v2.3.0: Correction Factors
+
+```bash
+# How strongly to correct deviations
+--gyroscope_floor_push_factor 0.5     # Loss weight for floor violations
+--gyroscope_ceiling_clamp_factor 0.5  # Gain reduction per ceiling violation
+```
+
+#### v2.3.2: Reflexive Domain Morph
+
+Automatically adapts Sattvic Bands based on domain (language vs code/math):
+
+```bash
+# Enable/disable domain morphing
+--gyroscope_domain_morph_enabled      # Enable (default: True)
+--disable_gyroscope_domain_morph      # Disable for pure language training
+
+# EMA decay for token heuristics (higher = slower, more stable)
+--gyroscope_domain_morph_ema_decay 0.9    # Default: 0.9 (slow)
+# Use 0.5-0.7 for faster response to domain changes
+
+# Signal weights (must sum to positive)
+--gyroscope_domain_morph_internal_weight 0.5  # Weight for Kosha state signal
+--gyroscope_domain_morph_external_weight 0.5  # Weight for token pattern signal
+```
+
+**Domain Morph Effects:**
+- Language Mode (μ=0): Physical Floor=38.2%, Bliss Ceiling=61.8%, Push=×3.0
+- Logic Mode (μ=1): Physical Floor=50.0%, Bliss Ceiling=38.2%, Push=×5.0
+
+#### v2.2.4: Three-Stage Hybrid Logic
+
+Fine-tune the trap detection and correction mechanisms:
+
+```bash
+# Damper/Gate steepness (higher = sharper transitions)
+--gyroscope_damper_steepness 5.0      # Bliss/Physical damper sigmoid
+--gyroscope_gate_steepness 5.0        # Physical/Mental gate sigmoid
+
+# Reality Rip strength (circuit breaker for severe traps)
+--gyroscope_rip_multiplier 2.0        # Multiplier for rip signal loss
+```
+
+#### Temporal and Momentum Settings
+
+```bash
+# Physical history window (tokens) for temporal grounding
+--gyroscope_temporal_window 3         # Smooth Physical over N tokens
+
+# Vital momentum (dynamic gain via energy level)
+--gyroscope_vital_momentum            # Enable (default: True)
+--disable_gyroscope_vital_momentum    # Disable
+```
+
+#### Graduation Criteria (Inverted Curriculum)
+
+```bash
+# When to disengage gyroscope (model has "graduated")
+--gyroscope_graduation_ppl 30.0       # Target PPL for graduation
+--gyroscope_graduation_variance 1.5   # Max PPL variance for stability
+--gyroscope_graduation_window 10      # Steps to check stability
+
+# Warmup and rampdown
+--gyroscope_warmup_steps 100          # Steps before gyroscope fully active
+--gyroscope_rampdown_steps 500        # Steps to ramp gain to 0 at graduation
+```
+
+### 19.3 Recommended Configurations
+
+#### For WikiText/Language Training (Default)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_base_gain 0.15 \
+  --gyroscope_max_gain 3.0
+```
+
+#### For Code/Math Training (Strict Logic Mode)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_domain_morph_external_weight 0.7 \
+  --gyroscope_domain_morph_internal_weight 0.3 \
+  --gyroscope_floor_physical 0.45 \
+  --gyroscope_ceiling_bliss 0.45
+```
+
+#### For Mixed Domain Training (Code + Language)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_domain_morph_enabled \
+  --gyroscope_domain_morph_ema_decay 0.7 \
+  --gyroscope_domain_morph_external_weight 0.6 \
+  --gyroscope_domain_morph_internal_weight 0.4
+```
+
+#### For Pure Language (Disable Domain Morph)
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --disable_gyroscope_domain_morph
+```
+
+#### For Aggressive Grounding (Fix "Blissful Ignorance")
+
+```bash
+python train_unified_llm.py \
+  --enable_gyroscope \
+  --gyroscope_floor_physical 0.45 \
+  --gyroscope_ceiling_bliss 0.50 \
+  --gyroscope_floor_push_factor 0.7 \
+  --gyroscope_ceiling_clamp_factor 0.6
+```
+
+### 19.4 Understanding Training Logs
+
+The gyroscope produces detailed logs showing Kosha states and corrections:
+
+```
+⚖️ON [GYRO] Loss:0.0234 | Gain:1.50 (Base:0.15×A:1.00) 🔒×0.50
+     [PENTAD] MODE:LANG (μ:15%) | M:30%✓ P:45%✓ I:35%✓ V:55%✓ B:40%✓
+```
+
+**Interpreting the log:**
+
+| Element | Meaning |
+|---------|---------|
+| `⚖️ON` | Gyroscope is active |
+| `🎓GRAD` | Model has graduated (gyroscope disengaging) |
+| `⏳75%` | Warmup in progress (75% complete) |
+| `Loss:0.0234` | Current gyroscope loss |
+| `Gain:1.50` | Effective gain (after PPL scaling) |
+| `🔒×0.50` | Ceiling clamp active (gain reduced to 50%) |
+| `MODE:LANG` | Domain detected as Language |
+| `(μ:15%)` | Morph factor (15% toward Logic mode) |
+| `M:30%✓` | Mental at 30%, in Sattvic band |
+| `P:45%_` | Physical at 45%, below floor (being pushed) |
+| `I:70%!` | Intellect at 70%, above ceiling (being clamped) |
+
+**Status Indicators:**
+- `✓` = In Sattvic Band (healthy, no correction)
+- `_` = Below Floor (push loss active)
+- `!` = Above Ceiling (clamp active)
+
+### 19.5 Monitoring Domain Morph
+
+When domain morphing is active, watch for:
+
+1. **MODE transitions**: `LANG` → `CODE` → `MATH` as content changes
+2. **μ factor**: Should smoothly transition, not oscillate rapidly
+3. **Physical Floor elevation**: In code mode, Physical should be higher
+4. **Bliss Ceiling tightening**: In code mode, Bliss should be lower
+
+**Healthy behavior:**
+```
+[PENTAD] MODE:LANG (μ:8%)  | M:28%✓ P:42%✓ I:32%✓ V:52%✓ B:45%✓  # Prose
+[PENTAD] MODE:LANG (μ:22%) | M:30%✓ P:48%✓ I:38%✓ V:58%✓ B:38%✓  # Some structure
+[PENTAD] MODE:CODE (μ:78%) | M:25%✓ P:55%✓ I:52%✓ V:62%✓ B:28%✓  # Code block
+```
+
+**Unhealthy oscillation (increase EMA decay):**
+```
+[PENTAD] MODE:CODE (μ:85%) | ...
+[PENTAD] MODE:LANG (μ:12%) | ...  # Too fast!
+[PENTAD] MODE:CODE (μ:90%) | ...
+```
+
+### 19.6 Troubleshooting
+
+| Problem | Symptom | Solution |
+|---------|---------|----------|
+| "Blissful Ignorance" | B consistently >60%, fluent gibberish | Lower `--gyroscope_ceiling_bliss 0.50` |
+| Weak Grounding | P consistently <30% | Raise `--gyroscope_floor_physical 0.45` |
+| Over-Intellectualization | I consistently >60% | Lower `--gyroscope_ceiling_intellect 0.55` |
+| Sluggish Learning | V consistently <25% | Check Vital momentum is enabled |
+| Domain Oscillation | MODE flipping rapidly | Increase `--gyroscope_domain_morph_ema_decay 0.95` |
+| Wrong Domain Detection | CODE detected on prose | Increase internal weight, decrease external |
+| Gain Too Aggressive | High loss spikes | Lower `--gyroscope_max_gain 2.0` |
+| Gain Too Passive | Corrections not working | Raise `--gyroscope_floor_push_factor 0.7` |
+
+### 19.7 TensorBoard Metrics
+
+The following metrics are logged for monitoring:
+
+```python
+# Core metrics
+gyroscope/loss                 # Total gyroscope loss
+gyroscope/effective_gain       # Current gain (after PPL scaling)
+gyroscope/axis1_loss           # Mental→Intellect axis loss
+gyroscope/axis2_loss           # Physical→Bliss axis loss
+
+# Kosha values
+gyroscope/mental_val           # Mental Kosha saturation
+gyroscope/physical_val         # Physical Kosha saturation
+gyroscope/intellect_val        # Intellect Kosha saturation
+gyroscope/vital_val            # Vital Kosha saturation
+gyroscope/bliss_val            # Bliss Kosha saturation
+
+# v2.3.0 Harmonic Pentad
+gyroscope/floor_violations     # Count of Koshas below floor
+gyroscope/ceiling_violations   # Count of Koshas above ceiling
+gyroscope/ceiling_clamp_scalar # Multiplicative clamp factor
+gyroscope/floor_push_loss      # Loss from floor violations
+
+# v2.3.2 Domain Morph
+gyroscope/morph_factor         # Current μ (0=Language, 1=Logic)
+gyroscope/curr_phys_floor      # Current (morphed) Physical floor
+gyroscope/curr_bliss_ceil      # Current (morphed) Bliss ceiling
+gyroscope/curr_push_weight     # Current (morphed) push weight
+```
+
+### 19.8 Best Practices
+
+1. **Start with defaults**: The default configuration is well-tuned for most use cases.
+
+2. **Enable domain morph for mixed data**: If your dataset contains code, math, and prose, keep domain morphing enabled.
+
+3. **Disable domain morph for pure language**: If training on pure prose (no code/math), disable for slightly faster training.
+
+4. **Watch the PENTAD log**: The `_` and `!` indicators tell you which corrections are active.
+
+5. **Adjust one parameter at a time**: When tuning, change one threshold and observe the effect over several hundred steps.
+
+6. **Use graduation**: Let the model graduate naturally when PPL stabilizes below 30.
+
+7. **Monitor domain transitions**: Healthy training shows smooth μ transitions, not rapid oscillation.
