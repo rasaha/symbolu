@@ -217,6 +217,9 @@ class KoshaGyroscopicLoss(nn.Module):
         threshold_intellect: float = 0.500,  # Pivot - target for "Right Knowledge"
         threshold_vital: float = 0.786,      # Resistance - trigger momentum reset
         threshold_bliss: float = 0.236,      # Spark - below this, release damping
+        # v2.2.6: Bliss Clamp (ceiling for "blissful ignorance")
+        threshold_bliss_ceiling: float = 0.618,  # Ceiling - above this, apply Bliss Clamp
+        bliss_clamp_factor: float = 0.5,         # Gain reduction when Bliss > ceiling (0.5 = halve)
         # Legacy thresholds (backward compatibility)
         trap_threshold: float = 0.618,  # v2.2.5: Golden Ratio φ (sigmoid mode)
         gate_threshold: float = 0.30,   # v2.2.5: Gemini's original (sigmoid mode)
@@ -283,6 +286,9 @@ class KoshaGyroscopicLoss(nn.Module):
         self.threshold_intellect = threshold_intellect
         self.threshold_vital = threshold_vital
         self.threshold_bliss = threshold_bliss
+        # v2.2.6: Bliss Clamp
+        self.threshold_bliss_ceiling = threshold_bliss_ceiling
+        self.bliss_clamp_factor = bliss_clamp_factor
 
         # Legacy thresholds (backward compatibility)
         self.trap_threshold = trap_threshold
@@ -660,6 +666,21 @@ class KoshaGyroscopicLoss(nn.Module):
         else:
             effective_gain = base_dynamic_gain
 
+        # === v2.2.6: BLISS CLAMP - Counter "Blissful Ignorance" ===
+        # When Bliss exceeds ceiling (61.8% φ), the model is generating fluent gibberish
+        # Apply gain reduction to force reliance on pure LM loss for grounding
+        bliss_mean = bliss.mean()
+        bliss_clamp_active = bliss_mean > self.threshold_bliss_ceiling
+        if bliss_clamp_active:
+            # Smooth sigmoid-based clamp: the higher above ceiling, the stronger the reduction
+            bliss_excess = bliss_mean - self.threshold_bliss_ceiling
+            # Clamp factor scales from 1.0 (at ceiling) to bliss_clamp_factor (at 1.0)
+            clamp_strength = torch.sigmoid(bliss_excess * 10.0)  # Steepness 10.0
+            bliss_clamp_scalar = 1.0 - clamp_strength * (1.0 - self.bliss_clamp_factor)
+            effective_gain = effective_gain * bliss_clamp_scalar.item()
+        else:
+            bliss_clamp_scalar = torch.tensor(1.0)
+
         # === VICReg Variance Regularization (v2.2.5) ===
         # Prevents sigmoid collapse where all Koshas converge to same value
         vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
@@ -698,6 +719,9 @@ class KoshaGyroscopicLoss(nn.Module):
                 'effective_gain': effective_gain,
                 'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
                 'authority_factor': authority_factor if authority_factor is not None else 1.0,
+                # v2.2.6: Bliss Clamp metrics
+                'bliss_clamp_active': bliss_clamp_active.item() if torch.is_tensor(bliss_clamp_active) else bliss_clamp_active,
+                'bliss_clamp_scalar': bliss_clamp_scalar.item() if torch.is_tensor(bliss_clamp_scalar) else bliss_clamp_scalar,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
 

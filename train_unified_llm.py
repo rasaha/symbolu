@@ -7372,18 +7372,21 @@ class UnifiedTrainingConfig:
     gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
     gyroscope_balance_target: float = 0.25   # Required opposite activation
     gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
-    # v2.2.5: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
+    # v2.2.6: Fibonacci Pentad - Per-Kosha thresholds based on ontological roles
     # | Kosha     | Fib Level | Role       | Trigger Action                          |
     # | Mental    | 38.2%     | Warning    | Engage Bliss Damper (Dilution)          |
     # | Physical  | 38.2%     | Support    | Required to open the Vijnana Gate       |
     # | Intellect | 50.0%     | Pivot      | Target range for "Right Knowledge"      |
     # | Vital     | 78.6%     | Resistance | Trigger SGP Hammer (Reset Momentum)     |
     # | Bliss     | 23.6%     | Spark      | If below, release Damping for creativity|
+    # | Bliss     | 61.8%     | Ceiling    | If above, apply Bliss Clamp (reduce gain)|
     gyroscope_threshold_mental: float = 0.382     # Warning - engage Bliss Damper
     gyroscope_threshold_physical: float = 0.382   # Support - required to open Vijnana Gate
     gyroscope_threshold_intellect: float = 0.500  # Pivot - target for "Right Knowledge"
     gyroscope_threshold_vital: float = 0.786      # Resistance - trigger momentum reset
     gyroscope_threshold_bliss: float = 0.236      # Spark - below this, release damping
+    gyroscope_threshold_bliss_ceiling: float = 0.618  # v2.2.6: Ceiling - above this, apply Bliss Clamp
+    gyroscope_bliss_clamp_factor: float = 0.5     # v2.2.6: Gain reduction when Bliss > ceiling (0.5 = halve gain)
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     gyroscope_damper_steepness: float = 5.0  # Sigmoid steepness for Bliss/Physical damper
     gyroscope_gate_steepness: float = 5.0    # Sigmoid steepness for Physical/Mental gate
@@ -10654,12 +10657,13 @@ def train(config: UnifiedTrainingConfig):
             )
 
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  KOSHA GYROSCOPE v2.2.5: Fibonacci Pentad ENABLED               ║")
+        print(f"  ║  KOSHA GYROSCOPE v2.2.6: Fibonacci Pentad + Bliss Clamp         ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Fibonacci Pentad Thresholds (per-Kosha):                        ║")
         print(f"  ║    Mental:    {config.gyroscope_threshold_mental:.1%} (Warning)   Physical: {config.gyroscope_threshold_physical:.1%} (Support)   ║")
         print(f"  ║    Intellect: {config.gyroscope_threshold_intellect:.1%} (Pivot)    Vital:    {config.gyroscope_threshold_vital:.1%} (Resistance)║")
-        print(f"  ║    Bliss:     {config.gyroscope_threshold_bliss:.1%} (Spark)                                   ║")
+        print(f"  ║    Bliss:     {config.gyroscope_threshold_bliss:.1%} (Spark)     Ceiling:  {config.gyroscope_threshold_bliss_ceiling:.1%} (Clamp)    ║")
+        print(f"  ║  v2.2.6 Bliss Clamp: Gain×{config.gyroscope_bliss_clamp_factor:.1f} when B>{config.gyroscope_threshold_bliss_ceiling:.0%} (anti-hallucination) ║")
         print(f"  ║  Dynamic Weight Scheduler:                                       ║")
         print(f"  ║    Base Gain: {config.gyroscope_base_gain:.2f} (PPL > {config.gyroscope_ppl_ceiling:.0f})                                ║")
         print(f"  ║    Max Gain:  {config.gyroscope_max_gain:.2f} (PPL → {config.gyroscope_target_ppl:.0f})                                 ║")
@@ -11590,6 +11594,9 @@ def train(config: UnifiedTrainingConfig):
                             metrics['gyroscope_intellect_val'] = kosha_means.get('intellect', 0.0)
                             metrics['gyroscope_vital_val'] = kosha_means.get('vital', 0.0)
                             metrics['gyroscope_bliss_val'] = kosha_means.get('bliss', 0.0)
+                            # v2.2.6: Bliss Clamp metrics
+                            metrics['gyroscope_bliss_clamp_active'] = gyroscope_components.get('bliss_clamp_active', False)
+                            metrics['gyroscope_bliss_clamp_scalar'] = gyroscope_components.get('bliss_clamp_scalar', 1.0)
 
                             # Capture Reality Rips for diagnostic logging
                             if kosha_rip_logger is not None:
@@ -12206,16 +12213,26 @@ def train(config: UnifiedTrainingConfig):
                     th_i = config.gyroscope_threshold_intellect   # 50.0%
                     th_v = config.gyroscope_threshold_vital       # 78.6%
                     th_b = config.gyroscope_threshold_bliss       # 23.6%
+                    th_b_ceil = config.gyroscope_threshold_bliss_ceiling  # 61.8%
+                    # v2.2.6: Bliss Clamp status
+                    bliss_clamp_active = metrics.get('gyroscope_bliss_clamp_active', False)
+                    bliss_clamp_scalar = metrics.get('gyroscope_bliss_clamp_scalar', 1.0)
                     # Format: Kosha%/Threshold% with indicator if exceeding
-                    def kosha_fmt(val, thresh, name):
-                        exceeded = "!" if val > thresh else ""
-                        return f"{name}:{val:.0%}/{thresh:.0%}{exceeded}"
-                    kosha_pentad = f"{kosha_fmt(gyro_mental, th_m, 'M')} {kosha_fmt(gyro_physical, th_p, 'P')} {kosha_fmt(gyro_intellect, th_i, 'I')} {kosha_fmt(gyro_vital, th_v, 'V')} {kosha_fmt(gyro_bliss, th_b, 'B')}"
+                    def kosha_fmt(val, thresh, name, ceiling=None):
+                        if ceiling is not None and val > ceiling:
+                            return f"{name}:{val:.0%}/{thresh:.0%}🔒"  # Clamp active
+                        elif val > thresh:
+                            return f"{name}:{val:.0%}/{thresh:.0%}!"   # Exceeds threshold
+                        else:
+                            return f"{name}:{val:.0%}/{thresh:.0%}"
+                    kosha_pentad = f"{kosha_fmt(gyro_mental, th_m, 'M')} {kosha_fmt(gyro_physical, th_p, 'P')} {kosha_fmt(gyro_intellect, th_i, 'I')} {kosha_fmt(gyro_vital, th_v, 'V')} {kosha_fmt(gyro_bliss, th_b, 'B', th_b_ceil)}"
+                    # v2.2.6: Show clamp status if active
+                    clamp_status = f" 🔒CLAMP×{bliss_clamp_scalar:.2f}" if bliss_clamp_active else ""
                     if authority_controller is not None:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f})"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f} (Base:{gyro_base_gain:.2f}×A:{gyro_auth:.2f}){clamp_status}"
                         log_msg += f"\n         [PENTAD] {kosha_pentad}"
                     else:
-                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f}"
+                        log_msg += f"\n    {gyro_status} [GYRO] Loss:{gyro_loss:.4f} | Gain:{gyro_gain:.2f}{clamp_status}"
                         log_msg += f"\n         [PENTAD] {kosha_pentad}"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
@@ -13354,6 +13371,10 @@ def main():
                        help="v2.2.5: Vital threshold (78.6%% Resistance - trigger momentum reset)")
     parser.add_argument("--gyroscope_threshold_bliss", type=float, default=0.236,
                        help="v2.2.5: Bliss threshold (23.6%% Spark - below releases damping)")
+    parser.add_argument("--gyroscope_threshold_bliss_ceiling", type=float, default=0.618,
+                       help="v2.2.6: Bliss ceiling (61.8%% φ - above triggers Bliss Clamp)")
+    parser.add_argument("--gyroscope_bliss_clamp_factor", type=float, default=0.5,
+                       help="v2.2.6: Gain reduction when Bliss > ceiling (0.5 = halve gain)")
     # v2.2.4: Three-Stage Hybrid Logic (Damping + Gate + Rip)
     parser.add_argument("--gyroscope_damper_steepness", type=float, default=5.0,
                        help="v2.2.4: Sigmoid steepness for Bliss/Physical damper")
