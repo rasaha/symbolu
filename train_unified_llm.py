@@ -7356,8 +7356,8 @@ class UnifiedTrainingConfig:
     gyroscope_max_gain: float = 3.0          # Strict enforcement when PPL -> 30
     gyroscope_ppl_ceiling: float = 100.0     # PPL above which gain stays at base
     gyroscope_target_ppl: float = 30.0       # PPL at which gain reaches max (disengage threshold)
-    # Trap detection thresholds
-    gyroscope_trap_threshold: float = 0.75   # Kosha saturation point
+    # Trap detection thresholds (v2.2.5: Golden Ratio φ for sigmoid mode)
+    gyroscope_trap_threshold: float = 0.618  # Kosha saturation point (Golden Ratio φ)
     gyroscope_gate_threshold: float = 0.30   # Minimum for gate activation
     gyroscope_balance_target: float = 0.25   # Required opposite activation
     gyroscope_gate_temperature: float = 10.0 # Softness of gate (higher = sharper)
@@ -13246,9 +13246,9 @@ def main():
                        help="PPL above which gain stays at base")
     parser.add_argument("--gyroscope_target_ppl", type=float, default=30.0,
                        help="PPL at which gain reaches max (graduation threshold)")
-    # Trap detection thresholds
-    parser.add_argument("--gyroscope_trap_threshold", type=float, default=0.75,
-                       help="Kosha activation above this is 'trapped'")
+    # Trap detection thresholds (v2.2.5: Golden Ratio φ)
+    parser.add_argument("--gyroscope_trap_threshold", type=float, default=0.618,
+                       help="Kosha activation above this is 'trapped' (Golden Ratio φ)")
     parser.add_argument("--gyroscope_gate_threshold", type=float, default=0.30,
                        help="Minimum activation for gate to be open")
     parser.add_argument("--gyroscope_balance_target", type=float, default=0.25,
