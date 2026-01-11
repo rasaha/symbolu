@@ -1,22 +1,24 @@
 """
-Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.4.1)
+Kosha Gyroscope: Homeostatic Self-Regulation Loss Module (v2.2.5)
 
 This module implements the Vijnana-Gated Kosha Balance Loss, a homeostatic
 self-regulation mechanism that prevents pathological states (looping, fixation,
 mode collapse) by enforcing balance across the 5 Kosha (sheath) dimensions.
 
-Key Features (v2.2.4.1 - Softmax Threshold Calibration):
+Key Features (v2.2.5 - Geometric Expansion with VICReg):
 - Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
 - Physical Gate (Strict): Prerequisites for Intellectual activation (no bypass)
 - Hard ReLU Rip: Reality Reversal when trapped with gate closed
 - Two-Path Loss: intellect_path + rip_signal for distinct behaviors
-- Softmax-calibrated thresholds: trap=0.35, gate=0.22, balance=0.18
+- VICReg variance regularization: Prevents sigmoid collapse
+- Original Gemini thresholds restored: trap=0.75, gate=0.30, balance=0.25
 
-v2.2.4.1 Softmax Threshold Fix:
-- Kosha states are softmax-normalized (5 values summing to 1.0)
-- With uniform distribution, each Kosha = 0.20 (not 0.50)
-- Old threshold of 0.75 was NEVER triggered (impossible with softmax)
-- New threshold of 0.35 fires when a Kosha is 75% above uniform
+v2.2.5 Geometric Expansion (Sigmoid Mode):
+- Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
+- Each Kosha can reach [0, 1] independently
+- Model can be HIGH Physical AND HIGH Intellectual simultaneously
+- Thresholds restored to Gemini's v2.2.4 design (0.75/0.30/0.25)
+- VICReg variance term prevents all Koshas collapsing to same value
 
 v2.2.4 "Pressure Relief Valve" Architecture:
 - Damping manages the "volume" of Mental state
@@ -29,7 +31,8 @@ Three-Stage Internal Process:
 3. Reality Rip (Reversal): Trap + Gate Closed → ReLU shock forces re-grounding
 
 Previous Versions:
-- v2.2.4: Three-Stage Hybrid Logic (incorrect thresholds for softmax)
+- v2.2.4.1: Softmax threshold calibration (workaround, superseded by sigmoid)
+- v2.2.4: Three-Stage Hybrid Logic (correct design, wrong normalization)
 - v2.2.3.1: Soft-threshold damping (gate bypass approach - deprecated)
 - v2.2.1: Dynamic Weight Scheduler (PPL-based gain ramping - retained)
 
@@ -56,17 +59,18 @@ import torch.nn.functional as F
 
 @dataclass
 class KoshaGyroscopeConfig:
-    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.4.1).
+    """Configuration for Kosha Gyroscope with Inverted Curriculum (v2.2.5).
 
     The Inverted Curriculum paradigm:
     - Gyroscope: Active from start, disengages when fluent (PPL < 30)
     - Classification: Disabled at start, engages when fluent (PPL < 30)
 
-    v2.2.4.1 Softmax Threshold Calibration:
-    - Kosha states are softmax-normalized (5 values sum to 1.0)
-    - Uniform distribution = 0.20 per Kosha
-    - trap_threshold=0.35 fires at 75% above uniform
-    - Old threshold of 0.75 was unreachable with softmax
+    v2.2.5 Geometric Expansion (Sigmoid Mode):
+    - Koshas are INDEPENDENT sheaths via sigmoid (not softmax zero-sum)
+    - Each Kosha can reach [0, 1] independently
+    - Model can be HIGH Physical AND HIGH Intellectual simultaneously
+    - Thresholds restored to Gemini's v2.2.4 design (0.75/0.30/0.25)
+    - VICReg variance term prevents sigmoid collapse
 
     v2.2.4 Three-Stage Hybrid Logic:
     1. Bliss Damper (Sigmoid): Dilutes creative expansion during Mental dominance
@@ -88,12 +92,17 @@ class KoshaGyroscopeConfig:
     # Warmup for initial gyroscope activation
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
 
-    # Trap detection thresholds (v2.2.4.1: calibrated for softmax normalization)
-    # With softmax over 5 Koshas, uniform distribution = 0.20 each
-    # "Dominant" Kosha = 0.35+ (75% above uniform), "Trapped" = 0.40+
-    trap_threshold: float = 0.35         # Kosha saturation point (softmax-calibrated)
-    gate_threshold: float = 0.22         # Minimum for gate activation (slightly above uniform)
-    balance_target: float = 0.18         # Required opposite activation (slightly below uniform)
+    # Trap detection thresholds (v2.2.5: Gemini's original design for sigmoid mode)
+    # With sigmoid Koshas, each sheath is independent [0, 1]
+    # trap_threshold=0.75 fires when a Kosha is highly activated
+    trap_threshold: float = 0.75         # Kosha saturation point (Gemini v2.2.4)
+    gate_threshold: float = 0.30         # Minimum for gate activation (Gemini v2.2.4)
+    balance_target: float = 0.25         # Required opposite activation (Gemini v2.2.4)
+
+    # === VICREG VARIANCE REGULARIZATION (v2.2.5) ===
+    # Prevents sigmoid collapse where all Koshas go to same value
+    vicreg_variance_weight: float = 0.1  # Weight for variance loss term
+    vicreg_target_std: float = 0.25      # Target std dev per Kosha across batch
 
     # === THREE-STAGE HYBRID LOGIC (v2.2.4) ===
     # Damper steepness controls how aggressively Bliss is diluted
@@ -128,7 +137,7 @@ class KoshaGyroscopeConfig:
 
 class KoshaGyroscopicLoss(nn.Module):
     """
-    Vijnana-Gated Kosha Balance Loss (v2.2.4.1) - Softmax-Calibrated Thresholds.
+    Vijnana-Gated Kosha Balance Loss (v2.2.5) - Geometric Expansion with VICReg.
 
     Implements homeostatic regulation with the "Pressure Relief Valve" architecture:
     1. Bliss Damper (Sigmoid): Dilutes Bliss during Mental dominance
@@ -184,9 +193,9 @@ class KoshaGyroscopicLoss(nn.Module):
 
     def __init__(
         self,
-        trap_threshold: float = 0.35,  # v2.2.4.1: softmax-calibrated (was 0.75)
-        gate_threshold: float = 0.22,  # v2.2.4.1: softmax-calibrated (was 0.30)
-        balance_target: float = 0.18,  # v2.2.4.1: softmax-calibrated (was 0.25)
+        trap_threshold: float = 0.75,  # v2.2.5: Gemini's original (sigmoid mode)
+        gate_threshold: float = 0.30,  # v2.2.5: Gemini's original (sigmoid mode)
+        balance_target: float = 0.25,  # v2.2.5: Gemini's original (sigmoid mode)
         gate_temperature: float = 10.0,
         # Three-Stage Hybrid Logic (v2.2.4)
         damper_steepness: float = 5.0,
@@ -205,23 +214,25 @@ class KoshaGyroscopicLoss(nn.Module):
         temporal_window: int = 3,
         vital_momentum_enabled: bool = True,
         vital_momentum_range: Tuple[float, float] = (0.5, 1.5),
+        # VICReg variance regularization (v2.2.5)
+        vicreg_variance_weight: float = 0.1,
+        vicreg_target_std: float = 0.25,
     ):
         """
-        Initialize the Kosha Gyroscopic Loss (v2.2.4.1).
+        Initialize the Kosha Gyroscopic Loss (v2.2.5).
 
-        v2.2.4.1 Threshold Calibration for Softmax Normalization:
-        Kosha states are softmax-normalized (5 values summing to 1.0).
-        With uniform distribution, each Kosha = 0.20.
-        - "Dominant" = 0.35+ (75% above uniform)
-        - "Trapped" = 0.40+ (double uniform, severe imbalance)
+        v2.2.5 Geometric Expansion (Sigmoid Mode):
+        Koshas are now INDEPENDENT sheaths via sigmoid (not softmax zero-sum).
+        Each Kosha can reach [0, 1] independently, allowing "Full-Spectrum" awareness.
+        Thresholds restored to Gemini's v2.2.4 design.
 
         Args:
             trap_threshold: Activation level above which a Kosha is "trapped".
-                           Default 0.35 for softmax (was 0.75 for unnormalized).
+                           Default 0.75 for sigmoid (Gemini's v2.2.4 design).
             gate_threshold: Minimum activation for gate to be considered open.
-                           Default 0.22 for softmax (slightly above uniform 0.20).
+                           Default 0.30 for sigmoid (Gemini's v2.2.4 design).
             balance_target: Target activation level for the opposite Kosha.
-                           Default 0.18 for softmax (slightly below uniform).
+                           Default 0.25 for sigmoid (Gemini's v2.2.4 design).
             gate_temperature: Temperature for soft gate sigmoid (higher = sharper)
             damper_steepness: Sigmoid steepness for Bliss damper (v2.2.4)
                               Controls how aggressively Bliss is diluted during Mental dominance
@@ -265,6 +276,10 @@ class KoshaGyroscopicLoss(nn.Module):
         self.temporal_window = temporal_window
         self.vital_momentum_enabled = vital_momentum_enabled
         self.vital_min, self.vital_max = vital_momentum_range
+
+        # VICReg variance regularization (v2.2.5)
+        self.vicreg_variance_weight = vicreg_variance_weight
+        self.vicreg_target_std = vicreg_target_std
 
         # Kosha indices in the 5D projection
         self.PHYSICAL_IDX = 0   # Annamaya (+,+)
@@ -337,6 +352,44 @@ class KoshaGyroscopicLoss(nn.Module):
         momentum_scaler = self.vital_max - (self.vital_max - self.vital_min) * mean_vital
 
         return momentum_scaler
+
+    def _compute_vicreg_variance_loss(
+        self,
+        kosha_states: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Compute VICReg-style variance regularization loss (v2.2.5).
+
+        Prevents sigmoid collapse where all Koshas converge to the same value.
+        Encourages each Kosha dimension to maintain variance across the batch.
+
+        The variance loss is:
+            L_var = sum_d max(0, target_std - std(x_d))^2
+
+        This penalizes dimensions with variance below the target.
+
+        Args:
+            kosha_states: [batch, seq, 5] Kosha activations
+
+        Returns:
+            Scalar variance loss
+        """
+        if self.vicreg_variance_weight <= 0:
+            return torch.tensor(0.0, device=kosha_states.device)
+
+        # Flatten batch and seq dimensions for variance computation
+        # Shape: [batch * seq, 5]
+        flat_koshas = kosha_states.reshape(-1, 5)
+
+        # Compute std for each Kosha dimension across samples
+        # Shape: [5]
+        kosha_std = flat_koshas.std(dim=0)
+
+        # Variance loss: penalize dimensions with std below target
+        # Using hinge loss: max(0, target - actual)^2
+        variance_loss = F.relu(self.vicreg_target_std - kosha_std).pow(2).mean()
+
+        return variance_loss * self.vicreg_variance_weight
 
     def _soft_threshold(
         self,
@@ -556,7 +609,11 @@ class KoshaGyroscopicLoss(nn.Module):
         else:
             effective_gain = base_dynamic_gain
 
-        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler
+        # === VICReg Variance Regularization (v2.2.5) ===
+        # Prevents sigmoid collapse where all Koshas converge to same value
+        vicreg_variance_loss = self._compute_vicreg_variance_loss(kosha_states)
+
+        total_loss = (axis1_loss + axis2_loss) * effective_gain * momentum_scaler + vicreg_variance_loss
 
         if return_components:
             # v2.2.4: Compute diagnostic metrics for Three-Stage Hybrid Logic
@@ -582,11 +639,16 @@ class KoshaGyroscopicLoss(nn.Module):
                 # Loss breakdown
                 'axis1_loss': axis1_loss.item(),
                 'axis2_loss': axis2_loss.item(),
+                'vicreg_variance_loss': vicreg_variance_loss.item(),  # v2.2.5
                 'effective_gain': effective_gain,
                 'base_dynamic_gain': base_dynamic_gain,  # PPL-only gain before authority
                 'authority_factor': authority_factor if authority_factor is not None else 1.0,
                 'current_ppl': current_ppl,
                 'momentum_scaler': momentum_scaler.item() if torch.is_tensor(momentum_scaler) else momentum_scaler,
+
+                # v2.2.5 VICReg metrics
+                'vicreg_target_std': self.vicreg_target_std,
+                'vicreg_variance_weight': self.vicreg_variance_weight,
 
                 # v2.2.4 THREE-STAGE HYBRID METRICS
                 # Stage 1: Damper metrics
@@ -1049,15 +1111,15 @@ class KoshaPhaseCorrectorConfig:
     - Training: Indirect (loss gradients) → Model LEARNS balance
     - Inference: Direct (phase rotation) → Runtime GUARDRAILS
 
-    v2.2.4.1: Thresholds calibrated for softmax-normalized Kosha states.
-    With 5 Koshas summing to 1.0, uniform = 0.20 each.
+    v2.2.5: Thresholds restored to Gemini's v2.2.4 design for sigmoid mode.
+    Koshas are now independent [0,1] activations (not softmax zero-sum).
 
     Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
-    # Imbalance detection thresholds (v2.2.4.1: softmax-calibrated)
-    overactive_threshold: float = 0.35   # Kosha > this triggers correction (was 0.75)
-    underactive_threshold: float = 0.12  # Kosha < this is considered deficient
+    # Imbalance detection thresholds (v2.2.5: Gemini's design for sigmoid mode)
+    overactive_threshold: float = 0.75   # Kosha > this triggers correction (Gemini v2.2.4)
+    underactive_threshold: float = 0.15  # Kosha < this is considered deficient
 
     # Correction strength
     correction_strength: float = 0.3     # How much to rotate (0-1)
@@ -1237,6 +1299,9 @@ class KoshaPhaseCorrector(nn.Module):
         """
         Apply correction to full 32D sovereign state.
 
+        v2.2.5: Uses sigmoid clamping instead of softmax re-normalization.
+        This maintains independent sheath activations.
+
         Args:
             sovereign_state: [B, 32] full state
             correction: [B, 5] Kosha correction
@@ -1249,10 +1314,11 @@ class KoshaPhaseCorrector(nn.Module):
         # Apply correction to Kosha slice [12:17]
         corrected[:, self.KOSHA_SLICE] = corrected[:, self.KOSHA_SLICE] + correction
 
-        # Re-normalize Koshas to sum to 1 (softmax-like)
+        # v2.2.5: Clamp Koshas to [0, 1] (sigmoid mode - independent sheaths)
+        # Unlike softmax, this preserves independence between Koshas
         kosha_corrected = corrected[:, self.KOSHA_SLICE]
-        kosha_normalized = F.softmax(kosha_corrected, dim=-1)
-        corrected[:, self.KOSHA_SLICE] = kosha_normalized
+        kosha_clamped = torch.clamp(kosha_corrected, min=0.0, max=1.0)
+        corrected[:, self.KOSHA_SLICE] = kosha_clamped
 
         return corrected
 
