@@ -1254,6 +1254,148 @@ This allows empirical validation of the mapping before Phase 2 activation.
 
 ---
 
+## 13. Kosha Phase Corrector - Inference-Time Guardrail (v2.4.0)
+
+### 13.1 Training vs Inference Philosophy
+
+The Kosha Gyroscope system uses **different mechanisms** for training and inference:
+
+| Phase | Mechanism | Type | Purpose |
+|-------|-----------|------|---------|
+| **Training** | KoshaGyroscopicLoss | Indirect (gradients) | Model LEARNS balance |
+| **Inference** | KoshaPhaseCorrector | Direct (rotation) | Runtime GUARDRAILS |
+
+**Analogy**:
+- Training = Teaching someone to drive (learn the principles)
+- Inference = Guardrails on a cliff road (safety when deployed)
+
+You don't want guardrails during driving lessons (they'd never learn to balance), but you absolutely want them on real roads.
+
+### 13.2 Why Direct Correction Only During Inference
+
+During inference:
+- No gradients are available
+- The model cannot "learn its way out" of a stuck state
+- If Mental becomes overactive, Vikalpa loops can't be corrected through learning
+- Direct intervention is the ONLY option
+
+During training:
+- Gradients flow through KoshaGyroscopicLoss
+- The model learns to self-correct
+- Direct intervention would override learning
+- We want the model to internalize balance
+
+### 13.3 KoshaPhaseCorrector Implementation
+
+```python
+class KoshaPhaseCorrector(nn.Module):
+    """
+    Inference-time direct phase rotation.
+
+    When a Kosha becomes overactive during generation:
+    1. Detects the imbalance (Kosha > 0.75)
+    2. Computes corrective rotation vector
+    3. Applies rotation directly to sovereign state
+    4. Logs the intervention for diagnostics
+    """
+
+    def forward(self, sovereign_state: torch.Tensor) -> torch.Tensor:
+        # 1. Extract Kosha states [12:17]
+        kosha_states = sovereign_state[:, 12:17]
+
+        # 2. Detect overactive Kosha
+        is_imbalanced, overactive_kosha = self.detect_imbalance(kosha_states)
+
+        if not is_imbalanced:
+            return sovereign_state  # No correction needed
+
+        # 3. Compute correction toward target distribution
+        target = self.rotation_targets[overactive_kosha]
+        correction = (target - kosha_states) * self.correction_strength
+
+        # 4. Apply correction and re-normalize
+        corrected = sovereign_state.clone()
+        corrected[:, 12:17] = F.softmax(kosha_states + correction, dim=-1)
+
+        return corrected
+```
+
+### 13.4 Rotation Targets
+
+When a specific Kosha is overactive, rotate toward its complement:
+
+| Overactive Kosha | Rotation Target | Rationale |
+|------------------|-----------------|-----------|
+| **Physical** (>0.75) | Boost Bliss/Mental | Prevent over-grounding |
+| **Vital** (>0.75) | Boost Intellect | Channel energy into reasoning |
+| **Mental** (>0.75) | Boost Intellect (priority) | Break Vikalpa loops |
+| **Intellect** (>0.75) | Boost Mental | Allow creative flow |
+| **Bliss** (>0.75) | Boost Physical (grounding) | Prevent Viparyaya drift |
+
+### 13.5 InferenceGuardrail (Combined Module)
+
+The `InferenceGuardrail` combines phase correction with Vritti alignment checking:
+
+```python
+class InferenceGuardrail(nn.Module):
+    """
+    Combined inference-time safety module:
+    1. KoshaPhaseCorrector - Direct phase rotation
+    2. VrittiResonanceLoss - Alignment checking (diagnostic)
+    3. Health score computation
+    """
+
+    def forward(self, sovereign_state):
+        # 1. Apply phase correction if needed
+        corrected, phase_diag = self.phase_corrector(sovereign_state)
+
+        # 2. Check Vritti alignment (diagnostic only)
+        alignment = self.vritti_checker.compute_alignment_scores(...)
+
+        # 3. Compute health score
+        health = self._compute_health_score(corrected, alignment)
+
+        return corrected, {'phase': phase_diag, 'alignment': alignment, 'health': health}
+```
+
+### 13.6 Integration with SRK
+
+The phase corrector is integrated into `SovereignReasoningKernel.forward_pass()`:
+
+```python
+# In forward_pass, at Layer 11 (synthesis):
+if not self.training and self.config.enable_phase_corrector:
+    corrected_state, phase_diag = self.apply_inference_guardrail(current_state)
+    if phase_diag.get('correction_applied'):
+        current_state = corrected_state
+        diagnostics['intervention'] = 'synthesis + phase_correction'
+```
+
+### 13.7 Configuration
+
+```python
+@dataclass
+class SRKConfig:
+    # Kosha Phase Corrector (v2.4.0)
+    enable_phase_corrector: bool = True       # Enable during inference
+    phase_corrector_threshold: float = 0.75   # Activation threshold
+    phase_corrector_strength: float = 0.3     # Correction strength (0-1)
+    phase_corrector_max_step: float = 0.2     # Max correction per step
+```
+
+### 13.8 Diagnostic Output
+
+When phase correction is applied during inference:
+
+```
+🔧 [PHASE CORRECTION] Applied
+   Overactive: Mental (0.82)
+   Correction: Mental -0.15, Intellect +0.12, Physical +0.03
+   Health Score: 0.74
+```
+
+---
+
 ## Appendix A: Glossary
 
 | Term | Definition |

@@ -15,6 +15,10 @@ from symbolu.losses.kosha_gyroscope import (
     InvertedCurriculumController,
     VrittiResonanceLoss,
     VrittiResonanceConfig,
+    # Inference-time guardrails (v2.4.0)
+    KoshaPhaseCorrector,
+    KoshaPhaseCorrectorConfig,
+    InferenceGuardrail,
 )
 
 __all__ = [
@@ -23,4 +27,8 @@ __all__ = [
     'InvertedCurriculumController',
     'VrittiResonanceLoss',
     'VrittiResonanceConfig',
+    # Inference-time guardrails (v2.4.0)
+    'KoshaPhaseCorrector',
+    'KoshaPhaseCorrectorConfig',
+    'InferenceGuardrail',
 ]
