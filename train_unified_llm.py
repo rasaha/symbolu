@@ -12451,11 +12451,13 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage - show CURRENT allocated (matches nvidia-smi)
+                    # Memory usage - show reserved/total (matches nvidia-smi)
+                    # V9.8.5: Fixed misleading display - was showing allocated/reserved
+                    # Now shows reserved/total to match what nvidia-smi reports
                     if device.type == "cuda":
-                        mem_current = torch.cuda.memory_allocated() / (1024**3)
                         mem_reserved = torch.cuda.memory_reserved() / (1024**3)
-                        mem_str = f" | VRAM: {mem_current:.1f}GB/{mem_reserved:.1f}GB"
+                        mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                        mem_str = f" | VRAM: {mem_reserved:.1f}GB/{mem_total:.1f}GB"
                     else:
                         mem_str = ""
 
