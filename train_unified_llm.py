@@ -2316,12 +2316,16 @@ class EvolutionaryIntelligenceEngine:
 
     def get_state(self) -> Dict[str, Any]:
         """V9.8.6: Get internal state for checkpointing."""
+        # resonance_buffer is List[Tensor], convert each to list
+        res_buf = None
+        if self.resonance_buffer is not None:
+            res_buf = [t.cpu().tolist() for t in self.resonance_buffer]
         return {
             "flow_network_state": self.flow_network.get_state(),
             "flow_network_weights": self.flow_network.state_dict(),  # Save nn.Module weights!
             "evolution_history": list(self.evolution_history[-100:]),  # Keep last 100
             "current_gunas": self.current_gunas,
-            "resonance_buffer": self.resonance_buffer.cpu().tolist() if self.resonance_buffer is not None else None,
+            "resonance_buffer": res_buf,
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
@@ -2337,7 +2341,8 @@ class EvolutionaryIntelligenceEngine:
         if "current_gunas" in state:
             self.current_gunas = state["current_gunas"]
         if "resonance_buffer" in state and state["resonance_buffer"] is not None:
-            self.resonance_buffer = torch.tensor(state["resonance_buffer"], device=self.device)
+            # resonance_buffer is List[Tensor]
+            self.resonance_buffer = [torch.tensor(t, device=self.device) for t in state["resonance_buffer"]]
 
 
 # =============================================================================
