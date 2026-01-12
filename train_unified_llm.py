@@ -3250,14 +3250,26 @@ class VRAMGovernor:
 
         Returns:
             (usage_fraction, used_gb, total_gb)
+
+        Note: Uses memory_allocated() (actual tensor memory) not memory_reserved()
+        (which includes PyTorch's caching allocator overhead). This prevents
+        false VRAM pressure signals from cached but unused memory.
         """
         if not torch.cuda.is_available():
             return 0.0, 0.0, 0.0
 
-        used = torch.cuda.memory_reserved()
+        # Use memory_allocated() - actual tensor memory
+        # NOT memory_reserved() which includes caching allocator overhead
+        allocated = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
         total = torch.cuda.get_device_properties(0).total_memory
-        usage = used / total
 
+        # Primary metric: allocated memory (actual usage)
+        # But also consider if reserved is very high (fragmentation risk)
+        # Use max of allocated and 70% of reserved as a balanced metric
+        used = max(allocated, reserved * 0.7)
+
+        usage = used / total
         used_gb = used / (1024 ** 3)
         total_gb = total / (1024 ** 3)
 
@@ -12918,10 +12930,14 @@ def train(config: UnifiedTrainingConfig):
                     # V9.7.0: PIDv2 Dynamic Batch Sizing Check
                     if hasattr(authority_controller, 'check_batch_action') and config.pidv2_batch_resize:
                         # Get current VRAM usage for headroom check
+                        # Use memory_allocated() for actual tensor memory, not memory_reserved()
                         vram_usage = 0.0
                         if torch.cuda.is_available():
-                            vram_used = torch.cuda.memory_reserved()
+                            vram_allocated = torch.cuda.memory_allocated()
+                            vram_reserved = torch.cuda.memory_reserved()
                             vram_total = torch.cuda.get_device_properties(0).total_memory
+                            # Use actual allocated, but consider reserved if much higher (fragmentation)
+                            vram_used = max(vram_allocated, vram_reserved * 0.7)
                             vram_usage = vram_used / vram_total
 
                         batch_action, new_batch, batch_reason = authority_controller.check_batch_action(
