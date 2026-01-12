@@ -12116,7 +12116,9 @@ def train(config: UnifiedTrainingConfig):
             optimizer.zero_grad()
 
             # Update scheduler after warmup
-            if global_step >= config.warmup_steps:
+            # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
+            # The scheduler resets LR every step, undoing adaptive boosts
+            if global_step >= config.warmup_steps and not config.enable_adaptive_training:
                 scheduler.step()
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
