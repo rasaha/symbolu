@@ -11035,6 +11035,8 @@ def train(config: UnifiedTrainingConfig):
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
     current_seq_len = config.max_seq_len
+    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at max seq_len
+    seq_curriculum_ref_seq_len = config.max_seq_len  # Reference sequence length
     if config.enable_seq_curriculum:
         seq_len_curriculum = SequenceLengthCurriculum(
             seq_len_start=config.seq_len_start,
@@ -11044,16 +11046,26 @@ def train(config: UnifiedTrainingConfig):
             ppl_gate=config.seq_len_ppl_gate,
         )
         current_seq_len = config.seq_len_start  # Start with short sequences
+
+        # V2.3.4: Calculate scaled batch size for initial short sequence length
+        # Memory scales ~linearly with seq_len, so batch can scale inversely
+        seq_curriculum_ref_batch = config.batch_size
+        seq_curriculum_ref_seq_len = config.seq_len_end  # Reference is the target/max
+        scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+        scaled_batch = min(scaled_batch, 256)  # Cap at reasonable max
+        config.batch_size = scaled_batch
+
         print(f"\n  📏 [SEQ CURRICULUM] Sequence Length Curriculum ENABLED")
         print(f"     Ramping: {config.seq_len_start} → {config.seq_len_end} tokens")
         print(f"     Ramp steps: {config.seq_len_ramp_steps}")
         print(f"     Mode: {config.seq_len_ramp_mode.upper()}")
+        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok")
         if config.seq_len_ppl_gate > 0:
             print(f"     PPL Gate: Only ramp when PPL < {config.seq_len_ppl_gate}")
-        print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences")
+        print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences (batch={scaled_batch})")
         print(f"     ⚠️  Will reload dataloader as sequence length increases\n")
 
-        # Reload data with initial short sequence length
+        # Reload data with initial short sequence length and scaled batch
         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
         train_iter = iter(train_loader)
         seq_len_curriculum.mark_data_reloaded()
@@ -12843,9 +12855,19 @@ def train(config: UnifiedTrainingConfig):
                     # Check if we need to reload dataloader
                     if seq_len_curriculum.should_reload_data():
                         print(seq_len_curriculum.get_transition_message(global_step, old_seq_len, current_seq_len))
-                        print(f"  📏 [SEQ CURRICULUM] Reloading dataloader with seq_len={current_seq_len}...")
 
-                        # Reload data with new sequence length
+                        # V2.3.4: Recalculate batch size for new sequence length
+                        # Memory scales ~linearly with seq_len, so batch scales inversely
+                        old_batch = config.batch_size
+                        new_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+                        new_batch = max(1, min(new_batch, 256))  # Clamp to reasonable range
+                        config.batch_size = new_batch
+
+                        print(f"  📏 [SEQ CURRICULUM] Reloading dataloader:")
+                        print(f"     seq_len: {old_seq_len} → {current_seq_len}")
+                        print(f"     batch:   {old_batch} → {new_batch}")
+
+                        # Reload data with new sequence length and batch size
                         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
                         train_iter = iter(train_loader)
                         seq_len_curriculum.mark_data_reloaded()
