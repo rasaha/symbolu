@@ -345,11 +345,100 @@ class Bucket:
     # Computed centroid embedding (average of entry embeddings)
     centroid_embedding: Optional[List[float]] = None
 
-    def add_entry(self, entry: BucketEntry) -> None:
-        """Add an entry to this bucket."""
+    def add_entry(
+        self,
+        entry: BucketEntry,
+        deduplicate: bool = True,
+        similarity_threshold: float = 0.85,
+    ) -> bool:
+        """
+        Add an entry to this bucket with optional deduplication.
+
+        If deduplication is enabled and a similar entry exists:
+        - If new entry has higher importance: update existing entry
+        - Otherwise: reinforce existing entry (increment access count)
+
+        Args:
+            entry: The entry to add
+            deduplicate: Whether to check for duplicates
+            similarity_threshold: Cosine similarity threshold for duplicates
+
+        Returns:
+            True if entry was added/merged, False if discarded as duplicate
+        """
+        if deduplicate and entry.embedding is not None:
+            # Check for semantic duplicates
+            merged = self._try_merge_duplicate(entry, similarity_threshold)
+            if merged:
+                return True
+
+        # No duplicate found or deduplication disabled - add new entry
         self.entries.append(entry)
         self.total_entries += 1
         self._update_centroid(entry)
+        return True
+
+    def _try_merge_duplicate(
+        self,
+        new_entry: BucketEntry,
+        threshold: float,
+    ) -> bool:
+        """
+        Try to merge with an existing duplicate entry.
+
+        Returns True if merged (and caller should not add new entry).
+        """
+        if new_entry.embedding is None:
+            return False
+
+        for existing in self.entries:
+            if existing.embedding is None:
+                continue
+
+            # Compute cosine similarity
+            similarity = self._cosine_similarity(
+                new_entry.embedding,
+                existing.embedding,
+            )
+
+            if similarity > threshold:
+                # Found a duplicate - decide what to do
+                if new_entry.importance_score > existing.importance_score:
+                    # New entry is better - update existing
+                    existing.content = new_entry.content
+                    existing.importance_score = new_entry.importance_score
+                    existing.summary = new_entry.summary
+                    existing.embedding = new_entry.embedding
+                    existing.metadata["updated_at"] = datetime.utcnow().isoformat()
+                    existing.metadata["update_count"] = (
+                        existing.metadata.get("update_count", 0) + 1
+                    )
+                else:
+                    # Existing is better - just reinforce
+                    existing.metadata["access_count"] = (
+                        existing.metadata.get("access_count", 0) + 1
+                    )
+                    existing.metadata["last_reinforced"] = (
+                        datetime.utcnow().isoformat()
+                    )
+                return True
+
+        return False
+
+    @staticmethod
+    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+        """Compute cosine similarity between two vectors."""
+        if len(a) != len(b) or len(a) == 0:
+            return 0.0
+
+        dot_product = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(x * x for x in b) ** 0.5
+
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+
+        return dot_product / (norm_a * norm_b)
 
     def record_access(self) -> None:
         """Record an access/activation of this bucket."""

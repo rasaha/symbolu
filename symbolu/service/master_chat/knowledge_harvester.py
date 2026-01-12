@@ -33,6 +33,89 @@ from .bucket_models import (
     LAYER_TO_BUCKET,
 )
 
+# =============================================================================
+# Salience Scoring (Vritti vs Samskara Distinction)
+# =============================================================================
+
+# Linguistic markers for permanence vs temporariness
+STRONG_MARKERS = re.compile(
+    r"\b(always|never|every|prefer|hate|love|need|must|"
+    r"is defined as|rule is|principle is|i am a|my name is|"
+    r"decided|chose|learned|discovered|realized)\b",
+    re.IGNORECASE,
+)
+
+WEAK_MARKERS = re.compile(
+    r"\b(maybe|perhaps|guess|might|could|possibly|sometimes|"
+    r"feeling like|think maybe|not sure|wondering|suppose)\b",
+    re.IGNORECASE,
+)
+
+
+def calculate_salience(
+    text: str,
+    signals: Optional[MessageSignals] = None,
+    is_novel: bool = True,
+) -> float:
+    """
+    Calculate heuristic salience score for extracted content.
+
+    Uses linguistic markers and ontological signals to determine
+    if content is a permanent "Samskara" (worth storing) vs a
+    temporary "Vritti" (conversational noise).
+
+    Args:
+        text: The extracted content text
+        signals: Optional ontological signals for the turn
+        is_novel: Whether this is unlike existing bucket entries
+
+    Returns:
+        Salience score [0.0, 1.0] - higher = more permanent/important
+    """
+    score = 0.5  # Base score
+
+    # 1. Linguistic markers (±0.25)
+    strong_matches = len(STRONG_MARKERS.findall(text))
+    weak_matches = len(WEAK_MARKERS.findall(text))
+
+    if strong_matches > 0:
+        score += min(0.25, strong_matches * 0.1)
+    if weak_matches > 0:
+        score -= min(0.25, weak_matches * 0.1)
+
+    # 2. Signal intensity - biological encoding strength (±0.2)
+    # High Sattva (clarity) or Rajas (activity) = stronger encoding
+    # Tamas (inertia) = weaker encoding
+    if signals and signals.guna_distribution:
+        sattva = signals.guna_distribution.get("sattva", 0.0)
+        rajas = signals.guna_distribution.get("rajas", 0.0)
+        tamas = signals.guna_distribution.get("tamas", 0.0)
+
+        # Clarity and activity enhance memory encoding
+        intensity = (sattva * 0.6 + rajas * 0.4) - (tamas * 0.2)
+        score += intensity * 0.2
+
+    # 3. Novelty boost (+0.15)
+    # New/unique information is more valuable
+    if is_novel:
+        score += 0.15
+
+    # 4. Content length heuristic (±0.1)
+    # Very short or very long content is less reliable
+    word_count = len(text.split())
+    if 5 <= word_count <= 50:
+        score += 0.05  # Good length
+    elif word_count < 3 or word_count > 100:
+        score -= 0.1  # Too short or too long
+
+    # 5. Entity presence boost (+0.1)
+    # Content with named entities is more specific/valuable
+    if re.search(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', text):
+        score += 0.05
+
+    # Clamp to [0.0, 1.0]
+    return max(0.0, min(1.0, score))
+
 
 # =============================================================================
 # Extraction Patterns (Rule-Based)
@@ -744,13 +827,15 @@ class KnowledgeHarvester:
                 if len(content) > self.max_content_length:
                     content = content[:self.max_content_length] + "..."
 
-                # Compute importance
-                base_importance = 0.5
-                importance = min(1.0, base_importance + pattern.importance_modifier)
+                # Compute importance using salience scoring
+                salience = calculate_salience(content, signals, is_novel=True)
+                importance = salience + pattern.importance_modifier
 
                 # Boost importance for user messages (their own statements)
                 if role == "user":
-                    importance = min(1.0, importance + 0.1)
+                    importance += 0.1
+
+                importance = min(1.0, max(0.0, importance))
 
                 # Create harvested fact
                 fact = HarvestedFact(
@@ -1053,6 +1138,10 @@ __all__ = [
     # Data classes
     "HarvestedFact",
     "ExtractionPattern",
+    # Salience scoring
+    "calculate_salience",
+    "STRONG_MARKERS",
+    "WEAK_MARKERS",
     # Pattern collections
     "ALL_PATTERNS",
 ]
