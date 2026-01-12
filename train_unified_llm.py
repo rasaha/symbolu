@@ -10264,6 +10264,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.csr_engage_ppl} (full grounding)")
         print(f"       TRANSITION:   {config.csr_disengage_ppl} < PPL < {config.csr_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.csr_disengage_ppl} (CSR off after {config.csr_rampdown_steps} steps)")
+        # V9.8.6: Restore CSR curriculum state from checkpoint
+        if resumed_csr_curriculum_state is not None:
+            csr_curriculum.load_state(resumed_csr_curriculum_state)
+            print(f"       ✓ Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
 
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
@@ -10676,6 +10680,11 @@ def train(config: UnifiedTrainingConfig):
     resumed_sattvic_state = None
     resumed_srk_state = None
     resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
+    # V9.8.6: Curriculum state variables
+    resumed_csr_curriculum_state = None
+    resumed_kosha_curriculum_state = None
+    resumed_onto_curriculum_state = None
+    resumed_pidv2_curriculum_state = None
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -10695,6 +10704,11 @@ def train(config: UnifiedTrainingConfig):
             resumed_sattvic_state = resume_result.get("sattvic_state")
             resumed_srk_state = resume_result.get("srk_state")
             resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
+            # V9.8.6: Extract curriculum states
+            resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
+            resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
+            resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
+            resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -10931,6 +10945,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
         print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
+        # V9.8.6: Restore PIDv2 curriculum state from checkpoint
+        if resumed_pidv2_curriculum_state is not None:
+            authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
+            print(f"       ✓ Restored: Phase={authority_controller.phase}, Scale={authority_controller.phase_scale:.3f}")
         if config.pidv2_batch_resize:
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
@@ -11023,6 +11041,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.onto_engage_ppl} (full ontological grounding)")
         print(f"       TRANSITION:   {config.onto_disengage_ppl} < PPL < {config.onto_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.onto_disengage_ppl} (Onto off after {config.onto_rampdown_steps} steps)")
+        # V9.8.6: Restore Onto curriculum state from checkpoint
+        if resumed_onto_curriculum_state is not None:
+            onto_curriculum.load_state(resumed_onto_curriculum_state)
+            print(f"       ✓ Restored: Phase={onto_curriculum.phase}, Scale={onto_curriculum.scale:.3f}")
 
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
@@ -11145,6 +11167,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.kosha_engage_ppl} (full Kosha loss)")
         print(f"       TRANSITION:   {config.kosha_disengage_ppl} < PPL < {config.kosha_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.kosha_disengage_ppl} (Kosha off after {config.kosha_rampdown_steps} steps)")
+        # V9.8.6: Restore Kosha curriculum state from checkpoint
+        if resumed_kosha_curriculum_state is not None:
+            kosha_curriculum.load_state(resumed_kosha_curriculum_state)
+            print(f"       ✓ Restored: Phase={kosha_curriculum.phase}, Scale={kosha_curriculum.scale:.3f}")
 
         # Initialize Reality Rip Logger (diagnostic)
         if config.enable_rip_logger:
@@ -13574,7 +13600,12 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                         srk_state=srk.get_checkpoint_state() if srk else None,
-                        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                        scaler_state=scaler.state_dict() if scaler else None,
+                        # V9.8.6: Three-Phase Curriculum states
+                        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -13611,7 +13642,12 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     srk_state=srk.get_checkpoint_state() if srk else None,
-                    scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                    scaler_state=scaler.state_dict() if scaler else None,
+                    # V9.8.6: Three-Phase Curriculum states
+                    csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                    kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                    onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                    pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -13627,7 +13663,12 @@ def train(config: UnifiedTrainingConfig):
         sgp_state=sgp_controller.get_state() if sgp_controller else None,
         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
         srk_state=srk.get_checkpoint_state() if srk else None,
-        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+        scaler_state=scaler.state_dict() if scaler else None,
+        # V9.8.6: Three-Phase Curriculum states
+        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -13729,6 +13770,13 @@ def save_checkpoint(
     sattvic_state: Optional[dict] = None,
     srk_state: Optional[dict] = None,
     scaler_state: Optional[dict] = None,
+    # V9.8.6: Three-Phase Curriculum states
+    csr_curriculum_state: Optional[dict] = None,
+    kosha_curriculum_state: Optional[dict] = None,
+    onto_curriculum_state: Optional[dict] = None,
+    pidv2_curriculum_state: Optional[dict] = None,
+    # Dataloader position
+    dataloader_position: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
@@ -13771,6 +13819,20 @@ def save_checkpoint(
     # V9.8.1: Add AMP GradScaler state if provided
     if scaler_state is not None:
         checkpoint["scaler_state"] = scaler_state
+
+    # V9.8.6: Add Three-Phase Curriculum states
+    if csr_curriculum_state is not None:
+        checkpoint["csr_curriculum_state"] = csr_curriculum_state
+    if kosha_curriculum_state is not None:
+        checkpoint["kosha_curriculum_state"] = kosha_curriculum_state
+    if onto_curriculum_state is not None:
+        checkpoint["onto_curriculum_state"] = onto_curriculum_state
+    if pidv2_curriculum_state is not None:
+        checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
+
+    # V9.8.6: Add dataloader position for reproducibility
+    if dataloader_position is not None:
+        checkpoint["dataloader_position"] = dataloader_position
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -13912,6 +13974,25 @@ def load_checkpoint(
     if "scaler_state" in checkpoint:
         result["scaler_state"] = checkpoint["scaler_state"]
         print(f"    ✓ AMP GradScaler state available for restoration")
+
+    # V9.8.6: Return Three-Phase Curriculum states for restoration
+    if "csr_curriculum_state" in checkpoint:
+        result["csr_curriculum_state"] = checkpoint["csr_curriculum_state"]
+        print(f"    ✓ CSR Curriculum state available for restoration")
+    if "kosha_curriculum_state" in checkpoint:
+        result["kosha_curriculum_state"] = checkpoint["kosha_curriculum_state"]
+        print(f"    ✓ Kosha Curriculum state available for restoration")
+    if "onto_curriculum_state" in checkpoint:
+        result["onto_curriculum_state"] = checkpoint["onto_curriculum_state"]
+        print(f"    ✓ Onto Curriculum state available for restoration")
+    if "pidv2_curriculum_state" in checkpoint:
+        result["pidv2_curriculum_state"] = checkpoint["pidv2_curriculum_state"]
+        print(f"    ✓ PIDv2 Curriculum state available for restoration")
+
+    # V9.8.6: Return dataloader position for restoration
+    if "dataloader_position" in checkpoint:
+        result["dataloader_position"] = checkpoint["dataloader_position"]
+        print(f"    ✓ Dataloader position available for restoration")
 
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 

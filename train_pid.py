@@ -1211,6 +1211,24 @@ class AuthorityPIDv2:
             f"Kd={self.last_effective_Kd:.2f} ramp={self.last_ramp_frac:.0%}{semantic_tag}"
         )
 
+    def get_curriculum_state(self) -> dict:
+        """V9.8.6: Get curriculum state for checkpointing."""
+        return {
+            "phase": self.phase,
+            "disengage_step": self.disengage_step,
+            "phase_scale": self.phase_scale,
+            "graduated": self.graduated,
+        }
+
+    def load_curriculum_state(self, state: dict):
+        """V9.8.6: Restore curriculum state from checkpoint."""
+        if state is None:
+            return
+        self.phase = state.get("phase", "CONSTRUCTION")
+        self.disengage_step = state.get("disengage_step")
+        self.phase_scale = state.get("phase_scale", 1.0)
+        self.graduated = state.get("graduated", False)
+
     def apply_brake(self, factor: float = 0.85):
         """
         [Patent S8] Apply Inertial Brake for Sovereign Alert system.
