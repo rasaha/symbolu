@@ -1707,6 +1707,25 @@ class EvolutionaryFlowNetwork(nn.Module):
             f"[↓{min_gate[0]}:{min_gate[1]:.2f}]"
         )
 
+    def get_state(self) -> Dict[str, Any]:
+        """V9.8.6: Get internal state for checkpointing."""
+        return {
+            "micro_coherence": [list(mc) for mc in self.micro_coherence],
+            "meso_coherence": {k: list(v) for k, v in self.meso_coherence.items()},
+            "macro_coherence": list(self.macro_coherence),
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """V9.8.6: Restore internal state from checkpoint."""
+        if state is None:
+            return
+        if "micro_coherence" in state:
+            self.micro_coherence = [list(mc) for mc in state["micro_coherence"]]
+        if "meso_coherence" in state:
+            self.meso_coherence = {k: list(v) for k, v in state["meso_coherence"].items()}
+        if "macro_coherence" in state:
+            self.macro_coherence = list(state["macro_coherence"])
+
 
 class EvolutionaryFlowLoss(nn.Module):
     """
@@ -2294,6 +2313,36 @@ class EvolutionaryIntelligenceEngine:
             return "DESCENDING"
         else:
             return "STABLE"
+
+    def get_state(self) -> Dict[str, Any]:
+        """V9.8.6: Get internal state for checkpointing."""
+        # resonance_buffer is List[Tensor], convert each to list
+        res_buf = None
+        if self.resonance_buffer is not None:
+            res_buf = [t.cpu().tolist() for t in self.resonance_buffer]
+        return {
+            "flow_network_state": self.flow_network.get_state(),
+            "flow_network_weights": self.flow_network.state_dict(),  # Save nn.Module weights!
+            "evolution_history": list(self.evolution_history[-100:]),  # Keep last 100
+            "current_gunas": self.current_gunas,
+            "resonance_buffer": res_buf,
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """V9.8.6: Restore internal state from checkpoint."""
+        if state is None:
+            return
+        if "flow_network_weights" in state:
+            self.flow_network.load_state_dict(state["flow_network_weights"])  # Restore nn.Module weights!
+        if "flow_network_state" in state:
+            self.flow_network.load_state(state["flow_network_state"])
+        if "evolution_history" in state:
+            self.evolution_history = list(state["evolution_history"])
+        if "current_gunas" in state:
+            self.current_gunas = state["current_gunas"]
+        if "resonance_buffer" in state and state["resonance_buffer"] is not None:
+            # resonance_buffer is List[Tensor]
+            self.resonance_buffer = [torch.tensor(t, device=self.device) for t in state["resonance_buffer"]]
 
 
 # =============================================================================
@@ -10258,6 +10307,15 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
+    # These must be defined before curriculum controllers are created
+    resumed_csr_curriculum_state = None
+    resumed_kosha_curriculum_state = None
+    resumed_onto_curriculum_state = None
+    resumed_pidv2_curriculum_state = None
+    resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
+    resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
     csr_graduated = False
@@ -10465,6 +10523,10 @@ def train(config: UnifiedTrainingConfig):
         # Create HiddenStateExtractor for models that don't return hidden_states
         hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
         print(f"    → Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
+        # V9.8.6: Restore EvoFlow state from checkpoint
+        if resumed_evoflow_state is not None:
+            evolutionary_engine.load_state(resumed_evoflow_state)
+            print(f"  ✓ EvoFlow Restored: history={len(evolutionary_engine.evolution_history)}, gunas={evolutionary_engine.current_gunas}")
 
         if config.enable_toroidal_bridge:
             print(f"    ⚠️  Note: Toroidal Bridge superseded by Evolutionary Flow")
@@ -10703,9 +10765,22 @@ def train(config: UnifiedTrainingConfig):
             resumed_sattvic_state = resume_result.get("sattvic_state")
             resumed_srk_state = resume_result.get("srk_state")
             resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
+            # V9.8.6: Extract curriculum states
+            resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
+            resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
+            resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
+            resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
+            resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
+            resumed_evoflow_state = resume_result.get("evoflow_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
+
+    # V9.8.6: Restore CSR curriculum state (CSR is already initialized above)
+    if resumed_csr_curriculum_state is not None and csr_curriculum is not None:
+        csr_curriculum.load_state(resumed_csr_curriculum_state)
+        print(f"  ✓ CSR Curriculum Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
+    # NOTE: Onto, Kosha, and PIDv2 curriculum restoration happens after their initialization below
 
     # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
@@ -10939,6 +11014,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
         print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
+        # V9.8.6: Restore PIDv2 curriculum state from checkpoint
+        if resumed_pidv2_curriculum_state is not None:
+            authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
+            print(f"       ✓ Restored: Phase={authority_controller.phase}, Scale={authority_controller.phase_scale:.3f}")
         if config.pidv2_batch_resize:
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
@@ -11031,6 +11110,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.onto_engage_ppl} (full ontological grounding)")
         print(f"       TRANSITION:   {config.onto_disengage_ppl} < PPL < {config.onto_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.onto_disengage_ppl} (Onto off after {config.onto_rampdown_steps} steps)")
+        # V9.8.6: Restore Onto curriculum state from checkpoint
+        if resumed_onto_curriculum_state is not None:
+            onto_curriculum.load_state(resumed_onto_curriculum_state)
+            print(f"       ✓ Restored: Phase={onto_curriculum.phase}, Scale={onto_curriculum.scale:.3f}")
 
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
@@ -11050,6 +11133,7 @@ def train(config: UnifiedTrainingConfig):
     kosha_graduation_monitor = None
     kosha_rip_logger = None
     kosha_curriculum = None  # V9.8.6: Three-Phase Curriculum
+    kosha_curriculum_controller = None  # V9.8.6: InvertedCurriculumController
     kosha_graduated = False  # Track graduation state
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
     # V9.8.7: Three-phase gyroscope engagement tracking
@@ -11110,7 +11194,7 @@ def train(config: UnifiedTrainingConfig):
         # Initialize Inverted Curriculum Controller
         gyro_config = KoshaGyroscopeConfig(
             enable_gyroscope=True,
-            kosha_disengage_ppl=config.gyroscope_target_ppl,
+            gyroscope_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
             gain_rampdown_steps=config.kosha_rampdown_steps,
             # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
@@ -11146,6 +11230,10 @@ def train(config: UnifiedTrainingConfig):
             target_ppl=config.gyroscope_target_ppl,
         )
         kosha_curriculum_controller = InvertedCurriculumController(config=gyro_config)
+        # V9.8.6: Restore Kosha Gyroscope curriculum controller state from checkpoint
+        if resumed_kosha_gyroscope_state is not None:
+            kosha_curriculum_controller.load_state(resumed_kosha_gyroscope_state)
+            print(f"  ✓ Kosha Gyroscope Restored: graduated={kosha_curriculum_controller.graduated}, disengage_step={kosha_curriculum_controller.disengage_step}")
 
         # V9.8.6: Three-Phase Kosha Curriculum (unified with CSR/PID pattern)
         kosha_curriculum = ThreePhaseCurriculum(
@@ -11158,6 +11246,10 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.kosha_engage_ppl} (full Kosha loss)")
         print(f"       TRANSITION:   {config.kosha_disengage_ppl} < PPL < {config.kosha_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.kosha_disengage_ppl} (Kosha off after {config.kosha_rampdown_steps} steps)")
+        # V9.8.6: Restore Kosha curriculum state from checkpoint
+        if resumed_kosha_curriculum_state is not None:
+            kosha_curriculum.load_state(resumed_kosha_curriculum_state)
+            print(f"       ✓ Restored: Phase={kosha_curriculum.phase}, Scale={kosha_curriculum.scale:.3f}")
 
         # Initialize Reality Rip Logger (diagnostic)
         if config.enable_rip_logger:
@@ -13304,36 +13396,33 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.8.6: Onto Bridge Three-Phase Curriculum Update (Layer 4 - Foundation)
                 if onto_curriculum is not None:
-                    onto_phase_change, onto_phase_msg = onto_curriculum.update(val_ppl, global_step)
-                    if onto_phase_change:
-                        print(onto_phase_msg)
-                        # Log phase transition
-                        if onto_curriculum.graduated:
-                            print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
+                    old_phase = onto_curriculum.phase
+                    onto_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if onto_curriculum.graduated and old_phase != onto_curriculum.phase:
+                        print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
 
                 # V9.8.6: CSR Three-Phase Curriculum Update
                 if csr_curriculum is not None:
-                    csr_phase_change, csr_phase_msg = csr_curriculum.update(val_ppl, global_step)
-                    if csr_phase_change:
-                        print(csr_phase_msg)
-                        # Log phase transition
-                        if csr_curriculum.graduated:
-                            print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
+                    old_phase = csr_curriculum.phase
+                    csr_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if csr_curriculum.graduated and old_phase != csr_curriculum.phase:
+                        print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🔤 [CSR] Phase: {csr_curriculum.phase} | Scale: {csr_curriculum.scale:.3f}")
 
                 # V9.8.6: Kosha Three-Phase Curriculum Update
                 if kosha_curriculum is not None:
-                    kosha_phase_change, kosha_phase_msg = kosha_curriculum.update(val_ppl, global_step)
-                    if kosha_phase_change:
-                        print(kosha_phase_msg)
-                        # Log phase transition
-                        if kosha_curriculum.graduated:
-                            print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
+                    old_phase = kosha_curriculum.phase
+                    kosha_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if kosha_curriculum.graduated and old_phase != kosha_curriculum.phase:
+                        print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
@@ -13707,7 +13796,14 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                         srk_state=srk.get_checkpoint_state() if srk else None,
-                        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                        scaler_state=scaler.state_dict() if scaler else None,
+                        # V9.8.6: Three-Phase Curriculum states
+                        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -13744,7 +13840,14 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     srk_state=srk.get_checkpoint_state() if srk else None,
-                    scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                    scaler_state=scaler.state_dict() if scaler else None,
+                    # V9.8.6: Three-Phase Curriculum states
+                    csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                    kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                    onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                    pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                    kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                    evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -13760,7 +13863,14 @@ def train(config: UnifiedTrainingConfig):
         sgp_state=sgp_controller.get_state() if sgp_controller else None,
         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
         srk_state=srk.get_checkpoint_state() if srk else None,
-        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+        scaler_state=scaler.state_dict() if scaler else None,
+        # V9.8.6: Three-Phase Curriculum states
+        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -13862,6 +13972,17 @@ def save_checkpoint(
     sattvic_state: Optional[dict] = None,
     srk_state: Optional[dict] = None,
     scaler_state: Optional[dict] = None,
+    # V9.8.6: Three-Phase Curriculum states
+    csr_curriculum_state: Optional[dict] = None,
+    kosha_curriculum_state: Optional[dict] = None,
+    onto_curriculum_state: Optional[dict] = None,
+    pidv2_curriculum_state: Optional[dict] = None,
+    # V9.8.6: Kosha Gyroscope state (InvertedCurriculumController)
+    kosha_gyroscope_state: Optional[dict] = None,
+    # V9.8.6: EvoFlow state (EvolutionaryIntelligenceEngine)
+    evoflow_state: Optional[dict] = None,
+    # Dataloader position
+    dataloader_position: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
@@ -13904,6 +14025,26 @@ def save_checkpoint(
     # V9.8.1: Add AMP GradScaler state if provided
     if scaler_state is not None:
         checkpoint["scaler_state"] = scaler_state
+
+    # V9.8.6: Add Three-Phase Curriculum states
+    if csr_curriculum_state is not None:
+        checkpoint["csr_curriculum_state"] = csr_curriculum_state
+    if kosha_curriculum_state is not None:
+        checkpoint["kosha_curriculum_state"] = kosha_curriculum_state
+    if onto_curriculum_state is not None:
+        checkpoint["onto_curriculum_state"] = onto_curriculum_state
+    if pidv2_curriculum_state is not None:
+        checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
+    # V9.8.6: Add Kosha Gyroscope state (InvertedCurriculumController)
+    if kosha_gyroscope_state is not None:
+        checkpoint["kosha_gyroscope_state"] = kosha_gyroscope_state
+    # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
+    if evoflow_state is not None:
+        checkpoint["evoflow_state"] = evoflow_state
+
+    # V9.8.6: Add dataloader position for reproducibility
+    if dataloader_position is not None:
+        checkpoint["dataloader_position"] = dataloader_position
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -14045,6 +14186,33 @@ def load_checkpoint(
     if "scaler_state" in checkpoint:
         result["scaler_state"] = checkpoint["scaler_state"]
         print(f"    ✓ AMP GradScaler state available for restoration")
+
+    # V9.8.6: Return Three-Phase Curriculum states for restoration
+    if "csr_curriculum_state" in checkpoint:
+        result["csr_curriculum_state"] = checkpoint["csr_curriculum_state"]
+        print(f"    ✓ CSR Curriculum state available for restoration")
+    if "kosha_curriculum_state" in checkpoint:
+        result["kosha_curriculum_state"] = checkpoint["kosha_curriculum_state"]
+        print(f"    ✓ Kosha Curriculum state available for restoration")
+    if "onto_curriculum_state" in checkpoint:
+        result["onto_curriculum_state"] = checkpoint["onto_curriculum_state"]
+        print(f"    ✓ Onto Curriculum state available for restoration")
+    if "pidv2_curriculum_state" in checkpoint:
+        result["pidv2_curriculum_state"] = checkpoint["pidv2_curriculum_state"]
+        print(f"    ✓ PIDv2 Curriculum state available for restoration")
+    # V9.8.6: Return Kosha Gyroscope state (InvertedCurriculumController)
+    if "kosha_gyroscope_state" in checkpoint:
+        result["kosha_gyroscope_state"] = checkpoint["kosha_gyroscope_state"]
+        print(f"    ✓ Kosha Gyroscope state available for restoration")
+    # V9.8.6: Return EvoFlow state (EvolutionaryIntelligenceEngine)
+    if "evoflow_state" in checkpoint:
+        result["evoflow_state"] = checkpoint["evoflow_state"]
+        print(f"    ✓ EvoFlow state available for restoration")
+
+    # V9.8.6: Return dataloader position for restoration
+    if "dataloader_position" in checkpoint:
+        result["dataloader_position"] = checkpoint["dataloader_position"]
+        print(f"    ✓ Dataloader position available for restoration")
 
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 

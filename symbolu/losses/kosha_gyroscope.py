@@ -1339,6 +1339,24 @@ class InvertedCurriculumController:
             'disengage_step': self.disengage_step,
         }
 
+    def get_state(self) -> Dict[str, Any]:
+        """V9.8.6: Get curriculum state for checkpointing."""
+        return {
+            'gyroscope_active': self.gyroscope_active,
+            'classification_active': self.classification_active,
+            'graduated': self.graduated,
+            'disengage_step': self.disengage_step,
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """V9.8.6: Restore curriculum state from checkpoint."""
+        if state is None:
+            return
+        self.gyroscope_active = state.get('gyroscope_active', self.gyroscope_active)
+        self.classification_active = state.get('classification_active', self.classification_active)
+        self.graduated = state.get('graduated', False)
+        self.disengage_step = state.get('disengage_step', None)
+
 
 # =============================================================================
 # Kosha-Vritti Resonance Loss (v2.3.0)
