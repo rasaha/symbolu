@@ -87,6 +87,28 @@ from .master_session import (
     get_master_session_store,
 )
 
+# Embeddings (optional - graceful fallback)
+from .embeddings import (
+    get_embedding_provider,
+    cosine_similarity,
+)
+
+# Integration with ChatService (optional)
+try:
+    from .integration import (
+        MasterChatService,
+        MasterChatConfig,
+        MasterChatResponse,
+        get_master_chat_service,
+        master_chat,
+    )
+except ImportError:
+    MasterChatService = None
+    MasterChatConfig = None
+    MasterChatResponse = None
+    get_master_chat_service = None
+    master_chat = None
+
 # API router (optional import - only when FastAPI is available)
 try:
     from .api import router as master_chat_router
@@ -118,6 +140,15 @@ __all__ = [
     "MasterSessionStore",
     "TurnContext",
     "get_master_session_store",
+    # Embeddings
+    "get_embedding_provider",
+    "cosine_similarity",
+    # Integration
+    "MasterChatService",
+    "MasterChatConfig",
+    "MasterChatResponse",
+    "get_master_chat_service",
+    "master_chat",
     # API
     "master_chat_router",
 ]

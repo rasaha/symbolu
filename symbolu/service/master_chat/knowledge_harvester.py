@@ -281,6 +281,336 @@ EMOTION_PATTERNS = [
         importance_modifier=0.1,
         entity_groups=(1, 2),
     ),
+    ExtractionPattern(
+        name="emotional_reaction",
+        pattern=re.compile(
+            r"(?:that|this|it)\s+(?:makes me|made me)\s+(happy|sad|angry|frustrated|excited|nervous|anxious|relieved|proud|disappointed)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.EMOTIONS,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="concern_expression",
+        pattern=re.compile(
+            r"(?:i'm|I'm|I am)\s+(?:worried|concerned|nervous|anxious)\s+(?:about|that)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.EMOTIONS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+]
+
+# Values/Beliefs patterns
+VALUES_PATTERNS = [
+    ExtractionPattern(
+        name="belief_statement",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:believe|think|feel)\s+(?:that\s+)?(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.VALUES,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="importance_statement",
+        pattern=re.compile(
+            r"(?:it's|It's|it is|It is)\s+(?:important|crucial|essential|vital)\s+(?:to me\s+)?(?:that\s+)?(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.VALUES,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="value_expression",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:value|prioritize|care about|appreciate)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.VALUES,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="principle_statement",
+        pattern=re.compile(
+            r"(?:my|My)\s+(?:philosophy|principle|approach|belief)\s+is\s+(?:that\s+)?(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.VALUES,
+        importance_modifier=0.2,
+        entity_groups=(1,),
+    ),
+]
+
+# Technical/Skills patterns
+SKILLS_PATTERNS = [
+    ExtractionPattern(
+        name="skill_statement",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:know|use|work with|am familiar with|have experience with)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.LEARNING,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="expertise_claim",
+        pattern=re.compile(
+            r"(?:i'm|I'm|I am)\s+(?:good at|experienced in|skilled at|proficient in|an expert in)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SELF,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="tool_usage",
+        pattern=re.compile(
+            r"(?:i|I|we|We)\s+(?:use|are using|have been using)\s+(.+?)\s+(?:for|to)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYSTEMS,
+        importance_modifier=0.1,
+        entity_groups=(1, 2),
+    ),
+    ExtractionPattern(
+        name="tech_stack",
+        pattern=re.compile(
+            r"(?:our|my|the)\s+(?:tech stack|stack|tooling|infrastructure)\s+(?:includes|uses|is)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYSTEMS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+]
+
+# Analysis/Reasoning patterns
+ANALYSIS_PATTERNS = [
+    ExtractionPattern(
+        name="comparison",
+        pattern=re.compile(
+            r"(.+?)\s+is\s+(?:better|worse|faster|slower|cheaper|more expensive)\s+than\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.ANALYSIS,
+        importance_modifier=0.1,
+        entity_groups=(1, 2),
+    ),
+    ExtractionPattern(
+        name="tradeoff_analysis",
+        pattern=re.compile(
+            r"(?:the|The)\s+(?:tradeoff|trade-off|downside|upside|advantage|disadvantage)\s+(?:is|of)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.ANALYSIS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="evaluation",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:think|found|evaluated|assessed|concluded)\s+(?:that\s+)?(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.ANALYSIS,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="pros_cons",
+        pattern=re.compile(
+            r"(?:the|The)\s+(?:pros|cons|benefits|drawbacks)\s+(?:are|include)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.ANALYSIS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+]
+
+# Systems/Process patterns
+SYSTEMS_PATTERNS = [
+    ExtractionPattern(
+        name="process_description",
+        pattern=re.compile(
+            r"(?:our|my|the)\s+(?:process|workflow|procedure|approach)\s+(?:is|involves)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYSTEMS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="team_structure",
+        pattern=re.compile(
+            r"(?:our|my|the)\s+team\s+(?:is|has|includes|consists of)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYSTEMS,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="organization_fact",
+        pattern=re.compile(
+            r"(?:at|in)\s+(?:my|our)\s+(?:company|organization|team|department)\s*,?\s+(?:we|they)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYSTEMS,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+]
+
+# Temporal/Deadline patterns
+TEMPORAL_PATTERNS = [
+    ExtractionPattern(
+        name="deadline",
+        pattern=re.compile(
+            r"(?:the|my|our)\s+deadline\s+(?:is|for)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.TEMPORAL,
+        importance_modifier=0.2,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="time_constraint",
+        pattern=re.compile(
+            r"(?:i|I|we|We)\s+(?:need to|have to|must)\s+(?:finish|complete|deliver)\s+(?:by|before)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.TEMPORAL,
+        importance_modifier=0.2,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="schedule_mention",
+        pattern=re.compile(
+            r"(?:on|this|next)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month|year)\s+(?:i|I|we|We)\s+(?:will|are going to|plan to)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.TEMPORAL,
+        importance_modifier=0.15,
+        entity_groups=(1, 2),
+    ),
+    ExtractionPattern(
+        name="recurring_schedule",
+        pattern=re.compile(
+            r"(?:every|each)\s+(day|week|month|monday|tuesday|wednesday|thursday|friday)\s+(?:i|I|we|We)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.TEMPORAL,
+        importance_modifier=0.1,
+        entity_groups=(1, 2),
+    ),
+]
+
+# Closure/Completion patterns
+CLOSURE_PATTERNS = [
+    ExtractionPattern(
+        name="completion",
+        pattern=re.compile(
+            r"(?:i|I|we|We)\s+(?:finished|completed|done with|wrapped up)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.CLOSURE,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="resolution",
+        pattern=re.compile(
+            r"(?:the|that|this)\s+(?:issue|problem|bug|question)\s+(?:was|is|has been)\s+(?:resolved|fixed|answered|solved)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.CLOSURE,
+        importance_modifier=0.1,
+        entity_groups=(),
+    ),
+    ExtractionPattern(
+        name="no_longer",
+        pattern=re.compile(
+            r"(?:i|I|we|We)\s+(?:no longer|don't|stopped|quit)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.CLOSURE,
+        importance_modifier=0.1,
+        entity_groups=(1,),
+    ),
+]
+
+# Synthesis/Pattern patterns
+SYNTHESIS_PATTERNS = [
+    ExtractionPattern(
+        name="pattern_recognition",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:noticed|see|observe)\s+(?:a\s+)?(?:pattern|trend|connection)\s+(?:that|where|in)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYNTHESIS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="insight",
+        pattern=re.compile(
+            r"(?:the|The)\s+(?:key|main|important)\s+(?:insight|takeaway|lesson)\s+(?:is|was)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYNTHESIS,
+        importance_modifier=0.2,
+        entity_groups=(1,),
+    ),
+    ExtractionPattern(
+        name="connection",
+        pattern=re.compile(
+            r"(.+?)\s+(?:is connected to|relates to|is similar to|reminds me of)\s+(.+?)(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.SYNTHESIS,
+        importance_modifier=0.1,
+        entity_groups=(1, 2),
+    ),
+]
+
+# Extended relationship patterns
+EXTENDED_RELATIONSHIP_PATTERNS = [
+    ExtractionPattern(
+        name="named_person",
+        pattern=re.compile(
+            r"(?:my|My)\s+(?:friend|colleague|coworker|partner|client|customer)\s+([A-Z][a-z]+)\s+(.+?)(?:\.|$)",
+        ),
+        bucket_hint=BucketCategory.RELATIONSHIPS,
+        importance_modifier=0.2,
+        entity_groups=(1, 2),
+    ),
+    ExtractionPattern(
+        name="interaction",
+        pattern=re.compile(
+            r"(?:i|I)\s+(?:met with|talked to|spoke with|emailed|called|messaged)\s+(.+?)(?:\s+about\s+(.+?))?(?:\.|$)",
+            re.IGNORECASE,
+        ),
+        bucket_hint=BucketCategory.RELATIONSHIPS,
+        importance_modifier=0.1,
+        entity_groups=(1, 2),
+    ),
+    ExtractionPattern(
+        name="team_member",
+        pattern=re.compile(
+            r"([A-Z][a-z]+)\s+(?:is|was)\s+(?:on my team|my teammate|working with me|helping me)(?:\.|$)",
+        ),
+        bucket_hint=BucketCategory.RELATIONSHIPS,
+        importance_modifier=0.15,
+        entity_groups=(1,),
+    ),
 ]
 
 # All patterns grouped
@@ -291,9 +621,16 @@ ALL_PATTERNS: Dict[str, List[ExtractionPattern]] = {
     "decisions": DECISION_PATTERNS,
     "learning": LEARNING_PATTERNS,
     "aspirations": ASPIRATION_PATTERNS,
-    "relationships": RELATIONSHIP_PATTERNS,
+    "relationships": RELATIONSHIP_PATTERNS + EXTENDED_RELATIONSHIP_PATTERNS,
     "projects": PROJECT_PATTERNS,
     "emotions": EMOTION_PATTERNS,
+    "values": VALUES_PATTERNS,
+    "skills": SKILLS_PATTERNS,
+    "analysis": ANALYSIS_PATTERNS,
+    "systems": SYSTEMS_PATTERNS,
+    "temporal": TEMPORAL_PATTERNS,
+    "closure": CLOSURE_PATTERNS,
+    "synthesis": SYNTHESIS_PATTERNS,
 }
 
 
