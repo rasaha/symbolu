@@ -7906,8 +7906,8 @@ class UnifiedTrainingConfig:
     pidv2_ki: float = 0.02
     pidv2_kd: float = 0.10
     pidv2_a_min: float = 0.40  # Raised from 0.30 to boost sensory floor
-    pidv2_c_floor: float = 0.68
-    pidv2_c_good: float = 0.76
+    pidv2_c_floor: float = 0.45  # Lowered from 0.68 to prevent coherence gate lockup
+    pidv2_c_good: float = 0.65   # Lowered from 0.76 for earlier gate opening
     pidv2_w_s: float = 0.30  # Semantic weight
     pidv2_semantic_scale: float = 50.0
     pidv2_handshake_dampen: bool = True
@@ -8067,7 +8067,7 @@ class UnifiedTrainingConfig:
     sattvic_floor_lambda: float = 0.1        # Minimum λ_csr after decay
     sattvic_warmup_steps: int = 500          # Steps for warmup phase
     sattvic_variance_window: int = 50        # Window for entropy variance detection
-    sattvic_variance_threshold: float = 0.001  # Variance threshold for stagnation
+    sattvic_variance_threshold: float = 0.0001  # Lowered from 0.001 to reduce boost-release cycling
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
@@ -14464,9 +14464,9 @@ def main():
                        help="PIDv2 derivative gain")
     parser.add_argument("--pidv2_a_min", type=float, default=0.40,
                        help="PIDv2 minimum authority factor (sensory floor)")
-    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.45,
                        help="PIDv2 coherence floor - below this, gate is at minimum (0.5)")
-    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
+    parser.add_argument("--pidv2_c_good", type=float, default=0.65,
                        help="PIDv2 coherence good - above this, gate is at full (1.0)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
@@ -14744,7 +14744,7 @@ def main():
                        help="Steps for warmup phase")
     parser.add_argument("--sattvic_variance_window", type=int, default=50,
                        help="Window for entropy variance detection")
-    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.001,
+    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.0001,
                        help="Variance threshold for stagnation")
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
