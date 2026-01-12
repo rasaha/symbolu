@@ -11097,7 +11097,7 @@ def train(config: UnifiedTrainingConfig):
         # Initialize Inverted Curriculum Controller
         gyro_config = KoshaGyroscopeConfig(
             enable_gyroscope=True,
-            kosha_disengage_ppl=config.gyroscope_target_ppl,
+            gyroscope_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
             gain_rampdown_steps=config.kosha_rampdown_steps,
             # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
