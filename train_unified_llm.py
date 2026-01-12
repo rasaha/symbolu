@@ -13174,36 +13174,33 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.8.6: Onto Bridge Three-Phase Curriculum Update (Layer 4 - Foundation)
                 if onto_curriculum is not None:
-                    onto_phase_change, onto_phase_msg = onto_curriculum.update(val_ppl, global_step)
-                    if onto_phase_change:
-                        print(onto_phase_msg)
-                        # Log phase transition
-                        if onto_curriculum.graduated:
-                            print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
+                    old_phase = onto_curriculum.phase
+                    onto_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if onto_curriculum.graduated and old_phase != onto_curriculum.phase:
+                        print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
 
                 # V9.8.6: CSR Three-Phase Curriculum Update
                 if csr_curriculum is not None:
-                    csr_phase_change, csr_phase_msg = csr_curriculum.update(val_ppl, global_step)
-                    if csr_phase_change:
-                        print(csr_phase_msg)
-                        # Log phase transition
-                        if csr_curriculum.graduated:
-                            print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
+                    old_phase = csr_curriculum.phase
+                    csr_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if csr_curriculum.graduated and old_phase != csr_curriculum.phase:
+                        print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🔤 [CSR] Phase: {csr_curriculum.phase} | Scale: {csr_curriculum.scale:.3f}")
 
                 # V9.8.6: Kosha Three-Phase Curriculum Update
                 if kosha_curriculum is not None:
-                    kosha_phase_change, kosha_phase_msg = kosha_curriculum.update(val_ppl, global_step)
-                    if kosha_phase_change:
-                        print(kosha_phase_msg)
-                        # Log phase transition
-                        if kosha_curriculum.graduated:
-                            print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
+                    old_phase = kosha_curriculum.phase
+                    kosha_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if kosha_curriculum.graduated and old_phase != kosha_curriculum.phase:
+                        print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
                     # Periodic logging
                     if global_step % (config.eval_every * 5) == 0:
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
