@@ -10716,6 +10716,7 @@ def train(config: UnifiedTrainingConfig):
         authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
+        print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
         if config.pidv2_batch_resize:
@@ -12451,11 +12452,13 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage - show CURRENT allocated (matches nvidia-smi)
+                    # Memory usage - show reserved/total (matches nvidia-smi)
+                    # V9.8.5: Fixed misleading display - was showing allocated/reserved
+                    # Now shows reserved/total to match what nvidia-smi reports
                     if device.type == "cuda":
-                        mem_current = torch.cuda.memory_allocated() / (1024**3)
                         mem_reserved = torch.cuda.memory_reserved() / (1024**3)
-                        mem_str = f" | VRAM: {mem_current:.1f}GB/{mem_reserved:.1f}GB"
+                        mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                        mem_str = f" | VRAM: {mem_reserved:.1f}GB/{mem_total:.1f}GB"
                     else:
                         mem_str = ""
 
@@ -13978,6 +13981,10 @@ def main():
                        help="PIDv2 derivative gain")
     parser.add_argument("--pidv2_a_min", type=float, default=0.40,
                        help="PIDv2 minimum authority factor (sensory floor)")
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
+                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5)")
+    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
+                       help="PIDv2 coherence good - above this, gate is at full (1.0)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     # V9.7.0: PIDv2 Dynamic Batch Sizing
@@ -14603,6 +14610,8 @@ def main():
         pidv2_ki=args.pidv2_ki,
         pidv2_kd=args.pidv2_kd,
         pidv2_a_min=args.pidv2_a_min,
+        pidv2_c_floor=args.pidv2_c_floor,
+        pidv2_c_good=args.pidv2_c_good,
         pidv2_w_s=args.pidv2_w_s,
         # V9.7.0: PIDv2 Dynamic Batch Sizing
         pidv2_batch_resize=args.pidv2_batch_resize,
