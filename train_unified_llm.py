@@ -7782,6 +7782,13 @@ class UnifiedTrainingConfig:
     onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
     onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
     onto_bridge_layer: int = 4               # V9.7.0: Layer 4 = foundational ontological grounding
+    # V9.8.6: Three-Phase Onto Bridge Curriculum (Inverted - active at HIGH PPL)
+    # Phase A (PPL > engage): Full ontological grounding - "foundation building"
+    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
+    # Phase C (PPL < disengage): Onto bridge off - "model fluent"
+    onto_engage_ppl: float = 150.0           # Onto fully ON above this PPL (construction)
+    onto_disengage_ppl: float = 50.0         # Onto OFF below this PPL (polishing)
+    onto_rampdown_steps: int = 500           # Steps to ramp to 0 after disengage
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -11003,6 +11010,20 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Aspects: O1-O12 (Potential → Absolving)")
         print(f"     ⚠️  FOUNDATIONAL - establishes ontological DNA early")
 
+    # V9.8.6: Initialize Onto Bridge Three-Phase Curriculum Controller
+    onto_curriculum = None
+    if config.enable_onto_bridge and onto_bridge is not None:
+        onto_curriculum = ThreePhaseCurriculum(
+            name="Onto",
+            engage_ppl=config.onto_engage_ppl,
+            disengage_ppl=config.onto_disengage_ppl,
+            rampdown_steps=config.onto_rampdown_steps,
+        )
+        print(f"  🎓 Onto Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.onto_engage_ppl} (full ontological grounding)")
+        print(f"       TRANSITION:   {config.onto_disengage_ppl} < PPL < {config.onto_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.onto_disengage_ppl} (Onto off after {config.onto_rampdown_steps} steps)")
+
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
         print(f"\n  🎯 Kosha Phase Steering: ENABLED")
@@ -11808,9 +11829,16 @@ def train(config: UnifiedTrainingConfig):
                             )
                             # Scale by lambda and add to total loss
                             scaled_onto_loss = config.onto_bridge_lambda * onto_loss
+
+                            # V9.8.6: Apply three-phase curriculum scaling
+                            onto_scale = onto_curriculum.scale if onto_curriculum is not None else 1.0
+                            scaled_onto_loss = scaled_onto_loss * onto_scale
+
                             loss = loss + scaled_onto_loss
                             # Store metrics
                             metrics['onto_bridge_loss'] = scaled_onto_loss.item()
+                            metrics['onto_bridge_loss_unscaled'] = (config.onto_bridge_lambda * onto_loss).item()
+                            metrics['onto_curriculum_scale'] = onto_scale
                             metrics['onto_diversity'] = onto_metrics.get('onto_diversity', 0.0)
                             metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
                             metrics['onto_bridge_layer'] = onto_layer
@@ -13144,6 +13172,18 @@ def train(config: UnifiedTrainingConfig):
                               f"Avg PPL: {avg_ppl_str} | "
                               f"Steps in phase: {status['steps_in_phase']}")
 
+                # V9.8.6: Onto Bridge Three-Phase Curriculum Update (Layer 4 - Foundation)
+                if onto_curriculum is not None:
+                    onto_phase_change, onto_phase_msg = onto_curriculum.update(val_ppl, global_step)
+                    if onto_phase_change:
+                        print(onto_phase_msg)
+                        # Log phase transition
+                        if onto_curriculum.graduated:
+                            print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
+                    # Periodic logging
+                    if global_step % (config.eval_every * 5) == 0:
+                        print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
+
                 # V9.8.6: CSR Three-Phase Curriculum Update
                 if csr_curriculum is not None:
                     csr_phase_change, csr_phase_msg = csr_curriculum.update(val_ppl, global_step)
@@ -14214,6 +14254,13 @@ def main():
                        help="Weight for Pramāṇa alignment - truth prioritization (default: 0.1)")
     parser.add_argument("--onto_bridge_layer", type=int, default=4,
                        help="Layer for ontological bridge (4=foundational structure, default: 4)")
+    # V9.8.6: Three-Phase Onto Bridge Curriculum
+    parser.add_argument("--onto_engage_ppl", type=float, default=150.0,
+                       help="Onto fully ON above this PPL (construction phase)")
+    parser.add_argument("--onto_disengage_ppl", type=float, default=50.0,
+                       help="Onto OFF below this PPL (polishing phase)")
+    parser.add_argument("--onto_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp onto loss to 0 after disengage")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -14851,6 +14898,10 @@ def main():
         onto_bridge_diversity=args.onto_bridge_diversity,
         onto_bridge_pramana=args.onto_bridge_pramana,
         onto_bridge_layer=args.onto_bridge_layer,
+        # V9.8.6: Three-Phase Onto Bridge Curriculum
+        onto_engage_ppl=args.onto_engage_ppl,
+        onto_disengage_ppl=args.onto_disengage_ppl,
+        onto_rampdown_steps=args.onto_rampdown_steps,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
