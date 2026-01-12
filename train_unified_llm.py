@@ -8347,6 +8347,10 @@ def load_data(
 
             def tokenize(split):
                 text = "\n".join(ds[split]["text"])
+                # V9.8.4: Clean WikiText Moses tokenization artifacts BEFORE tokenizing
+                # This prevents the model from learning @,@ @-@ @.@ and = = = patterns
+                if GRADIENT_THROTTLE_AVAILABLE:
+                    text = clean_wikitext_artifacts(text)
                 if hasattr(tokenizer, "encode"):
                     tokens = tokenizer.encode(text)
                 else:
