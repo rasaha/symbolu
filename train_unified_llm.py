@@ -7705,6 +7705,14 @@ class UnifiedTrainingConfig:
     pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
     pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
+    # Three-Phase PID Curriculum (like Kosha Gyroscope)
+    # Phase A (PPL > engage): Full PID control (construction)
+    # Phase B (disengage < PPL < engage): Linear rampdown
+    # Phase C (PPL < disengage): PID off (polishing)
+    pidv2_engage_ppl: float = 100.0           # PID fully ON above this PPL (construction phase)
+    pidv2_disengage_ppl: float = 30.0         # PID OFF below this PPL (polishing phase)
+    pidv2_rampdown_steps: int = 500           # Steps to ramp down after disengage trigger
+
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
     phase_ramp_steps: int = 7000
@@ -10719,6 +10727,10 @@ def train(config: UnifiedTrainingConfig):
             batch_max=config.pidv2_batch_max,
             batch_velocity_threshold=config.pidv2_batch_velocity_threshold,
             batch_stable_streak=config.pidv2_batch_stable_streak,
+            # V9.8.6: Three-Phase Curriculum
+            engage_ppl=config.pidv2_engage_ppl,
+            disengage_ppl=config.pidv2_disengage_ppl,
+            rampdown_steps=config.pidv2_rampdown_steps,
         )
         authority_controller = AuthorityPIDv2(pidv2_config)
         authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
@@ -10727,6 +10739,11 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
+        # V9.8.6: Three-Phase Curriculum info
+        print(f"    🎓 Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
+        print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
         if config.pidv2_batch_resize:
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
@@ -14006,6 +14023,13 @@ def main():
                        help="PPL velocity %% to trigger batch reduction")
     parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
                        help="Consecutive stable evals before batch increase")
+    # V9.8.6: Three-Phase PID Curriculum
+    parser.add_argument("--pidv2_engage_ppl", type=float, default=100.0,
+                       help="PID fully ON above this PPL (construction phase)")
+    parser.add_argument("--pidv2_disengage_ppl", type=float, default=30.0,
+                       help="PID OFF below this PPL (polishing phase)")
+    parser.add_argument("--pidv2_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp down PID after disengage trigger")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="Steps for phase LR ramp (handshake dampening)")
     parser.add_argument("--tensorboard", action="store_true", default=True,
@@ -14627,6 +14651,10 @@ def main():
         pidv2_batch_max=args.pidv2_batch_max,
         pidv2_batch_velocity_threshold=args.pidv2_batch_velocity_threshold,
         pidv2_batch_stable_streak=args.pidv2_batch_stable_streak,
+        # V9.8.6: Three-Phase PID Curriculum
+        pidv2_engage_ppl=args.pidv2_engage_ppl,
+        pidv2_disengage_ppl=args.pidv2_disengage_ppl,
+        pidv2_rampdown_steps=args.pidv2_rampdown_steps,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
