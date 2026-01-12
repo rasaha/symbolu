@@ -1615,12 +1615,28 @@ class VrittiResonanceLoss(nn.Module):
         """
         Compute differentiable alignment loss to fix Kosha-Vritti inversions.
 
-        This loss pushes each correlation toward its target:
-        - physical_pramana: Target +1.0 (HARD - Truth requires Physical anchor)
-        - mental_vikalpa:   Target >0.0 (SOFT - Allow creative friction)
-        - intellect_smriti: Target +1.0 (FIRM - Memory needs logical structure)
-        - bliss_viparyaya:  Target +1.0 (FIRM - Bliss anchors misconception detection)
-        - vital_nidra:      Target -1.0 (INVERSE - Sleep = low vitality)
+        Architecture: Four Conscious Koshas + One Living Medium
+        ─────────────────────────────────────────────────────────
+        The Pancha Kosha model has 5 sheaths, but they are NOT equal:
+
+        CONSCIOUS KOSHAS (alignment targets):
+        - Physical (Annamaya):  Ground/Anchor    → Target Pramana +1.0
+        - Mental (Manomaya):    Processing       → Target Vikalpa >0.0
+        - Intellect (Vijnanamaya): Discrimination → Target Smriti 0.7
+        - Bliss (Anandamaya):   Integration/Will → Target Viparyaya 0.0
+
+        LIVING MEDIUM (no target - emergent):
+        - Vital (Pranamaya): The life force that animates transitions
+          between the other four. Its purpose is to be consumed/depleted
+          as coherence is achieved. Nidra (sleep) naturally emerges when
+          Vital is exhausted - this is healthy homeostasis, not pathology.
+
+        Correlation Targets:
+        - physical_pramana: +1.0 (HARD) - Truth requires Physical anchor
+        - intellect_smriti: +0.7 (FIRM) - Memory needs logic, 30% gap for inference
+        - bliss_viparyaya:  0.0 (ORTHOGONAL) - Will transcends error
+        - mental_vikalpa:   >0.0 (SOFT) - Allow creative friction
+        - vital_nidra:      EMERGENT (no penalty) - Natural energy flow
 
         Args:
             kosha_states: [B, N, 5] or [B, 5] Kosha activations
@@ -1678,14 +1694,20 @@ class VrittiResonanceLoss(nn.Module):
         loss = loss + m_vikalpa_loss
         diagnostics['mental_vikalpa_corr'] = m_vikalpa.item()
 
-        # === 5. VITAL-NIDRA: VITAL DRIVE ===
-        # Target: -1.0 | Maximum energy, minimum sleep/inertia
-        # Weight: MEDIUM (0.2)
-        # High Vital should correlate with LOW Nidra (inverse relationship)
+        # === 5. VITAL-NIDRA: EMERGENT (NO PENALTY) ===
+        # Pranamaya (Vital) is the LIVING MEDIUM between the other four koshas.
+        # Its natural purpose is to be consumed/depleted as coherence is achieved.
+        # Nidra (Sleep) naturally emerges when Vital is exhausted - this is healthy.
+        #
+        # Philosophy: Vital-Nidra correlation should EMERGE from the coherence
+        # of Physical↔Mental↔Intellect↔Bliss, not be forced by a penalty.
+        # The existing VrittiResonanceLoss handles pathology: relu(nidra * vital)
+        # prevents simultaneous high-sleep AND high-energy (impossible state).
+        #
+        # We log it for diagnostics but do NOT add to loss.
         v_nidra = correlations['vital_nidra']
-        v_nidra_loss = 0.2 * (1.0 + v_nidra)  # Push toward -1.0
-        loss = loss + v_nidra_loss
         diagnostics['vital_nidra_corr'] = v_nidra.item()
+        # NO v_nidra_loss added to total
 
         # Apply overall lambda scaling
         loss = loss * lambda_scale
