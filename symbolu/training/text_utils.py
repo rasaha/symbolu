@@ -19,8 +19,12 @@ def clean_wikitext_artifacts(text: str) -> str:
     - 3 @.@ 14        ->  3.14
     - 1 @,@ 000       ->  1,000
 
+    Also removes Wikipedia-specific formatting:
+    - = = Section = =  ->  Section
+    - Empty lines and excessive whitespace
+
     These artifacts appear in model outputs when trained on raw WikiText.
-    This function reverses the escaping for cleaner display.
+    This function reverses the escaping for cleaner training/display.
 
     Args:
         text: Text containing potential WikiText artifacts
@@ -52,6 +56,17 @@ def clean_wikitext_artifacts(text: str) -> str:
 
     # Fix question mark: @?@ -> ?
     text = re.sub(r'\s*@\?@\s*', '?', text)
+
+    # V9.8.4: Remove Wikipedia section headers: = = Title = = -> Title
+    # These appear as "= = = Heading = = =" in raw WikiText
+    text = re.sub(r'(?:^|\n)\s*=+\s*=*\s*', '\n', text)  # Remove leading = = =
+    text = re.sub(r'\s*=+\s*=*\s*(?=\n|$)', '', text)    # Remove trailing = = =
+
+    # Remove empty lines and excessive newlines
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+
+    # Clean up stray @ symbols that might remain
+    text = re.sub(r'\s*@\s*', ' ', text)
 
     return text
 

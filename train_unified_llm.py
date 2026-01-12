@@ -3250,14 +3250,26 @@ class VRAMGovernor:
 
         Returns:
             (usage_fraction, used_gb, total_gb)
+
+        Note: Uses memory_allocated() (actual tensor memory) not memory_reserved()
+        (which includes PyTorch's caching allocator overhead). This prevents
+        false VRAM pressure signals from cached but unused memory.
         """
         if not torch.cuda.is_available():
             return 0.0, 0.0, 0.0
 
-        used = torch.cuda.memory_reserved()
+        # Use memory_allocated() - actual tensor memory
+        # NOT memory_reserved() which includes caching allocator overhead
+        allocated = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
         total = torch.cuda.get_device_properties(0).total_memory
-        usage = used / total
 
+        # Primary metric: allocated memory (actual usage)
+        # But also consider if reserved is very high (fragmentation risk)
+        # Use max of allocated and 70% of reserved as a balanced metric
+        used = max(allocated, reserved * 0.7)
+
+        usage = used / total
         used_gb = used / (1024 ** 3)
         total_gb = total / (1024 ** 3)
 
@@ -8335,6 +8347,10 @@ def load_data(
 
             def tokenize(split):
                 text = "\n".join(ds[split]["text"])
+                # V9.8.4: Clean WikiText Moses tokenization artifacts BEFORE tokenizing
+                # This prevents the model from learning @,@ @-@ @.@ and = = = patterns
+                if GRADIENT_THROTTLE_AVAILABLE:
+                    text = clean_wikitext_artifacts(text)
                 if hasattr(tokenizer, "encode"):
                     tokens = tokenizer.encode(text)
                 else:
@@ -11780,9 +11796,13 @@ def train(config: UnifiedTrainingConfig):
                             r_axis = max(-1.0, min(1.0, r_axis))
 
                         # Get gradient norm (Time axis) - use captured value
+                        # V9.8.5: SIGN FIX - Documentation states:
+                        #   High gradient → Future (-T) = Dynamic, projecting
+                        #   Low gradient  → Past (+T)   = Static, repeating
+                        # Original code had this inverted. Negating to match doc.
                         t_axis_grad = captured_grad_norm if 'captured_grad_norm' in dir() else 1.0
                         if t_axis_grad > 0:
-                            t_axis = math.log(t_axis_grad + 1e-8) / 2.3
+                            t_axis = -math.log(t_axis_grad + 1e-8) / 2.3  # Negated!
                             t_axis = max(-1.0, min(1.0, t_axis))
                         else:
                             t_axis = 0.0
@@ -11877,11 +11897,15 @@ def train(config: UnifiedTrainingConfig):
                             # This enables real-time feedback control of gyroscope gain
                             auth_factor = authority_controller.A if authority_controller is not None else None
 
+                            # V9.8.5: Pass toroidal coherence for Vital-Coherence coupling
+                            coherence_for_gyro = toroidal_coherence if 'toroidal_coherence' in dir() else None
+
                             gyro_loss, gyroscope_components = kosha_gyroscope(
                                 kosha_states_for_gyro,
                                 current_ppl=current_ppl,
                                 return_components=True,
                                 authority_factor=auth_factor,
+                                coherence=coherence_for_gyro,
                             )
 
                             # Apply warmup scaling
@@ -11967,6 +11991,24 @@ def train(config: UnifiedTrainingConfig):
                                         loss = loss + res_loss
                                         metrics['vritti_resonance_loss'] = res_loss.item()
                                         metrics['vritti_components'] = res_components
+
+                                    # === DIFFERENTIABLE ALIGNMENT LOSS (P-Pram Fix) ===
+                                    # Fixes inverted Kosha-Vritti correlations (e.g., P-Pram at -0.98)
+                                    # by adding gradient flow through Pearson correlation
+                                    alignment_loss, alignment_diag = vritti_resonance.compute_alignment_loss(
+                                        kosha_states_for_gyro, vritti_states_for_res,
+                                        lambda_scale=0.3,  # Moderate pressure to fix inversion
+                                    )
+                                    loss = loss + alignment_loss
+                                    metrics['alignment_loss'] = alignment_diag.get('alignment_loss_total', 0.0)
+                                    metrics['p_pram_corr'] = alignment_diag.get('p_pram_corr', 0.0)
+                                    metrics['p_pram_loss'] = alignment_diag.get('p_pram_loss', 0.0)
+
+                                    # Log other alignment correlations
+                                    metrics['intellect_smriti_corr'] = alignment_diag.get('intellect_smriti_corr', 0.0)
+                                    metrics['bliss_viparyaya_corr'] = alignment_diag.get('bliss_viparyaya_corr', 0.0)
+                                    metrics['mental_vikalpa_corr'] = alignment_diag.get('mental_vikalpa_corr', 0.0)
+                                    metrics['vital_nidra_corr'] = alignment_diag.get('vital_nidra_corr', 0.0)
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -12104,7 +12146,9 @@ def train(config: UnifiedTrainingConfig):
             optimizer.zero_grad()
 
             # Update scheduler after warmup
-            if global_step >= config.warmup_steps:
+            # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
+            # The scheduler resets LR every step, undoing adaptive boosts
+            if global_step >= config.warmup_steps and not config.enable_adaptive_training:
                 scheduler.step()
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
@@ -12781,7 +12825,16 @@ def train(config: UnifiedTrainingConfig):
                 )
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
-                current_coh = val_metrics.get('coherence', 0.75)
+
+                # V9.8.5: Use REAL toroidal coherence for PID, not hardcoded default
+                # The evaluate() function discards coherence metrics, so we use the
+                # training loop's toroidal_coherence which measures actual cognitive
+                # continuity (O1↔O12 cosine similarity).
+                # Fallback to val_metrics only if toroidal_coherence not yet computed.
+                if 'toroidal_coherence' in dir() and toroidal_coherence is not None:
+                    current_coh = toroidal_coherence
+                else:
+                    current_coh = val_metrics.get('coherence', 0.75)
 
                 # v2.2.1: Kosha Gyroscope Graduation Check
                 # Model graduates when PPL is stable below threshold
@@ -12918,10 +12971,14 @@ def train(config: UnifiedTrainingConfig):
                     # V9.7.0: PIDv2 Dynamic Batch Sizing Check
                     if hasattr(authority_controller, 'check_batch_action') and config.pidv2_batch_resize:
                         # Get current VRAM usage for headroom check
+                        # Use memory_allocated() for actual tensor memory, not memory_reserved()
                         vram_usage = 0.0
                         if torch.cuda.is_available():
-                            vram_used = torch.cuda.memory_reserved()
+                            vram_allocated = torch.cuda.memory_allocated()
+                            vram_reserved = torch.cuda.memory_reserved()
                             vram_total = torch.cuda.get_device_properties(0).total_memory
+                            # Use actual allocated, but consider reserved if much higher (fragmentation)
+                            vram_used = max(vram_allocated, vram_reserved * 0.7)
                             vram_usage = vram_used / vram_total
 
                         batch_action, new_batch, batch_reason = authority_controller.check_batch_action(

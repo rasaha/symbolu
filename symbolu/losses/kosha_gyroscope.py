@@ -715,6 +715,7 @@ class KoshaGyroscopicLoss(nn.Module):
         return_components: bool = False,
         authority_factor: Optional[float] = None,
         input_text: Optional[str] = None,
+        coherence: Optional[float] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
         Compute the Kosha Gyroscopic Loss (v2.3.2 Reflexive Domain Morph).
@@ -734,6 +735,13 @@ class KoshaGyroscopicLoss(nn.Module):
         - Bliss Ceiling: 61.8% → 38.2% as μ increases
         - Grounding Push: 3.0× → 5.0× as μ increases
 
+        v9.8.5 Coherence-Vital Coupling:
+        Pranamaya (Vital) is the "living medium" whose purpose is to be consumed
+        as coherence is achieved between the other four koshas. When coherence
+        is high, the Vital floor is lowered (efficient operation needs less energy).
+        When coherence is low, the Vital floor remains at baseline (struggling
+        system needs more energy).
+
         Args:
             kosha_states: [batch, seq, 5] Kosha activations normalized to [0, 1]
                          Indices: [Physical, Vital, Mental, Intellect, Blissful]
@@ -748,6 +756,10 @@ class KoshaGyroscopicLoss(nn.Module):
                              This enables integration with --controller pidv2.
             input_text: Optional text for domain detection (v2.3.2).
                        If provided, enables external signal for domain morphing.
+            coherence: Optional toroidal coherence value [0, 1] (v9.8.5).
+                      When provided, modulates Vital floor threshold:
+                      - High coherence (>0.7): Lower Vital floor (efficient)
+                      - Low coherence (<0.3): Keep baseline floor (struggling)
 
         Returns:
             If return_components=False: Scalar loss value
@@ -876,9 +888,35 @@ class KoshaGyroscopicLoss(nn.Module):
 
         # Vital Floor (23.6%): Wake-up Boost - boost momentum when too low
         # Vital uses MOMENTUM control, not loss pressure
-        vital_below_floor = F.relu(self.floor_vital - vital)
-        vital_floor_active = vital.mean() < self.floor_vital
-        # Per Gemini: Boost = 1.5 if vit < 0.236
+        #
+        # v9.8.5: Coherence-Vital Coupling (Conservative)
+        # Pranamaya (Vital) is the "living medium" that depletes as coherence
+        # is achieved. When coherence is high, we ALLOW lower Vital (efficient).
+        # When coherence is low, we REQUIRE higher Vital (struggling needs energy).
+        #
+        # Why Toroidal Coherence is the correct metric:
+        # - Vital controls MOMENTUM (maintains direction/trajectory)
+        # - Toroidal coherence measures trajectory consistency (O1↔O12)
+        # - High coherence = stable trajectory = less momentum needed
+        # - Suppressing momentum boost when coherent is physically correct
+        #
+        # Conservative scaling (20% max reduction):
+        # - Avoids "Fake Flow" crash scenario where model starves itself
+        #   of momentum while on wrong trajectory
+        # - coherence >= 0.7: Vital floor drops to ~18.9% (from 23.6%)
+        # - coherence <= 0.3: Vital floor stays at 23.6%
+        # - in between: Linear interpolation
+        if coherence is not None:
+            # Linear interpolation: low_coh (0.3) → high_coh (0.7)
+            coh_factor = max(0.0, min(1.0, (coherence - 0.3) / 0.4))
+            # Floor morphs from 23.6% (low coh) to ~18.9% (high coh) - 20% max reduction
+            effective_vital_floor = self.floor_vital * (1.0 - 0.20 * coh_factor)
+        else:
+            effective_vital_floor = self.floor_vital
+
+        vital_below_floor = F.relu(effective_vital_floor - vital)
+        vital_floor_active = vital.mean() < effective_vital_floor
+        # Per Gemini: Boost = 1.5 if vit < floor
         vital_momentum_boost = torch.where(
             vital_below_floor.mean() > 0,
             torch.tensor(1.5),
@@ -1083,6 +1121,10 @@ class KoshaGyroscopicLoss(nn.Module):
                 'vital_momentum_boost': vital_momentum_boost.item() if torch.is_tensor(vital_momentum_boost) else vital_momentum_boost,
                 'vital_momentum_damper': vital_momentum_damper.mean().item() if torch.is_tensor(vital_momentum_damper) else vital_momentum_damper,
                 'combined_vital_scalar': combined_vital_scalar.item() if torch.is_tensor(combined_vital_scalar) else combined_vital_scalar,
+
+                # v9.8.5 Coherence-Vital Coupling
+                'coherence_input': coherence if coherence is not None else -1.0,
+                'effective_vital_floor': effective_vital_floor,
 
                 # VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
@@ -1544,6 +1586,176 @@ class VrittiResonanceLoss(nn.Module):
             'bliss_viparyaya': correlation(bliss, viparyaya),
             'vital_nidra_inv': -correlation(vital, nidra),  # Inverse relationship
         }
+
+    def compute_differentiable_alignment(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute differentiable Kosha-Vritti alignment correlations.
+
+        Unlike compute_alignment_scores(), this returns TENSORS that preserve
+        the computation graph for backpropagation. This allows the alignment
+        to influence training directly.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+
+        Returns:
+            Dict of alignment tensors (scalar tensors with grad)
+        """
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract Kosha dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX].flatten()
+        vital = kosha_states[..., self.VITAL_IDX].flatten()
+        mental = kosha_states[..., self.MENTAL_IDX].flatten()
+        intellect = kosha_states[..., self.INTELLECT_IDX].flatten()
+        bliss = kosha_states[..., self.BLISS_IDX].flatten()
+
+        # Extract Vritti dimensions
+        pramana = vritti_states[..., self.PRAMANA_IDX].flatten()
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX].flatten()
+        vikalpa = vritti_states[..., self.VIKALPA_IDX].flatten()
+        nidra = vritti_states[..., self.NIDRA_IDX].flatten()
+        smriti = vritti_states[..., self.SMRITI_IDX].flatten()
+
+        def pearson_corr(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            """Differentiable Pearson correlation coefficient."""
+            # Check for constant vectors (would cause NaN)
+            if x.std() < 1e-6 or y.std() < 1e-6:
+                return torch.tensor(0.0, device=x.device, requires_grad=True)
+
+            x_centered = x - x.mean()
+            y_centered = y - y.mean()
+
+            numerator = (x_centered * y_centered).sum()
+            denominator = x_centered.norm() * y_centered.norm() + 1e-8
+
+            return numerator / denominator
+
+        return {
+            'physical_pramana': pearson_corr(physical, pramana),
+            'mental_vikalpa': pearson_corr(mental, vikalpa),
+            'intellect_smriti': pearson_corr(intellect, smriti),
+            'bliss_viparyaya': pearson_corr(bliss, viparyaya),
+            'vital_nidra': pearson_corr(vital, nidra),  # Raw (will invert in loss)
+        }
+
+    def compute_alignment_loss(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+        lambda_scale: float = 0.3,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute differentiable alignment loss to fix Kosha-Vritti inversions.
+
+        Architecture: Four Conscious Koshas + One Living Medium
+        ─────────────────────────────────────────────────────────
+        The Pancha Kosha model has 5 sheaths, but they are NOT equal:
+
+        CONSCIOUS KOSHAS (alignment targets):
+        - Physical (Annamaya):  Ground/Anchor    → Target Pramana +1.0
+        - Mental (Manomaya):    Processing       → Target Vikalpa >0.0
+        - Intellect (Vijnanamaya): Discrimination → Target Smriti 0.7
+        - Bliss (Anandamaya):   Integration/Will → Target Viparyaya 0.0
+
+        LIVING MEDIUM (no target - emergent):
+        - Vital (Pranamaya): The life force that animates transitions
+          between the other four. Its purpose is to be consumed/depleted
+          as coherence is achieved. Nidra (sleep) naturally emerges when
+          Vital is exhausted - this is healthy homeostasis, not pathology.
+
+        Correlation Targets:
+        - physical_pramana: +1.0 (HARD) - Truth requires Physical anchor
+        - intellect_smriti: +0.7 (FIRM) - Memory needs logic, 30% gap for inference
+        - bliss_viparyaya:  0.0 (ORTHOGONAL) - Will transcends error
+        - mental_vikalpa:   >0.0 (SOFT) - Allow creative friction
+        - vital_nidra:      EMERGENT (no penalty) - Natural energy flow
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+            lambda_scale: Overall weight for alignment loss (default 0.3)
+
+        Returns:
+            (loss_tensor, diagnostics_dict)
+        """
+        correlations = self.compute_differentiable_alignment(kosha_states, vritti_states)
+
+        device = kosha_states.device
+        loss = torch.tensor(0.0, device=device)
+        diagnostics = {}
+
+        # === 1. PHYSICAL-PRAMANA (P-Pram): EMERGENCY FIX ===
+        # Target: +1.0 | Current: typically -0.98 (inverted!)
+        # Weight: HIGH (0.5) - Force model out of anti-phase inversion
+        # This is the critical fix for hallucination/truth grounding
+        p_pram = correlations['physical_pramana']
+        p_pram_loss = 0.5 * (1.0 - p_pram)
+        loss = loss + p_pram_loss
+        diagnostics['p_pram_corr'] = p_pram.item()
+        diagnostics['p_pram_loss'] = p_pram_loss.item()
+
+        # === 2. INTELLECT-SMRITI: REASONING GAP ===
+        # Target: +0.7 (NOT 1.0!) | Leave 30% gap for logical inference
+        # Weight: MEDIUM (0.3)
+        # Rationale: 1.0 = "Parrot Trap" (only validate memorized facts)
+        #            0.7 = Heavy reliance on memory + room for reasoning
+        # Penalize deviation in EITHER direction (too tight OR too loose)
+        i_smriti = correlations['intellect_smriti']
+        i_smriti_loss = 0.3 * torch.abs(i_smriti - 0.7)
+        loss = loss + i_smriti_loss
+        diagnostics['intellect_smriti_corr'] = i_smriti.item()
+
+        # === 3. BLISS-VIPARYAYA: SOVEREIGN DETACHMENT ===
+        # Target: 0.0 (ORTHOGONAL) | Sovereign Will independent of Error
+        # Weight: MEDIUM (0.2)
+        # Rationale: +1.0 = "Blissfully Delusional" (High confidence in errors)
+        #            -1.0 = "Paralyzed Perfectionist" (Bliss crashes on any error)
+        #             0.0 = Will transcends error, neither chasing nor fleeing
+        # Use squared correlation to punish magnitude in either direction
+        b_viparyaya = correlations['bliss_viparyaya']
+        b_viparyaya_loss = 0.2 * (b_viparyaya ** 2)
+        loss = loss + b_viparyaya_loss
+        diagnostics['bliss_viparyaya_corr'] = b_viparyaya.item()
+
+        # === 4. MENTAL-VIKALPA: CREATIVE FRICTION ===
+        # Target: >0.0 | Allow debate, just prevent hostile opposition
+        # Weight: LOW (0.1) - Only penalize if < 0.0
+        # The Mind should have some friction with Imagination (healthy debate)
+        m_vikalpa = correlations['mental_vikalpa']
+        m_vikalpa_loss = 0.1 * F.relu(-m_vikalpa)  # Only penalize negative
+        loss = loss + m_vikalpa_loss
+        diagnostics['mental_vikalpa_corr'] = m_vikalpa.item()
+
+        # === 5. VITAL-NIDRA: EMERGENT (NO PENALTY) ===
+        # Pranamaya (Vital) is the LIVING MEDIUM between the other four koshas.
+        # Its natural purpose is to be consumed/depleted as coherence is achieved.
+        # Nidra (Sleep) naturally emerges when Vital is exhausted - this is healthy.
+        #
+        # Philosophy: Vital-Nidra correlation should EMERGE from the coherence
+        # of Physical↔Mental↔Intellect↔Bliss, not be forced by a penalty.
+        # The existing VrittiResonanceLoss handles pathology: relu(nidra * vital)
+        # prevents simultaneous high-sleep AND high-energy (impossible state).
+        #
+        # We log it for diagnostics but do NOT add to loss.
+        v_nidra = correlations['vital_nidra']
+        diagnostics['vital_nidra_corr'] = v_nidra.item()
+        # NO v_nidra_loss added to total
+
+        # Apply overall lambda scaling
+        loss = loss * lambda_scale
+        diagnostics['alignment_loss_total'] = loss.item()
+
+        return loss, diagnostics
 
 
 # =============================================================================
