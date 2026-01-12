@@ -182,7 +182,11 @@ def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
     vritti_state_idx = vritti_vals.argmax(dim=-1)
 
     # Guna balance (Sattva-Rajas-Tamas ratio)
-    guna_balance = F.softmax(guna_vals[:, :3], dim=-1)  # First 3 are S-R-T
+    # Note: guna_vals are already sigmoid-normalized in state_projector, so we normalize
+    # by sum instead of applying softmax (which causes 33/33/33 collapse on similar values)
+    guna_raw = guna_vals[:, :3]  # First 3 are S-R-T
+    guna_sum = guna_raw.sum(dim=-1, keepdim=True).clamp(min=1e-6)
+    guna_balance = guna_raw / guna_sum  # Proportional normalization preserves variance
 
     return {
         'dominant_bhava': BHAVA_NAMES[dominant_bhava_idx[0].item()],

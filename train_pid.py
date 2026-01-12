@@ -830,6 +830,14 @@ class AuthorityPIDv2Config:
     batch_resize_cooldown: int = 3           # Evals between resizes
     batch_step_factor: float = 0.5           # Reduction factor (0.5 = halve)
 
+    # V9.8.6: Three-Phase PID Curriculum (like Kosha Gyroscope)
+    # Phase A (PPL > engage_ppl): Full PID control - "construction" phase
+    # Phase B (disengage_ppl < PPL < engage_ppl): Linear rampdown - "transition" phase
+    # Phase C (PPL < disengage_ppl): PID off - "polishing" phase
+    engage_ppl: float = 100.0                # PID fully ON above this (construction)
+    disengage_ppl: float = 30.0              # PID OFF below this (polishing)
+    rampdown_steps: int = 500                # Steps to ramp down after disengage trigger
+
 
 class AuthorityPIDv2:
     """
@@ -887,6 +895,86 @@ class AuthorityPIDv2:
         self.batch_resize_cooldown_counter = 0  # Cooldown counter
         self.last_batch_action = "HOLD"  # HOLD, REDUCE, INCREASE
 
+        # V9.8.6: Three-Phase Curriculum State
+        self.phase = "CONSTRUCTION"    # CONSTRUCTION, TRANSITION, POLISHING
+        self.disengage_step: Optional[int] = None  # Step when disengage triggered
+        self.phase_scale = 1.0         # Current phase-based authority scale (1.0 = full, 0.0 = off)
+        self.graduated = False         # True once fully transitioned to polishing
+
+    def _update_phase_curriculum(self, val_ppl: float, step: int) -> float:
+        """
+        V9.8.6: Three-Phase PID Curriculum (like Kosha Gyroscope).
+
+        Phase A (PPL > engage_ppl): Full PID control - "CONSTRUCTION"
+            - Model is learning fundamentals, needs active guidance
+            - phase_scale = 1.0 (full authority modulation)
+
+        Phase B (disengage_ppl < PPL < engage_ppl): Linear rampdown - "TRANSITION"
+            - Model is improving, gradually reduce PID intervention
+            - phase_scale interpolates from 1.0 → 0.0
+
+        Phase C (PPL < disengage_ppl): PID off - "POLISHING"
+            - Model is stable, let natural learning happen
+            - phase_scale ramps to 0.0 over rampdown_steps, then stays at 0
+
+        Returns:
+            phase_scale: Authority scale factor (1.0 = full PID, 0.0 = PID bypassed)
+        """
+        cfg = self.config
+
+        # Already graduated - stay in polishing mode
+        if self.graduated:
+            self.phase = "POLISHING"
+            self.phase_scale = 0.0
+            return 0.0
+
+        # Phase A: CONSTRUCTION (PPL > engage_ppl)
+        if val_ppl >= cfg.engage_ppl:
+            self.phase = "CONSTRUCTION"
+            self.disengage_step = None  # Reset disengage trigger
+            self.phase_scale = 1.0
+            return 1.0
+
+        # Phase C trigger: Check if PPL dropped below disengage threshold
+        if val_ppl < cfg.disengage_ppl:
+            if self.disengage_step is None:
+                # First time crossing disengage threshold
+                self.disengage_step = step
+                print(f"  🎓 [PID] Disengage triggered at step {step} (PPL={val_ppl:.1f} < {cfg.disengage_ppl})")
+
+            # Compute rampdown progress
+            steps_since_disengage = step - self.disengage_step
+            if cfg.rampdown_steps > 0:
+                rampdown_progress = min(1.0, steps_since_disengage / cfg.rampdown_steps)
+            else:
+                rampdown_progress = 1.0
+
+            self.phase_scale = 1.0 - rampdown_progress
+
+            if rampdown_progress >= 1.0:
+                # Fully graduated
+                self.graduated = True
+                self.phase = "POLISHING"
+                self.phase_scale = 0.0
+                print(f"  🎓 [PID] GRADUATED to polishing mode at step {step}")
+            else:
+                self.phase = "TRANSITION"
+
+            return self.phase_scale
+
+        # Phase B: TRANSITION (disengage_ppl <= PPL < engage_ppl)
+        # Linear interpolation: PPL=100 → scale=1.0, PPL=30 → scale=0.0
+        self.phase = "TRANSITION"
+        self.disengage_step = None  # Reset if PPL goes back up
+        ppl_range = cfg.engage_ppl - cfg.disengage_ppl
+        if ppl_range > 0:
+            progress = (cfg.engage_ppl - val_ppl) / ppl_range
+            self.phase_scale = 1.0 - progress
+        else:
+            self.phase_scale = 1.0
+
+        return self.phase_scale
+
     def update(
         self,
         val_ppl: float,
@@ -902,6 +990,11 @@ class AuthorityPIDv2:
         - semantic_ppl: PPL on prompt-based generation (weighted by W_s)
         - step: Current training step (for D-term dampening)
         - phase_ramp_steps: Steps for phase ramp (for D-term dampening)
+
+        V9.8.6: Three-Phase Curriculum
+        - CONSTRUCTION (PPL > engage): Full PID control
+        - TRANSITION (disengage < PPL < engage): Linear rampdown
+        - POLISHING (PPL < disengage): PID bypassed
         """
         cfg = self.config
 
@@ -912,6 +1005,17 @@ class AuthorityPIDv2:
             self.ppl_history = self.ppl_history[-10:]
         if len(self.coh_history) > 10:
             self.coh_history = self.coh_history[-10:]
+
+        # =====================================================================
+        # V9.8.6: THREE-PHASE CURRICULUM
+        # =====================================================================
+        # Update phase based on current PPL and compute scaling factor
+        phase_scale = self._update_phase_curriculum(val_ppl, step)
+
+        # If fully graduated (polishing mode), bypass PID entirely
+        if self.graduated:
+            self.A = 1.0  # No modulation in polishing mode
+            return self.A
 
         # =====================================================================
         # HANDSHAKE D-TERM DAMPENING (V9.4.3)
@@ -1065,6 +1169,17 @@ class AuthorityPIDv2:
         if self.good_streak >= cfg.recovery_streak and self.A < 0.95:
             self.A = min(cfg.A_max, self.A + cfg.recovery_step)
 
+        # =====================================================================
+        # V9.8.6: APPLY THREE-PHASE CURRICULUM SCALING
+        # =====================================================================
+        # Blend PID authority with full authority (1.0) based on phase_scale
+        # phase_scale=1.0 (construction): use full PID authority
+        # phase_scale=0.0 (polishing): bypass PID (A=1.0)
+        # phase_scale=0.5 (transition): blend between PID and bypass
+        if phase_scale < 1.0:
+            # A_effective = phase_scale * A_pid + (1 - phase_scale) * 1.0
+            self.A = phase_scale * self.A + (1.0 - phase_scale) * 1.0
+
         return self.A
 
     def get_status_icon(self) -> str:
@@ -1080,9 +1195,12 @@ class AuthorityPIDv2:
         recovery_tag = " [RECOVERING]" if self.good_streak >= 1 else ""
         # Show which signal is limiting: the one with lower value
         limiter = "PPL" if self.A_ppl <= self.last_coh_gate else "COH"
+        # V9.8.6: Add phase info
+        phase_tag = f" [{self.phase}]" if self.phase != "CONSTRUCTION" else ""
+        scale_tag = f" scale={self.phase_scale:.0%}" if self.phase_scale < 1.0 else ""
         return (
             f"GOV {icon} | Brake(PPL): {self.A_ppl:.2f} | Gate(Coh): {self.last_coh_gate:.2f} | "
-            f"Final_A: {self.A:.2f} [{limiter}] | vel: {self.last_v:+.1f}% | "
+            f"Final_A: {self.A:.2f} [{limiter}]{phase_tag}{scale_tag} | vel: {self.last_v:+.1f}% | "
             f"Kp: {self.last_Kp:.2f}{recovery_tag}"
         )
 
