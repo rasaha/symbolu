@@ -10716,6 +10716,7 @@ def train(config: UnifiedTrainingConfig):
         authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
+        print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
         if config.pidv2_batch_resize:
