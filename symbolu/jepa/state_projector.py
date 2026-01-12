@@ -103,14 +103,21 @@ class SovereignStateProjector(nn.Module):
 
     def _init_weights(self):
         """Initialize weights for stable initial state distributions."""
-        # Initialize final layer to small values for stable softmax
+        # Initialize final layer with variance to prevent Qualia collapse (33/33/33 bug)
+        # Using Xavier/Glorot initialization for better gradient flow
         with torch.no_grad():
-            self.projector[-1].weight.fill_(0.01)
+            nn.init.xavier_normal_(self.projector[-1].weight, gain=0.5)
             self.projector[-1].bias.fill_(0.0)
 
             # Bias Bhavas toward ABS (Absolute) initially for Sattvic anchor
             # Index 11 is ABS in BHAVA_NAMES
             self.projector[-1].bias[11] = 0.1
+
+            # Add slight bias diversity to Gunas (indices 22-24: Sattva, Rajas, Tamas)
+            # to prevent softmax collapse to uniform 33/33/33
+            self.projector[-1].bias[22] = 0.05   # Sattva slight preference
+            self.projector[-1].bias[23] = -0.02  # Rajas
+            self.projector[-1].bias[24] = -0.03  # Tamas
 
     def forward(
         self,

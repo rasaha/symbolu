@@ -9817,10 +9817,18 @@ def compute_phase_loss(
         ignore_index=-100,
     )
 
+    # Compute entropy for Sattvic controller (prevents variance=0.0 stagnation bug)
+    with torch.no_grad():
+        probs = F.softmax(logits, dim=-1)
+        token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        max_entropy = math.log(V)
+        normalized_entropy = (token_entropy / max_entropy).mean().item()
+
     metrics = {
         "lm_loss": lm_loss.item(),
         "ppl": math.exp(min(lm_loss.item(), 20)),
         "total_loss": lm_loss.item(),
+        "onto_entropy": normalized_entropy,  # Required for Sattvic stagnation detection
     }
 
     return lm_loss, metrics
@@ -13276,7 +13284,7 @@ def train(config: UnifiedTrainingConfig):
                         srk_state=srk.get_checkpoint_state() if srk else None,
                         scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
                     )
-                print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
