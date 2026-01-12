@@ -11984,6 +11984,24 @@ def train(config: UnifiedTrainingConfig):
                                         metrics['vritti_resonance_loss'] = res_loss.item()
                                         metrics['vritti_components'] = res_components
 
+                                    # === DIFFERENTIABLE ALIGNMENT LOSS (P-Pram Fix) ===
+                                    # Fixes inverted Kosha-Vritti correlations (e.g., P-Pram at -0.98)
+                                    # by adding gradient flow through Pearson correlation
+                                    alignment_loss, alignment_diag = vritti_resonance.compute_alignment_loss(
+                                        kosha_states_for_gyro, vritti_states_for_res,
+                                        lambda_scale=0.3,  # Moderate pressure to fix inversion
+                                    )
+                                    loss = loss + alignment_loss
+                                    metrics['alignment_loss'] = alignment_diag.get('alignment_loss_total', 0.0)
+                                    metrics['p_pram_corr'] = alignment_diag.get('p_pram_corr', 0.0)
+                                    metrics['p_pram_loss'] = alignment_diag.get('p_pram_loss', 0.0)
+
+                                    # Log other alignment correlations
+                                    metrics['intellect_smriti_corr'] = alignment_diag.get('intellect_smriti_corr', 0.0)
+                                    metrics['bliss_viparyaya_corr'] = alignment_diag.get('bliss_viparyaya_corr', 0.0)
+                                    metrics['mental_vikalpa_corr'] = alignment_diag.get('mental_vikalpa_corr', 0.0)
+                                    metrics['vital_nidra_corr'] = alignment_diag.get('vital_nidra_corr', 0.0)
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [KOSHA GYROSCOPE] Error: {e}")

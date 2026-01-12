@@ -1545,6 +1545,144 @@ class VrittiResonanceLoss(nn.Module):
             'vital_nidra_inv': -correlation(vital, nidra),  # Inverse relationship
         }
 
+    def compute_differentiable_alignment(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute differentiable Kosha-Vritti alignment correlations.
+
+        Unlike compute_alignment_scores(), this returns TENSORS that preserve
+        the computation graph for backpropagation. This allows the alignment
+        to influence training directly.
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+
+        Returns:
+            Dict of alignment tensors (scalar tensors with grad)
+        """
+        # Handle both 2D and 3D tensors
+        if kosha_states.dim() == 2:
+            kosha_states = kosha_states.unsqueeze(1)
+        if vritti_states.dim() == 2:
+            vritti_states = vritti_states.unsqueeze(1)
+
+        # Extract Kosha dimensions
+        physical = kosha_states[..., self.PHYSICAL_IDX].flatten()
+        vital = kosha_states[..., self.VITAL_IDX].flatten()
+        mental = kosha_states[..., self.MENTAL_IDX].flatten()
+        intellect = kosha_states[..., self.INTELLECT_IDX].flatten()
+        bliss = kosha_states[..., self.BLISS_IDX].flatten()
+
+        # Extract Vritti dimensions
+        pramana = vritti_states[..., self.PRAMANA_IDX].flatten()
+        viparyaya = vritti_states[..., self.VIPARYAYA_IDX].flatten()
+        vikalpa = vritti_states[..., self.VIKALPA_IDX].flatten()
+        nidra = vritti_states[..., self.NIDRA_IDX].flatten()
+        smriti = vritti_states[..., self.SMRITI_IDX].flatten()
+
+        def pearson_corr(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            """Differentiable Pearson correlation coefficient."""
+            # Check for constant vectors (would cause NaN)
+            if x.std() < 1e-6 or y.std() < 1e-6:
+                return torch.tensor(0.0, device=x.device, requires_grad=True)
+
+            x_centered = x - x.mean()
+            y_centered = y - y.mean()
+
+            numerator = (x_centered * y_centered).sum()
+            denominator = x_centered.norm() * y_centered.norm() + 1e-8
+
+            return numerator / denominator
+
+        return {
+            'physical_pramana': pearson_corr(physical, pramana),
+            'mental_vikalpa': pearson_corr(mental, vikalpa),
+            'intellect_smriti': pearson_corr(intellect, smriti),
+            'bliss_viparyaya': pearson_corr(bliss, viparyaya),
+            'vital_nidra': pearson_corr(vital, nidra),  # Raw (will invert in loss)
+        }
+
+    def compute_alignment_loss(
+        self,
+        kosha_states: torch.Tensor,
+        vritti_states: torch.Tensor,
+        lambda_scale: float = 0.3,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """
+        Compute differentiable alignment loss to fix Kosha-Vritti inversions.
+
+        This loss pushes each correlation toward its target:
+        - physical_pramana: Target +1.0 (HARD - Truth requires Physical anchor)
+        - mental_vikalpa:   Target >0.0 (SOFT - Allow creative friction)
+        - intellect_smriti: Target +1.0 (FIRM - Memory needs logical structure)
+        - bliss_viparyaya:  Target +1.0 (FIRM - Bliss anchors misconception detection)
+        - vital_nidra:      Target -1.0 (INVERSE - Sleep = low vitality)
+
+        Args:
+            kosha_states: [B, N, 5] or [B, 5] Kosha activations
+            vritti_states: [B, N, 5] or [B, 5] Vritti probabilities
+            lambda_scale: Overall weight for alignment loss (default 0.3)
+
+        Returns:
+            (loss_tensor, diagnostics_dict)
+        """
+        correlations = self.compute_differentiable_alignment(kosha_states, vritti_states)
+
+        device = kosha_states.device
+        loss = torch.tensor(0.0, device=device)
+        diagnostics = {}
+
+        # === 1. PHYSICAL-PRAMANA (P-Pram): HARD alignment ===
+        # Target: +1.0 | Current: typically -0.98 (inverted!)
+        # Weight: HIGH (0.5) - This is the critical fix
+        p_pram = correlations['physical_pramana']
+        p_pram_loss = 0.5 * (1.0 - p_pram)
+        loss = loss + p_pram_loss
+        diagnostics['p_pram_corr'] = p_pram.item()
+        diagnostics['p_pram_loss'] = p_pram_loss.item()
+
+        # === 2. INTELLECT-SMRITI: FIRM alignment ===
+        # Target: +1.0 | Memory needs intellectual validation
+        # Weight: MEDIUM (0.3)
+        i_smriti = correlations['intellect_smriti']
+        i_smriti_loss = 0.3 * (1.0 - i_smriti)
+        loss = loss + i_smriti_loss
+        diagnostics['intellect_smriti_corr'] = i_smriti.item()
+
+        # === 3. BLISS-VIPARYAYA: FIRM alignment ===
+        # Target: +1.0 | Sovereign Will anchors error detection
+        # Weight: MEDIUM (0.3)
+        b_viparyaya = correlations['bliss_viparyaya']
+        b_viparyaya_loss = 0.3 * (1.0 - b_viparyaya)
+        loss = loss + b_viparyaya_loss
+        diagnostics['bliss_viparyaya_corr'] = b_viparyaya.item()
+
+        # === 4. MENTAL-VIKALPA: SOFT alignment ===
+        # Target: >0.0 | Allow debate, just prevent hostile opposition
+        # Weight: LOW (0.1) - Only penalize if < 0.0
+        m_vikalpa = correlations['mental_vikalpa']
+        m_vikalpa_loss = 0.1 * F.relu(-m_vikalpa)  # Only penalize negative
+        loss = loss + m_vikalpa_loss
+        diagnostics['mental_vikalpa_corr'] = m_vikalpa.item()
+
+        # === 5. VITAL-NIDRA: INVERSE alignment ===
+        # Target: -1.0 | High vital = low sleep, and vice versa
+        # Weight: LOW (0.1) - Less critical
+        v_nidra = correlations['vital_nidra']
+        v_nidra_loss = 0.1 * (1.0 + v_nidra)  # Push toward -1.0
+        loss = loss + v_nidra_loss
+        diagnostics['vital_nidra_corr'] = v_nidra.item()
+
+        # Apply overall lambda scaling
+        loss = loss * lambda_scale
+        diagnostics['alignment_loss_total'] = loss.item()
+
+        return loss, diagnostics
+
 
 # =============================================================================
 # Kosha Phase Corrector (Inference-Time Guardrail) - v2.4.0
