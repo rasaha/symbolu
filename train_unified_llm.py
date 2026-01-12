@@ -7752,13 +7752,13 @@ class UnifiedTrainingConfig:
     gyroscope_temporal_window: int = 3       # Physical history window size
     gyroscope_vital_momentum: bool = True    # Enable dynamic gain via Vital
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
-    gyroscope_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
+    kosha_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
     # V9.8.6: Three-Phase Kosha Curriculum (Inverted - active at HIGH PPL)
     # Phase A (PPL > engage): Full Kosha guidance - "instructor mode"
     # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
     # Phase C (PPL < disengage): Kosha off - "student fluent"
-    gyroscope_engage_ppl: float = 100.0      # Kosha fully ON above this PPL (construction)
-    gyroscope_disengage_ppl: float = 30.0    # Kosha OFF below this PPL (polishing)
+    kosha_engage_ppl: float = 100.0      # Kosha fully ON above this PPL (construction)
+    kosha_disengage_ppl: float = 30.0    # Kosha OFF below this PPL (polishing)
     # Graduation criteria (legacy - kept for stability check)
     gyroscope_graduation_ppl: float = 30.0   # PPL threshold for graduation (mean)
     gyroscope_graduation_variance: float = 1.5  # Max PPL variance for stability
@@ -11076,9 +11076,9 @@ def train(config: UnifiedTrainingConfig):
         # Initialize Inverted Curriculum Controller
         gyro_config = KoshaGyroscopeConfig(
             enable_gyroscope=True,
-            gyroscope_disengage_ppl=config.gyroscope_target_ppl,
+            kosha_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
-            gain_rampdown_steps=config.gyroscope_rampdown_steps,
+            gain_rampdown_steps=config.kosha_rampdown_steps,
             # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
             floor_mental=config.gyroscope_floor_mental,
             ceiling_mental=config.gyroscope_ceiling_mental,
@@ -11116,14 +11116,14 @@ def train(config: UnifiedTrainingConfig):
         # V9.8.6: Three-Phase Kosha Curriculum (unified with CSR/PID pattern)
         kosha_curriculum = ThreePhaseCurriculum(
             name="Kosha",
-            engage_ppl=config.gyroscope_engage_ppl,
-            disengage_ppl=config.gyroscope_disengage_ppl,
-            rampdown_steps=config.gyroscope_rampdown_steps,
+            engage_ppl=config.kosha_engage_ppl,
+            disengage_ppl=config.kosha_disengage_ppl,
+            rampdown_steps=config.kosha_rampdown_steps,
         )
         print(f"  🎓 Kosha Three-Phase Curriculum:")
-        print(f"       CONSTRUCTION: PPL > {config.gyroscope_engage_ppl} (full Kosha loss)")
-        print(f"       TRANSITION:   {config.gyroscope_disengage_ppl} < PPL < {config.gyroscope_engage_ppl} (rampdown)")
-        print(f"       POLISHING:    PPL < {config.gyroscope_disengage_ppl} (Kosha off after {config.gyroscope_rampdown_steps} steps)")
+        print(f"       CONSTRUCTION: PPL > {config.kosha_engage_ppl} (full Kosha loss)")
+        print(f"       TRANSITION:   {config.kosha_disengage_ppl} < PPL < {config.kosha_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.kosha_disengage_ppl} (Kosha off after {config.kosha_rampdown_steps} steps)")
 
         # Initialize Reality Rip Logger (diagnostic)
         if config.enable_rip_logger:
@@ -14165,12 +14165,12 @@ def main():
                        help="Disable Vital momentum for gyroscope")
     parser.add_argument("--gyroscope_warmup_steps", type=int, default=100,
                        help="Steps before gyroscope fully active")
-    parser.add_argument("--gyroscope_rampdown_steps", type=int, default=500,
+    parser.add_argument("--kosha_rampdown_steps", type=int, default=500,
                        help="Steps to ramp gain to 0 at graduation")
     # V9.8.6: Three-Phase Kosha Curriculum
-    parser.add_argument("--gyroscope_engage_ppl", type=float, default=100.0,
+    parser.add_argument("--kosha_engage_ppl", type=float, default=100.0,
                        help="Kosha fully ON above this PPL (construction phase)")
-    parser.add_argument("--gyroscope_disengage_ppl", type=float, default=30.0,
+    parser.add_argument("--kosha_disengage_ppl", type=float, default=30.0,
                        help="Kosha OFF below this PPL (polishing phase)")
     # Graduation criteria (legacy - kept for stability check)
     parser.add_argument("--gyroscope_graduation_ppl", type=float, default=30.0,
@@ -14827,10 +14827,10 @@ def main():
         gyroscope_temporal_window=args.gyroscope_temporal_window,
         gyroscope_vital_momentum=args.gyroscope_vital_momentum and not args.disable_gyroscope_vital_momentum,
         gyroscope_warmup_steps=args.gyroscope_warmup_steps,
-        gyroscope_rampdown_steps=args.gyroscope_rampdown_steps,
+        kosha_rampdown_steps=args.kosha_rampdown_steps,
         # V9.8.6: Three-Phase Kosha Curriculum
-        gyroscope_engage_ppl=args.gyroscope_engage_ppl,
-        gyroscope_disengage_ppl=args.gyroscope_disengage_ppl,
+        kosha_engage_ppl=args.kosha_engage_ppl,
+        kosha_disengage_ppl=args.kosha_disengage_ppl,
         gyroscope_graduation_ppl=args.gyroscope_graduation_ppl,
         gyroscope_graduation_variance=args.gyroscope_graduation_variance,
         gyroscope_graduation_window=args.gyroscope_graduation_window,
