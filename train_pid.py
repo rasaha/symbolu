@@ -1027,6 +1027,13 @@ class AuthorityPIDv2:
         # SUPERVISORY GATE: COHERENCE (NOT in PID math)
         # =====================================================================
 
+        # Debug: Show config values once (first 3 updates)
+        if not hasattr(self, '_coh_debug_count'):
+            self._coh_debug_count = 0
+        if self._coh_debug_count < 3:
+            print(f"    [COH-GATE DEBUG] coherence={coherence:.3f}, C_floor={cfg.C_floor}, C_good={cfg.C_good}")
+            self._coh_debug_count += 1
+
         # Simple linear interpolation for coherence gate
         if coherence >= cfg.C_good:
             coh_gate = 1.0

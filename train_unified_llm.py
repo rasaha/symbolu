@@ -10717,6 +10717,7 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
         print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
+        print(f"    [DEBUG] PIDv2Config actual: C_floor={pidv2_config.C_floor}, C_good={pidv2_config.C_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
         if config.pidv2_batch_resize:
