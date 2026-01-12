@@ -11796,9 +11796,13 @@ def train(config: UnifiedTrainingConfig):
                             r_axis = max(-1.0, min(1.0, r_axis))
 
                         # Get gradient norm (Time axis) - use captured value
+                        # V9.8.5: SIGN FIX - Documentation states:
+                        #   High gradient → Future (-T) = Dynamic, projecting
+                        #   Low gradient  → Past (+T)   = Static, repeating
+                        # Original code had this inverted. Negating to match doc.
                         t_axis_grad = captured_grad_norm if 'captured_grad_norm' in dir() else 1.0
                         if t_axis_grad > 0:
-                            t_axis = math.log(t_axis_grad + 1e-8) / 2.3
+                            t_axis = -math.log(t_axis_grad + 1e-8) / 2.3  # Negated!
                             t_axis = max(-1.0, min(1.0, t_axis))
                         else:
                             t_axis = 0.0
@@ -11893,11 +11897,15 @@ def train(config: UnifiedTrainingConfig):
                             # This enables real-time feedback control of gyroscope gain
                             auth_factor = authority_controller.A if authority_controller is not None else None
 
+                            # V9.8.5: Pass toroidal coherence for Vital-Coherence coupling
+                            coherence_for_gyro = toroidal_coherence if 'toroidal_coherence' in dir() else None
+
                             gyro_loss, gyroscope_components = kosha_gyroscope(
                                 kosha_states_for_gyro,
                                 current_ppl=current_ppl,
                                 return_components=True,
                                 authority_factor=auth_factor,
+                                coherence=coherence_for_gyro,
                             )
 
                             # Apply warmup scaling
@@ -12817,7 +12825,16 @@ def train(config: UnifiedTrainingConfig):
                 )
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
-                current_coh = val_metrics.get('coherence', 0.75)
+
+                # V9.8.5: Use REAL toroidal coherence for PID, not hardcoded default
+                # The evaluate() function discards coherence metrics, so we use the
+                # training loop's toroidal_coherence which measures actual cognitive
+                # continuity (O1↔O12 cosine similarity).
+                # Fallback to val_metrics only if toroidal_coherence not yet computed.
+                if 'toroidal_coherence' in dir() and toroidal_coherence is not None:
+                    current_coh = toroidal_coherence
+                else:
+                    current_coh = val_metrics.get('coherence', 0.75)
 
                 # v2.2.1: Kosha Gyroscope Graduation Check
                 # Model graduates when PPL is stable below threshold

@@ -715,6 +715,7 @@ class KoshaGyroscopicLoss(nn.Module):
         return_components: bool = False,
         authority_factor: Optional[float] = None,
         input_text: Optional[str] = None,
+        coherence: Optional[float] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, Any]]:
         """
         Compute the Kosha Gyroscopic Loss (v2.3.2 Reflexive Domain Morph).
@@ -734,6 +735,13 @@ class KoshaGyroscopicLoss(nn.Module):
         - Bliss Ceiling: 61.8% → 38.2% as μ increases
         - Grounding Push: 3.0× → 5.0× as μ increases
 
+        v9.8.5 Coherence-Vital Coupling:
+        Pranamaya (Vital) is the "living medium" whose purpose is to be consumed
+        as coherence is achieved between the other four koshas. When coherence
+        is high, the Vital floor is lowered (efficient operation needs less energy).
+        When coherence is low, the Vital floor remains at baseline (struggling
+        system needs more energy).
+
         Args:
             kosha_states: [batch, seq, 5] Kosha activations normalized to [0, 1]
                          Indices: [Physical, Vital, Mental, Intellect, Blissful]
@@ -748,6 +756,10 @@ class KoshaGyroscopicLoss(nn.Module):
                              This enables integration with --controller pidv2.
             input_text: Optional text for domain detection (v2.3.2).
                        If provided, enables external signal for domain morphing.
+            coherence: Optional toroidal coherence value [0, 1] (v9.8.5).
+                      When provided, modulates Vital floor threshold:
+                      - High coherence (>0.7): Lower Vital floor (efficient)
+                      - Low coherence (<0.3): Keep baseline floor (struggling)
 
         Returns:
             If return_components=False: Scalar loss value
@@ -876,9 +888,35 @@ class KoshaGyroscopicLoss(nn.Module):
 
         # Vital Floor (23.6%): Wake-up Boost - boost momentum when too low
         # Vital uses MOMENTUM control, not loss pressure
-        vital_below_floor = F.relu(self.floor_vital - vital)
-        vital_floor_active = vital.mean() < self.floor_vital
-        # Per Gemini: Boost = 1.5 if vit < 0.236
+        #
+        # v9.8.5: Coherence-Vital Coupling (Conservative)
+        # Pranamaya (Vital) is the "living medium" that depletes as coherence
+        # is achieved. When coherence is high, we ALLOW lower Vital (efficient).
+        # When coherence is low, we REQUIRE higher Vital (struggling needs energy).
+        #
+        # Why Toroidal Coherence is the correct metric:
+        # - Vital controls MOMENTUM (maintains direction/trajectory)
+        # - Toroidal coherence measures trajectory consistency (O1↔O12)
+        # - High coherence = stable trajectory = less momentum needed
+        # - Suppressing momentum boost when coherent is physically correct
+        #
+        # Conservative scaling (20% max reduction):
+        # - Avoids "Fake Flow" crash scenario where model starves itself
+        #   of momentum while on wrong trajectory
+        # - coherence >= 0.7: Vital floor drops to ~18.9% (from 23.6%)
+        # - coherence <= 0.3: Vital floor stays at 23.6%
+        # - in between: Linear interpolation
+        if coherence is not None:
+            # Linear interpolation: low_coh (0.3) → high_coh (0.7)
+            coh_factor = max(0.0, min(1.0, (coherence - 0.3) / 0.4))
+            # Floor morphs from 23.6% (low coh) to ~18.9% (high coh) - 20% max reduction
+            effective_vital_floor = self.floor_vital * (1.0 - 0.20 * coh_factor)
+        else:
+            effective_vital_floor = self.floor_vital
+
+        vital_below_floor = F.relu(effective_vital_floor - vital)
+        vital_floor_active = vital.mean() < effective_vital_floor
+        # Per Gemini: Boost = 1.5 if vit < floor
         vital_momentum_boost = torch.where(
             vital_below_floor.mean() > 0,
             torch.tensor(1.5),
@@ -1083,6 +1121,10 @@ class KoshaGyroscopicLoss(nn.Module):
                 'vital_momentum_boost': vital_momentum_boost.item() if torch.is_tensor(vital_momentum_boost) else vital_momentum_boost,
                 'vital_momentum_damper': vital_momentum_damper.mean().item() if torch.is_tensor(vital_momentum_damper) else vital_momentum_damper,
                 'combined_vital_scalar': combined_vital_scalar.item() if torch.is_tensor(combined_vital_scalar) else combined_vital_scalar,
+
+                # v9.8.5 Coherence-Vital Coupling
+                'coherence_input': coherence if coherence is not None else -1.0,
+                'effective_vital_floor': effective_vital_floor,
 
                 # VICReg metrics
                 'vicreg_target_std': self.vicreg_target_std,
