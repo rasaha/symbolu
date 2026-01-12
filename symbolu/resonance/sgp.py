@@ -241,6 +241,7 @@ class SGPController:
         self.rate_history: List[Dict[str, Any]] = []
         self.stagnation_active = False
         self.last_pulse_step = 0
+        self._last_stagnation_logged = False  # Track if we already logged stagnation
 
         # Gradient buffer (if torch available)
         if HAS_TORCH:
@@ -327,13 +328,17 @@ class SGPController:
         if stagnation or collapse:
             self.current_rate = self.config.stagnation_rate  # 12
             self.stagnation_active = True
-            if collapse:
-                print(f"  🔨 [SGP] Mode collapse → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
-            elif stagnation:
-                print(f"  🔨 [SGP] Stagnation → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
+            # Only log on state CHANGE (not every step)
+            if not self._last_stagnation_logged:
+                if collapse:
+                    print(f"  🔨 [SGP] Mode collapse → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
+                elif stagnation:
+                    print(f"  🔨 [SGP] Stagnation → Rate halved to {self.current_rate} (FREQUENT HAMMERING)")
+                self._last_stagnation_logged = True
         else:
             self.current_rate = self.config.base_rate  # 25
             self.stagnation_active = False
+            self._last_stagnation_logged = False  # Reset so we can log again if stagnation returns
 
         # Update persistence buffer every step
         self.update_persistence_buffer()
