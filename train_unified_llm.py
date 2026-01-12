@@ -7693,8 +7693,8 @@ class UnifiedTrainingConfig:
     pidv2_ki: float = 0.02
     pidv2_kd: float = 0.10
     pidv2_a_min: float = 0.40  # Raised from 0.30 to boost sensory floor
-    pidv2_c_floor: float = 0.68
-    pidv2_c_good: float = 0.76
+    pidv2_c_floor: float = 0.45  # V9.8.6: Relaxed for Phase 1 (construction)
+    pidv2_c_good: float = 0.65   # V9.8.6: Achievable target, auto-disable PID at 0.75
     pidv2_w_s: float = 0.30  # Semantic weight
     pidv2_semantic_scale: float = 50.0
     pidv2_handshake_dampen: bool = True
@@ -10717,7 +10717,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  PIDv2 Governor ENABLED")
         print(f"    Dynamic Kp: [{config.pidv2_kp_min}, {config.pidv2_kp_max}]")
         print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
-        print(f"    [DEBUG] PIDv2Config actual: C_floor={pidv2_config.C_floor}, C_good={pidv2_config.C_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
         if config.pidv2_batch_resize:
@@ -13982,10 +13981,10 @@ def main():
                        help="PIDv2 derivative gain")
     parser.add_argument("--pidv2_a_min", type=float, default=0.40,
                        help="PIDv2 minimum authority factor (sensory floor)")
-    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
-                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5)")
-    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
-                       help="PIDv2 coherence good - above this, gate is at full (1.0)")
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.45,
+                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5). V9.8.6: Relaxed for Phase 1")
+    parser.add_argument("--pidv2_c_good", type=float, default=0.65,
+                       help="PIDv2 coherence good - above this, gate is at full (1.0). V9.8.6: Auto-disable PID at 0.75")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     # V9.7.0: PIDv2 Dynamic Batch Sizing

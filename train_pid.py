@@ -796,8 +796,10 @@ class AuthorityPIDv2Config:
     I_max: float = 5.0       # Maximum integral accumulation
 
     # Coherence gate (SUPERVISORY ONLY - not in PID)
-    C_floor: float = 0.68    # Below this = minimum gate (0.5)
-    C_good: float = 0.76     # Above this = full gate (1.0)
+    # V9.8.6: Relaxed defaults for Phase 1 (construction) training
+    # Auto-disable PID when coherence > 0.75 for Phase 2 (crystallization)
+    C_floor: float = 0.45    # Below this = minimum gate (0.5)
+    C_good: float = 0.65     # Above this = full gate (1.0)
     gate_min: float = 0.5    # Minimum coherence gate value
 
     # Authority bounds
@@ -1026,13 +1028,6 @@ class AuthorityPIDv2:
         # =====================================================================
         # SUPERVISORY GATE: COHERENCE (NOT in PID math)
         # =====================================================================
-
-        # Debug: Show config values once (first 3 updates)
-        if not hasattr(self, '_coh_debug_count'):
-            self._coh_debug_count = 0
-        if self._coh_debug_count < 3:
-            print(f"    [COH-GATE DEBUG] coherence={coherence:.3f}, C_floor={cfg.C_floor}, C_good={cfg.C_good}")
-            self._coh_debug_count += 1
 
         # Simple linear interpolation for coherence gate
         if coherence >= cfg.C_good:
