@@ -13980,6 +13980,10 @@ def main():
                        help="PIDv2 derivative gain")
     parser.add_argument("--pidv2_a_min", type=float, default=0.40,
                        help="PIDv2 minimum authority factor (sensory floor)")
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
+                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5)")
+    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
+                       help="PIDv2 coherence good - above this, gate is at full (1.0)")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     # V9.7.0: PIDv2 Dynamic Batch Sizing
@@ -14605,6 +14609,8 @@ def main():
         pidv2_ki=args.pidv2_ki,
         pidv2_kd=args.pidv2_kd,
         pidv2_a_min=args.pidv2_a_min,
+        pidv2_c_floor=args.pidv2_c_floor,
+        pidv2_c_good=args.pidv2_c_good,
         pidv2_w_s=args.pidv2_w_s,
         # V9.7.0: PIDv2 Dynamic Batch Sizing
         pidv2_batch_resize=args.pidv2_batch_resize,
