@@ -209,16 +209,13 @@ python train_unified_llm.py \
     --batch_size "$BATCH_SIZE" \
     --learning_rate "$LEARNING_RATE" \
     --max_steps "$MAX_STEPS" \
-    --warmup_steps 1000 \
     --gradient_accumulation 4 \
-    --max_grad_norm 1.0 \
-    --weight_decay 0.1 \
     \
     `# ============================================================` \
     `# MEMORY OPTIMIZATION` \
     `# ============================================================` \
     --gradient_checkpointing \
-    --mixed_precision \
+    --mixed_precision bf16 \
     --use_8bit_optimizer \
     \
     `# ============================================================` \
@@ -276,9 +273,9 @@ python train_unified_llm.py \
     `# - Prevents sensory-authority imbalance` \
     `# ============================================================` \
     --use_9_3_split \
-    --sensory_gradient_scale 0.3 \
-    --authority_gradient_scale 1.0 \
-    --witness_layer 9 \
+    --alpha_sens_initial 0.05 \
+    --alpha_sens_max 0.7 \
+    --gradient_warmup_steps 500 \
     \
     `# ============================================================` \
     `# PIDv2 CONTROLLER` \
@@ -295,24 +292,16 @@ python train_unified_llm.py \
     --pidv2_w_s 0.30 \
     \
     `# ============================================================` \
-    `# SOVEREIGN-1 HARDENED LOSS (Priority 1)` \
-    `# - Decomposed state friction` \
-    `# - Prevents "signal washing"` \
-    `# - R-Signal weighted heavily (ontology critical)` \
-    `# ============================================================` \
-    --use_sovereign_loss \
-    --sovereign_weight_guna 1.0 \
-    --sovereign_weight_s 2.0 \
-    --sovereign_weight_r 5.0 \
-    --sovereign_weight_c 0.5 \
-    \
-    `# ============================================================` \
-    `# SOVEREIGN-LAGRANGIAN LOSS (Priority 2)` \
+    `# SOVEREIGN-LAGRANGIAN LOSS` \
     `# - B1: Forward/backward consistency` \
     `# - S3: Global phase coherence` \
     `# - S8: Entropy-based stability anchoring` \
+    `# - R-Signal weighted heavily (ontology critical)` \
     `# ============================================================` \
     --enable_sovereign_loss \
+    --sovereign_weight_s 2.0 \
+    --sovereign_weight_r 5.0 \
+    --sovereign_weight_c 0.5 \
     --b1_lambda 0.5 \
     --mu_s3 0.2 \
     --enable_stability_constraint \
