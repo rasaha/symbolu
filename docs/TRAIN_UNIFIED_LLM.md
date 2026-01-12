@@ -20,6 +20,66 @@ python train_unified_llm.py --resume checkpoints_unified/step_5000.pt
 
 ---
 
+## Master Training Script
+
+For production training with all features correctly integrated, use the master training script:
+
+```bash
+./scripts/run_master_training.sh
+```
+
+### Usage
+
+```bash
+# Default: small model, 50K steps with all features
+./scripts/run_master_training.sh
+
+# Quick test (~10M params, 1000 steps)
+./scripts/run_master_training.sh --quick
+
+# Production medium model
+./scripts/run_master_training.sh --size medium --steps 100000
+
+# Resume from checkpoint
+./scripts/run_master_training.sh --resume checkpoints_unified/step_25000.pt
+```
+
+### Script Options
+
+| Option | Description |
+|--------|-------------|
+| `--size SIZE` | Model size: tiny, small, medium, large (default: small) |
+| `--steps N` | Maximum training steps (default: 50000) |
+| `--batch N` | Batch size (default: 8, auto-adjusted for GPU) |
+| `--lr RATE` | Base learning rate (default: 3e-4) |
+| `--checkpoint DIR` | Checkpoint directory (default: checkpoints_unified) |
+| `--resume PATH` | Resume from checkpoint |
+| `--dataset NAME` | Dataset: wikitext103, wikitext2, fineweb (default: fineweb) |
+| `--quick` | Quick mode: tiny model, 1000 steps |
+
+### Features Enabled
+
+The master script integrates all training features:
+
+1. **Adaptive Learning Rate** - Automatic LR adjustment with safety bounds
+2. **PPL-Gated Curriculum** - FOUNDATION → REGULARIZATION → GROUNDING → SOVEREIGN
+3. **Sequence Length Curriculum** - Gradual ramping from 256 to 1024
+4. **9:3 Hierarchical Gradient Scaling** - Authority/Sensory balance
+5. **PIDv2 Controller** - Dynamic S/A ratio control
+6. **Sovereign-Lagrangian Loss** - B1/S3 consistency + signal weights
+7. **Kosha Gyroscope** - Homeostatic self-regulation
+8. **CSR Grounding** - Phoneme-ontological alignment
+9. **SGP Cement** - Gradient persistence for stability
+10. **SRK** - Sovereign Reasoning Kernel with layer hooks
+11. **Phase-JEPA** - Perceptual learning
+12. **Ontological Bridge** - Layer 4 projection
+13. **Evolutionary Flow** - Layer transition coherence
+14. **Dynamic Relaxation** - 9:3 → 6:6 transition
+15. **Saturation Gate** - Auto-thaw for frozen layers
+16. **Stress Probe** - Emergency recovery
+
+---
+
 ## Model Configuration
 
 | Option | Type | Default | Description |
@@ -470,6 +530,86 @@ The phase angle is computed as `atan2(t, r)` to ensure the compass matches the m
 
 ---
 
+## Kosha Gyroscope (v2.2.5)
+
+Homeostatic self-regulation system that prevents pathological training states (looping, fixation, collapse).
+
+### Core Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_kosha_gyroscope` | flag | `False` | Enable gyroscope system |
+| `--gyroscope_base_gain` | float | `0.15` | Gentle observation gain |
+| `--gyroscope_max_gain` | float | `3.0` | Strict enforcement gain |
+| `--gyroscope_ppl_ceiling` | float | `100.0` | PPL above which gain stays low |
+| `--gyroscope_target_ppl` | float | `30.0` | PPL at which max gain kicks in |
+
+### Kosha Thresholds (Golden Ratio Based)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_floor_mental` | float | `0.236` | Minimum Mental Kosha |
+| `--gyroscope_ceiling_mental` | float | `0.382` | Maximum Mental (Bliss Damper) |
+| `--gyroscope_floor_physical` | float | `0.382` | Minimum Physical Kosha |
+| `--gyroscope_ceiling_physical` | float | `0.618` | Maximum Physical Kosha |
+| `--gyroscope_floor_intellect` | float | `0.250` | Minimum Intellect Kosha |
+| `--gyroscope_ceiling_intellect` | float | `0.618` | Maximum Intellect Kosha |
+| `--gyroscope_floor_vital` | float | `0.236` | Minimum Vital Kosha |
+| `--gyroscope_ceiling_vital` | float | `0.786` | Maximum Vital Kosha |
+| `--gyroscope_floor_bliss` | float | `0.236` | Minimum Bliss Kosha |
+| `--gyroscope_ceiling_bliss` | float | `0.618` | Maximum Bliss Kosha |
+
+### Gate and Damper Behavior
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_trap_threshold` | float | `0.618` | Reality Rip trap threshold |
+| `--gyroscope_gate_threshold` | float | `0.30` | Physical gate threshold |
+| `--gyroscope_balance_target` | float | `0.25` | Target balance ratio |
+| `--gyroscope_gate_temperature` | float | `10.0` | Gate softmax temperature |
+| `--gyroscope_damper_steepness` | float | `5.0` | Bliss Damper curve steepness |
+| `--gyroscope_gate_steepness` | float | `5.0` | Physical Gate curve steepness |
+| `--gyroscope_rip_multiplier` | float | `2.0` | Reality Rip penalty multiplier |
+
+### Domain Morphing
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_domain_morph_enabled` | flag | `True` | Enable domain morphing |
+| `--disable_gyroscope_domain_morph` | flag | `False` | Disable domain morphing |
+| `--gyroscope_domain_morph_ema_decay` | float | `0.9` | EMA decay for morphing |
+| `--gyroscope_domain_morph_internal_weight` | float | `0.5` | Internal signal weight |
+| `--gyroscope_domain_morph_external_weight` | float | `0.5` | External signal weight |
+
+### Graduation Criteria
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_graduation_ppl` | float | `30.0` | PPL threshold for graduation |
+| `--gyroscope_graduation_variance` | float | `1.5` | Max PPL variance for graduation |
+| `--gyroscope_graduation_window` | int | `10` | Stability window for graduation |
+| `--gyroscope_warmup_steps` | int | `100` | Steps before gyroscope fully active |
+| `--gyroscope_rampdown_steps` | int | `500` | Steps for graduation rampdown |
+
+### Advanced Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_temporal_window` | int | `3` | Temporal smoothing window |
+| `--gyroscope_vital_momentum` | flag | `True` | Enable Vital momentum tracking |
+| `--disable_gyroscope_vital_momentum` | flag | `False` | Disable Vital momentum |
+| `--gyroscope_floor_push_factor` | float | `0.5` | Floor push strength |
+| `--gyroscope_ceiling_clamp_factor` | float | `0.5` | Ceiling clamp strength |
+| `--gyroscope_steepness` | float | `5.0` | Overall sigmoid steepness |
+
+### Notes
+- Golden Ratio thresholds (φ = 0.618) based on optimal activation patterns
+- Bliss Damper dilutes creative expansion when Mental dominance exceeds ceiling
+- Physical Gate requires minimum grounding before Intellectual activation
+- Reality Rip triggers hard reversal when model gets trapped with gate closed
+
+---
+
 ## PIDv2 Controller
 
 Automatic authority/sensory balance controller.
@@ -790,7 +930,9 @@ Dynamic λ_csr regulation based on training health.
 
 ## Adaptive Training Controller
 
-Automatic LR/Kp adjustment.
+Automatic LR/Kp adjustment based on training dynamics.
+
+### Core Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -800,15 +942,32 @@ Automatic LR/Kp adjustment.
 | `--adaptive_lr_max` | float | `1e-3` | Maximum LR ceiling |
 | `--adaptive_lr_boost` | float | `1.5` | Boost multiplier for plateau |
 | `--adaptive_lr_decay` | float | `0.7` | Decay multiplier for spike |
+
+### Velocity & Plateau Detection
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
 | `--adaptive_velocity_slow` | float | `-2.0` | PPL velocity % for "too slow" |
 | `--adaptive_velocity_spike` | float | `10.0` | PPL velocity % for "spike" |
 | `--adaptive_plateau_window` | int | `5` | Evaluations to check plateau |
 | `--adaptive_plateau_threshold` | float | `1.0` | Min improvement % |
 | `--adaptive_min_interval` | int | `200` | Min steps between adjustments |
 
+### Safety & Emergency Options (v9.8.2)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--adaptive_max_lr_relative` | float | `10.0` | Max LR = base_lr × this (prevents runaway) |
+| `--adaptive_loss_spike_threshold` | float | `5.0` | % loss increase triggers emergency decay |
+| `--adaptive_grad_norm_spike` | float | `100.0` | Gradient norm threshold for emergency |
+| `--adaptive_emergency_decay` | float | `0.5` | Emergency decay factor (aggressive) |
+| `--adaptive_consecutive_spike_limit` | int | `3` | Blocks boosts after N consecutive spikes |
+
 ### Notes
 - Automatically boosts LR on plateaus, reduces on spikes
-- **adaptive_min_interval**: Prevents thrashing
+- **adaptive_min_interval**: Prevents thrashing between adjustments
+- Emergency decay triggers on loss spikes or gradient explosions
+- Consecutive spike limit prevents boost-spike-decay loops
 
 ---
 
@@ -892,6 +1051,290 @@ Inject corruption to test model resilience.
 | `noise` | Add random noise |
 | `label_flip` | Flip labels |
 | `repeat` | Repeat tokens |
+
+---
+
+## Curriculum Learning (PPL-Gated)
+
+Phased introduction of auxiliary losses based on validation perplexity.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_curriculum` | flag | `False` | Enable PPL-gated curriculum |
+| `--curriculum_ppl_regularization` | float | `30.0` | PPL to enter REGULARIZATION |
+| `--curriculum_ppl_grounding` | float | `15.0` | PPL to enter GROUNDING |
+| `--curriculum_ppl_sovereign` | float | `10.0` | PPL to enter SOVEREIGN |
+| `--curriculum_stability_window` | int | `5` | Consecutive evals below threshold |
+| `--curriculum_hysteresis` | float | `1.5` | Prevent oscillation (must exceed threshold × this to regress) |
+
+### Curriculum Phases
+
+| Phase | PPL Range | Active Features |
+|-------|-----------|-----------------|
+| FOUNDATION | > 30 | Pure LM loss only |
+| REGULARIZATION | 30-15 | + Light Bhava (0.01), Coherence (0.01) |
+| GROUNDING | 15-10 | + CSR (0.05), Bridge (0.05), JEPA (0.1) |
+| SOVEREIGN | < 10 | Full auxiliary stack |
+
+### Notes
+- Ensures LM loss remains dominant (≥50%) throughout training
+- Stability window prevents premature phase transitions
+- Hysteresis prevents oscillation at phase boundaries
+- Once SOVEREIGN reached, phase is locked (no regression)
+
+---
+
+## Sequence Length Curriculum
+
+Gradual sequence length ramping for efficient training.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_seq_curriculum` | flag | `False` | Enable sequence length ramping |
+| `--seq_len_start` | int | `256` | Starting sequence length |
+| `--seq_len_end` | int | `1024` | Target sequence length (0 = use max_seq_len) |
+| `--seq_len_ramp_steps` | int | `5000` | Steps to ramp from start to end |
+| `--seq_len_ramp_mode` | str | `linear` | Ramp mode: `linear` or `exponential` |
+| `--seq_len_ppl_gate` | float | `0.0` | PPL gate (0 = step-based only) |
+
+### Benefits
+- Faster early training (more updates per second with short sequences)
+- Lower VRAM initially (allows larger batch sizes)
+- Syntax learned quickly before long-range dependencies
+
+### Notes
+- Data automatically reloaded when sequence length changes by ≥64 tokens
+- PPL-gated mode ensures model masters current length before extending
+- Exponential mode provides slower initial growth, faster final growth
+
+---
+
+## Sovereign Reasoning Kernel (SRK v9.8.0)
+
+Centralized ontological intervention with layer-specific hooks.
+
+### Core Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_srk` | flag | `False` | Enable SRK system |
+| `--srk_hidden_dim` | int | `768` | Projection dimension |
+| `--srk_total_steps` | int | `50000` | Total training steps for scheduling |
+| `--srk_warmup_steps` | int | `5000` | System 1 warmup steps |
+
+### Layer Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--srk_dna_bridge_layer` | int | `4` | DNA Bridge layer (foundational ontology) |
+| `--srk_csr_alignment_layer` | int | `7` | CSR Hook layer (concept consolidation) |
+| `--srk_witness_layer` | int | `9` | Witness layer (consciousness alignment) |
+| `--srk_synthesis_layer` | int | `11` | Synthesis layer (output integration) |
+
+### Component Toggles
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--srk_disable_dna_bridge` | flag | `False` | Disable DNA Bridge |
+| `--srk_disable_witness` | flag | `False` | Disable Witness hook |
+| `--srk_disable_synthesis` | flag | `False` | Disable Synthesis hook |
+| `--srk_disable_imr` | flag | `False` | Disable Isomorphism Monitoring |
+| `--srk_disable_mauna` | flag | `False` | Disable Mauna (silence) gating |
+
+### Loss Weights
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--srk_lambda_f` | float | `1.0` | Forward prediction weight |
+| `--srk_lambda_b` | float | `1.0` | Backward prediction weight |
+| `--srk_lambda_c` | float | `0.5` | Consistency weight |
+| `--srk_lambda_coherence` | float | `0.2` | Coherence weight |
+| `--srk_lambda_entropy` | float | `0.1` | Entropy regularization |
+| `--srk_lambda_task` | float | `1.0` | Task loss weight |
+
+### Advanced Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--srk_isomorphism_threshold` | float | `0.75` | Isomorphism detection threshold |
+| `--srk_karma_decay` | float | `0.9` | Karma momentum decay |
+| `--srk_mauna_confidence_threshold` | float | `0.6` | Mauna confidence threshold |
+| `--srk_mauna_consistency_threshold` | float | `0.5` | Mauna consistency threshold |
+| `--srk_disable_nidra_penalty` | flag | `False` | Disable Nidra penalty |
+| `--srk_nidra_penalty_weight` | float | `0.05` | Nidra penalty weight |
+
+---
+
+## Phase-JEPA (Joint Embedding Predictive Architecture)
+
+Perceptual learning via k-step prediction.
+
+### Core Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_jepa` | flag | `False` | Enable JEPA training |
+| `--jepa_hidden_dim` | int | `256` | MLP hidden dimension |
+| `--jepa_prediction_steps` | int | `4` | k-step lookahead |
+| `--jepa_num_heads` | int | `4` | Number of attention heads |
+| `--jepa_cosine_mode` | str | `complex` | Phase interaction: `standard`, `shifted`, `complex` |
+
+### Loss Weights
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_vicreg_weight` | float | `1.0` | VICReg collapse prevention |
+| `--jepa_alignment_weight` | float | `1.0` | Predictor-target alignment |
+| `--jepa_prediction_weight` | float | `0.5` | Forward/backward consistency |
+| `--jepa_orthogonality_weight` | float | `0.01` | Representation orthogonality |
+| `--jepa_bhava_weight` | float | `10.0` | Bhava alignment weight |
+| `--jepa_semantic_weight` | float | `1.0` | Semantic consistency |
+| `--jepa_guna_weight` | float | `0.1` | Guna alignment |
+
+### Target Network
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_target_momentum` | float | `0.996` | EMA momentum for target |
+| `--jepa_momentum_schedule` | str | `cosine` | Momentum schedule: `constant`, `cosine`, `linear` |
+
+### Training Phases (Body → Soul → Union)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_training_phase` | str | `body` | Current phase: `body`, `soul`, `union` |
+| `--jepa_phase_body_steps` | int | `20000` | Duration of BODY phase |
+| `--jepa_phase_soul_steps` | int | `30000` | Duration of SOUL phase |
+| `--jepa_auto_phase_transition` | flag | `False` | Automatic phase transitions |
+
+### Dynamic Graduation
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_enable_dynamic_graduation` | flag | `True` | Enable metric-based graduation |
+| `--jepa_graduation_loss_threshold` | float | `20.0` | Graduate when loss < this |
+| `--jepa_graduation_alignment_threshold` | float | `25.0` | Alignment threshold |
+
+### Vritti Validation
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_enable_vritti_validation` | flag | `False` | Enable Vritti-based validation |
+| `--jepa_viparyaya_threshold` | float | `0.4` | Viparyaya (error) threshold |
+| `--jepa_vikalpa_threshold` | float | `0.6` | Vikalpa (conceptual) threshold |
+| `--jepa_damping_factor` | float | `0.5` | Damping on Vritti detection |
+
+### Karma Injection
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--jepa_enable_karma_injection` | flag | `False` | Enable karma gate injection |
+| `--jepa_karma_gate_bias` | float | `0.5` | Initial karma gate bias |
+
+---
+
+## Ontological Bridge (Layer 4)
+
+Projects to 12D ontology at foundational layer.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_onto_bridge` | flag | `False` | Enable ontological bridge |
+| `--onto_bridge_lambda` | float | `0.1` | Bridge loss weight |
+| `--onto_bridge_diversity` | float | `0.1` | Diversity penalty (prevents collapse) |
+| `--onto_bridge_pramana` | float | `0.1` | Pramana (valid knowledge) weight |
+| `--onto_bridge_layer` | int | `4` | Layer for bridge projection |
+
+---
+
+## RSS (Resurgent Start System)
+
+PPL-gated feature activation for gradual system warm-up.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_rss` | flag | `False` | Enable RSS |
+| `--rss_evoflow_ppl` | float | `100.0` | PPL to enable EvoFlow |
+| `--rss_toroidal_ppl` | float | `60.0` | PPL to enable Toroidal Bridge |
+| `--rss_csr_ppl` | float | `45.0` | PPL to enable CSR |
+| `--rss_kosha_ppl` | float | `35.0` | PPL to enable Kosha Steering |
+| `--rss_csr_warmup_steps` | int | `2500` | CSR warmup steps |
+| `--rss_use_val_ppl` | flag | `True` | Use validation PPL (vs training) |
+
+### Notes
+- Prevents "14x gradient shock" from CSR activation
+- Features activate as PPL drops below thresholds
+- Use with caution - curriculum learning is generally preferred
+
+---
+
+## State Regularizer
+
+Prevents activation saturation in Kosha states.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_state_regularizer` | flag | `False` | Enable state regularization |
+| `--state_reg_anti_sat_weight` | float | `0.5` | Anti-saturation penalty weight |
+| `--state_reg_variance_weight` | float | `0.2` | Variance penalty weight |
+| `--state_reg_sat_thresh_high` | float | `0.95` | High saturation threshold |
+| `--state_reg_sat_thresh_low` | float | `0.05` | Low saturation threshold |
+| `--state_reg_target_std_kosha` | float | `0.15` | Target std for Kosha states |
+| `--state_reg_vital_weight` | float | `1.5` | Extra weight for Vital Kosha |
+| `--state_reg_bliss_weight` | float | `1.5` | Extra weight for Bliss Kosha |
+
+---
+
+## PIDv2 Batch Resize
+
+Dynamic batch size adjustment based on training dynamics.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--pidv2_batch_resize` | flag | `False` | Enable batch resizing |
+| `--pidv2_batch_min` | int | `4` | Minimum batch size |
+| `--pidv2_batch_max` | int | `64` | Maximum batch size |
+| `--pidv2_batch_velocity_threshold` | float | `5.0` | PPL velocity trigger |
+| `--pidv2_batch_stable_streak` | int | `5` | Stable evals before resize |
+
+---
+
+## RIP Logger
+
+Reality Rip event logging for debugging.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_rip_logger` | flag | `False` | Enable RIP logging |
+| `--rip_logger_dir` | str | `diagnostics/rips` | Directory for RIP logs |
+
+---
+
+## CSR Sparse Supervision
+
+Word-boundary-only supervision for CSR.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--csr_sparse_supervision` | flag | `False` | Enable word-boundary-only supervision |
+| `--csr_content_word_only` | flag | `False` | Only supervise content words |
+
+### Notes
+- Reduces computational overhead
+- Focuses alignment on semantically meaningful boundaries
+- Combine with `--csr_alignment_layer 7` for concept-level alignment
+
+---
+
+## Evolutionary Flow Fluency Gate
+
+PPL-based gating for evolutionary flow.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--evo_fluency_gate` | flag | `False` | Enable fluency gating |
+| `--evo_fluency_min_steps` | int | `2000` | Min steps before gating |
+| `--evo_fluency_ppl_threshold` | float | `100.0` | PPL threshold for gating |
 
 ---
 

@@ -5820,6 +5820,174 @@ class CurriculumController:
 
 
 # =============================================================================
+# V2.3.4: SEQUENCE LENGTH CURRICULUM
+# =============================================================================
+
+class SequenceLengthCurriculum:
+    """
+    Sequence Length Curriculum Controller.
+
+    Starts training with shorter sequences for faster syntax learning,
+    then gradually ramps up to full length for long-range dependencies.
+
+    Benefits:
+    - Faster early training (more updates per second with short sequences)
+    - Lower VRAM usage initially (allows larger batch sizes)
+    - Syntax/grammar learned quickly on short contexts
+    - Long-range dependencies introduced gradually
+
+    Modes:
+    - linear: seq_len = start + (end - start) * (step / ramp_steps)
+    - exponential: seq_len = start * (end / start) ^ (step / ramp_steps)
+
+    PPL Gating (optional):
+    - If seq_len_ppl_gate > 0, sequence length only increases when PPL drops
+      below the gate threshold. This ensures the model masters current length
+      before extending.
+
+    Usage:
+        curriculum = SequenceLengthCurriculum(config)
+
+        # In training loop:
+        current_seq_len = curriculum.get_seq_len(global_step, current_ppl)
+
+        # Check for transitions:
+        if curriculum.should_reload_data():
+            dataloader = create_dataloader(seq_len=current_seq_len)
+            curriculum.mark_data_reloaded()
+    """
+
+    def __init__(
+        self,
+        seq_len_start: int = 256,
+        seq_len_end: int = 1024,
+        ramp_steps: int = 5000,
+        ramp_mode: str = "linear",
+        ppl_gate: float = 0.0,
+        reload_threshold: int = 64,  # Reload data if seq_len changes by this much
+    ):
+        self.seq_len_start = seq_len_start
+        self.seq_len_end = seq_len_end
+        self.ramp_steps = ramp_steps
+        self.ramp_mode = ramp_mode
+        self.ppl_gate = ppl_gate
+        self.reload_threshold = reload_threshold
+
+        # State
+        self.current_seq_len = seq_len_start
+        self.last_reload_seq_len = seq_len_start
+        self.ppl_gated_step = 0  # Effective step for PPL-gated mode
+        self.last_ppl_below_gate = False
+        self._needs_reload = False
+
+        # History for logging
+        self.seq_len_history: List[Tuple[int, int]] = []  # (step, seq_len)
+
+    def get_seq_len(self, step: int, current_ppl: Optional[float] = None) -> int:
+        """
+        Get the current sequence length based on step and optionally PPL.
+
+        Args:
+            step: Current training step
+            current_ppl: Current validation PPL (optional, for PPL-gated mode)
+
+        Returns:
+            Current sequence length to use
+        """
+        if step >= self.ramp_steps:
+            # Reached full length
+            new_seq_len = self.seq_len_end
+        else:
+            # Calculate progress
+            if self.ppl_gate > 0 and current_ppl is not None:
+                # PPL-gated mode: only advance when PPL < gate
+                if current_ppl < self.ppl_gate:
+                    if not self.last_ppl_below_gate:
+                        self.last_ppl_below_gate = True
+                    self.ppl_gated_step += 1
+                else:
+                    self.last_ppl_below_gate = False
+                progress = min(1.0, self.ppl_gated_step / self.ramp_steps)
+            else:
+                # Step-based mode
+                progress = min(1.0, step / self.ramp_steps)
+
+            # Calculate new sequence length
+            if self.ramp_mode == "exponential":
+                # Exponential: faster early growth, slower later
+                ratio = self.seq_len_end / self.seq_len_start
+                new_seq_len = int(self.seq_len_start * (ratio ** progress))
+            else:
+                # Linear (default)
+                new_seq_len = int(
+                    self.seq_len_start + (self.seq_len_end - self.seq_len_start) * progress
+                )
+
+        # Round to multiple of 64 for efficiency
+        new_seq_len = ((new_seq_len + 63) // 64) * 64
+        new_seq_len = min(new_seq_len, self.seq_len_end)
+        new_seq_len = max(new_seq_len, self.seq_len_start)
+
+        # Check if we need to reload data
+        if abs(new_seq_len - self.last_reload_seq_len) >= self.reload_threshold:
+            self._needs_reload = True
+
+        # Update state
+        old_seq_len = self.current_seq_len
+        self.current_seq_len = new_seq_len
+
+        # Log transitions
+        if new_seq_len != old_seq_len:
+            self.seq_len_history.append((step, new_seq_len))
+
+        return new_seq_len
+
+    def should_reload_data(self) -> bool:
+        """Check if dataloader should be reloaded with new sequence length."""
+        return self._needs_reload
+
+    def mark_data_reloaded(self):
+        """Mark that data has been reloaded with current sequence length."""
+        self._needs_reload = False
+        self.last_reload_seq_len = self.current_seq_len
+
+    def get_progress(self) -> float:
+        """Get curriculum progress as fraction [0, 1]."""
+        return (self.current_seq_len - self.seq_len_start) / max(
+            1, self.seq_len_end - self.seq_len_start
+        )
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status for logging."""
+        return {
+            'current_seq_len': self.current_seq_len,
+            'target_seq_len': self.seq_len_end,
+            'progress': self.get_progress(),
+            'mode': self.ramp_mode,
+            'ppl_gated': self.ppl_gate > 0,
+            'ppl_gate_threshold': self.ppl_gate if self.ppl_gate > 0 else None,
+            'transitions': len(self.seq_len_history),
+        }
+
+    def get_transition_message(self, step: int, old_len: int, new_len: int) -> str:
+        """Generate human-readable transition message."""
+        progress = self.get_progress()
+        direction = "↗️" if new_len > old_len else "↘️"
+
+        msg = f"\n{'='*60}\n"
+        msg += f"  📏 [SEQ CURRICULUM] Length Transition {direction}\n"
+        msg += f"{'='*60}\n"
+        msg += f"  Step {step} | {old_len} → {new_len} tokens\n"
+        msg += f"  Progress: {progress:.1%} toward {self.seq_len_end}\n"
+        msg += f"  Mode: {self.ramp_mode.upper()}"
+        if self.ppl_gate > 0:
+            msg += f" (PPL-gated < {self.ppl_gate})"
+        msg += f"\n{'='*60}\n"
+
+        return msg
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -7316,6 +7484,7 @@ class UnifiedTrainingConfig:
 
     # Training hyperparameters
     batch_size: int = 8
+    batch_size_max: int = 512  # Max batch size for dynamic scaling (seq len curriculum)
     gradient_accumulation: int = 1
     vram_threshold: float = 0.95  # VRAM % to trigger batch reduction (0.95 = 95%)
     vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
@@ -7614,6 +7783,15 @@ class UnifiedTrainingConfig:
     curriculum_ppl_sovereign: float = 10.0        # Enter SOVEREIGN when PPL < this
     curriculum_stability_window: int = 5          # Consecutive evals below threshold
     curriculum_hysteresis: float = 1.5            # Prevent oscillation between phases
+
+    # V2.3.4: Sequence Length Curriculum - Gradual sequence length ramping
+    # Starts with shorter sequences for faster syntax learning, ramps up for long-range dependencies
+    enable_seq_curriculum: bool = False           # Enable sequence length ramping
+    seq_len_start: int = 256                      # Starting sequence length
+    seq_len_end: int = 1024                       # Target sequence length (will use max_seq_len if 0)
+    seq_len_ramp_steps: int = 5000                # Steps to reach full length
+    seq_len_ramp_mode: str = "linear"             # "linear" or "exponential"
+    seq_len_ppl_gate: float = 0.0                 # If > 0, only ramp when PPL < this (0 = step-based only)
 
     # CSR Phoneme-Ontological Grounding
     enable_csr: bool = True                  # Enable CSR phoneme grounding
@@ -8106,7 +8284,11 @@ def cache_validation_batches(dataloader, num_batches: int = 20) -> list:
     return cached
 
 
-def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, DataLoader]:
+def load_data(
+    config: UnifiedTrainingConfig,
+    tokenizer,
+    seq_len_override: Optional[int] = None,
+) -> Tuple[DataLoader, DataLoader]:
     """Load and tokenize dataset.
 
     Supports:
@@ -8117,7 +8299,11 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
     V9.7.0: Implements tokenization caching for WikiText datasets.
     First run tokenizes and saves to disk (~2-5 min).
     Subsequent runs load from cache (<5 sec).
+
+    V2.3.4: Added seq_len_override for sequence length curriculum.
     """
+    # V2.3.4: Use override if provided, otherwise use config
+    effective_seq_len = seq_len_override if seq_len_override is not None else config.max_seq_len
     print(f"Loading {config.dataset} dataset...")
 
     if config.dataset in ["wikitext103", "wikitext2"]:
@@ -8167,8 +8353,8 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
             cache_size_mb = cache_path.stat().st_size / (1024 * 1024)
             print(f"  ✅ Cache saved ({cache_size_mb:.1f} MB). Next startup will be <5s!")
 
-        train_dataset = TextDataset(train_tokens, config.max_seq_len)
-        val_dataset = TextDataset(val_tokens, config.max_seq_len)
+        train_dataset = TextDataset(train_tokens, effective_seq_len)
+        val_dataset = TextDataset(val_tokens, effective_seq_len)
 
         train_loader = DataLoader(
             train_dataset,
@@ -8198,13 +8384,13 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         # Streaming or cached FineWeb dataset
         print(f"  Dataset: {config.dataset_name}")
         print(f"  Subset: {config.dataset_subset}")
-        print(f"  Sequence length: {config.max_seq_len}")
+        print(f"  Sequence length: {effective_seq_len}")
         print(f"  Mode: {'Cached (local)' if config.cache_dataset else 'Streaming'}")
 
         # Create streaming/cached datasets for train and val
         train_dataset = FineWebStreamingDataset(
             tokenizer=tokenizer,
-            seq_length=config.max_seq_len,
+            seq_length=effective_seq_len,
             dataset_name=config.dataset_name,
             dataset_subset=config.dataset_subset,
             split="train",
@@ -8214,7 +8400,7 @@ def load_data(config: UnifiedTrainingConfig, tokenizer) -> Tuple[DataLoader, Dat
         # For validation, we use a small portion of train (FineWeb doesn't have val split)
         val_dataset = FineWebStreamingDataset(
             tokenizer=tokenizer,
-            seq_length=config.max_seq_len,
+            seq_length=effective_seq_len,
             dataset_name=config.dataset_name,
             dataset_subset=config.dataset_subset,
             split="train",  # Use train split, will cache limited batches
@@ -10847,6 +11033,44 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
         print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
 
+    # V2.3.4: Sequence Length Curriculum Controller
+    seq_len_curriculum = None
+    current_seq_len = config.max_seq_len
+    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at max seq_len
+    seq_curriculum_ref_seq_len = config.max_seq_len  # Reference sequence length
+    if config.enable_seq_curriculum:
+        seq_len_curriculum = SequenceLengthCurriculum(
+            seq_len_start=config.seq_len_start,
+            seq_len_end=config.seq_len_end,
+            ramp_steps=config.seq_len_ramp_steps,
+            ramp_mode=config.seq_len_ramp_mode,
+            ppl_gate=config.seq_len_ppl_gate,
+        )
+        current_seq_len = config.seq_len_start  # Start with short sequences
+
+        # V2.3.4: Calculate scaled batch size for initial short sequence length
+        # Memory scales ~linearly with seq_len, so batch can scale inversely
+        seq_curriculum_ref_batch = config.batch_size
+        seq_curriculum_ref_seq_len = config.seq_len_end  # Reference is the target/max
+        scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+        scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
+        config.batch_size = scaled_batch
+
+        print(f"\n  📏 [SEQ CURRICULUM] Sequence Length Curriculum ENABLED")
+        print(f"     Ramping: {config.seq_len_start} → {config.seq_len_end} tokens")
+        print(f"     Ramp steps: {config.seq_len_ramp_steps}")
+        print(f"     Mode: {config.seq_len_ramp_mode.upper()}")
+        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
+        if config.seq_len_ppl_gate > 0:
+            print(f"     PPL Gate: Only ramp when PPL < {config.seq_len_ppl_gate}")
+        print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences (batch={scaled_batch})")
+        print(f"     ⚠️  Will reload dataloader as sequence length increases\n")
+
+        # Reload data with initial short sequence length and scaled batch
+        train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
+        train_iter = iter(train_loader)
+        seq_len_curriculum.mark_data_reloaded()
+
     while global_step < config.max_steps:
         # Get batch
         try:
@@ -12183,10 +12407,11 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage
+                    # Memory usage - show CURRENT allocated (matches nvidia-smi)
                     if device.type == "cuda":
-                        mem_used = torch.cuda.max_memory_allocated() / (1024**3)
-                        mem_str = f" | VRAM: {mem_used:.1f}GB"
+                        mem_current = torch.cuda.memory_allocated() / (1024**3)
+                        mem_reserved = torch.cuda.memory_reserved() / (1024**3)
+                        mem_str = f" | VRAM: {mem_current:.1f}GB/{mem_reserved:.1f}GB"
                     else:
                         mem_str = ""
 
@@ -12623,6 +12848,39 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  📚 [CURRICULUM] Phase: {status['phase']} | "
                               f"Avg PPL: {avg_ppl_str} | "
                               f"Steps in phase: {status['steps_in_phase']}")
+
+                # V2.3.4: Sequence Length Curriculum Update
+                if seq_len_curriculum is not None:
+                    old_seq_len = current_seq_len
+                    current_seq_len = seq_len_curriculum.get_seq_len(global_step, val_ppl)
+
+                    # Check if we need to reload dataloader
+                    if seq_len_curriculum.should_reload_data():
+                        print(seq_len_curriculum.get_transition_message(global_step, old_seq_len, current_seq_len))
+
+                        # V2.3.4: Recalculate batch size for new sequence length
+                        # Memory scales ~linearly with seq_len, so batch scales inversely
+                        old_batch = config.batch_size
+                        new_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+                        new_batch = max(1, min(new_batch, config.batch_size_max))  # Clamp to configurable max
+                        config.batch_size = new_batch
+
+                        print(f"  📏 [SEQ CURRICULUM] Reloading dataloader:")
+                        print(f"     seq_len: {old_seq_len} → {current_seq_len}")
+                        print(f"     batch:   {old_batch} → {new_batch} (max: {config.batch_size_max})")
+
+                        # Reload data with new sequence length and batch size
+                        train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
+                        train_iter = iter(train_loader)
+                        seq_len_curriculum.mark_data_reloaded()
+
+                        print(f"  ✅ Dataloader reloaded. Progress: {seq_len_curriculum.get_progress():.1%}")
+
+                    # Log sequence curriculum status periodically
+                    elif global_step % (config.eval_every * 5) == 0:
+                        status = seq_len_curriculum.get_status()
+                        print(f"  📏 [SEQ CURRICULUM] Length: {status['current_seq_len']}/{status['target_seq_len']} | "
+                              f"Progress: {status['progress']:.1%}")
 
                 # PIDv2 Controller Update (V9.4.4)
                 if authority_controller is not None:
@@ -13322,7 +13580,9 @@ def main():
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
-                       help="Batch size per GPU")
+                       help="Batch size per GPU (reference batch for seq len curriculum)")
+    parser.add_argument("--batch_size_max", type=int, default=512,
+                       help="Max batch size for dynamic scaling (seq len curriculum). Higher = more VRAM utilization")
     parser.add_argument("--gradient_accumulation", type=int, default=1,
                        help="Gradient accumulation steps")
     parser.add_argument("--vram_threshold", type=float, default=0.95,
@@ -13851,6 +14111,21 @@ def main():
     parser.add_argument("--curriculum_hysteresis", type=float, default=1.5,
                        help="PPL must exceed threshold * hysteresis to regress to earlier phase")
 
+    # V2.3.4: Sequence Length Curriculum
+    parser.add_argument("--enable_seq_curriculum", action="store_true",
+                       help="Enable sequence length ramping (start short, ramp to full length)")
+    parser.add_argument("--seq_len_start", type=int, default=256,
+                       help="Starting sequence length for curriculum")
+    parser.add_argument("--seq_len_end", type=int, default=1024,
+                       help="Target sequence length (0 = use max_seq_len)")
+    parser.add_argument("--seq_len_ramp_steps", type=int, default=5000,
+                       help="Steps to ramp from start to end length")
+    parser.add_argument("--seq_len_ramp_mode", type=str, default="linear",
+                       choices=["linear", "exponential"],
+                       help="Ramping mode: linear or exponential")
+    parser.add_argument("--seq_len_ppl_gate", type=float, default=0.0,
+                       help="Only ramp when PPL < this (0 = step-based only)")
+
     # CSR Phoneme-Ontological Grounding
     parser.add_argument("--enable_csr", action="store_true", default=True,
                        help="Enable CSR phoneme grounding")
@@ -14139,6 +14414,7 @@ def main():
         model_size=args.model_size,
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
+        batch_size_max=args.batch_size_max,
         gradient_accumulation=args.gradient_accumulation,
         vram_threshold=args.vram_threshold,
         vram_recovery_buffer=args.vram_recovery_buffer,
@@ -14360,6 +14636,13 @@ def main():
         curriculum_ppl_sovereign=args.curriculum_ppl_sovereign,
         curriculum_stability_window=args.curriculum_stability_window,
         curriculum_hysteresis=args.curriculum_hysteresis,
+        # V2.3.4: Sequence Length Curriculum
+        enable_seq_curriculum=args.enable_seq_curriculum,
+        seq_len_start=args.seq_len_start,
+        seq_len_end=args.seq_len_end if args.seq_len_end > 0 else args.max_seq_len,
+        seq_len_ramp_steps=args.seq_len_ramp_steps,
+        seq_len_ramp_mode=args.seq_len_ramp_mode,
+        seq_len_ppl_gate=args.seq_len_ppl_gate,
         # CSR Phoneme-Ontological Grounding
         enable_csr=args.enable_csr and not args.disable_csr,
         csr_lambda=args.csr_lambda,
