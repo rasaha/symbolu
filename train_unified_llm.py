@@ -10250,6 +10250,13 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
+    # These must be defined before curriculum controllers are created
+    resumed_csr_curriculum_state = None
+    resumed_kosha_curriculum_state = None
+    resumed_onto_curriculum_state = None
+    resumed_pidv2_curriculum_state = None
+
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
     csr_graduated = False
@@ -10264,10 +10271,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.csr_engage_ppl} (full grounding)")
         print(f"       TRANSITION:   {config.csr_disengage_ppl} < PPL < {config.csr_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.csr_disengage_ppl} (CSR off after {config.csr_rampdown_steps} steps)")
-        # V9.8.6: Restore CSR curriculum state from checkpoint
-        if resumed_csr_curriculum_state is not None:
-            csr_curriculum.load_state(resumed_csr_curriculum_state)
-            print(f"       ✓ Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
 
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
@@ -10680,11 +10683,6 @@ def train(config: UnifiedTrainingConfig):
     resumed_sattvic_state = None
     resumed_srk_state = None
     resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
-    # V9.8.6: Curriculum state variables
-    resumed_csr_curriculum_state = None
-    resumed_kosha_curriculum_state = None
-    resumed_onto_curriculum_state = None
-    resumed_pidv2_curriculum_state = None
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
@@ -10712,6 +10710,21 @@ def train(config: UnifiedTrainingConfig):
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
+
+    # V9.8.6: Restore curriculum states from checkpoint (after loading)
+    if resumed_csr_curriculum_state is not None and csr_curriculum is not None:
+        csr_curriculum.load_state(resumed_csr_curriculum_state)
+        print(f"  ✓ CSR Curriculum Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
+    if resumed_onto_curriculum_state is not None and onto_curriculum is not None:
+        onto_curriculum.load_state(resumed_onto_curriculum_state)
+        print(f"  ✓ Onto Curriculum Restored: Phase={onto_curriculum.phase}, Scale={onto_curriculum.scale:.3f}")
+    if resumed_kosha_curriculum_state is not None and kosha_curriculum is not None:
+        kosha_curriculum.load_state(resumed_kosha_curriculum_state)
+        print(f"  ✓ Kosha Curriculum Restored: Phase={kosha_curriculum.phase}, Scale={kosha_curriculum.scale:.3f}")
+    if resumed_pidv2_curriculum_state is not None and authority_controller is not None:
+        if hasattr(authority_controller, 'load_curriculum_state'):
+            authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
+            print(f"  ✓ PIDv2 Curriculum Restored: Phase={authority_controller.phase}, Scale={authority_controller.phase_scale:.3f}")
 
     # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
@@ -10945,10 +10958,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
         print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
-        # V9.8.6: Restore PIDv2 curriculum state from checkpoint
-        if resumed_pidv2_curriculum_state is not None:
-            authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
-            print(f"       ✓ Restored: Phase={authority_controller.phase}, Scale={authority_controller.phase_scale:.3f}")
         if config.pidv2_batch_resize:
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
@@ -11041,10 +11050,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.onto_engage_ppl} (full ontological grounding)")
         print(f"       TRANSITION:   {config.onto_disengage_ppl} < PPL < {config.onto_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.onto_disengage_ppl} (Onto off after {config.onto_rampdown_steps} steps)")
-        # V9.8.6: Restore Onto curriculum state from checkpoint
-        if resumed_onto_curriculum_state is not None:
-            onto_curriculum.load_state(resumed_onto_curriculum_state)
-            print(f"       ✓ Restored: Phase={onto_curriculum.phase}, Scale={onto_curriculum.scale:.3f}")
 
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
@@ -11167,10 +11172,6 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.kosha_engage_ppl} (full Kosha loss)")
         print(f"       TRANSITION:   {config.kosha_disengage_ppl} < PPL < {config.kosha_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.kosha_disengage_ppl} (Kosha off after {config.kosha_rampdown_steps} steps)")
-        # V9.8.6: Restore Kosha curriculum state from checkpoint
-        if resumed_kosha_curriculum_state is not None:
-            kosha_curriculum.load_state(resumed_kosha_curriculum_state)
-            print(f"       ✓ Restored: Phase={kosha_curriculum.phase}, Scale={kosha_curriculum.scale:.3f}")
 
         # Initialize Reality Rip Logger (diagnostic)
         if config.enable_rip_logger:
