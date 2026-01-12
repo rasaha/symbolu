@@ -7545,6 +7545,14 @@ class UnifiedTrainingConfig:
     # Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md
     # ==========================================================================
     enable_kosha_gyroscope: bool = False     # Master toggle for Kosha Gyroscope system
+    # V9.8.7: Dynamic three-phase engagement based on Val PPL thresholds
+    gyroscope_engage_ppl: float = 50.0       # Phase 2: Auto-engage with RELAXED settings
+    gyroscope_active_ppl: float = 30.0       # Phase 3: Switch to ACTIVE settings
+    # Phase settings: RELAXED (30-50 PPL) vs ACTIVE (<30 PPL)
+    gyroscope_relaxed_ceiling_clamp: float = 0.90   # Relaxed: gentle clamping
+    gyroscope_relaxed_floor_push: float = 0.30      # Relaxed: gentle push
+    gyroscope_active_ceiling_clamp: float = 0.65    # Active: firm clamping
+    gyroscope_active_floor_push: float = 0.75       # Active: firm push
     # Dynamic Weight Scheduler (v2.2.1 - prevents "Aphasia")
     gyroscope_base_gain: float = 0.15        # Gentle observation when PPL > 100
     gyroscope_max_gain: float = 3.0          # Strict enforcement when PPL -> 30
@@ -7693,8 +7701,8 @@ class UnifiedTrainingConfig:
     pidv2_ki: float = 0.02
     pidv2_kd: float = 0.10
     pidv2_a_min: float = 0.40  # Raised from 0.30 to boost sensory floor
-    pidv2_c_floor: float = 0.68
-    pidv2_c_good: float = 0.76
+    pidv2_c_floor: float = 0.45  # V9.8.6: Relaxed for Phase 1 (construction)
+    pidv2_c_good: float = 0.65   # V9.8.6: Achievable target, auto-disable PID at 0.75
     pidv2_w_s: float = 0.30  # Semantic weight
     pidv2_semantic_scale: float = 50.0
     pidv2_handshake_dampen: bool = True
@@ -10818,6 +10826,11 @@ def train(config: UnifiedTrainingConfig):
     kosha_curriculum_controller = None
     kosha_graduated = False  # Track graduation state
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
+    # V9.8.7: Three-phase gyroscope engagement tracking
+    # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF
+    # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED
+    # Phase 3: POLISHING (PPL < 30) - Gyroscope ACTIVE
+    gyroscope_phase = "CONSTRUCTION"  # Current phase
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
         # Initialize KoshaGyroscopicLoss with Harmonic Pentad (v2.3.0)
@@ -12829,6 +12842,123 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V9.8.7: Dynamic Three-Phase Gyroscope Engagement
+                # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF, freedom to learn
+                # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED, gentle guidance
+                # Phase 3: POLISHING (PPL < 30) - Gyroscope ACTIVE, firm homeostasis
+                if not config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
+
+                    # Phase transition: CONSTRUCTION -> REFINEMENT
+                    if (gyroscope_phase == "CONSTRUCTION" and
+                        val_ppl < config.gyroscope_engage_ppl):
+
+                        gyroscope_phase = "REFINEMENT"
+                        print(f"\n  {'='*60}")
+                        print(f"  🎯 PHASE 2: REFINEMENT at step {global_step}")
+                        print(f"     Val PPL {val_ppl:.2f} < threshold {config.gyroscope_engage_ppl}")
+                        print(f"     Gyroscope: RELAXED (gentle guidance)")
+                        print(f"       ceiling_clamp: {config.gyroscope_relaxed_ceiling_clamp}")
+                        print(f"       floor_push: {config.gyroscope_relaxed_floor_push}")
+                        print(f"  {'='*60}\n")
+
+                        # Initialize with RELAXED settings
+                        kosha_gyroscope = KoshaGyroscopicLoss(
+                            floor_mental=config.gyroscope_floor_mental,
+                            ceiling_mental=config.gyroscope_ceiling_mental,
+                            floor_physical=config.gyroscope_floor_physical,
+                            ceiling_physical=config.gyroscope_ceiling_physical,
+                            floor_intellect=config.gyroscope_floor_intellect,
+                            ceiling_intellect=config.gyroscope_ceiling_intellect,
+                            floor_vital=config.gyroscope_floor_vital,
+                            ceiling_vital=config.gyroscope_ceiling_vital,
+                            floor_bliss=config.gyroscope_floor_bliss,
+                            ceiling_bliss=config.gyroscope_ceiling_bliss,
+                            # RELAXED settings
+                            floor_push_factor=config.gyroscope_relaxed_floor_push,
+                            ceiling_clamp_factor=config.gyroscope_relaxed_ceiling_clamp,
+                            domain_morph_enabled=config.gyroscope_domain_morph_enabled,
+                            domain_morph_ema_decay=config.gyroscope_domain_morph_ema_decay,
+                            domain_morph_internal_weight=config.gyroscope_domain_morph_internal_weight,
+                            domain_morph_external_weight=config.gyroscope_domain_morph_external_weight,
+                            trap_threshold=config.gyroscope_trap_threshold,
+                            gate_threshold=config.gyroscope_gate_threshold,
+                            balance_target=config.gyroscope_balance_target,
+                            gate_temperature=config.gyroscope_gate_temperature,
+                            damper_steepness=config.gyroscope_damper_steepness,
+                            gate_steepness=config.gyroscope_gate_steepness,
+                            rip_multiplier=config.gyroscope_rip_multiplier,
+                            steepness=config.gyroscope_steepness,
+                            base_gain=config.gyroscope_base_gain,
+                            max_gain=config.gyroscope_max_gain,
+                            ppl_ceiling=config.gyroscope_ppl_ceiling,
+                            target_ppl=config.gyroscope_target_ppl,
+                            temporal_window=config.gyroscope_temporal_window,
+                            vital_momentum_enabled=config.gyroscope_vital_momentum,
+                        ).to(device)
+
+                        kosha_graduation_monitor = GraduationMonitor(
+                            target_ppl=config.gyroscope_graduation_ppl,
+                            stability_window=config.gyroscope_graduation_window,
+                            variance_threshold=config.gyroscope_graduation_variance,
+                        )
+
+                        if tb_writer is not None:
+                            tb_writer.add_scalar("gyro/phase", 2.0, global_step)
+                            tb_writer.add_scalar("gyro/refinement_start_ppl", val_ppl, global_step)
+
+                    # Phase transition: REFINEMENT -> POLISHING
+                    elif (gyroscope_phase == "REFINEMENT" and
+                          val_ppl < config.gyroscope_active_ppl and
+                          kosha_gyroscope is not None):
+
+                        gyroscope_phase = "POLISHING"
+                        print(f"\n  {'='*60}")
+                        print(f"  🔱 PHASE 3: POLISHING at step {global_step}")
+                        print(f"     Val PPL {val_ppl:.2f} < threshold {config.gyroscope_active_ppl}")
+                        print(f"     Gyroscope: ACTIVE (firm homeostasis)")
+                        print(f"       ceiling_clamp: {config.gyroscope_active_ceiling_clamp}")
+                        print(f"       floor_push: {config.gyroscope_active_floor_push}")
+                        print(f"  {'='*60}\n")
+
+                        # Reinitialize with ACTIVE settings
+                        kosha_gyroscope = KoshaGyroscopicLoss(
+                            floor_mental=config.gyroscope_floor_mental,
+                            ceiling_mental=config.gyroscope_ceiling_mental,
+                            floor_physical=config.gyroscope_floor_physical,
+                            ceiling_physical=config.gyroscope_ceiling_physical,
+                            floor_intellect=config.gyroscope_floor_intellect,
+                            ceiling_intellect=config.gyroscope_ceiling_intellect,
+                            floor_vital=config.gyroscope_floor_vital,
+                            ceiling_vital=config.gyroscope_ceiling_vital,
+                            floor_bliss=config.gyroscope_floor_bliss,
+                            ceiling_bliss=config.gyroscope_ceiling_bliss,
+                            # ACTIVE settings
+                            floor_push_factor=config.gyroscope_active_floor_push,
+                            ceiling_clamp_factor=config.gyroscope_active_ceiling_clamp,
+                            domain_morph_enabled=config.gyroscope_domain_morph_enabled,
+                            domain_morph_ema_decay=config.gyroscope_domain_morph_ema_decay,
+                            domain_morph_internal_weight=config.gyroscope_domain_morph_internal_weight,
+                            domain_morph_external_weight=config.gyroscope_domain_morph_external_weight,
+                            trap_threshold=config.gyroscope_trap_threshold,
+                            gate_threshold=config.gyroscope_gate_threshold,
+                            balance_target=config.gyroscope_balance_target,
+                            gate_temperature=config.gyroscope_gate_temperature,
+                            damper_steepness=config.gyroscope_damper_steepness,
+                            gate_steepness=config.gyroscope_gate_steepness,
+                            rip_multiplier=config.gyroscope_rip_multiplier,
+                            steepness=config.gyroscope_steepness,
+                            base_gain=config.gyroscope_base_gain,
+                            max_gain=config.gyroscope_max_gain,
+                            ppl_ceiling=config.gyroscope_ppl_ceiling,
+                            target_ppl=config.gyroscope_target_ppl,
+                            temporal_window=config.gyroscope_temporal_window,
+                            vital_momentum_enabled=config.gyroscope_vital_momentum,
+                        ).to(device)
+
+                        if tb_writer is not None:
+                            tb_writer.add_scalar("gyro/phase", 3.0, global_step)
+                            tb_writer.add_scalar("gyro/polishing_start_ppl", val_ppl, global_step)
+
                 # V9.8.5: Use REAL toroidal coherence for PID, not hardcoded default
                 # The evaluate() function discards coherence metrics, so we use the
                 # training loop's toroidal_coherence which measures actual cognitive
@@ -13823,6 +13953,19 @@ def main():
     # ==========================================================================
     parser.add_argument("--enable_kosha_gyroscope", action="store_true",
                        help="Enable Kosha Gyroscope homeostatic self-regulation loss")
+    # V9.8.7: Dynamic three-phase engagement
+    parser.add_argument("--gyroscope_engage_ppl", type=float, default=50.0,
+                       help="V9.8.7: Phase 2 - Auto-engage gyroscope with RELAXED settings when Val PPL < this")
+    parser.add_argument("--gyroscope_active_ppl", type=float, default=30.0,
+                       help="V9.8.7: Phase 3 - Switch to ACTIVE settings when Val PPL < this")
+    parser.add_argument("--gyroscope_relaxed_ceiling_clamp", type=float, default=0.90,
+                       help="V9.8.7: Relaxed phase ceiling clamp factor (gentle)")
+    parser.add_argument("--gyroscope_relaxed_floor_push", type=float, default=0.30,
+                       help="V9.8.7: Relaxed phase floor push factor (gentle)")
+    parser.add_argument("--gyroscope_active_ceiling_clamp", type=float, default=0.65,
+                       help="V9.8.7: Active phase ceiling clamp factor (firm)")
+    parser.add_argument("--gyroscope_active_floor_push", type=float, default=0.75,
+                       help="V9.8.7: Active phase floor push factor (firm)")
     # Dynamic Weight Scheduler (v2.2.1)
     parser.add_argument("--gyroscope_base_gain", type=float, default=0.15,
                        help="Base gain when PPL > ceiling (gentle observation)")
@@ -13981,10 +14124,10 @@ def main():
                        help="PIDv2 derivative gain")
     parser.add_argument("--pidv2_a_min", type=float, default=0.40,
                        help="PIDv2 minimum authority factor (sensory floor)")
-    parser.add_argument("--pidv2_c_floor", type=float, default=0.68,
-                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5)")
-    parser.add_argument("--pidv2_c_good", type=float, default=0.76,
-                       help="PIDv2 coherence good - above this, gate is at full (1.0)")
+    parser.add_argument("--pidv2_c_floor", type=float, default=0.45,
+                       help="PIDv2 coherence floor - below this, gate is at minimum (0.5). V9.8.6: Relaxed for Phase 1")
+    parser.add_argument("--pidv2_c_good", type=float, default=0.65,
+                       help="PIDv2 coherence good - above this, gate is at full (1.0). V9.8.6: Auto-disable PID at 0.75")
     parser.add_argument("--pidv2_w_s", type=float, default=0.30,
                        help="Semantic weight (0.30 = 30%% prompt-based)")
     # V9.7.0: PIDv2 Dynamic Batch Sizing
@@ -14511,6 +14654,13 @@ def main():
         kosha_steering_layer=args.kosha_steering_layer,
         # v2.2.1: Kosha Gyroscope - Homeostatic Self-Regulation
         enable_kosha_gyroscope=args.enable_kosha_gyroscope,
+        # V9.8.7: Three-phase dynamic engagement
+        gyroscope_engage_ppl=args.gyroscope_engage_ppl,
+        gyroscope_active_ppl=args.gyroscope_active_ppl,
+        gyroscope_relaxed_ceiling_clamp=args.gyroscope_relaxed_ceiling_clamp,
+        gyroscope_relaxed_floor_push=args.gyroscope_relaxed_floor_push,
+        gyroscope_active_ceiling_clamp=args.gyroscope_active_ceiling_clamp,
+        gyroscope_active_floor_push=args.gyroscope_active_floor_push,
         gyroscope_base_gain=args.gyroscope_base_gain,
         gyroscope_max_gain=args.gyroscope_max_gain,
         gyroscope_ppl_ceiling=args.gyroscope_ppl_ceiling,

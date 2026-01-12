@@ -796,8 +796,10 @@ class AuthorityPIDv2Config:
     I_max: float = 5.0       # Maximum integral accumulation
 
     # Coherence gate (SUPERVISORY ONLY - not in PID)
-    C_floor: float = 0.68    # Below this = minimum gate (0.5)
-    C_good: float = 0.76     # Above this = full gate (1.0)
+    # V9.8.6: Relaxed defaults for Phase 1 (construction) training
+    # Auto-disable PID when coherence > 0.75 for Phase 2 (crystallization)
+    C_floor: float = 0.45    # Below this = minimum gate (0.5)
+    C_good: float = 0.65     # Above this = full gate (1.0)
     gate_min: float = 0.5    # Minimum coherence gate value
 
     # Authority bounds
