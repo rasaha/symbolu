@@ -8067,7 +8067,7 @@ class UnifiedTrainingConfig:
     sattvic_floor_lambda: float = 0.1        # Minimum λ_csr after decay
     sattvic_warmup_steps: int = 500          # Steps for warmup phase
     sattvic_variance_window: int = 50        # Window for entropy variance detection
-    sattvic_variance_threshold: float = 0.0001  # Lowered from 0.001 to reduce boost-release cycling
+    sattvic_variance_threshold: float = 0.00001  # Lowered from 0.0001 - variance ~1e-5 still triggering boosts
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
@@ -14744,8 +14744,8 @@ def main():
                        help="Steps for warmup phase")
     parser.add_argument("--sattvic_variance_window", type=int, default=50,
                        help="Window for entropy variance detection")
-    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.0001,
-                       help="Variance threshold for stagnation")
+    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.00001,
+                       help="Variance threshold for stagnation (lowered to 1e-5)")
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     parser.add_argument("--enable_adaptive_training", action="store_true", default=True,
