@@ -7484,6 +7484,7 @@ class UnifiedTrainingConfig:
 
     # Training hyperparameters
     batch_size: int = 8
+    batch_size_max: int = 512  # Max batch size for dynamic scaling (seq len curriculum)
     gradient_accumulation: int = 1
     vram_threshold: float = 0.95  # VRAM % to trigger batch reduction (0.95 = 95%)
     vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
@@ -11052,14 +11053,14 @@ def train(config: UnifiedTrainingConfig):
         seq_curriculum_ref_batch = config.batch_size
         seq_curriculum_ref_seq_len = config.seq_len_end  # Reference is the target/max
         scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
-        scaled_batch = min(scaled_batch, 256)  # Cap at reasonable max
+        scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
         config.batch_size = scaled_batch
 
         print(f"\n  📏 [SEQ CURRICULUM] Sequence Length Curriculum ENABLED")
         print(f"     Ramping: {config.seq_len_start} → {config.seq_len_end} tokens")
         print(f"     Ramp steps: {config.seq_len_ramp_steps}")
         print(f"     Mode: {config.seq_len_ramp_mode.upper()}")
-        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok")
+        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
         if config.seq_len_ppl_gate > 0:
             print(f"     PPL Gate: Only ramp when PPL < {config.seq_len_ppl_gate}")
         print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences (batch={scaled_batch})")
@@ -12860,12 +12861,12 @@ def train(config: UnifiedTrainingConfig):
                         # Memory scales ~linearly with seq_len, so batch scales inversely
                         old_batch = config.batch_size
                         new_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
-                        new_batch = max(1, min(new_batch, 256))  # Clamp to reasonable range
+                        new_batch = max(1, min(new_batch, config.batch_size_max))  # Clamp to configurable max
                         config.batch_size = new_batch
 
                         print(f"  📏 [SEQ CURRICULUM] Reloading dataloader:")
                         print(f"     seq_len: {old_seq_len} → {current_seq_len}")
-                        print(f"     batch:   {old_batch} → {new_batch}")
+                        print(f"     batch:   {old_batch} → {new_batch} (max: {config.batch_size_max})")
 
                         # Reload data with new sequence length and batch size
                         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
@@ -13578,7 +13579,9 @@ def main():
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
-                       help="Batch size per GPU")
+                       help="Batch size per GPU (reference batch for seq len curriculum)")
+    parser.add_argument("--batch_size_max", type=int, default=512,
+                       help="Max batch size for dynamic scaling (seq len curriculum). Higher = more VRAM utilization")
     parser.add_argument("--gradient_accumulation", type=int, default=1,
                        help="Gradient accumulation steps")
     parser.add_argument("--vram_threshold", type=float, default=0.95,
@@ -14410,6 +14413,7 @@ def main():
         model_size=args.model_size,
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
+        batch_size_max=args.batch_size_max,
         gradient_accumulation=args.gradient_accumulation,
         vram_threshold=args.vram_threshold,
         vram_recovery_buffer=args.vram_recovery_buffer,
