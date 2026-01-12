@@ -1636,44 +1636,54 @@ class VrittiResonanceLoss(nn.Module):
         loss = torch.tensor(0.0, device=device)
         diagnostics = {}
 
-        # === 1. PHYSICAL-PRAMANA (P-Pram): HARD alignment ===
+        # === 1. PHYSICAL-PRAMANA (P-Pram): EMERGENCY FIX ===
         # Target: +1.0 | Current: typically -0.98 (inverted!)
-        # Weight: HIGH (0.5) - This is the critical fix
+        # Weight: HIGH (0.5) - Force model out of anti-phase inversion
+        # This is the critical fix for hallucination/truth grounding
         p_pram = correlations['physical_pramana']
         p_pram_loss = 0.5 * (1.0 - p_pram)
         loss = loss + p_pram_loss
         diagnostics['p_pram_corr'] = p_pram.item()
         diagnostics['p_pram_loss'] = p_pram_loss.item()
 
-        # === 2. INTELLECT-SMRITI: FIRM alignment ===
-        # Target: +1.0 | Memory needs intellectual validation
+        # === 2. INTELLECT-SMRITI: REASONING GAP ===
+        # Target: +0.7 (NOT 1.0!) | Leave 30% gap for logical inference
         # Weight: MEDIUM (0.3)
+        # Rationale: 1.0 = "Parrot Trap" (only validate memorized facts)
+        #            0.7 = Heavy reliance on memory + room for reasoning
+        # Penalize deviation in EITHER direction (too tight OR too loose)
         i_smriti = correlations['intellect_smriti']
-        i_smriti_loss = 0.3 * (1.0 - i_smriti)
+        i_smriti_loss = 0.3 * torch.abs(i_smriti - 0.7)
         loss = loss + i_smriti_loss
         diagnostics['intellect_smriti_corr'] = i_smriti.item()
 
-        # === 3. BLISS-VIPARYAYA: FIRM alignment ===
-        # Target: +1.0 | Sovereign Will anchors error detection
-        # Weight: MEDIUM (0.3)
+        # === 3. BLISS-VIPARYAYA: SOVEREIGN DETACHMENT ===
+        # Target: 0.0 (ORTHOGONAL) | Sovereign Will independent of Error
+        # Weight: MEDIUM (0.2)
+        # Rationale: +1.0 = "Blissfully Delusional" (High confidence in errors)
+        #            -1.0 = "Paralyzed Perfectionist" (Bliss crashes on any error)
+        #             0.0 = Will transcends error, neither chasing nor fleeing
+        # Use squared correlation to punish magnitude in either direction
         b_viparyaya = correlations['bliss_viparyaya']
-        b_viparyaya_loss = 0.3 * (1.0 - b_viparyaya)
+        b_viparyaya_loss = 0.2 * (b_viparyaya ** 2)
         loss = loss + b_viparyaya_loss
         diagnostics['bliss_viparyaya_corr'] = b_viparyaya.item()
 
-        # === 4. MENTAL-VIKALPA: SOFT alignment ===
+        # === 4. MENTAL-VIKALPA: CREATIVE FRICTION ===
         # Target: >0.0 | Allow debate, just prevent hostile opposition
         # Weight: LOW (0.1) - Only penalize if < 0.0
+        # The Mind should have some friction with Imagination (healthy debate)
         m_vikalpa = correlations['mental_vikalpa']
         m_vikalpa_loss = 0.1 * F.relu(-m_vikalpa)  # Only penalize negative
         loss = loss + m_vikalpa_loss
         diagnostics['mental_vikalpa_corr'] = m_vikalpa.item()
 
-        # === 5. VITAL-NIDRA: INVERSE alignment ===
-        # Target: -1.0 | High vital = low sleep, and vice versa
-        # Weight: LOW (0.1) - Less critical
+        # === 5. VITAL-NIDRA: VITAL DRIVE ===
+        # Target: -1.0 | Maximum energy, minimum sleep/inertia
+        # Weight: MEDIUM (0.2)
+        # High Vital should correlate with LOW Nidra (inverse relationship)
         v_nidra = correlations['vital_nidra']
-        v_nidra_loss = 0.1 * (1.0 + v_nidra)  # Push toward -1.0
+        v_nidra_loss = 0.2 * (1.0 + v_nidra)  # Push toward -1.0
         loss = loss + v_nidra_loss
         diagnostics['vital_nidra_corr'] = v_nidra.item()
 
