@@ -10256,6 +10256,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_kosha_curriculum_state = None
     resumed_onto_curriculum_state = None
     resumed_pidv2_curriculum_state = None
+    resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
 
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
@@ -10707,6 +10708,7 @@ def train(config: UnifiedTrainingConfig):
             resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
             resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
             resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
+            resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -11069,6 +11071,7 @@ def train(config: UnifiedTrainingConfig):
     kosha_graduation_monitor = None
     kosha_rip_logger = None
     kosha_curriculum = None  # V9.8.6: Three-Phase Curriculum
+    kosha_curriculum_controller = None  # V9.8.6: InvertedCurriculumController
     kosha_graduated = False  # Track graduation state
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
 
@@ -11160,6 +11163,10 @@ def train(config: UnifiedTrainingConfig):
             target_ppl=config.gyroscope_target_ppl,
         )
         kosha_curriculum_controller = InvertedCurriculumController(config=gyro_config)
+        # V9.8.6: Restore Kosha Gyroscope curriculum controller state from checkpoint
+        if resumed_kosha_gyroscope_state is not None:
+            kosha_curriculum_controller.load_state(resumed_kosha_gyroscope_state)
+            print(f"  ✓ Kosha Gyroscope Restored: graduated={kosha_curriculum_controller.graduated}, disengage_step={kosha_curriculum_controller.disengage_step}")
 
         # V9.8.6: Three-Phase Kosha Curriculum (unified with CSR/PID pattern)
         kosha_curriculum = ThreePhaseCurriculum(
@@ -13607,6 +13614,7 @@ def train(config: UnifiedTrainingConfig):
                         kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
                         onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
                         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -13649,6 +13657,7 @@ def train(config: UnifiedTrainingConfig):
                     kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
                     onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
                     pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                    kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -13670,6 +13679,7 @@ def train(config: UnifiedTrainingConfig):
         kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
         onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -13776,6 +13786,8 @@ def save_checkpoint(
     kosha_curriculum_state: Optional[dict] = None,
     onto_curriculum_state: Optional[dict] = None,
     pidv2_curriculum_state: Optional[dict] = None,
+    # V9.8.6: Kosha Gyroscope state (InvertedCurriculumController)
+    kosha_gyroscope_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
 ):
@@ -13830,6 +13842,9 @@ def save_checkpoint(
         checkpoint["onto_curriculum_state"] = onto_curriculum_state
     if pidv2_curriculum_state is not None:
         checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
+    # V9.8.6: Add Kosha Gyroscope state (InvertedCurriculumController)
+    if kosha_gyroscope_state is not None:
+        checkpoint["kosha_gyroscope_state"] = kosha_gyroscope_state
 
     # V9.8.6: Add dataloader position for reproducibility
     if dataloader_position is not None:
@@ -13989,6 +14004,10 @@ def load_checkpoint(
     if "pidv2_curriculum_state" in checkpoint:
         result["pidv2_curriculum_state"] = checkpoint["pidv2_curriculum_state"]
         print(f"    ✓ PIDv2 Curriculum state available for restoration")
+    # V9.8.6: Return Kosha Gyroscope state (InvertedCurriculumController)
+    if "kosha_gyroscope_state" in checkpoint:
+        result["kosha_gyroscope_state"] = checkpoint["kosha_gyroscope_state"]
+        print(f"    ✓ Kosha Gyroscope state available for restoration")
 
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
