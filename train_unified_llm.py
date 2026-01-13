@@ -7508,16 +7508,17 @@ def generate_sample(
 
 def compute_sample_metrics(text: str) -> Dict[str, float]:
     """
-    Compute quality metrics for generated text (ChatGPT recommendation).
+    Compute quality metrics for generated text.
 
     Returns:
         - completion_rate: 1.0 if ends with punctuation, 0.0 otherwise
         - repetition_score: n-gram repetition rate (lower is better)
         - unique_ratio: ratio of unique tokens to total tokens
+        - coherence_score: basic semantic coherence (0.0-1.0, higher is better)
     """
     words = text.split()
     if len(words) < 2:
-        return {"completion": 0.0, "repetition": 1.0, "unique_ratio": 0.0}
+        return {"completion": 0.0, "repetition": 1.0, "unique_ratio": 0.0, "coherence": 0.0}
 
     # Completion rate: ends with sentence-ending punctuation
     completion = 1.0 if text.rstrip()[-1:] in '.!?' else 0.0
@@ -7533,10 +7534,42 @@ def compute_sample_metrics(text: str) -> Dict[str, float]:
     # Unique token ratio
     unique_ratio = len(set(words)) / len(words) if words else 0.0
 
+    # CRITICAL FIX: Semantic coherence check (basic heuristics)
+    # Checks for common signs of gibberish vs. meaningful text
+    coherence = 1.0
+
+    # Penalty 1: Too many short words (gibberish often has many 1-2 char tokens)
+    short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
+    if short_word_ratio > 0.5:
+        coherence *= 0.5
+
+    # Penalty 2: Too many non-alphabetic tokens
+    alpha_ratio = sum(1 for w in words if w.isalpha()) / len(words)
+    if alpha_ratio < 0.6:
+        coherence *= 0.6
+
+    # Penalty 3: Excessive punctuation clustering (e.g., "... ,, ,,")
+    punct_cluster = text.count(',,') + text.count('..') * 0.5
+    if punct_cluster > 3:
+        coherence *= 0.4
+
+    # Penalty 4: Repeated single characters (e.g., "a a a a")
+    single_char_repeat = sum(1 for i in range(len(words)-2)
+                            if len(words[i]) == 1 and words[i] == words[i+1])
+    if single_char_repeat > 2:
+        coherence *= 0.3
+
+    # Bonus: Reasonable average word length (4-8 chars is typical English)
+    avg_word_len = sum(len(w) for w in words) / len(words)
+    if 4.0 <= avg_word_len <= 8.0:
+        coherence *= 1.1
+    coherence = min(coherence, 1.0)
+
     return {
         "completion": completion,
         "repetition": repetition,
         "unique_ratio": unique_ratio,
+        "coherence": coherence,
     }
 
 
@@ -7592,6 +7625,7 @@ def run_quality_samples(
     total_completion = 0.0
     total_repetition = 0.0
     total_unique = 0.0
+    total_coherence = 0.0
     sample_count = 0
 
     for prompt in config.sample_prompts:
@@ -7619,6 +7653,7 @@ def run_quality_samples(
             total_completion += metrics["completion"]
             total_repetition += metrics["repetition"]
             total_unique += metrics["unique_ratio"]
+            total_coherence += metrics["coherence"]
             sample_count += 1
 
             log(f"  Prompt: \"{prompt}\"")
@@ -7632,20 +7667,24 @@ def run_quality_samples(
         avg_completion = total_completion / sample_count
         avg_repetition = total_repetition / sample_count
         avg_unique = total_unique / sample_count
+        avg_coherence = total_coherence / sample_count
 
         log("  ────────────────────────────────────────────────────────")
         log(f"  📊 SAMPLE QUALITY METRICS (n={sample_count})")
         log(f"     Completion Rate: {avg_completion*100:.0f}% (ends with punctuation)")
         log(f"     Repetition Score: {avg_repetition*100:.1f}% (lower is better)")
         log(f"     Unique Token Ratio: {avg_unique*100:.1f}%")
+        log(f"     Coherence Score: {avg_coherence*100:.0f}% (semantic quality)")
 
-        # Quality indicator
-        if avg_repetition < 0.3 and avg_unique > 0.6:
-            log("     Quality: 🟢 GOOD")
-        elif avg_repetition < 0.5 and avg_unique > 0.4:
-            log("     Quality: 🟡 IMPROVING")
+        # CRITICAL FIX: Quality indicator now includes coherence
+        # Previous logic was misleading - high diversity alone doesn't mean good quality
+        if avg_coherence > 0.7 and avg_repetition < 0.3 and avg_unique > 0.6:
+            log("     Quality: 🟢 GOOD (coherent + diverse)")
+        elif avg_coherence > 0.5 and avg_repetition < 0.5:
+            log("     Quality: 🟡 IMPROVING (needs better coherence)")
         else:
-            log("     Quality: 🔴 NEEDS WORK (expect improvement by step 2k-6k)")
+            log("     Quality: 🔴 NEEDS WORK (likely gibberish despite diversity)")
+            log("     ⚠️  WARNING: High diversity without coherence = meaningless tokens")
 
     log("=" * 60)
     log("")
@@ -7810,12 +7849,15 @@ class UnifiedTrainingConfig:
     gyroscope_vital_momentum: bool = True    # Enable dynamic gain via Vital
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
     kosha_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
-    # V9.8.6: Three-Phase Kosha Curriculum (Inverted - active at HIGH PPL)
-    # Phase A (PPL > engage): Full Kosha guidance - "instructor mode"
-    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
-    # Phase C (PPL < disengage): Kosha off - "student fluent"
-    kosha_engage_ppl: float = 100.0      # Kosha fully ON above this PPL (construction)
-    kosha_disengage_ppl: float = 30.0    # Kosha OFF below this PPL (polishing)
+    # V9.9.0 CRITICAL FIX: Corrected Kosha Engagement Logic
+    # PREVIOUS (WRONG): Engaged at high PPL (struggling) → Added constraints when model needed fundamentals
+    # CORRECTED: Engage at low PPL (ready) → Add sophistication only after basics are learned
+    #
+    # Phase A (PPL > disengage): Kosha OFF - "learning fundamentals, no constraints"
+    # Phase B (engage < PPL < disengage): Linear rampup - "transition"
+    # Phase C (PPL < engage): Kosha fully ON - "ready for homeostatic regulation"
+    kosha_engage_ppl: float = 30.0       # Kosha fully ON below this PPL (model ready)
+    kosha_disengage_ppl: float = 100.0   # Kosha OFF above this PPL (model struggling)
     # Graduation criteria (legacy - kept for stability check)
     gyroscope_graduation_ppl: float = 30.0   # PPL threshold for graduation (mean)
     gyroscope_graduation_variance: float = 1.5  # Max PPL variance for stability
@@ -7839,12 +7881,15 @@ class UnifiedTrainingConfig:
     onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
     onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
     onto_bridge_layer: int = 4               # V9.7.0: Layer 4 = foundational ontological grounding
-    # V9.8.6: Three-Phase Onto Bridge Curriculum (Inverted - active at HIGH PPL)
-    # Phase A (PPL > engage): Full ontological grounding - "foundation building"
-    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
-    # Phase C (PPL < disengage): Onto bridge off - "model fluent"
-    onto_engage_ppl: float = 150.0           # Onto fully ON above this PPL (construction)
-    onto_disengage_ppl: float = 50.0         # Onto OFF below this PPL (polishing)
+    # V9.9.0 CRITICAL FIX: Corrected Ontological Bridge Engagement Logic
+    # PREVIOUS (WRONG): Engaged at PPL>150 → Added 12D ontological constraints too early
+    # CORRECTED: Engage at PPL<50 → Add ontological structure only after language modeling works
+    #
+    # Phase A (PPL > disengage): Onto OFF - "pure language modeling"
+    # Phase B (engage < PPL < disengage): Linear rampup - "gradual introduction"
+    # Phase C (PPL < engage): Onto fully ON - "ontological grounding ready"
+    onto_engage_ppl: float = 50.0            # Onto fully ON below this PPL (model ready)
+    onto_disengage_ppl: float = 150.0        # Onto OFF above this PPL (model needs fundamentals)
     onto_rampdown_steps: int = 500           # Steps to ramp to 0 after disengage
 
     # Dataset
@@ -7926,12 +7971,15 @@ class UnifiedTrainingConfig:
     pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
     pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
-    # V9.8.7: Three-phase PID engagement based on Val PPL
-    # Phase 1 (Construction): PPL > engage_ppl → PID ON (aggressive correction)
-    # Phase 2 (Transition):   disengage_ppl < PPL < engage_ppl → PID continues
-    # Phase 3 (Polishing):    PPL < disengage_ppl → PID OFF (let model converge naturally)
-    controller_engage_ppl: float = 100.0      # PID turns ON when Val PPL > this
-    controller_disengage_ppl: float = 30.0    # PID turns OFF when Val PPL < this
+    # V9.9.0 CRITICAL FIX: Corrected PID engagement (inverted thresholds)
+    # PREVIOUS (WRONG): PID ON when PPL > 100 (struggling) → Added control when model needed basics
+    # CORRECTED: PID ON when PPL < 30 (ready) → Add dynamic control only when fundamentals work
+    #
+    # Phase 1 (Learning):    PPL > disengage_ppl → PID OFF (no dynamic control yet)
+    # Phase 2 (Transition):  engage_ppl < PPL < disengage_ppl → PID ramps up
+    # Phase 3 (Regulation):  PPL < engage_ppl → PID ON (dynamic sensory/authority balance)
+    controller_engage_ppl: float = 30.0       # PID turns ON when Val PPL < this (ready)
+    controller_disengage_ppl: float = 100.0   # PID turns OFF when Val PPL > this (struggling)
     controller_engagement_enabled: bool = True # Enable dynamic PID engagement
 
     # Phase ramp settings (for handshake dampening)
@@ -8052,12 +8100,15 @@ class UnifiedTrainingConfig:
     csr_sparse_supervision: bool = False     # Enable word-boundary-only supervision
     csr_content_word_only: bool = False      # Also filter out stopwords (requires sparse_supervision)
 
-    # V9.8.6: CSR Three-Phase Curriculum (like PID)
-    # Phase A (PPL > engage): Full CSR grounding - "construction"
-    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
-    # Phase C (PPL < disengage): CSR off - "polishing"
-    csr_engage_ppl: float = 120.0            # CSR fully ON above this PPL
-    csr_disengage_ppl: float = 40.0          # CSR OFF below this PPL
+    # V9.9.0 CRITICAL FIX: Corrected CSR Engagement Logic
+    # PREVIOUS (WRONG): Engaged at PPL>120 → Added phoneme constraints before basic tokens learned
+    # CORRECTED: Engage at PPL<40 → Add CSR grounding only after coherent generation works
+    #
+    # Phase A (PPL > disengage): CSR OFF - "learning basic tokenization"
+    # Phase B (engage < PPL < disengage): Linear rampup - "introducing phoneme awareness"
+    # Phase C (PPL < engage): CSR fully ON - "phoneme-semantic alignment ready"
+    csr_engage_ppl: float = 40.0             # CSR fully ON below this PPL (model ready)
+    csr_disengage_ppl: float = 120.0         # CSR OFF above this PPL (model struggling)
     csr_rampdown_steps: int = 500            # Steps to ramp down after disengage trigger
 
     # V9.6.0: Embedding configuration
@@ -14672,11 +14723,13 @@ def main():
                        help="PPL velocity %% to trigger batch reduction")
     parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
                        help="Consecutive stable evals before batch increase")
-    # V9.8.7: Three-phase PID engagement
-    parser.add_argument("--controller_engage_ppl", type=float, default=100.0,
-                       help="PID turns ON when Val PPL > this (construction phase)")
-    parser.add_argument("--controller_disengage_ppl", type=float, default=30.0,
-                       help="PID turns OFF when Val PPL < this (polishing phase)")
+    # V9.9.0 CRITICAL FIX: Corrected PID engagement (inverted thresholds)
+    # PREVIOUS (WRONG): Engaged when PPL > 100 (model struggling)
+    # CORRECTED: Engage when PPL < 30 (model ready for dynamic control)
+    parser.add_argument("--controller_engage_ppl", type=float, default=30.0,
+                       help="PID turns ON when Val PPL < this (model ready for regulation)")
+    parser.add_argument("--controller_disengage_ppl", type=float, default=100.0,
+                       help="PID turns OFF when Val PPL > this (model needs fundamentals)")
     parser.add_argument("--no_controller_engagement", action="store_true",
                        help="Disable dynamic PID engagement (PID always on if enabled)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
