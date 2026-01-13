@@ -65,20 +65,59 @@ python train_unified_llm.py \
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--model_type` | str | ontological | Model architecture: `baseline`, `ontological`, `local`, `phase`, `local_phase`, `hybrid` |
+| `--model_type` | str | ontological | Model architecture: `baseline`, `ontological`, `local`, `phase`, `local_phase`, `hybrid`, `ontological_hybrid` |
 | `--model_size` | str | small | Model size: `tiny`, `small`, `medium`, `large` |
 | `--max_seq_len` | int | 2048 | Maximum sequence length |
+
+### Architecture Overrides (Optional)
+
+Override `model_size` preset with custom architecture. All parameters are optional - if not specified, uses preset values.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--n_layer` | int | None | Number of transformer layers (overrides preset). Example: `24` for larger model |
+| `--n_head` | int | None | Number of attention heads (overrides preset). Must be divisible by `n_kv_heads` if using GQA. Example: `16` |
+| `--n_embd` | int | None | Embedding dimension (overrides preset). FFN dimension auto-set to `n_embd * 4`. Example: `1024` |
+| `--n_kv_heads` | int | None | Number of Key-Value heads for Grouped Query Attention (GQA). Reduces KV cache memory. `None` = standard MHA (uses `n_head`), `8` = Mistral-style GQA (4x memory savings with 32 Q heads), `4` = Moderate GQA, `1` = Multi-Query Attention (MQA). Only supported in `ontological_hybrid` model type |
+| `--dropout` | float | 0.1 | Dropout rate applied to embeddings, attention, and FFN layers. Range: 0.0-0.3. Higher = more regularization |
+| `--attention_dropout` | float | 0.1 | Attention-specific dropout applied after softmax. Range: 0.0-0.3. Lower = sharper attention, higher = smoother |
+
+**Model Size Presets:**
+- `tiny`: 256 dim, 6 layers, 4 heads, 1024 FFN (~15M params)
+- `small`: 512 dim, 8 layers, 8 heads, 2048 FFN (~50M params)
+- `medium`: 768 dim, 12 layers, 12 heads, 3072 FFN (~120M params)
+- `large`: 1024 dim, 16 layers, 16 heads, 4096 FFN (~220M params)
+
+**Example: Custom architecture overriding `small` preset**
+```bash
+--model_size small --n_layer 24 --n_head 16 --n_embd 1024 --n_kv_heads 4
+# Creates: 1024 dim, 24 layers, 16 Q heads, 4 KV heads (GQA), 4096 FFN
+```
 
 ### Training Core
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--batch_size` | int | 8 | Training batch size |
-| `--gradient_accumulation` | int | 1 | Gradient accumulation steps |
-| `--max_steps` | int | 10000 | Maximum training steps |
-| `--learning_rate` | float | 3e-4 | Base learning rate |
-| `--use_per_layer_clipping` | flag | False | Enable per-layer gradient clipping |
+| `--batch_size` | int | 8 | Training batch size per GPU. Effective batch = `batch_size × gradient_accumulation` |
+| `--gradient_accumulation` | int | 1 | Gradient accumulation steps. Use higher values to simulate larger batches without OOM |
+| `--max_steps` | int | 10000 | Maximum training steps before termination |
+| `--learning_rate` | float | 3e-4 | Peak learning rate. Reached after warmup, then decays with cosine schedule |
+| `--warmup_steps` | int | 500 | Learning rate warmup steps. LR increases linearly from 0 → `learning_rate`. Prevents early training instability |
+| `--weight_decay` | float | 0.1 | L2 regularization weight (AdamW). Range: 0.0-0.3. Prevents overfitting. 0.1 = standard, 0.01 = light, 0.3 = heavy |
+| `--max_grad_norm` | float | 1.0 | Maximum gradient norm for clipping. Prevents gradient explosions. 1.0 = conservative, 5.0 = aggressive |
+| `--use_per_layer_clipping` | flag | False | Enable per-layer gradient clipping (clips Authority/Sensory separately for 9:3 split) |
 | `--seed` | int | 42 | Random seed for reproducibility |
+
+**Optimizer Configuration (AdamW):**
+- Beta1: `0.9` (momentum)
+- Beta2: `0.95` (variance tracking)
+- Epsilon: `1e-8`
+- LR Schedule: Linear warmup → Cosine decay
+
+**Typical Settings:**
+- Small model (50M): `--warmup_steps 500 --weight_decay 0.1 --max_grad_norm 1.0`
+- Medium model (120M): `--warmup_steps 1000 --weight_decay 0.1 --max_grad_norm 1.0`
+- Large model (220M+): `--warmup_steps 2000 --weight_decay 0.05 --max_grad_norm 1.0`
 
 ### Dataset
 
@@ -97,14 +136,25 @@ python train_unified_llm.py \
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--local_backend` | str | auto | Local attention backend: `auto`, `unfold`, `native` |
-| `--window_size` | int | 256 | Local attention window size |
-| `--local_layers` | int | 4 | Number of local attention layers |
-| `--alpha_local` | float | 0.8 | Local attention weight |
-| `--alpha_phase` | float | 0.2 | Phase attention weight |
-| `--alpha_phase_start` | float | 0.6 | Phase α at training start |
-| `--alpha_phase_end` | float | 0.4 | Phase α at training end |
-| `--alpha_decay_steps` | int | 10000 | Steps to decay α from start to end |
+| `--local_backend` | str | auto | Local attention backend: `auto` (FlashAttention if available, else SDPA), `flash` (FlashAttention-2), `sdpa` (PyTorch native), `unfold` (memory-efficient fallback) |
+| `--window_size` | int | 256 | Local attention window size for O(N×W) complexity. Each token attends to W neighbors. `256` = 25% coverage at seq=1024, `512` = 50% coverage, `1024` = full (not recommended). Larger window = more context but slower. Memory: O(N×W) vs O(N²) standard attention |
+| `--local_layers` | int | 4 | Number of early layers using local attention only (no phase). Faster learning of local patterns (syntax/grammar) |
+| `--alpha_local` | float | 0.8 | Weight for local attention in hybrid layers. Higher = more local focus, lower = more global context via phase |
+| `--alpha_phase` | float | 0.2 | Weight for phase attention in hybrid layers. Decays over training via alpha_decay_steps |
+| `--alpha_phase_start` | float | 0.6 | Phase α at training start (step 0). High initial value helps establish global coherence |
+| `--alpha_phase_end` | float | 0.4 | Phase α after decay completes. Lower final value focuses on local patterns |
+| `--alpha_decay_steps` | int | 10000 | Steps to decay α from start → end. Linear schedule |
+
+**Window Size Recommendations:**
+- `256`: Safe default, ~2GB VRAM, 25% seq coverage at 1024 tokens
+- `512`: Balanced, ~4GB VRAM, 50% seq coverage (recommended for PPL <120)
+- `768`: Aggressive, ~6GB VRAM, 75% seq coverage
+- `1024`: Full attention, ~8GB VRAM, loses O(N×W) efficiency
+
+**Complexity Analysis (seq_len=1024):**
+- Standard Attention: O(1024²) = 1M ops, ~16GB VRAM
+- Local W=256: O(1024×256) = 262K ops (~3.8x faster), ~4GB VRAM
+- Local W=512: O(1024×512) = 524K ops (~2x faster), ~8GB VRAM
 
 ### Loss Functions
 
@@ -288,7 +338,53 @@ python train_unified_llm.py \
     --max_steps 20000
 ```
 
-### 5. Stress Testing
+### 5. Ontological Hybrid with Custom Architecture & GQA
+
+**Two-Tier AGI** with architecture overrides, Grouped Query Attention, and enlarged window size:
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size small \
+    --n_layer 24 \
+    --n_head 16 \
+    --n_embd 1024 \
+    --n_kv_heads 4 \
+    --dropout 0.1 \
+    --attention_dropout 0.1 \
+    --max_seq_len 1024 \
+    --window_size 512 \
+    --batch_size 8 \
+    --gradient_accumulation 4 \
+    --learning_rate 3e-4 \
+    --warmup_steps 1000 \
+    --weight_decay 0.1 \
+    --max_grad_norm 1.0 \
+    --mixed_precision bf16 \
+    --enable_rss \
+    --pidv2_engage_ppl 100.0 \
+    --pidv2_disengage_ppl 30.0 \
+    --rss_evoflow_ppl 100.0 \
+    --rss_toroidal_ppl 85.0 \
+    --rss_csr_ppl 55.0 \
+    --rss_kosha_ppl 40.0 \
+    --controller pidv2 \
+    --dataset wikitext \
+    --eval_every 50 \
+    --save_every 1000 \
+    --gradient_checkpointing \
+    --tensorboard \
+    --max_steps 200000
+```
+
+**Key Features:**
+- **Custom Architecture**: 1024 dim, 24 layers, 16 heads (overrides `small` preset)
+- **GQA (4 KV heads)**: 4x KV cache reduction vs standard MHA
+- **Enlarged Window**: 512 tokens (50% coverage) for better semantic learning
+- **RSS Controller**: Auto-engages EvoFlow/Toroidal/CSR/Kosha at PPL thresholds
+- **PIDv2**: Regulates training stability, engages at PPL < 100
+
+### 6. Stress Testing
 
 ```bash
 python train_unified_llm.py \
@@ -366,6 +462,42 @@ The core metric for training stability:
 1. Increase `--guna_lock_steps` to 100
 2. Lower `--relaxation_thaw_alpha` to 0.02
 3. Increase `--relaxation_thaw_steps` to 1000
+
+### PPL Plateau at Semantic Barrier (PPL ~120)
+
+The PPL 120-125 range is the **semantic barrier** (syntax → semantics transition). If stuck:
+
+1. **Increase window size**: `--window_size 512` (from 256) gives 2x local context
+2. **Wait for controller engagement**: PIDv2 and RSS auto-engage at PPL < 100
+3. **Reduce sequence length**: `--max_seq_len 768` makes task easier
+4. **Check training/val PPL**: If train > val (backwards), model may need more capacity
+
+**Don't change if:**
+- PPL decreasing steadily (>1 PPL per 1K steps)
+- Within 20 PPL of controller engagement threshold
+
+### Gradient Explosion (NaN loss)
+
+1. **Lower learning rate**: Try `--learning_rate 1e-4` (from 3e-4)
+2. **Increase warmup**: `--warmup_steps 2000` (from 500-1000)
+3. **Lower max_grad_norm**: `--max_grad_norm 0.5` (from 1.0)
+4. **Check architecture**: Very deep models (>24 layers) need careful init
+
+### Model Too Large for VRAM
+
+If using architecture overrides and hitting OOM:
+
+1. **Enable GQA**: `--n_kv_heads 4` (4x KV cache reduction)
+2. **Reduce window**: `--window_size 256` (from 512)
+3. **Gradient checkpointing**: `--gradient_checkpointing`
+4. **Mixed precision**: `--mixed_precision bf16` (default, but verify)
+5. **Reduce dimensions**: Lower `--n_embd` or `--n_layer`
+
+**Memory Estimates (ontological_hybrid, seq=1024, batch=8):**
+- `n_embd=1024, n_layer=24, n_head=16, window=512`: ~75GB
+- With GQA (n_kv_heads=4): ~68GB (10% savings)
+- With gradient checkpointing: ~45GB (40% savings)
+- With both: ~38GB
 
 ## File Structure
 
