@@ -8596,6 +8596,11 @@ class UnifiedTrainingConfig:
     per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
     layer_transition_steps: int = 500  # Steps for soft layer transitions
 
+    # V9.9.1 Inverted Curriculum Controller
+    enable_inverted_curriculum: bool = False  # Enable full inverted curriculum
+    inverted_curriculum_stages: str = ""  # Custom stages: "3:9@256,5:7@512,6:6@768,9:3@2048"
+    inverted_curriculum_ppl_triggers: str = ""  # PPL triggers: "300,200,120,75,45,25"
+
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
@@ -10067,6 +10072,311 @@ class PerLayerPhaseController:
             num_layers=12,  # Fixed for Sovereign-1 architecture
             initial_weights=initial_weights,
             local_layers=config.local_layers if hasattr(config, 'local_layers') else 4,
+        )
+
+
+# =============================================================================
+# INVERTED CURRICULUM CONTROLLER (V9.9.1)
+# =============================================================================
+
+class InvertedCurriculumController:
+    """
+    V9.9.1: Orchestrates the full Inverted Curriculum Evolution.
+
+    Combines:
+    1. Per-layer phase weights (via PerLayerPhaseController)
+    2. Split evolution: 3:9 → 6:6 → 9:3 (Sensory-first → Authority-later)
+    3. Sequence length growth: 256 → 512 → 1024 → 2048
+    4. Soft layer transitions with phase ramp as shock absorber
+
+    The curriculum uses PPL thresholds to advance, ensuring compute stays bounded:
+    - Early: Heavy Sensory (expensive) + Short seq (cheap) = Manageable
+    - Late: Heavy Authority (cheap) + Long seq (expensive) = Manageable
+
+    Example curriculum:
+        Stage 0: 3:9 split @ 256 seq | PPL > 300
+        Stage 1: 4:8 split @ 256 seq | PPL < 300
+        Stage 2: 5:7 split @ 512 seq | PPL < 150
+        Stage 3: 6:6 split @ 768 seq | PPL < 75
+        Stage 4: 7:5 split @ 1024 seq | PPL < 40
+        Stage 5: 8:4 split @ 1536 seq | PPL < 25
+        Stage 6: 9:3 split @ 2048 seq | PPL < 18
+
+    Usage:
+        controller = InvertedCurriculumController.from_config(config)
+
+        # In training loop:
+        result = controller.update(step, current_ppl)
+        if result['split_changed']:
+            reconfigure_gradient_scaler(result['current_split'])
+        if result['seq_len_changed']:
+            reload_dataloader(result['current_seq_len'])
+        controller.apply_to_model(model)
+    """
+
+    def __init__(
+        self,
+        stages: List[Tuple[Tuple[int, int], int]],  # [(split, seq_len), ...]
+        ppl_triggers: List[float],  # PPL thresholds for each transition
+        local_layers: int = 4,
+        transition_steps: int = 500,  # Steps for soft layer transition
+    ):
+        """
+        Initialize the Inverted Curriculum Controller.
+
+        Args:
+            stages: List of (split, seq_len) tuples, e.g., [((3, 9), 256), ((6, 6), 768), ...]
+            ppl_triggers: PPL thresholds for advancing to next stage
+            local_layers: Number of local attention layers (no phase component)
+            transition_steps: Steps for soft layer transitions
+        """
+        self.stages = stages
+        self.ppl_triggers = ppl_triggers
+        self.local_layers = local_layers
+        self.transition_steps = transition_steps
+
+        # Current state
+        self.current_stage_idx = 0
+        self.current_split = stages[0][0]
+        self.current_seq_len = stages[0][1]
+
+        # Per-layer phase controller
+        # Initialize with weights based on initial split
+        initial_weights = self._split_to_weights(self.current_split)
+        self.phase_controller = PerLayerPhaseController(
+            num_layers=12,
+            initial_weights=initial_weights,
+            local_layers=local_layers,
+        )
+
+        # PPL tracking for smooth triggers
+        self.ppl_history: List[float] = []
+        self.ppl_window = 10  # Steps to average PPL
+
+        # Transition tracking
+        self.stage_history: List[Dict] = []
+        self.last_stage_change_step = 0
+
+        # Print curriculum
+        self._print_curriculum()
+
+    def _print_curriculum(self):
+        """Print the full curriculum schedule."""
+        print(f"\n  🎓 [INVERTED CURRICULUM] Schedule:")
+        print(f"      {'Stage':<8} {'Split':<8} {'Seq Len':<10} {'PPL Trigger':<12}")
+        print(f"      {'-'*40}")
+        for i, ((auth, sens), seq_len) in enumerate(self.stages):
+            trigger = f"< {self.ppl_triggers[i]:.0f}" if i < len(self.ppl_triggers) else "START"
+            marker = " ◀" if i == self.current_stage_idx else ""
+            print(f"      {i:<8} {auth}:{sens:<5} {seq_len:<10} {trigger:<12}{marker}")
+
+    def _split_to_weights(self, split: Tuple[int, int]) -> List[float]:
+        """
+        Convert a split (authority, sensory) to per-layer weights.
+
+        For 12 layers with local_layers=4:
+        - Layers 0-3: Local only (weight doesn't matter, but set to 0)
+        - Layers 4-11: Hybrid, weight = 1.0 for Authority, 0.0 for Sensory
+
+        Example: split (6, 6) means layers 0-5 are Authority, layers 6-11 are Sensory
+        So weights for layers 4-11 would be [1, 1, 0, 0, 0, 0, 0, 0]
+        (layers 4-5 = Authority = 1.0, layers 6-11 = Sensory = 0.0)
+        """
+        authority_layers, sensory_layers = split
+        weights = [0.0] * 12
+
+        # Layers 0 to (authority_layers - 1) are Authority (phase weight = 1.0)
+        # But only layers >= local_layers have hybrid attention
+        for i in range(12):
+            if i < authority_layers:
+                weights[i] = 1.0  # Authority layer
+            else:
+                weights[i] = 0.0  # Sensory layer
+
+        return weights
+
+    def update(
+        self,
+        step: int,
+        current_ppl: Optional[float] = None,
+    ) -> Dict[str, any]:
+        """
+        Update the curriculum based on current step and PPL.
+
+        Args:
+            step: Current training step
+            current_ppl: Current validation PPL (optional)
+
+        Returns:
+            Dict with:
+                - 'current_stage': Current stage index
+                - 'current_split': Current (authority, sensory) split
+                - 'current_seq_len': Current sequence length
+                - 'split_changed': Whether split changed this step
+                - 'seq_len_changed': Whether seq_len changed this step
+                - 'transitioning_layers': Number of layers currently transitioning
+        """
+        split_changed = False
+        seq_len_changed = False
+        old_split = self.current_split
+        old_seq_len = self.current_seq_len
+
+        # Update PPL history
+        if current_ppl is not None:
+            self.ppl_history.append(current_ppl)
+            if len(self.ppl_history) > self.ppl_window:
+                self.ppl_history.pop(0)
+
+        # Check for stage advancement
+        if self.current_stage_idx < len(self.stages) - 1 and current_ppl is not None:
+            # Get smoothed PPL
+            smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else current_ppl
+
+            # Check if PPL is below threshold for next stage
+            next_trigger = self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else float('inf')
+
+            if smoothed_ppl < next_trigger:
+                # Advance to next stage
+                self.current_stage_idx += 1
+                new_split, new_seq_len = self.stages[self.current_stage_idx]
+
+                # Check what changed
+                if new_split != old_split:
+                    split_changed = True
+                    # Start soft transition for the changing layer
+                    self._transition_to_split(new_split, step)
+
+                if new_seq_len != old_seq_len:
+                    seq_len_changed = True
+                    self.current_seq_len = new_seq_len
+
+                # Record history
+                self.stage_history.append({
+                    'stage': self.current_stage_idx,
+                    'step': step,
+                    'ppl': smoothed_ppl,
+                    'split': new_split,
+                    'seq_len': new_seq_len,
+                })
+                self.last_stage_change_step = step
+
+                print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!")
+                print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
+                print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
+                print(f"      Seq Len: {old_seq_len} → {new_seq_len}")
+
+        # Update per-layer phase controller (for soft transitions)
+        phase_result = self.phase_controller.update(step)
+
+        return {
+            'current_stage': self.current_stage_idx,
+            'current_split': self.current_split,
+            'current_seq_len': self.current_seq_len,
+            'split_changed': split_changed,
+            'seq_len_changed': seq_len_changed,
+            'transitioning_layers': phase_result['active_transitions'],
+            'layer_weights': phase_result['weights'],
+        }
+
+    def _transition_to_split(self, new_split: Tuple[int, int], step: int):
+        """
+        Start soft transition to a new split.
+
+        Identifies which layer(s) are changing and starts their transition.
+        """
+        old_auth, old_sens = self.current_split
+        new_auth, new_sens = new_split
+
+        # Determine which layers are transitioning
+        if new_auth > old_auth:
+            # Moving from Sensory to Authority (3:9 → 4:8 → 5:7 → ...)
+            # Layers old_auth to new_auth-1 need to transition from 0 to 1
+            for layer_idx in range(old_auth, new_auth):
+                if layer_idx >= self.local_layers:
+                    self.phase_controller.start_transition(
+                        layer_idx=layer_idx,
+                        target_weight=1.0,  # Becoming Authority
+                        duration_steps=self.transition_steps,
+                        current_step=step,
+                    )
+        else:
+            # Moving from Authority to Sensory (9:3 → 8:4 → 7:5 → ...)
+            # Layers new_auth to old_auth-1 need to transition from 1 to 0
+            for layer_idx in range(new_auth, old_auth):
+                if layer_idx >= self.local_layers:
+                    self.phase_controller.start_transition(
+                        layer_idx=layer_idx,
+                        target_weight=0.0,  # Becoming Sensory
+                        duration_steps=self.transition_steps,
+                        current_step=step,
+                    )
+
+        self.current_split = new_split
+
+    def apply_to_model(self, model: nn.Module):
+        """Apply current per-layer weights to the model."""
+        self.phase_controller.apply_to_model(model)
+
+    def get_status(self) -> Dict[str, any]:
+        """Get current curriculum status for logging."""
+        return {
+            'stage': self.current_stage_idx,
+            'total_stages': len(self.stages),
+            'split': f"{self.current_split[0]}:{self.current_split[1]}",
+            'seq_len': self.current_seq_len,
+            'smoothed_ppl': sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else None,
+            'next_trigger': self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else None,
+            'transitioning_layers': len(self.phase_controller.transitions),
+            'layer_weights': self.phase_controller.weights[self.local_layers:],
+        }
+
+    @classmethod
+    def from_config(cls, config) -> 'InvertedCurriculumController':
+        """
+        Create controller from config.
+
+        Uses:
+        - custom_evolution_stages (or default inverted stages)
+        - evolution_ppl_triggers
+        - layer_transition_steps
+        - seq_length_schedule (new)
+        """
+        # Parse stages
+        if hasattr(config, 'inverted_curriculum_stages') and config.inverted_curriculum_stages:
+            # Parse from config string: "3:9@256,5:7@512,6:6@768,9:3@2048"
+            stages = []
+            for stage_str in config.inverted_curriculum_stages.split(','):
+                parts = stage_str.strip().split('@')
+                if len(parts) == 2:
+                    split_parts = parts[0].split(':')
+                    if len(split_parts) == 2:
+                        auth, sens = int(split_parts[0]), int(split_parts[1])
+                        seq_len = int(parts[1])
+                        stages.append(((auth, sens), seq_len))
+        else:
+            # Default inverted curriculum
+            stages = [
+                ((3, 9), 256),   # Start: Heavy Sensory, short seq
+                ((4, 8), 256),   # Still short seq
+                ((5, 7), 512),   # Grow seq
+                ((6, 6), 768),   # Balanced
+                ((7, 5), 1024),  # More Authority
+                ((8, 4), 1536),  # Near full Authority
+                ((9, 3), 2048),  # Full Authority, full seq
+            ]
+
+        # Parse PPL triggers
+        if hasattr(config, 'inverted_curriculum_ppl_triggers') and config.inverted_curriculum_ppl_triggers:
+            ppl_triggers = [float(t.strip()) for t in config.inverted_curriculum_ppl_triggers.split(',')]
+        else:
+            # Default triggers (inverted - high to low)
+            ppl_triggers = [300, 200, 120, 75, 45, 25]
+
+        return cls(
+            stages=stages,
+            ppl_triggers=ppl_triggers,
+            local_layers=getattr(config, 'local_layers', 4),
+            transition_steps=getattr(config, 'layer_transition_steps', 500),
         )
 
 
@@ -15794,6 +16104,14 @@ def main():
     parser.add_argument("--layer_transition_steps", type=int, default=500,
                        help="Steps for soft layer transitions during evolution")
 
+    # V9.9.1 Inverted Curriculum Controller
+    parser.add_argument("--enable_inverted_curriculum", action="store_true",
+                       help="Enable full inverted curriculum (3:9→9:3 with seq length growth)")
+    parser.add_argument("--inverted_curriculum_stages", type=str, default="",
+                       help="Custom curriculum stages: '3:9@256,5:7@512,6:6@768,9:3@2048' (split@seq_len)")
+    parser.add_argument("--inverted_curriculum_ppl_triggers", type=str, default="",
+                       help="PPL triggers for stage advancement: '300,200,120,75,45,25'")
+
     # V9.6.12: Cosine mode for phase attention
     parser.add_argument("--cosine_mode", type=str, default="standard",
                        choices=["standard", "shifted", "complex"],
@@ -16840,6 +17158,10 @@ def main():
         enable_per_layer_phase=args.enable_per_layer_phase,
         per_layer_phase_weights=args.per_layer_phase_weights,
         layer_transition_steps=args.layer_transition_steps,
+        # V9.9.1 Inverted Curriculum
+        enable_inverted_curriculum=args.enable_inverted_curriculum,
+        inverted_curriculum_stages=args.inverted_curriculum_stages,
+        inverted_curriculum_ppl_triggers=args.inverted_curriculum_ppl_triggers,
         # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
         enable_stress_probe=args.enable_stress_probe,
         stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,

@@ -532,17 +532,41 @@ controller.apply_to_model(model)          # Apply weights to model
 
 **Note**: Soft layer transition was integrated directly into `PerLayerPhaseController`.
 
-### Phase 3: Dynamic Sequence Length
-- [ ] Create `DynamicSequenceLengthScheduler` class
-- [ ] Implement PPL-based and step-based triggers
-- [ ] Handle batch size adjustment for memory
-- [ ] Add dataloader support for variable length
+### Phase 3: Dynamic Sequence Length ✅ INCLUDED IN PHASE 4
+- [x] Integrated into `InvertedCurriculumController`
+- [x] PPL-based triggers for seq_len growth
+- [x] Stage-based sequence lengths
 
-### Phase 4: Coupled Curriculum
-- [ ] Create `InvertedCurriculumController` class
-- [ ] Synchronize split evolution + layer transition + seq length
-- [ ] Add comprehensive logging
-- [ ] Add CLI flags for full curriculum config
+### Phase 4: Coupled Curriculum ✅ COMPLETED
+- [x] Create `InvertedCurriculumController` class (`train_unified_llm.py:10077-10375`)
+- [x] Synchronize split evolution + layer transition + seq length
+- [x] Comprehensive logging with curriculum table
+- [x] CLI flags: `--enable_inverted_curriculum`, `--inverted_curriculum_stages`, `--inverted_curriculum_ppl_triggers`
+
+**Key Implementation Details:**
+```python
+# InvertedCurriculumController usage:
+controller = InvertedCurriculumController.from_config(config)
+
+# In training loop:
+result = controller.update(step, current_ppl)
+if result['split_changed']:
+    reconfigure_gradient_scaler(result['current_split'])
+if result['seq_len_changed']:
+    reload_dataloader(result['current_seq_len'])
+controller.apply_to_model(model)
+```
+
+**Default Curriculum:**
+| Stage | Split | Seq Len | PPL Trigger |
+|-------|-------|---------|-------------|
+| 0 | 3:9 | 256 | START |
+| 1 | 4:8 | 256 | < 300 |
+| 2 | 5:7 | 512 | < 200 |
+| 3 | 6:6 | 768 | < 120 |
+| 4 | 7:5 | 1024 | < 75 |
+| 5 | 8:4 | 1536 | < 45 |
+| 6 | 9:3 | 2048 | < 25 |
 
 ### Phase 5: Testing & Validation
 - [ ] Unit tests for each component
@@ -627,6 +651,8 @@ class InvertedCurriculumController:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0 | 2026-01-13 | Initial design document |
+| 1.1.0 | 2026-01-13 | Phase 1-2: Implemented PerLayerPhaseController with soft transitions |
+| 1.2.0 | 2026-01-13 | Phase 3-4: Implemented InvertedCurriculumController with coupled seq_len |
 
 ---
 
