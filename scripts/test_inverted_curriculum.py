@@ -181,26 +181,71 @@ class PerLayerPhaseController:
         }
 
 
+class MockSequenceLengthCurriculum:
+    """Mock SequenceLengthCurriculum for testing delegation."""
+
+    def __init__(self, seq_len_start: int = 256, seq_len_end: int = 2048, ppl_gate: float = 100.0):
+        self.seq_len_start = seq_len_start
+        self.seq_len_end = seq_len_end
+        self.ppl_gate = ppl_gate
+        self.current_seq_len = seq_len_start
+        self.ramp_mode = "linear"
+        self._needs_reload = False
+        self._last_ppl = None
+
+    def get_seq_len(self, step: int, current_ppl: Optional[float] = None) -> int:
+        """Simple PPL-based seq_len progression for testing."""
+        if current_ppl is not None:
+            self._last_ppl = current_ppl
+            # Simple rule: decrease PPL -> increase seq_len
+            if current_ppl < 50:
+                new_seq_len = self.seq_len_end
+            elif current_ppl < 100:
+                new_seq_len = 1024
+            elif current_ppl < 200:
+                new_seq_len = 512
+            else:
+                new_seq_len = self.seq_len_start
+
+            if new_seq_len != self.current_seq_len:
+                self._needs_reload = True
+            self.current_seq_len = new_seq_len
+
+        return self.current_seq_len
+
+    def should_reload_data(self) -> bool:
+        return self._needs_reload
+
+    def mark_data_reloaded(self):
+        self._needs_reload = False
+
+    def get_transition_message(self, step, old_len, new_len):
+        return f"Seq len: {old_len} -> {new_len}"
+
+
 class InvertedLayerCurriculumController:
     """
-    V9.9.1: Orchestrates the full Inverted Layer Curriculum Evolution.
+    V9.9.2: Orchestrates split evolution with optional seq_len delegation.
     """
 
     def __init__(
         self,
-        stages: List[Tuple[Tuple[int, int], int]],
+        stages: List[Tuple[int, int]],  # [(3, 9), (4, 8), ...] - just splits
         ppl_triggers: List[float],
         local_layers: int = 4,
         transition_steps: int = 500,
+        seq_len_curriculum: Optional['MockSequenceLengthCurriculum'] = None,
+        default_seq_len: int = 1024,
     ):
         self.stages = stages
         self.ppl_triggers = ppl_triggers
         self.local_layers = local_layers
         self.transition_steps = transition_steps
+        self.seq_len_curriculum = seq_len_curriculum
+        self.default_seq_len = default_seq_len
 
         self.current_stage_idx = 0
-        self.current_split = stages[0][0]
-        self.current_seq_len = stages[0][1]
+        self.current_split = stages[0]
 
         initial_weights = self._split_to_weights(self.current_split)
         self.phase_controller = PerLayerPhaseController(
@@ -232,9 +277,7 @@ class InvertedLayerCurriculumController:
         current_ppl: Optional[float] = None,
     ) -> Dict[str, any]:
         split_changed = False
-        seq_len_changed = False
         old_split = self.current_split
-        old_seq_len = self.current_seq_len
 
         if current_ppl is not None:
             self.ppl_history.append(current_ppl)
@@ -247,31 +290,34 @@ class InvertedLayerCurriculumController:
 
             if smoothed_ppl < next_trigger:
                 self.current_stage_idx += 1
-                new_split, new_seq_len = self.stages[self.current_stage_idx]
+                new_split = self.stages[self.current_stage_idx]
 
                 if new_split != old_split:
                     split_changed = True
                     self._transition_to_split(new_split, step)
-
-                if new_seq_len != old_seq_len:
-                    seq_len_changed = True
-                    self.current_seq_len = new_seq_len
 
                 self.stage_history.append({
                     'stage': self.current_stage_idx,
                     'step': step,
                     'ppl': smoothed_ppl,
                     'split': new_split,
-                    'seq_len': new_seq_len,
                 })
                 self.last_stage_change_step = step
 
         phase_result = self.phase_controller.update(step)
 
+        # Get seq_len from delegate or use fixed
+        if self.seq_len_curriculum is not None:
+            current_seq_len = self.seq_len_curriculum.get_seq_len(step, current_ppl)
+            seq_len_changed = self.seq_len_curriculum.should_reload_data()
+        else:
+            current_seq_len = self.default_seq_len
+            seq_len_changed = False
+
         return {
             'current_stage': self.current_stage_idx,
             'current_split': self.current_split,
-            'current_seq_len': self.current_seq_len,
+            'current_seq_len': current_seq_len,
             'split_changed': split_changed,
             'seq_len_changed': seq_len_changed,
             'transitioning_layers': phase_result['active_transitions'],
@@ -307,16 +353,23 @@ class InvertedLayerCurriculumController:
         self.phase_controller.apply_to_model(model)
 
     def get_status(self) -> Dict[str, any]:
-        return {
+        status = {
             'stage': self.current_stage_idx,
             'total_stages': len(self.stages),
             'split': f"{self.current_split[0]}:{self.current_split[1]}",
-            'seq_len': self.current_seq_len,
             'smoothed_ppl': sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else None,
             'next_trigger': self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else None,
             'transitioning_layers': len(self.phase_controller.transitions),
             'layer_weights': self.phase_controller.weights[self.local_layers:],
         }
+        # Add seq_len info from delegate or fixed
+        if self.seq_len_curriculum is not None:
+            status['seq_len'] = self.seq_len_curriculum.current_seq_len
+            status['seq_len_mode'] = 'delegated'
+        else:
+            status['seq_len'] = self.default_seq_len
+            status['seq_len_mode'] = 'fixed'
+        return status
 
 
 # =============================================================================
@@ -487,29 +540,30 @@ def test_per_layer_phase_controller():
 
 
 def test_inverted_layer_curriculum_controller():
-    """Test InvertedLayerCurriculumController functionality."""
+    """Test InvertedLayerCurriculumController functionality (V9.9.2)."""
     print("\n" + "="*70)
-    print("TEST: InvertedLayerCurriculumController")
+    print("TEST: InvertedLayerCurriculumController (V9.9.2)")
     print("="*70)
 
     results = TestResult()
 
-    # Define test curriculum
+    # Define test curriculum - V9.9.2: just splits, no seq_len
     stages = [
-        ((3, 9), 256),   # Stage 0: Heavy Sensory, short seq
-        ((4, 8), 256),   # Stage 1
-        ((5, 7), 512),   # Stage 2: Grow seq
-        ((6, 6), 768),   # Stage 3: Balanced
+        (3, 9),   # Stage 0: Heavy Sensory
+        (4, 8),   # Stage 1
+        (5, 7),   # Stage 2
+        (6, 6),   # Stage 3: Balanced
     ]
     ppl_triggers = [300, 200, 100]  # PPL thresholds for stages 0->1, 1->2, 2->3
 
-    # Test 1: Initialization
-    print("\n1. Testing initialization...")
+    # Test 1: Initialization with fixed seq_len
+    print("\n1. Testing initialization (fixed seq_len)...")
     controller = InvertedLayerCurriculumController(
         stages=stages,
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=100,
+        default_seq_len=1024,  # Fixed seq_len
     )
     results.record(
         "Initial stage is 0",
@@ -521,10 +575,11 @@ def test_inverted_layer_curriculum_controller():
         controller.current_split == (3, 9),
         f"split={controller.current_split}"
     )
+    status = controller.get_status()
     results.record(
-        "Initial seq_len is 256",
-        controller.current_seq_len == 256,
-        f"seq_len={controller.current_seq_len}"
+        "Seq len mode is fixed",
+        status['seq_len_mode'] == 'fixed' and status['seq_len'] == 1024,
+        f"mode={status['seq_len_mode']}, seq_len={status['seq_len']}"
     )
 
     # Test 2: Split to weights conversion
@@ -552,6 +607,7 @@ def test_inverted_layer_curriculum_controller():
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=100,
+        default_seq_len=1024,
     )
 
     # Simulate PPL above threshold (no advancement)
@@ -563,7 +619,6 @@ def test_inverted_layer_curriculum_controller():
     )
 
     # Simulate PPL below threshold (advance to stage 1)
-    # Need multiple calls to fill the PPL history window for smoothing
     for i in range(10):
         controller.update(step=200 + i, current_ppl=250)
     result = controller.update(step=210, current_ppl=250)
@@ -578,20 +633,39 @@ def test_inverted_layer_curriculum_controller():
         f"split={controller.current_split}"
     )
 
-    # Test 4: Sequence length change
-    print("\n4. Testing sequence length change...")
-    # Continue to stage 2 (PPL < 200, seq_len changes to 512)
-    for i in range(15):  # Fill PPL window with low PPL
-        controller.update(step=300 + i, current_ppl=150)
-    results.record(
-        "Advance to stage 2 with PPL < 200",
-        controller.current_stage_idx == 2,
-        f"stage={controller.current_stage_idx}"
+    # Test 4: Seq_len delegation to MockSequenceLengthCurriculum
+    print("\n4. Testing seq_len delegation...")
+    seq_curriculum = MockSequenceLengthCurriculum(seq_len_start=256, seq_len_end=2048)
+    controller = InvertedLayerCurriculumController(
+        stages=stages,
+        ppl_triggers=ppl_triggers,
+        local_layers=4,
+        transition_steps=100,
+        seq_len_curriculum=seq_curriculum,  # Delegation
     )
+    status = controller.get_status()
     results.record(
-        "Seq len changed to 512",
-        controller.current_seq_len == 512,
-        f"seq_len={controller.current_seq_len}"
+        "Seq len mode is delegated",
+        status['seq_len_mode'] == 'delegated',
+        f"mode={status['seq_len_mode']}"
+    )
+
+    # Test seq_len changes via delegation
+    result = controller.update(step=0, current_ppl=300)
+    results.record(
+        "Initial delegated seq_len is 256",
+        result['current_seq_len'] == 256,
+        f"seq_len={result['current_seq_len']}"
+    )
+
+    # PPL drop should trigger seq_len change via delegate
+    for i in range(12):
+        controller.update(step=100 + i, current_ppl=150)
+    result = controller.update(step=112, current_ppl=150)
+    results.record(
+        "Delegated seq_len changed to 512 (PPL < 200)",
+        result['current_seq_len'] == 512,
+        f"seq_len={result['current_seq_len']}"
     )
 
     # Test 5: Soft layer transitions
@@ -601,6 +675,7 @@ def test_inverted_layer_curriculum_controller():
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=100,
+        default_seq_len=1024,
     )
 
     # Advance to stage 1 (3:9 -> 4:8)
@@ -615,10 +690,11 @@ def test_inverted_layer_curriculum_controller():
     print("\n6. Testing model application...")
     model = MockHybridModel(num_layers=12)
     controller = InvertedLayerCurriculumController(
-        stages=[((6, 6), 512)],
+        stages=[(6, 6)],  # V9.9.2: just split
         ppl_triggers=[],
         local_layers=4,
         transition_steps=100,
+        default_seq_len=512,
     )
     controller.apply_to_model(model)
 
@@ -644,6 +720,7 @@ def test_inverted_layer_curriculum_controller():
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=100,
+        default_seq_len=1024,
     )
     status = controller.get_status()
     results.record(
@@ -657,9 +734,9 @@ def test_inverted_layer_curriculum_controller():
         f"split={status['split']}"
     )
     results.record(
-        "Status seq_len correct",
-        status['seq_len'] == 256,
-        f"seq_len={status['seq_len']}"
+        "Status seq_len correct (fixed mode)",
+        status['seq_len'] == 1024 and status['seq_len_mode'] == 'fixed',
+        f"seq_len={status['seq_len']}, mode={status['seq_len_mode']}"
     )
 
     # Test 8: PPL smoothing
@@ -669,6 +746,7 @@ def test_inverted_layer_curriculum_controller():
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=100,
+        default_seq_len=1024,
     )
     # Add high PPL values
     for i in range(5):
@@ -689,6 +767,7 @@ def test_inverted_layer_curriculum_controller():
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=10,  # Fast transitions for testing
+        default_seq_len=1024,
     )
 
     step = 0
@@ -726,39 +805,46 @@ def test_inverted_layer_curriculum_controller():
         controller.current_split == (6, 6),
         f"split={controller.current_split}"
     )
+    # V9.9.2: seq_len is fixed, not stage-dependent
+    result = controller.update(step, current_ppl=80)
     results.record(
-        "Final seq_len is 768",
-        controller.current_seq_len == 768,
-        f"seq_len={controller.current_seq_len}"
+        "Seq_len stays fixed at 1024",
+        result['current_seq_len'] == 1024,
+        f"seq_len={result['current_seq_len']}"
     )
 
     return results
 
 
 def test_integration():
-    """Test integration of controllers with model."""
+    """Test integration of controllers with model (V9.9.2)."""
     print("\n" + "="*70)
-    print("TEST: Integration")
+    print("TEST: Integration (V9.9.2)")
     print("="*70)
 
     results = TestResult()
 
-    # Test 1: Full training loop simulation
-    print("\n1. Simulating full training loop...")
+    # Test 1: Full training loop simulation with delegation
+    print("\n1. Simulating full training loop with seq_len delegation...")
     model = MockHybridModel(num_layers=12)
 
+    # V9.9.2: stages are just splits
     stages = [
-        ((3, 9), 256),
-        ((6, 6), 512),
-        ((9, 3), 1024),
+        (3, 9),
+        (6, 6),
+        (9, 3),
     ]
     ppl_triggers = [200, 50]
+
+    # Create delegated seq_len curriculum
+    seq_curriculum = MockSequenceLengthCurriculum(seq_len_start=256, seq_len_end=2048)
 
     controller = InvertedLayerCurriculumController(
         stages=stages,
         ppl_triggers=ppl_triggers,
         local_layers=4,
         transition_steps=50,
+        seq_len_curriculum=seq_curriculum,  # Delegation
     )
 
     # Initial state
@@ -798,10 +884,11 @@ def test_integration():
         controller.current_split == (9, 3),
         f"split={controller.current_split}"
     )
+    # V9.9.2: seq_len comes from delegate
     results.record(
-        "Seq len grew to 1024",
-        controller.current_seq_len == 1024,
-        f"seq_len={controller.current_seq_len}"
+        "Seq len grew via delegation",
+        result['current_seq_len'] >= 512,  # Should have grown from PPL drops
+        f"seq_len={result['current_seq_len']}"
     )
 
     # Check final model state
@@ -814,6 +901,7 @@ def test_integration():
 
     print(f"\n   Split changes: {split_changes}")
     print(f"   Seq len changes: {seq_len_changes}")
+    print(f"   Final seq_len: {result['current_seq_len']} (via delegation)")
 
     return results
 

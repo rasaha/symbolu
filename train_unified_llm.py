@@ -10076,72 +10076,93 @@ class PerLayerPhaseController:
 
 
 # =============================================================================
-# INVERTED LAYER CURRICULUM CONTROLLER (V9.9.1)
+# INVERTED LAYER CURRICULUM CONTROLLER (V9.9.2)
 # =============================================================================
 
 class InvertedLayerCurriculumController:
     """
-    V9.9.1: Orchestrates the full Inverted Layer Curriculum Evolution.
+    V9.9.2: Orchestrates the Inverted Layer Curriculum Evolution.
 
-    Combines:
-    1. Per-layer phase weights (via PerLayerPhaseController)
-    2. Split evolution: 3:9 → 6:6 → 9:3 (Sensory-first → Authority-later)
-    3. Sequence length growth: 256 → 512 → 1024 → 2048
-    4. Soft layer transitions with phase ramp as shock absorber
+    Manages split evolution (3:9 → 9:3) with per-layer phase weights and soft
+    transitions. Optionally delegates sequence length management to an external
+    SequenceLengthCurriculum for sophisticated PPL-gated seq_len progression.
 
-    The curriculum uses PPL thresholds to advance, ensuring compute stays bounded:
-    - Early: Heavy Sensory (expensive) + Short seq (cheap) = Manageable
-    - Late: Heavy Authority (cheap) + Long seq (expensive) = Manageable
+    Responsibilities:
+    1. Split evolution: 3:9 → 6:6 → 9:3 (Sensory-first → Authority-later)
+    2. Per-layer phase weights (via PerLayerPhaseController)
+    3. Soft layer transitions with phase ramp as shock absorber
 
-    Example curriculum:
-        Stage 0: 3:9 split @ 256 seq | PPL > 300
-        Stage 1: 4:8 split @ 256 seq | PPL < 300
-        Stage 2: 5:7 split @ 512 seq | PPL < 150
-        Stage 3: 6:6 split @ 768 seq | PPL < 75
-        Stage 4: 7:5 split @ 1024 seq | PPL < 40
-        Stage 5: 8:4 split @ 1536 seq | PPL < 25
-        Stage 6: 9:3 split @ 2048 seq | PPL < 18
+    Delegation (optional):
+    - If seq_len_curriculum is provided, seq_len is delegated to it
+    - If not provided, uses fixed default_seq_len
 
-    Usage:
-        controller = InvertedCurriculumController.from_config(config)
+    Benefits of separation:
+    - SequenceLengthCurriculum handles: PPL gating, linear/exponential ramp, reload detection
+    - InvertedLayerCurriculumController handles: split evolution, layer weights, transitions
+    - Both react to PPL but control different aspects
+
+    Example curriculum (splits only):
+        Stage 0: 3:9 split | PPL > 300  (start)
+        Stage 1: 4:8 split | PPL < 300
+        Stage 2: 5:7 split | PPL < 200
+        Stage 3: 6:6 split | PPL < 120
+        Stage 4: 7:5 split | PPL < 75
+        Stage 5: 8:4 split | PPL < 45
+        Stage 6: 9:3 split | PPL < 25
+
+    Usage (with delegation):
+        seq_curriculum = SequenceLengthCurriculum(seq_len_start=256, seq_len_end=2048, ...)
+        split_curriculum = InvertedLayerCurriculumController.from_config(
+            config, seq_len_curriculum=seq_curriculum
+        )
 
         # In training loop:
-        result = controller.update(step, current_ppl)
+        result = split_curriculum.update(step, current_ppl)
         if result['split_changed']:
             reconfigure_gradient_scaler(result['current_split'])
-        if result['seq_len_changed']:
-            reload_dataloader(result['current_seq_len'])
-        controller.apply_to_model(model)
+        # seq_len changes handled by seq_curriculum.should_reload_data()
+        split_curriculum.apply_to_model(model)
+
+    Usage (standalone):
+        split_curriculum = InvertedLayerCurriculumController(
+            stages=[(3,9), (4,8), (5,7), (6,6), (7,5), (8,4), (9,3)],
+            ppl_triggers=[300, 200, 120, 75, 45, 25],
+            default_seq_len=1024,  # Fixed seq_len
+        )
     """
 
     def __init__(
         self,
-        stages: List[Tuple[Tuple[int, int], int]],  # [(split, seq_len), ...]
+        stages: List[Tuple[int, int]],  # [(3, 9), (4, 8), ...] - just splits
         ppl_triggers: List[float],  # PPL thresholds for each transition
         local_layers: int = 4,
         transition_steps: int = 500,  # Steps for soft layer transition
+        seq_len_curriculum: Optional['SequenceLengthCurriculum'] = None,  # Optional delegation
+        default_seq_len: int = 1024,  # Used when no seq_len_curriculum provided
     ):
         """
         Initialize the Inverted Curriculum Controller.
 
         Args:
-            stages: List of (split, seq_len) tuples, e.g., [((3, 9), 256), ((6, 6), 768), ...]
+            stages: List of (authority, sensory) split tuples, e.g., [(3, 9), (6, 6), (9, 3)]
             ppl_triggers: PPL thresholds for advancing to next stage
             local_layers: Number of local attention layers (no phase component)
             transition_steps: Steps for soft layer transitions
+            seq_len_curriculum: Optional SequenceLengthCurriculum for seq_len delegation
+            default_seq_len: Fixed seq_len when no curriculum provided
         """
         self.stages = stages
         self.ppl_triggers = ppl_triggers
         self.local_layers = local_layers
         self.transition_steps = transition_steps
+        self.seq_len_curriculum = seq_len_curriculum
+        self.default_seq_len = default_seq_len
 
         # Current state
         self.current_stage_idx = 0
-        self.current_split = stages[0][0]
-        self.current_seq_len = stages[0][1]
+        self.current_split = stages[0]
 
         # Per-layer phase controller
-        # Initialize with weights based on initial split
         initial_weights = self._split_to_weights(self.current_split)
         self.phase_controller = PerLayerPhaseController(
             num_layers=12,
@@ -10162,13 +10183,20 @@ class InvertedLayerCurriculumController:
 
     def _print_curriculum(self):
         """Print the full curriculum schedule."""
-        print(f"\n  🎓 [INVERTED CURRICULUM] Schedule:")
-        print(f"      {'Stage':<8} {'Split':<8} {'Seq Len':<10} {'PPL Trigger':<12}")
-        print(f"      {'-'*40}")
-        for i, ((auth, sens), seq_len) in enumerate(self.stages):
+        seq_mode = "DELEGATED" if self.seq_len_curriculum else f"FIXED@{self.default_seq_len}"
+        print(f"\n  🎓 [INVERTED CURRICULUM] Schedule (seq_len: {seq_mode}):")
+        print(f"      {'Stage':<8} {'Split':<8} {'PPL Trigger':<12}")
+        print(f"      {'-'*30}")
+        for i, (auth, sens) in enumerate(self.stages):
             trigger = f"< {self.ppl_triggers[i]:.0f}" if i < len(self.ppl_triggers) else "START"
             marker = " ◀" if i == self.current_stage_idx else ""
-            print(f"      {i:<8} {auth}:{sens:<5} {seq_len:<10} {trigger:<12}{marker}")
+            print(f"      {i:<8} {auth}:{sens:<5} {trigger:<12}{marker}")
+        if self.seq_len_curriculum:
+            print(f"\n      Seq Len: Delegated to SequenceLengthCurriculum")
+            print(f"      Range: {self.seq_len_curriculum.seq_len_start} → {self.seq_len_curriculum.seq_len_end}")
+            print(f"      Mode: {self.seq_len_curriculum.ramp_mode}")
+            if self.seq_len_curriculum.ppl_gate > 0:
+                print(f"      PPL Gate: < {self.seq_len_curriculum.ppl_gate}")
 
     def _split_to_weights(self, split: Tuple[int, int]) -> List[float]:
         """
@@ -10180,13 +10208,10 @@ class InvertedLayerCurriculumController:
 
         Example: split (6, 6) means layers 0-5 are Authority, layers 6-11 are Sensory
         So weights for layers 4-11 would be [1, 1, 0, 0, 0, 0, 0, 0]
-        (layers 4-5 = Authority = 1.0, layers 6-11 = Sensory = 0.0)
         """
         authority_layers, sensory_layers = split
         weights = [0.0] * 12
 
-        # Layers 0 to (authority_layers - 1) are Authority (phase weight = 1.0)
-        # But only layers >= local_layers have hybrid attention
         for i in range(12):
             if i < authority_layers:
                 weights[i] = 1.0  # Authority layer
@@ -10211,15 +10236,14 @@ class InvertedLayerCurriculumController:
             Dict with:
                 - 'current_stage': Current stage index
                 - 'current_split': Current (authority, sensory) split
-                - 'current_seq_len': Current sequence length
+                - 'current_seq_len': Current sequence length (from delegate or fixed)
                 - 'split_changed': Whether split changed this step
-                - 'seq_len_changed': Whether seq_len changed this step
+                - 'seq_len_changed': Whether seq_len changed (from delegate)
                 - 'transitioning_layers': Number of layers currently transitioning
+                - 'layer_weights': Current per-layer weights
         """
         split_changed = False
-        seq_len_changed = False
         old_split = self.current_split
-        old_seq_len = self.current_seq_len
 
         # Update PPL history
         if current_ppl is not None:
@@ -10227,28 +10251,19 @@ class InvertedLayerCurriculumController:
             if len(self.ppl_history) > self.ppl_window:
                 self.ppl_history.pop(0)
 
-        # Check for stage advancement
+        # Check for stage advancement (split evolution)
         if self.current_stage_idx < len(self.stages) - 1 and current_ppl is not None:
-            # Get smoothed PPL
             smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else current_ppl
-
-            # Check if PPL is below threshold for next stage
             next_trigger = self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else float('inf')
 
             if smoothed_ppl < next_trigger:
                 # Advance to next stage
                 self.current_stage_idx += 1
-                new_split, new_seq_len = self.stages[self.current_stage_idx]
+                new_split = self.stages[self.current_stage_idx]
 
-                # Check what changed
                 if new_split != old_split:
                     split_changed = True
-                    # Start soft transition for the changing layer
                     self._transition_to_split(new_split, step)
-
-                if new_seq_len != old_seq_len:
-                    seq_len_changed = True
-                    self.current_seq_len = new_seq_len
 
                 # Record history
                 self.stage_history.append({
@@ -10256,22 +10271,28 @@ class InvertedLayerCurriculumController:
                     'step': step,
                     'ppl': smoothed_ppl,
                     'split': new_split,
-                    'seq_len': new_seq_len,
                 })
                 self.last_stage_change_step = step
 
                 print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!")
                 print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
                 print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
-                print(f"      Seq Len: {old_seq_len} → {new_seq_len}")
 
         # Update per-layer phase controller (for soft transitions)
         phase_result = self.phase_controller.update(step)
 
+        # Get seq_len from delegate or use fixed
+        if self.seq_len_curriculum is not None:
+            current_seq_len = self.seq_len_curriculum.get_seq_len(step, current_ppl)
+            seq_len_changed = self.seq_len_curriculum.should_reload_data()
+        else:
+            current_seq_len = self.default_seq_len
+            seq_len_changed = False
+
         return {
             'current_stage': self.current_stage_idx,
             'current_split': self.current_split,
-            'current_seq_len': self.current_seq_len,
+            'current_seq_len': current_seq_len,
             'split_changed': split_changed,
             'seq_len_changed': seq_len_changed,
             'transitioning_layers': phase_result['active_transitions'],
@@ -10287,10 +10308,8 @@ class InvertedLayerCurriculumController:
         old_auth, old_sens = self.current_split
         new_auth, new_sens = new_split
 
-        # Determine which layers are transitioning
         if new_auth > old_auth:
             # Moving from Sensory to Authority (3:9 → 4:8 → 5:7 → ...)
-            # Layers old_auth to new_auth-1 need to transition from 0 to 1
             for layer_idx in range(old_auth, new_auth):
                 if layer_idx >= self.local_layers:
                     self.phase_controller.start_transition(
@@ -10301,7 +10320,6 @@ class InvertedLayerCurriculumController:
                     )
         else:
             # Moving from Authority to Sensory (9:3 → 8:4 → 7:5 → ...)
-            # Layers new_auth to old_auth-1 need to transition from 1 to 0
             for layer_idx in range(new_auth, old_auth):
                 if layer_idx >= self.local_layers:
                     self.phase_controller.start_transition(
@@ -10319,57 +10337,72 @@ class InvertedLayerCurriculumController:
 
     def get_status(self) -> Dict[str, any]:
         """Get current curriculum status for logging."""
-        return {
+        status = {
             'stage': self.current_stage_idx,
             'total_stages': len(self.stages),
             'split': f"{self.current_split[0]}:{self.current_split[1]}",
-            'seq_len': self.current_seq_len,
             'smoothed_ppl': sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else None,
             'next_trigger': self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else None,
             'transitioning_layers': len(self.phase_controller.transitions),
             'layer_weights': self.phase_controller.weights[self.local_layers:],
         }
+        # Add seq_len info from delegate or fixed
+        if self.seq_len_curriculum is not None:
+            status['seq_len'] = self.seq_len_curriculum.current_seq_len
+            status['seq_len_mode'] = 'delegated'
+        else:
+            status['seq_len'] = self.default_seq_len
+            status['seq_len_mode'] = 'fixed'
+        return status
 
     @classmethod
-    def from_config(cls, config) -> 'InvertedLayerCurriculumController':
+    def from_config(
+        cls,
+        config,
+        seq_len_curriculum: Optional['SequenceLengthCurriculum'] = None,
+    ) -> 'InvertedLayerCurriculumController':
         """
-        Create controller from config.
+        Create controller from config with optional seq_len delegation.
 
-        Uses:
-        - custom_evolution_stages (or default inverted stages)
-        - evolution_ppl_triggers
-        - layer_transition_steps
-        - seq_length_schedule (new)
+        Args:
+            config: UnifiedTrainingConfig with inverted curriculum settings
+            seq_len_curriculum: Optional SequenceLengthCurriculum for seq_len delegation
+
+        Config fields used:
+        - inverted_curriculum_stages: "3:9,4:8,5:7,6:6,7:5,8:4,9:3" (splits only)
+        - inverted_curriculum_ppl_triggers: "300,200,120,75,45,25"
+        - layer_transition_steps: Steps for soft transitions (default: 500)
+        - local_layers: Number of local attention layers (default: 4)
         """
-        # Parse stages
+        # Parse stages (splits only, no seq_len)
         if hasattr(config, 'inverted_curriculum_stages') and config.inverted_curriculum_stages:
-            # Parse from config string: "3:9@256,5:7@512,6:6@768,9:3@2048"
             stages = []
             for stage_str in config.inverted_curriculum_stages.split(','):
-                parts = stage_str.strip().split('@')
-                if len(parts) == 2:
-                    split_parts = parts[0].split(':')
-                    if len(split_parts) == 2:
-                        auth, sens = int(split_parts[0]), int(split_parts[1])
-                        seq_len = int(parts[1])
-                        stages.append(((auth, sens), seq_len))
+                stage_str = stage_str.strip()
+                # Support both "3:9" and "3:9@256" formats (ignore @seq_len for backwards compat)
+                if '@' in stage_str:
+                    stage_str = stage_str.split('@')[0]
+                split_parts = stage_str.split(':')
+                if len(split_parts) == 2:
+                    auth, sens = int(split_parts[0]), int(split_parts[1])
+                    stages.append((auth, sens))
         else:
-            # Default inverted curriculum
+            # Default inverted curriculum (splits only)
             stages = [
-                ((3, 9), 256),   # Start: Heavy Sensory, short seq
-                ((4, 8), 256),   # Still short seq
-                ((5, 7), 512),   # Grow seq
-                ((6, 6), 768),   # Balanced
-                ((7, 5), 1024),  # More Authority
-                ((8, 4), 1536),  # Near full Authority
-                ((9, 3), 2048),  # Full Authority, full seq
+                (3, 9),   # Start: Heavy Sensory
+                (4, 8),
+                (5, 7),
+                (6, 6),   # Balanced
+                (7, 5),
+                (8, 4),
+                (9, 3),   # End: Heavy Authority
             ]
 
         # Parse PPL triggers
         if hasattr(config, 'inverted_curriculum_ppl_triggers') and config.inverted_curriculum_ppl_triggers:
             ppl_triggers = [float(t.strip()) for t in config.inverted_curriculum_ppl_triggers.split(',')]
         else:
-            # Default triggers (inverted - high to low)
+            # Default triggers
             ppl_triggers = [300, 200, 120, 75, 45, 25]
 
         return cls(
@@ -10377,6 +10410,8 @@ class InvertedLayerCurriculumController:
             ppl_triggers=ppl_triggers,
             local_layers=getattr(config, 'local_layers', 4),
             transition_steps=getattr(config, 'layer_transition_steps', 500),
+            seq_len_curriculum=seq_len_curriculum,
+            default_seq_len=getattr(config, 'max_seq_len', 1024),
         )
 
 
@@ -12476,15 +12511,10 @@ def train(config: UnifiedTrainingConfig):
                 print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
                 print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
 
-    # V9.9.1 Inverted Layer Curriculum Controller
+    # V9.9.2 Inverted Layer Curriculum Controller
+    # Note: Full initialization happens after seq_len_curriculum is created (see below)
     inverted_layer_curriculum = None
-    if config.enable_inverted_curriculum:
-        inverted_layer_curriculum = InvertedLayerCurriculumController.from_config(config)
-        # Apply initial per-layer weights to model
-        inverted_layer_curriculum.apply_to_model(model)
-        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled")
-        print(f"      Initial split: {inverted_layer_curriculum.current_split[0]}:{inverted_layer_curriculum.current_split[1]}")
-        print(f"      Initial seq_len: {inverted_layer_curriculum.current_seq_len}")
+    _enable_inverted_curriculum = config.enable_inverted_curriculum  # Store for later init
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     adaptive_controller = None
@@ -13054,6 +13084,19 @@ def train(config: UnifiedTrainingConfig):
         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
         train_iter = iter(train_loader)
         seq_len_curriculum.mark_data_reloaded()
+
+    # V9.9.2: Initialize Inverted Layer Curriculum with seq_len delegation
+    if _enable_inverted_curriculum:
+        inverted_layer_curriculum = InvertedLayerCurriculumController.from_config(
+            config,
+            seq_len_curriculum=seq_len_curriculum,  # Delegate seq_len to SequenceLengthCurriculum
+        )
+        # Apply initial per-layer weights to model
+        inverted_layer_curriculum.apply_to_model(model)
+        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled (V9.9.2)")
+        print(f"      Initial split: {inverted_layer_curriculum.current_split[0]}:{inverted_layer_curriculum.current_split[1]}")
+        status = inverted_layer_curriculum.get_status()
+        print(f"      Seq len mode: {status['seq_len_mode']} ({status['seq_len']} tokens)")
 
     while global_step < config.max_steps:
         # Get batch
@@ -14901,13 +14944,31 @@ def train(config: UnifiedTrainingConfig):
                         gradient_scaler_hgs.sensory_layers = new_sens
                         print(f"  🔧 [HGS] Reconfigured for {new_auth}:{new_sens} split")
 
-                    # Handle seq_len change - flag for dataloader reload
-                    if ilc_result['seq_len_changed']:
-                        # The dataloader reload would happen at the end of evaluation
-                        # For now, just log it - full dataloader integration would require
-                        # changes to the data loading infrastructure
-                        print(f"  📏 [CURRICULUM] Sequence length changed to {ilc_result['current_seq_len']}")
-                        print(f"      Note: Dataloader reload required for new seq_len")
+                    # Handle seq_len change (when using delegated seq_len_curriculum)
+                    # V9.9.2: If seq_len is delegated, handle reload here instead of separate block
+                    if ilc_result['seq_len_changed'] and inverted_layer_curriculum.seq_len_curriculum is not None:
+                        old_seq_len = current_seq_len
+                        current_seq_len = ilc_result['current_seq_len']
+
+                        print(inverted_layer_curriculum.seq_len_curriculum.get_transition_message(
+                            global_step, old_seq_len, current_seq_len
+                        ))
+
+                        # Recalculate batch size for new sequence length
+                        old_batch = config.batch_size
+                        new_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+                        new_batch = max(1, min(new_batch, config.batch_size_max))
+                        config.batch_size = new_batch
+
+                        print(f"  📏 [INVERTED CURRICULUM] Reloading dataloader:")
+                        print(f"     seq_len: {old_seq_len} → {current_seq_len}")
+                        print(f"     batch:   {old_batch} → {new_batch}")
+
+                        # Reload data with new sequence length
+                        train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
+                        train_iter = iter(train_loader)
+                        inverted_layer_curriculum.seq_len_curriculum.mark_data_reloaded()
+                        print(f"  ✅ Dataloader reloaded.")
 
                     # Log curriculum status periodically
                     if global_step % (config.eval_every * 5) == 0:
@@ -15189,7 +15250,10 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
 
                 # V2.3.4: Sequence Length Curriculum Update
-                if seq_len_curriculum is not None:
+                # Skip if inverted_layer_curriculum is handling seq_len via delegation
+                _ilc_handles_seq = (inverted_layer_curriculum is not None and
+                                   inverted_layer_curriculum.seq_len_curriculum is not None)
+                if seq_len_curriculum is not None and not _ilc_handles_seq:
                     old_seq_len = current_seq_len
                     current_seq_len = seq_len_curriculum.get_seq_len(global_step, val_ppl)
 

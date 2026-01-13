@@ -585,50 +585,138 @@ controller.apply_to_model(model)
 
 ## 6. API Reference
 
-### Proposed CLI Flags
+### CLI Flags (V9.9.2)
 
 ```bash
-# Inverted curriculum master switch
+# =============================================================================
+# INVERTED LAYER CURRICULUM (Split Evolution)
+# =============================================================================
+
+# Master switch - enables inverted curriculum for split evolution (3:9 → 9:3)
 --enable_inverted_curriculum
 
-# Per-layer phase weights (initial)
---initial_layer_phase_weights "0,0,0,0,0,0,0,0,0,0,0,0"  # Start all Sensory
+# Split stages (authority:sensory format, no seq_len - that's handled separately)
+# Default: "3:9,4:8,5:7,6:6,7:5,8:4,9:3"
+--inverted_curriculum_stages "3:9,4:8,5:7,6:6,7:5,8:4,9:3"
 
-# Soft transition
---layer_transition_steps 500        # Steps per layer transition
---layer_transition_mode "linear"    # linear, cosine, sigmoid
+# PPL triggers for advancing to next split stage
+# Default: "300,200,120,75,45,25"
+--inverted_curriculum_ppl_triggers "300,200,120,75,45,25"
 
-# Dynamic sequence length
---enable_dynamic_seq_length
---seq_length_schedule "256@500,512@200,1024@100,2048@50"  # seq@ppl_threshold
+# Steps for soft layer transition (phase ramp as shock absorber)
+# Default: 500
+--layer_transition_steps 500
 
-# Coupled curriculum
---curriculum_stages "3:9@256,5:7@512,6:6@768,8:4@1536,9:3@2048"
---curriculum_triggers "ppl"         # ppl, step, or auto
---curriculum_ppl_triggers "300,150,75,40,20"
+# =============================================================================
+# SEQUENCE LENGTH CURRICULUM (Delegated)
+# =============================================================================
+
+# Enable adaptive sequence length curriculum
+--enable_seq_curriculum
+
+# Sequence length range
+--seq_len_start 256       # Start with short sequences
+--seq_len_end 2048        # Target full length
+
+# Ramping configuration
+--seq_len_ramp_steps 10000   # Steps to reach full length
+--seq_len_ramp_mode linear   # linear or exponential
+
+# PPL gating - only increase seq_len when PPL drops below threshold
+--seq_len_ppl_gate 100.0     # 0.0 = disabled
+
+# =============================================================================
+# COMBINED USAGE (Recommended)
+# =============================================================================
+
+# Full inverted curriculum with adaptive seq_len:
+python train_unified_llm.py \
+    --enable_inverted_curriculum \
+    --inverted_curriculum_stages "3:9,4:8,5:7,6:6,7:5,8:4,9:3" \
+    --inverted_curriculum_ppl_triggers "300,200,120,75,45,25" \
+    --layer_transition_steps 500 \
+    --enable_seq_curriculum \
+    --seq_len_start 256 \
+    --seq_len_end 2048 \
+    --seq_len_ramp_mode exponential \
+    --seq_len_ppl_gate 100.0
 ```
 
-### Proposed Classes
+### Implemented Classes (V9.9.2)
 
 ```python
-class PerLayerPhaseConfig:
-    """Manages per-layer phase weights."""
-    layer_weights: List[float]  # 12 values, 0.0-1.0
+class PerLayerPhaseController:
+    """
+    Manages per-layer phase weights for fine-grained split control.
 
-class LayerTransitionScheduler:
-    """Manages soft layer transitions."""
-    def start_transition(self, layer_idx, duration_steps)
-    def update(self, step) -> Dict[int, float]  # layer_idx -> new_weight
+    Methods:
+        get_weight(layer_idx) -> float
+        set_weight(layer_idx, weight)
+        start_transition(layer_idx, target_weight, duration_steps, current_step)
+        update(current_step) -> Dict  # Returns weights, active_transitions, completed
+        apply_to_model(model)  # Updates alpha_phase on all layers
+        get_status() -> Dict
+    """
 
-class DynamicSequenceLengthScheduler:
-    """Manages sequence length growth."""
-    def get_seq_len(self, ppl, step) -> int
-    def get_batch_size(self, seq_len) -> int  # Memory-aware
+class InvertedLayerCurriculumController:
+    """
+    Orchestrates split evolution with optional seq_len delegation.
 
-class InvertedCurriculumController:
-    """Orchestrates the full curriculum."""
-    def update(self, step, ppl, metrics) -> CurriculumState
-    def get_current_config(self) -> Dict  # split, seq_len, layer_weights
+    Args:
+        stages: List[Tuple[int, int]]  # [(3,9), (4,8), ...] - just splits
+        ppl_triggers: List[float]      # PPL thresholds for stage advancement
+        local_layers: int              # Layers 0 to local_layers-1 are LocalAttention
+        transition_steps: int          # Steps for soft layer transition
+        seq_len_curriculum: Optional[SequenceLengthCurriculum]  # Delegation
+        default_seq_len: int           # Used when no delegation
+
+    Methods:
+        update(step, current_ppl) -> Dict:
+            Returns: current_stage, current_split, current_seq_len,
+                     split_changed, seq_len_changed, transitioning_layers, layer_weights
+        apply_to_model(model)
+        get_status() -> Dict
+
+    Class Methods:
+        from_config(config, seq_len_curriculum=None) -> InvertedLayerCurriculumController
+    """
+
+class SequenceLengthCurriculum:
+    """
+    Existing class for PPL-gated sequence length progression.
+
+    Methods:
+        get_seq_len(step, current_ppl) -> int
+        should_reload_data() -> bool
+        mark_data_reloaded()
+        get_progress() -> float
+        get_status() -> Dict
+    """
+```
+
+### Architecture Diagram (V9.9.2)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Training Loop                                │
+│                                                                      │
+│   ┌─────────────────────────┐      ┌─────────────────────────────┐  │
+│   │  SequenceLengthCurriculum │      │ InvertedLayerCurriculumCtrl │  │
+│   │  (--enable_seq_curriculum)│◄─────│ (--enable_inverted_curr.)  │  │
+│   │                          │      │                             │  │
+│   │  • seq_len progression   │      │  • split evolution 3:9→9:3  │  │
+│   │  • PPL gating            │      │  • per-layer phase weights  │  │
+│   │  • linear/exponential    │      │  • soft layer transitions   │  │
+│   │  • reload detection      │      │                             │  │
+│   │                          │      │  Delegates seq_len ─────────┼──┘
+│   │  Input:  step, PPL       │      │  Input:  step, PPL          │
+│   │  Output: seq_len         │      │  Output: split, weights     │
+│   └────────────┬─────────────┘      └──────────────┬──────────────┘
+│                │                                    │
+│                ▼                                    ▼
+│        Dataloader reload                    Model alpha_phase
+│        Batch size adjust                    HGS reconfigure
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -662,6 +750,7 @@ class InvertedCurriculumController:
 | 1.2.0 | 2026-01-13 | Phase 3-4: Implemented InvertedLayerCurriculumController with coupled seq_len |
 | 1.3.0 | 2026-01-13 | Phase 5: Training loop integration (init, update, HGS reconfigure) |
 | 1.4.0 | 2026-01-13 | Phase 6: Testing & validation (41 tests in scripts/test_inverted_curriculum.py) |
+| 1.5.0 | 2026-01-13 | V9.9.2: Refactored to delegate seq_len to SequenceLengthCurriculum |
 
 ---
 
