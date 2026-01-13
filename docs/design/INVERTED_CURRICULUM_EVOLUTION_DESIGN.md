@@ -568,7 +568,14 @@ controller.apply_to_model(model)
 | 5 | 8:4 | 1536 | < 45 |
 | 6 | 9:3 | 2048 | < 25 |
 
-### Phase 5: Testing & Validation
+### Phase 5: Training Loop Integration ✅ COMPLETED
+- [x] Initialize `InvertedLayerCurriculumController` in training setup (`train_unified_llm.py:12479-12487`)
+- [x] Add curriculum update in validation loop (`train_unified_llm.py:14890-14917`)
+- [x] Reconfigure HGS on split change
+- [x] Log sequence length changes (full dataloader reload TBD)
+- [x] Periodic curriculum status logging
+
+### Phase 6: Testing & Validation
 - [ ] Unit tests for each component
 - [ ] Integration test for full curriculum
 - [ ] Benchmark compute vs. current system
@@ -652,7 +659,8 @@ class InvertedCurriculumController:
 |---------|------|---------|
 | 1.0.0 | 2026-01-13 | Initial design document |
 | 1.1.0 | 2026-01-13 | Phase 1-2: Implemented PerLayerPhaseController with soft transitions |
-| 1.2.0 | 2026-01-13 | Phase 3-4: Implemented InvertedCurriculumController with coupled seq_len |
+| 1.2.0 | 2026-01-13 | Phase 3-4: Implemented InvertedLayerCurriculumController with coupled seq_len |
+| 1.3.0 | 2026-01-13 | Phase 5: Training loop integration (init, update, HGS reconfigure) |
 
 ---
 

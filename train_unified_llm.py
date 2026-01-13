@@ -10076,12 +10076,12 @@ class PerLayerPhaseController:
 
 
 # =============================================================================
-# INVERTED CURRICULUM CONTROLLER (V9.9.1)
+# INVERTED LAYER CURRICULUM CONTROLLER (V9.9.1)
 # =============================================================================
 
-class InvertedCurriculumController:
+class InvertedLayerCurriculumController:
     """
-    V9.9.1: Orchestrates the full Inverted Curriculum Evolution.
+    V9.9.1: Orchestrates the full Inverted Layer Curriculum Evolution.
 
     Combines:
     1. Per-layer phase weights (via PerLayerPhaseController)
@@ -10331,7 +10331,7 @@ class InvertedCurriculumController:
         }
 
     @classmethod
-    def from_config(cls, config) -> 'InvertedCurriculumController':
+    def from_config(cls, config) -> 'InvertedLayerCurriculumController':
         """
         Create controller from config.
 
@@ -12475,6 +12475,16 @@ def train(config: UnifiedTrainingConfig):
                 relaxation_controller.state = relaxation_controller.STATE_BALANCED
                 print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
                 print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # V9.9.1 Inverted Layer Curriculum Controller
+    inverted_layer_curriculum = None
+    if config.enable_inverted_curriculum:
+        inverted_layer_curriculum = InvertedLayerCurriculumController.from_config(config)
+        # Apply initial per-layer weights to model
+        inverted_layer_curriculum.apply_to_model(model)
+        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled")
+        print(f"      Initial split: {inverted_layer_curriculum.current_split[0]}:{inverted_layer_curriculum.current_split[1]}")
+        print(f"      Initial seq_len: {inverted_layer_curriculum.current_seq_len}")
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     adaptive_controller = None
@@ -14876,6 +14886,35 @@ def train(config: UnifiedTrainingConfig):
                 )
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
+
+                # V9.9.1: Inverted Layer Curriculum Update
+                if inverted_layer_curriculum is not None:
+                    ilc_result = inverted_layer_curriculum.update(global_step, val_ppl)
+
+                    # Apply updated per-layer weights to model
+                    inverted_layer_curriculum.apply_to_model(model)
+
+                    # Handle split change - reconfigure gradient scaler
+                    if ilc_result['split_changed'] and gradient_scaler_hgs is not None:
+                        new_auth, new_sens = ilc_result['current_split']
+                        gradient_scaler_hgs.authority_layers = new_auth
+                        gradient_scaler_hgs.sensory_layers = new_sens
+                        print(f"  🔧 [HGS] Reconfigured for {new_auth}:{new_sens} split")
+
+                    # Handle seq_len change - flag for dataloader reload
+                    if ilc_result['seq_len_changed']:
+                        # The dataloader reload would happen at the end of evaluation
+                        # For now, just log it - full dataloader integration would require
+                        # changes to the data loading infrastructure
+                        print(f"  📏 [CURRICULUM] Sequence length changed to {ilc_result['current_seq_len']}")
+                        print(f"      Note: Dataloader reload required for new seq_len")
+
+                    # Log curriculum status periodically
+                    if global_step % (config.eval_every * 5) == 0:
+                        status = inverted_layer_curriculum.get_status()
+                        print(f"  🎓 [CURRICULUM] Stage {status['stage']}/{status['total_stages']-1} | "
+                              f"Split: {status['split']} | Seq: {status['seq_len']} | "
+                              f"Transitioning: {status['transitioning_layers']} layers")
 
                 # V9.8.9: Dynamic Window Scheduler Update
                 if dynamic_window_scheduler is not None:
