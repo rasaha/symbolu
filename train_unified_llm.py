@@ -69,6 +69,7 @@ import json
 import logging
 import math
 import os
+import pickle
 import random
 import sys
 import time
@@ -6059,21 +6060,25 @@ class ThreePhaseCurriculum:
     Used by CSR (Layer 7), Kosha Gyroscope (Layer 9), and PIDv2 to implement
     smooth engagement/disengagement based on perplexity thresholds.
 
+    INVERTED CURRICULUM: Components activate when model is COMPETENT (low PPL).
+    This follows proper curriculum learning where advanced controllers are added
+    after basic language modeling is established.
+
     Phases:
-        CONSTRUCTION (PPL > engage_ppl): Component fully active (scale=1.0)
-        TRANSITION (disengage_ppl < PPL < engage_ppl): Linear rampdown
-        POLISHING (PPL < disengage_ppl): Component off after rampdown (scale=0.0)
+        FOUNDATION (PPL > engage_ppl): Component OFF - learning basics (scale=0.0)
+        TRANSITION (disengage_ppl < PPL < engage_ppl): Linear ramp-up
+        CONSTRUCTION (PPL < disengage_ppl): Component fully active (scale=1.0)
 
     Args:
         name: Component name for logging (e.g., "CSR", "Kosha", "PID")
-        engage_ppl: PPL threshold above which component is fully active
-        disengage_ppl: PPL threshold below which component disengages
-        rampdown_steps: Steps to ramp down after disengage trigger
+        engage_ppl: PPL threshold below which component starts engaging
+        disengage_ppl: PPL threshold below which component is fully active
+        rampdown_steps: Steps to ramp up during transition phase
     """
 
-    PHASE_CONSTRUCTION = "CONSTRUCTION"
+    PHASE_FOUNDATION = "FOUNDATION"
     PHASE_TRANSITION = "TRANSITION"
-    PHASE_POLISHING = "POLISHING"
+    PHASE_CONSTRUCTION = "CONSTRUCTION"
 
     def __init__(
         self,
@@ -6098,6 +6103,8 @@ class ThreePhaseCurriculum:
         """
         Update phase based on current PPL and compute scaling factor.
 
+        INVERTED LOGIC: Lower PPL → Higher controller engagement
+
         Args:
             val_ppl: Current validation perplexity
             step: Current training step
@@ -6105,59 +6112,48 @@ class ThreePhaseCurriculum:
         Returns:
             scale: Authority scale factor (1.0 = full, 0.0 = off)
         """
-        # Already graduated - stay in polishing mode
+        # Already graduated - stay in full construction mode
         if self.graduated:
-            self.phase = self.PHASE_POLISHING
+            self.phase = self.PHASE_CONSTRUCTION
+            self.scale = 1.0
+            return 1.0
+
+        # Phase 1: FOUNDATION (PPL > engage_ppl) - Component OFF
+        # Model is still learning basics, don't interfere
+        if val_ppl > self.engage_ppl:
+            self.phase = "FOUNDATION"
+            self.disengage_step = None  # Reset engagement tracking
             self.scale = 0.0
+            self._log_phase_change(step, val_ppl)
             return 0.0
 
-        # Phase A: CONSTRUCTION (PPL > engage_ppl)
-        if val_ppl >= self.engage_ppl:
+        # Phase 3: CONSTRUCTION (PPL <= disengage_ppl) - Component fully ON
+        # Model is competent, apply full controller strength
+        if val_ppl <= self.disengage_ppl:
+            if self.disengage_step is None:
+                # First time entering construction phase
+                self.disengage_step = step
+                print(f"  🎓 [{self.name}] CONSTRUCTION phase triggered at step {step} "
+                      f"(PPL={val_ppl:.1f} ≤ {self.disengage_ppl})")
+
             self.phase = self.PHASE_CONSTRUCTION
-            self.disengage_step = None  # Reset disengage trigger
             self.scale = 1.0
             self._log_phase_change(step, val_ppl)
             return 1.0
 
-        # Phase C trigger: Check if PPL dropped below disengage threshold
-        if val_ppl < self.disengage_ppl:
-            if self.disengage_step is None:
-                # First time crossing disengage threshold
-                self.disengage_step = step
-                print(f"  🎓 [{self.name}] Disengage triggered at step {step} "
-                      f"(PPL={val_ppl:.1f} < {self.disengage_ppl})")
-
-            # Compute rampdown progress
-            steps_since_disengage = step - self.disengage_step
-            if self.rampdown_steps > 0:
-                rampdown_progress = min(1.0, steps_since_disengage / self.rampdown_steps)
-            else:
-                rampdown_progress = 1.0
-
-            self.scale = 1.0 - rampdown_progress
-
-            if rampdown_progress >= 1.0:
-                # Fully graduated
-                self.graduated = True
-                self.phase = self.PHASE_POLISHING
-                self.scale = 0.0
-                print(f"  🎓 [{self.name}] GRADUATED to polishing mode at step {step}")
-            else:
-                self.phase = self.PHASE_TRANSITION
-
-            self._log_phase_change(step, val_ppl)
-            return self.scale
-
-        # Phase B: TRANSITION (disengage_ppl <= PPL < engage_ppl)
-        # Linear interpolation: PPL=engage → scale=1.0, PPL=disengage → scale=0.0
+        # Phase 2: TRANSITION (disengage_ppl < PPL <= engage_ppl) - Ramp up
+        # Gradually increase controller strength as PPL improves
         self.phase = self.PHASE_TRANSITION
-        self.disengage_step = None  # Reset if PPL goes back up
+        self.disengage_step = None  # Reset engagement tracking
+
         ppl_range = self.engage_ppl - self.disengage_ppl
         if ppl_range > 0:
+            # Scale increases as PPL decreases
+            # PPL at engage_ppl → scale=0.0, PPL at disengage_ppl → scale=1.0
             progress = (self.engage_ppl - val_ppl) / ppl_range
-            self.scale = 1.0 - progress
+            self.scale = max(0.0, min(1.0, progress))
         else:
-            self.scale = 1.0
+            self.scale = 0.5
 
         self._log_phase_change(step, val_ppl)
         return self.scale
@@ -6174,13 +6170,13 @@ class ThreePhaseCurriculum:
     def get_status(self) -> str:
         """Get human-readable status string."""
         if self.graduated:
-            return f"[{self.name}] 🎓 GRADUATED (polishing mode)"
+            return f"[{self.name}] 🎓 GRADUATED (full construction)"
         elif self.phase == self.PHASE_CONSTRUCTION:
             return f"[{self.name}] 🔧 CONSTRUCTION (scale={self.scale:.0%})"
         elif self.phase == self.PHASE_TRANSITION:
             return f"[{self.name}] 📐 TRANSITION (scale={self.scale:.0%})"
-        else:
-            return f"[{self.name}] ✨ POLISHING (scale={self.scale:.0%})"
+        else:  # FOUNDATION
+            return f"[{self.name}] 🌱 FOUNDATION (scale={self.scale:.0%})"
 
     def get_state(self) -> Dict[str, Any]:
         """Get serializable state for checkpointing."""
@@ -7971,16 +7967,14 @@ class UnifiedTrainingConfig:
     pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
     pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
-    # V9.9.0 CRITICAL FIX: Corrected PID engagement (inverted thresholds)
-    # PREVIOUS (WRONG): PID ON when PPL > 100 (struggling) → Added control when model needed basics
-    # CORRECTED: PID ON when PPL < 30 (ready) → Add dynamic control only when fundamentals work
-    #
-    # Phase 1 (Learning):    PPL > disengage_ppl → PID OFF (no dynamic control yet)
-    # Phase 2 (Transition):  engage_ppl < PPL < disengage_ppl → PID ramps up
-    # Phase 3 (Regulation):  PPL < engage_ppl → PID ON (dynamic sensory/authority balance)
-    controller_engage_ppl: float = 30.0       # PID turns ON when Val PPL < this (ready)
-    controller_disengage_ppl: float = 100.0   # PID turns OFF when Val PPL > this (struggling)
-    controller_engagement_enabled: bool = True # Enable dynamic PID engagement
+    # V9.8.7: Three-phase PID engagement based on Val PPL
+    # Phase 1 (Construction): PPL > engage_ppl → PID ON (aggressive correction)
+    # Phase 2 (Transition):   disengage_ppl < PPL < engage_ppl → PID continues
+    # Phase 3 (Polishing):    PPL < disengage_ppl → PID OFF (let model converge naturally)
+    pidv2_engage_ppl: float = 100.0      # PID turns ON when Val PPL > this
+    pidv2_disengage_ppl: float = 30.0    # PID turns OFF when Val PPL < this
+    pidv2_rampdown_steps: int = 500      # Steps to ramp down after disengage
+    pidv2_engagement_enabled: bool = True # Enable dynamic PID engagement
 
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
@@ -10800,29 +10794,35 @@ def train(config: UnifiedTrainingConfig):
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
-            resume_result = load_checkpoint(
-                path=resume_path,
-                model=model,
-                optimizer=optimizer if not config.resume_weights_only else None,
-                scheduler=scheduler if not config.resume_weights_only else None,
-                weights_only=config.resume_weights_only,
-                device=device,
-            )
-            resume_step = resume_result["step"]
-            best_val_loss = resume_result["best_val_loss"]
-            resumed_hgs_state = resume_result.get("hgs_state")
-            resumed_drc_state = resume_result.get("drc_state")
-            resumed_sgp_state = resume_result.get("sgp_state")
-            resumed_sattvic_state = resume_result.get("sattvic_state")
-            resumed_srk_state = resume_result.get("srk_state")
-            resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
-            # V9.8.6: Extract curriculum states
-            resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
-            resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
-            resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
-            resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
-            resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
-            resumed_evoflow_state = resume_result.get("evoflow_state")
+            try:
+                resume_result = load_checkpoint(
+                    path=resume_path,
+                    model=model,
+                    optimizer=optimizer if not config.resume_weights_only else None,
+                    scheduler=scheduler if not config.resume_weights_only else None,
+                    weights_only=config.resume_weights_only,
+                    device=device,
+                )
+                resume_step = resume_result["step"]
+                best_val_loss = resume_result["best_val_loss"]
+                resumed_hgs_state = resume_result.get("hgs_state")
+                resumed_drc_state = resume_result.get("drc_state")
+                resumed_sgp_state = resume_result.get("sgp_state")
+                resumed_sattvic_state = resume_result.get("sattvic_state")
+                resumed_srk_state = resume_result.get("srk_state")
+                resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
+                # V9.8.6: Extract curriculum states
+                resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
+                resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
+                resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
+                resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
+                resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
+                resumed_evoflow_state = resume_result.get("evoflow_state")
+            except RuntimeError as e:
+                # Checkpoint is corrupted - start from scratch
+                print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
+                print(f"      Starting training from scratch instead...")
+                # Keep default values (resume_step=0, etc.)
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -11074,11 +11074,11 @@ def train(config: UnifiedTrainingConfig):
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
             print(f"       Increase after: {config.pidv2_batch_stable_streak} stable evals")
         # V9.8.7: Three-phase PID engagement
-        if config.controller_engagement_enabled:
+        if config.pidv2_engagement_enabled:
             print(f"    📊 Three-Phase Engagement: ENABLED")
-            print(f"       CONSTRUCTION (PID ON):  Val PPL > {config.controller_engage_ppl:.1f}")
-            print(f"       TRANSITION:             {config.controller_disengage_ppl:.1f} < Val PPL < {config.controller_engage_ppl:.1f}")
-            print(f"       POLISHING (PID OFF):    Val PPL < {config.controller_disengage_ppl:.1f}")
+            print(f"       CONSTRUCTION (PID ON):  Val PPL > {config.pidv2_engage_ppl:.1f}")
+            print(f"       TRANSITION:             {config.pidv2_disengage_ppl:.1f} < Val PPL < {config.pidv2_engage_ppl:.1f}")
+            print(f"       POLISHING (PID OFF):    Val PPL < {config.pidv2_disengage_ppl:.1f}")
     elif config.controller == "emergency_pd" and PIDV2_AVAILABLE:
         pd_config = EmergencyPDConfig(A_min=0.25)
         authority_controller = EmergencyPD(pd_config)
@@ -12990,7 +12990,8 @@ def train(config: UnifiedTrainingConfig):
                             log_msg += f" {metacognitive_tracker.get_status()}"
 
                     # Full Evolutionary Flow: Multi-scale coherence and metacognitive status
-                    if evolutionary_engine is not None and evo_result is not None:
+                    # Only log when EvoFlow is engaged (rss_weights['evoflow'] > 0)
+                    if evolutionary_engine is not None and evo_result is not None and rss_weights.get('evoflow', 0) > 0:
                         evo_micro = metrics.get('evo_micro', 0.0)
                         evo_auth = metrics.get('evo_auth', 0.0)
                         evo_sens = metrics.get('evo_sens', 0.0)
@@ -13026,17 +13027,22 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.8.0: Log RSS phase and weights
                 if rss_controller is not None:
-                    phase_icons = {
-                        'FOUNDATION': '🏗️', 'COHERENCE': '🔄', 'FEEDBACK': '🌀',
-                        'ONTOLOGY': '📜', 'SOVEREIGN': '👑'
-                    }
-                    phase = rss_controller.current_phase
-                    icon = phase_icons.get(phase, '❓')
-                    csr_pct = int(rss_weights['csr'] * 100)
-                    log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
+                    # Only log RSS when at least one component is engaged
+                    any_engaged = any(w > 0 for w in rss_weights.values())
+                    if any_engaged:
+                        phase_icons = {
+                            'FOUNDATION': '🏗️', 'COHERENCE': '🔄', 'FEEDBACK': '🌀',
+                            'ONTOLOGY': '📜', 'SOVEREIGN': '👑'
+                        }
+                        phase = rss_controller.current_phase
+                        icon = phase_icons.get(phase, '❓')
+                        csr_pct = int(rss_weights['csr'] * 100)
+                        log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
                 # v2.2.1: Kosha Gyroscope Status (Homeostatic Self-Regulation)
-                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
+                # Only log when Kosha is engaged (kosha_curriculum.scale > 0 or RSS kosha > 0)
+                kosha_inline_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics and kosha_inline_engaged:
                     gyro_loss = metrics.get('gyroscope_loss', 0.0)
                     gyro_gain = metrics.get('gyroscope_effective_gain', 0.0)
                     gyro_base_gain = metrics.get('gyroscope_base_gain', 0.0)
@@ -13105,7 +13111,8 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f"\n         [PENTAD] {kosha_pentad}"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
-                if vritti_resonance is not None and 'vritti_alignment' in metrics:
+                # Only log when Kosha is engaged
+                if vritti_resonance is not None and 'vritti_alignment' in metrics and kosha_inline_engaged:
                     align = metrics['vritti_alignment']
                     res_status = "🎓ACT" if vritti_resonance.active else "👁️OBS"
                     log_msg += f"\n    {res_status} [VRITTI] P-Pram:{align.get('physical_pramana', 0):.2f} | M-Vikal:{align.get('mental_vikalpa', 0):.2f} | I-Smrit:{align.get('intellect_smriti', 0):.2f}"
@@ -13113,8 +13120,10 @@ def train(config: UnifiedTrainingConfig):
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
+                # Only log when Kosha is engaged (kosha_curriculum.scale > 0 or RSS kosha > 0)
                 kosha_log_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
-                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0:
+                kosha_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0 and kosha_engaged:
                     try:
                         # Get logits for entropy calculation
                         kosha_logits = None
@@ -13149,7 +13158,7 @@ def train(config: UnifiedTrainingConfig):
                             layer_grad_norm=layer_grad if layer_grad > 0 else None,
                         )
 
-                        # Format and print (include steering metrics if available)
+                        # Format and print (include steering metrics if available) - only when Kosha is engaged
                         steering_metrics = {k: v for k, v in metrics.items() if k.startswith('kosha_')}
                         kosha_output = format_kosha_diagnostic(
                             kosha_diag,
@@ -13162,7 +13171,8 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
 
                 # V9.7.0: CSR Diagnostics (Layer 7 - Concept Consolidation)
-                if csr_provider is not None and global_step % kosha_log_interval == 0:
+                # Only log when CSR is engaged (rss_weights['csr'] > 0)
+                if csr_provider is not None and global_step % kosha_log_interval == 0 and rss_weights.get('csr', 0) > 0:
                     try:
                         # Get hidden states for CSR layer
                         csr_diag_hidden = None
@@ -13184,7 +13194,7 @@ def train(config: UnifiedTrainingConfig):
                             grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
                         )
 
-                        # Format and print
+                        # Format and print - only when CSR is engaged
                         csr_output = format_csr_diagnostic(csr_diag)
                         print(csr_output, flush=True)
                     except Exception as e:
@@ -13192,7 +13202,9 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [CSR] Diagnostic error: {e}", flush=True)
 
                 # V9.7.0: Ontological Bridge Diagnostics (Layer 4 - Foundational Structure)
-                if config.enable_onto_bridge and global_step % kosha_log_interval == 0:
+                # Only log when Onto is engaged (onto_curriculum.scale > 0)
+                onto_engaged = (onto_curriculum is None) or (onto_curriculum.scale > 0)
+                if config.enable_onto_bridge and global_step % kosha_log_interval == 0 and onto_engaged:
                     try:
                         # Get hidden states for Onto Bridge layer (skip in lightweight mode)
                         onto_diag_hidden = None
@@ -13223,7 +13235,7 @@ def train(config: UnifiedTrainingConfig):
                             grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
                         )
 
-                        # Format and print
+                        # Format and print - only when Onto is engaged
                         onto_output = format_onto_bridge_diagnostic(onto_diag)
                         print(onto_output, flush=True)
                     except Exception as e:
@@ -13231,7 +13243,9 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [ONTO] Diagnostic error: {e}", flush=True)
 
                 # V9.8.0: Sovereign State Diagnostics for ontological_hybrid model
-                if config.model_type == "ontological_hybrid":
+                # Only log when Kosha is engaged (since Bhava/Kosha/Vritti are part of sovereign synthesis)
+                sovereign_state_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if config.model_type == "ontological_hybrid" and sovereign_state_engaged:
                     try:
                         # Extract state and delta_S from outputs dict
                         sovereign_state = None
@@ -13465,8 +13479,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if onto_curriculum.graduated and old_phase != onto_curriculum.phase:
                         print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and onto_curriculum.scale > 0:
                         print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
 
                 # V9.8.6: CSR Three-Phase Curriculum Update
@@ -13476,8 +13490,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if csr_curriculum.graduated and old_phase != csr_curriculum.phase:
                         print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and csr_curriculum.scale > 0:
                         print(f"  🔤 [CSR] Phase: {csr_curriculum.phase} | Scale: {csr_curriculum.scale:.3f}")
 
                 # V9.8.6: Kosha Three-Phase Curriculum Update
@@ -13487,8 +13501,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if kosha_curriculum.graduated and old_phase != kosha_curriculum.phase:
                         print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and kosha_curriculum.scale > 0:
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
 
                 # V2.3.4: Sequence Length Curriculum Update
@@ -13524,20 +13538,20 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  📏 [SEQ CURRICULUM] Length: {status['current_seq_len']}/{status['target_seq_len']} | "
                               f"Progress: {status['progress']:.1%}")
 
-                # V9.8.7: Three-phase PID engagement logic
-                # Check PPL thresholds and determine if PID should be engaged
-                if config.controller_engagement_enabled and authority_controller is not None:
+                # V9.8.7: Three-phase PID engagement logic (INVERTED CURRICULUM)
+                # Lower PPL → PID engages (model is competent, apply control)
+                if config.pidv2_engagement_enabled and authority_controller is not None:
                     old_pid_phase = pid_phase
                     old_pid_engaged = pid_engaged
 
-                    if val_ppl > config.controller_engage_ppl:
-                        # Phase 1: CONSTRUCTION - High PPL, PID ON
+                    if val_ppl > config.pidv2_engage_ppl:
+                        # Phase 1: FOUNDATION - High PPL, PID OFF (learning basics)
+                        pid_phase = "FOUNDATION"
+                        pid_engaged = False
+                    elif val_ppl <= config.pidv2_disengage_ppl:
+                        # Phase 3: CONSTRUCTION - Low PPL, PID ON (apply control)
                         pid_phase = "CONSTRUCTION"
                         pid_engaged = True
-                    elif val_ppl < config.controller_disengage_ppl:
-                        # Phase 3: POLISHING - Low PPL, PID OFF
-                        pid_phase = "POLISHING"
-                        pid_engaged = False
                     else:
                         # Phase 2: TRANSITION - Keep current engagement state
                         pid_phase = "TRANSITION"
@@ -13549,7 +13563,7 @@ def train(config: UnifiedTrainingConfig):
                         print(f"\n  {'='*60}")
                         print(f"  📊 PID ENGAGEMENT PHASE CHANGE at step {global_step}")
                         print(f"     {old_pid_phase} → {pid_phase}")
-                        print(f"     Val PPL: {val_ppl:.2f} | Engage>{config.controller_engage_ppl:.1f} | Disengage<{config.controller_disengage_ppl:.1f}")
+                        print(f"     Val PPL: {val_ppl:.2f} | Engage>{config.pidv2_engage_ppl:.1f} | Disengage<{config.pidv2_disengage_ppl:.1f}")
                         print(f"     PID Controller: {status_emoji} {'ENGAGED' if pid_engaged else 'DISENGAGED'}")
                         print(f"  {'='*60}\n")
 
@@ -13560,7 +13574,7 @@ def train(config: UnifiedTrainingConfig):
 
                 # PIDv2 Controller Update (V9.4.4)
                 # Skip if PID is disengaged (POLISHING phase)
-                if authority_controller is not None and (not config.controller_engagement_enabled or pid_engaged):
+                if authority_controller is not None and (not config.pidv2_engagement_enabled or pid_engaged):
                     old_A = authority_controller.A
                     new_A = authority_controller.update(
                         val_ppl, current_coh,
@@ -14179,8 +14193,19 @@ def load_checkpoint(
 
     print(f"\n  📂 Loading checkpoint from: {path}")
 
-    # Load checkpoint
-    checkpoint = torch.load(path, map_location=device, weights_only=False)
+    # Load checkpoint with error handling for corrupted files
+    try:
+        checkpoint = torch.load(path, map_location=device, weights_only=False)
+    except (EOFError, pickle.UnpicklingError, RuntimeError) as e:
+        # Checkpoint file is corrupted or incomplete
+        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {path}")
+        print(f"      Error: {type(e).__name__}: {e}")
+        print(f"      This typically happens if training was interrupted during checkpoint save.")
+        print(f"\n  Solutions:")
+        print(f"      1. Delete the corrupted checkpoint: rm {path}")
+        print(f"      2. Use a different checkpoint: --resume <path_to_valid_checkpoint>")
+        print(f"      3. Start from scratch: remove --resume flag")
+        raise RuntimeError(f"Cannot load corrupted checkpoint: {path}") from e
 
     # Load model weights
     # Filter out runtime buffers that may have been saved with tensor values
@@ -15375,9 +15400,10 @@ def main():
         pidv2_batch_velocity_threshold=args.pidv2_batch_velocity_threshold,
         pidv2_batch_stable_streak=args.pidv2_batch_stable_streak,
         # V9.8.7: Three-phase PID engagement
-        controller_engage_ppl=args.controller_engage_ppl,
-        controller_disengage_ppl=args.controller_disengage_ppl,
-        controller_engagement_enabled=not args.no_controller_engagement,
+        pidv2_engage_ppl=args.pidv2_engage_ppl,
+        pidv2_disengage_ppl=args.pidv2_disengage_ppl,
+        pidv2_rampdown_steps=args.pidv2_rampdown_steps,
+        pidv2_engagement_enabled=not args.no_pidv2_engagement,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
