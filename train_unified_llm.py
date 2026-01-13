@@ -69,6 +69,7 @@ import json
 import logging
 import math
 import os
+import pickle
 import random
 import sys
 import time
@@ -10749,29 +10750,35 @@ def train(config: UnifiedTrainingConfig):
     if config.resume:
         resume_path = Path(config.resume)
         if resume_path.exists():
-            resume_result = load_checkpoint(
-                path=resume_path,
-                model=model,
-                optimizer=optimizer if not config.resume_weights_only else None,
-                scheduler=scheduler if not config.resume_weights_only else None,
-                weights_only=config.resume_weights_only,
-                device=device,
-            )
-            resume_step = resume_result["step"]
-            best_val_loss = resume_result["best_val_loss"]
-            resumed_hgs_state = resume_result.get("hgs_state")
-            resumed_drc_state = resume_result.get("drc_state")
-            resumed_sgp_state = resume_result.get("sgp_state")
-            resumed_sattvic_state = resume_result.get("sattvic_state")
-            resumed_srk_state = resume_result.get("srk_state")
-            resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
-            # V9.8.6: Extract curriculum states
-            resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
-            resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
-            resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
-            resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
-            resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
-            resumed_evoflow_state = resume_result.get("evoflow_state")
+            try:
+                resume_result = load_checkpoint(
+                    path=resume_path,
+                    model=model,
+                    optimizer=optimizer if not config.resume_weights_only else None,
+                    scheduler=scheduler if not config.resume_weights_only else None,
+                    weights_only=config.resume_weights_only,
+                    device=device,
+                )
+                resume_step = resume_result["step"]
+                best_val_loss = resume_result["best_val_loss"]
+                resumed_hgs_state = resume_result.get("hgs_state")
+                resumed_drc_state = resume_result.get("drc_state")
+                resumed_sgp_state = resume_result.get("sgp_state")
+                resumed_sattvic_state = resume_result.get("sattvic_state")
+                resumed_srk_state = resume_result.get("srk_state")
+                resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
+                # V9.8.6: Extract curriculum states
+                resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
+                resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
+                resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
+                resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
+                resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
+                resumed_evoflow_state = resume_result.get("evoflow_state")
+            except RuntimeError as e:
+                # Checkpoint is corrupted - start from scratch
+                print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
+                print(f"      Starting training from scratch instead...")
+                # Keep default values (resume_step=0, etc.)
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
@@ -14128,8 +14135,19 @@ def load_checkpoint(
 
     print(f"\n  📂 Loading checkpoint from: {path}")
 
-    # Load checkpoint
-    checkpoint = torch.load(path, map_location=device, weights_only=False)
+    # Load checkpoint with error handling for corrupted files
+    try:
+        checkpoint = torch.load(path, map_location=device, weights_only=False)
+    except (EOFError, pickle.UnpicklingError, RuntimeError) as e:
+        # Checkpoint file is corrupted or incomplete
+        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {path}")
+        print(f"      Error: {type(e).__name__}: {e}")
+        print(f"      This typically happens if training was interrupted during checkpoint save.")
+        print(f"\n  Solutions:")
+        print(f"      1. Delete the corrupted checkpoint: rm {path}")
+        print(f"      2. Use a different checkpoint: --resume <path_to_valid_checkpoint>")
+        print(f"      3. Start from scratch: remove --resume flag")
+        raise RuntimeError(f"Cannot load corrupted checkpoint: {path}") from e
 
     # Load model weights
     # Filter out runtime buffers that may have been saved with tensor values
