@@ -4102,6 +4102,292 @@ class SovereignPhaseController:
 
 
 # =============================================================================
+# DYNAMIC WINDOW SCHEDULER: PPL-Adaptive Local Attention Window
+# =============================================================================
+
+class DynamicWindowScheduler:
+    """
+    Dynamic Window Scheduler - PPL-Adaptive Local Attention Window Sizing.
+
+    Implements curriculum learning for attention span: small windows early
+    (syntax learning), large windows late (long-range reasoning).
+
+    Philosophy:
+    - Early training (high PPL): Small window → Faster, cleaner gradients
+    - Late training (low PPL): Large window → Long-range dependencies
+
+    Memory Tradeoff:
+    - Smaller window = Less VRAM = Can increase batch size
+    - O(N×W) complexity: halving window = 50% memory savings
+
+    Smooth Progression:
+    - Uses intermediate values (not just powers of 2)
+    - Gradual transitions (interpolates over N steps)
+    - Growth rate limiting (max 25% per transition)
+
+    Version: 1.0.0 (V9.8.9)
+    Reference: Curriculum learning for receptive field dimension
+    """
+
+    def __init__(
+        self,
+        enable: bool = False,
+        window_schedule: dict = None,
+        growth_rate_max: float = 1.25,
+        shrink_rate_max: float = 0.80,
+        align_to_multiple: int = 32,
+        smooth_transition_steps: int = 100,
+        min_steps_between_changes: int = 200,
+        hysteresis_factor: float = 0.15,
+        vram_shrink_threshold: float = 0.85,
+    ):
+        """
+        Initialize Dynamic Window Scheduler.
+
+        Args:
+            enable: Enable dynamic window sizing (default: False for safety)
+            window_schedule: Dict mapping PPL → window_size. Default:
+                {800:128, 500:160, 350:192, 240:224, 170:256, 125:288, 95:320,
+                 75:352, 60:384, 48:416, 39:448, 32:480, 26:512, 21:576,
+                 17:640, 14:704, 11:768, 9:832, 7:896, 5:960, 3:1024}
+            growth_rate_max: Maximum growth per transition (1.25 = 25% max)
+            shrink_rate_max: Maximum shrink per transition (0.80 = 20% max)
+            align_to_multiple: Round windows to multiples (32 for GPU alignment)
+            smooth_transition_steps: Interpolate window over N steps (prevents jumps)
+            min_steps_between_changes: Cooldown between target changes (stability)
+            hysteresis_factor: PPL gap for shrinking (prevents thrashing)
+            vram_shrink_threshold: Emergency shrink if VRAM > threshold
+        """
+        self.enable = enable
+
+        # Default schedule: smooth progression aligned to 32
+        if window_schedule is None:
+            window_schedule = {
+                800: 128,   # Syntax learning (very high PPL)
+                500: 160,   # Basic semantics (+25%)
+                350: 192,   # Improving semantics (+20%)
+                240: 224,   # Good semantics (+17%)
+                170: 256,   # Paragraph coherence (+14%)
+                125: 288,   # Multi-sentence (+13%)
+                95: 320,    # Short documents (+11%)
+                75: 352,    # Medium documents (+10%)
+                60: 384,    # Long documents (+9%)
+                48: 416,    # Very long context (+8%)
+                39: 448,    # Reasoning start (+8%)
+                32: 480,    # Multi-hop reasoning (+7%)
+                26: 512,    # Complex reasoning (+7%)
+                21: 576,    # Advanced reasoning (+13%)
+                17: 640,    # Expert reasoning (+11%)
+                14: 704,    # Deep reasoning (+10%)
+                11: 768,    # Master level (+9%)
+                9: 832,     # Expert+ level (+8%)
+                7: 896,     # Near mastery (+8%)
+                5: 960,     # Approaching mastery (+7%)
+                3: 1024,    # Full context mastery (+7%)
+            }
+
+        # Sort schedule by PPL descending
+        self.schedule = sorted(window_schedule.items(), reverse=True)
+
+        # Parameters
+        self.growth_rate_max = growth_rate_max
+        self.shrink_rate_max = shrink_rate_max
+        self.align_to = align_to_multiple
+        self.smooth_steps = smooth_transition_steps
+        self.min_steps_between = min_steps_between_changes
+        self.hysteresis = hysteresis_factor
+        self.vram_threshold = vram_shrink_threshold
+
+        # State
+        self.current_window = self.schedule[-1][1]  # Start with smallest
+        self.target_window = self.current_window
+        self.transition_start_step = 0
+        self.transition_start_window = self.current_window
+        self.last_target_change_step = 0
+
+        # Statistics
+        self.total_expansions = 0
+        self.total_shrinks = 0
+        self.total_vram_overrides = 0
+
+    def _align_window(self, window: int) -> int:
+        """Align window to multiple for GPU efficiency."""
+        if self.align_to > 1:
+            return ((window + self.align_to - 1) // self.align_to) * self.align_to
+        return window
+
+    def _smooth_transition(self, step: int) -> int:
+        """
+        Smoothly interpolate from start window to target window.
+
+        Instead of jumping 384 → 512 instantly:
+        - Step 0: 384
+        - Step 25: 416 (25% progress)
+        - Step 50: 448 (50% progress)
+        - Step 75: 480 (75% progress)
+        - Step 100: 512 (complete)
+        """
+        if step < self.transition_start_step:
+            return self.transition_start_window
+
+        steps_since_start = step - self.transition_start_step
+        if steps_since_start >= self.smooth_steps:
+            return self.target_window
+
+        # Linear interpolation
+        progress = steps_since_start / self.smooth_steps
+        interpolated = (
+            self.transition_start_window +
+            (self.target_window - self.transition_start_window) * progress
+        )
+
+        return self._align_window(int(interpolated))
+
+    def update(
+        self,
+        step: int,
+        val_ppl: float,
+        vram_usage: float = 0.0,
+    ) -> dict:
+        """
+        Update window size based on PPL and VRAM.
+
+        Args:
+            step: Current training step
+            val_ppl: Validation PPL
+            vram_usage: VRAM usage fraction (0.0-1.0)
+
+        Returns:
+            Dictionary containing:
+                - 'window': Current window size (interpolated)
+                - 'target': Target window size
+                - 'changed': Whether target changed this step
+                - 'reason': Reason for change
+                - 'would_change': True if would change (for disabled mode)
+        """
+        # Cooldown check (prevent thrashing)
+        steps_since_change = step - self.last_target_change_step
+        cooldown_active = steps_since_change < self.min_steps_between
+
+        # Determine target window from schedule
+        scheduled_target = self.schedule[-1][1]  # Default to max
+        for ppl_threshold, window_size in self.schedule:
+            if val_ppl > ppl_threshold:
+                scheduled_target = self._align_window(window_size)
+                break
+
+        # VRAM pressure override (safety)
+        vram_override = False
+        if vram_usage > 0.90:
+            # Critical VRAM - emergency shrink
+            scheduled_target = min(scheduled_target, self._align_window(256))
+            vram_override = True
+        elif vram_usage > self.vram_threshold:
+            # High VRAM - don't expand
+            scheduled_target = min(scheduled_target, self.target_window)
+            if scheduled_target < self.target_window:
+                vram_override = True
+
+        # Check if target should change
+        would_change = False
+        reason = "stable"
+
+        if scheduled_target != self.target_window and not cooldown_active:
+            would_change = True
+
+            # Growth: Apply rate limiting
+            if scheduled_target > self.target_window:
+                max_allowed = int(self.target_window * self.growth_rate_max)
+                if scheduled_target > max_allowed:
+                    scheduled_target = self._align_window(max_allowed)
+                    reason = "growth_rate_limited"
+                else:
+                    reason = f"ppl_improved_{val_ppl:.0f}"
+
+                # Hysteresis check for growth
+                # Only grow if PPL is definitively below threshold
+                ppl_hysteresis_met = True
+                for ppl_thresh, win_size in self.schedule:
+                    if win_size == scheduled_target:
+                        # Require PPL to be below threshold - hysteresis%
+                        if val_ppl > ppl_thresh * (1 - self.hysteresis):
+                            ppl_hysteresis_met = False
+                            would_change = False
+                            reason = "hysteresis_block_growth"
+                        break
+
+            # Shrink: Apply rate limiting
+            elif scheduled_target < self.target_window:
+                min_allowed = int(self.target_window * self.shrink_rate_max)
+                if scheduled_target < min_allowed:
+                    scheduled_target = self._align_window(min_allowed)
+                    reason = "shrink_rate_limited"
+                else:
+                    reason = f"ppl_degraded_{val_ppl:.0f}"
+
+                # Hysteresis check for shrinking
+                # Only shrink if PPL is definitively above threshold
+                ppl_hysteresis_met = True
+                for ppl_thresh, win_size in self.schedule:
+                    if win_size == self.target_window:
+                        # Require PPL to be above threshold + hysteresis%
+                        if val_ppl < ppl_thresh * (1 + self.hysteresis):
+                            ppl_hysteresis_met = False
+                            would_change = False
+                            reason = "hysteresis_block_shrink"
+                        break
+
+            if vram_override:
+                reason = f"vram_override_{vram_usage:.0%}"
+
+        # Apply target change if enabled
+        target_changed = False
+        if would_change and self.enable:
+            self.transition_start_step = step
+            self.transition_start_window = self.current_window
+            self.target_window = scheduled_target
+            self.last_target_change_step = step
+            target_changed = True
+
+            # Update statistics
+            if scheduled_target > self.transition_start_window:
+                self.total_expansions += 1
+            else:
+                self.total_shrinks += 1
+            if vram_override:
+                self.total_vram_overrides += 1
+
+        # Compute current window (smooth interpolation)
+        old_window = self.current_window
+        if self.enable:
+            self.current_window = self._smooth_transition(step)
+        else:
+            # When disabled, show what target would be
+            self.current_window = old_window
+
+        return {
+            'window': self.current_window,
+            'target': self.target_window if self.enable else scheduled_target,
+            'changed': target_changed,
+            'reason': reason,
+            'would_change': would_change,
+            'cooldown_active': cooldown_active,
+            'steps_until_cooldown': max(0, self.min_steps_between - steps_since_change),
+            'interpolation_progress': min(1.0, (step - self.transition_start_step) / self.smooth_steps) if self.enable else 0.0,
+        }
+
+    def get_statistics(self) -> dict:
+        """Get window change statistics for logging."""
+        return {
+            'current_window': self.current_window,
+            'target_window': self.target_window,
+            'total_expansions': self.total_expansions,
+            'total_shrinks': self.total_shrinks,
+            'total_vram_overrides': self.total_vram_overrides,
+        }
+
+
+# =============================================================================
 # V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
 # =============================================================================
 
@@ -8500,6 +8786,20 @@ class UnifiedTrainingConfig:
     spc_velocity_threshold: float = 0.2      # Velocity threshold for applying damping
 
     # ==========================================================================
+    # V9.8.9: Dynamic Window Scheduler (DWS) Configuration
+    # Reference: Curriculum learning for receptive field dimension
+    # ==========================================================================
+    enable_dynamic_window: bool = False      # Master toggle (DISABLED by default)
+    dws_schedule: Optional[str] = None       # Custom schedule "ppl1:win1,ppl2:win2,..."
+    dws_growth_rate_max: float = 1.25        # Maximum growth rate (25% per transition)
+    dws_shrink_rate_max: float = 0.80        # Maximum shrink rate (20% per transition)
+    dws_align_to: int = 32                   # Align to multiples (GPU efficiency)
+    dws_smooth_steps: int = 100              # Interpolation steps (smooth transitions)
+    dws_min_steps_between: int = 200         # Cooldown between changes (stability)
+    dws_hysteresis: float = 0.15             # PPL hysteresis factor (prevent thrashing)
+    dws_vram_threshold: float = 0.85         # VRAM emergency shrink threshold
+
+    # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
     # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
@@ -10794,6 +11094,43 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Damping: α={config.spc_alpha}, max_rotation={config.spc_max_rotation:.2f}rad")
     else:
         print(f"  🧠 Sovereign Phase Controller: DISABLED (diagnostics only)")
+
+    # V9.8.9: Dynamic Window Scheduler (PPL-Adaptive Attention Span)
+    # Parse custom schedule if provided
+    custom_window_schedule = None
+    if config.dws_schedule:
+        try:
+            custom_window_schedule = {}
+            for pair in config.dws_schedule.split(','):
+                ppl_str, win_str = pair.strip().split(':')
+                custom_window_schedule[float(ppl_str)] = int(win_str)
+        except Exception as e:
+            print(f"  ⚠️  Invalid DWS schedule format: {e}")
+            print(f"     Using default schedule")
+            custom_window_schedule = None
+
+    dynamic_window_scheduler = DynamicWindowScheduler(
+        enable=config.enable_dynamic_window,
+        window_schedule=custom_window_schedule,
+        growth_rate_max=config.dws_growth_rate_max,
+        shrink_rate_max=config.dws_shrink_rate_max,
+        align_to_multiple=config.dws_align_to,
+        smooth_transition_steps=config.dws_smooth_steps,
+        min_steps_between_changes=config.dws_min_steps_between,
+        hysteresis_factor=config.dws_hysteresis,
+        vram_shrink_threshold=config.dws_vram_threshold,
+    )
+    if config.enable_dynamic_window:
+        print(f"  📏 Dynamic Window Scheduler: ENABLED")
+        print(f"     Start window: {dynamic_window_scheduler.current_window}")
+        print(f"     Growth: ≤{config.dws_growth_rate_max:.0%}, Shrink: ≥{config.dws_shrink_rate_max:.0%}")
+        print(f"     Smooth: {config.dws_smooth_steps} steps, Cooldown: {config.dws_min_steps_between} steps")
+        if custom_window_schedule:
+            print(f"     Custom schedule: {len(custom_window_schedule)} thresholds")
+        else:
+            print(f"     Default schedule: {len(dynamic_window_scheduler.schedule)} thresholds (128→1024)")
+    else:
+        print(f"  📏 Dynamic Window Scheduler: DISABLED (diagnostics only)")
 
     # Sattvic Brake (Lightweight Confidence via Phase Variance)
     sattvic_brake = SattvicBrake(
@@ -13651,6 +13988,52 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V9.8.9: Dynamic Window Scheduler Update
+                if dynamic_window_scheduler is not None:
+                    # Get VRAM usage for pressure override
+                    vram_usage = 0.0
+                    if device.type == "cuda":
+                        vram_used = torch.cuda.memory_allocated(device)
+                        vram_total = torch.cuda.get_device_properties(device).total_memory
+                        vram_usage = vram_used / vram_total
+
+                    # Update window size based on PPL
+                    dws_result = dynamic_window_scheduler.update(
+                        step=global_step,
+                        val_ppl=val_ppl,
+                        vram_usage=vram_usage,
+                    )
+
+                    # Log window changes (or diagnostic info)
+                    if dws_result['changed'] or dws_result['would_change']:
+                        progress_pct = int(dws_result['interpolation_progress'] * 100)
+                        if config.enable_dynamic_window:
+                            log_msg = f"  📏 [DWS] Window: {dws_result['window']} → {dws_result['target']} ({progress_pct}% interpolated)"
+                            log_msg += f" | Reason: {dws_result['reason']}"
+                            if dws_result['cooldown_active']:
+                                log_msg += f" | Cooldown: {dws_result['steps_until_cooldown']} steps"
+                            print(log_msg)
+
+                            # Apply window size to model if it supports it
+                            if hasattr(model, 'window_size'):
+                                old_window = model.window_size
+                                model.window_size = dws_result['window']
+                                if old_window != dws_result['window']:
+                                    print(f"     Updated model window: {old_window} → {dws_result['window']}")
+                            elif hasattr(model, 'config') and hasattr(model.config, 'window_size'):
+                                old_window = model.config.window_size
+                                model.config.window_size = dws_result['window']
+                                if old_window != dws_result['window']:
+                                    print(f"     Updated model.config window: {old_window} → {dws_result['window']}")
+                        else:
+                            # Diagnostic mode (disabled)
+                            if dws_result['would_change']:
+                                log_msg = f"  📏 [DWS-DIAGNOSTIC] WOULD CHANGE: {dws_result['window']} → {dws_result['target']}"
+                                log_msg += f" | Reason: {dws_result['reason']}"
+                                if dws_result['cooldown_active']:
+                                    log_msg += f" | (cooldown: {dws_result['steps_until_cooldown']} steps)"
+                                print(log_msg)
+
                 # V9.8.7: Dynamic Three-Phase Gyroscope Engagement
                 # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF, freedom to learn
                 # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED, gentle guidance
@@ -15552,6 +15935,29 @@ def main():
                        help="SPC velocity threshold for applying damping")
 
     # ==========================================================================
+    # V9.8.9: Dynamic Window Scheduler (DWS)
+    # Reference: Curriculum learning for receptive field dimension
+    # ==========================================================================
+    parser.add_argument("--enable_dynamic_window", action="store_true",
+                       help="Enable dynamic window sizing (PPL-adaptive attention span)")
+    parser.add_argument("--dws_schedule", type=str, default=None,
+                       help="Custom window schedule as 'ppl1:win1,ppl2:win2,...' (default: built-in smooth schedule)")
+    parser.add_argument("--dws_growth_rate_max", type=float, default=1.25,
+                       help="Maximum growth rate per transition (1.25 = 25%% max increase)")
+    parser.add_argument("--dws_shrink_rate_max", type=float, default=0.80,
+                       help="Maximum shrink rate per transition (0.80 = 20%% max decrease)")
+    parser.add_argument("--dws_align_to", type=int, default=32,
+                       help="Align windows to multiples (32 for GPU efficiency, 0 = no alignment)")
+    parser.add_argument("--dws_smooth_steps", type=int, default=100,
+                       help="Interpolate window transitions over N steps (prevents jumps)")
+    parser.add_argument("--dws_min_steps_between", type=int, default=200,
+                       help="Minimum steps between target changes (cooldown for stability)")
+    parser.add_argument("--dws_hysteresis", type=float, default=0.15,
+                       help="PPL hysteresis factor (15%% gap prevents thrashing)")
+    parser.add_argument("--dws_vram_threshold", type=float, default=0.85,
+                       help="VRAM threshold for emergency window shrink (85%%)")
+
+    # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture
     # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
@@ -16030,6 +16436,16 @@ def main():
         spc_max_rotation=args.spc_max_rotation,
         spc_damping=args.spc_damping,
         spc_velocity_threshold=args.spc_velocity_threshold,
+        # V9.8.9: Dynamic Window Scheduler (DWS)
+        enable_dynamic_window=args.enable_dynamic_window,
+        dws_schedule=args.dws_schedule,
+        dws_growth_rate_max=args.dws_growth_rate_max,
+        dws_shrink_rate_max=args.dws_shrink_rate_max,
+        dws_align_to=args.dws_align_to,
+        dws_smooth_steps=args.dws_smooth_steps,
+        dws_min_steps_between=args.dws_min_steps_between,
+        dws_hysteresis=args.dws_hysteresis,
+        dws_vram_threshold=args.dws_vram_threshold,
         # Phase-JEPA Configuration
         enable_jepa=args.enable_jepa,
         jepa_hidden_dim=args.jepa_hidden_dim,
