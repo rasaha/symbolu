@@ -71,8 +71,11 @@ class SattvicConfig:
 
     # Entropy variance detection
     variance_window: int = 50        # Window size for variance calculation
-    variance_threshold: float = 0.001  # Variance below this = stagnation
-    variance_release_threshold: float = 0.0001  # Variance must exceed this to release (10x trigger)
+    # V9.9.0 CRITICAL FIX: Increased variance threshold 10x to reduce thrashing
+    # PREVIOUS (WRONG): 0.001 was too tight → Boosted every time variance dipped slightly
+    # CORRECTED: 0.01 allows natural small fluctuations without triggering emergency boost
+    variance_threshold: float = 0.01   # Variance below this = stagnation (increased from 0.001)
+    variance_release_threshold: float = 0.001  # Variance must exceed this to release (10x trigger, updated from 0.0001)
     entropy_floor: float = 0.40      # Entropy below this = mode collapse
 
     # Boost settings
