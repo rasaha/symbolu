@@ -3794,6 +3794,314 @@ class AutoBatchSizer:
 
 
 # =============================================================================
+# SOVEREIGN PHASE CONTROLLER: Graduated, Damped, Layer-Specific Intervention
+# =============================================================================
+
+class SovereignPhaseController:
+    """
+    Sovereign Phase Controller - The "Nervous System" for Breaking Barriers.
+
+    Implements graduated response, rotation damping, and layer-specific targeting
+    to break through training plateaus and mode collapse without gradient instability.
+
+    Three-Part Architecture:
+    1. Graduated Response: Proportional intervention based on entropy + variance
+    2. Rotation Damping: Smooth phase transitions to prevent gradient spikes
+    3. Layer-Specific Targeting: Surgical interventions based on diagnostics
+
+    Hysteresis Design:
+    - Entry thresholds: entropy < 0.4 OR variance < 0.001
+    - Exit thresholds: entropy > 0.55 AND variance > 0.002 AND min_duration
+    - Prevents "1-step cycle" oscillation (boost → release → boost)
+
+    Version: 1.0.0 (V9.8.8)
+    Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    """
+
+    def __init__(
+        self,
+        enable: bool = False,
+        entropy_critical: float = 0.4,
+        entropy_warning: float = 0.5,
+        entropy_recovered: float = 0.55,
+        variance_critical: float = 0.0005,
+        variance_warning: float = 0.001,
+        variance_recovered: float = 0.002,
+        min_boost_duration: int = 100,
+        alpha: float = 0.2,
+        max_rotation_per_step: float = 0.3,
+        damping_coefficient: float = 0.9,
+        velocity_threshold: float = 0.2,
+    ):
+        """
+        Initialize Sovereign Phase Controller.
+
+        Args:
+            enable: Enable controller (default: False for safety)
+            entropy_critical: Red alert threshold (emergency boost)
+            entropy_warning: Yellow alert threshold (caution boost)
+            entropy_recovered: Exit threshold (hysteresis)
+            variance_critical: Red alert variance threshold
+            variance_warning: Yellow alert variance threshold
+            variance_recovered: Exit variance threshold
+            min_boost_duration: Minimum steps to stay in boost mode
+            alpha: EMA smoothing coefficient for rotation damping
+            max_rotation_per_step: Maximum rotation per step (radians)
+            damping_coefficient: Velocity damping coefficient
+            velocity_threshold: Velocity above which damping applies
+        """
+        self.enable = enable
+
+        # Thresholds with hysteresis
+        self.entropy_critical = entropy_critical
+        self.entropy_warning = entropy_warning
+        self.entropy_recovered = entropy_recovered
+        self.variance_critical = variance_critical
+        self.variance_warning = variance_warning
+        self.variance_recovered = variance_recovered
+
+        # Graduated response levels (steering force multipliers)
+        self.steering_levels = {
+            'normal': 0.15,    # Baseline gentle nudge
+            'caution': 0.30,   # Slight concern
+            'warning': 0.60,   # Moderate intervention
+            'critical': 1.0,   # Full nuclear option
+        }
+
+        # Damping parameters
+        self.alpha = alpha
+        self.max_rotation = max_rotation_per_step
+        self.damping = damping_coefficient
+        self.velocity_threshold = velocity_threshold
+
+        # Hysteresis state
+        self.boost_active = False
+        self.boost_start_step = None
+        self.min_boost_duration = min_boost_duration
+
+        # Layer-specific rotation state (for damping)
+        self.theta_prev = {}
+
+        # Statistics
+        self.total_interventions = 0
+        self.layer_intervention_counts = {}
+
+    def compute_intervention_level(
+        self,
+        entropy: float,
+        variance: float,
+    ) -> str:
+        """
+        Compute intervention level based on entropy and variance.
+
+        Uses BOTH metrics to avoid false positives from noise.
+
+        Returns:
+            'critical', 'warning', 'caution', or 'normal'
+        """
+        # Critical: Either metric at critical level
+        if entropy < self.entropy_critical or variance < self.variance_critical:
+            return 'critical'
+
+        # Warning: Both metrics moderately concerning
+        elif entropy < 0.45 and variance < 0.001:
+            return 'warning'
+
+        # Caution: Either metric at warning level
+        elif entropy < self.entropy_warning or variance < self.variance_warning:
+            return 'caution'
+
+        else:
+            return 'normal'
+
+    def compute_damped_rotation(
+        self,
+        layer: str,
+        theta_target: float,
+        step: int,
+    ) -> float:
+        """
+        Apply exponential smoothing + velocity limiting to phase rotation.
+
+        Prevents gradient discontinuities and oscillation by:
+        1. EMA smoothing: θ_applied = θ_prev + α(θ_target - θ_prev)
+        2. Velocity limiting: |Δθ| ≤ max_rotation_per_step
+        3. Velocity damping: If moving too fast, reduce by damping coefficient
+
+        Args:
+            layer: Layer identifier (e.g., 'O4', 'O9', 'O12')
+            theta_target: Target rotation angle (radians)
+            step: Current training step
+
+        Returns:
+            Damped rotation angle to apply (radians)
+        """
+        # Initialize if first time seeing this layer
+        if layer not in self.theta_prev:
+            self.theta_prev[layer] = 0.0
+
+        theta_prev = self.theta_prev[layer]
+
+        # Step 1: Exponential smoothing
+        theta_delta = self.alpha * (theta_target - theta_prev)
+
+        # Step 2: Velocity limiting (prevent sudden jumps)
+        if abs(theta_delta) > self.max_rotation:
+            theta_delta = math.copysign(self.max_rotation, theta_delta)
+
+        # Step 3: Apply
+        theta_applied = theta_prev + theta_delta
+
+        # Step 4: Velocity damping (prevent oscillation)
+        velocity = abs(theta_applied - theta_prev)
+        if velocity > self.velocity_threshold:
+            theta_applied = theta_applied * self.damping
+
+        # Store for next step
+        self.theta_prev[layer] = theta_applied
+
+        return theta_applied
+
+    def get_layer_targets(
+        self,
+        diagnostics: dict,
+    ) -> dict:
+        """
+        Determine which layers need intervention based on diagnostics.
+
+        Maps observable symptoms to layer-specific rotations:
+        - Vritti (mental states) → Layer targeting
+        - Bhava (intentions) → Integration layer
+        - Kosha (sheaths) → Synthesis layers
+
+        Args:
+            diagnostics: Dictionary containing vritti, bhava, kosha metrics
+
+        Returns:
+            Dict[layer_name, target_angle_radians]
+        """
+        targets = {}
+
+        # Extract diagnostics (handle missing keys gracefully)
+        vritti = diagnostics.get('vritti', {})
+        bhava = diagnostics.get('bhava', {})
+        kosha = diagnostics.get('kosha', {})
+
+        # === Vritti-based interventions ===
+        # Vikalpa loop (mental distortion) → Rotate O9 toward grounding
+        m_vikal = vritti.get('M_Vikal', 0.0)
+        if m_vikal > 0.8:
+            targets['O9'] = -math.pi / 4  # -45° toward Pramana (grounding)
+
+        # Pramana stuck (over-grounding) → Rotate O4 toward recall
+        p_pram = vritti.get('P_Pram', 0.0)
+        if p_pram > 0.9:
+            targets['O4'] = math.pi / 6   # +30° toward Smriti (memory)
+
+        # Smriti trap (stuck in memory) → Rotate O12 toward creativity
+        i_smrit = vritti.get('I_Smrit', 0.0)
+        if i_smrit > 0.9:
+            targets['O12'] = math.pi / 3  # +60° toward Viparyaya (creativity)
+
+        # === Bhava-based interventions ===
+        # Single Bhava dominance → Rotate O6 (integration layer)
+        if bhava:
+            bhava_max = max(bhava.values()) if bhava.values() else 0.0
+            if bhava_max > 0.4:
+                targets['O6'] = 0.0  # Rotate toward balance (neutral angle)
+
+        # === Kosha-based interventions ===
+        # Kosha imbalance → Dual rotation O9+O12
+        if kosha:
+            kosha_max = max(kosha.values()) if kosha.values() else 0.0
+            if kosha_max > 0.7:
+                targets['O9'] = math.pi / 8     # +22.5°
+                targets['O12'] = -math.pi / 8   # -22.5° (counter-rotate)
+
+        return targets
+
+    def update(
+        self,
+        step: int,
+        entropy: float,
+        variance: float,
+        diagnostics: dict,
+    ) -> dict:
+        """
+        Main update loop - combines graduated response, damping, and targeting.
+
+        Args:
+            step: Current training step
+            entropy: Current entropy value
+            variance: Current entropy variance
+            diagnostics: Dictionary with vritti, bhava, kosha metrics
+
+        Returns:
+            Dictionary containing:
+                - 'rotations': Dict[layer_name, rotation_radians]
+                - 'level': Intervention level ('critical', 'warning', etc.)
+                - 'boost_active': Whether boost mode is active
+                - 'steering_force': Current steering force multiplier
+                - 'would_trigger': True if would trigger (for disabled mode)
+        """
+        # Determine intervention level
+        level = self.compute_intervention_level(entropy, variance)
+        steering_force = self.steering_levels[level]
+
+        # Check if we should enter boost mode (with hysteresis)
+        would_trigger = False
+        if not self.boost_active and level in ['warning', 'critical']:
+            would_trigger = True
+            if self.enable:
+                self.boost_active = True
+                self.boost_start_step = step
+                self.total_interventions += 1
+
+        # Check if we should exit boost mode (with hysteresis)
+        if self.boost_active:
+            steps_boosting = step - self.boost_start_step
+            if (steps_boosting > self.min_boost_duration and
+                entropy > self.entropy_recovered and
+                variance > self.variance_recovered):
+                self.boost_active = False
+
+        # Get layer-specific targets
+        targets = self.get_layer_targets(diagnostics)
+
+        # Apply damped rotations
+        rotations = {}
+        for layer, theta_target in targets.items():
+            theta_damped = self.compute_damped_rotation(layer, theta_target, step)
+            # Scale by intervention level (only if enabled)
+            if self.enable and self.boost_active:
+                rotations[layer] = theta_damped * steering_force
+                # Track statistics
+                if layer not in self.layer_intervention_counts:
+                    self.layer_intervention_counts[layer] = 0
+                self.layer_intervention_counts[layer] += 1
+            else:
+                # Return what WOULD be applied (for diagnostics)
+                rotations[layer] = theta_damped * steering_force
+
+        return {
+            'rotations': rotations,
+            'level': level,
+            'boost_active': self.boost_active,
+            'steering_force': steering_force,
+            'would_trigger': would_trigger,
+            'targets': targets,
+        }
+
+    def get_statistics(self) -> dict:
+        """Get intervention statistics for logging."""
+        return {
+            'total_interventions': self.total_interventions,
+            'layer_intervention_counts': self.layer_intervention_counts.copy(),
+            'boost_active': self.boost_active,
+        }
+
+
+# =============================================================================
 # V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
 # =============================================================================
 
@@ -8175,6 +8483,23 @@ class UnifiedTrainingConfig:
     srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
 
     # ==========================================================================
+    # V9.8.8: Sovereign Phase Controller (SPC) Configuration
+    # Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    # ==========================================================================
+    enable_sovereign_phase_controller: bool = False  # Master toggle (DISABLED by default)
+    spc_entropy_critical: float = 0.4        # Red alert entropy threshold
+    spc_entropy_warning: float = 0.5         # Yellow alert entropy threshold
+    spc_entropy_recovered: float = 0.55      # Exit boost threshold (hysteresis)
+    spc_variance_critical: float = 0.0005    # Critical variance threshold (stagnation)
+    spc_variance_warning: float = 0.001      # Warning variance threshold
+    spc_variance_recovered: float = 0.002    # Exit boost variance threshold
+    spc_min_boost_duration: int = 100        # Minimum steps in boost mode (prevents oscillation)
+    spc_alpha: float = 0.2                   # EMA smoothing coefficient for rotation damping
+    spc_max_rotation: float = 0.3            # Maximum rotation per step (radians ~17°)
+    spc_damping: float = 0.9                 # Velocity damping coefficient
+    spc_velocity_threshold: float = 0.2      # Velocity threshold for applying damping
+
+    # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
     # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
@@ -10447,6 +10772,29 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  v2.7 State Tracker: ENABLED (EMA α=0.1)")
 
+    # V9.8.8: Sovereign Phase Controller (Graduated Phase Interventions)
+    sovereign_phase_controller = SovereignPhaseController(
+        enable=config.enable_sovereign_phase_controller,
+        entropy_critical=config.spc_entropy_critical,
+        entropy_warning=config.spc_entropy_warning,
+        entropy_recovered=config.spc_entropy_recovered,
+        variance_critical=config.spc_variance_critical,
+        variance_warning=config.spc_variance_warning,
+        variance_recovered=config.spc_variance_recovered,
+        min_boost_duration=config.spc_min_boost_duration,
+        alpha=config.spc_alpha,
+        max_rotation_per_step=config.spc_max_rotation,
+        damping_coefficient=config.spc_damping,
+        velocity_threshold=config.spc_velocity_threshold,
+    )
+    if config.enable_sovereign_phase_controller:
+        print(f"  🧠 Sovereign Phase Controller: ENABLED")
+        print(f"     Thresholds: entropy[{config.spc_entropy_critical:.2f}→{config.spc_entropy_warning:.2f}→{config.spc_entropy_recovered:.2f}]")
+        print(f"     Variance: [{config.spc_variance_critical:.4f}→{config.spc_variance_warning:.4f}→{config.spc_variance_recovered:.4f}]")
+        print(f"     Damping: α={config.spc_alpha}, max_rotation={config.spc_max_rotation:.2f}rad")
+    else:
+        print(f"  🧠 Sovereign Phase Controller: DISABLED (diagnostics only)")
+
     # Sattvic Brake (Lightweight Confidence via Phase Variance)
     sattvic_brake = SattvicBrake(
         model=model,
@@ -12660,6 +13008,47 @@ def train(config: UnifiedTrainingConfig):
                     'ent': entropy,
                     'know': knowledge,
                 })
+
+                # V9.8.8: Sovereign Phase Controller Update
+                if sovereign_phase_controller is not None:
+                    # Gather diagnostics from metrics
+                    spc_diagnostics = {
+                        'vritti': {
+                            'P_Pram': float(metrics.get('vritti_pram', 0.0)),
+                            'M_Vikal': float(metrics.get('vritti_vikal', 0.0)),
+                            'I_Smrit': float(metrics.get('vritti_smrit', 0.0)),
+                        },
+                        'bhava': {k: float(v) for k, v in metrics.items() if k.startswith('bhava_')},
+                        'kosha': {k: float(v) for k, v in metrics.items() if k.startswith('kosha_')},
+                    }
+
+                    # Update SPC with current state
+                    spc_result = sovereign_phase_controller.update(
+                        step=global_step,
+                        entropy=entropy,
+                        variance=sattvic_controller.entropy_variance,
+                        diagnostics=spc_diagnostics,
+                    )
+
+                    # Log SPC status at validation steps or when would trigger
+                    if global_step % config.val_every == 0 or spc_result['would_trigger']:
+                        level_icon = {'normal': '🟢', 'caution': '🟡', 'warning': '🟠', 'critical': '🔴'}
+                        icon = level_icon.get(spc_result['level'], '⚪')
+                        status_str = "ACTIVE" if spc_result['boost_active'] else "MONITORING"
+                        if config.enable_sovereign_phase_controller:
+                            log_msg = f"  {icon} [SPC] {status_str} | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
+                        else:
+                            # When disabled, show what WOULD happen
+                            if spc_result['would_trigger']:
+                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
+                            else:
+                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] Level:{spc_result['level'].upper()}"
+
+                        if spc_result['rotations']:
+                            rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
+                            log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
+
+                        print(log_msg)
 
                 # SGP Metabolic Step: Inject persisted gradients to Authority layers
                 pulse_applied = sgp_controller.sgp_metabolic_step({
@@ -15134,6 +15523,35 @@ def main():
                        help="Steps for System 1 warmup phase (Learn to Speak)")
 
     # ==========================================================================
+    # V9.8.8: Sovereign Phase Controller (SPC)
+    # Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    # ==========================================================================
+    parser.add_argument("--enable_sovereign_phase_controller", action="store_true",
+                       help="Enable Sovereign Phase Controller (graduated, damped phase interventions)")
+    parser.add_argument("--spc_entropy_critical", type=float, default=0.4,
+                       help="SPC critical entropy threshold (red alert)")
+    parser.add_argument("--spc_entropy_warning", type=float, default=0.5,
+                       help="SPC warning entropy threshold (yellow alert)")
+    parser.add_argument("--spc_entropy_recovered", type=float, default=0.55,
+                       help="SPC recovered entropy threshold (exit boost - hysteresis)")
+    parser.add_argument("--spc_variance_critical", type=float, default=0.0005,
+                       help="SPC critical variance threshold (stagnation detection)")
+    parser.add_argument("--spc_variance_warning", type=float, default=0.001,
+                       help="SPC warning variance threshold")
+    parser.add_argument("--spc_variance_recovered", type=float, default=0.002,
+                       help="SPC recovered variance threshold (exit boost)")
+    parser.add_argument("--spc_min_boost_duration", type=int, default=100,
+                       help="Minimum steps to stay in boost mode (prevents oscillation)")
+    parser.add_argument("--spc_alpha", type=float, default=0.2,
+                       help="SPC EMA smoothing coefficient for rotation damping")
+    parser.add_argument("--spc_max_rotation", type=float, default=0.3,
+                       help="SPC maximum rotation per step in radians (~17 degrees)")
+    parser.add_argument("--spc_damping", type=float, default=0.9,
+                       help="SPC velocity damping coefficient")
+    parser.add_argument("--spc_velocity_threshold", type=float, default=0.2,
+                       help="SPC velocity threshold for applying damping")
+
+    # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture
     # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
@@ -15599,6 +16017,19 @@ def main():
         # SRK Annealing
         srk_total_steps=args.srk_total_steps,
         srk_warmup_steps=args.srk_warmup_steps,
+        # V9.8.8: Sovereign Phase Controller (SPC)
+        enable_sovereign_phase_controller=args.enable_sovereign_phase_controller,
+        spc_entropy_critical=args.spc_entropy_critical,
+        spc_entropy_warning=args.spc_entropy_warning,
+        spc_entropy_recovered=args.spc_entropy_recovered,
+        spc_variance_critical=args.spc_variance_critical,
+        spc_variance_warning=args.spc_variance_warning,
+        spc_variance_recovered=args.spc_variance_recovered,
+        spc_min_boost_duration=args.spc_min_boost_duration,
+        spc_alpha=args.spc_alpha,
+        spc_max_rotation=args.spc_max_rotation,
+        spc_damping=args.spc_damping,
+        spc_velocity_threshold=args.spc_velocity_threshold,
         # Phase-JEPA Configuration
         enable_jepa=args.enable_jepa,
         jepa_hidden_dim=args.jepa_hidden_dim,
