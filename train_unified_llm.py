@@ -2843,14 +2843,31 @@ class HierarchicalGradientScaler:
         self,
         new_authority_layers: int,
         new_sensory_layers: int,
-        new_alpha_min: float,
-        new_alpha_max: float,
-        new_warmup_steps: int,
+        new_alpha_min: float = None,
+        new_alpha_max: float = None,
+        new_warmup_steps: int = 100,
+        alpha_range: tuple = None,  # V9.9.3: Alternative to separate min/max
     ):
         """
         Reconfigure the scaler for a new split configuration.
-        Used for dynamic 9:3 → 6:6 transitions.
+        Used for dynamic 9:3 → 6:6 transitions and Inverted Curriculum evolution.
+
+        Args:
+            new_authority_layers: New count of authority layers
+            new_sensory_layers: New count of sensory layers
+            new_alpha_min: Minimum alpha for sensory (or use alpha_range)
+            new_alpha_max: Maximum alpha for sensory (or use alpha_range)
+            new_warmup_steps: Steps for warmup ramp
+            alpha_range: Alternative tuple (min, max) for alpha values
         """
+        # V9.9.3: Handle alpha_range tuple format
+        if alpha_range is not None:
+            new_alpha_min, new_alpha_max = alpha_range
+        elif new_alpha_min is None or new_alpha_max is None:
+            # Use current values if not specified
+            new_alpha_min = new_alpha_min or self.alpha_sens_min
+            new_alpha_max = new_alpha_max or self.alpha_sens_max
+
         # Remove existing hooks
         self.remove_hooks()
 
@@ -15122,14 +15139,17 @@ def train(config: UnifiedTrainingConfig):
                         )
 
                     # Handle split change - reconfigure gradient scaler
+                    # V9.9.3: CRITICAL - Must call reconfigure() to re-register hooks!
+                    # Just setting properties causes Gradient Stagnation (Gemini's warning)
                     if ilc_result['split_changed'] and gradient_scaler_hgs is not None:
                         new_auth, new_sens = ilc_result['current_split']
-                        gradient_scaler_hgs.authority_layers = new_auth
-                        gradient_scaler_hgs.sensory_layers = new_sens
-                        # V9.9.3: Force HGS re-calibration after split change
-                        if hasattr(gradient_scaler_hgs, 'recalibrate'):
-                            gradient_scaler_hgs.recalibrate()
-                        print(f"  🔧 [HGS] Reconfigured for {new_auth}:{new_sens} split")
+                        gradient_scaler_hgs.reconfigure(
+                            new_authority_layers=new_auth,
+                            new_sensory_layers=new_sens,
+                            alpha_range=(0.1, 0.7),  # Standard range for inverted curriculum
+                            new_warmup_steps=100,    # Quick re-warmup after split change
+                        )
+                        print(f"  🔧 [HGS] Re-registered hooks for {new_auth}:{new_sens} split")
 
                     # Handle seq_len change (when using delegated seq_len_curriculum)
                     # V9.9.2: If seq_len is delegated, handle reload here instead of separate block
