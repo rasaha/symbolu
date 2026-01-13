@@ -3794,6 +3794,637 @@ class AutoBatchSizer:
 
 
 # =============================================================================
+# SOVEREIGN PHASE CONTROLLER: Graduated, Damped, Layer-Specific Intervention
+# =============================================================================
+
+class SovereignPhaseController:
+    """
+    Sovereign Phase Controller - The "Nervous System" for Breaking Barriers.
+
+    Implements graduated response, rotation damping, and layer-specific targeting
+    to break through training plateaus and mode collapse without gradient instability.
+
+    Three-Part Architecture:
+    1. Graduated Response: Proportional intervention based on entropy + variance
+    2. Rotation Damping: Smooth phase transitions to prevent gradient spikes
+    3. Layer-Specific Targeting: Surgical interventions based on diagnostics
+
+    Hysteresis Design:
+    - Entry thresholds: entropy < 0.4 OR variance < 0.001
+    - Exit thresholds: entropy > 0.55 AND variance > 0.002 AND min_duration
+    - Prevents "1-step cycle" oscillation (boost → release → boost)
+
+    Version: 1.0.0 (V9.8.8)
+    Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    """
+
+    def __init__(
+        self,
+        enable: bool = False,
+        entropy_critical: float = 0.4,
+        entropy_warning: float = 0.5,
+        entropy_recovered: float = 0.55,
+        variance_critical: float = 0.0005,
+        variance_warning: float = 0.001,
+        variance_recovered: float = 0.002,
+        min_boost_duration: int = 100,
+        alpha: float = 0.2,
+        max_rotation_per_step: float = 0.3,
+        damping_coefficient: float = 0.9,
+        velocity_threshold: float = 0.2,
+    ):
+        """
+        Initialize Sovereign Phase Controller.
+
+        Args:
+            enable: Enable controller (default: False for safety)
+            entropy_critical: Red alert threshold (emergency boost)
+            entropy_warning: Yellow alert threshold (caution boost)
+            entropy_recovered: Exit threshold (hysteresis)
+            variance_critical: Red alert variance threshold
+            variance_warning: Yellow alert variance threshold
+            variance_recovered: Exit variance threshold
+            min_boost_duration: Minimum steps to stay in boost mode
+            alpha: EMA smoothing coefficient for rotation damping
+            max_rotation_per_step: Maximum rotation per step (radians)
+            damping_coefficient: Velocity damping coefficient
+            velocity_threshold: Velocity above which damping applies
+        """
+        self.enable = enable
+
+        # Thresholds with hysteresis
+        self.entropy_critical = entropy_critical
+        self.entropy_warning = entropy_warning
+        self.entropy_recovered = entropy_recovered
+        self.variance_critical = variance_critical
+        self.variance_warning = variance_warning
+        self.variance_recovered = variance_recovered
+
+        # Graduated response levels (steering force multipliers)
+        self.steering_levels = {
+            'normal': 0.15,    # Baseline gentle nudge
+            'caution': 0.30,   # Slight concern
+            'warning': 0.60,   # Moderate intervention
+            'critical': 1.0,   # Full nuclear option
+        }
+
+        # Damping parameters
+        self.alpha = alpha
+        self.max_rotation = max_rotation_per_step
+        self.damping = damping_coefficient
+        self.velocity_threshold = velocity_threshold
+
+        # Hysteresis state
+        self.boost_active = False
+        self.boost_start_step = None
+        self.min_boost_duration = min_boost_duration
+
+        # Layer-specific rotation state (for damping)
+        self.theta_prev = {}
+
+        # Statistics
+        self.total_interventions = 0
+        self.layer_intervention_counts = {}
+
+    def compute_intervention_level(
+        self,
+        entropy: float,
+        variance: float,
+    ) -> str:
+        """
+        Compute intervention level based on entropy and variance.
+
+        Uses BOTH metrics to avoid false positives from noise.
+
+        Returns:
+            'critical', 'warning', 'caution', or 'normal'
+        """
+        # Critical: Either metric at critical level
+        if entropy < self.entropy_critical or variance < self.variance_critical:
+            return 'critical'
+
+        # Warning: Both metrics moderately concerning
+        elif entropy < 0.45 and variance < 0.001:
+            return 'warning'
+
+        # Caution: Either metric at warning level
+        elif entropy < self.entropy_warning or variance < self.variance_warning:
+            return 'caution'
+
+        else:
+            return 'normal'
+
+    def compute_damped_rotation(
+        self,
+        layer: str,
+        theta_target: float,
+        step: int,
+    ) -> float:
+        """
+        Apply exponential smoothing + velocity limiting to phase rotation.
+
+        Prevents gradient discontinuities and oscillation by:
+        1. EMA smoothing: θ_applied = θ_prev + α(θ_target - θ_prev)
+        2. Velocity limiting: |Δθ| ≤ max_rotation_per_step
+        3. Velocity damping: If moving too fast, reduce by damping coefficient
+
+        Args:
+            layer: Layer identifier (e.g., 'O4', 'O9', 'O12')
+            theta_target: Target rotation angle (radians)
+            step: Current training step
+
+        Returns:
+            Damped rotation angle to apply (radians)
+        """
+        # Initialize if first time seeing this layer
+        if layer not in self.theta_prev:
+            self.theta_prev[layer] = 0.0
+
+        theta_prev = self.theta_prev[layer]
+
+        # Step 1: Exponential smoothing
+        theta_delta = self.alpha * (theta_target - theta_prev)
+
+        # Step 2: Velocity limiting (prevent sudden jumps)
+        if abs(theta_delta) > self.max_rotation:
+            theta_delta = math.copysign(self.max_rotation, theta_delta)
+
+        # Step 3: Apply
+        theta_applied = theta_prev + theta_delta
+
+        # Step 4: Velocity damping (prevent oscillation)
+        velocity = abs(theta_applied - theta_prev)
+        if velocity > self.velocity_threshold:
+            theta_applied = theta_applied * self.damping
+
+        # Store for next step
+        self.theta_prev[layer] = theta_applied
+
+        return theta_applied
+
+    def get_layer_targets(
+        self,
+        diagnostics: dict,
+    ) -> dict:
+        """
+        Determine which layers need intervention based on diagnostics.
+
+        Maps observable symptoms to layer-specific rotations:
+        - Vritti (mental states) → Layer targeting
+        - Bhava (intentions) → Integration layer
+        - Kosha (sheaths) → Synthesis layers
+
+        Args:
+            diagnostics: Dictionary containing vritti, bhava, kosha metrics
+
+        Returns:
+            Dict[layer_name, target_angle_radians]
+        """
+        targets = {}
+
+        # Extract diagnostics (handle missing keys gracefully)
+        vritti = diagnostics.get('vritti', {})
+        bhava = diagnostics.get('bhava', {})
+        kosha = diagnostics.get('kosha', {})
+
+        # === Vritti-based interventions ===
+        # Vikalpa loop (mental distortion) → Rotate O9 toward grounding
+        m_vikal = vritti.get('M_Vikal', 0.0)
+        if m_vikal > 0.8:
+            targets['O9'] = -math.pi / 4  # -45° toward Pramana (grounding)
+
+        # Pramana stuck (over-grounding) → Rotate O4 toward recall
+        p_pram = vritti.get('P_Pram', 0.0)
+        if p_pram > 0.9:
+            targets['O4'] = math.pi / 6   # +30° toward Smriti (memory)
+
+        # Smriti trap (stuck in memory) → Rotate O12 toward creativity
+        i_smrit = vritti.get('I_Smrit', 0.0)
+        if i_smrit > 0.9:
+            targets['O12'] = math.pi / 3  # +60° toward Viparyaya (creativity)
+
+        # === Bhava-based interventions ===
+        # Single Bhava dominance → Rotate O6 (integration layer)
+        if bhava:
+            bhava_max = max(bhava.values()) if bhava.values() else 0.0
+            if bhava_max > 0.4:
+                targets['O6'] = 0.0  # Rotate toward balance (neutral angle)
+
+        # === Kosha-based interventions ===
+        # Kosha imbalance → Dual rotation O9+O12
+        if kosha:
+            kosha_max = max(kosha.values()) if kosha.values() else 0.0
+            if kosha_max > 0.7:
+                targets['O9'] = math.pi / 8     # +22.5°
+                targets['O12'] = -math.pi / 8   # -22.5° (counter-rotate)
+
+        return targets
+
+    def update(
+        self,
+        step: int,
+        entropy: float,
+        variance: float,
+        diagnostics: dict,
+    ) -> dict:
+        """
+        Main update loop - combines graduated response, damping, and targeting.
+
+        Args:
+            step: Current training step
+            entropy: Current entropy value
+            variance: Current entropy variance
+            diagnostics: Dictionary with vritti, bhava, kosha metrics
+
+        Returns:
+            Dictionary containing:
+                - 'rotations': Dict[layer_name, rotation_radians]
+                - 'level': Intervention level ('critical', 'warning', etc.)
+                - 'boost_active': Whether boost mode is active
+                - 'steering_force': Current steering force multiplier
+                - 'would_trigger': True if would trigger (for disabled mode)
+        """
+        # Determine intervention level
+        level = self.compute_intervention_level(entropy, variance)
+        steering_force = self.steering_levels[level]
+
+        # Check if we should enter boost mode (with hysteresis)
+        would_trigger = False
+        if not self.boost_active and level in ['warning', 'critical']:
+            would_trigger = True
+            if self.enable:
+                self.boost_active = True
+                self.boost_start_step = step
+                self.total_interventions += 1
+
+        # Check if we should exit boost mode (with hysteresis)
+        if self.boost_active:
+            steps_boosting = step - self.boost_start_step
+            if (steps_boosting > self.min_boost_duration and
+                entropy > self.entropy_recovered and
+                variance > self.variance_recovered):
+                self.boost_active = False
+
+        # Get layer-specific targets
+        targets = self.get_layer_targets(diagnostics)
+
+        # Apply damped rotations
+        rotations = {}
+        for layer, theta_target in targets.items():
+            theta_damped = self.compute_damped_rotation(layer, theta_target, step)
+            # Scale by intervention level (only if enabled)
+            if self.enable and self.boost_active:
+                rotations[layer] = theta_damped * steering_force
+                # Track statistics
+                if layer not in self.layer_intervention_counts:
+                    self.layer_intervention_counts[layer] = 0
+                self.layer_intervention_counts[layer] += 1
+            else:
+                # Return what WOULD be applied (for diagnostics)
+                rotations[layer] = theta_damped * steering_force
+
+        return {
+            'rotations': rotations,
+            'level': level,
+            'boost_active': self.boost_active,
+            'steering_force': steering_force,
+            'would_trigger': would_trigger,
+            'targets': targets,
+        }
+
+    def get_statistics(self) -> dict:
+        """Get intervention statistics for logging."""
+        return {
+            'total_interventions': self.total_interventions,
+            'layer_intervention_counts': self.layer_intervention_counts.copy(),
+            'boost_active': self.boost_active,
+        }
+
+
+# =============================================================================
+# DYNAMIC WINDOW SCHEDULER: PPL-Adaptive Local Attention Window
+# =============================================================================
+
+class DynamicWindowScheduler:
+    """
+    Dynamic Window Scheduler - PPL-Adaptive Local Attention Window Sizing.
+
+    Implements curriculum learning for attention span: small windows early
+    (syntax learning), large windows late (long-range reasoning).
+
+    Philosophy:
+    - Early training (high PPL): Small window → Faster, cleaner gradients
+    - Late training (low PPL): Large window → Long-range dependencies
+
+    Memory Tradeoff:
+    - Smaller window = Less VRAM = Can increase batch size
+    - O(N×W) complexity: halving window = 50% memory savings
+
+    Smooth Progression:
+    - Uses intermediate values (not just powers of 2)
+    - Gradual transitions (interpolates over N steps)
+    - Growth rate limiting (max 25% per transition)
+
+    Version: 1.0.0 (V9.8.9)
+    Reference: Curriculum learning for receptive field dimension
+    """
+
+    def __init__(
+        self,
+        enable: bool = False,
+        window_schedule: dict = None,
+        growth_rate_max: float = 1.25,
+        shrink_rate_max: float = 0.80,
+        align_to_multiple: int = 32,
+        smooth_transition_steps: int = 100,
+        min_steps_between_changes: int = 200,
+        hysteresis_factor: float = 0.15,
+        vram_shrink_threshold: float = 0.85,
+        initial_ppl: float = None,
+    ):
+        """
+        Initialize Dynamic Window Scheduler.
+
+        Args:
+            enable: Enable dynamic window sizing (default: False for safety)
+            window_schedule: Dict mapping PPL → window_size. Default:
+                {800:128, 500:160, 350:192, 240:224, 170:256, 125:288, 95:320,
+                 75:352, 60:384, 48:416, 39:448, 32:480, 26:512, 21:576,
+                 17:640, 14:704, 11:768, 9:832, 7:896, 5:960, 3:1024}
+            growth_rate_max: Maximum growth per transition (1.25 = 25% max)
+            shrink_rate_max: Maximum shrink per transition (0.80 = 20% max)
+            align_to_multiple: Round windows to multiples (32 for GPU alignment)
+            smooth_transition_steps: Interpolate window over N steps (prevents jumps)
+            min_steps_between_changes: Cooldown between target changes (stability)
+            hysteresis_factor: PPL gap for shrinking (prevents thrashing)
+            vram_shrink_threshold: Emergency shrink if VRAM > threshold
+            initial_ppl: Starting PPL (for checkpoint resume). If provided, sets
+                appropriate starting window. If None, starts at smallest (128).
+        """
+        self.enable = enable
+
+        # Default schedule: smooth progression aligned to 32
+        if window_schedule is None:
+            window_schedule = {
+                800: 128,   # Syntax learning (very high PPL)
+                500: 160,   # Basic semantics (+25%)
+                350: 192,   # Improving semantics (+20%)
+                240: 224,   # Good semantics (+17%)
+                170: 256,   # Paragraph coherence (+14%)
+                125: 288,   # Multi-sentence (+13%)
+                95: 320,    # Short documents (+11%)
+                75: 352,    # Medium documents (+10%)
+                60: 384,    # Long documents (+9%)
+                48: 416,    # Very long context (+8%)
+                39: 448,    # Reasoning start (+8%)
+                32: 480,    # Multi-hop reasoning (+7%)
+                26: 512,    # Complex reasoning (+7%)
+                21: 576,    # Advanced reasoning (+13%)
+                17: 640,    # Expert reasoning (+11%)
+                14: 704,    # Deep reasoning (+10%)
+                11: 768,    # Master level (+9%)
+                9: 832,     # Expert+ level (+8%)
+                7: 896,     # Near mastery (+8%)
+                5: 960,     # Approaching mastery (+7%)
+                3: 1024,    # Full context mastery (+7%)
+            }
+
+        # Sort schedule by PPL descending
+        self.schedule = sorted(window_schedule.items(), reverse=True)
+
+        # Parameters
+        self.growth_rate_max = growth_rate_max
+        self.shrink_rate_max = shrink_rate_max
+        self.align_to = align_to_multiple
+        self.smooth_steps = smooth_transition_steps
+        self.min_steps_between = min_steps_between_changes
+        self.hysteresis = hysteresis_factor
+        self.vram_threshold = vram_shrink_threshold
+
+        # State: Initialize window based on PPL if provided
+        if initial_ppl is not None:
+            # Find appropriate starting window for current PPL
+            starting_window = self.schedule[-1][1]  # Default to max (1024)
+            for ppl_threshold, window_size in self.schedule:
+                if initial_ppl > ppl_threshold:
+                    starting_window = window_size
+                    break
+            self.current_window = self._align_window(starting_window)
+        else:
+            # No initial PPL: start with smallest window (fresh training)
+            self.current_window = self.schedule[0][1]  # First entry (128)
+
+        self.target_window = self.current_window
+        self.transition_start_step = 0
+        self.transition_start_window = self.current_window
+        self.last_target_change_step = 0
+
+        # Statistics
+        self.total_expansions = 0
+        self.total_shrinks = 0
+        self.total_vram_overrides = 0
+
+    def _align_window(self, window: int) -> int:
+        """Align window to multiple for GPU efficiency."""
+        if self.align_to > 1:
+            return ((window + self.align_to - 1) // self.align_to) * self.align_to
+        return window
+
+    def _smooth_transition(self, step: int) -> int:
+        """
+        Smoothly interpolate from start window to target window.
+
+        Instead of jumping 384 → 512 instantly:
+        - Step 0: 384
+        - Step 25: 416 (25% progress)
+        - Step 50: 448 (50% progress)
+        - Step 75: 480 (75% progress)
+        - Step 100: 512 (complete)
+        """
+        if step < self.transition_start_step:
+            return self.transition_start_window
+
+        steps_since_start = step - self.transition_start_step
+        if steps_since_start >= self.smooth_steps:
+            return self.target_window
+
+        # Linear interpolation
+        progress = steps_since_start / self.smooth_steps
+        interpolated = (
+            self.transition_start_window +
+            (self.target_window - self.transition_start_window) * progress
+        )
+
+        return self._align_window(int(interpolated))
+
+    def update(
+        self,
+        step: int,
+        val_ppl: float,
+        vram_usage: float = 0.0,
+    ) -> dict:
+        """
+        Update window size based on PPL and VRAM.
+
+        Args:
+            step: Current training step
+            val_ppl: Validation PPL
+            vram_usage: VRAM usage fraction (0.0-1.0)
+
+        Returns:
+            Dictionary containing:
+                - 'window': Current window size (interpolated)
+                - 'target': Target window size
+                - 'changed': Whether target changed this step
+                - 'reason': Reason for change
+                - 'would_change': True if would change (for disabled mode)
+        """
+        # Cooldown check (prevent thrashing)
+        steps_since_change = step - self.last_target_change_step
+        cooldown_active = steps_since_change < self.min_steps_between
+
+        # Determine target window from schedule
+        scheduled_target = self.schedule[-1][1]  # Default to max
+        for ppl_threshold, window_size in self.schedule:
+            if val_ppl > ppl_threshold:
+                scheduled_target = self._align_window(window_size)
+                break
+
+        # VRAM pressure override (safety)
+        vram_override = False
+        if vram_usage > 0.90:
+            # Critical VRAM - emergency shrink
+            scheduled_target = min(scheduled_target, self._align_window(256))
+            vram_override = True
+        elif vram_usage > self.vram_threshold:
+            # High VRAM - don't expand
+            scheduled_target = min(scheduled_target, self.target_window)
+            if scheduled_target < self.target_window:
+                vram_override = True
+
+        # Check if target should change
+        would_change = False
+        reason = "stable"
+
+        if scheduled_target != self.target_window and not cooldown_active:
+            would_change = True
+
+            # Growth: Apply rate limiting
+            if scheduled_target > self.target_window:
+                max_allowed = int(self.target_window * self.growth_rate_max)
+                if scheduled_target > max_allowed:
+                    scheduled_target = self._align_window(max_allowed)
+                    reason = "growth_rate_limited"
+                else:
+                    reason = f"ppl_improved_{val_ppl:.0f}"
+
+                # Hysteresis check for growth
+                # Only grow if PPL is definitively below threshold
+                ppl_hysteresis_met = True
+                for ppl_thresh, win_size in self.schedule:
+                    if win_size == scheduled_target:
+                        # Require PPL to be below threshold - hysteresis%
+                        if val_ppl > ppl_thresh * (1 - self.hysteresis):
+                            ppl_hysteresis_met = False
+                            would_change = False
+                            reason = "hysteresis_block_growth"
+                        break
+
+            # Shrink: Apply rate limiting
+            elif scheduled_target < self.target_window:
+                min_allowed = int(self.target_window * self.shrink_rate_max)
+                if scheduled_target < min_allowed:
+                    scheduled_target = self._align_window(min_allowed)
+                    reason = "shrink_rate_limited"
+                else:
+                    reason = f"ppl_degraded_{val_ppl:.0f}"
+
+                # Hysteresis check for shrinking
+                # Only shrink if PPL is definitively above threshold
+                ppl_hysteresis_met = True
+                for ppl_thresh, win_size in self.schedule:
+                    if win_size == self.target_window:
+                        # Require PPL to be above threshold + hysteresis%
+                        if val_ppl < ppl_thresh * (1 + self.hysteresis):
+                            ppl_hysteresis_met = False
+                            would_change = False
+                            reason = "hysteresis_block_shrink"
+                        break
+
+            if vram_override:
+                reason = f"vram_override_{vram_usage:.0%}"
+
+        # Apply target change if enabled
+        target_changed = False
+        if would_change and self.enable:
+            self.transition_start_step = step
+            self.transition_start_window = self.current_window
+            self.target_window = scheduled_target
+            self.last_target_change_step = step
+            target_changed = True
+
+            # Update statistics
+            if scheduled_target > self.transition_start_window:
+                self.total_expansions += 1
+            else:
+                self.total_shrinks += 1
+            if vram_override:
+                self.total_vram_overrides += 1
+
+        # Compute current window (smooth interpolation)
+        old_window = self.current_window
+        if self.enable:
+            self.current_window = self._smooth_transition(step)
+        else:
+            # When disabled, show what target would be
+            self.current_window = old_window
+
+        return {
+            'window': self.current_window,
+            'target': self.target_window if self.enable else scheduled_target,
+            'changed': target_changed,
+            'reason': reason,
+            'would_change': would_change,
+            'cooldown_active': cooldown_active,
+            'steps_until_cooldown': max(0, self.min_steps_between - steps_since_change),
+            'interpolation_progress': min(1.0, (step - self.transition_start_step) / self.smooth_steps) if self.enable else 0.0,
+        }
+
+    def set_initial_window_from_ppl(self, ppl: float) -> int:
+        """
+        Set starting window based on current PPL (for checkpoint resume).
+
+        Args:
+            ppl: Current validation PPL
+
+        Returns:
+            The window size that was set
+        """
+        # Find appropriate window for this PPL
+        starting_window = self.schedule[-1][1]  # Default to max (1024)
+        for ppl_threshold, window_size in self.schedule:
+            if ppl > ppl_threshold:
+                starting_window = window_size
+                break
+
+        self.current_window = self._align_window(starting_window)
+        self.target_window = self.current_window
+        self.transition_start_window = self.current_window
+
+        return self.current_window
+
+    def get_statistics(self) -> dict:
+        """Get window change statistics for logging."""
+        return {
+            'current_window': self.current_window,
+            'target_window': self.target_window,
+            'total_expansions': self.total_expansions,
+            'total_shrinks': self.total_shrinks,
+            'total_vram_overrides': self.total_vram_overrides,
+        }
+
+
+# =============================================================================
 # V2.7 TRAINING STATE TRACKER: Knowledge State Evolution
 # =============================================================================
 
@@ -5290,7 +5921,7 @@ class AdaptiveTrainingController:
 # SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
 # =============================================================================
 
-class SovereignPhaseController:
+class ResonanceStateScheduler:
     """
     Implements the Rational Sovereign Sequence (RSS) for staged engagement
     of auxiliary gradient systems based on PPL thresholds.
@@ -5315,7 +5946,7 @@ class SovereignPhaseController:
     Components cannot disengage once they pass their PPL threshold.
 
     Usage:
-        controller = SovereignPhaseController(config)
+        controller = ResonanceStateScheduler(config)
         # In training loop:
         weights = controller.get_gate_weights(current_ppl, global_step)
         # Apply weights to auxiliary losses
@@ -7700,6 +8331,13 @@ class UnifiedTrainingConfig:
     vocab_size: int = 50257
     max_seq_len: int = 2048
     dropout: float = 0.1
+    attention_dropout: float = 0.1
+
+    # Architecture overrides (optional - if None, use model_size preset)
+    n_layer: Optional[int] = None
+    n_head: Optional[int] = None
+    n_embd: Optional[int] = None
+    n_kv_heads: Optional[int] = None
 
     # Phase-specific parameters
     sync_steps: int = 3
@@ -8214,6 +8852,37 @@ class UnifiedTrainingConfig:
     # SRK Annealing (Lambda Warmup)
     srk_total_steps: int = 50000             # Total training steps for annealing
     srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
+
+    # ==========================================================================
+    # V9.8.8: Sovereign Phase Controller (SPC) Configuration
+    # Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    # ==========================================================================
+    enable_sovereign_phase_controller: bool = False  # Master toggle (DISABLED by default)
+    spc_entropy_critical: float = 0.4        # Red alert entropy threshold
+    spc_entropy_warning: float = 0.5         # Yellow alert entropy threshold
+    spc_entropy_recovered: float = 0.55      # Exit boost threshold (hysteresis)
+    spc_variance_critical: float = 0.0005    # Critical variance threshold (stagnation)
+    spc_variance_warning: float = 0.001      # Warning variance threshold
+    spc_variance_recovered: float = 0.002    # Exit boost variance threshold
+    spc_min_boost_duration: int = 100        # Minimum steps in boost mode (prevents oscillation)
+    spc_alpha: float = 0.2                   # EMA smoothing coefficient for rotation damping
+    spc_max_rotation: float = 0.3            # Maximum rotation per step (radians ~17°)
+    spc_damping: float = 0.9                 # Velocity damping coefficient
+    spc_velocity_threshold: float = 0.2      # Velocity threshold for applying damping
+
+    # ==========================================================================
+    # V9.8.9: Dynamic Window Scheduler (DWS) Configuration
+    # Reference: Curriculum learning for receptive field dimension
+    # ==========================================================================
+    enable_dynamic_window: bool = False      # Master toggle (DISABLED by default)
+    dws_schedule: Optional[str] = None       # Custom schedule "ppl1:win1,ppl2:win2,..."
+    dws_growth_rate_max: float = 1.25        # Maximum growth rate (25% per transition)
+    dws_shrink_rate_max: float = 0.80        # Maximum shrink rate (20% per transition)
+    dws_align_to: int = 32                   # Align to multiples (GPU efficiency)
+    dws_smooth_steps: int = 100              # Interpolation steps (smooth transitions)
+    dws_min_steps_between: int = 200         # Cooldown between changes (stability)
+    dws_hysteresis: float = 0.15             # PPL hysteresis factor (prevent thrashing)
+    dws_vram_threshold: float = 0.85         # VRAM emergency shrink threshold
 
     # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture Configuration
@@ -8737,6 +9406,29 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     """Create model based on configuration."""
     preset = MODEL_PRESETS[config.model_size]
 
+    # Apply architecture overrides if provided
+    embed_dim = config.n_embd if config.n_embd is not None else preset["embed_dim"]
+    num_layers = config.n_layer if config.n_layer is not None else preset["num_layers"]
+    num_heads = config.n_head if config.n_head is not None else preset["num_heads"]
+    ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
+    n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
+
+    # Print architecture configuration
+    print(f"\n{'='*80}")
+    print(f"Model Architecture: {config.model_type} ({config.model_size} preset)")
+    print(f"{'='*80}")
+    if config.n_embd is not None or config.n_layer is not None or config.n_head is not None:
+        print(f"  ⚙️  Architecture Overrides Active:")
+    print(f"  Embedding Dimension:  {embed_dim}" + (" (override)" if config.n_embd is not None else ""))
+    print(f"  Number of Layers:     {num_layers}" + (" (override)" if config.n_layer is not None else ""))
+    print(f"  Number of Heads:      {num_heads}" + (" (override)" if config.n_head is not None else ""))
+    print(f"  FFN Dimension:        {ff_dim}")
+    if n_kv_heads is not None:
+        print(f"  KV Heads (GQA):       {n_kv_heads} (override)")
+    print(f"  Dropout:              {config.dropout}")
+    print(f"  Attention Dropout:    {config.attention_dropout}")
+    print(f"{'='*80}\n")
+
     if config.model_type == "ontological":
         if not ONTOLOGICAL_AVAILABLE:
             raise ImportError("Ontological models not available. Check imports.")
@@ -8855,10 +9547,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = OntologicalHybridTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            n_kv_heads=n_kv_heads,  # V9.8.7: GQA support
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             local_layers=config.local_layers,
@@ -10464,6 +11157,66 @@ def train(config: UnifiedTrainingConfig):
     )
     print(f"  v2.7 State Tracker: ENABLED (EMA α=0.1)")
 
+    # V9.8.8: Sovereign Phase Controller (Graduated Phase Interventions)
+    sovereign_phase_controller = SovereignPhaseController(
+        enable=config.enable_sovereign_phase_controller,
+        entropy_critical=config.spc_entropy_critical,
+        entropy_warning=config.spc_entropy_warning,
+        entropy_recovered=config.spc_entropy_recovered,
+        variance_critical=config.spc_variance_critical,
+        variance_warning=config.spc_variance_warning,
+        variance_recovered=config.spc_variance_recovered,
+        min_boost_duration=config.spc_min_boost_duration,
+        alpha=config.spc_alpha,
+        max_rotation_per_step=config.spc_max_rotation,
+        damping_coefficient=config.spc_damping,
+        velocity_threshold=config.spc_velocity_threshold,
+    )
+    if config.enable_sovereign_phase_controller:
+        print(f"  🧠 Sovereign Phase Controller: ENABLED")
+        print(f"     Thresholds: entropy[{config.spc_entropy_critical:.2f}→{config.spc_entropy_warning:.2f}→{config.spc_entropy_recovered:.2f}]")
+        print(f"     Variance: [{config.spc_variance_critical:.4f}→{config.spc_variance_warning:.4f}→{config.spc_variance_recovered:.4f}]")
+        print(f"     Damping: α={config.spc_alpha}, max_rotation={config.spc_max_rotation:.2f}rad")
+    else:
+        print(f"  🧠 Sovereign Phase Controller: DISABLED (diagnostics only)")
+
+    # V9.8.9: Dynamic Window Scheduler (PPL-Adaptive Attention Span)
+    # Parse custom schedule if provided
+    custom_window_schedule = None
+    if config.dws_schedule:
+        try:
+            custom_window_schedule = {}
+            for pair in config.dws_schedule.split(','):
+                ppl_str, win_str = pair.strip().split(':')
+                custom_window_schedule[float(ppl_str)] = int(win_str)
+        except Exception as e:
+            print(f"  ⚠️  Invalid DWS schedule format: {e}")
+            print(f"     Using default schedule")
+            custom_window_schedule = None
+
+    dynamic_window_scheduler = DynamicWindowScheduler(
+        enable=config.enable_dynamic_window,
+        window_schedule=custom_window_schedule,
+        growth_rate_max=config.dws_growth_rate_max,
+        shrink_rate_max=config.dws_shrink_rate_max,
+        align_to_multiple=config.dws_align_to,
+        smooth_transition_steps=config.dws_smooth_steps,
+        min_steps_between_changes=config.dws_min_steps_between,
+        hysteresis_factor=config.dws_hysteresis,
+        vram_shrink_threshold=config.dws_vram_threshold,
+    )
+    if config.enable_dynamic_window:
+        print(f"  📏 Dynamic Window Scheduler: ENABLED")
+        print(f"     Start window: {dynamic_window_scheduler.current_window}")
+        print(f"     Growth: ≤{config.dws_growth_rate_max:.0%}, Shrink: ≥{config.dws_shrink_rate_max:.0%}")
+        print(f"     Smooth: {config.dws_smooth_steps} steps, Cooldown: {config.dws_min_steps_between} steps")
+        if custom_window_schedule:
+            print(f"     Custom schedule: {len(custom_window_schedule)} thresholds")
+        else:
+            print(f"     Default schedule: {len(dynamic_window_scheduler.schedule)} thresholds (128→1024)")
+    else:
+        print(f"  📏 Dynamic Window Scheduler: DISABLED (diagnostics only)")
+
     # Sattvic Brake (Lightweight Confidence via Phase Variance)
     sattvic_brake = SattvicBrake(
         model=model,
@@ -10832,6 +11585,13 @@ def train(config: UnifiedTrainingConfig):
         csr_curriculum.load_state(resumed_csr_curriculum_state)
         print(f"  ✓ CSR Curriculum Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
     # NOTE: Onto, Kosha, and PIDv2 curriculum restoration happens after their initialization below
+
+    # V9.8.9: Initialize DWS window from resumed PPL if resuming
+    if config.resume and best_val_loss < float('inf') and dynamic_window_scheduler is not None:
+        import math
+        resumed_ppl = math.exp(best_val_loss)
+        initial_window = dynamic_window_scheduler.set_initial_window_from_ppl(resumed_ppl)
+        print(f"  ✓ DWS Window Initialized: {initial_window} (PPL={resumed_ppl:.1f})")
 
     # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
@@ -11421,7 +12181,7 @@ def train(config: UnifiedTrainingConfig):
     # V9.8.0: RSS (Rational Sovereign Sequence) Controller
     rss_controller = None
     if config.enable_rss:
-        rss_controller = SovereignPhaseController(
+        rss_controller = ResonanceStateScheduler(
             evoflow_ppl_threshold=config.rss_evoflow_ppl,
             toroidal_ppl_threshold=config.rss_toroidal_ppl,
             csr_ppl_threshold=config.rss_csr_ppl,
@@ -12678,6 +13438,52 @@ def train(config: UnifiedTrainingConfig):
                     'know': knowledge,
                 })
 
+                # V9.8.8: Sovereign Phase Controller Update
+                if sovereign_phase_controller is not None:
+                    # Gather diagnostics from metrics
+                    spc_diagnostics = {
+                        'vritti': {
+                            'P_Pram': float(metrics.get('vritti_pram', 0.0)),
+                            'M_Vikal': float(metrics.get('vritti_vikal', 0.0)),
+                            'I_Smrit': float(metrics.get('vritti_smrit', 0.0)),
+                        },
+                        'bhava': {k: float(v) for k, v in metrics.items() if k.startswith('bhava_')},
+                        'kosha': {k: float(v) for k, v in metrics.items() if k.startswith('kosha_')},
+                    }
+
+                    # Update SPC with current state
+                    spc_result = sovereign_phase_controller.update(
+                        step=global_step,
+                        entropy=entropy,
+                        variance=sattvic_controller.entropy_variance,
+                        diagnostics=spc_diagnostics,
+                    )
+
+                    # Log SPC status at validation steps (or when actively triggering if enabled)
+                    # Diagnostic mode (disabled): only log at eval intervals to avoid spam
+                    should_log = global_step % config.eval_every == 0
+                    if config.enable_sovereign_phase_controller and spc_result['would_trigger']:
+                        should_log = True  # When enabled, also log on triggers
+
+                    if should_log:
+                        level_icon = {'normal': '🟢', 'caution': '🟡', 'warning': '🟠', 'critical': '🔴'}
+                        icon = level_icon.get(spc_result['level'], '⚪')
+                        status_str = "ACTIVE" if spc_result['boost_active'] else "MONITORING"
+                        if config.enable_sovereign_phase_controller:
+                            log_msg = f"  {icon} [SPC] {status_str} | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
+                        else:
+                            # When disabled, show what WOULD happen
+                            if spc_result['would_trigger']:
+                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
+                            else:
+                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] Level:{spc_result['level'].upper()}"
+
+                        if spc_result['rotations']:
+                            rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
+                            log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
+
+                        print(log_msg)
+
                 # SGP Metabolic Step: Inject persisted gradients to Authority layers
                 pulse_applied = sgp_controller.sgp_metabolic_step({
                     'entropy': entropy,
@@ -13278,6 +14084,52 @@ def train(config: UnifiedTrainingConfig):
                 )
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
+
+                # V9.8.9: Dynamic Window Scheduler Update
+                if dynamic_window_scheduler is not None:
+                    # Get VRAM usage for pressure override
+                    vram_usage = 0.0
+                    if device.type == "cuda":
+                        vram_used = torch.cuda.memory_allocated(device)
+                        vram_total = torch.cuda.get_device_properties(device).total_memory
+                        vram_usage = vram_used / vram_total
+
+                    # Update window size based on PPL
+                    dws_result = dynamic_window_scheduler.update(
+                        step=global_step,
+                        val_ppl=val_ppl,
+                        vram_usage=vram_usage,
+                    )
+
+                    # Log window changes (or diagnostic info)
+                    if dws_result['changed'] or dws_result['would_change']:
+                        progress_pct = int(dws_result['interpolation_progress'] * 100)
+                        if config.enable_dynamic_window:
+                            log_msg = f"  📏 [DWS] Window: {dws_result['window']} → {dws_result['target']} ({progress_pct}% interpolated)"
+                            log_msg += f" | Reason: {dws_result['reason']}"
+                            if dws_result['cooldown_active']:
+                                log_msg += f" | Cooldown: {dws_result['steps_until_cooldown']} steps"
+                            print(log_msg)
+
+                            # Apply window size to model if it supports it
+                            if hasattr(model, 'window_size'):
+                                old_window = model.window_size
+                                model.window_size = dws_result['window']
+                                if old_window != dws_result['window']:
+                                    print(f"     Updated model window: {old_window} → {dws_result['window']}")
+                            elif hasattr(model, 'config') and hasattr(model.config, 'window_size'):
+                                old_window = model.config.window_size
+                                model.config.window_size = dws_result['window']
+                                if old_window != dws_result['window']:
+                                    print(f"     Updated model.config window: {old_window} → {dws_result['window']}")
+                        else:
+                            # Diagnostic mode (disabled)
+                            if dws_result['would_change']:
+                                log_msg = f"  📏 [DWS-DIAGNOSTIC] WOULD CHANGE: {dws_result['window']} → {dws_result['target']}"
+                                log_msg += f" | Reason: {dws_result['reason']}"
+                                if dws_result['cooldown_active']:
+                                    log_msg += f" | (cooldown: {dws_result['steps_until_cooldown']} steps)"
+                                print(log_msg)
 
                 # V9.8.7: Dynamic Three-Phase Gyroscope Engagement
                 # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF, freedom to learn
@@ -14363,6 +15215,20 @@ def main():
     parser.add_argument("--max_seq_len", type=int, default=2048,
                        help="Maximum sequence length")
 
+    # Architecture overrides (optional - override model_size preset)
+    parser.add_argument("--n_layer", type=int, default=None,
+                       help="Number of transformer layers (overrides model_size)")
+    parser.add_argument("--n_head", type=int, default=None,
+                       help="Number of attention heads (overrides model_size)")
+    parser.add_argument("--n_embd", type=int, default=None,
+                       help="Embedding dimension (overrides model_size)")
+    parser.add_argument("--n_kv_heads", type=int, default=None,
+                       help="Number of KV heads for GQA (if None, uses n_head)")
+    parser.add_argument("--dropout", type=float, default=0.1,
+                       help="Dropout rate")
+    parser.add_argument("--attention_dropout", type=float, default=0.1,
+                       help="Attention dropout rate")
+
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size per GPU (reference batch for seq len curriculum)")
@@ -14378,6 +15244,12 @@ def main():
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
+    parser.add_argument("--warmup_steps", type=int, default=500,
+                       help="Learning rate warmup steps")
+    parser.add_argument("--weight_decay", type=float, default=0.1,
+                       help="Weight decay (L2 regularization)")
+    parser.add_argument("--max_grad_norm", type=float, default=1.0,
+                       help="Maximum gradient norm for clipping")
     parser.add_argument("--use_per_layer_clipping", action="store_true",
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
     parser.add_argument("--use_8bit_optimizer", action="store_true",
@@ -14408,6 +15280,8 @@ def main():
     parser.add_argument("--mixed_precision", type=str, default="bf16",
                        choices=["none", "fp16", "bf16"],
                        help="Mixed precision training")
+    parser.add_argument("--use_amp", action="store_true",
+                       help="Enable Automatic Mixed Precision training with bf16 (convenience flag, equivalent to --mixed_precision bf16)")
 
     # Hybrid-specific
     parser.add_argument("--local_backend", type=str, default="auto",
@@ -15129,6 +16003,58 @@ def main():
                        help="Steps for System 1 warmup phase (Learn to Speak)")
 
     # ==========================================================================
+    # V9.8.8: Sovereign Phase Controller (SPC)
+    # Reference: docs/SOVEREIGN_PHASE_CONTROLLER_DESIGN.md
+    # ==========================================================================
+    parser.add_argument("--enable_sovereign_phase_controller", action="store_true",
+                       help="Enable Sovereign Phase Controller (graduated, damped phase interventions)")
+    parser.add_argument("--spc_entropy_critical", type=float, default=0.4,
+                       help="SPC critical entropy threshold (red alert)")
+    parser.add_argument("--spc_entropy_warning", type=float, default=0.5,
+                       help="SPC warning entropy threshold (yellow alert)")
+    parser.add_argument("--spc_entropy_recovered", type=float, default=0.55,
+                       help="SPC recovered entropy threshold (exit boost - hysteresis)")
+    parser.add_argument("--spc_variance_critical", type=float, default=0.0005,
+                       help="SPC critical variance threshold (stagnation detection)")
+    parser.add_argument("--spc_variance_warning", type=float, default=0.001,
+                       help="SPC warning variance threshold")
+    parser.add_argument("--spc_variance_recovered", type=float, default=0.002,
+                       help="SPC recovered variance threshold (exit boost)")
+    parser.add_argument("--spc_min_boost_duration", type=int, default=100,
+                       help="Minimum steps to stay in boost mode (prevents oscillation)")
+    parser.add_argument("--spc_alpha", type=float, default=0.2,
+                       help="SPC EMA smoothing coefficient for rotation damping")
+    parser.add_argument("--spc_max_rotation", type=float, default=0.3,
+                       help="SPC maximum rotation per step in radians (~17 degrees)")
+    parser.add_argument("--spc_damping", type=float, default=0.9,
+                       help="SPC velocity damping coefficient")
+    parser.add_argument("--spc_velocity_threshold", type=float, default=0.2,
+                       help="SPC velocity threshold for applying damping")
+
+    # ==========================================================================
+    # V9.8.9: Dynamic Window Scheduler (DWS)
+    # Reference: Curriculum learning for receptive field dimension
+    # ==========================================================================
+    parser.add_argument("--enable_dynamic_window", action="store_true",
+                       help="Enable dynamic window sizing (PPL-adaptive attention span)")
+    parser.add_argument("--dws_schedule", type=str, default=None,
+                       help="Custom window schedule as 'ppl1:win1,ppl2:win2,...' (default: built-in smooth schedule)")
+    parser.add_argument("--dws_growth_rate_max", type=float, default=1.25,
+                       help="Maximum growth rate per transition (1.25 = 25%% max increase)")
+    parser.add_argument("--dws_shrink_rate_max", type=float, default=0.80,
+                       help="Maximum shrink rate per transition (0.80 = 20%% max decrease)")
+    parser.add_argument("--dws_align_to", type=int, default=32,
+                       help="Align windows to multiples (32 for GPU efficiency, 0 = no alignment)")
+    parser.add_argument("--dws_smooth_steps", type=int, default=100,
+                       help="Interpolate window transitions over N steps (prevents jumps)")
+    parser.add_argument("--dws_min_steps_between", type=int, default=200,
+                       help="Minimum steps between target changes (cooldown for stability)")
+    parser.add_argument("--dws_hysteresis", type=float, default=0.15,
+                       help="PPL hysteresis factor (15%% gap prevents thrashing)")
+    parser.add_argument("--dws_vram_threshold", type=float, default=0.85,
+                       help="VRAM threshold for emergency window shrink (85%%)")
+
+    # ==========================================================================
     # Phase-JEPA: Joint Embedding Predictive Architecture
     # Reference: docs/design/HYBRID_PHASE_JEPA_DESIGN.md
     # ==========================================================================
@@ -15219,6 +16145,10 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle --use_amp convenience flag
+    if args.use_amp:
+        args.mixed_precision = "bf16"
+
     # Handle stress test redirect
     if args.stress_test:
         print("=" * 70)
@@ -15243,6 +16173,14 @@ def main():
         model_type=args.model_type,
         model_size=args.model_size,
         max_seq_len=args.max_seq_len,
+        # Architecture overrides
+        n_layer=args.n_layer,
+        n_head=args.n_head,
+        n_embd=args.n_embd,
+        n_kv_heads=args.n_kv_heads,
+        dropout=args.dropout,
+        attention_dropout=args.attention_dropout,
+        # Training hyperparameters
         batch_size=args.batch_size,
         batch_size_max=args.batch_size_max,
         gradient_accumulation=args.gradient_accumulation,
@@ -15250,6 +16188,9 @@ def main():
         vram_recovery_buffer=args.vram_recovery_buffer,
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
+        warmup_steps=args.warmup_steps,
+        weight_decay=args.weight_decay,
+        max_grad_norm=args.max_grad_norm,
         dataset=args.dataset,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
@@ -15579,6 +16520,29 @@ def main():
         # SRK Annealing
         srk_total_steps=args.srk_total_steps,
         srk_warmup_steps=args.srk_warmup_steps,
+        # V9.8.8: Sovereign Phase Controller (SPC)
+        enable_sovereign_phase_controller=args.enable_sovereign_phase_controller,
+        spc_entropy_critical=args.spc_entropy_critical,
+        spc_entropy_warning=args.spc_entropy_warning,
+        spc_entropy_recovered=args.spc_entropy_recovered,
+        spc_variance_critical=args.spc_variance_critical,
+        spc_variance_warning=args.spc_variance_warning,
+        spc_variance_recovered=args.spc_variance_recovered,
+        spc_min_boost_duration=args.spc_min_boost_duration,
+        spc_alpha=args.spc_alpha,
+        spc_max_rotation=args.spc_max_rotation,
+        spc_damping=args.spc_damping,
+        spc_velocity_threshold=args.spc_velocity_threshold,
+        # V9.8.9: Dynamic Window Scheduler (DWS)
+        enable_dynamic_window=args.enable_dynamic_window,
+        dws_schedule=args.dws_schedule,
+        dws_growth_rate_max=args.dws_growth_rate_max,
+        dws_shrink_rate_max=args.dws_shrink_rate_max,
+        dws_align_to=args.dws_align_to,
+        dws_smooth_steps=args.dws_smooth_steps,
+        dws_min_steps_between=args.dws_min_steps_between,
+        dws_hysteresis=args.dws_hysteresis,
+        dws_vram_threshold=args.dws_vram_threshold,
         # Phase-JEPA Configuration
         enable_jepa=args.enable_jepa,
         jepa_hidden_dim=args.jepa_hidden_dim,
