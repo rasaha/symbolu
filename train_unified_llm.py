@@ -13517,7 +13517,7 @@ def train(config: UnifiedTrainingConfig):
 
                 # PIDv2 Controller Update (V9.4.4)
                 # Skip if PID is disengaged (POLISHING phase)
-                if authority_controller is not None and (not config.controller_engagement_enabled or pid_engaged):
+                if authority_controller is not None and (not config.pidv2_engagement_enabled or pid_engaged):
                     old_A = authority_controller.A
                     new_A = authority_controller.update(
                         val_ppl, current_coh,
