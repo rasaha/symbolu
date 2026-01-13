@@ -14411,6 +14411,8 @@ def main():
     parser.add_argument("--mixed_precision", type=str, default="bf16",
                        choices=["none", "fp16", "bf16"],
                        help="Mixed precision training")
+    parser.add_argument("--use_amp", action="store_true",
+                       help="Enable Automatic Mixed Precision training with bf16 (convenience flag, equivalent to --mixed_precision bf16)")
 
     # Hybrid-specific
     parser.add_argument("--local_backend", type=str, default="auto",
@@ -15221,6 +15223,10 @@ def main():
                        help="Type of corruption")
 
     args = parser.parse_args()
+
+    # Handle --use_amp convenience flag
+    if args.use_amp:
+        args.mixed_precision = "bf16"
 
     # Handle stress test redirect
     if args.stress_test:

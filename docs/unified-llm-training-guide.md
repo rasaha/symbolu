@@ -129,8 +129,31 @@ Override `model_size` preset with custom architecture. All parameters are option
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--gradient_checkpointing` | flag | False | Enable gradient checkpointing |
-| `--mixed_precision` | str | bf16 | Precision: `none`, `fp16`, `bf16` |
+| `--gradient_checkpointing` | flag | False | Enable gradient checkpointing (activation checkpointing). Reduces memory by ~40% at cost of ~20% slower training. Recommended for large models or limited VRAM |
+| `--mixed_precision` | str | bf16 | Mixed precision training mode: `none` (FP32 only, slow), `fp16` (FP16 mixed precision, unstable on some hardware), `bf16` (BF16 mixed precision, recommended). BF16 provides same speed as FP16 with better numerical stability |
+| `--use_amp` | flag | False | **Convenience flag** to enable Automatic Mixed Precision with BF16. Equivalent to `--mixed_precision bf16`. Use this for simpler command lines. **Note**: AMP is already enabled by default (mixed_precision defaults to bf16) |
+
+**Mixed Precision Training:**
+- **BF16 (bfloat16)**: Recommended. Same dynamic range as FP32, better stability than FP16. Supported on Ampere+ GPUs (A100, RTX 3090+)
+- **FP16 (float16)**: Faster but can have numerical instability (NaN/Inf). Requires careful gradient scaling. Use only if BF16 unavailable
+- **None (FP32)**: Full precision. Slowest but most stable. Use only for debugging numerical issues
+
+**Memory Savings:**
+- BF16/FP16: ~2x memory reduction for activations and gradients
+- Gradient checkpointing: ~40% memory reduction (recomputes activations during backward pass)
+- Combined: ~60-70% total memory reduction
+
+**Example Usage:**
+```bash
+# Option 1: Explicit mixed precision
+--mixed_precision bf16
+
+# Option 2: Convenience flag (same as above)
+--use_amp
+
+# With gradient checkpointing for very large models
+--use_amp --gradient_checkpointing
+```
 
 ### Local/Phase Attention (Hybrid Models)
 
