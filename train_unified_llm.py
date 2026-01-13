@@ -6060,21 +6060,25 @@ class ThreePhaseCurriculum:
     Used by CSR (Layer 7), Kosha Gyroscope (Layer 9), and PIDv2 to implement
     smooth engagement/disengagement based on perplexity thresholds.
 
+    INVERTED CURRICULUM: Components activate when model is COMPETENT (low PPL).
+    This follows proper curriculum learning where advanced controllers are added
+    after basic language modeling is established.
+
     Phases:
-        CONSTRUCTION (PPL > engage_ppl): Component fully active (scale=1.0)
-        TRANSITION (disengage_ppl < PPL < engage_ppl): Linear rampdown
-        POLISHING (PPL < disengage_ppl): Component off after rampdown (scale=0.0)
+        FOUNDATION (PPL > engage_ppl): Component OFF - learning basics (scale=0.0)
+        TRANSITION (disengage_ppl < PPL < engage_ppl): Linear ramp-up
+        CONSTRUCTION (PPL < disengage_ppl): Component fully active (scale=1.0)
 
     Args:
         name: Component name for logging (e.g., "CSR", "Kosha", "PID")
-        engage_ppl: PPL threshold above which component is fully active
-        disengage_ppl: PPL threshold below which component disengages
-        rampdown_steps: Steps to ramp down after disengage trigger
+        engage_ppl: PPL threshold below which component starts engaging
+        disengage_ppl: PPL threshold below which component is fully active
+        rampdown_steps: Steps to ramp up during transition phase
     """
 
-    PHASE_CONSTRUCTION = "CONSTRUCTION"
+    PHASE_FOUNDATION = "FOUNDATION"
     PHASE_TRANSITION = "TRANSITION"
-    PHASE_POLISHING = "POLISHING"
+    PHASE_CONSTRUCTION = "CONSTRUCTION"
 
     def __init__(
         self,
@@ -6099,6 +6103,8 @@ class ThreePhaseCurriculum:
         """
         Update phase based on current PPL and compute scaling factor.
 
+        INVERTED LOGIC: Lower PPL → Higher controller engagement
+
         Args:
             val_ppl: Current validation perplexity
             step: Current training step
@@ -6106,59 +6112,48 @@ class ThreePhaseCurriculum:
         Returns:
             scale: Authority scale factor (1.0 = full, 0.0 = off)
         """
-        # Already graduated - stay in polishing mode
+        # Already graduated - stay in full construction mode
         if self.graduated:
-            self.phase = self.PHASE_POLISHING
+            self.phase = self.PHASE_CONSTRUCTION
+            self.scale = 1.0
+            return 1.0
+
+        # Phase 1: FOUNDATION (PPL > engage_ppl) - Component OFF
+        # Model is still learning basics, don't interfere
+        if val_ppl > self.engage_ppl:
+            self.phase = "FOUNDATION"
+            self.disengage_step = None  # Reset engagement tracking
             self.scale = 0.0
+            self._log_phase_change(step, val_ppl)
             return 0.0
 
-        # Phase A: CONSTRUCTION (PPL > engage_ppl)
-        if val_ppl >= self.engage_ppl:
+        # Phase 3: CONSTRUCTION (PPL <= disengage_ppl) - Component fully ON
+        # Model is competent, apply full controller strength
+        if val_ppl <= self.disengage_ppl:
+            if self.disengage_step is None:
+                # First time entering construction phase
+                self.disengage_step = step
+                print(f"  🎓 [{self.name}] CONSTRUCTION phase triggered at step {step} "
+                      f"(PPL={val_ppl:.1f} ≤ {self.disengage_ppl})")
+
             self.phase = self.PHASE_CONSTRUCTION
-            self.disengage_step = None  # Reset disengage trigger
             self.scale = 1.0
             self._log_phase_change(step, val_ppl)
             return 1.0
 
-        # Phase C trigger: Check if PPL dropped below disengage threshold
-        if val_ppl < self.disengage_ppl:
-            if self.disengage_step is None:
-                # First time crossing disengage threshold
-                self.disengage_step = step
-                print(f"  🎓 [{self.name}] Disengage triggered at step {step} "
-                      f"(PPL={val_ppl:.1f} < {self.disengage_ppl})")
-
-            # Compute rampdown progress
-            steps_since_disengage = step - self.disengage_step
-            if self.rampdown_steps > 0:
-                rampdown_progress = min(1.0, steps_since_disengage / self.rampdown_steps)
-            else:
-                rampdown_progress = 1.0
-
-            self.scale = 1.0 - rampdown_progress
-
-            if rampdown_progress >= 1.0:
-                # Fully graduated
-                self.graduated = True
-                self.phase = self.PHASE_POLISHING
-                self.scale = 0.0
-                print(f"  🎓 [{self.name}] GRADUATED to polishing mode at step {step}")
-            else:
-                self.phase = self.PHASE_TRANSITION
-
-            self._log_phase_change(step, val_ppl)
-            return self.scale
-
-        # Phase B: TRANSITION (disengage_ppl <= PPL < engage_ppl)
-        # Linear interpolation: PPL=engage → scale=1.0, PPL=disengage → scale=0.0
+        # Phase 2: TRANSITION (disengage_ppl < PPL <= engage_ppl) - Ramp up
+        # Gradually increase controller strength as PPL improves
         self.phase = self.PHASE_TRANSITION
-        self.disengage_step = None  # Reset if PPL goes back up
+        self.disengage_step = None  # Reset engagement tracking
+
         ppl_range = self.engage_ppl - self.disengage_ppl
         if ppl_range > 0:
+            # Scale increases as PPL decreases
+            # PPL at engage_ppl → scale=0.0, PPL at disengage_ppl → scale=1.0
             progress = (self.engage_ppl - val_ppl) / ppl_range
-            self.scale = 1.0 - progress
+            self.scale = max(0.0, min(1.0, progress))
         else:
-            self.scale = 1.0
+            self.scale = 0.5
 
         self._log_phase_change(step, val_ppl)
         return self.scale
@@ -6175,13 +6170,13 @@ class ThreePhaseCurriculum:
     def get_status(self) -> str:
         """Get human-readable status string."""
         if self.graduated:
-            return f"[{self.name}] 🎓 GRADUATED (polishing mode)"
+            return f"[{self.name}] 🎓 GRADUATED (full construction)"
         elif self.phase == self.PHASE_CONSTRUCTION:
             return f"[{self.name}] 🔧 CONSTRUCTION (scale={self.scale:.0%})"
         elif self.phase == self.PHASE_TRANSITION:
             return f"[{self.name}] 📐 TRANSITION (scale={self.scale:.0%})"
-        else:
-            return f"[{self.name}] ✨ POLISHING (scale={self.scale:.0%})"
+        else:  # FOUNDATION
+            return f"[{self.name}] 🌱 FOUNDATION (scale={self.scale:.0%})"
 
     def get_state(self) -> Dict[str, Any]:
         """Get serializable state for checkpointing."""
@@ -13481,20 +13476,20 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  📏 [SEQ CURRICULUM] Length: {status['current_seq_len']}/{status['target_seq_len']} | "
                               f"Progress: {status['progress']:.1%}")
 
-                # V9.8.7: Three-phase PID engagement logic
-                # Check PPL thresholds and determine if PID should be engaged
+                # V9.8.7: Three-phase PID engagement logic (INVERTED CURRICULUM)
+                # Lower PPL → PID engages (model is competent, apply control)
                 if config.pidv2_engagement_enabled and authority_controller is not None:
                     old_pid_phase = pid_phase
                     old_pid_engaged = pid_engaged
 
                     if val_ppl > config.pidv2_engage_ppl:
-                        # Phase 1: CONSTRUCTION - High PPL, PID ON
+                        # Phase 1: FOUNDATION - High PPL, PID OFF (learning basics)
+                        pid_phase = "FOUNDATION"
+                        pid_engaged = False
+                    elif val_ppl <= config.pidv2_disengage_ppl:
+                        # Phase 3: CONSTRUCTION - Low PPL, PID ON (apply control)
                         pid_phase = "CONSTRUCTION"
                         pid_engaged = True
-                    elif val_ppl < config.pidv2_disengage_ppl:
-                        # Phase 3: POLISHING - Low PPL, PID OFF
-                        pid_phase = "POLISHING"
-                        pid_engaged = False
                     else:
                         # Phase 2: TRANSITION - Keep current engagement state
                         pid_phase = "TRANSITION"
