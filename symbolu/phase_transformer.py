@@ -1674,8 +1674,12 @@ class HybridAttentionLayer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper phase attention
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
+        layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
     ):
         super().__init__()
+        # V9.9.1: Track layer index for per-layer phase weight control
+        self.layer_idx = layer_idx
+
         # Keep alphas for potential future use (e.g., residual weighting)
         self.alpha_local = nn.Parameter(torch.tensor(alpha_local))
         self.alpha_phase = nn.Parameter(torch.tensor(alpha_phase))
@@ -1763,8 +1767,10 @@ class HybridTransformerBlock(nn.Module):
         alpha_local: float = 0.8,
         alpha_phase: float = 0.2,
         n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
+        layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
     ):
         super().__init__()
+        self.layer_idx = layer_idx  # V9.9.1: Track layer index
         self.attention = HybridAttentionLayer(
             embed_dim=config.embed_dim,
             num_heads=config.num_heads,
@@ -1779,6 +1785,7 @@ class HybridTransformerBlock(nn.Module):
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
+            layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -2224,6 +2231,7 @@ class HybridPhaseTransformer(nn.Module):
         self.embed_dropout = nn.Dropout(dropout)
 
         # Transformer blocks: Local (early) + Hybrid (later)
+        # V9.9.1: Track layer indices for per-layer phase control
         self.blocks = nn.ModuleList()
         for i in range(num_layers):
             if i < local_layers:
@@ -2233,6 +2241,7 @@ class HybridPhaseTransformer(nn.Module):
                     n_kv_heads=n_kv_heads))  # GQA support
             else:
                 # Later layers: Hybrid Local + Phase attention
+                # V9.9.1: Pass layer_idx for per-layer phase weight control
                 self.blocks.append(HybridTransformerBlock(
                     config,
                     window_size=window_size,
@@ -2240,6 +2249,7 @@ class HybridPhaseTransformer(nn.Module):
                     alpha_local=alpha_local,
                     alpha_phase=alpha_phase,
                     n_kv_heads=n_kv_heads,  # GQA support
+                    layer_idx=i,  # V9.9.1: Layer index for per-layer control
                 ))
 
         # Output

@@ -507,17 +507,30 @@ class DynamicSequenceLengthScheduler:
 
 ## 5. Implementation Plan
 
-### Phase 1: Per-Layer Phase Weights
-- [ ] Add `layer_phase_weights` array to model config
-- [ ] Modify attention layers to accept per-layer alpha
-- [ ] Add CLI flags for initial per-layer weights
-- [ ] Test that existing behavior unchanged when all weights equal
+### Phase 1: Per-Layer Phase Weights ✅ COMPLETED
+- [x] Add `layer_idx` attribute to `HybridAttentionLayer` (`symbolu/phase_transformer.py:1677,1681`)
+- [x] Add `layer_idx` to `HybridTransformerBlock` (`symbolu/phase_transformer.py:1770,1773,1788`)
+- [x] Pass `layer_idx` during model creation (`symbolu/phase_transformer.py:2252`)
+- [x] Create `PerLayerPhaseController` class (`train_unified_llm.py:9860-10065`)
+- [x] Add config fields: `enable_per_layer_phase`, `per_layer_phase_weights`, `layer_transition_steps`
+- [x] Add CLI flags: `--enable_per_layer_phase`, `--per_layer_phase_weights`, `--layer_transition_steps`
 
-### Phase 2: Soft Layer Transition
-- [ ] Create `LayerTransitionScheduler` class
-- [ ] Implement phase ramp logic (0→1 over N steps)
-- [ ] Integrate with evolution system
-- [ ] Add CLI flags for ramp duration
+**Key Implementation Details:**
+```python
+# PerLayerPhaseController provides:
+controller.set_weights([0.0] * 12)       # Set all layers
+controller.start_transition(6, 1.0, 500, step)  # Soft transition
+controller.update(step)                   # Update active transitions
+controller.apply_to_model(model)          # Apply weights to model
+```
+
+### Phase 2: Soft Layer Transition ✅ INCLUDED IN PHASE 1
+- [x] `start_transition()` method in `PerLayerPhaseController`
+- [x] Linear interpolation over `duration_steps`
+- [x] Automatic completion tracking
+- [x] CLI flag `--layer_transition_steps` for ramp duration
+
+**Note**: Soft layer transition was integrated directly into `PerLayerPhaseController`.
 
 ### Phase 3: Dynamic Sequence Length
 - [ ] Create `DynamicSequenceLengthScheduler` class

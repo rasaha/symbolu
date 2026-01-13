@@ -8591,6 +8591,11 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
+    enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
+    per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
+    layer_transition_steps: int = 500  # Steps for soft layer transitions
+
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
@@ -9851,6 +9856,218 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
 
     return model.to(device)
+
+
+# =============================================================================
+# PER-LAYER PHASE CONTROLLER (V9.9.1)
+# =============================================================================
+
+class PerLayerPhaseController:
+    """
+    V9.9.1: Manages per-layer phase weights for fine-grained control over
+    the Phase/Sensory split during Inverted Curriculum Evolution.
+
+    Instead of a global alpha_phase applied to all layers, this controller
+    maintains individual weights for each layer, enabling:
+    1. Soft layer transitions (gradual 0→1 ramp)
+    2. Per-layer decay schedules
+    3. Inverted curriculum where Sensory→Authority transitions happen one layer at a time
+
+    The weight for each layer controls the blend:
+        output = (1 - alpha) * quadratic_attention + alpha * phase_attention
+        - alpha = 0.0: Pure Sensory (Quadratic attention)
+        - alpha = 1.0: Pure Authority (Phase attention)
+        - 0 < alpha < 1: Hybrid blend
+
+    Usage:
+        controller = PerLayerPhaseController(num_layers=12)
+        controller.set_weights([0.0] * 12)  # Start all Sensory
+
+        # In training loop:
+        controller.update(step)
+        controller.apply_to_model(model)
+    """
+
+    def __init__(
+        self,
+        num_layers: int = 12,
+        initial_weights: Optional[List[float]] = None,
+        local_layers: int = 4,  # Layers 0 to local_layers-1 are LocalAttention (no phase weight)
+    ):
+        """
+        Initialize per-layer phase controller.
+
+        Args:
+            num_layers: Total number of layers in the model
+            initial_weights: Initial phase weights for each layer (0.0 = Sensory, 1.0 = Authority)
+                            If None, defaults to [0.0] * num_layers (all Sensory)
+            local_layers: Number of early layers that use LocalAttention only (no phase component)
+        """
+        self.num_layers = num_layers
+        self.local_layers = local_layers
+
+        # Initialize weights
+        if initial_weights is not None:
+            if len(initial_weights) != num_layers:
+                raise ValueError(f"initial_weights must have {num_layers} elements, got {len(initial_weights)}")
+            self.weights = list(initial_weights)
+        else:
+            # Default: all Sensory (alpha_phase = 0.0)
+            self.weights = [0.0] * num_layers
+
+        # Transition tracking for soft layer transitions
+        self.transitions = {}  # layer_idx -> {start_step, end_step, start_val, end_val}
+        self.transition_history = []  # Log of completed transitions
+
+        print(f"\n  🎛️ [PER-LAYER PHASE] Controller initialized:")
+        print(f"      Total layers: {num_layers}")
+        print(f"      Local layers: 0-{local_layers-1} (no phase component)")
+        print(f"      Hybrid layers: {local_layers}-{num_layers-1} (per-layer phase weights)")
+        print(f"      Initial weights: {self._format_weights()}")
+
+    def _format_weights(self) -> str:
+        """Format weights for display, showing only hybrid layers."""
+        hybrid_weights = self.weights[self.local_layers:]
+        return "[" + ", ".join(f"{w:.2f}" for w in hybrid_weights) + "]"
+
+    def get_weight(self, layer_idx: int) -> float:
+        """Get the current phase weight for a specific layer."""
+        if layer_idx < 0 or layer_idx >= self.num_layers:
+            return 0.0
+        return self.weights[layer_idx]
+
+    def set_weight(self, layer_idx: int, weight: float):
+        """Set the phase weight for a specific layer."""
+        if 0 <= layer_idx < self.num_layers:
+            self.weights[layer_idx] = max(0.0, min(1.0, weight))
+
+    def set_weights(self, weights: List[float]):
+        """Set all phase weights at once."""
+        if len(weights) != self.num_layers:
+            raise ValueError(f"weights must have {self.num_layers} elements, got {len(weights)}")
+        self.weights = [max(0.0, min(1.0, w)) for w in weights]
+
+    def start_transition(
+        self,
+        layer_idx: int,
+        target_weight: float,
+        duration_steps: int,
+        current_step: int,
+    ):
+        """
+        Start a soft transition for a specific layer.
+
+        The weight will linearly interpolate from current value to target
+        over duration_steps training steps.
+
+        Args:
+            layer_idx: Which layer to transition
+            target_weight: Target phase weight (0.0 = Sensory, 1.0 = Authority)
+            duration_steps: Number of steps for the transition
+            current_step: Current training step
+        """
+        if layer_idx < self.local_layers:
+            print(f"  ⚠️ [PER-LAYER PHASE] Layer {layer_idx} is LocalAttention, no phase to transition")
+            return
+
+        current_weight = self.weights[layer_idx]
+        self.transitions[layer_idx] = {
+            'start_step': current_step,
+            'end_step': current_step + duration_steps,
+            'start_val': current_weight,
+            'end_val': target_weight,
+        }
+        direction = "→Authority" if target_weight > current_weight else "→Sensory"
+        print(f"  🔄 [PER-LAYER PHASE] Layer {layer_idx} transition: {current_weight:.2f} → {target_weight:.2f} ({direction}) over {duration_steps} steps")
+
+    def update(self, current_step: int) -> Dict[str, any]:
+        """
+        Update all active transitions based on current step.
+
+        Returns dict with:
+            - 'weights': Current per-layer weights
+            - 'active_transitions': Number of layers currently transitioning
+            - 'completed': List of layer indices that completed this step
+        """
+        completed = []
+
+        for layer_idx, trans in list(self.transitions.items()):
+            start_step = trans['start_step']
+            end_step = trans['end_step']
+            start_val = trans['start_val']
+            end_val = trans['end_val']
+
+            if current_step >= end_step:
+                # Transition complete
+                self.weights[layer_idx] = end_val
+                completed.append(layer_idx)
+                self.transition_history.append({
+                    'layer_idx': layer_idx,
+                    'completed_step': current_step,
+                    'final_weight': end_val,
+                })
+                del self.transitions[layer_idx]
+                print(f"  ✓ [PER-LAYER PHASE] Layer {layer_idx} transition complete: α={end_val:.2f}")
+            else:
+                # Interpolate
+                progress = (current_step - start_step) / (end_step - start_step)
+                self.weights[layer_idx] = start_val + progress * (end_val - start_val)
+
+        return {
+            'weights': self.weights.copy(),
+            'active_transitions': len(self.transitions),
+            'completed': completed,
+        }
+
+    def apply_to_model(self, model: nn.Module):
+        """
+        Apply current per-layer weights to the model's HybridAttentionLayer modules.
+
+        This updates each layer's alpha_phase parameter based on its layer_idx.
+        """
+        for module in model.modules():
+            if hasattr(module, 'alpha_phase') and hasattr(module, 'layer_idx'):
+                layer_idx = module.layer_idx
+                if 0 <= layer_idx < self.num_layers:
+                    weight = self.weights[layer_idx]
+                    module.alpha_phase.data.fill_(weight)
+                    if hasattr(module, 'alpha_local'):
+                        module.alpha_local.data.fill_(1.0 - weight)
+
+    def get_status(self) -> Dict[str, any]:
+        """Get current controller status for logging."""
+        # Count layers by type based on current weights
+        authority_count = sum(1 for w in self.weights[self.local_layers:] if w >= 0.9)
+        sensory_count = sum(1 for w in self.weights[self.local_layers:] if w <= 0.1)
+        transitioning_count = len(self.weights[self.local_layers:]) - authority_count - sensory_count
+
+        return {
+            'weights': self.weights.copy(),
+            'local_layers': self.local_layers,
+            'authority_count': authority_count,
+            'sensory_count': sensory_count,
+            'transitioning_count': transitioning_count,
+            'active_transitions': len(self.transitions),
+            'completed_transitions': len(self.transition_history),
+        }
+
+    @classmethod
+    def from_config(cls, config) -> 'PerLayerPhaseController':
+        """Create controller from UnifiedTrainingConfig."""
+        # Parse initial weights from config string
+        initial_weights = None
+        if hasattr(config, 'per_layer_phase_weights') and config.per_layer_phase_weights:
+            try:
+                initial_weights = [float(w.strip()) for w in config.per_layer_phase_weights.split(',')]
+            except ValueError:
+                print(f"  ⚠️ [PER-LAYER PHASE] Invalid weights string: {config.per_layer_phase_weights}")
+                initial_weights = None
+
+        return cls(
+            num_layers=12,  # Fixed for Sovereign-1 architecture
+            initial_weights=initial_weights,
+            local_layers=config.local_layers if hasattr(config, 'local_layers') else 4,
+        )
 
 
 def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingConfig) -> float:
@@ -15569,6 +15786,14 @@ def main():
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
 
+    # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
+    parser.add_argument("--enable_per_layer_phase", action="store_true",
+                       help="Enable per-layer phase weight control (for inverted curriculum)")
+    parser.add_argument("--per_layer_phase_weights", type=str, default="",
+                       help="Initial per-layer phase weights, comma-separated 12 values (e.g., '0,0,0,0,0,0,0,0,0,0,0,0' for all Sensory)")
+    parser.add_argument("--layer_transition_steps", type=int, default=500,
+                       help="Steps for soft layer transitions during evolution")
+
     # V9.6.12: Cosine mode for phase attention
     parser.add_argument("--cosine_mode", type=str, default="standard",
                        choices=["standard", "shifted", "complex"],
@@ -16611,6 +16836,10 @@ def main():
         evolution_ppl_window=args.evolution_ppl_window,
         evolution_thaw_alpha=args.evolution_thaw_alpha,
         evolution_thaw_steps=args.evolution_thaw_steps,
+        # V9.9.1 Per-Layer Phase Control
+        enable_per_layer_phase=args.enable_per_layer_phase,
+        per_layer_phase_weights=args.per_layer_phase_weights,
+        layer_transition_steps=args.layer_transition_steps,
         # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
         enable_stress_probe=args.enable_stress_probe,
         stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,
