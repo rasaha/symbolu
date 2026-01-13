@@ -260,7 +260,10 @@ Quality samples use these default prompts:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--controller` | str | none | Controller type: `none`, `pid`, `pidv2` |
+| `--controller` | str | none | Controller type: `none`, `pid`, `pidv2`. PIDv2 regulates training stability and S/A ratio |
+| `--pidv2_engage_ppl` | float | 100.0 | **PPL threshold to ENGAGE PIDv2**. Controller turns ON when Val PPL **drops below** this (model competent, ready for regulation) |
+| `--pidv2_disengage_ppl` | float | 30.0 | **PPL threshold to DISENGAGE PIDv2**. Controller turns OFF when Val PPL **drops below** this (model expert, no longer needs regulation) |
+| `--pidv2_rampdown_steps` | int | 500 | Steps to gradually ramp down PID after disengagement (smooth transition) |
 | `--pidv2_kp_min` | float | 0.10 | Minimum proportional gain |
 | `--pidv2_kp_max` | float | 0.30 | Maximum proportional gain |
 | `--pidv2_kp_sensitivity` | float | 5.0 | Kp sensitivity to error magnitude |
@@ -269,6 +272,76 @@ Quality samples use these default prompts:
 | `--pidv2_a_min` | float | 0.40 | Minimum sensory gradient scale |
 | `--pidv2_w_s` | float | 0.30 | Sattvic weight in S/A calculation |
 | `--phase_ramp_steps` | int | 7000 | Steps to ramp phase attention weight |
+
+**PIDv2 Three-Phase Engagement:**
+- **Phase 1 (FOUNDATION)**: PPL > 100 → PID **OFF** - Model learns basics without interference
+- **Phase 2 (TRANSITION)**: 30 < PPL < 100 → PID **ON** - Active S/A ratio regulation, prevents instability
+- **Phase 3 (CONSTRUCTION)**: PPL < 30 → PID **OFF** (rampdown) - Model expert, self-regulating
+
+**Inverted Curriculum Logic**: Controllers engage at LOW PPL (competent model), not HIGH PPL (struggling model)
+
+### RSS (Resonance State Scheduler)
+
+**Staged Controller Engagement System** for ontological_hybrid model. Automatically enables auxiliary gradient controllers (EvoFlow, Toroidal, CSR, Kosha) based on PPL thresholds.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--enable_rss` | flag | False | **Enable RSS controller cascade**. Required for automatic EvoFlow/Toroidal/CSR/Kosha engagement |
+| `--rss_evoflow_ppl` | float | 100.0 | **EvoFlow engagement threshold**. Engages when Val PPL **< 100** (coherence transitions, micro/meso/macro flow) |
+| `--rss_toroidal_ppl` | float | 60.0 | **Toroidal engagement threshold**. Engages when Val PPL **< 60** (DEFAULT - updated to 85.0 recommended). Handles rotational feedback dynamics |
+| `--rss_csr_ppl` | float | 45.0 | **CSR engagement threshold**. Engages when Val PPL **< 45** (DEFAULT - updated to 55.0 recommended). Conceptual State Regularization with gradual warmup |
+| `--rss_kosha_ppl` | float | 35.0 | **Kosha engagement threshold**. Engages when Val PPL **< 35** (DEFAULT - updated to 40.0 recommended). Five-sheath consciousness model |
+| `--rss_csr_warmup_steps` | int | 2500 | CSR warmup duration. Prevents 14× gradient shock by gradually increasing CSR loss weight |
+| `--rss_use_val_ppl` | flag | True | Use validation PPL (more stable) instead of training PPL for RSS thresholds. Recommended: keep enabled |
+
+**RSS Cascade Sequence** (from syntactic → semantic → reasoning):
+
+```
+PPL 300+ : FOUNDATION     → All controllers OFF, model learns syntax
+    ↓
+PPL <100 : EvoFlow ON     → Coherence transitions, evolutionary flow
+    ↓
+PPL <85  : Toroidal ON    → Rotational feedback, toroidal dynamics
+    ↓
+PPL <70  : Onto ON        → Ontological bridge, 12D aspect space
+    ↓
+PPL <55  : CSR ON         → Conceptual regularization (with 2500-step warmup)
+    ↓
+PPL <40  : Kosha ON       → Five-sheath consciousness (after CSR settles)
+    ↓
+PPL <30  : Gyro ON        → Kosha Gyroscope, homeostatic self-regulation
+```
+
+**Updated Recommended Thresholds** (align with PPL hierarchy):
+```bash
+--enable_rss \
+--rss_evoflow_ppl 100.0 \   # Semantic barrier (coherence)
+--rss_toroidal_ppl 85.0 \   # Strong semantics (toroidal)
+--rss_csr_ppl 55.0 \        # Light reasoning (regularization)
+--rss_kosha_ppl 40.0        # Deep reasoning (consciousness)
+```
+
+**Key Design:**
+- **Inverted Curriculum**: Controllers engage when model is COMPETENT (low PPL), not struggling (high PPL)
+- **Staged Complexity**: Each controller adds architectural depth as model masters current level
+- **Validation PPL**: Uses val PPL (stable) not train PPL (noisy) for engagement decisions
+- **Warmup Protection**: CSR has 2500-step ramp to prevent sudden 14× gradient shock
+
+### Controller Engagement Summary (Ontological Hybrid)
+
+For `ontological_hybrid` model with `--enable_rss` and `--controller pidv2`:
+
+| Controller | Engage PPL | Disengage PPL | Purpose |
+|------------|------------|---------------|---------|
+| **PIDv2** | 100.0 | 30.0 | Training stability, S/A ratio regulation |
+| **EvoFlow** | 100.0 | - | Evolutionary coherence flow (micro/meso/macro) |
+| **Toroidal** | 85.0 | - | Rotational feedback dynamics |
+| **Onto** | 70.0 | 25.0 | Ontological 12D aspect bridge |
+| **CSR** | 55.0 | 20.0 | Conceptual State Regularization |
+| **Kosha** | 40.0 | 15.0 | Five-sheath consciousness model |
+| **Gyroscope** | 30.0 | - | Homeostatic self-regulation |
+
+Use `--pidv2_engage_ppl`, `--onto_engage_ppl`, `--csr_engage_ppl`, `--kosha_engage_ppl`, `--gyroscope_engage_ppl` to override individual thresholds.
 
 ### Stress Testing
 
