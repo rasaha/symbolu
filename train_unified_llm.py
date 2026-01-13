@@ -13368,7 +13368,7 @@ def train(config: UnifiedTrainingConfig):
                     )
 
                     # Log SPC status at validation steps or when would trigger
-                    if global_step % config.val_every == 0 or spc_result['would_trigger']:
+                    if global_step % config.eval_every == 0 or spc_result['would_trigger']:
                         level_icon = {'normal': '🟢', 'caution': '🟡', 'warning': '🟠', 'critical': '🔴'}
                         icon = level_icon.get(spc_result['level'], '⚪')
                         status_str = "ACTIVE" if spc_result['boost_active'] else "MONITORING"
