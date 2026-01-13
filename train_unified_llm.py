@@ -6962,6 +6962,17 @@ class DynamicRelaxationController:
         self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
         self.evolution_coherence_min = 0.82  # Must maintain high coherence
 
+        # V9.9.1 Multi-Stage Evolution with PPL/Step triggers
+        self.evolution_trigger_mode = "metrics"  # "metrics", "ppl", "step", "auto"
+        self.evolution_ppl_triggers = []  # PPL thresholds: [100, 50, 25, 15]
+        self.evolution_step_triggers = []  # Step triggers: [10000, 30000, 50000, 70000]
+        self.evolution_ppl_window = 10  # Steps to average PPL for smoother triggers
+        self.evolution_thaw_alpha = 0.1  # Initial gradient scale for new sensory layers
+        self.evolution_thaw_steps = 300  # Steps to ramp new sensory layer gradients
+        self.ppl_history = []  # Rolling PPL history for averaging
+        self.evolution_ppl_triggered = [False] * 10  # Track which PPL triggers fired
+        self.evolution_step_triggered = [False] * 10  # Track which step triggers fired
+
         # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
         self.stress_probe_active = False  # Currently in stress-probe mode
         self.stress_probe_start_step = None  # When stress-probe started
@@ -7297,6 +7308,229 @@ class DynamicRelaxationController:
         print(f"      Transitional layer: {new_split[0]} (newly sensory)")
 
         return new_split
+
+    def configure_evolution(
+        self,
+        trigger_mode: str = "auto",
+        ppl_triggers: str = "",
+        step_triggers: str = "",
+        custom_stages: str = "",
+        patience: int = 200,
+        coherence_min: float = 0.82,
+        entropy_floor: float = 0.42,
+        ppl_window: int = 10,
+        thaw_alpha: float = 0.1,
+        thaw_steps: int = 300,
+    ):
+        """
+        V9.9.1 Configure multi-stage evolution from config parameters.
+
+        Args:
+            trigger_mode: "metrics", "ppl", "step", or "auto"
+            ppl_triggers: Comma-separated PPL thresholds (e.g., "100,50,25,15")
+            step_triggers: Comma-separated step thresholds (e.g., "10000,30000,50000,70000")
+            custom_stages: Comma-separated stages (e.g., "9:3,6:6,4:8,3:9")
+            patience: Steps of stable metrics before evolution (metrics mode)
+            coherence_min: Minimum coherence for evolution (metrics mode)
+            entropy_floor: Minimum entropy for evolution (metrics mode)
+            ppl_window: Steps to average PPL for smoother triggers
+            thaw_alpha: Initial gradient scale for newly sensory layers
+            thaw_steps: Steps to ramp newly sensory layer gradients
+        """
+        self.evolution_trigger_mode = trigger_mode.lower()
+        self.evolution_patience = patience
+        self.evolution_coherence_min = coherence_min
+        self.evolution_entropy_floor = entropy_floor
+        self.evolution_ppl_window = ppl_window
+        self.evolution_thaw_alpha = thaw_alpha
+        self.evolution_thaw_steps = thaw_steps
+
+        # Parse PPL triggers
+        if ppl_triggers:
+            try:
+                self.evolution_ppl_triggers = [float(x.strip()) for x in ppl_triggers.split(",") if x.strip()]
+                self.evolution_ppl_triggered = [False] * len(self.evolution_ppl_triggers)
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid PPL triggers: {ppl_triggers}, using empty list")
+                self.evolution_ppl_triggers = []
+
+        # Parse step triggers
+        if step_triggers:
+            try:
+                self.evolution_step_triggers = [int(x.strip()) for x in step_triggers.split(",") if x.strip()]
+                self.evolution_step_triggered = [False] * len(self.evolution_step_triggers)
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid step triggers: {step_triggers}, using empty list")
+                self.evolution_step_triggers = []
+
+        # Parse custom stages
+        if custom_stages:
+            try:
+                stages = []
+                for stage in custom_stages.split(","):
+                    parts = stage.strip().split(":")
+                    if len(parts) == 2:
+                        auth, sens = int(parts[0]), int(parts[1])
+                        if auth + sens == 12:  # Validate 12-layer model
+                            stages.append((auth, sens))
+                        else:
+                            print(f"  ⚠️ [EVOLUTION] Stage {stage} doesn't sum to 12, skipping")
+                if stages:
+                    self.evolution_stages = stages
+                    print(f"  🔧 [EVOLUTION] Custom stages: {' → '.join(f'{a}:{s}' for a, s in stages)}")
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid custom stages: {custom_stages}, using default")
+
+        # Auto-detect best mode if "auto"
+        if self.evolution_trigger_mode == "auto":
+            if self.evolution_ppl_triggers:
+                self.evolution_trigger_mode = "ppl"
+            elif self.evolution_step_triggers:
+                self.evolution_trigger_mode = "step"
+            else:
+                self.evolution_trigger_mode = "metrics"
+
+        # Log configuration
+        print(f"\n  🧬 [MULTI-STAGE EVOLUTION] Configuration:")
+        print(f"      Trigger mode: {self.evolution_trigger_mode.upper()}")
+        print(f"      Stages: {' → '.join(f'{a}:{s}' for a, s in self.evolution_stages)}")
+        if self.evolution_trigger_mode == "ppl" and self.evolution_ppl_triggers:
+            print(f"      PPL triggers: {self.evolution_ppl_triggers}")
+        elif self.evolution_trigger_mode == "step" and self.evolution_step_triggers:
+            print(f"      Step triggers: {self.evolution_step_triggers}")
+        else:
+            print(f"      Metrics: coherence>{coherence_min}, entropy>{entropy_floor}, patience={patience}")
+        print(f"      Thaw: α={thaw_alpha}→0.7 over {thaw_steps} steps")
+
+    def check_evolution_triggers(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+        current_ppl: float = None,
+    ) -> str:
+        """
+        V9.9.1 Unified evolution trigger check supporting multiple modes.
+
+        Args:
+            metrics: Training metrics dict (coherence, entropy, etc.)
+            vram_usage: Current VRAM utilization (0-1)
+            global_step: Current training step
+            current_ppl: Current validation PPL (optional, for PPL mode)
+
+        Returns:
+            "EVOLVE_TO_X_Y" if should evolve, "WAITING"/"NOT_READY"/etc. otherwise
+        """
+        # Only check if we're past the initial 9:3 stage
+        if self.current_stage_idx < 1:
+            return "NOT_READY"
+
+        # Already at final stage
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return "FINAL_STAGE"
+
+        # Safety: VRAM check applies to all modes
+        if vram_usage >= self.metabolic_vram_safety:
+            return "VRAM_UNSAFE"
+
+        # Track PPL history for smoothing
+        if current_ppl is not None:
+            self.ppl_history.append(current_ppl)
+            if len(self.ppl_history) > self.evolution_ppl_window:
+                self.ppl_history.pop(0)
+
+        # Mode-specific trigger logic
+        if self.evolution_trigger_mode == "ppl":
+            return self._check_ppl_evolution(current_ppl, global_step)
+        elif self.evolution_trigger_mode == "step":
+            return self._check_step_evolution(global_step)
+        else:  # "metrics" mode (default)
+            return self.check_granular_evolution(metrics, vram_usage, global_step)
+
+    def _check_ppl_evolution(self, current_ppl: float, global_step: int) -> str:
+        """
+        Check if PPL has dropped below the next trigger threshold.
+
+        Uses smoothed PPL (average over window) to avoid noise-triggered evolutions.
+        """
+        if not self.evolution_ppl_triggers:
+            return "NO_PPL_TRIGGERS"
+
+        if current_ppl is None or len(self.ppl_history) < 3:
+            return "WAITING_PPL"
+
+        # Use smoothed PPL
+        smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history)
+
+        # Find the next untriggered PPL threshold
+        next_trigger_idx = self.current_stage_idx  # stages are 0-indexed, triggers map to transitions
+        if next_trigger_idx >= len(self.evolution_ppl_triggers):
+            return "ALL_PPL_TRIGGERS_USED"
+
+        trigger_ppl = self.evolution_ppl_triggers[next_trigger_idx]
+
+        # Check if PPL has dropped below threshold
+        if smoothed_ppl <= trigger_ppl and not self.evolution_ppl_triggered[next_trigger_idx]:
+            self.evolution_ppl_triggered[next_trigger_idx] = True
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            print(f"\n  📉 [PPL EVOLUTION] Smoothed PPL {smoothed_ppl:.2f} <= {trigger_ppl}")
+            print(f"      Triggering evolution to {next_stage[0]}:{next_stage[1]}")
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def _check_step_evolution(self, global_step: int) -> str:
+        """
+        Check if training has reached the next step trigger.
+        """
+        if not self.evolution_step_triggers:
+            return "NO_STEP_TRIGGERS"
+
+        # Find the next untriggered step threshold
+        next_trigger_idx = self.current_stage_idx  # stages are 0-indexed
+        if next_trigger_idx >= len(self.evolution_step_triggers):
+            return "ALL_STEP_TRIGGERS_USED"
+
+        trigger_step = self.evolution_step_triggers[next_trigger_idx]
+
+        # Check if step has been reached
+        if global_step >= trigger_step and not self.evolution_step_triggered[next_trigger_idx]:
+            self.evolution_step_triggered[next_trigger_idx] = True
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            print(f"\n  📊 [STEP EVOLUTION] Step {global_step} >= {trigger_step}")
+            print(f"      Triggering evolution to {next_stage[0]}:{next_stage[1]}")
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def get_evolution_status(self) -> Dict[str, any]:
+        """
+        Get current evolution status for logging/display.
+        """
+        current = self.evolution_stages[self.current_stage_idx]
+        next_stage = None
+        if self.current_stage_idx < len(self.evolution_stages) - 1:
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+
+        status = {
+            "current_stage": f"{current[0]}:{current[1]}",
+            "stage_idx": self.current_stage_idx,
+            "total_stages": len(self.evolution_stages),
+            "next_stage": f"{next_stage[0]}:{next_stage[1]}" if next_stage else "FINAL",
+            "trigger_mode": self.evolution_trigger_mode,
+            "evolution_streak": self.evolution_streak,
+        }
+
+        if self.evolution_trigger_mode == "ppl" and self.evolution_ppl_triggers:
+            next_idx = min(self.current_stage_idx, len(self.evolution_ppl_triggers) - 1)
+            status["next_ppl_trigger"] = self.evolution_ppl_triggers[next_idx] if next_idx < len(self.evolution_ppl_triggers) else None
+            if self.ppl_history:
+                status["smoothed_ppl"] = sum(self.ppl_history) / len(self.ppl_history)
+        elif self.evolution_trigger_mode == "step" and self.evolution_step_triggers:
+            next_idx = min(self.current_stage_idx, len(self.evolution_step_triggers) - 1)
+            status["next_step_trigger"] = self.evolution_step_triggers[next_idx] if next_idx < len(self.evolution_step_triggers) else None
+
+        return status
 
     def check_stress_probe(
         self,
@@ -8357,6 +8591,16 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
+    enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
+    per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
+    layer_transition_steps: int = 500  # Steps for soft layer transitions
+
+    # V9.9.1 Inverted Curriculum Controller
+    enable_inverted_curriculum: bool = False  # Enable full inverted curriculum
+    inverted_curriculum_stages: str = ""  # Custom stages: "3:9@256,5:7@512,6:6@768,9:3@2048"
+    inverted_curriculum_ppl_triggers: str = ""  # PPL triggers: "300,200,120,75,45,25"
+
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
     num_drishti_heads: int = 4
@@ -8547,6 +8791,20 @@ class UnifiedTrainingConfig:
 
     # V9.5.1 Force Evolution (manual intervention)
     force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
+
+    # V9.9.1 Multi-Stage Evolution Configuration
+    # Allows dynamic progression through layer splits based on PPL or step triggers
+    enable_multi_stage_evolution: bool = True  # Enable automatic multi-stage evolution
+    evolution_trigger_mode: str = "auto"  # "metrics", "ppl", "step", or "auto" (best available)
+    evolution_ppl_triggers: str = ""  # PPL thresholds: "100,50,25,15" → trigger at each PPL
+    evolution_step_triggers: str = ""  # Step triggers: "10000,30000,50000,70000"
+    custom_evolution_stages: str = ""  # Custom stages: "9:3,6:6,4:8,3:9" (default: 9:3→6:6→5:7→4:8→3:9)
+    evolution_patience: int = 200  # Steps of stable metrics before evolution (for metrics mode)
+    evolution_coherence_min: float = 0.82  # Minimum coherence to evolve (metrics mode)
+    evolution_entropy_floor: float = 0.42  # Minimum entropy to evolve (metrics mode)
+    evolution_ppl_window: int = 10  # Steps to average PPL for smoother triggers
+    evolution_thaw_alpha: float = 0.1  # Initial gradient scale for newly sensory layers
+    evolution_thaw_steps: int = 300  # Steps to ramp newly sensory layer gradients
 
     # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
     # Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness
@@ -9603,6 +9861,558 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
 
     return model.to(device)
+
+
+# =============================================================================
+# PER-LAYER PHASE CONTROLLER (V9.9.1)
+# =============================================================================
+
+class PerLayerPhaseController:
+    """
+    V9.9.1: Manages per-layer phase weights for fine-grained control over
+    the Phase/Sensory split during Inverted Curriculum Evolution.
+
+    Instead of a global alpha_phase applied to all layers, this controller
+    maintains individual weights for each layer, enabling:
+    1. Soft layer transitions (gradual 0→1 ramp)
+    2. Per-layer decay schedules
+    3. Inverted curriculum where Sensory→Authority transitions happen one layer at a time
+
+    The weight for each layer controls the blend:
+        output = (1 - alpha) * quadratic_attention + alpha * phase_attention
+        - alpha = 0.0: Pure Sensory (Quadratic attention)
+        - alpha = 1.0: Pure Authority (Phase attention)
+        - 0 < alpha < 1: Hybrid blend
+
+    Usage:
+        controller = PerLayerPhaseController(num_layers=12)
+        controller.set_weights([0.0] * 12)  # Start all Sensory
+
+        # In training loop:
+        controller.update(step)
+        controller.apply_to_model(model)
+    """
+
+    def __init__(
+        self,
+        num_layers: int = 12,
+        initial_weights: Optional[List[float]] = None,
+        local_layers: int = 4,  # Layers 0 to local_layers-1 are LocalAttention (no phase weight)
+    ):
+        """
+        Initialize per-layer phase controller.
+
+        Args:
+            num_layers: Total number of layers in the model
+            initial_weights: Initial phase weights for each layer (0.0 = Sensory, 1.0 = Authority)
+                            If None, defaults to [0.0] * num_layers (all Sensory)
+            local_layers: Number of early layers that use LocalAttention only (no phase component)
+        """
+        self.num_layers = num_layers
+        self.local_layers = local_layers
+
+        # Initialize weights
+        if initial_weights is not None:
+            if len(initial_weights) != num_layers:
+                raise ValueError(f"initial_weights must have {num_layers} elements, got {len(initial_weights)}")
+            self.weights = list(initial_weights)
+        else:
+            # Default: all Sensory (alpha_phase = 0.0)
+            self.weights = [0.0] * num_layers
+
+        # Transition tracking for soft layer transitions
+        self.transitions = {}  # layer_idx -> {start_step, end_step, start_val, end_val}
+        self.transition_history = []  # Log of completed transitions
+
+        print(f"\n  🎛️ [PER-LAYER PHASE] Controller initialized:")
+        print(f"      Total layers: {num_layers}")
+        print(f"      Local layers: 0-{local_layers-1} (no phase component)")
+        print(f"      Hybrid layers: {local_layers}-{num_layers-1} (per-layer phase weights)")
+        print(f"      Initial weights: {self._format_weights()}")
+
+    def _format_weights(self) -> str:
+        """Format weights for display, showing only hybrid layers."""
+        hybrid_weights = self.weights[self.local_layers:]
+        return "[" + ", ".join(f"{w:.2f}" for w in hybrid_weights) + "]"
+
+    def get_weight(self, layer_idx: int) -> float:
+        """Get the current phase weight for a specific layer."""
+        if layer_idx < 0 or layer_idx >= self.num_layers:
+            return 0.0
+        return self.weights[layer_idx]
+
+    def set_weight(self, layer_idx: int, weight: float):
+        """Set the phase weight for a specific layer."""
+        if 0 <= layer_idx < self.num_layers:
+            self.weights[layer_idx] = max(0.0, min(1.0, weight))
+
+    def set_weights(self, weights: List[float]):
+        """Set all phase weights at once."""
+        if len(weights) != self.num_layers:
+            raise ValueError(f"weights must have {self.num_layers} elements, got {len(weights)}")
+        self.weights = [max(0.0, min(1.0, w)) for w in weights]
+
+    def start_transition(
+        self,
+        layer_idx: int,
+        target_weight: float,
+        duration_steps: int,
+        current_step: int,
+    ):
+        """
+        Start a soft transition for a specific layer.
+
+        The weight will linearly interpolate from current value to target
+        over duration_steps training steps.
+
+        Args:
+            layer_idx: Which layer to transition
+            target_weight: Target phase weight (0.0 = Sensory, 1.0 = Authority)
+            duration_steps: Number of steps for the transition
+            current_step: Current training step
+        """
+        if layer_idx < self.local_layers:
+            print(f"  ⚠️ [PER-LAYER PHASE] Layer {layer_idx} is LocalAttention, no phase to transition")
+            return
+
+        current_weight = self.weights[layer_idx]
+        self.transitions[layer_idx] = {
+            'start_step': current_step,
+            'end_step': current_step + duration_steps,
+            'start_val': current_weight,
+            'end_val': target_weight,
+        }
+        direction = "→Authority" if target_weight > current_weight else "→Sensory"
+        print(f"  🔄 [PER-LAYER PHASE] Layer {layer_idx} transition: {current_weight:.2f} → {target_weight:.2f} ({direction}) over {duration_steps} steps")
+
+    def update(self, current_step: int) -> Dict[str, any]:
+        """
+        Update all active transitions based on current step.
+
+        Returns dict with:
+            - 'weights': Current per-layer weights
+            - 'active_transitions': Number of layers currently transitioning
+            - 'completed': List of layer indices that completed this step
+        """
+        completed = []
+
+        for layer_idx, trans in list(self.transitions.items()):
+            start_step = trans['start_step']
+            end_step = trans['end_step']
+            start_val = trans['start_val']
+            end_val = trans['end_val']
+
+            if current_step >= end_step:
+                # Transition complete
+                self.weights[layer_idx] = end_val
+                completed.append(layer_idx)
+                self.transition_history.append({
+                    'layer_idx': layer_idx,
+                    'completed_step': current_step,
+                    'final_weight': end_val,
+                })
+                del self.transitions[layer_idx]
+                print(f"  ✓ [PER-LAYER PHASE] Layer {layer_idx} transition complete: α={end_val:.2f}")
+            else:
+                # Interpolate
+                progress = (current_step - start_step) / (end_step - start_step)
+                self.weights[layer_idx] = start_val + progress * (end_val - start_val)
+
+        return {
+            'weights': self.weights.copy(),
+            'active_transitions': len(self.transitions),
+            'completed': completed,
+        }
+
+    def apply_to_model(self, model: nn.Module):
+        """
+        Apply current per-layer weights to the model's HybridAttentionLayer modules.
+
+        This updates each layer's alpha_phase parameter based on its layer_idx.
+        """
+        for module in model.modules():
+            if hasattr(module, 'alpha_phase') and hasattr(module, 'layer_idx'):
+                layer_idx = module.layer_idx
+                if 0 <= layer_idx < self.num_layers:
+                    weight = self.weights[layer_idx]
+                    module.alpha_phase.data.fill_(weight)
+                    if hasattr(module, 'alpha_local'):
+                        module.alpha_local.data.fill_(1.0 - weight)
+
+    def get_status(self) -> Dict[str, any]:
+        """Get current controller status for logging."""
+        # Count layers by type based on current weights
+        authority_count = sum(1 for w in self.weights[self.local_layers:] if w >= 0.9)
+        sensory_count = sum(1 for w in self.weights[self.local_layers:] if w <= 0.1)
+        transitioning_count = len(self.weights[self.local_layers:]) - authority_count - sensory_count
+
+        return {
+            'weights': self.weights.copy(),
+            'local_layers': self.local_layers,
+            'authority_count': authority_count,
+            'sensory_count': sensory_count,
+            'transitioning_count': transitioning_count,
+            'active_transitions': len(self.transitions),
+            'completed_transitions': len(self.transition_history),
+        }
+
+    @classmethod
+    def from_config(cls, config) -> 'PerLayerPhaseController':
+        """Create controller from UnifiedTrainingConfig."""
+        # Parse initial weights from config string
+        initial_weights = None
+        if hasattr(config, 'per_layer_phase_weights') and config.per_layer_phase_weights:
+            try:
+                initial_weights = [float(w.strip()) for w in config.per_layer_phase_weights.split(',')]
+            except ValueError:
+                print(f"  ⚠️ [PER-LAYER PHASE] Invalid weights string: {config.per_layer_phase_weights}")
+                initial_weights = None
+
+        return cls(
+            num_layers=12,  # Fixed for Sovereign-1 architecture
+            initial_weights=initial_weights,
+            local_layers=config.local_layers if hasattr(config, 'local_layers') else 4,
+        )
+
+
+# =============================================================================
+# INVERTED LAYER CURRICULUM CONTROLLER (V9.9.2)
+# =============================================================================
+
+class InvertedLayerCurriculumController:
+    """
+    V9.9.2: Orchestrates the Inverted Layer Curriculum Evolution.
+
+    Manages split evolution (3:9 → 9:3) with per-layer phase weights and soft
+    transitions. Optionally delegates sequence length management to an external
+    SequenceLengthCurriculum for sophisticated PPL-gated seq_len progression.
+
+    Responsibilities:
+    1. Split evolution: 3:9 → 6:6 → 9:3 (Sensory-first → Authority-later)
+    2. Per-layer phase weights (via PerLayerPhaseController)
+    3. Soft layer transitions with phase ramp as shock absorber
+
+    Delegation (optional):
+    - If seq_len_curriculum is provided, seq_len is delegated to it
+    - If not provided, uses fixed default_seq_len
+
+    Benefits of separation:
+    - SequenceLengthCurriculum handles: PPL gating, linear/exponential ramp, reload detection
+    - InvertedLayerCurriculumController handles: split evolution, layer weights, transitions
+    - Both react to PPL but control different aspects
+
+    Example curriculum (splits only):
+        Stage 0: 3:9 split | PPL > 300  (start)
+        Stage 1: 4:8 split | PPL < 300
+        Stage 2: 5:7 split | PPL < 200
+        Stage 3: 6:6 split | PPL < 120
+        Stage 4: 7:5 split | PPL < 75
+        Stage 5: 8:4 split | PPL < 45
+        Stage 6: 9:3 split | PPL < 25
+
+    Usage (with delegation):
+        seq_curriculum = SequenceLengthCurriculum(seq_len_start=256, seq_len_end=2048, ...)
+        split_curriculum = InvertedLayerCurriculumController.from_config(
+            config, seq_len_curriculum=seq_curriculum
+        )
+
+        # In training loop:
+        result = split_curriculum.update(step, current_ppl)
+        if result['split_changed']:
+            reconfigure_gradient_scaler(result['current_split'])
+        # seq_len changes handled by seq_curriculum.should_reload_data()
+        split_curriculum.apply_to_model(model)
+
+    Usage (standalone):
+        split_curriculum = InvertedLayerCurriculumController(
+            stages=[(3,9), (4,8), (5,7), (6,6), (7,5), (8,4), (9,3)],
+            ppl_triggers=[300, 200, 120, 75, 45, 25],
+            default_seq_len=1024,  # Fixed seq_len
+        )
+    """
+
+    def __init__(
+        self,
+        stages: List[Tuple[int, int]],  # [(3, 9), (4, 8), ...] - just splits
+        ppl_triggers: List[float],  # PPL thresholds for each transition
+        local_layers: int = 4,
+        transition_steps: int = 500,  # Steps for soft layer transition
+        seq_len_curriculum: Optional['SequenceLengthCurriculum'] = None,  # Optional delegation
+        default_seq_len: int = 1024,  # Used when no seq_len_curriculum provided
+    ):
+        """
+        Initialize the Inverted Curriculum Controller.
+
+        Args:
+            stages: List of (authority, sensory) split tuples, e.g., [(3, 9), (6, 6), (9, 3)]
+            ppl_triggers: PPL thresholds for advancing to next stage
+            local_layers: Number of local attention layers (no phase component)
+            transition_steps: Steps for soft layer transitions
+            seq_len_curriculum: Optional SequenceLengthCurriculum for seq_len delegation
+            default_seq_len: Fixed seq_len when no curriculum provided
+        """
+        self.stages = stages
+        self.ppl_triggers = ppl_triggers
+        self.local_layers = local_layers
+        self.transition_steps = transition_steps
+        self.seq_len_curriculum = seq_len_curriculum
+        self.default_seq_len = default_seq_len
+
+        # Current state
+        self.current_stage_idx = 0
+        self.current_split = stages[0]
+
+        # Per-layer phase controller
+        initial_weights = self._split_to_weights(self.current_split)
+        self.phase_controller = PerLayerPhaseController(
+            num_layers=12,
+            initial_weights=initial_weights,
+            local_layers=local_layers,
+        )
+
+        # PPL tracking for smooth triggers
+        self.ppl_history: List[float] = []
+        self.ppl_window = 10  # Steps to average PPL
+
+        # Transition tracking
+        self.stage_history: List[Dict] = []
+        self.last_stage_change_step = 0
+
+        # Print curriculum
+        self._print_curriculum()
+
+    def _print_curriculum(self):
+        """Print the full curriculum schedule."""
+        seq_mode = "DELEGATED" if self.seq_len_curriculum else f"FIXED@{self.default_seq_len}"
+        print(f"\n  🎓 [INVERTED CURRICULUM] Schedule (seq_len: {seq_mode}):")
+        print(f"      {'Stage':<8} {'Split':<8} {'PPL Trigger':<12}")
+        print(f"      {'-'*30}")
+        for i, (auth, sens) in enumerate(self.stages):
+            trigger = f"< {self.ppl_triggers[i]:.0f}" if i < len(self.ppl_triggers) else "START"
+            marker = " ◀" if i == self.current_stage_idx else ""
+            print(f"      {i:<8} {auth}:{sens:<5} {trigger:<12}{marker}")
+        if self.seq_len_curriculum:
+            print(f"\n      Seq Len: Delegated to SequenceLengthCurriculum")
+            print(f"      Range: {self.seq_len_curriculum.seq_len_start} → {self.seq_len_curriculum.seq_len_end}")
+            print(f"      Mode: {self.seq_len_curriculum.ramp_mode}")
+            if self.seq_len_curriculum.ppl_gate > 0:
+                print(f"      PPL Gate: < {self.seq_len_curriculum.ppl_gate}")
+
+    def _split_to_weights(self, split: Tuple[int, int]) -> List[float]:
+        """
+        Convert a split (authority, sensory) to per-layer weights.
+
+        For 12 layers with local_layers=4:
+        - Layers 0-3: Local only (weight doesn't matter, but set to 0)
+        - Layers 4-11: Hybrid, weight = 1.0 for Authority, 0.0 for Sensory
+
+        Example: split (6, 6) means layers 0-5 are Authority, layers 6-11 are Sensory
+        So weights for layers 4-11 would be [1, 1, 0, 0, 0, 0, 0, 0]
+        """
+        authority_layers, sensory_layers = split
+        weights = [0.0] * 12
+
+        for i in range(12):
+            if i < authority_layers:
+                weights[i] = 1.0  # Authority layer
+            else:
+                weights[i] = 0.0  # Sensory layer
+
+        return weights
+
+    def update(
+        self,
+        step: int,
+        current_ppl: Optional[float] = None,
+    ) -> Dict[str, any]:
+        """
+        Update the curriculum based on current step and PPL.
+
+        Args:
+            step: Current training step
+            current_ppl: Current validation PPL (optional)
+
+        Returns:
+            Dict with:
+                - 'current_stage': Current stage index
+                - 'current_split': Current (authority, sensory) split
+                - 'current_seq_len': Current sequence length (from delegate or fixed)
+                - 'split_changed': Whether split changed this step
+                - 'seq_len_changed': Whether seq_len changed (from delegate)
+                - 'transitioning_layers': Number of layers currently transitioning
+                - 'layer_weights': Current per-layer weights
+        """
+        split_changed = False
+        old_split = self.current_split
+
+        # Update PPL history
+        if current_ppl is not None:
+            self.ppl_history.append(current_ppl)
+            if len(self.ppl_history) > self.ppl_window:
+                self.ppl_history.pop(0)
+
+        # Check for stage advancement (split evolution)
+        if self.current_stage_idx < len(self.stages) - 1 and current_ppl is not None:
+            smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else current_ppl
+            next_trigger = self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else float('inf')
+
+            if smoothed_ppl < next_trigger:
+                # Advance to next stage
+                self.current_stage_idx += 1
+                new_split = self.stages[self.current_stage_idx]
+
+                if new_split != old_split:
+                    split_changed = True
+                    self._transition_to_split(new_split, step)
+
+                # Record history
+                self.stage_history.append({
+                    'stage': self.current_stage_idx,
+                    'step': step,
+                    'ppl': smoothed_ppl,
+                    'split': new_split,
+                })
+                self.last_stage_change_step = step
+
+                print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!")
+                print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
+                print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
+
+        # Update per-layer phase controller (for soft transitions)
+        phase_result = self.phase_controller.update(step)
+
+        # Get seq_len from delegate or use fixed
+        if self.seq_len_curriculum is not None:
+            current_seq_len = self.seq_len_curriculum.get_seq_len(step, current_ppl)
+            seq_len_changed = self.seq_len_curriculum.should_reload_data()
+        else:
+            current_seq_len = self.default_seq_len
+            seq_len_changed = False
+
+        return {
+            'current_stage': self.current_stage_idx,
+            'current_split': self.current_split,
+            'current_seq_len': current_seq_len,
+            'split_changed': split_changed,
+            'seq_len_changed': seq_len_changed,
+            'transitioning_layers': phase_result['active_transitions'],
+            'layer_weights': phase_result['weights'],
+        }
+
+    def _transition_to_split(self, new_split: Tuple[int, int], step: int):
+        """
+        Start soft transition to a new split.
+
+        Identifies which layer(s) are changing and starts their transition.
+        """
+        old_auth, old_sens = self.current_split
+        new_auth, new_sens = new_split
+
+        if new_auth > old_auth:
+            # Moving from Sensory to Authority (3:9 → 4:8 → 5:7 → ...)
+            for layer_idx in range(old_auth, new_auth):
+                if layer_idx >= self.local_layers:
+                    self.phase_controller.start_transition(
+                        layer_idx=layer_idx,
+                        target_weight=1.0,  # Becoming Authority
+                        duration_steps=self.transition_steps,
+                        current_step=step,
+                    )
+        else:
+            # Moving from Authority to Sensory (9:3 → 8:4 → 7:5 → ...)
+            for layer_idx in range(new_auth, old_auth):
+                if layer_idx >= self.local_layers:
+                    self.phase_controller.start_transition(
+                        layer_idx=layer_idx,
+                        target_weight=0.0,  # Becoming Sensory
+                        duration_steps=self.transition_steps,
+                        current_step=step,
+                    )
+
+        self.current_split = new_split
+
+    def apply_to_model(self, model: nn.Module):
+        """Apply current per-layer weights to the model."""
+        self.phase_controller.apply_to_model(model)
+
+    def get_status(self) -> Dict[str, any]:
+        """Get current curriculum status for logging."""
+        status = {
+            'stage': self.current_stage_idx,
+            'total_stages': len(self.stages),
+            'split': f"{self.current_split[0]}:{self.current_split[1]}",
+            'smoothed_ppl': sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else None,
+            'next_trigger': self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else None,
+            'transitioning_layers': len(self.phase_controller.transitions),
+            'layer_weights': self.phase_controller.weights[self.local_layers:],
+        }
+        # Add seq_len info from delegate or fixed
+        if self.seq_len_curriculum is not None:
+            status['seq_len'] = self.seq_len_curriculum.current_seq_len
+            status['seq_len_mode'] = 'delegated'
+        else:
+            status['seq_len'] = self.default_seq_len
+            status['seq_len_mode'] = 'fixed'
+        return status
+
+    @classmethod
+    def from_config(
+        cls,
+        config,
+        seq_len_curriculum: Optional['SequenceLengthCurriculum'] = None,
+    ) -> 'InvertedLayerCurriculumController':
+        """
+        Create controller from config with optional seq_len delegation.
+
+        Args:
+            config: UnifiedTrainingConfig with inverted curriculum settings
+            seq_len_curriculum: Optional SequenceLengthCurriculum for seq_len delegation
+
+        Config fields used:
+        - inverted_curriculum_stages: "3:9,4:8,5:7,6:6,7:5,8:4,9:3" (splits only)
+        - inverted_curriculum_ppl_triggers: "300,200,120,75,45,25"
+        - layer_transition_steps: Steps for soft transitions (default: 500)
+        - local_layers: Number of local attention layers (default: 4)
+        """
+        # Parse stages (splits only, no seq_len)
+        if hasattr(config, 'inverted_curriculum_stages') and config.inverted_curriculum_stages:
+            stages = []
+            for stage_str in config.inverted_curriculum_stages.split(','):
+                stage_str = stage_str.strip()
+                # Support both "3:9" and "3:9@256" formats (ignore @seq_len for backwards compat)
+                if '@' in stage_str:
+                    stage_str = stage_str.split('@')[0]
+                split_parts = stage_str.split(':')
+                if len(split_parts) == 2:
+                    auth, sens = int(split_parts[0]), int(split_parts[1])
+                    stages.append((auth, sens))
+        else:
+            # Default inverted curriculum (splits only)
+            stages = [
+                (3, 9),   # Start: Heavy Sensory
+                (4, 8),
+                (5, 7),
+                (6, 6),   # Balanced
+                (7, 5),
+                (8, 4),
+                (9, 3),   # End: Heavy Authority
+            ]
+
+        # Parse PPL triggers
+        if hasattr(config, 'inverted_curriculum_ppl_triggers') and config.inverted_curriculum_ppl_triggers:
+            ppl_triggers = [float(t.strip()) for t in config.inverted_curriculum_ppl_triggers.split(',')]
+        else:
+            # Default triggers
+            ppl_triggers = [300, 200, 120, 75, 45, 25]
+
+        return cls(
+            stages=stages,
+            ppl_triggers=ppl_triggers,
+            local_layers=getattr(config, 'local_layers', 4),
+            transition_steps=getattr(config, 'layer_transition_steps', 500),
+            seq_len_curriculum=seq_len_curriculum,
+            default_seq_len=getattr(config, 'max_seq_len', 1024),
+        )
 
 
 def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingConfig) -> float:
@@ -11674,6 +12484,21 @@ def train(config: UnifiedTrainingConfig):
             saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
+        # V9.9.1 Configure Multi-Stage Evolution
+        if config.enable_multi_stage_evolution:
+            relaxation_controller.configure_evolution(
+                trigger_mode=config.evolution_trigger_mode,
+                ppl_triggers=config.evolution_ppl_triggers,
+                step_triggers=config.evolution_step_triggers,
+                custom_stages=config.custom_evolution_stages,
+                patience=config.evolution_patience,
+                coherence_min=config.evolution_coherence_min,
+                entropy_floor=config.evolution_entropy_floor,
+                ppl_window=config.evolution_ppl_window,
+                thaw_alpha=config.evolution_thaw_alpha,
+                thaw_steps=config.evolution_thaw_steps,
+            )
+
         # V9.5.1 Force Evolution: Manual intervention to specific stage
         if config.force_evolution_stage is not None:
             target_stage = config.force_evolution_stage
@@ -11685,6 +12510,11 @@ def train(config: UnifiedTrainingConfig):
                 relaxation_controller.state = relaxation_controller.STATE_BALANCED
                 print(f"\n  🔧 [FORCE EVOLUTION] Manually set to stage {target_stage}: {new_split[0]}:{new_split[1]}")
                 print(f"      Stages: 0=9:3, 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # V9.9.2 Inverted Layer Curriculum Controller
+    # Note: Full initialization happens after seq_len_curriculum is created (see below)
+    inverted_layer_curriculum = None
+    _enable_inverted_curriculum = config.enable_inverted_curriculum  # Store for later init
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     adaptive_controller = None
@@ -12254,6 +13084,19 @@ def train(config: UnifiedTrainingConfig):
         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
         train_iter = iter(train_loader)
         seq_len_curriculum.mark_data_reloaded()
+
+    # V9.9.2: Initialize Inverted Layer Curriculum with seq_len delegation
+    if _enable_inverted_curriculum:
+        inverted_layer_curriculum = InvertedLayerCurriculumController.from_config(
+            config,
+            seq_len_curriculum=seq_len_curriculum,  # Delegate seq_len to SequenceLengthCurriculum
+        )
+        # Apply initial per-layer weights to model
+        inverted_layer_curriculum.apply_to_model(model)
+        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled (V9.9.2)")
+        print(f"      Initial split: {inverted_layer_curriculum.current_split[0]}:{inverted_layer_curriculum.current_split[1]}")
+        status = inverted_layer_curriculum.get_status()
+        print(f"      Seq len mode: {status['seq_len_mode']} ({status['seq_len']} tokens)")
 
     while global_step < config.max_steps:
         # Get batch
@@ -13534,11 +14377,13 @@ def train(config: UnifiedTrainingConfig):
                         relaxation_controller.current_stage_idx = 1  # Now at 6:6
                         print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
 
-                    # V9.5.1 Granular Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
-                    evolution_result = relaxation_controller.check_granular_evolution(
+                    # V9.9.1 Multi-Stage Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
+                    # Supports PPL, step, or metrics-based triggers
+                    evolution_result = relaxation_controller.check_evolution_triggers(
                         metrics=metrics,
                         vram_usage=vram_usage,
                         global_step=global_step,
+                        current_ppl=last_val_ppl if last_val_ppl != float('inf') else None,
                     )
 
                     if evolution_result.startswith("EVOLVE_TO_"):
@@ -14085,6 +14930,53 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V9.9.1: Inverted Layer Curriculum Update
+                if inverted_layer_curriculum is not None:
+                    ilc_result = inverted_layer_curriculum.update(global_step, val_ppl)
+
+                    # Apply updated per-layer weights to model
+                    inverted_layer_curriculum.apply_to_model(model)
+
+                    # Handle split change - reconfigure gradient scaler
+                    if ilc_result['split_changed'] and gradient_scaler_hgs is not None:
+                        new_auth, new_sens = ilc_result['current_split']
+                        gradient_scaler_hgs.authority_layers = new_auth
+                        gradient_scaler_hgs.sensory_layers = new_sens
+                        print(f"  🔧 [HGS] Reconfigured for {new_auth}:{new_sens} split")
+
+                    # Handle seq_len change (when using delegated seq_len_curriculum)
+                    # V9.9.2: If seq_len is delegated, handle reload here instead of separate block
+                    if ilc_result['seq_len_changed'] and inverted_layer_curriculum.seq_len_curriculum is not None:
+                        old_seq_len = current_seq_len
+                        current_seq_len = ilc_result['current_seq_len']
+
+                        print(inverted_layer_curriculum.seq_len_curriculum.get_transition_message(
+                            global_step, old_seq_len, current_seq_len
+                        ))
+
+                        # Recalculate batch size for new sequence length
+                        old_batch = config.batch_size
+                        new_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+                        new_batch = max(1, min(new_batch, config.batch_size_max))
+                        config.batch_size = new_batch
+
+                        print(f"  📏 [INVERTED CURRICULUM] Reloading dataloader:")
+                        print(f"     seq_len: {old_seq_len} → {current_seq_len}")
+                        print(f"     batch:   {old_batch} → {new_batch}")
+
+                        # Reload data with new sequence length
+                        train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
+                        train_iter = iter(train_loader)
+                        inverted_layer_curriculum.seq_len_curriculum.mark_data_reloaded()
+                        print(f"  ✅ Dataloader reloaded.")
+
+                    # Log curriculum status periodically
+                    if global_step % (config.eval_every * 5) == 0:
+                        status = inverted_layer_curriculum.get_status()
+                        print(f"  🎓 [CURRICULUM] Stage {status['stage']}/{status['total_stages']-1} | "
+                              f"Split: {status['split']} | Seq: {status['seq_len']} | "
+                              f"Transitioning: {status['transitioning_layers']} layers")
+
                 # V9.8.9: Dynamic Window Scheduler Update
                 if dynamic_window_scheduler is not None:
                     # Get VRAM usage for pressure override
@@ -14358,7 +15250,10 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
 
                 # V2.3.4: Sequence Length Curriculum Update
-                if seq_len_curriculum is not None:
+                # Skip if inverted_layer_curriculum is handling seq_len via delegation
+                _ilc_handles_seq = (inverted_layer_curriculum is not None and
+                                   inverted_layer_curriculum.seq_len_curriculum is not None)
+                if seq_len_curriculum is not None and not _ilc_handles_seq:
                     old_seq_len = current_seq_len
                     current_seq_len = seq_len_curriculum.get_seq_len(global_step, val_ppl)
 
@@ -15304,6 +16199,22 @@ def main():
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
 
+    # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
+    parser.add_argument("--enable_per_layer_phase", action="store_true",
+                       help="Enable per-layer phase weight control (for inverted curriculum)")
+    parser.add_argument("--per_layer_phase_weights", type=str, default="",
+                       help="Initial per-layer phase weights, comma-separated 12 values (e.g., '0,0,0,0,0,0,0,0,0,0,0,0' for all Sensory)")
+    parser.add_argument("--layer_transition_steps", type=int, default=500,
+                       help="Steps for soft layer transitions during evolution")
+
+    # V9.9.1 Inverted Curriculum Controller
+    parser.add_argument("--enable_inverted_curriculum", action="store_true",
+                       help="Enable full inverted curriculum (3:9→9:3 with seq length growth)")
+    parser.add_argument("--inverted_curriculum_stages", type=str, default="",
+                       help="Custom curriculum stages: '3:9@256,5:7@512,6:6@768,9:3@2048' (split@seq_len)")
+    parser.add_argument("--inverted_curriculum_ppl_triggers", type=str, default="",
+                       help="PPL triggers for stage advancement: '300,200,120,75,45,25'")
+
     # V9.6.12: Cosine mode for phase attention
     parser.add_argument("--cosine_mode", type=str, default="standard",
                        choices=["standard", "shifted", "complex"],
@@ -15360,6 +16271,33 @@ def main():
     # V9.5.1 Force Evolution (manual intervention)
     parser.add_argument("--force_evolution_stage", type=int, default=None,
                        help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
+
+    # V9.9.1 Multi-Stage Evolution Configuration
+    parser.add_argument("--enable_multi_stage_evolution", action="store_true", default=True,
+                       help="Enable automatic multi-stage evolution (9:3→6:6→5:7→4:8→3:9)")
+    parser.add_argument("--disable_multi_stage_evolution", action="store_true",
+                       help="Disable multi-stage evolution (stay at initial split)")
+    parser.add_argument("--evolution_trigger_mode", type=str, default="auto",
+                       choices=["auto", "metrics", "ppl", "step"],
+                       help="Evolution trigger mode: auto (detect), metrics (coherence/entropy), ppl (perplexity), step (fixed steps)")
+    parser.add_argument("--evolution_ppl_triggers", type=str, default="",
+                       help="PPL thresholds to trigger evolution, comma-separated (e.g., '100,50,25,15')")
+    parser.add_argument("--evolution_step_triggers", type=str, default="",
+                       help="Step numbers to trigger evolution, comma-separated (e.g., '10000,30000,50000,70000')")
+    parser.add_argument("--custom_evolution_stages", type=str, default="",
+                       help="Custom evolution stages, comma-separated (e.g., '9:3,6:6,4:8,3:9')")
+    parser.add_argument("--evolution_patience", type=int, default=200,
+                       help="Steps of stable metrics before evolution (metrics mode)")
+    parser.add_argument("--evolution_coherence_min", type=float, default=0.82,
+                       help="Minimum coherence to evolve (metrics mode)")
+    parser.add_argument("--evolution_entropy_floor", type=float, default=0.42,
+                       help="Minimum entropy to evolve (metrics mode)")
+    parser.add_argument("--evolution_ppl_window", type=int, default=10,
+                       help="Steps to average PPL for smoother triggers")
+    parser.add_argument("--evolution_thaw_alpha", type=float, default=0.1,
+                       help="Initial gradient scale for newly sensory layers after evolution")
+    parser.add_argument("--evolution_thaw_steps", type=int, default=300,
+                       help="Steps to ramp newly sensory layer gradients after evolution")
 
     # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
     # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
@@ -16307,6 +17245,26 @@ def main():
         entropy_floor_weight=args.entropy_floor_weight,
         # V9.5.1 Force Evolution
         force_evolution_stage=args.force_evolution_stage,
+        # V9.9.1 Multi-Stage Evolution
+        enable_multi_stage_evolution=args.enable_multi_stage_evolution and not args.disable_multi_stage_evolution,
+        evolution_trigger_mode=args.evolution_trigger_mode,
+        evolution_ppl_triggers=args.evolution_ppl_triggers,
+        evolution_step_triggers=args.evolution_step_triggers,
+        custom_evolution_stages=args.custom_evolution_stages,
+        evolution_patience=args.evolution_patience,
+        evolution_coherence_min=args.evolution_coherence_min,
+        evolution_entropy_floor=args.evolution_entropy_floor,
+        evolution_ppl_window=args.evolution_ppl_window,
+        evolution_thaw_alpha=args.evolution_thaw_alpha,
+        evolution_thaw_steps=args.evolution_thaw_steps,
+        # V9.9.1 Per-Layer Phase Control
+        enable_per_layer_phase=args.enable_per_layer_phase,
+        per_layer_phase_weights=args.per_layer_phase_weights,
+        layer_transition_steps=args.layer_transition_steps,
+        # V9.9.1 Inverted Curriculum
+        enable_inverted_curriculum=args.enable_inverted_curriculum,
+        inverted_curriculum_stages=args.inverted_curriculum_stages,
+        inverted_curriculum_ppl_triggers=args.inverted_curriculum_ppl_triggers,
         # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
         enable_stress_probe=args.enable_stress_probe,
         stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,
