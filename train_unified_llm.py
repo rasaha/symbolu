@@ -13268,7 +13268,20 @@ def train(config: UnifiedTrainingConfig):
         )
         # Apply initial per-layer weights to model
         inverted_layer_curriculum.apply_to_model(model)
-        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled (V9.9.2)")
+
+        # V9.9.3: CRITICAL - Reconfigure HGS to match inverted curriculum's initial split!
+        # Without this, HGS would use config's 9:3 while model is actually 3:9
+        if gradient_scaler_hgs is not None:
+            init_auth, init_sens = inverted_layer_curriculum.current_split
+            gradient_scaler_hgs.reconfigure(
+                new_authority_layers=init_auth,
+                new_sensory_layers=init_sens,
+                alpha_range=(config.alpha_sens_initial, config.alpha_sens_max),
+                new_warmup_steps=config.gradient_warmup_steps,
+            )
+            print(f"  🔧 [HGS] Synchronized with inverted curriculum: {init_auth}:{init_sens} split")
+
+        print(f"\n  🎓 [INVERTED CURRICULUM] Controller enabled (V9.9.3)")
         print(f"      Initial split: {inverted_layer_curriculum.current_split[0]}:{inverted_layer_curriculum.current_split[1]}")
         status = inverted_layer_curriculum.get_status()
         print(f"      Seq len mode: {status['seq_len_mode']} ({status['seq_len']} tokens)")
