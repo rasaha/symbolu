@@ -1,7 +1,7 @@
 # Inverted Curriculum Evolution Design
 
-**Version**: 1.0.0
-**Status**: DRAFT
+**Version**: 1.6.0
+**Status**: IMPLEMENTED
 **Author**: Claude Code
 **Date**: 2026-01-13
 
@@ -34,7 +34,8 @@
 5. [Implementation Plan](#5-implementation-plan)
 6. [API Reference](#6-api-reference)
 7. [Testing Strategy](#7-testing-strategy)
-8. [Changelog](#8-changelog)
+8. [Sovereign Reset Protocol (V9.9.3)](#8-sovereign-reset-protocol-v993)
+9. [Changelog](#9-changelog)
 
 ---
 
@@ -741,7 +742,111 @@ class SequenceLengthCurriculum:
 
 ---
 
-## 8. Changelog
+## 8. Sovereign Reset Protocol (V9.9.3)
+
+When transitioning between sequence lengths or completing layer transitions, the training state needs careful handling to prevent gradient corruption and momentum artifacts.
+
+### 8.1 The "Re-Loading Tax" Problem
+
+When switching sequence lengths mid-training:
+- **Gradient Accumulation**: If halfway through accumulation, old gradients are from different tensor shapes
+- **Optimizer Momentum**: AdamW tracks velocity per-parameter; sudden shape changes create "ghosts"
+- **VRAM Fragmentation**: Different tensor shapes cause memory fragmentation
+
+### 8.2 The Sovereign Reset Protocol
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           SOVEREIGN RESET PROTOCOL (V9.9.3)                 │
+│         "Soft-Reset" for Clean State Transitions            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. SYNC-POINT EVOLUTION                                    │
+│     └── Curriculum updates only at end of grad accumulation │
+│         (global_step only increments after full cycle)      │
+│                                                             │
+│  2. GRADIENT CLEAR                                          │
+│     └── optimizer.zero_grad(set_to_none=True)               │
+│         (Memory-efficient gradient clearing)                │
+│                                                             │
+│  3. CUDA CACHE CLEAR                                        │
+│     └── torch.cuda.empty_cache()                            │
+│         (Release fragmented memory)                         │
+│                                                             │
+│  4. MOMENTUM DAMPENING                                      │
+│     └── When layer transitions complete (α reaches 1.0):    │
+│         - Decay exp_avg by 50%                              │
+│         - Decay exp_avg_sq by 50%                           │
+│         (Allows layer to find new "ontological direction")  │
+│                                                             │
+│  5. SKIP STEP                                               │
+│     └── Skip one training step after seq_len reload         │
+│         (VRAM stabilization before next forward pass)       │
+│                                                             │
+│  6. HGS RE-CALIBRATION                                      │
+│     └── Force recalculation of gradient scaler targets      │
+│         after split change                                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Implementation Functions
+
+```python
+# V9.9.3: Sovereign Reset Protocol Functions
+
+def on_seq_len_transition(optimizer, device, old_seq_len, new_seq_len, grad_accum_counter):
+    """Clear buffers and prepare for new sequence length."""
+    optimizer.zero_grad(set_to_none=True)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    return {'skip_step': True}  # Caller skips next step
+
+def dampen_layer_momentum(optimizer, model, layer_indices, dampen_factor=0.5):
+    """Decay momentum for layers that completed transition."""
+    for param in layer_parameters:
+        if param in optimizer.state:
+            optimizer.state[param]['exp_avg'].mul_(dampen_factor)
+            optimizer.state[param]['exp_avg_sq'].mul_(dampen_factor)
+```
+
+### 8.4 Training Loop Integration
+
+```python
+# In validation block after curriculum update:
+if ilc_result['seq_len_changed']:
+    # Sovereign Reset Protocol
+    reset_result = on_seq_len_transition(optimizer, device, old_seq, new_seq, accum_step)
+    # ... reload dataloader ...
+    _skip_next_step = reset_result['skip_step']
+
+if ilc_result['completed_transitions']:
+    # Momentum Dampening for layers that finished transitioning
+    dampen_layer_momentum(optimizer, model, ilc_result['completed_transitions'])
+```
+
+### 8.5 Expected Log Output
+
+```
+  🎓 [INVERTED CURRICULUM] Stage 2 reached!
+      PPL 85.50 < 100
+      Split: 4:8 → 5:7
+  🎛️  [MOMENTUM DAMPEN] Applied 50% decay to layers [4]
+     Parameters affected: 24
+  🧹 [SOVEREIGN RESET] Seq transition protocol:
+     Gradients: cleared (set_to_none=True)
+     CUDA cache: cleared
+     Next step: SKIP (VRAM stabilization)
+  📏 [INVERTED CURRICULUM] Reloading dataloader:
+     seq_len: 512 → 768
+     batch:   16 → 10
+  ✅ Dataloader reloaded. All buffers synchronized.
+  ⏭️  [SOVEREIGN RESET] Skipping step 5000 for VRAM stabilization
+```
+
+---
+
+## 9. Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
@@ -751,6 +856,7 @@ class SequenceLengthCurriculum:
 | 1.3.0 | 2026-01-13 | Phase 5: Training loop integration (init, update, HGS reconfigure) |
 | 1.4.0 | 2026-01-13 | Phase 6: Testing & validation (41 tests in scripts/test_inverted_curriculum.py) |
 | 1.5.0 | 2026-01-13 | V9.9.2: Refactored to delegate seq_len to SequenceLengthCurriculum |
+| 1.6.0 | 2026-01-13 | V9.9.3: Added Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations) |
 
 ---
 
