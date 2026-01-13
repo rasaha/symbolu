@@ -4140,6 +4140,7 @@ class DynamicWindowScheduler:
         min_steps_between_changes: int = 200,
         hysteresis_factor: float = 0.15,
         vram_shrink_threshold: float = 0.85,
+        initial_ppl: float = None,
     ):
         """
         Initialize Dynamic Window Scheduler.
@@ -4157,6 +4158,8 @@ class DynamicWindowScheduler:
             min_steps_between_changes: Cooldown between target changes (stability)
             hysteresis_factor: PPL gap for shrinking (prevents thrashing)
             vram_shrink_threshold: Emergency shrink if VRAM > threshold
+            initial_ppl: Starting PPL (for checkpoint resume). If provided, sets
+                appropriate starting window. If None, starts at smallest (128).
         """
         self.enable = enable
 
@@ -4198,8 +4201,19 @@ class DynamicWindowScheduler:
         self.hysteresis = hysteresis_factor
         self.vram_threshold = vram_shrink_threshold
 
-        # State
-        self.current_window = self.schedule[-1][1]  # Start with smallest
+        # State: Initialize window based on PPL if provided
+        if initial_ppl is not None:
+            # Find appropriate starting window for current PPL
+            starting_window = self.schedule[-1][1]  # Default to max (1024)
+            for ppl_threshold, window_size in self.schedule:
+                if initial_ppl > ppl_threshold:
+                    starting_window = window_size
+                    break
+            self.current_window = self._align_window(starting_window)
+        else:
+            # No initial PPL: start with smallest window (fresh training)
+            self.current_window = self.schedule[0][1]  # First entry (128)
+
         self.target_window = self.current_window
         self.transition_start_step = 0
         self.transition_start_window = self.current_window
@@ -4375,6 +4389,29 @@ class DynamicWindowScheduler:
             'steps_until_cooldown': max(0, self.min_steps_between - steps_since_change),
             'interpolation_progress': min(1.0, (step - self.transition_start_step) / self.smooth_steps) if self.enable else 0.0,
         }
+
+    def set_initial_window_from_ppl(self, ppl: float) -> int:
+        """
+        Set starting window based on current PPL (for checkpoint resume).
+
+        Args:
+            ppl: Current validation PPL
+
+        Returns:
+            The window size that was set
+        """
+        # Find appropriate window for this PPL
+        starting_window = self.schedule[-1][1]  # Default to max (1024)
+        for ppl_threshold, window_size in self.schedule:
+            if ppl > ppl_threshold:
+                starting_window = window_size
+                break
+
+        self.current_window = self._align_window(starting_window)
+        self.target_window = self.current_window
+        self.transition_start_window = self.current_window
+
+        return self.current_window
 
     def get_statistics(self) -> dict:
         """Get window change statistics for logging."""
@@ -11500,6 +11537,13 @@ def train(config: UnifiedTrainingConfig):
         csr_curriculum.load_state(resumed_csr_curriculum_state)
         print(f"  ✓ CSR Curriculum Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
     # NOTE: Onto, Kosha, and PIDv2 curriculum restoration happens after their initialization below
+
+    # V9.8.9: Initialize DWS window from resumed PPL if resuming
+    if config.resume and best_val_loss < float('inf') and dynamic_window_scheduler is not None:
+        import math
+        resumed_ppl = math.exp(best_val_loss)
+        initial_window = dynamic_window_scheduler.set_initial_window_from_ppl(resumed_ppl)
+        print(f"  ✓ DWS Window Initialized: {initial_window} (PPL={resumed_ppl:.1f})")
 
     # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
