@@ -6962,6 +6962,17 @@ class DynamicRelaxationController:
         self.evolution_entropy_floor = 0.42  # Abort if entropy drops below this
         self.evolution_coherence_min = 0.82  # Must maintain high coherence
 
+        # V9.9.1 Multi-Stage Evolution with PPL/Step triggers
+        self.evolution_trigger_mode = "metrics"  # "metrics", "ppl", "step", "auto"
+        self.evolution_ppl_triggers = []  # PPL thresholds: [100, 50, 25, 15]
+        self.evolution_step_triggers = []  # Step triggers: [10000, 30000, 50000, 70000]
+        self.evolution_ppl_window = 10  # Steps to average PPL for smoother triggers
+        self.evolution_thaw_alpha = 0.1  # Initial gradient scale for new sensory layers
+        self.evolution_thaw_steps = 300  # Steps to ramp new sensory layer gradients
+        self.ppl_history = []  # Rolling PPL history for averaging
+        self.evolution_ppl_triggered = [False] * 10  # Track which PPL triggers fired
+        self.evolution_step_triggered = [False] * 10  # Track which step triggers fired
+
         # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
         self.stress_probe_active = False  # Currently in stress-probe mode
         self.stress_probe_start_step = None  # When stress-probe started
@@ -7297,6 +7308,229 @@ class DynamicRelaxationController:
         print(f"      Transitional layer: {new_split[0]} (newly sensory)")
 
         return new_split
+
+    def configure_evolution(
+        self,
+        trigger_mode: str = "auto",
+        ppl_triggers: str = "",
+        step_triggers: str = "",
+        custom_stages: str = "",
+        patience: int = 200,
+        coherence_min: float = 0.82,
+        entropy_floor: float = 0.42,
+        ppl_window: int = 10,
+        thaw_alpha: float = 0.1,
+        thaw_steps: int = 300,
+    ):
+        """
+        V9.9.1 Configure multi-stage evolution from config parameters.
+
+        Args:
+            trigger_mode: "metrics", "ppl", "step", or "auto"
+            ppl_triggers: Comma-separated PPL thresholds (e.g., "100,50,25,15")
+            step_triggers: Comma-separated step thresholds (e.g., "10000,30000,50000,70000")
+            custom_stages: Comma-separated stages (e.g., "9:3,6:6,4:8,3:9")
+            patience: Steps of stable metrics before evolution (metrics mode)
+            coherence_min: Minimum coherence for evolution (metrics mode)
+            entropy_floor: Minimum entropy for evolution (metrics mode)
+            ppl_window: Steps to average PPL for smoother triggers
+            thaw_alpha: Initial gradient scale for newly sensory layers
+            thaw_steps: Steps to ramp newly sensory layer gradients
+        """
+        self.evolution_trigger_mode = trigger_mode.lower()
+        self.evolution_patience = patience
+        self.evolution_coherence_min = coherence_min
+        self.evolution_entropy_floor = entropy_floor
+        self.evolution_ppl_window = ppl_window
+        self.evolution_thaw_alpha = thaw_alpha
+        self.evolution_thaw_steps = thaw_steps
+
+        # Parse PPL triggers
+        if ppl_triggers:
+            try:
+                self.evolution_ppl_triggers = [float(x.strip()) for x in ppl_triggers.split(",") if x.strip()]
+                self.evolution_ppl_triggered = [False] * len(self.evolution_ppl_triggers)
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid PPL triggers: {ppl_triggers}, using empty list")
+                self.evolution_ppl_triggers = []
+
+        # Parse step triggers
+        if step_triggers:
+            try:
+                self.evolution_step_triggers = [int(x.strip()) for x in step_triggers.split(",") if x.strip()]
+                self.evolution_step_triggered = [False] * len(self.evolution_step_triggers)
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid step triggers: {step_triggers}, using empty list")
+                self.evolution_step_triggers = []
+
+        # Parse custom stages
+        if custom_stages:
+            try:
+                stages = []
+                for stage in custom_stages.split(","):
+                    parts = stage.strip().split(":")
+                    if len(parts) == 2:
+                        auth, sens = int(parts[0]), int(parts[1])
+                        if auth + sens == 12:  # Validate 12-layer model
+                            stages.append((auth, sens))
+                        else:
+                            print(f"  ⚠️ [EVOLUTION] Stage {stage} doesn't sum to 12, skipping")
+                if stages:
+                    self.evolution_stages = stages
+                    print(f"  🔧 [EVOLUTION] Custom stages: {' → '.join(f'{a}:{s}' for a, s in stages)}")
+            except ValueError:
+                print(f"  ⚠️ [EVOLUTION] Invalid custom stages: {custom_stages}, using default")
+
+        # Auto-detect best mode if "auto"
+        if self.evolution_trigger_mode == "auto":
+            if self.evolution_ppl_triggers:
+                self.evolution_trigger_mode = "ppl"
+            elif self.evolution_step_triggers:
+                self.evolution_trigger_mode = "step"
+            else:
+                self.evolution_trigger_mode = "metrics"
+
+        # Log configuration
+        print(f"\n  🧬 [MULTI-STAGE EVOLUTION] Configuration:")
+        print(f"      Trigger mode: {self.evolution_trigger_mode.upper()}")
+        print(f"      Stages: {' → '.join(f'{a}:{s}' for a, s in self.evolution_stages)}")
+        if self.evolution_trigger_mode == "ppl" and self.evolution_ppl_triggers:
+            print(f"      PPL triggers: {self.evolution_ppl_triggers}")
+        elif self.evolution_trigger_mode == "step" and self.evolution_step_triggers:
+            print(f"      Step triggers: {self.evolution_step_triggers}")
+        else:
+            print(f"      Metrics: coherence>{coherence_min}, entropy>{entropy_floor}, patience={patience}")
+        print(f"      Thaw: α={thaw_alpha}→0.7 over {thaw_steps} steps")
+
+    def check_evolution_triggers(
+        self,
+        metrics: Dict[str, float],
+        vram_usage: float,
+        global_step: int,
+        current_ppl: float = None,
+    ) -> str:
+        """
+        V9.9.1 Unified evolution trigger check supporting multiple modes.
+
+        Args:
+            metrics: Training metrics dict (coherence, entropy, etc.)
+            vram_usage: Current VRAM utilization (0-1)
+            global_step: Current training step
+            current_ppl: Current validation PPL (optional, for PPL mode)
+
+        Returns:
+            "EVOLVE_TO_X_Y" if should evolve, "WAITING"/"NOT_READY"/etc. otherwise
+        """
+        # Only check if we're past the initial 9:3 stage
+        if self.current_stage_idx < 1:
+            return "NOT_READY"
+
+        # Already at final stage
+        if self.current_stage_idx >= len(self.evolution_stages) - 1:
+            return "FINAL_STAGE"
+
+        # Safety: VRAM check applies to all modes
+        if vram_usage >= self.metabolic_vram_safety:
+            return "VRAM_UNSAFE"
+
+        # Track PPL history for smoothing
+        if current_ppl is not None:
+            self.ppl_history.append(current_ppl)
+            if len(self.ppl_history) > self.evolution_ppl_window:
+                self.ppl_history.pop(0)
+
+        # Mode-specific trigger logic
+        if self.evolution_trigger_mode == "ppl":
+            return self._check_ppl_evolution(current_ppl, global_step)
+        elif self.evolution_trigger_mode == "step":
+            return self._check_step_evolution(global_step)
+        else:  # "metrics" mode (default)
+            return self.check_granular_evolution(metrics, vram_usage, global_step)
+
+    def _check_ppl_evolution(self, current_ppl: float, global_step: int) -> str:
+        """
+        Check if PPL has dropped below the next trigger threshold.
+
+        Uses smoothed PPL (average over window) to avoid noise-triggered evolutions.
+        """
+        if not self.evolution_ppl_triggers:
+            return "NO_PPL_TRIGGERS"
+
+        if current_ppl is None or len(self.ppl_history) < 3:
+            return "WAITING_PPL"
+
+        # Use smoothed PPL
+        smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history)
+
+        # Find the next untriggered PPL threshold
+        next_trigger_idx = self.current_stage_idx  # stages are 0-indexed, triggers map to transitions
+        if next_trigger_idx >= len(self.evolution_ppl_triggers):
+            return "ALL_PPL_TRIGGERS_USED"
+
+        trigger_ppl = self.evolution_ppl_triggers[next_trigger_idx]
+
+        # Check if PPL has dropped below threshold
+        if smoothed_ppl <= trigger_ppl and not self.evolution_ppl_triggered[next_trigger_idx]:
+            self.evolution_ppl_triggered[next_trigger_idx] = True
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            print(f"\n  📉 [PPL EVOLUTION] Smoothed PPL {smoothed_ppl:.2f} <= {trigger_ppl}")
+            print(f"      Triggering evolution to {next_stage[0]}:{next_stage[1]}")
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def _check_step_evolution(self, global_step: int) -> str:
+        """
+        Check if training has reached the next step trigger.
+        """
+        if not self.evolution_step_triggers:
+            return "NO_STEP_TRIGGERS"
+
+        # Find the next untriggered step threshold
+        next_trigger_idx = self.current_stage_idx  # stages are 0-indexed
+        if next_trigger_idx >= len(self.evolution_step_triggers):
+            return "ALL_STEP_TRIGGERS_USED"
+
+        trigger_step = self.evolution_step_triggers[next_trigger_idx]
+
+        # Check if step has been reached
+        if global_step >= trigger_step and not self.evolution_step_triggered[next_trigger_idx]:
+            self.evolution_step_triggered[next_trigger_idx] = True
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+            print(f"\n  📊 [STEP EVOLUTION] Step {global_step} >= {trigger_step}")
+            print(f"      Triggering evolution to {next_stage[0]}:{next_stage[1]}")
+            return f"EVOLVE_TO_{next_stage[0]}_{next_stage[1]}"
+
+        return "WAITING"
+
+    def get_evolution_status(self) -> Dict[str, any]:
+        """
+        Get current evolution status for logging/display.
+        """
+        current = self.evolution_stages[self.current_stage_idx]
+        next_stage = None
+        if self.current_stage_idx < len(self.evolution_stages) - 1:
+            next_stage = self.evolution_stages[self.current_stage_idx + 1]
+
+        status = {
+            "current_stage": f"{current[0]}:{current[1]}",
+            "stage_idx": self.current_stage_idx,
+            "total_stages": len(self.evolution_stages),
+            "next_stage": f"{next_stage[0]}:{next_stage[1]}" if next_stage else "FINAL",
+            "trigger_mode": self.evolution_trigger_mode,
+            "evolution_streak": self.evolution_streak,
+        }
+
+        if self.evolution_trigger_mode == "ppl" and self.evolution_ppl_triggers:
+            next_idx = min(self.current_stage_idx, len(self.evolution_ppl_triggers) - 1)
+            status["next_ppl_trigger"] = self.evolution_ppl_triggers[next_idx] if next_idx < len(self.evolution_ppl_triggers) else None
+            if self.ppl_history:
+                status["smoothed_ppl"] = sum(self.ppl_history) / len(self.ppl_history)
+        elif self.evolution_trigger_mode == "step" and self.evolution_step_triggers:
+            next_idx = min(self.current_stage_idx, len(self.evolution_step_triggers) - 1)
+            status["next_step_trigger"] = self.evolution_step_triggers[next_idx] if next_idx < len(self.evolution_step_triggers) else None
+
+        return status
 
     def check_stress_probe(
         self,
@@ -8547,6 +8781,20 @@ class UnifiedTrainingConfig:
 
     # V9.5.1 Force Evolution (manual intervention)
     force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
+
+    # V9.9.1 Multi-Stage Evolution Configuration
+    # Allows dynamic progression through layer splits based on PPL or step triggers
+    enable_multi_stage_evolution: bool = True  # Enable automatic multi-stage evolution
+    evolution_trigger_mode: str = "auto"  # "metrics", "ppl", "step", or "auto" (best available)
+    evolution_ppl_triggers: str = ""  # PPL thresholds: "100,50,25,15" → trigger at each PPL
+    evolution_step_triggers: str = ""  # Step triggers: "10000,30000,50000,70000"
+    custom_evolution_stages: str = ""  # Custom stages: "9:3,6:6,4:8,3:9" (default: 9:3→6:6→5:7→4:8→3:9)
+    evolution_patience: int = 200  # Steps of stable metrics before evolution (for metrics mode)
+    evolution_coherence_min: float = 0.82  # Minimum coherence to evolve (metrics mode)
+    evolution_entropy_floor: float = 0.42  # Minimum entropy to evolve (metrics mode)
+    evolution_ppl_window: int = 10  # Steps to average PPL for smoother triggers
+    evolution_thaw_alpha: float = 0.1  # Initial gradient scale for newly sensory layers
+    evolution_thaw_steps: int = 300  # Steps to ramp newly sensory layer gradients
 
     # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
     # Gemini Protocol: Freeze Authority, flood with Sensory to break stiffness
@@ -11674,6 +11922,21 @@ def train(config: UnifiedTrainingConfig):
             saturation_thaw_steps=config.saturation_thaw_steps,
         )
 
+        # V9.9.1 Configure Multi-Stage Evolution
+        if config.enable_multi_stage_evolution:
+            relaxation_controller.configure_evolution(
+                trigger_mode=config.evolution_trigger_mode,
+                ppl_triggers=config.evolution_ppl_triggers,
+                step_triggers=config.evolution_step_triggers,
+                custom_stages=config.custom_evolution_stages,
+                patience=config.evolution_patience,
+                coherence_min=config.evolution_coherence_min,
+                entropy_floor=config.evolution_entropy_floor,
+                ppl_window=config.evolution_ppl_window,
+                thaw_alpha=config.evolution_thaw_alpha,
+                thaw_steps=config.evolution_thaw_steps,
+            )
+
         # V9.5.1 Force Evolution: Manual intervention to specific stage
         if config.force_evolution_stage is not None:
             target_stage = config.force_evolution_stage
@@ -13534,11 +13797,13 @@ def train(config: UnifiedTrainingConfig):
                         relaxation_controller.current_stage_idx = 1  # Now at 6:6
                         print(f"  🔄 [RELAXATION] 9:3 → 6:6 transition initiated")
 
-                    # V9.5.1 Granular Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
-                    evolution_result = relaxation_controller.check_granular_evolution(
+                    # V9.9.1 Multi-Stage Evolution: Check for further evolution (6:6 → 5:7 → 4:8 → 3:9)
+                    # Supports PPL, step, or metrics-based triggers
+                    evolution_result = relaxation_controller.check_evolution_triggers(
                         metrics=metrics,
                         vram_usage=vram_usage,
                         global_step=global_step,
+                        current_ppl=last_val_ppl if last_val_ppl != float('inf') else None,
                     )
 
                     if evolution_result.startswith("EVOLVE_TO_"):
@@ -15361,6 +15626,33 @@ def main():
     parser.add_argument("--force_evolution_stage", type=int, default=None,
                        help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
 
+    # V9.9.1 Multi-Stage Evolution Configuration
+    parser.add_argument("--enable_multi_stage_evolution", action="store_true", default=True,
+                       help="Enable automatic multi-stage evolution (9:3→6:6→5:7→4:8→3:9)")
+    parser.add_argument("--disable_multi_stage_evolution", action="store_true",
+                       help="Disable multi-stage evolution (stay at initial split)")
+    parser.add_argument("--evolution_trigger_mode", type=str, default="auto",
+                       choices=["auto", "metrics", "ppl", "step"],
+                       help="Evolution trigger mode: auto (detect), metrics (coherence/entropy), ppl (perplexity), step (fixed steps)")
+    parser.add_argument("--evolution_ppl_triggers", type=str, default="",
+                       help="PPL thresholds to trigger evolution, comma-separated (e.g., '100,50,25,15')")
+    parser.add_argument("--evolution_step_triggers", type=str, default="",
+                       help="Step numbers to trigger evolution, comma-separated (e.g., '10000,30000,50000,70000')")
+    parser.add_argument("--custom_evolution_stages", type=str, default="",
+                       help="Custom evolution stages, comma-separated (e.g., '9:3,6:6,4:8,3:9')")
+    parser.add_argument("--evolution_patience", type=int, default=200,
+                       help="Steps of stable metrics before evolution (metrics mode)")
+    parser.add_argument("--evolution_coherence_min", type=float, default=0.82,
+                       help="Minimum coherence to evolve (metrics mode)")
+    parser.add_argument("--evolution_entropy_floor", type=float, default=0.42,
+                       help="Minimum entropy to evolve (metrics mode)")
+    parser.add_argument("--evolution_ppl_window", type=int, default=10,
+                       help="Steps to average PPL for smoother triggers")
+    parser.add_argument("--evolution_thaw_alpha", type=float, default=0.1,
+                       help="Initial gradient scale for newly sensory layers after evolution")
+    parser.add_argument("--evolution_thaw_steps", type=int, default=300,
+                       help="Steps to ramp newly sensory layer gradients after evolution")
+
     # V9.5.2 Emergency Stress-Probe (Phase A: 3:9 Rajas)
     # ChatGPT Guardrails: Compound trigger, strict duration, gradual LR restore
     parser.add_argument("--enable_stress_probe", action="store_true",
@@ -16307,6 +16599,18 @@ def main():
         entropy_floor_weight=args.entropy_floor_weight,
         # V9.5.1 Force Evolution
         force_evolution_stage=args.force_evolution_stage,
+        # V9.9.1 Multi-Stage Evolution
+        enable_multi_stage_evolution=args.enable_multi_stage_evolution and not args.disable_multi_stage_evolution,
+        evolution_trigger_mode=args.evolution_trigger_mode,
+        evolution_ppl_triggers=args.evolution_ppl_triggers,
+        evolution_step_triggers=args.evolution_step_triggers,
+        custom_evolution_stages=args.custom_evolution_stages,
+        evolution_patience=args.evolution_patience,
+        evolution_coherence_min=args.evolution_coherence_min,
+        evolution_entropy_floor=args.evolution_entropy_floor,
+        evolution_ppl_window=args.evolution_ppl_window,
+        evolution_thaw_alpha=args.evolution_thaw_alpha,
+        evolution_thaw_steps=args.evolution_thaw_steps,
         # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
         enable_stress_probe=args.enable_stress_probe,
         stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,

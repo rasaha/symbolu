@@ -266,6 +266,71 @@ Quality samples use these default prompts:
 | `--relaxation_ppl_spike_threshold` | float | 0.20 | PPL spike threshold for rollback |
 | `--relaxation_recovery_steps` | int | 100 | Steps to wait after PPL spike |
 
+### Multi-Stage Evolution (V9.9.1)
+
+Enables automatic progression through multiple layer splits based on PPL, step count, or metrics.
+
+**Default Progression**: `9:3 → 6:6 → 5:7 → 4:8 → 3:9`
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--enable_multi_stage_evolution` | flag | True | Enable automatic multi-stage evolution |
+| `--evolution_trigger_mode` | str | auto | Trigger mode: `auto`, `metrics`, `ppl`, `step` |
+| `--evolution_ppl_triggers` | str | "" | PPL thresholds, comma-separated (e.g., "100,50,25,15") |
+| `--evolution_step_triggers` | str | "" | Step triggers, comma-separated (e.g., "10000,30000,50000,70000") |
+| `--custom_evolution_stages` | str | "" | Custom stages (e.g., "9:3,6:6,4:8,3:9") |
+| `--evolution_patience` | int | 200 | Steps of stable metrics before evolution (metrics mode) |
+| `--evolution_coherence_min` | float | 0.82 | Minimum coherence to evolve (metrics mode) |
+| `--evolution_entropy_floor` | float | 0.42 | Minimum entropy to evolve (metrics mode) |
+| `--evolution_ppl_window` | int | 10 | Steps to average PPL for smoother triggers |
+| `--evolution_thaw_alpha` | float | 0.1 | Initial gradient scale for newly sensory layers |
+| `--evolution_thaw_steps` | int | 300 | Steps to ramp newly sensory layer gradients |
+
+**Trigger Modes:**
+- **auto**: Automatically selects best mode (PPL if triggers provided, else metrics)
+- **ppl**: Evolve when validation PPL drops below each threshold
+- **step**: Evolve at fixed training steps
+- **metrics**: Evolve when coherence/entropy criteria met for patience steps
+
+**Example: PPL-Based Evolution**
+```bash
+python train_unified_llm.py \
+    --enable_multi_stage_evolution \
+    --evolution_trigger_mode ppl \
+    --evolution_ppl_triggers "100,50,25,15" \
+    --custom_evolution_stages "9:3,6:6,4:8,3:9"
+```
+This evolves:
+- 9:3 → 6:6 when PPL < 100
+- 6:6 → 4:8 when PPL < 50
+- 4:8 → 3:9 when PPL < 25
+
+**Example: Step-Based Evolution**
+```bash
+python train_unified_llm.py \
+    --enable_multi_stage_evolution \
+    --evolution_trigger_mode step \
+    --evolution_step_triggers "10000,30000,50000,70000"
+```
+This evolves at fixed intervals regardless of PPL.
+
+**Recommended Strategy for PPL → Low Teens:**
+```bash
+# Automatic progression based on PPL milestones
+--enable_multi_stage_evolution \
+--evolution_trigger_mode ppl \
+--evolution_ppl_triggers "100,50,30,18" \
+--custom_evolution_stages "9:3,6:6,5:7,4:8,3:9"
+```
+
+| PPL Range | Split | Rationale |
+|-----------|-------|-----------|
+| 1000 → 100 | 9:3 | Stability. Syntax/grammar foundation. |
+| 100 → 50 | 6:6 | Breaking semantic barrier. |
+| 50 → 30 | 5:7 | Semantic refinement. |
+| 30 → 18 | 4:8 | Fine-grained distinctions. |
+| 18 → 12 | 3:9 | Maximum expressiveness. |
+
 ### Weight Transfer & Guna-Lock
 
 | Flag | Type | Default | Description |
