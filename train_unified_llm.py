@@ -12942,7 +12942,8 @@ def train(config: UnifiedTrainingConfig):
                             log_msg += f" {metacognitive_tracker.get_status()}"
 
                     # Full Evolutionary Flow: Multi-scale coherence and metacognitive status
-                    if evolutionary_engine is not None and evo_result is not None:
+                    # Only log when EvoFlow is engaged (rss_weights['evoflow'] > 0)
+                    if evolutionary_engine is not None and evo_result is not None and rss_weights.get('evoflow', 0) > 0:
                         evo_micro = metrics.get('evo_micro', 0.0)
                         evo_auth = metrics.get('evo_auth', 0.0)
                         evo_sens = metrics.get('evo_sens', 0.0)
@@ -12978,14 +12979,17 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.8.0: Log RSS phase and weights
                 if rss_controller is not None:
-                    phase_icons = {
-                        'FOUNDATION': '🏗️', 'COHERENCE': '🔄', 'FEEDBACK': '🌀',
-                        'ONTOLOGY': '📜', 'SOVEREIGN': '👑'
-                    }
-                    phase = rss_controller.current_phase
-                    icon = phase_icons.get(phase, '❓')
-                    csr_pct = int(rss_weights['csr'] * 100)
-                    log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
+                    # Only log RSS when at least one component is engaged
+                    any_engaged = any(w > 0 for w in rss_weights.values())
+                    if any_engaged:
+                        phase_icons = {
+                            'FOUNDATION': '🏗️', 'COHERENCE': '🔄', 'FEEDBACK': '🌀',
+                            'ONTOLOGY': '📜', 'SOVEREIGN': '👑'
+                        }
+                        phase = rss_controller.current_phase
+                        icon = phase_icons.get(phase, '❓')
+                        csr_pct = int(rss_weights['csr'] * 100)
+                        log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
                 # v2.2.1: Kosha Gyroscope Status (Homeostatic Self-Regulation)
                 if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
@@ -13065,8 +13069,10 @@ def train(config: UnifiedTrainingConfig):
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
+                # Only log when Kosha is engaged (kosha_curriculum.scale > 0 or RSS kosha > 0)
                 kosha_log_interval = config.kosha_log_every if config.kosha_log_every > 0 else config.log_every
-                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0:
+                kosha_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if config.enable_kosha_diagnostics and global_step % kosha_log_interval == 0 and kosha_engaged:
                     try:
                         # Get logits for entropy calculation
                         kosha_logits = None
@@ -13101,7 +13107,7 @@ def train(config: UnifiedTrainingConfig):
                             layer_grad_norm=layer_grad if layer_grad > 0 else None,
                         )
 
-                        # Format and print (include steering metrics if available)
+                        # Format and print (include steering metrics if available) - only when Kosha is engaged
                         steering_metrics = {k: v for k, v in metrics.items() if k.startswith('kosha_')}
                         kosha_output = format_kosha_diagnostic(
                             kosha_diag,
@@ -13114,7 +13120,8 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [KOSHA] Diagnostic error: {e}", flush=True)
 
                 # V9.7.0: CSR Diagnostics (Layer 7 - Concept Consolidation)
-                if csr_provider is not None and global_step % kosha_log_interval == 0:
+                # Only log when CSR is engaged (rss_weights['csr'] > 0)
+                if csr_provider is not None and global_step % kosha_log_interval == 0 and rss_weights.get('csr', 0) > 0:
                     try:
                         # Get hidden states for CSR layer
                         csr_diag_hidden = None
@@ -13136,7 +13143,7 @@ def train(config: UnifiedTrainingConfig):
                             grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
                         )
 
-                        # Format and print
+                        # Format and print - only when CSR is engaged
                         csr_output = format_csr_diagnostic(csr_diag)
                         print(csr_output, flush=True)
                     except Exception as e:
@@ -13144,7 +13151,9 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [CSR] Diagnostic error: {e}", flush=True)
 
                 # V9.7.0: Ontological Bridge Diagnostics (Layer 4 - Foundational Structure)
-                if config.enable_onto_bridge and global_step % kosha_log_interval == 0:
+                # Only log when Onto is engaged (onto_curriculum.scale > 0)
+                onto_engaged = (onto_curriculum is None) or (onto_curriculum.scale > 0)
+                if config.enable_onto_bridge and global_step % kosha_log_interval == 0 and onto_engaged:
                     try:
                         # Get hidden states for Onto Bridge layer (skip in lightweight mode)
                         onto_diag_hidden = None
@@ -13175,7 +13184,7 @@ def train(config: UnifiedTrainingConfig):
                             grad_norm=raw_grad_norm if 'raw_grad_norm' in dir() else 0.0,
                         )
 
-                        # Format and print
+                        # Format and print - only when Onto is engaged
                         onto_output = format_onto_bridge_diagnostic(onto_diag)
                         print(onto_output, flush=True)
                     except Exception as e:
@@ -13417,8 +13426,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if onto_curriculum.graduated and old_phase != onto_curriculum.phase:
                         print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and onto_curriculum.scale > 0:
                         print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
 
                 # V9.8.6: CSR Three-Phase Curriculum Update
@@ -13428,8 +13437,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if csr_curriculum.graduated and old_phase != csr_curriculum.phase:
                         print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and csr_curriculum.scale > 0:
                         print(f"  🔤 [CSR] Phase: {csr_curriculum.phase} | Scale: {csr_curriculum.scale:.3f}")
 
                 # V9.8.6: Kosha Three-Phase Curriculum Update
@@ -13439,8 +13448,8 @@ def train(config: UnifiedTrainingConfig):
                     # Log graduation event
                     if kosha_curriculum.graduated and old_phase != kosha_curriculum.phase:
                         print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
-                    # Periodic logging
-                    if global_step % (config.eval_every * 5) == 0:
+                    # Periodic logging - only when engaged (scale > 0)
+                    if global_step % (config.eval_every * 5) == 0 and kosha_curriculum.scale > 0:
                         print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
 
                 # V2.3.4: Sequence Length Curriculum Update
