@@ -5884,7 +5884,7 @@ class AdaptiveTrainingController:
 # SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
 # =============================================================================
 
-class SovereignPhaseController:
+class ResonanceStateScheduler:
     """
     Implements the Rational Sovereign Sequence (RSS) for staged engagement
     of auxiliary gradient systems based on PPL thresholds.
@@ -5909,7 +5909,7 @@ class SovereignPhaseController:
     Components cannot disengage once they pass their PPL threshold.
 
     Usage:
-        controller = SovereignPhaseController(config)
+        controller = ResonanceStateScheduler(config)
         # In training loop:
         weights = controller.get_gate_weights(current_ppl, global_step)
         # Apply weights to auxiliary losses
@@ -12089,7 +12089,7 @@ def train(config: UnifiedTrainingConfig):
     # V9.8.0: RSS (Rational Sovereign Sequence) Controller
     rss_controller = None
     if config.enable_rss:
-        rss_controller = SovereignPhaseController(
+        rss_controller = ResonanceStateScheduler(
             evoflow_ppl_threshold=config.rss_evoflow_ppl,
             toroidal_ppl_threshold=config.rss_toroidal_ppl,
             csr_ppl_threshold=config.rss_csr_ppl,
