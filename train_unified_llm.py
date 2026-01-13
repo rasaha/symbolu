@@ -7926,13 +7926,13 @@ class UnifiedTrainingConfig:
     pidv2_batch_velocity_threshold: float = 5.0  # PPL velocity % to trigger reduction
     pidv2_batch_stable_streak: int = 5        # Consecutive stable evals before increase
 
-    # Three-Phase PID Curriculum (like Kosha Gyroscope)
-    # Phase A (PPL > engage): Full PID control (construction)
-    # Phase B (disengage < PPL < engage): Linear rampdown
-    # Phase C (PPL < disengage): PID off (polishing)
-    pidv2_engage_ppl: float = 100.0           # PID fully ON above this PPL (construction phase)
-    pidv2_disengage_ppl: float = 30.0         # PID OFF below this PPL (polishing phase)
-    pidv2_rampdown_steps: int = 500           # Steps to ramp down after disengage trigger
+    # V9.8.7: Three-phase PID engagement based on Val PPL
+    # Phase 1 (Construction): PPL > engage_ppl → PID ON (aggressive correction)
+    # Phase 2 (Transition):   disengage_ppl < PPL < engage_ppl → PID continues
+    # Phase 3 (Polishing):    PPL < disengage_ppl → PID OFF (let model converge naturally)
+    controller_engage_ppl: float = 100.0      # PID turns ON when Val PPL > this
+    controller_disengage_ppl: float = 30.0    # PID turns OFF when Val PPL < this
+    controller_engagement_enabled: bool = True # Enable dynamic PID engagement
 
     # Phase ramp settings (for handshake dampening)
     phase_delay_steps: int = 0
@@ -11022,6 +11022,12 @@ def train(config: UnifiedTrainingConfig):
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
             print(f"       Increase after: {config.pidv2_batch_stable_streak} stable evals")
+        # V9.8.7: Three-phase PID engagement
+        if config.controller_engagement_enabled:
+            print(f"    📊 Three-Phase Engagement: ENABLED")
+            print(f"       CONSTRUCTION (PID ON):  Val PPL > {config.controller_engage_ppl:.1f}")
+            print(f"       TRANSITION:             {config.controller_disengage_ppl:.1f} < Val PPL < {config.controller_engage_ppl:.1f}")
+            print(f"       POLISHING (PID OFF):    Val PPL < {config.controller_disengage_ppl:.1f}")
     elif config.controller == "emergency_pd" and PIDV2_AVAILABLE:
         pd_config = EmergencyPDConfig(A_min=0.25)
         authority_controller = EmergencyPD(pd_config)
@@ -11141,6 +11147,13 @@ def train(config: UnifiedTrainingConfig):
     # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED
     # Phase 3: POLISHING (PPL < 30) - Gyroscope ACTIVE
     gyroscope_phase = "CONSTRUCTION"  # Current phase
+
+    # V9.8.7: Three-phase PID engagement tracking
+    # Phase 1: CONSTRUCTION (PPL > engage_ppl) - PID ON (aggressive correction)
+    # Phase 2: TRANSITION (disengage_ppl < PPL < engage_ppl) - PID continues if already on
+    # Phase 3: POLISHING (PPL < disengage_ppl) - PID OFF (natural convergence)
+    pid_engaged = True  # Start with PID engaged (will check PPL at first eval)
+    pid_phase = "CONSTRUCTION"
 
     if config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
         # Initialize KoshaGyroscopicLoss with Harmonic Pentad (v2.3.0)
@@ -13460,8 +13473,43 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  📏 [SEQ CURRICULUM] Length: {status['current_seq_len']}/{status['target_seq_len']} | "
                               f"Progress: {status['progress']:.1%}")
 
+                # V9.8.7: Three-phase PID engagement logic
+                # Check PPL thresholds and determine if PID should be engaged
+                if config.controller_engagement_enabled and authority_controller is not None:
+                    old_pid_phase = pid_phase
+                    old_pid_engaged = pid_engaged
+
+                    if val_ppl > config.controller_engage_ppl:
+                        # Phase 1: CONSTRUCTION - High PPL, PID ON
+                        pid_phase = "CONSTRUCTION"
+                        pid_engaged = True
+                    elif val_ppl < config.controller_disengage_ppl:
+                        # Phase 3: POLISHING - Low PPL, PID OFF
+                        pid_phase = "POLISHING"
+                        pid_engaged = False
+                    else:
+                        # Phase 2: TRANSITION - Keep current engagement state
+                        pid_phase = "TRANSITION"
+                        # pid_engaged stays as-is (hysteresis)
+
+                    # Log phase transitions
+                    if pid_phase != old_pid_phase or pid_engaged != old_pid_engaged:
+                        status_emoji = "🟢" if pid_engaged else "🔴"
+                        print(f"\n  {'='*60}")
+                        print(f"  📊 PID ENGAGEMENT PHASE CHANGE at step {global_step}")
+                        print(f"     {old_pid_phase} → {pid_phase}")
+                        print(f"     Val PPL: {val_ppl:.2f} | Engage>{config.controller_engage_ppl:.1f} | Disengage<{config.controller_disengage_ppl:.1f}")
+                        print(f"     PID Controller: {status_emoji} {'ENGAGED' if pid_engaged else 'DISENGAGED'}")
+                        print(f"  {'='*60}\n")
+
+                        if tb_writer is not None:
+                            tb_writer.add_scalar("ctrl/pid_engaged", 1.0 if pid_engaged else 0.0, global_step)
+                            phase_num = {"CONSTRUCTION": 1, "TRANSITION": 2, "POLISHING": 3}.get(pid_phase, 0)
+                            tb_writer.add_scalar("ctrl/pid_phase", phase_num, global_step)
+
                 # PIDv2 Controller Update (V9.4.4)
-                if authority_controller is not None:
+                # Skip if PID is disengaged (POLISHING phase)
+                if authority_controller is not None and (not config.controller_engagement_enabled or pid_engaged):
                     old_A = authority_controller.A
                     new_A = authority_controller.update(
                         val_ppl, current_coh,
@@ -14624,13 +14672,13 @@ def main():
                        help="PPL velocity %% to trigger batch reduction")
     parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
                        help="Consecutive stable evals before batch increase")
-    # V9.8.6: Three-Phase PID Curriculum
-    parser.add_argument("--pidv2_engage_ppl", type=float, default=100.0,
-                       help="PID fully ON above this PPL (construction phase)")
-    parser.add_argument("--pidv2_disengage_ppl", type=float, default=30.0,
-                       help="PID OFF below this PPL (polishing phase)")
-    parser.add_argument("--pidv2_rampdown_steps", type=int, default=500,
-                       help="Steps to ramp down PID after disengage trigger")
+    # V9.8.7: Three-phase PID engagement
+    parser.add_argument("--controller_engage_ppl", type=float, default=100.0,
+                       help="PID turns ON when Val PPL > this (construction phase)")
+    parser.add_argument("--controller_disengage_ppl", type=float, default=30.0,
+                       help="PID turns OFF when Val PPL < this (polishing phase)")
+    parser.add_argument("--no_controller_engagement", action="store_true",
+                       help="Disable dynamic PID engagement (PID always on if enabled)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="Steps for phase LR ramp (handshake dampening)")
     parser.add_argument("--tensorboard", action="store_true", default=True,
@@ -15273,10 +15321,10 @@ def main():
         pidv2_batch_max=args.pidv2_batch_max,
         pidv2_batch_velocity_threshold=args.pidv2_batch_velocity_threshold,
         pidv2_batch_stable_streak=args.pidv2_batch_stable_streak,
-        # V9.8.6: Three-Phase PID Curriculum
-        pidv2_engage_ppl=args.pidv2_engage_ppl,
-        pidv2_disengage_ppl=args.pidv2_disengage_ppl,
-        pidv2_rampdown_steps=args.pidv2_rampdown_steps,
+        # V9.8.7: Three-phase PID engagement
+        controller_engage_ppl=args.controller_engage_ppl,
+        controller_disengage_ppl=args.controller_disengage_ppl,
+        controller_engagement_enabled=not args.no_controller_engagement,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
