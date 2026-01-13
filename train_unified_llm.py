@@ -7933,6 +7933,7 @@ class UnifiedTrainingConfig:
     # Phase 3 (Polishing):    PPL < disengage_ppl → PID OFF (let model converge naturally)
     controller_engage_ppl: float = 100.0      # PID turns ON when Val PPL > this
     controller_disengage_ppl: float = 30.0    # PID turns OFF when Val PPL < this
+    controller_rampdown_steps: int = 500      # Steps to ramp down after disengage
     controller_engagement_enabled: bool = True # Enable dynamic PID engagement
 
     # Phase ramp settings (for handshake dampening)
@@ -11005,9 +11006,9 @@ def train(config: UnifiedTrainingConfig):
             batch_velocity_threshold=config.pidv2_batch_velocity_threshold,
             batch_stable_streak=config.pidv2_batch_stable_streak,
             # V9.8.6: Three-Phase Curriculum
-            engage_ppl=config.pidv2_engage_ppl,
-            disengage_ppl=config.pidv2_disengage_ppl,
-            rampdown_steps=config.pidv2_rampdown_steps,
+            engage_ppl=config.controller_engage_ppl,
+            disengage_ppl=config.controller_disengage_ppl,
+            rampdown_steps=config.controller_rampdown_steps,
         )
         authority_controller = AuthorityPIDv2(pidv2_config)
         authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
@@ -11018,9 +11019,9 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Authority floor: {config.pidv2_a_min}")
         # V9.8.6: Three-Phase Curriculum info
         print(f"    🎓 Three-Phase Curriculum:")
-        print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
-        print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
-        print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
+        print(f"       CONSTRUCTION: PPL > {config.controller_engage_ppl} (full PID)")
+        print(f"       TRANSITION:   {config.controller_disengage_ppl} < PPL < {config.controller_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.controller_disengage_ppl} (PID off after {config.controller_rampdown_steps} steps)")
         # V9.8.6: Restore PIDv2 curriculum state from checkpoint
         if resumed_pidv2_curriculum_state is not None:
             authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
@@ -14695,6 +14696,8 @@ def main():
                        help="PID turns ON when Val PPL > this (construction phase)")
     parser.add_argument("--controller_disengage_ppl", type=float, default=30.0,
                        help="PID turns OFF when Val PPL < this (polishing phase)")
+    parser.add_argument("--controller_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp down controller after disengage trigger")
     parser.add_argument("--no_controller_engagement", action="store_true",
                        help="Disable dynamic PID engagement (PID always on if enabled)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
@@ -15342,6 +15345,7 @@ def main():
         # V9.8.7: Three-phase PID engagement
         controller_engage_ppl=args.controller_engage_ppl,
         controller_disengage_ppl=args.controller_disengage_ppl,
+        controller_rampdown_steps=args.controller_rampdown_steps,
         controller_engagement_enabled=not args.no_controller_engagement,
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
