@@ -366,6 +366,253 @@ For `ontological_hybrid` model with `--enable_rss` and `--controller pidv2`:
 
 Use `--pidv2_engage_ppl`, `--onto_engage_ppl`, `--csr_engage_ppl`, `--kosha_engage_ppl`, `--gyroscope_engage_ppl` to override individual thresholds.
 
+### Sovereign Phase Controller (SPC) - V9.8.8
+
+**The "Nervous System" for Breaking Training Plateaus and Mode Collapse**
+
+The Sovereign Phase Controller implements graduated, damped, layer-specific phase interventions to break through training barriers without gradient instability. Unlike controllers that add loss terms, SPC directly rotates embeddings in complex phase space - a multiplicative intervention that can "shatter" stuck states.
+
+**⚠️ DISABLED BY DEFAULT** - Enable only when you observe:
+- Sustained PPL plateaus (>1000 steps at same PPL)
+- Mode collapse (entropy < 0.4, repetitive outputs)
+- Stagnation (variance < 0.001 for 500+ steps)
+
+#### SPC CLI Parameters
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--enable_sovereign_phase_controller` | flag | False | **Enable SPC** (DISABLED by default). Only enable when plateaus/collapse observed |
+| `--spc_entropy_critical` | float | 0.4 | **Red alert threshold**. Triggers critical intervention when entropy < 0.4 (mode collapse) |
+| `--spc_entropy_warning` | float | 0.5 | **Yellow alert threshold**. Triggers warning intervention when entropy < 0.5 (concerning) |
+| `--spc_entropy_recovered` | float | 0.55 | **Exit threshold (hysteresis)**. Boost mode exits when entropy > 0.55 (recovered). Higher than entry to prevent oscillation |
+| `--spc_variance_critical` | float | 0.0005 | **Stagnation detection threshold**. Triggers when entropy variance < 0.0005 (stuck) |
+| `--spc_variance_warning` | float | 0.001 | **Warning variance threshold**. Triggers when entropy variance < 0.001 (slowing) |
+| `--spc_variance_recovered` | float | 0.002 | **Exit variance threshold**. Requires variance > 0.002 to exit boost mode (moving again) |
+| `--spc_min_boost_duration` | int | 100 | **Minimum boost duration (steps)**. Prevents 1-step oscillation (boost→release→boost). Stays in boost for at least 100 steps |
+| `--spc_alpha` | float | 0.2 | **EMA smoothing coefficient**. Controls rotation speed: 0.1=slow/smooth, 0.5=fast/aggressive |
+| `--spc_max_rotation` | float | 0.3 | **Maximum rotation per step (radians)**. Limits rotation velocity to ~17°/step. Prevents gradient spikes |
+| `--spc_damping` | float | 0.9 | **Velocity damping coefficient**. Reduces rotation by 10% if moving too fast. Prevents oscillation |
+| `--spc_velocity_threshold` | float | 0.2 | **Velocity threshold for damping**. Applies damping when rotation velocity > 0.2 rad/step |
+
+#### SPC Architecture: Three-Part Design
+
+**1. Graduated Response** (Proportional Intervention)
+```
+Intervention Level     Steering Force    Trigger Condition
+────────────────────────────────────────────────────────────
+🟢 Normal              0.15 (gentle)     entropy > 0.5 AND variance > 0.001
+🟡 Caution             0.30 (moderate)   entropy < 0.5 OR variance < 0.001
+🟠 Warning             0.60 (strong)     entropy < 0.45 AND variance < 0.001
+🔴 Critical            1.00 (maximum)    entropy < 0.4 OR variance < 0.0005
+```
+
+**2. Rotation Damping** (Prevents Gradient Spikes)
+```
+θ_applied = θ_prev + α(θ_target - θ_prev)  [EMA smoothing]
+           ↓
+    Velocity Limiting (max 0.3 rad/step)
+           ↓
+    Momentum Damping (if velocity > threshold)
+```
+
+**3. Layer-Specific Targeting** (Surgical Interventions)
+
+| Symptom | Diagnostic | Layer Target | Rotation | Effect |
+|---------|-----------|--------------|----------|--------|
+| **Vikalpa loop** (mental distortion) | M_Vikal > 0.8 | O9 (Witnesses) | -45° | Rotate toward grounding (Pramana) |
+| **Pramana stuck** (over-grounding) | P_Pram > 0.9 | O4 (DNA) | +30° | Rotate toward memory (Smriti) |
+| **Smriti trap** (stuck in memory) | I_Smrit > 0.9 | O12 (Synthesis) | +60° | Rotate toward creativity (Viparyaya) |
+| **Bhava dominance** (single intention) | Any Bhava > 40% | O6 (Integration) | 0° (neutral) | Rotate toward balanced distribution |
+| **Kosha imbalance** (sheath overactive) | Any Kosha > 70% | O9 + O12 (dual) | ±22.5° | Counter-rotating correction |
+
+#### Hysteresis Design (Prevents "1-Step Cycle" Oscillation)
+
+**Problem:** Without hysteresis, controller oscillates:
+```
+Step 1000: entropy=0.39 → BOOST ON
+Step 1001: entropy=0.41 (from boost) → BOOST OFF
+Step 1002: entropy=0.39 (drops again) → BOOST ON
+```
+
+**Solution:** Entry and exit thresholds are DIFFERENT:
+
+**Entry Conditions** (ANY triggers boost):
+- Entropy < 0.4 (critical)
+- Variance < 0.001 (stagnation)
+
+**Exit Conditions** (ALL must be met):
+- Entropy > 0.55 (higher than entry - hysteresis gap)
+- Variance > 0.002 (movement detected)
+- Min duration: 100 steps (forced minimum)
+
+This creates a "sticky" boost mode that only exits when model is clearly recovered.
+
+#### Diagnostic Mode (Default Behavior)
+
+**When DISABLED** (default), SPC runs in diagnostic mode:
+- Monitors entropy, variance, and diagnostics
+- Logs what WOULD happen without actually intervening
+- Shows intervention level and target rotations
+- Helps you find real use cases before enabling
+
+**Example diagnostic logs:**
+```
+🟢 [SPC-DIAGNOSTIC] Level:NORMAL
+🟡 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:CAUTION | Force:0.30
+🔴 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:CRITICAL | Force:1.00 | Rotations:[O9:-0.79rad,O12:1.05rad]
+```
+
+#### When to Enable SPC
+
+**Use Case 1: Semantic Barrier Plateau**
+```bash
+# Symptom: PPL stuck at ~95 for 1000+ steps
+Step 12,000-14,000 | PPL: 98 → 96 → 97 → 95 → 96 (no progress)
+🟠 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:WARNING
+
+# Solution: Enable SPC
+--enable_sovereign_phase_controller
+```
+
+**Use Case 2: Mode Collapse**
+```bash
+# Symptom: All outputs repetitive, entropy crashed
+Step 8,500 | Samples: "the the the the the..."
+Entropy: 0.38 (CRITICAL!)
+🔴 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:CRITICAL | Force:1.00
+
+# Solution: Enable SPC immediately
+--enable_sovereign_phase_controller
+```
+
+**Use Case 3: Vikalpa Loop (Mental Distortion)**
+```bash
+# Symptom: M_Vikal metric very high (mental distortions)
+Step 20,000 | M_Vikal: 0.85 (over-imagining)
+🟡 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:CAUTION | Rotations:[O9:-0.79rad]
+
+# Solution: Enable SPC for O9 rotation
+--enable_sovereign_phase_controller
+```
+
+**Use Case 4: Stagnation (Low Variance)**
+```bash
+# Symptom: Entropy variance near zero (frozen)
+Step 16,000 | Entropy: 0.52 (ok) but Variance: 0.0003 (STUCK!)
+🟠 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:WARNING
+
+# Solution: Enable SPC to break stagnation
+--enable_sovereign_phase_controller
+```
+
+#### Integration with Other Controllers
+
+SPC works alongside existing controllers:
+
+| Controller | Purpose | Intervention Type | When Active |
+|------------|---------|-------------------|-------------|
+| **PIDv2** | S/A ratio regulation | Additive (gradient scaling) | 30 < PPL < 100 |
+| **RSS** | Staged controller engagement | Additive (loss terms) | PPL-based cascade |
+| **Sattvic** | λ_csr regulation | Multiplicative (loss weight) | Always (monitors variance) |
+| **SPC** | Emergency barrier breaking | **Multiplicative (phase rotation)** | When enabled + stagnation detected |
+
+**SPC is the MOST AGGRESSIVE** because:
+- Multiplicative transformation (z × e^{iθ}) vs additive (loss + λ*term)
+- Can apply full 180° rotation (semantic inversion)
+- Combines with SGP acceleration (gradient hammering 2x faster)
+- Triggers on worst-case failure modes (collapse/stagnation)
+
+#### Tuning Thresholds
+
+**If SPC triggers too early:**
+```bash
+--spc_entropy_critical 0.35           # Lower (more sensitive)
+--spc_variance_critical 0.0003        # Detect stagnation faster
+--spc_min_boost_duration 50           # Shorter boost cycles
+```
+
+**If SPC triggers too late:**
+```bash
+--spc_entropy_critical 0.45           # Higher (more conservative)
+--spc_entropy_warning 0.55            # Wider safe zone
+--spc_min_boost_duration 200          # Longer boost cycles
+```
+
+**If rotations too aggressive (gradient spikes):**
+```bash
+--spc_alpha 0.1                       # Slower EMA (smoother)
+--spc_max_rotation 0.2                # Lower velocity limit (~11°/step)
+--spc_damping 0.8                     # Stronger damping (20% reduction)
+```
+
+**If rotations too gentle (not breaking plateau):**
+```bash
+--spc_alpha 0.3                       # Faster EMA
+--spc_max_rotation 0.5                # Higher velocity (~28°/step)
+--spc_damping 0.95                    # Lighter damping
+```
+
+#### Example: Full Sovereign Training with SPC
+
+```bash
+# Stage 1: Train with SPC disabled (diagnostic mode)
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --enable_srk \
+    --enable_rss \
+    --controller pidv2 \
+    --max_steps 50000 \
+    # SPC disabled by default - watch for diagnostic logs
+
+# Stage 2: If plateau observed, enable SPC
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --enable_srk \
+    --enable_rss \
+    --controller pidv2 \
+    --enable_sovereign_phase_controller \    # ← Enable when plateau hits
+    --spc_entropy_warning 0.5 \              # Optional: tune thresholds
+    --spc_min_boost_duration 150 \           # Optional: longer boost
+    --resume checkpoints_medium/checkpoint_15000.pt \
+    --max_steps 50000
+```
+
+#### SPC Status Logs
+
+**When ENABLED:**
+```
+🟢 [SPC] MONITORING | Level:NORMAL | Force:0.15
+🟡 [SPC] ACTIVE | Level:CAUTION | Force:0.30 | Rotations:[O9:-0.16rad]
+🟠 [SPC] ACTIVE | Level:WARNING | Force:0.60 | Rotations:[O9:-0.47rad,O12:0.31rad]
+🔴 [SPC] ACTIVE | Level:CRITICAL | Force:1.00 | Rotations:[O9:-0.79rad,O12:1.05rad,O6:0.00rad]
+```
+
+**When DISABLED (diagnostic):**
+```
+🟢 [SPC-DIAGNOSTIC] Level:NORMAL
+🟠 [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:WARNING | Force:0.60
+```
+
+#### Important Notes
+
+1. **Start Disabled**: Always start training with SPC disabled. Enable only when you observe actual plateaus/collapse.
+
+2. **Monitor Diagnostics**: Watch for `WOULD TRIGGER` logs during normal training to understand when SPC would activate.
+
+3. **Gradient Monitoring**: After enabling, monitor gradient norms. If you see >10x spikes, reduce `--spc_max_rotation` or `--spc_alpha`.
+
+4. **Hysteresis is Critical**: Don't lower `--spc_min_boost_duration` below 50 steps or you risk oscillation.
+
+5. **Layer Targeting is Automatic**: SPC automatically determines which layers need rotation based on Vritti/Bhava/Kosha diagnostics.
+
+6. **Combines with SGP**: When SPC triggers, SGP (Stochastic Gradient Persistence) also accelerates, creating a combined intervention.
+
+7. **Not a Replacement**: SPC is an emergency intervention, not a replacement for proper training dynamics. Fix underlying issues (learning rate, batch size, data quality) first.
+
+**Reference:** Gemini's graduated response, rotation damping, and layer targeting proposal (2026-01-13)
+
 ### Stress Testing
 
 | Flag | Type | Default | Description |
