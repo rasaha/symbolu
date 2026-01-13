@@ -12992,7 +12992,9 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f"\n    {icon} [RSS] Phase: {phase} | Evo:{int(rss_weights['evoflow']*100)}% Tor:{int(rss_weights['toroidal']*100)}% CSR:{csr_pct}% Kosh:{int(rss_weights['kosha']*100)}%"
 
                 # v2.2.1: Kosha Gyroscope Status (Homeostatic Self-Regulation)
-                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics:
+                # Only log when Kosha is engaged (kosha_curriculum.scale > 0 or RSS kosha > 0)
+                kosha_inline_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if kosha_gyroscope is not None and 'gyroscope_loss' in metrics and kosha_inline_engaged:
                     gyro_loss = metrics.get('gyroscope_loss', 0.0)
                     gyro_gain = metrics.get('gyroscope_effective_gain', 0.0)
                     gyro_base_gain = metrics.get('gyroscope_base_gain', 0.0)
@@ -13061,7 +13063,8 @@ def train(config: UnifiedTrainingConfig):
                         log_msg += f"\n         [PENTAD] {kosha_pentad}"
 
                 # v2.3.0: Vritti Resonance diagnostic logging (Phase 1 = read-only)
-                if vritti_resonance is not None and 'vritti_alignment' in metrics:
+                # Only log when Kosha is engaged
+                if vritti_resonance is not None and 'vritti_alignment' in metrics and kosha_inline_engaged:
                     align = metrics['vritti_alignment']
                     res_status = "🎓ACT" if vritti_resonance.active else "👁️OBS"
                     log_msg += f"\n    {res_status} [VRITTI] P-Pram:{align.get('physical_pramana', 0):.2f} | M-Vikal:{align.get('mental_vikalpa', 0):.2f} | I-Smrit:{align.get('intellect_smriti', 0):.2f}"
@@ -13192,7 +13195,9 @@ def train(config: UnifiedTrainingConfig):
                             print(f"    ⚠️ [ONTO] Diagnostic error: {e}", flush=True)
 
                 # V9.8.0: Sovereign State Diagnostics for ontological_hybrid model
-                if config.model_type == "ontological_hybrid":
+                # Only log when Kosha is engaged (since Bhava/Kosha/Vritti are part of sovereign synthesis)
+                sovereign_state_engaged = (kosha_curriculum is None) or (kosha_curriculum.scale > 0) or (rss_weights.get('kosha', 0) > 0)
+                if config.model_type == "ontological_hybrid" and sovereign_state_engaged:
                     try:
                         # Extract state and delta_S from outputs dict
                         sovereign_state = None
