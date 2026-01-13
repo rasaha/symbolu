@@ -13367,8 +13367,13 @@ def train(config: UnifiedTrainingConfig):
                         diagnostics=spc_diagnostics,
                     )
 
-                    # Log SPC status at validation steps or when would trigger
-                    if global_step % config.eval_every == 0 or spc_result['would_trigger']:
+                    # Log SPC status at validation steps (or when actively triggering if enabled)
+                    # Diagnostic mode (disabled): only log at eval intervals to avoid spam
+                    should_log = global_step % config.eval_every == 0
+                    if config.enable_sovereign_phase_controller and spc_result['would_trigger']:
+                        should_log = True  # When enabled, also log on triggers
+
+                    if should_log:
                         level_icon = {'normal': '🟢', 'caution': '🟡', 'warning': '🟠', 'critical': '🔴'}
                         icon = level_icon.get(spc_result['level'], '⚪')
                         status_str = "ACTIVE" if spc_result['boost_active'] else "MONITORING"
