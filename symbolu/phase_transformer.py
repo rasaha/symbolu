@@ -2511,6 +2511,7 @@ class OntologicalHybridTransformer(nn.Module):
         embed_dim: int = 768,
         num_layers: int = 12,
         num_heads: int = 12,
+        n_kv_heads: Optional[int] = None,  # V9.8.7: GQA support
         ff_dim: Optional[int] = None,
         max_seq_len: int = 8192,
         dropout: float = 0.1,
@@ -2535,6 +2536,7 @@ class OntologicalHybridTransformer(nn.Module):
             embed_dim=embed_dim,
             num_layers=num_layers,
             num_heads=num_heads,
+            n_kv_heads=n_kv_heads,  # V9.8.7: Pass through GQA
             ff_dim=ff_dim,
             max_seq_len=max_seq_len,
             dropout=dropout,

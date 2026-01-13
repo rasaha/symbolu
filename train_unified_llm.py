@@ -7661,6 +7661,13 @@ class UnifiedTrainingConfig:
     vocab_size: int = 50257
     max_seq_len: int = 2048
     dropout: float = 0.1
+    attention_dropout: float = 0.1
+
+    # Architecture overrides (optional - if None, use model_size preset)
+    n_layer: Optional[int] = None
+    n_head: Optional[int] = None
+    n_embd: Optional[int] = None
+    n_kv_heads: Optional[int] = None
 
     # Phase-specific parameters
     sync_steps: int = 3
@@ -8689,6 +8696,29 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     """Create model based on configuration."""
     preset = MODEL_PRESETS[config.model_size]
 
+    # Apply architecture overrides if provided
+    embed_dim = config.n_embd if config.n_embd is not None else preset["embed_dim"]
+    num_layers = config.n_layer if config.n_layer is not None else preset["num_layers"]
+    num_heads = config.n_head if config.n_head is not None else preset["num_heads"]
+    ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
+    n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
+
+    # Print architecture configuration
+    print(f"\n{'='*80}")
+    print(f"Model Architecture: {config.model_type} ({config.model_size} preset)")
+    print(f"{'='*80}")
+    if config.n_embd is not None or config.n_layer is not None or config.n_head is not None:
+        print(f"  ⚙️  Architecture Overrides Active:")
+    print(f"  Embedding Dimension:  {embed_dim}" + (" (override)" if config.n_embd is not None else ""))
+    print(f"  Number of Layers:     {num_layers}" + (" (override)" if config.n_layer is not None else ""))
+    print(f"  Number of Heads:      {num_heads}" + (" (override)" if config.n_head is not None else ""))
+    print(f"  FFN Dimension:        {ff_dim}")
+    if n_kv_heads is not None:
+        print(f"  KV Heads (GQA):       {n_kv_heads} (override)")
+    print(f"  Dropout:              {config.dropout}")
+    print(f"  Attention Dropout:    {config.attention_dropout}")
+    print(f"{'='*80}\n")
+
     if config.model_type == "ontological":
         if not ONTOLOGICAL_AVAILABLE:
             raise ImportError("Ontological models not available. Check imports.")
@@ -8807,10 +8837,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = OntologicalHybridTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            n_kv_heads=n_kv_heads,  # V9.8.7: GQA support
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             local_layers=config.local_layers,
@@ -14315,6 +14346,20 @@ def main():
     parser.add_argument("--max_seq_len", type=int, default=2048,
                        help="Maximum sequence length")
 
+    # Architecture overrides (optional - override model_size preset)
+    parser.add_argument("--n_layer", type=int, default=None,
+                       help="Number of transformer layers (overrides model_size)")
+    parser.add_argument("--n_head", type=int, default=None,
+                       help="Number of attention heads (overrides model_size)")
+    parser.add_argument("--n_embd", type=int, default=None,
+                       help="Embedding dimension (overrides model_size)")
+    parser.add_argument("--n_kv_heads", type=int, default=None,
+                       help="Number of KV heads for GQA (if None, uses n_head)")
+    parser.add_argument("--dropout", type=float, default=0.1,
+                       help="Dropout rate")
+    parser.add_argument("--attention_dropout", type=float, default=0.1,
+                       help="Attention dropout rate")
+
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size per GPU (reference batch for seq len curriculum)")
@@ -14330,6 +14375,12 @@ def main():
                        help="Maximum training steps")
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
+    parser.add_argument("--warmup_steps", type=int, default=500,
+                       help="Learning rate warmup steps")
+    parser.add_argument("--weight_decay", type=float, default=0.1,
+                       help="Weight decay (L2 regularization)")
+    parser.add_argument("--max_grad_norm", type=float, default=1.0,
+                       help="Maximum gradient norm for clipping")
     parser.add_argument("--use_per_layer_clipping", action="store_true",
                        help="Clip authority/sensory gradients separately (respects 9:3 design)")
     parser.add_argument("--use_8bit_optimizer", action="store_true",
