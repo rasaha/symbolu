@@ -1707,6 +1707,25 @@ class EvolutionaryFlowNetwork(nn.Module):
             f"[↓{min_gate[0]}:{min_gate[1]:.2f}]"
         )
 
+    def get_state(self) -> Dict[str, Any]:
+        """V9.8.6: Get internal state for checkpointing."""
+        return {
+            "micro_coherence": [list(mc) for mc in self.micro_coherence],
+            "meso_coherence": {k: list(v) for k, v in self.meso_coherence.items()},
+            "macro_coherence": list(self.macro_coherence),
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """V9.8.6: Restore internal state from checkpoint."""
+        if state is None:
+            return
+        if "micro_coherence" in state:
+            self.micro_coherence = [list(mc) for mc in state["micro_coherence"]]
+        if "meso_coherence" in state:
+            self.meso_coherence = {k: list(v) for k, v in state["meso_coherence"].items()}
+        if "macro_coherence" in state:
+            self.macro_coherence = list(state["macro_coherence"])
+
 
 class EvolutionaryFlowLoss(nn.Module):
     """
@@ -2294,6 +2313,36 @@ class EvolutionaryIntelligenceEngine:
             return "DESCENDING"
         else:
             return "STABLE"
+
+    def get_state(self) -> Dict[str, Any]:
+        """V9.8.6: Get internal state for checkpointing."""
+        # resonance_buffer is List[Tensor], convert each to list
+        res_buf = None
+        if self.resonance_buffer is not None:
+            res_buf = [t.cpu().tolist() for t in self.resonance_buffer]
+        return {
+            "flow_network_state": self.flow_network.get_state(),
+            "flow_network_weights": self.flow_network.state_dict(),  # Save nn.Module weights!
+            "evolution_history": list(self.evolution_history[-100:]),  # Keep last 100
+            "current_gunas": self.current_gunas,
+            "resonance_buffer": res_buf,
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """V9.8.6: Restore internal state from checkpoint."""
+        if state is None:
+            return
+        if "flow_network_weights" in state:
+            self.flow_network.load_state_dict(state["flow_network_weights"])  # Restore nn.Module weights!
+        if "flow_network_state" in state:
+            self.flow_network.load_state(state["flow_network_state"])
+        if "evolution_history" in state:
+            self.evolution_history = list(state["evolution_history"])
+        if "current_gunas" in state:
+            self.current_gunas = state["current_gunas"]
+        if "resonance_buffer" in state and state["resonance_buffer"] is not None:
+            # resonance_buffer is List[Tensor]
+            self.resonance_buffer = [torch.tensor(t, device=self.device) for t in state["resonance_buffer"]]
 
 
 # =============================================================================
@@ -6000,6 +6049,157 @@ class SequenceLengthCurriculum:
 
 
 # =============================================================================
+# V9.8.6: THREE-PHASE CURRICULUM CONTROLLER (Reusable for CSR, Kosha, PID)
+# =============================================================================
+
+class ThreePhaseCurriculum:
+    """
+    Generic three-phase curriculum controller for PPL-based engagement.
+
+    Used by CSR (Layer 7), Kosha Gyroscope (Layer 9), and PIDv2 to implement
+    smooth engagement/disengagement based on perplexity thresholds.
+
+    Phases:
+        CONSTRUCTION (PPL > engage_ppl): Component fully active (scale=1.0)
+        TRANSITION (disengage_ppl < PPL < engage_ppl): Linear rampdown
+        POLISHING (PPL < disengage_ppl): Component off after rampdown (scale=0.0)
+
+    Args:
+        name: Component name for logging (e.g., "CSR", "Kosha", "PID")
+        engage_ppl: PPL threshold above which component is fully active
+        disengage_ppl: PPL threshold below which component disengages
+        rampdown_steps: Steps to ramp down after disengage trigger
+    """
+
+    PHASE_CONSTRUCTION = "CONSTRUCTION"
+    PHASE_TRANSITION = "TRANSITION"
+    PHASE_POLISHING = "POLISHING"
+
+    def __init__(
+        self,
+        name: str,
+        engage_ppl: float = 100.0,
+        disengage_ppl: float = 30.0,
+        rampdown_steps: int = 500,
+    ):
+        self.name = name
+        self.engage_ppl = engage_ppl
+        self.disengage_ppl = disengage_ppl
+        self.rampdown_steps = rampdown_steps
+
+        # State tracking
+        self.phase = self.PHASE_CONSTRUCTION
+        self.disengage_step: Optional[int] = None
+        self.scale = 1.0
+        self.graduated = False
+        self._last_log_phase = None  # For change-only logging
+
+    def update(self, val_ppl: float, step: int) -> float:
+        """
+        Update phase based on current PPL and compute scaling factor.
+
+        Args:
+            val_ppl: Current validation perplexity
+            step: Current training step
+
+        Returns:
+            scale: Authority scale factor (1.0 = full, 0.0 = off)
+        """
+        # Already graduated - stay in polishing mode
+        if self.graduated:
+            self.phase = self.PHASE_POLISHING
+            self.scale = 0.0
+            return 0.0
+
+        # Phase A: CONSTRUCTION (PPL > engage_ppl)
+        if val_ppl >= self.engage_ppl:
+            self.phase = self.PHASE_CONSTRUCTION
+            self.disengage_step = None  # Reset disengage trigger
+            self.scale = 1.0
+            self._log_phase_change(step, val_ppl)
+            return 1.0
+
+        # Phase C trigger: Check if PPL dropped below disengage threshold
+        if val_ppl < self.disengage_ppl:
+            if self.disengage_step is None:
+                # First time crossing disengage threshold
+                self.disengage_step = step
+                print(f"  🎓 [{self.name}] Disengage triggered at step {step} "
+                      f"(PPL={val_ppl:.1f} < {self.disengage_ppl})")
+
+            # Compute rampdown progress
+            steps_since_disengage = step - self.disengage_step
+            if self.rampdown_steps > 0:
+                rampdown_progress = min(1.0, steps_since_disengage / self.rampdown_steps)
+            else:
+                rampdown_progress = 1.0
+
+            self.scale = 1.0 - rampdown_progress
+
+            if rampdown_progress >= 1.0:
+                # Fully graduated
+                self.graduated = True
+                self.phase = self.PHASE_POLISHING
+                self.scale = 0.0
+                print(f"  🎓 [{self.name}] GRADUATED to polishing mode at step {step}")
+            else:
+                self.phase = self.PHASE_TRANSITION
+
+            self._log_phase_change(step, val_ppl)
+            return self.scale
+
+        # Phase B: TRANSITION (disengage_ppl <= PPL < engage_ppl)
+        # Linear interpolation: PPL=engage → scale=1.0, PPL=disengage → scale=0.0
+        self.phase = self.PHASE_TRANSITION
+        self.disengage_step = None  # Reset if PPL goes back up
+        ppl_range = self.engage_ppl - self.disengage_ppl
+        if ppl_range > 0:
+            progress = (self.engage_ppl - val_ppl) / ppl_range
+            self.scale = 1.0 - progress
+        else:
+            self.scale = 1.0
+
+        self._log_phase_change(step, val_ppl)
+        return self.scale
+
+    def _log_phase_change(self, step: int, val_ppl: float):
+        """Log only when phase changes."""
+        if self.phase != self._last_log_phase:
+            self._last_log_phase = self.phase
+            # Only log transitions, not every update
+            if self.phase == self.PHASE_TRANSITION:
+                print(f"  📐 [{self.name}] Phase: {self.phase} | "
+                      f"PPL={val_ppl:.1f} | scale={self.scale:.0%}")
+
+    def get_status(self) -> str:
+        """Get human-readable status string."""
+        if self.graduated:
+            return f"[{self.name}] 🎓 GRADUATED (polishing mode)"
+        elif self.phase == self.PHASE_CONSTRUCTION:
+            return f"[{self.name}] 🔧 CONSTRUCTION (scale={self.scale:.0%})"
+        elif self.phase == self.PHASE_TRANSITION:
+            return f"[{self.name}] 📐 TRANSITION (scale={self.scale:.0%})"
+        else:
+            return f"[{self.name}] ✨ POLISHING (scale={self.scale:.0%})"
+
+    def get_state(self) -> Dict[str, Any]:
+        """Get serializable state for checkpointing."""
+        return {
+            'phase': self.phase,
+            'disengage_step': self.disengage_step,
+            'scale': self.scale,
+            'graduated': self.graduated,
+        }
+
+    def load_state(self, state: Dict[str, Any]):
+        """Load state from checkpoint."""
+        self.phase = state.get('phase', self.PHASE_CONSTRUCTION)
+        self.disengage_step = state.get('disengage_step', None)
+        self.scale = state.get('scale', 1.0)
+        self.graduated = state.get('graduated', False)
+
+
+# =============================================================================
 # DYNAMIC RELAXATION CONTROLLER: 9:3 → 6:6 TRANSITION
 # =============================================================================
 
@@ -7609,8 +7809,14 @@ class UnifiedTrainingConfig:
     gyroscope_temporal_window: int = 3       # Physical history window size
     gyroscope_vital_momentum: bool = True    # Enable dynamic gain via Vital
     gyroscope_warmup_steps: int = 100        # Steps before gyroscope fully active
-    gyroscope_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
-    # Graduation criteria (Inverted Curriculum)
+    kosha_rampdown_steps: int = 500      # Steps to ramp gain to 0 at disengage
+    # V9.8.6: Three-Phase Kosha Curriculum (Inverted - active at HIGH PPL)
+    # Phase A (PPL > engage): Full Kosha guidance - "instructor mode"
+    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
+    # Phase C (PPL < disengage): Kosha off - "student fluent"
+    kosha_engage_ppl: float = 100.0      # Kosha fully ON above this PPL (construction)
+    kosha_disengage_ppl: float = 30.0    # Kosha OFF below this PPL (polishing)
+    # Graduation criteria (legacy - kept for stability check)
     gyroscope_graduation_ppl: float = 30.0   # PPL threshold for graduation (mean)
     gyroscope_graduation_variance: float = 1.5  # Max PPL variance for stability
     gyroscope_graduation_window: int = 10    # Window for stability check
@@ -7633,6 +7839,13 @@ class UnifiedTrainingConfig:
     onto_bridge_diversity: float = 0.1       # Weight for diversity component (prevent collapse)
     onto_bridge_pramana: float = 0.1         # Weight for Pramāṇa alignment component
     onto_bridge_layer: int = 4               # V9.7.0: Layer 4 = foundational ontological grounding
+    # V9.8.6: Three-Phase Onto Bridge Curriculum (Inverted - active at HIGH PPL)
+    # Phase A (PPL > engage): Full ontological grounding - "foundation building"
+    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
+    # Phase C (PPL < disengage): Onto bridge off - "model fluent"
+    onto_engage_ppl: float = 150.0           # Onto fully ON above this PPL (construction)
+    onto_disengage_ppl: float = 50.0         # Onto OFF below this PPL (polishing)
+    onto_rampdown_steps: int = 500           # Steps to ramp to 0 after disengage
 
     # Dataset
     dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
@@ -7839,6 +8052,14 @@ class UnifiedTrainingConfig:
     csr_sparse_supervision: bool = False     # Enable word-boundary-only supervision
     csr_content_word_only: bool = False      # Also filter out stopwords (requires sparse_supervision)
 
+    # V9.8.6: CSR Three-Phase Curriculum (like PID)
+    # Phase A (PPL > engage): Full CSR grounding - "construction"
+    # Phase B (disengage < PPL < engage): Linear rampdown - "transition"
+    # Phase C (PPL < disengage): CSR off - "polishing"
+    csr_engage_ppl: float = 120.0            # CSR fully ON above this PPL
+    csr_disengage_ppl: float = 40.0          # CSR OFF below this PPL
+    csr_rampdown_steps: int = 500            # Steps to ramp down after disengage trigger
+
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
 
@@ -7854,7 +8075,7 @@ class UnifiedTrainingConfig:
     sattvic_floor_lambda: float = 0.1        # Minimum λ_csr after decay
     sattvic_warmup_steps: int = 500          # Steps for warmup phase
     sattvic_variance_window: int = 50        # Window for entropy variance detection
-    sattvic_variance_threshold: float = 0.001  # Variance threshold for stagnation
+    sattvic_variance_threshold: float = 0.00001  # Lowered from 0.0001 - variance ~1e-5 still triggering boosts
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     enable_adaptive_training: bool = True    # Enable automatic LR/Kp adjustment
@@ -9833,10 +10054,18 @@ def compute_phase_loss(
         ignore_index=-100,
     )
 
+    # Compute entropy for Sattvic controller (prevents variance=0.0 stagnation bug)
+    with torch.no_grad():
+        probs = F.softmax(logits, dim=-1)
+        token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        max_entropy = math.log(V)
+        normalized_entropy = (token_entropy / max_entropy).mean().item()
+
     metrics = {
         "lm_loss": lm_loss.item(),
         "ppl": math.exp(min(lm_loss.item(), 20)),
         "total_loss": lm_loss.item(),
+        "onto_entropy": normalized_entropy,  # Required for Sattvic stagnation detection
     }
 
     return lm_loss, metrics
@@ -10078,6 +10307,30 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
+    # These must be defined before curriculum controllers are created
+    resumed_csr_curriculum_state = None
+    resumed_kosha_curriculum_state = None
+    resumed_onto_curriculum_state = None
+    resumed_pidv2_curriculum_state = None
+    resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
+    resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+
+    # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
+    csr_curriculum = None
+    csr_graduated = False
+    if config.enable_csr and csr_provider is not None:
+        csr_curriculum = ThreePhaseCurriculum(
+            name="CSR",
+            engage_ppl=config.csr_engage_ppl,
+            disengage_ppl=config.csr_disengage_ppl,
+            rampdown_steps=config.csr_rampdown_steps,
+        )
+        print(f"  🎓 CSR Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.csr_engage_ppl} (full grounding)")
+        print(f"       TRANSITION:   {config.csr_disengage_ppl} < PPL < {config.csr_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.csr_disengage_ppl} (CSR off after {config.csr_rampdown_steps} steps)")
+
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
     sgp_controller = None
@@ -10270,6 +10523,10 @@ def train(config: UnifiedTrainingConfig):
         # Create HiddenStateExtractor for models that don't return hidden_states
         hidden_state_extractor = HiddenStateExtractor(model, num_layers=12)
         print(f"    → Hidden State Extractor: ENABLED ({len(hidden_state_extractor.hooks)} hooks registered)")
+        # V9.8.6: Restore EvoFlow state from checkpoint
+        if resumed_evoflow_state is not None:
+            evolutionary_engine.load_state(resumed_evoflow_state)
+            print(f"  ✓ EvoFlow Restored: history={len(evolutionary_engine.evolution_history)}, gunas={evolutionary_engine.current_gunas}")
 
         if config.enable_toroidal_bridge:
             print(f"    ⚠️  Note: Toroidal Bridge superseded by Evolutionary Flow")
@@ -10508,9 +10765,22 @@ def train(config: UnifiedTrainingConfig):
             resumed_sattvic_state = resume_result.get("sattvic_state")
             resumed_srk_state = resume_result.get("srk_state")
             resumed_scaler_state = resume_result.get("scaler_state")  # V9.8.1
+            # V9.8.6: Extract curriculum states
+            resumed_csr_curriculum_state = resume_result.get("csr_curriculum_state")
+            resumed_kosha_curriculum_state = resume_result.get("kosha_curriculum_state")
+            resumed_onto_curriculum_state = resume_result.get("onto_curriculum_state")
+            resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
+            resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
+            resumed_evoflow_state = resume_result.get("evoflow_state")
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
             print(f"      Starting training from scratch...")
+
+    # V9.8.6: Restore CSR curriculum state (CSR is already initialized above)
+    if resumed_csr_curriculum_state is not None and csr_curriculum is not None:
+        csr_curriculum.load_state(resumed_csr_curriculum_state)
+        print(f"  ✓ CSR Curriculum Restored: Phase={csr_curriculum.phase}, Scale={csr_curriculum.scale:.3f}")
+    # NOTE: Onto, Kosha, and PIDv2 curriculum restoration happens after their initialization below
 
     # Formula [1331]: Hierarchical Gradient Scaling (9:3, 6:6, or any split)
     gradient_scaler_hgs = None
@@ -10727,6 +10997,10 @@ def train(config: UnifiedTrainingConfig):
             batch_max=config.pidv2_batch_max,
             batch_velocity_threshold=config.pidv2_batch_velocity_threshold,
             batch_stable_streak=config.pidv2_batch_stable_streak,
+            # V9.8.6: Three-Phase Curriculum
+            engage_ppl=config.pidv2_engage_ppl,
+            disengage_ppl=config.pidv2_disengage_ppl,
+            rampdown_steps=config.pidv2_rampdown_steps,
         )
         authority_controller = AuthorityPIDv2(pidv2_config)
         authority_controller.set_batch_size(config.batch_size)  # Initialize with current batch
@@ -10735,6 +11009,15 @@ def train(config: UnifiedTrainingConfig):
         print(f"    Coherence Gate: C_floor={config.pidv2_c_floor}, C_good={config.pidv2_c_good}")
         print(f"    Semantic Weight (W_s): {config.pidv2_w_s:.0%}")
         print(f"    Authority floor: {config.pidv2_a_min}")
+        # V9.8.6: Three-Phase Curriculum info
+        print(f"    🎓 Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.pidv2_engage_ppl} (full PID)")
+        print(f"       TRANSITION:   {config.pidv2_disengage_ppl} < PPL < {config.pidv2_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.pidv2_disengage_ppl} (PID off after {config.pidv2_rampdown_steps} steps)")
+        # V9.8.6: Restore PIDv2 curriculum state from checkpoint
+        if resumed_pidv2_curriculum_state is not None:
+            authority_controller.load_curriculum_state(resumed_pidv2_curriculum_state)
+            print(f"       ✓ Restored: Phase={authority_controller.phase}, Scale={authority_controller.phase_scale:.3f}")
         if config.pidv2_batch_resize:
             print(f"    🔄 Batch Resize: ENABLED (min={config.pidv2_batch_min}, max={config.pidv2_batch_max})")
             print(f"       Reduce when: PPL vel > {config.pidv2_batch_velocity_threshold}%")
@@ -10820,6 +11103,24 @@ def train(config: UnifiedTrainingConfig):
         print(f"     Aspects: O1-O12 (Potential → Absolving)")
         print(f"     ⚠️  FOUNDATIONAL - establishes ontological DNA early")
 
+    # V9.8.6: Initialize Onto Bridge Three-Phase Curriculum Controller
+    onto_curriculum = None
+    if config.enable_onto_bridge and onto_bridge is not None:
+        onto_curriculum = ThreePhaseCurriculum(
+            name="Onto",
+            engage_ppl=config.onto_engage_ppl,
+            disengage_ppl=config.onto_disengage_ppl,
+            rampdown_steps=config.onto_rampdown_steps,
+        )
+        print(f"  🎓 Onto Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.onto_engage_ppl} (full ontological grounding)")
+        print(f"       TRANSITION:   {config.onto_disengage_ppl} < PPL < {config.onto_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.onto_disengage_ppl} (Onto off after {config.onto_rampdown_steps} steps)")
+        # V9.8.6: Restore Onto curriculum state from checkpoint
+        if resumed_onto_curriculum_state is not None:
+            onto_curriculum.load_state(resumed_onto_curriculum_state)
+            print(f"       ✓ Restored: Phase={onto_curriculum.phase}, Scale={onto_curriculum.scale:.3f}")
+
     # Kosha Phase Steering (Active Intervention) - Layer 9 = O9_WITNESSES
     if config.enable_kosha_steering:
         print(f"\n  🎯 Kosha Phase Steering: ENABLED")
@@ -10837,7 +11138,8 @@ def train(config: UnifiedTrainingConfig):
     kosha_gyroscope = None
     kosha_graduation_monitor = None
     kosha_rip_logger = None
-    kosha_curriculum_controller = None
+    kosha_curriculum = None  # V9.8.6: Three-Phase Curriculum
+    kosha_curriculum_controller = None  # V9.8.6: InvertedCurriculumController
     kosha_graduated = False  # Track graduation state
     vritti_resonance = None  # v2.3.0: Kosha-Vritti Resonance Loss
     # V9.8.7: Three-phase gyroscope engagement tracking
@@ -10907,7 +11209,7 @@ def train(config: UnifiedTrainingConfig):
             enable_gyroscope=True,
             gyroscope_disengage_ppl=config.gyroscope_target_ppl,
             gyroscope_warmup_steps=config.gyroscope_warmup_steps,
-            gain_rampdown_steps=config.gyroscope_rampdown_steps,
+            gain_rampdown_steps=config.kosha_rampdown_steps,
             # v2.3.0: Complete Harmonic Pentad - Floors and Ceilings
             floor_mental=config.gyroscope_floor_mental,
             ceiling_mental=config.gyroscope_ceiling_mental,
@@ -10941,6 +11243,26 @@ def train(config: UnifiedTrainingConfig):
             target_ppl=config.gyroscope_target_ppl,
         )
         kosha_curriculum_controller = InvertedCurriculumController(config=gyro_config)
+        # V9.8.6: Restore Kosha Gyroscope curriculum controller state from checkpoint
+        if resumed_kosha_gyroscope_state is not None:
+            kosha_curriculum_controller.load_state(resumed_kosha_gyroscope_state)
+            print(f"  ✓ Kosha Gyroscope Restored: graduated={kosha_curriculum_controller.graduated}, disengage_step={kosha_curriculum_controller.disengage_step}")
+
+        # V9.8.6: Three-Phase Kosha Curriculum (unified with CSR/PID pattern)
+        kosha_curriculum = ThreePhaseCurriculum(
+            name="Kosha",
+            engage_ppl=config.kosha_engage_ppl,
+            disengage_ppl=config.kosha_disengage_ppl,
+            rampdown_steps=config.kosha_rampdown_steps,
+        )
+        print(f"  🎓 Kosha Three-Phase Curriculum:")
+        print(f"       CONSTRUCTION: PPL > {config.kosha_engage_ppl} (full Kosha loss)")
+        print(f"       TRANSITION:   {config.kosha_disengage_ppl} < PPL < {config.kosha_engage_ppl} (rampdown)")
+        print(f"       POLISHING:    PPL < {config.kosha_disengage_ppl} (Kosha off after {config.kosha_rampdown_steps} steps)")
+        # V9.8.6: Restore Kosha curriculum state from checkpoint
+        if resumed_kosha_curriculum_state is not None:
+            kosha_curriculum.load_state(resumed_kosha_curriculum_state)
+            print(f"       ✓ Restored: Phase={kosha_curriculum.phase}, Scale={kosha_curriculum.scale:.3f}")
 
         # Initialize Reality Rip Logger (diagnostic)
         if config.enable_rip_logger:
@@ -11500,9 +11822,14 @@ def train(config: UnifiedTrainingConfig):
                             content_word_only=config.csr_content_word_only,
                         )
 
-                        loss = loss + csr_loss
+                        # V9.8.6: Apply three-phase curriculum scaling
+                        csr_scale = csr_curriculum.scale if csr_curriculum is not None else 1.0
+                        csr_loss_scaled = csr_loss * csr_scale
+                        loss = loss + csr_loss_scaled
                         csr_metrics.update(sparse_metrics)
                         csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_loss_scaled'] = csr_loss_scaled.item()
+                        csr_metrics['csr_curriculum_scale'] = csr_scale
                         csr_metrics['csr_confidence'] = csr_confidence.mean().item()
                         # Use sparse similarity metric
                         csr_metrics['csr_similarity'] = sparse_metrics.get('csr_sparse_similarity', 0.0)
@@ -11530,8 +11857,13 @@ def train(config: UnifiedTrainingConfig):
                         # V9.6.9: CSR loss is now purely observational (no gradients flow)
                         # We still track it for metrics, but it doesn't influence training
                         # The cross-entropy LM loss is the ONLY training signal
-                        loss = loss + csr_loss
+                        # V9.8.6: Apply three-phase curriculum scaling
+                        csr_scale = csr_curriculum.scale if csr_curriculum is not None else 1.0
+                        csr_loss_scaled = csr_loss * csr_scale
+                        loss = loss + csr_loss_scaled
                         csr_metrics['csr_loss'] = csr_loss.item()
+                        csr_metrics['csr_loss_scaled'] = csr_loss_scaled.item()
+                        csr_metrics['csr_curriculum_scale'] = csr_scale
                         csr_metrics['csr_confidence'] = csr_confidence.mean().item()
                         csr_metrics['csr_similarity'] = csr_similarity.mean().item()
                 else:
@@ -11615,9 +11947,16 @@ def train(config: UnifiedTrainingConfig):
                             )
                             # Scale by lambda and add to total loss
                             scaled_onto_loss = config.onto_bridge_lambda * onto_loss
+
+                            # V9.8.6: Apply three-phase curriculum scaling
+                            onto_scale = onto_curriculum.scale if onto_curriculum is not None else 1.0
+                            scaled_onto_loss = scaled_onto_loss * onto_scale
+
                             loss = loss + scaled_onto_loss
                             # Store metrics
                             metrics['onto_bridge_loss'] = scaled_onto_loss.item()
+                            metrics['onto_bridge_loss_unscaled'] = (config.onto_bridge_lambda * onto_loss).item()
+                            metrics['onto_curriculum_scale'] = onto_scale
                             metrics['onto_diversity'] = onto_metrics.get('onto_diversity', 0.0)
                             metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
                             metrics['onto_bridge_layer'] = onto_layer
@@ -11871,11 +12210,17 @@ def train(config: UnifiedTrainingConfig):
                                     # Use L2 loss scaled by steering force
                                     kosha_steering_loss = (phase_error ** 2).mean() * config.kosha_steering_force
 
+                                    # V9.8.6: Apply three-phase curriculum scaling
+                                    kosha_scale = kosha_curriculum.scale if kosha_curriculum is not None else 1.0
+                                    kosha_steering_scaled = kosha_steering_loss * kosha_scale
+
                                     # Add to total loss (this creates gradient pressure toward target angle)
-                                    loss = loss + kosha_steering_loss
+                                    loss = loss + kosha_steering_scaled
 
                                     # Log steering metrics
                                     metrics['kosha_steering_loss'] = kosha_steering_loss.item()
+                                    metrics['kosha_steering_scaled'] = kosha_steering_scaled.item()
+                                    metrics['kosha_curriculum_scale'] = kosha_scale
                                     metrics['kosha_target_angle'] = math.degrees(target_angle_rad)
                                     metrics['kosha_mean_phase'] = math.degrees(current_phase.mean().item())
                                     metrics['kosha_phase_error'] = math.degrees(phase_error.abs().mean().item())
@@ -11946,11 +12291,17 @@ def train(config: UnifiedTrainingConfig):
                             # Apply warmup scaling
                             gyroscope_loss = gyro_loss * warmup_scale
 
+                            # V9.8.6: Apply three-phase curriculum scaling
+                            kosha_gyro_scale = kosha_curriculum.scale if kosha_curriculum is not None else 1.0
+                            gyroscope_loss_scaled = gyroscope_loss * kosha_gyro_scale
+
                             # Add to total loss
-                            loss = loss + gyroscope_loss
+                            loss = loss + gyroscope_loss_scaled
 
                             # Log gyroscope metrics
-                            metrics['gyroscope_loss'] = gyroscope_loss.item()
+                            metrics['gyroscope_loss'] = gyroscope_loss_scaled.item()
+                            metrics['gyroscope_loss_unscaled'] = gyroscope_loss.item()
+                            metrics['gyroscope_curriculum_scale'] = kosha_gyro_scale
                             metrics['gyroscope_effective_gain'] = gyroscope_components.get('effective_gain', 0.0)
                             metrics['gyroscope_base_gain'] = gyroscope_components.get('base_dynamic_gain', 0.0)
                             metrics['gyroscope_authority_factor'] = gyroscope_components.get('authority_factor', 1.0)
@@ -13056,6 +13407,39 @@ def train(config: UnifiedTrainingConfig):
                               f"Avg PPL: {avg_ppl_str} | "
                               f"Steps in phase: {status['steps_in_phase']}")
 
+                # V9.8.6: Onto Bridge Three-Phase Curriculum Update (Layer 4 - Foundation)
+                if onto_curriculum is not None:
+                    old_phase = onto_curriculum.phase
+                    onto_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if onto_curriculum.graduated and old_phase != onto_curriculum.phase:
+                        print(f"  🎓 [Onto] Graduated from POLISHING phase - Onto loss weight = 0.0")
+                    # Periodic logging
+                    if global_step % (config.eval_every * 5) == 0:
+                        print(f"  🌉 [Onto] Phase: {onto_curriculum.phase} | Scale: {onto_curriculum.scale:.3f}")
+
+                # V9.8.6: CSR Three-Phase Curriculum Update
+                if csr_curriculum is not None:
+                    old_phase = csr_curriculum.phase
+                    csr_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if csr_curriculum.graduated and old_phase != csr_curriculum.phase:
+                        print(f"  🎓 [CSR] Graduated from POLISHING phase - CSR loss weight = 0.0")
+                    # Periodic logging
+                    if global_step % (config.eval_every * 5) == 0:
+                        print(f"  🔤 [CSR] Phase: {csr_curriculum.phase} | Scale: {csr_curriculum.scale:.3f}")
+
+                # V9.8.6: Kosha Three-Phase Curriculum Update
+                if kosha_curriculum is not None:
+                    old_phase = kosha_curriculum.phase
+                    kosha_curriculum.update(val_ppl, global_step)
+                    # Log graduation event
+                    if kosha_curriculum.graduated and old_phase != kosha_curriculum.phase:
+                        print(f"  🎓 [Kosha] Graduated from POLISHING phase - Kosha loss weight = 0.0")
+                    # Periodic logging
+                    if global_step % (config.eval_every * 5) == 0:
+                        print(f"  🧘 [Kosha] Phase: {kosha_curriculum.phase} | Scale: {kosha_curriculum.scale:.3f}")
+
                 # V2.3.4: Sequence Length Curriculum Update
                 if seq_len_curriculum is not None:
                     old_seq_len = current_seq_len
@@ -13460,9 +13844,16 @@ def train(config: UnifiedTrainingConfig):
                         sgp_state=sgp_controller.get_state() if sgp_controller else None,
                         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                         srk_state=srk.get_checkpoint_state() if srk else None,
-                        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                        scaler_state=scaler.state_dict() if scaler else None,
+                        # V9.8.6: Three-Phase Curriculum states
+                        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     )
-                print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -13497,7 +13888,14 @@ def train(config: UnifiedTrainingConfig):
                     sgp_state=sgp_controller.get_state() if sgp_controller else None,
                     sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
                     srk_state=srk.get_checkpoint_state() if srk else None,
-                    scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+                    scaler_state=scaler.state_dict() if scaler else None,
+                    # V9.8.6: Three-Phase Curriculum states
+                    csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                    kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                    onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                    pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                    kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                    evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -13513,7 +13911,14 @@ def train(config: UnifiedTrainingConfig):
         sgp_state=sgp_controller.get_state() if sgp_controller else None,
         sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
         srk_state=srk.get_checkpoint_state() if srk else None,
-        scaler_state=scaler.state_dict() if scaler else None,  # V9.8.1
+        scaler_state=scaler.state_dict() if scaler else None,
+        # V9.8.6: Three-Phase Curriculum states
+        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -13615,6 +14020,17 @@ def save_checkpoint(
     sattvic_state: Optional[dict] = None,
     srk_state: Optional[dict] = None,
     scaler_state: Optional[dict] = None,
+    # V9.8.6: Three-Phase Curriculum states
+    csr_curriculum_state: Optional[dict] = None,
+    kosha_curriculum_state: Optional[dict] = None,
+    onto_curriculum_state: Optional[dict] = None,
+    pidv2_curriculum_state: Optional[dict] = None,
+    # V9.8.6: Kosha Gyroscope state (InvertedCurriculumController)
+    kosha_gyroscope_state: Optional[dict] = None,
+    # V9.8.6: EvoFlow state (EvolutionaryIntelligenceEngine)
+    evoflow_state: Optional[dict] = None,
+    # Dataloader position
+    dataloader_position: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
@@ -13657,6 +14073,26 @@ def save_checkpoint(
     # V9.8.1: Add AMP GradScaler state if provided
     if scaler_state is not None:
         checkpoint["scaler_state"] = scaler_state
+
+    # V9.8.6: Add Three-Phase Curriculum states
+    if csr_curriculum_state is not None:
+        checkpoint["csr_curriculum_state"] = csr_curriculum_state
+    if kosha_curriculum_state is not None:
+        checkpoint["kosha_curriculum_state"] = kosha_curriculum_state
+    if onto_curriculum_state is not None:
+        checkpoint["onto_curriculum_state"] = onto_curriculum_state
+    if pidv2_curriculum_state is not None:
+        checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
+    # V9.8.6: Add Kosha Gyroscope state (InvertedCurriculumController)
+    if kosha_gyroscope_state is not None:
+        checkpoint["kosha_gyroscope_state"] = kosha_gyroscope_state
+    # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
+    if evoflow_state is not None:
+        checkpoint["evoflow_state"] = evoflow_state
+
+    # V9.8.6: Add dataloader position for reproducibility
+    if dataloader_position is not None:
+        checkpoint["dataloader_position"] = dataloader_position
 
     # Explicitly remove old checkpoint before saving (especially for last.pt)
     # This ensures clean replacement and frees disk space before writing
@@ -13798,6 +14234,33 @@ def load_checkpoint(
     if "scaler_state" in checkpoint:
         result["scaler_state"] = checkpoint["scaler_state"]
         print(f"    ✓ AMP GradScaler state available for restoration")
+
+    # V9.8.6: Return Three-Phase Curriculum states for restoration
+    if "csr_curriculum_state" in checkpoint:
+        result["csr_curriculum_state"] = checkpoint["csr_curriculum_state"]
+        print(f"    ✓ CSR Curriculum state available for restoration")
+    if "kosha_curriculum_state" in checkpoint:
+        result["kosha_curriculum_state"] = checkpoint["kosha_curriculum_state"]
+        print(f"    ✓ Kosha Curriculum state available for restoration")
+    if "onto_curriculum_state" in checkpoint:
+        result["onto_curriculum_state"] = checkpoint["onto_curriculum_state"]
+        print(f"    ✓ Onto Curriculum state available for restoration")
+    if "pidv2_curriculum_state" in checkpoint:
+        result["pidv2_curriculum_state"] = checkpoint["pidv2_curriculum_state"]
+        print(f"    ✓ PIDv2 Curriculum state available for restoration")
+    # V9.8.6: Return Kosha Gyroscope state (InvertedCurriculumController)
+    if "kosha_gyroscope_state" in checkpoint:
+        result["kosha_gyroscope_state"] = checkpoint["kosha_gyroscope_state"]
+        print(f"    ✓ Kosha Gyroscope state available for restoration")
+    # V9.8.6: Return EvoFlow state (EvolutionaryIntelligenceEngine)
+    if "evoflow_state" in checkpoint:
+        result["evoflow_state"] = checkpoint["evoflow_state"]
+        print(f"    ✓ EvoFlow state available for restoration")
+
+    # V9.8.6: Return dataloader position for restoration
+    if "dataloader_position" in checkpoint:
+        result["dataloader_position"] = checkpoint["dataloader_position"]
+        print(f"    ✓ Dataloader position available for restoration")
 
     print(f"    → Resuming from step {result['step']}, best_val_loss={result['best_val_loss']:.4f}")
 
@@ -14101,9 +14564,14 @@ def main():
                        help="Disable Vital momentum for gyroscope")
     parser.add_argument("--gyroscope_warmup_steps", type=int, default=100,
                        help="Steps before gyroscope fully active")
-    parser.add_argument("--gyroscope_rampdown_steps", type=int, default=500,
+    parser.add_argument("--kosha_rampdown_steps", type=int, default=500,
                        help="Steps to ramp gain to 0 at graduation")
-    # Graduation criteria
+    # V9.8.6: Three-Phase Kosha Curriculum
+    parser.add_argument("--kosha_engage_ppl", type=float, default=100.0,
+                       help="Kosha fully ON above this PPL (construction phase)")
+    parser.add_argument("--kosha_disengage_ppl", type=float, default=30.0,
+                       help="Kosha OFF below this PPL (polishing phase)")
+    # Graduation criteria (legacy - kept for stability check)
     parser.add_argument("--gyroscope_graduation_ppl", type=float, default=30.0,
                        help="PPL threshold for graduation (mean)")
     parser.add_argument("--gyroscope_graduation_variance", type=float, default=1.5,
@@ -14145,6 +14613,13 @@ def main():
                        help="Weight for Pramāṇa alignment - truth prioritization (default: 0.1)")
     parser.add_argument("--onto_bridge_layer", type=int, default=4,
                        help="Layer for ontological bridge (4=foundational structure, default: 4)")
+    # V9.8.6: Three-Phase Onto Bridge Curriculum
+    parser.add_argument("--onto_engage_ppl", type=float, default=150.0,
+                       help="Onto fully ON above this PPL (construction phase)")
+    parser.add_argument("--onto_disengage_ppl", type=float, default=50.0,
+                       help="Onto OFF below this PPL (polishing phase)")
+    parser.add_argument("--onto_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp onto loss to 0 after disengage")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
@@ -14430,6 +14905,13 @@ def main():
                        help="Enable word-boundary-only supervision (fixes 'word salad' problem)")
     parser.add_argument("--csr_content_word_only", action="store_true",
                        help="Only apply CSR to content words, skip stopwords (requires --csr_sparse_supervision)")
+    # V9.8.6: CSR Three-Phase Curriculum
+    parser.add_argument("--csr_engage_ppl", type=float, default=120.0,
+                       help="CSR fully ON above this PPL (construction phase)")
+    parser.add_argument("--csr_disengage_ppl", type=float, default=40.0,
+                       help="CSR OFF below this PPL (polishing phase)")
+    parser.add_argument("--csr_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp down CSR after disengage trigger")
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
@@ -14453,8 +14935,8 @@ def main():
                        help="Steps for warmup phase")
     parser.add_argument("--sattvic_variance_window", type=int, default=50,
                        help="Window for entropy variance detection")
-    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.001,
-                       help="Variance threshold for stagnation")
+    parser.add_argument("--sattvic_variance_threshold", type=float, default=0.00001,
+                       help="Variance threshold for stagnation (lowered to 1e-5)")
 
     # Adaptive Training Controller (dynamic hyperparameter tuning)
     parser.add_argument("--enable_adaptive_training", action="store_true", default=True,
@@ -14758,7 +15240,10 @@ def main():
         gyroscope_temporal_window=args.gyroscope_temporal_window,
         gyroscope_vital_momentum=args.gyroscope_vital_momentum and not args.disable_gyroscope_vital_momentum,
         gyroscope_warmup_steps=args.gyroscope_warmup_steps,
-        gyroscope_rampdown_steps=args.gyroscope_rampdown_steps,
+        kosha_rampdown_steps=args.kosha_rampdown_steps,
+        # V9.8.6: Three-Phase Kosha Curriculum
+        kosha_engage_ppl=args.kosha_engage_ppl,
+        kosha_disengage_ppl=args.kosha_disengage_ppl,
         gyroscope_graduation_ppl=args.gyroscope_graduation_ppl,
         gyroscope_graduation_variance=args.gyroscope_graduation_variance,
         gyroscope_graduation_window=args.gyroscope_graduation_window,
@@ -14779,6 +15264,10 @@ def main():
         onto_bridge_diversity=args.onto_bridge_diversity,
         onto_bridge_pramana=args.onto_bridge_pramana,
         onto_bridge_layer=args.onto_bridge_layer,
+        # V9.8.6: Three-Phase Onto Bridge Curriculum
+        onto_engage_ppl=args.onto_engage_ppl,
+        onto_disengage_ppl=args.onto_disengage_ppl,
+        onto_rampdown_steps=args.onto_rampdown_steps,
         eval_every=args.eval_every,
         save_every=args.save_every,
         checkpoint_dir=args.checkpoint_dir,
@@ -14941,6 +15430,10 @@ def main():
         # V9.7.0: CSR Sparse Delayed Supervision
         csr_sparse_supervision=args.csr_sparse_supervision,
         csr_content_word_only=args.csr_content_word_only,
+        # V9.8.6: CSR Three-Phase Curriculum
+        csr_engage_ppl=args.csr_engage_ppl,
+        csr_disengage_ppl=args.csr_disengage_ppl,
+        csr_rampdown_steps=args.csr_rampdown_steps,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,

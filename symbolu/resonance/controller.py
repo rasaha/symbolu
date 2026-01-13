@@ -72,12 +72,13 @@ class SattvicConfig:
     # Entropy variance detection
     variance_window: int = 50        # Window size for variance calculation
     variance_threshold: float = 0.001  # Variance below this = stagnation
+    variance_release_threshold: float = 0.0001  # Variance must exceed this to release (10x trigger)
     entropy_floor: float = 0.40      # Entropy below this = mode collapse
 
     # Boost settings
     boost_factor: float = 1.5        # Multiplier when boosting λ
     boost_cooldown: int = 100        # Steps before boost can trigger again
-    boost_release_ratio: float = 1.2  # Entropy must exceed floor * this to release
+    collapse_release_buffer: float = 0.05  # Entropy must exceed floor + buffer to release collapse boost
 
     # Decay curve
     decay_type: str = "cosine"       # linear, cosine, exponential
@@ -132,7 +133,9 @@ class SattvicController:
         self.stagnation_detected = False
         self.mode_collapse_detected = False
         self.boost_active = False
+        self.boost_trigger_type = None  # Track what caused the boost: "stagnation" or "collapse"
         self.last_boost_step = -self.config.boost_cooldown  # Allow immediate boost
+        self.steps_since_boost_start = 0  # Track duration of boost for hysteresis
 
         # Entropy history for variance calculation
         self.entropy_history: deque = deque(maxlen=self.config.variance_window)
@@ -185,6 +188,13 @@ class SattvicController:
             self.mode_collapse_detected = collapse_trigger
             self.boost_active = True
             self.last_boost_step = step
+            self.steps_since_boost_start = 0  # Reset counter
+
+            # Track what triggered the boost
+            if collapse_trigger:
+                self.boost_trigger_type = "collapse"
+            else:
+                self.boost_trigger_type = "stagnation"
 
             # EMERGENCY BOOST: Force-shatter the loop
             # λ can exceed initial_lambda (up to 1.0) during emergency
@@ -199,20 +209,22 @@ class SattvicController:
             if collapse_trigger:
                 trigger_reason.append(f"entropy={entropy:.3f}")
 
-            print(f"  🔥 [SATTVIC BOOST] Step {step}: {', '.join(trigger_reason)}")
+            print(f"  🔥 [SATTVIC BOOST] Step {step}: {', '.join(trigger_reason)} (type={self.boost_trigger_type})")
             print(f"     λ increased to {self.lambda_csr:.3f}")
 
             self._record_history(step, "boost")
             return self.lambda_csr
 
-        # Check if boost should be released
+        # Check if boost should be released - with hysteresis and proper variance checking
         if self.boost_active:
-            release_threshold = self.config.entropy_floor * self.config.boost_release_ratio
-            if entropy > release_threshold:
+            self.steps_since_boost_start += 1
+
+            if self._check_release_condition(entropy, entropy_variance, step):
                 self.boost_active = False
                 self.stagnation_detected = False
                 self.mode_collapse_detected = False
-                print(f"  ✅ [SATTVIC RELEASE] Step {step}: Entropy {entropy:.3f} > {release_threshold:.3f}")
+                self.boost_trigger_type = None
+                self.steps_since_boost_start = 0
 
         # 3. SATTVIC DECAY: Knowledge-Based Release
         if knowledge >= self.config.know_threshold:
@@ -275,6 +287,41 @@ class SattvicController:
     def _can_boost(self, step: int) -> bool:
         """Check if boost is allowed (cooldown elapsed)."""
         return (step - self.last_boost_step) >= self.config.boost_cooldown
+
+    def _check_release_condition(self, current_entropy: float, current_variance: float, step: int) -> bool:
+        """
+        Check if boost should be released.
+
+        Uses hysteresis and variance-based detection to prevent 1-step cycles.
+
+        Args:
+            current_entropy: Current normalized entropy
+            current_variance: Current entropy variance
+            step: Current training step
+
+        Returns:
+            True if boost should be released, False otherwise
+        """
+        # 1. Enforce Minimum Duration (Hysteresis)
+        # Prevent immediate release - must boost for at least 50 steps
+        if self.steps_since_boost_start < 50:
+            return False  # Keep boosting!
+
+        # 2. Check if Stagnation is actually broken (Variance-based)
+        # We want variance to be healthy again, not just entropy level.
+        # Use 5x the trigger threshold to ensure variance has meaningfully increased
+        is_stagnation_broken = current_variance > (self.config.variance_threshold * 5)
+
+        # 3. Emergency Release (if Entropy gets too high/hallucination)
+        # If entropy exceeds 0.65, model is becoming too chaotic
+        is_entropy_unsafe = current_entropy > 0.65
+
+        if is_stagnation_broken or is_entropy_unsafe:
+            reason = "stagnation broken" if is_stagnation_broken else "entropy unsafe"
+            print(f"  ✅ [SATTVIC RELEASE] Step {step}: {reason} (variance={current_variance:.6f}, entropy={current_entropy:.3f}, duration={self.steps_since_boost_start})")
+            return True  # Release
+
+        return False  # Keep boosting
 
     def _record_history(self, step: int, phase: str):
         """Record state for analysis."""
@@ -418,7 +465,9 @@ class SattvicController:
             "stagnation_detected": self.stagnation_detected,
             "mode_collapse_detected": self.mode_collapse_detected,
             "boost_active": self.boost_active,
+            "boost_trigger_type": self.boost_trigger_type,
             "last_boost_step": self.last_boost_step,
+            "steps_since_boost_start": self.steps_since_boost_start,
             "entropy_history": list(self.entropy_history),
             "variance_history": self.variance_history.copy(),
         }
@@ -432,7 +481,9 @@ class SattvicController:
         self.stagnation_detected = state.get("stagnation_detected", False)
         self.mode_collapse_detected = state.get("mode_collapse_detected", False)
         self.boost_active = state.get("boost_active", False)
+        self.boost_trigger_type = state.get("boost_trigger_type", None)
         self.last_boost_step = state.get("last_boost_step", -self.config.boost_cooldown)
+        self.steps_since_boost_start = state.get("steps_since_boost_start", 0)
         # Restore entropy history
         self.entropy_history.clear()
         for ent in state.get("entropy_history", []):
