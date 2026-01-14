@@ -12288,9 +12288,14 @@ def train(config: UnifiedTrainingConfig):
         else:
             auto_max_batch = max(8, int(64 * combined_factor))
 
+        # V9.8.10: Use curriculum start length if enabled, otherwise max_seq_len
+        probe_seq_len = config.seq_len_start if config.enable_seq_curriculum else config.max_seq_len
+        if config.enable_seq_curriculum:
+            print(f"  📐 Seq Curriculum: Probing with START length {probe_seq_len} (will ramp to {config.max_seq_len})")
+
         auto_sizer = AutoBatchSizer(
             model=model,
-            seq_len=config.max_seq_len,
+            seq_len=probe_seq_len,
             vocab_size=config.vocab_size,
             target_utilization=config.auto_batch_target_utilization,
             safety_margin=config.auto_batch_safety_margin,
