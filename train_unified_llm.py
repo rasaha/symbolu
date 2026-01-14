@@ -17223,15 +17223,6 @@ def main():
                        help="Steps to ramp down PID after disengagement")
     parser.add_argument("--no_pidv2_engagement", action="store_true",
                        help="Disable dynamic PID engagement (PID behavior unchanged)")
-    # V9.9.0 CRITICAL FIX: Corrected PID engagement (inverted thresholds)
-    # PREVIOUS (WRONG): Engaged when PPL > 100 (model struggling)
-    # CORRECTED: Engage when PPL < 30 (model ready for dynamic control)
-    parser.add_argument("--controller_engage_ppl", type=float, default=30.0,
-                       help="PID turns ON when Val PPL < this (model ready for regulation)")
-    parser.add_argument("--controller_disengage_ppl", type=float, default=100.0,
-                       help="PID turns OFF when Val PPL > this (model needs fundamentals)")
-    parser.add_argument("--no_controller_engagement", action="store_true",
-                       help="Disable dynamic PID engagement (PID always on if enabled)")
     parser.add_argument("--phase_ramp_steps", type=int, default=7000,
                        help="Steps for phase LR ramp (handshake dampening)")
     parser.add_argument("--tensorboard", action="store_true", default=True,
