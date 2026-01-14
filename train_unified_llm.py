@@ -17214,6 +17214,15 @@ def main():
                        help="PPL velocity %% to trigger batch reduction")
     parser.add_argument("--pidv2_batch_stable_streak", type=int, default=5,
                        help="Consecutive stable evals before batch increase")
+    # V9.8.7: Three-phase PID engagement
+    parser.add_argument("--pidv2_engage_ppl", type=float, default=100.0,
+                       help="PID turns ON when Val PPL > this (construction phase)")
+    parser.add_argument("--pidv2_disengage_ppl", type=float, default=30.0,
+                       help="PID turns OFF when Val PPL < this (polishing phase)")
+    parser.add_argument("--pidv2_rampdown_steps", type=int, default=500,
+                       help="Steps to ramp down PID after disengagement")
+    parser.add_argument("--no_pidv2_engagement", action="store_true",
+                       help="Disable dynamic PID engagement (PID behavior unchanged)")
     # V9.9.0 CRITICAL FIX: Corrected PID engagement (inverted thresholds)
     # PREVIOUS (WRONG): Engaged when PPL > 100 (model struggling)
     # CORRECTED: Engage when PPL < 30 (model ready for dynamic control)
