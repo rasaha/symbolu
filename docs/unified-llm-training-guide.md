@@ -351,7 +351,8 @@ This evolves at fixed intervals regardless of PPL.
 | `--controller` | str | none | Controller type: `none`, `pid`, `pidv2`. PIDv2 regulates training stability and S/A ratio |
 | `--pidv2_engage_ppl` | float | 100.0 | **PPL threshold to ENGAGE PIDv2**. Controller turns ON when Val PPL **drops below** this (model competent, ready for regulation) |
 | `--pidv2_disengage_ppl` | float | 30.0 | **PPL threshold to DISENGAGE PIDv2**. Controller turns OFF when Val PPL **drops below** this (model expert, no longer needs regulation) |
-| `--pidv2_rampdown_steps` | int | 500 | Steps to gradually ramp down PID after disengagement (smooth transition) |
+| `--pidv2_rampdown_steps` | int | 500 | **Steps to ramp down PID after disengagement**. Gradually reduces PID influence over N steps (smooth transition to autonomous operation) |
+| `--no_pidv2_engagement` | flag | False | **Disable dynamic PID engagement**. When enabled, PID behavior remains unchanged regardless of PPL thresholds |
 | `--pidv2_kp_min` | float | 0.10 | Minimum proportional gain |
 | `--pidv2_kp_max` | float | 0.30 | Maximum proportional gain |
 | `--pidv2_kp_sensitivity` | float | 5.0 | Kp sensitivity to error magnitude |
@@ -359,14 +360,40 @@ This evolves at fixed intervals regardless of PPL.
 | `--pidv2_kd` | float | 0.10 | Derivative gain |
 | `--pidv2_a_min` | float | 0.40 | Minimum sensory gradient scale |
 | `--pidv2_w_s` | float | 0.30 | Sattvic weight in S/A calculation |
+| `--pidv2_batch_resize` | flag | False | **Enable PPL-driven dynamic batch sizing**. PIDv2 automatically adjusts batch size based on PPL velocity |
+| `--pidv2_batch_min` | int | 4 | Minimum batch size for dynamic resizing |
+| `--pidv2_batch_max` | int | 64 | Maximum batch size for dynamic resizing |
+| `--pidv2_batch_velocity_threshold` | float | 5.0 | PPL velocity % to trigger batch reduction (reduces batch when PPL increasing rapidly) |
+| `--pidv2_batch_stable_streak` | int | 5 | Consecutive stable evaluations before increasing batch size |
 | `--phase_ramp_steps` | int | 7000 | Steps to ramp phase attention weight |
 
 **PIDv2 Three-Phase Engagement:**
 - **Phase 1 (FOUNDATION)**: PPL > 100 → PID **OFF** - Model learns basics without interference
 - **Phase 2 (TRANSITION)**: 30 < PPL < 100 → PID **ON** - Active S/A ratio regulation, prevents instability
-- **Phase 3 (CONSTRUCTION)**: PPL < 30 → PID **OFF** (rampdown) - Model expert, self-regulating
+- **Phase 3 (CONSTRUCTION)**: PPL < 30 → PID **OFF** (gradual rampdown over `--pidv2_rampdown_steps`) - Model expert, self-regulating
 
 **Inverted Curriculum Logic**: Controllers engage at LOW PPL (competent model), not HIGH PPL (struggling model)
+
+**Disabling Dynamic Engagement**: Use `--no_pidv2_engagement` to keep PID always-on regardless of PPL. Useful for debugging or when you want consistent regulation throughout training.
+
+**Example: Custom PID Engagement Thresholds**
+```bash
+# More aggressive engagement (turn on earlier at PPL 150)
+--controller pidv2 \
+--pidv2_engage_ppl 150.0 \
+--pidv2_disengage_ppl 40.0 \
+--pidv2_rampdown_steps 1000
+
+# Conservative engagement (turn on later at PPL 80)
+--controller pidv2 \
+--pidv2_engage_ppl 80.0 \
+--pidv2_disengage_ppl 25.0 \
+--pidv2_rampdown_steps 250
+
+# Always-on PID (no dynamic engagement)
+--controller pidv2 \
+--no_pidv2_engagement
+```
 
 ### RSS (Resonance State Scheduler)
 
