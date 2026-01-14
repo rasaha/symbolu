@@ -35,13 +35,30 @@ def load_model(checkpoint_path: str):
 
     config = SimpleConfig(**config_dict)
 
+    # Debug: Print key config values
+    print(f"Config keys check:")
+    print(f"  n_embd: {getattr(config, 'n_embd', 'NOT FOUND')}")
+    print(f"  d_model: {getattr(config, 'd_model', 'NOT FOUND')}")
+    print(f"  n_layer: {getattr(config, 'n_layer', 'NOT FOUND')}")
+    print(f"  n_head: {getattr(config, 'n_head', 'NOT FOUND')}")
+
     # Map config keys (training script uses different names)
+    # Prefer n_embd over d_model
     if hasattr(config, 'n_embd') and config.n_embd is not None:
         config.d_model = config.n_embd
+    elif not hasattr(config, 'd_model') or config.d_model is None:
+        raise ValueError("Config must have either 'n_embd' or 'd_model'")
+
     if hasattr(config, 'n_layer') and config.n_layer is not None:
         config.n_layers = config.n_layer
+    elif not hasattr(config, 'n_layers') or config.n_layers is None:
+        raise ValueError("Config must have either 'n_layer' or 'n_layers'")
+
     if hasattr(config, 'n_head') and config.n_head is not None:
         config.n_heads = config.n_head
+    elif not hasattr(config, 'n_heads') or config.n_heads is None:
+        raise ValueError("Config must have either 'n_head' or 'n_heads'")
+
     if not hasattr(config, 'd_ff') or config.d_ff is None:
         config.d_ff = 4 * config.d_model  # Standard transformer ratio
 
