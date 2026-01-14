@@ -238,14 +238,14 @@ def load_model_and_config(checkpoint_path: str, device: torch.device):
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
     # Import training config and model creation
-    from train_unified_llm import UnifiedTrainingConfig, create_unified_model
+    from train_unified_llm import UnifiedTrainingConfig, create_model
 
     # Restore config
     config_dict = checkpoint.get('config', {})
     config = UnifiedTrainingConfig(**config_dict)
 
     # Create model
-    model = create_unified_model(config)
+    model = create_model(config, device)
 
     # Load weights
     model.load_state_dict(checkpoint['model'], strict=False)
