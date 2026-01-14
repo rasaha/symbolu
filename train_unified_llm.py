@@ -15192,8 +15192,9 @@ def train(config: UnifiedTrainingConfig):
                         if "level_3_coh" in metrics:
                             log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
 
-                    # Add alpha for phase/hybrid models
-                    if config.model_type in ("phase", "hybrid"):
+                    # Add alpha for phase/hybrid models (including ontological_hybrid)
+                    # V9.8.10: Check if model type contains "phase" or "hybrid"
+                    if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
 
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
