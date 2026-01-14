@@ -17965,6 +17965,13 @@ def main():
         evolution_ppl_window=args.evolution_ppl_window,
         evolution_thaw_alpha=args.evolution_thaw_alpha,
         evolution_thaw_steps=args.evolution_thaw_steps,
+        # Alpha phase and decay schedule (for phase/hybrid attention)
+        alpha_phase=args.alpha_phase,
+        alpha_phase_start=args.alpha_phase_start,
+        alpha_phase_end=args.alpha_phase_end,
+        alpha_decay_steps=args.alpha_decay_steps,
+        # Decorrelation loss (to force phase and local to learn different features)
+        decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.1 Per-Layer Phase Control
         enable_per_layer_phase=args.enable_per_layer_phase,
         per_layer_phase_weights=args.per_layer_phase_weights,
