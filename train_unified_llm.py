@@ -13250,7 +13250,9 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.4.5: Initialize Friction Controller with Corrective Actions
     friction_controller = None
-    if PIDV2_AVAILABLE and config.model_type == "hybrid" and not config.disable_friction:
+    # V9.8.10: Support both "hybrid" and "ontological_hybrid" models
+    has_hybrid_attention = "hybrid" in config.model_type
+    if PIDV2_AVAILABLE and has_hybrid_attention and not config.disable_friction:
         friction_config = FrictionControllerConfig(
             dom_high=config.friction_dom_high,
             dom_low=config.friction_dom_low,
@@ -14772,7 +14774,8 @@ def train(config: UnifiedTrainingConfig):
             friction_penalty = 1.0
             if PIDV2_AVAILABLE and global_step % 10 == 0:  # Every 10 steps to save compute
                 try:
-                    friction_alignment, friction_dominance = measure_friction(model, local_layers=6)
+                    # V9.8.10: Use config.local_layers instead of hardcoded value
+                    friction_alignment, friction_dominance = measure_friction(model, local_layers=config.local_layers)
                     # Update friction controller with corrective actions
                     if friction_controller is not None:
                         friction_penalty = friction_controller.update(friction_alignment, friction_dominance)
