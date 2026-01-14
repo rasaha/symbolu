@@ -57,7 +57,7 @@ KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
 KOSHA_SLICE = slice(12, 17)
 
 # State indices [17:22] - 5 Reliability States
-VRITTI_NAMES = ['FACT', 'ERROR', 'IMAGINATION', 'VOID', 'MEMORY']
+VRITTI_NAMES = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
 VRITTI_SLICE = slice(17, 22)
 
 # Qualia indices [22:28] - 6 System Dynamics
@@ -734,12 +734,12 @@ class VrittiGate(nn.Module):
 
     Monitors the 5 Vrittis (States) during reasoning:
     - FACT (0): Verified Truth
-    - ERROR (1): Hallucination
+    - MISCONCEPTION (1): False knowledge / Hallucination
     - IMAGINATION (2): Conceptualization
     - VOID (3): Null State
     - MEMORY (4): Recall/Weights
 
-    Can reject tokens when ERROR spikes, forcing re-reasoning.
+    Can reject tokens when MISCONCEPTION spikes, forcing re-reasoning.
     """
 
     def __init__(
@@ -756,7 +756,7 @@ class VrittiGate(nn.Module):
 
         self.thresholds = {
             'FACT': fact_min,
-            'ERROR': error_max,
+            'MISCONCEPTION': error_max,
             'IMAGINATION': imagination_max,
             'VOID': void_max,
             'MEMORY': memory_max,
@@ -778,21 +778,21 @@ class VrittiGate(nn.Module):
             should_reject: [B] boolean tensor
         """
         fact = vritti_state[:, 0]      # FACT
-        error = vritti_state[:, 1]     # ERROR
+        error = vritti_state[:, 1]     # MISCONCEPTION
         imagination = vritti_state[:, 2]  # IMAGINATION
 
         if task_type == 'factual':
-            # Reject if error spikes or valid cognition drops
-            return (error > self.thresholds['ERROR']) | \
+            # Reject if misconception spikes or valid cognition drops
+            return (error > self.thresholds['MISCONCEPTION']) | \
                    (fact < self.thresholds['FACT'])
 
         elif task_type == 'creative':
-            # Allow imagination, still reject pure error
+            # Allow imagination, still reject pure misconception
             return error > 0.7  # Higher tolerance
 
         elif task_type == 'recall':
             # Memory-heavy, allow high memory activation
-            return error > self.thresholds['ERROR']
+            return error > self.thresholds['MISCONCEPTION']
 
         return torch.zeros(vritti_state.shape[0], dtype=torch.bool,
                           device=vritti_state.device)
@@ -883,8 +883,8 @@ class UserOntologicalMirror(nn.Module):
         anchor[17] = 0.9   # FACT
         # Guna: Lucidity (Clarity/Balance)
         anchor[22] = 1.0   # LUCIDITY
-        # Low Error/Imagination/Void
-        anchor[18] = 0.1   # ERROR (low)
+        # Low Misconception/Imagination/Void
+        anchor[18] = 0.1   # MISCONCEPTION (low)
         anchor[19] = 0.2   # IMAGINATION (low for factual)
         anchor[20] = 0.1   # VOID (low)
         return anchor
@@ -945,7 +945,7 @@ class UserOntologicalMirror(nn.Module):
         # Detect distress indicators
         vital_high = koshas[:, 1] > 0.5     # VITAL (emotional reaction)
         rajas_high = gunas[:, 1] > 0.6      # ACTIVITY (panic/agitation)
-        error_high = vrittis[:, 1] > 0.5    # ERROR (confusion/hallucination)
+        error_high = vrittis[:, 1] > 0.5    # MISCONCEPTION (confusion/hallucination)
         void_high = vrittis[:, 3] > 0.4     # VOID (dissociation)
 
         # Compute aggregate scores
@@ -1033,10 +1033,10 @@ class UserOntologicalMirror(nn.Module):
             target_state = 0.6 * anchor_expanded + 0.4 * current_state
         elif user_analysis['is_confused']:
             strategy = 'CLARIFY'
-            # Boost FACT vritti, reduce ERROR
+            # Boost FACT vritti, reduce MISCONCEPTION
             target_state = current_state.clone()
             target_state[:, 17] = torch.clamp(target_state[:, 17] + 0.3, max=1.0)  # FACT
-            target_state[:, 18] = torch.clamp(target_state[:, 18] - 0.3, min=0.0)  # ERROR
+            target_state[:, 18] = torch.clamp(target_state[:, 18] - 0.3, min=0.0)  # MISCONCEPTION
         else:
             strategy = 'DIRECT_ACTION'
             target_state = current_state  # Continue as-is
@@ -1128,7 +1128,7 @@ class UOMDiagnosticsMonitor:
 
         # 2. Calculate Vritti Shift (Validity gain)
         pramana_gain = (user_post_state[17] - user_initial_state[17]).item()  # FACT
-        viparyaya_reduction = (user_initial_state[18] - user_post_state[18]).item()  # ERROR
+        viparyaya_reduction = (user_initial_state[18] - user_post_state[18]).item()  # MISCONCEPTION
         validity_gain = pramana_gain + viparyaya_reduction
 
         # 3. Teleological Effectiveness
