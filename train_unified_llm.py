@@ -12959,7 +12959,6 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.8.9: Initialize DWS window from resumed PPL if resuming
     if config.resume and best_val_loss < float('inf') and dynamic_window_scheduler is not None:
-        import math
         resumed_ppl = math.exp(best_val_loss)
         initial_window = dynamic_window_scheduler.set_initial_window_from_ppl(resumed_ppl)
         print(f"  ✓ DWS Window Initialized: {initial_window} (PPL={resumed_ppl:.1f})")
