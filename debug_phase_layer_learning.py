@@ -414,7 +414,8 @@ class PhaseEvalHarness:
         self.device = device
         self.config = config
 
-        self.seq_lengths = seq_lengths or [256, 512, 1024, 2048, 4096]
+        # Default seq_lengths - will be filtered to model's max_seq_len
+        self.seq_lengths = seq_lengths or [128, 256, 512, 1024]
         self.phase_modes = phase_modes or ["normal", "zero", "noise", "shuffle"]
         self.noise_sigmas = noise_sigmas or [0.00, 0.03, 0.10, 0.30]
         self.runs = runs
@@ -433,9 +434,31 @@ class PhaseEvalHarness:
 
         For now, uses random tokens. In production, use real validation data.
         """
-        # Simple random data for testing (replace with real validation data)
-        vocab_size = self.config.vocab_size if hasattr(self.config, 'vocab_size') else 50257
-        data = torch.randint(0, vocab_size, (num_samples, seq_len), device=self.device)
+        # Get vocab_size from model's actual embedding layer (safest)
+        if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'token_embed'):
+            vocab_size = self.model.hybrid.token_embed.num_embeddings
+        elif hasattr(self.model, 'token_embed'):
+            vocab_size = self.model.token_embed.num_embeddings
+        elif hasattr(self.config, 'vocab_size'):
+            vocab_size = self.config.vocab_size
+        else:
+            vocab_size = 50257  # GPT-2 default
+
+        # Get max_seq_len from model
+        if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'pos_embed'):
+            max_seq_len = self.model.hybrid.pos_embed.num_embeddings
+        elif hasattr(self.model, 'pos_embed'):
+            max_seq_len = self.model.pos_embed.num_embeddings
+        elif hasattr(self.config, 'max_seq_len'):
+            max_seq_len = self.config.max_seq_len
+        else:
+            max_seq_len = 2048
+
+        # Clamp seq_len to model's max
+        effective_seq_len = min(seq_len, max_seq_len - 1)  # -1 for safety with x[:,:-1]/y[:,1:]
+
+        # Generate random data with valid token indices
+        data = torch.randint(0, vocab_size, (num_samples, effective_seq_len), device=self.device)
         return data
 
     def _inject_phase_policy(self, mode: str, sigma: float):
@@ -591,6 +614,29 @@ class PhaseEvalHarness:
         print("\n" + "=" * 70)
         print("  PHASE LAYER LEARNING EVALUATION HARNESS")
         print("=" * 70)
+
+        # Detect model's max_seq_len and vocab_size
+        if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'pos_embed'):
+            max_seq_len = self.model.hybrid.pos_embed.num_embeddings
+            vocab_size = self.model.hybrid.token_embed.num_embeddings
+        elif hasattr(self.model, 'pos_embed'):
+            max_seq_len = self.model.pos_embed.num_embeddings
+            vocab_size = self.model.token_embed.num_embeddings
+        else:
+            max_seq_len = getattr(self.config, 'max_seq_len', 2048)
+            vocab_size = getattr(self.config, 'vocab_size', 50257)
+
+        print(f"\n  Model constraints:")
+        print(f"    max_seq_len: {max_seq_len}")
+        print(f"    vocab_size: {vocab_size}")
+
+        # Filter seq_lengths to model's max
+        valid_seq_lengths = [s for s in self.seq_lengths if s < max_seq_len]
+        if len(valid_seq_lengths) < len(self.seq_lengths):
+            skipped = [s for s in self.seq_lengths if s >= max_seq_len]
+            print(f"    Skipping seq_lengths >= max_seq_len: {skipped}")
+        self.seq_lengths = valid_seq_lengths
+
         print(f"\n  Configuration:")
         print(f"    Sequence lengths: {self.seq_lengths}")
         print(f"    Phase modes: {self.phase_modes}")
@@ -845,8 +891,8 @@ def add_phase_eval_args(parser: argparse.ArgumentParser):
     group.add_argument(
         "--phase_eval_lengths",
         type=str,
-        default="256,512,1024,2048,4096",
-        help="Comma-separated sequence lengths for evaluation"
+        default="128,256,512,1024",
+        help="Comma-separated sequence lengths for evaluation (will be clamped to model's max_seq_len)"
     )
     group.add_argument(
         "--phase_eval_runs",
