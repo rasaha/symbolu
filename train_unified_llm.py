@@ -9007,6 +9007,7 @@ class UnifiedTrainingConfig:
     sync_lr: float = 0.1
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
+    learned_decay: bool = False  # V9.9.7: Per-head learned decay (Mamba/S4-style)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -10184,9 +10185,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
             decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
+            learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
+        if config.learned_decay:
+            print(f"  Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -10255,6 +10259,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,
             decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10265,6 +10270,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
         print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     else:
@@ -16987,6 +16994,11 @@ def main():
                        help="State decay factor for phase attention (1.0=infinite memory, "
                             "<1.0=local focus like Mamba/RWKV). "
                             "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
+    # V9.9.7: Learned per-head decay (Mamba/S4-style)
+    parser.add_argument("--learned_decay", action="store_true",
+                       help="Enable per-head learned decay (Mamba/S4-style). "
+                            "Each attention head learns its own decay rate [0.5, 1.0] via gradient descent. "
+                            "Adds 1 learnable parameter per head. Allows model to learn optimal attention span.")
 
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
@@ -17901,6 +17913,7 @@ def main():
         window_size=args.window_size,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
+        learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,

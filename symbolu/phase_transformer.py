@@ -393,6 +393,7 @@ class PhaseAttentionLayer(nn.Module):
         aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -413,6 +414,25 @@ class PhaseAttentionLayer(nn.Module):
         assert 0.0 < decay_gamma <= 1.0, \
             f"decay_gamma must be in (0, 1], got {decay_gamma}"
         self.decay_gamma = decay_gamma
+
+        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        # Each head learns its own attention span via sigmoid-constrained decay
+        # Range: [0.5, 1.0] to ensure numerical stability
+        # - Low decay (~0.5): Focus on last ~2 tokens
+        # - High decay (~0.99): Remember ~100 tokens
+        self.learned_decay = learned_decay
+        # Initialize decay_logit so sigmoid gives decay_gamma as default
+        # sigmoid(x) = decay_gamma => x = log(decay_gamma / (1 - decay_gamma))
+        # But we use 0.5 + 0.5*sigmoid for range [0.5, 1.0]
+        # So: 0.5 + 0.5*sigmoid(x) = decay_gamma => sigmoid(x) = 2*decay_gamma - 1
+        # For decay_gamma=1.0, we want sigmoid(x)=1, so x=large (use 5.0)
+        if decay_gamma >= 0.99:
+            init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
+        else:
+            target_sigmoid = 2.0 * decay_gamma - 1.0
+            target_sigmoid = max(0.01, min(0.99, target_sigmoid))  # Clamp for stability
+            init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
+        self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -577,7 +597,10 @@ class PhaseAttentionLayer(nn.Module):
 
         # O(n) Causal aggregation with optional decay
         # V9.6.13: State decay for memory horizon control
-        if self.decay_gamma == 1.0:
+        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        use_decay = self.learned_decay or self.decay_gamma < 1.0
+
+        if not use_decay:
             # Original: infinite memory via cumsum
             global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
         else:
@@ -587,7 +610,16 @@ class PhaseAttentionLayer(nn.Module):
             global_state = torch.zeros_like(kv_complex)
             state = torch.zeros(B_size, 1, H_size, D_size,
                               dtype=kv_complex.dtype, device=kv_complex.device)
-            gamma = self.decay_gamma
+
+            # V9.9.7: Per-head learned decay or fixed decay
+            if self.learned_decay:
+                # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
+                # Higher values = longer memory, lower = focus on recent
+                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                gamma = gamma.view(1, 1, H_size, 1).to(kv_complex.dtype)  # [1, 1, H, 1]
+            else:
+                gamma = self.decay_gamma  # Scalar
+
             for t in range(N_size):
                 state = gamma * state + kv_complex[:, t:t+1, :, :]
                 global_state[:, t:t+1, :, :] = state
@@ -598,7 +630,8 @@ class PhaseAttentionLayer(nn.Module):
         # V9.6.11: Use amplitude-based normalization (always positive)
         # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
         # V9.6.13: Apply same decay to normalizer for consistency
-        if self.decay_gamma == 1.0:
+        # V9.9.7: Use same per-head learned decay as state accumulation
+        if not use_decay:
             a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
             # Stable decay accumulation for normalizer
@@ -606,9 +639,14 @@ class PhaseAttentionLayer(nn.Module):
             a_k_cumsum = torch.zeros_like(a_k)
             state_ak = torch.zeros(B_size, 1, H_size, D_size,
                                    dtype=a_k.dtype, device=a_k.device)
-            gamma = self.decay_gamma
+            # Reuse gamma from above (already computed for learned_decay case)
+            if self.learned_decay:
+                gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                gamma_norm = gamma_norm.view(1, 1, H_size, 1).to(a_k.dtype)  # [1, 1, H, 1]
+            else:
+                gamma_norm = self.decay_gamma
             for t in range(N_size):
-                state_ak = gamma * state_ak + a_k[:, t:t+1, :, :]
+                state_ak = gamma_norm * state_ak + a_k[:, t:t+1, :, :]
                 a_k_cumsum[:, t:t+1, :, :] = state_ak
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
@@ -1675,6 +1713,7 @@ class HybridAttentionLayer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -1707,6 +1746,7 @@ class HybridAttentionLayer(nn.Module):
             aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
             cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
             decay_gamma=decay_gamma,  # V9.6.13: State decay factor
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1876,6 +1916,7 @@ class HybridTransformerBlock(nn.Module):
         alpha_phase: float = 0.2,
         n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -1894,6 +1935,7 @@ class HybridTransformerBlock(nn.Module):
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
             layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -2318,6 +2360,7 @@ class HybridPhaseTransformer(nn.Module):
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
 
@@ -2340,6 +2383,7 @@ class HybridPhaseTransformer(nn.Module):
         self.local_backend = local_backend
         self.tie_embeddings = tie_embeddings
         self.n_kv_heads = n_kv_heads  # Store for reference
+        self.learned_decay = learned_decay  # V9.9.7: Per-head learned decay
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -2366,6 +2410,7 @@ class HybridPhaseTransformer(nn.Module):
                     alpha_phase=alpha_phase,
                     n_kv_heads=n_kv_heads,  # GQA support
                     layer_idx=i,  # V9.9.1: Layer index for per-layer control
+                    learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
                 ))
 
         # Output
@@ -2671,6 +2716,7 @@ class OntologicalHybridTransformer(nn.Module):
         tie_embeddings: bool = True,
         cosine_mode: str = "standard",
         decay_gamma: float = 1.0,
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay
     ):
         super().__init__()
 
@@ -2692,6 +2738,7 @@ class OntologicalHybridTransformer(nn.Module):
             tie_embeddings=tie_embeddings,
             cosine_mode=cosine_mode,
             decay_gamma=decay_gamma,
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
