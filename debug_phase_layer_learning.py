@@ -20,8 +20,14 @@ Reference: ChatGPT's Phase Layer Learning Verification Protocol
 
 Usage:
 ------
-    # Run full evaluation harness
-    python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt
+    # Quick gradient flow check (RECOMMENDED FIRST)
+    python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --check_gradients
+
+    # Full evaluation harness
+    python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --run_full_harness
+
+    # Both gradient check + full harness
+    python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --check_gradients --run_full_harness
 
     # Run specific ablation test
     python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --phase_eval_mode zero
@@ -29,9 +35,6 @@ Usage:
     # Run noise sweep
     python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --phase_eval_mode noise \
         --phase_noise_sigmas 0.00,0.03,0.10,0.30
-
-    # Full matrix evaluation
-    python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --run_full_harness
 
 Author: SymbolU Team (based on ChatGPT's Phase Verification Protocol)
 Date: January 2026
@@ -383,6 +386,182 @@ class PhaseGradientMonitor:
             print(f"    WARNING: Phase gradients are ZERO - check wiring!")
         elif stats['phase_grad_ratio'] > 0.5:
             print(f"    WARNING: Phase gradients dominating - may overpower quadratic")
+
+
+def run_gradient_check(
+    model: nn.Module,
+    config: Any,
+    device: torch.device,
+    num_steps: int = 5,
+    seq_len: int = 128,
+    batch_size: int = 4,
+) -> Dict[str, Any]:
+    """
+    Run a quick gradient flow check with synthetic training steps.
+
+    This performs actual backward passes to verify gradients flow through phase layers.
+
+    Args:
+        model: The model to check
+        config: Model config
+        device: Torch device
+        num_steps: Number of training steps to run
+        seq_len: Sequence length for synthetic data
+        batch_size: Batch size
+
+    Returns:
+        Dict with gradient statistics per step
+    """
+    print("\n" + "=" * 70)
+    print("  PHASE GRADIENT FLOW CHECK")
+    print("=" * 70)
+
+    # Get vocab_size from model
+    if hasattr(model, 'embed'):
+        vocab_size = model.embed.num_embeddings
+    elif hasattr(model, 'token_embed'):
+        vocab_size = model.token_embed.num_embeddings
+    elif hasattr(model, 'hybrid') and hasattr(model.hybrid, 'token_embed'):
+        vocab_size = model.hybrid.token_embed.num_embeddings
+    else:
+        vocab_size = getattr(config, 'vocab_size', 50257)
+
+    print(f"\n  Configuration:")
+    print(f"    num_steps: {num_steps}")
+    print(f"    seq_len: {seq_len}")
+    print(f"    batch_size: {batch_size}")
+    print(f"    vocab_size: {vocab_size}")
+
+    # Initialize gradient monitor
+    monitor = PhaseGradientMonitor(model)
+
+    # Put model in training mode
+    model.train()
+
+    # Create dummy optimizer (we won't actually step, just check gradients)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+
+    results = []
+
+    print(f"\n  Running {num_steps} gradient check steps...")
+    print(f"  {'Step':<6} {'Loss':<12} {'Phase Grad':<14} {'Total Grad':<14} {'Ratio':<10} {'Status'}")
+    print(f"  {'-'*70}")
+
+    for step in range(num_steps):
+        # Generate random batch
+        x = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+        y = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+
+        # Zero gradients
+        optimizer.zero_grad()
+
+        try:
+            # Forward pass
+            outputs = model(x[:, :-1])
+
+            if isinstance(outputs, dict):
+                logits = outputs.get('logits', outputs.get('output'))
+            else:
+                logits = outputs
+
+            if logits is None:
+                print(f"  {step:<6} {'N/A':<12} {'ERROR: No logits in output'}")
+                continue
+
+            # Compute loss
+            loss = F.cross_entropy(
+                logits.reshape(-1, logits.size(-1)),
+                y[:, 1:].reshape(-1),
+            )
+
+            # Backward pass
+            loss.backward()
+
+            # Compute gradient stats
+            stats = monitor.compute_gradient_stats()
+            stats['loss'] = loss.item()
+            results.append(stats)
+
+            # Determine status
+            if stats['phase_grad_norm'] == 0:
+                status = "❌ ZERO"
+            elif stats['phase_grad_ratio'] < 0.001:
+                status = "⚠️  TINY"
+            elif stats['phase_grad_ratio'] > 0.5:
+                status = "⚠️  HUGE"
+            else:
+                status = "✅ OK"
+
+            print(f"  {step:<6} {loss.item():<12.4f} {stats['phase_grad_norm']:<14.6f} "
+                  f"{stats['total_grad_norm']:<14.6f} {stats['phase_grad_ratio']:<10.4f} {status}")
+
+        except Exception as e:
+            print(f"  {step:<6} ERROR: {e}")
+            continue
+
+    # Summary
+    print(f"\n  " + "-" * 70)
+
+    if results:
+        avg_ratio = sum(r['phase_grad_ratio'] for r in results) / len(results)
+        avg_phase = sum(r['phase_grad_norm'] for r in results) / len(results)
+        zero_count = sum(1 for r in results if r['phase_grad_norm'] == 0)
+
+        print(f"\n  Summary:")
+        print(f"    Average phase_grad_ratio: {avg_ratio:.6f}")
+        print(f"    Average phase_grad_norm: {avg_phase:.6f}")
+        print(f"    Steps with zero phase grad: {zero_count}/{len(results)}")
+
+        # Verdict
+        print(f"\n  Gradient Flow Verdict:")
+        if zero_count == len(results):
+            print(f"    ❌ CRITICAL: Phase gradients are ALWAYS ZERO")
+            print(f"       → Phase layers are not connected to the loss")
+            print(f"       → Check: Is intent_phase being used? Is phase_attn in forward path?")
+        elif zero_count > 0:
+            print(f"    ⚠️  WARNING: Phase gradients are sometimes zero ({zero_count}/{len(results)} steps)")
+        elif avg_ratio < 0.001:
+            print(f"    ⚠️  WARNING: Phase gradients are very small (ratio={avg_ratio:.6f})")
+            print(f"       → Phase contribution may be suppressed")
+            print(f"       → Check: alpha_phase value, aux_scale, dampening")
+        elif avg_ratio > 0.3:
+            print(f"    ⚠️  WARNING: Phase gradients are large (ratio={avg_ratio:.4f})")
+            print(f"       → Phase may be dominating local attention")
+        else:
+            print(f"    ✅ PASS: Phase gradients are flowing (ratio={avg_ratio:.4f})")
+
+        # Per-layer breakdown
+        print(f"\n  Phase Parameter Gradient Breakdown:")
+        phase_grads = {}
+        for name, param in model.named_parameters():
+            if name in monitor.phase_param_names and param.grad is not None:
+                grad_norm = param.grad.norm().item()
+                # Group by layer
+                parts = name.split('.')
+                layer_name = '.'.join(parts[:3]) if len(parts) > 3 else name
+                if layer_name not in phase_grads:
+                    phase_grads[layer_name] = []
+                phase_grads[layer_name].append((name, grad_norm))
+
+        for layer, params in sorted(phase_grads.items())[:10]:  # Show top 10
+            total = sum(g for _, g in params)
+            print(f"    {layer}: {total:.6f} ({len(params)} params)")
+
+    else:
+        print(f"    ❌ No successful gradient computations")
+
+    # Restore eval mode
+    model.eval()
+
+    print("\n" + "=" * 70)
+
+    return {
+        'steps': results,
+        'summary': {
+            'avg_ratio': avg_ratio if results else 0,
+            'zero_count': zero_count if results else num_steps,
+        }
+    }
 
 
 # =============================================================================
@@ -918,6 +1097,17 @@ def add_phase_eval_args(parser: argparse.ArgumentParser):
         action="store_true",
         help="Run complete phase evaluation harness"
     )
+    group.add_argument(
+        "--check_gradients",
+        action="store_true",
+        help="Run gradient flow check (quick training step test)"
+    )
+    group.add_argument(
+        "--gradient_steps",
+        type=int,
+        default=5,
+        help="Number of steps for gradient check"
+    )
 
 
 # =============================================================================
@@ -986,6 +1176,28 @@ def main():
     # Parse sequence lengths and sigmas
     seq_lengths = [int(x.strip()) for x in args.phase_eval_lengths.split(',')]
     noise_sigmas = [float(x.strip()) for x in args.phase_noise_sigmas.split(',')]
+
+    # Run gradient check if requested
+    if args.check_gradients:
+        grad_results = run_gradient_check(
+            model=model,
+            config=config,
+            device=device,
+            num_steps=args.gradient_steps,
+            seq_len=min(seq_lengths),
+            batch_size=args.batch_size,
+        )
+
+        if args.output:
+            output_path = args.output.replace('.json', '_gradients.json')
+            with open(output_path, 'w') as f:
+                json.dump(grad_results, f, indent=2)
+            print(f"\n  Gradient results saved to: {output_path}")
+
+        # If only checking gradients, exit
+        if not args.run_full_harness:
+            print("\n  Gradient check complete.")
+            return
 
     # Run evaluation
     if args.run_full_harness:
