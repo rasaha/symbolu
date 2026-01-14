@@ -860,6 +860,7 @@ if ilc_result['completed_transitions']:
 | 1.6.0 | 2026-01-13 | V9.9.3: Added Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations) |
 | 1.7.0 | 2026-01-14 | V9.9.4: Added PPL Stability Check (ChatGPT's "Readiness Index") |
 | 1.8.0 | 2026-01-14 | V9.9.4: Upgraded to composite ReadinessIndex (velocity + acceleration + geometry) |
+| 1.9.0 | 2026-01-14 | V9.9.4: Added persistence guard (N consecutive stable windows required) |
 
 ---
 
@@ -943,6 +944,63 @@ ChatGPT's explanation:
 > "A student can score well on arithmetic (low PPL) but still not be ready for algebra. If you push abstraction too early, they hesitate and stutter."
 
 The stability check ensures the model is not just passing the test, but is **stable at that level** before advancing.
+
+### 10.6 Persistence Guard: N Consecutive Windows
+
+**ChatGPT's Safety Guard:**
+> "Guard against 'false calm.' Geometry must be stable for N consecutive windows, not just one."
+
+**The Problem:** Phase can appear stable briefly during representation re-binding, especially around inverted-curriculum midpoints. A single stable reading doesn't mean the model has truly settled.
+
+**The Solution:** Track consecutive stable windows. Only advance when stability persists:
+
+```python
+class ReadinessIndex:
+    def __init__(self, ..., required_consecutive_stable: int = 3):
+        self.consecutive_stable_count: int = 0
+        self.required_consecutive_stable = required_consecutive_stable
+
+    def is_ready(self, require_geometry: bool = True) -> Tuple[bool, Dict]:
+        # Check all conditions
+        window_stable = velocity_ok and accel_ok and geometry_ok
+
+        # Track consecutive stability
+        if window_stable:
+            self.consecutive_stable_count += 1
+        else:
+            self.consecutive_stable_count = 0  # Reset on any failure
+
+        # True readiness requires N consecutive stable windows
+        is_ready = self.consecutive_stable_count >= self.required_consecutive_stable
+
+        diagnostics['consecutive_stable'] = self.consecutive_stable_count
+        diagnostics['reason'] = f"stabilizing_{count}/{required}" if window_stable and not is_ready
+```
+
+**Logged Output:**
+
+When stabilizing (building up consecutive count):
+```
+  ⏳ [INVERTED CURRICULUM] Stage 3 pending: PPL 110.2 < 120 but stabilizing_2/3
+      Δppl: -1.20, ΔΔppl: +0.50, stability: 2/3
+```
+
+When persistence requirement met:
+```
+  🎓 [INVERTED CURRICULUM] Stage 3 reached! (Δppl: -0.80, ΔΔppl: +0.30, consec: 3)
+      PPL 108.50 < 120
+      Split: 5:7 → 6:6
+      Readiness: settled (geometry checked)
+```
+
+**Why This Matters:**
+
+The persistence guard prevents:
+- Premature advancement during brief "false calm" periods
+- Stage jumps during representation re-binding oscillations
+- Momentum from previous stages causing unstable transitions
+
+After a successful transition, `reset_persistence()` is called to start fresh stability tracking for the new stage.
 
 ---
 

@@ -6732,6 +6732,7 @@ class ReadinessIndex:
         state_delta_threshold: float = 0.5,       # Max state-delta magnitude for stable
         history_window: int = 10,                 # Steps to track
         require_geometry_check: bool = True,      # Gate with internal metrics
+        required_consecutive_stable: int = 3,     # N consecutive windows for persistence
     ):
         """
         Initialize ReadinessIndex.
@@ -6743,6 +6744,8 @@ class ReadinessIndex:
             state_delta_threshold: Maximum state-delta norm for stable geometry
             history_window: Number of steps to track in history
             require_geometry_check: If True, also check internal geometry metrics
+            required_consecutive_stable: Number of consecutive windows that must
+                pass all checks before declaring truly ready (persistence guard)
         """
         self.ppl_velocity_threshold = ppl_velocity_threshold
         self.ppl_accel_threshold = ppl_accel_threshold
@@ -6750,11 +6753,18 @@ class ReadinessIndex:
         self.state_delta_threshold = state_delta_threshold
         self.history_window = history_window
         self.require_geometry_check = require_geometry_check
+        self.required_consecutive_stable = required_consecutive_stable
 
         # History tracking
         self.ppl_history: List[float] = []
         self.phase_coherence_history: List[float] = []
         self.state_delta_history: List[float] = []
+
+        # V9.9.4 Persistence Guard: Track consecutive stable windows
+        # "Geometry must be stable for N consecutive windows, not just one"
+        # This prevents premature advancement during "false calm" when phase
+        # appears stable briefly during representation re-binding.
+        self.consecutive_stable_count: int = 0
 
     def update(
         self,
@@ -6867,13 +6877,31 @@ class ReadinessIndex:
 
         diagnostics['checks']['geometry'] = geometry_ok
 
-        # All checks must pass
-        is_ready = velocity_ok and accel_ok and geometry_ok
+        # All individual checks pass this window?
+        window_stable = velocity_ok and accel_ok and geometry_ok
+
+        # V9.9.4 Persistence Guard: Track consecutive stable windows
+        # "Geometry must be stable for N consecutive windows, not just one"
+        # This prevents premature advancement during "false calm" when phase
+        # appears stable briefly during representation re-binding.
+        if window_stable:
+            self.consecutive_stable_count += 1
+        else:
+            self.consecutive_stable_count = 0
+
+        # True readiness requires N consecutive stable windows
+        is_ready = self.consecutive_stable_count >= self.required_consecutive_stable
+
+        diagnostics['consecutive_stable'] = self.consecutive_stable_count
+        diagnostics['required_consecutive'] = self.required_consecutive_stable
+        diagnostics['window_stable'] = window_stable
         diagnostics['ready'] = is_ready
 
         # Generate reason string
         if is_ready:
             diagnostics['reason'] = "settled"
+        elif window_stable and self.consecutive_stable_count < self.required_consecutive_stable:
+            diagnostics['reason'] = f"stabilizing_{self.consecutive_stable_count}/{self.required_consecutive_stable}"
         elif not velocity_ok:
             if velocity > 0:
                 diagnostics['reason'] = "ppl_rising"
@@ -6892,7 +6920,7 @@ class ReadinessIndex:
         """
         Get a 0-1 readiness score (useful for logging/visualization).
 
-        Higher = more ready to advance.
+        Higher = more ready to advance. Includes persistence progress.
         """
         velocity = abs(self.compute_ppl_velocity())
         accel = abs(self.compute_ppl_acceleration())
@@ -6901,8 +6929,26 @@ class ReadinessIndex:
         velocity_score = max(0, 1 - velocity / (self.ppl_velocity_threshold * 3))
         accel_score = max(0, 1 - accel / (self.ppl_accel_threshold * 3))
 
-        # Weight: velocity matters more than acceleration
-        return 0.6 * velocity_score + 0.4 * accel_score
+        # Persistence progress: how close are we to required consecutive stable?
+        persistence_score = min(1.0, self.consecutive_stable_count / max(1, self.required_consecutive_stable))
+
+        # Weight: velocity + acceleration determine metric stability,
+        # persistence determines temporal stability
+        metric_score = 0.6 * velocity_score + 0.4 * accel_score
+        return 0.7 * metric_score + 0.3 * persistence_score
+
+    def reset_persistence(self):
+        """
+        Reset the consecutive stability counter.
+
+        Call this after a curriculum transition to start fresh with
+        stability tracking for the new stage.
+        """
+        self.consecutive_stable_count = 0
+
+    def get_persistence_progress(self) -> Tuple[int, int]:
+        """Get (current_consecutive, required_consecutive) for logging."""
+        return self.consecutive_stable_count, self.required_consecutive_stable
 
 
 # =============================================================================
@@ -10742,6 +10788,10 @@ class InvertedLayerCurriculumController:
                         split_changed = True
                         self._transition_to_split(new_split, step)
 
+                    # V9.9.4: Reset persistence counter for next stage
+                    # "Start fresh with stability tracking for the new stage"
+                    self.readiness_index.reset_persistence()
+
                     # Record history with full diagnostics
                     self.stage_history.append({
                         'stage': self.current_stage_idx,
@@ -10749,6 +10799,7 @@ class InvertedLayerCurriculumController:
                         'ppl': smoothed_ppl,
                         'velocity': diagnostics['ppl_velocity'],
                         'acceleration': diagnostics['ppl_acceleration'],
+                        'consecutive_stable': diagnostics.get('consecutive_stable', 0),
                         'reason': diagnostics['reason'],
                         'split': new_split,
                     })
@@ -10757,7 +10808,8 @@ class InvertedLayerCurriculumController:
                     # Log with velocity/acceleration info
                     vel = diagnostics['ppl_velocity']
                     acc = diagnostics['ppl_acceleration']
-                    stability_note = f" (Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f})"
+                    consec = diagnostics.get('consecutive_stable', 0)
+                    stability_note = f" (Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f}, consec: {consec})"
                     print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!{stability_note}")
                     print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
                     print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
@@ -10769,9 +10821,11 @@ class InvertedLayerCurriculumController:
                     if step % 500 == 0:
                         vel = diagnostics['ppl_velocity']
                         acc = diagnostics['ppl_acceleration']
+                        consec = diagnostics.get('consecutive_stable', 0)
+                        req_consec = diagnostics.get('required_consecutive', 3)
                         print(f"  ⏳ [INVERTED CURRICULUM] Stage {next_stage_idx} pending: "
                               f"PPL {smoothed_ppl:.1f} < {next_trigger:.0f} but {diagnostics['reason']}")
-                        print(f"      Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f}")
+                        print(f"      Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f}, stability: {consec}/{req_consec}")
 
         # Update per-layer phase controller (for soft transitions)
         phase_result = self.phase_controller.update(step)
