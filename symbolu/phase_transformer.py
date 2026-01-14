@@ -1716,7 +1716,8 @@ class HybridAttentionLayer(nn.Module):
         x: torch.Tensor,
         causal_mask: bool = True,
         intent_phase: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+        return_decorr_loss: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Weighted hybrid forward: Blend local and phase attention outputs.
 
@@ -1732,6 +1733,11 @@ class HybridAttentionLayer(nn.Module):
             causal_mask: Apply causal masking
             intent_phase: Optional phase rotation from Ontological State Delta.
                          Only affects Phase attention (Local is unchanged).
+            return_decorr_loss: If True, return (output, decorr_loss) tuple
+
+        Returns:
+            output: [B, N, D] blended attention output
+            decorr_loss: (optional) Decorrelation loss to penalize feature redundancy
         """
         residual = x
 
@@ -1752,6 +1758,22 @@ class HybridAttentionLayer(nn.Module):
         w_phase = torch.abs(self.alpha_phase) / alpha_sum
 
         output = w_local * x_local + w_phase * x_phase
+
+        if return_decorr_loss:
+            # Decorrelation loss: Penalize high cosine similarity between phase and local
+            # We want phase and local to learn different features (orthogonal outputs)
+            # Flatten spatial dimensions but keep batch dimension
+            x_local_flat = x_local.flatten(1)  # [B, N*D]
+            x_phase_flat = x_phase.flatten(1)  # [B, N*D]
+
+            # Cosine similarity per batch element, then average
+            # High similarity (close to 1.0) means redundant features
+            # We use squared similarity so both +1 (aligned) and -1 (opposite) are penalized
+            # Only orthogonal vectors (similarity=0) minimize this loss
+            cos_sim = F.cosine_similarity(x_local_flat, x_phase_flat, dim=1, eps=1e-8)
+            decorr_loss = (cos_sim ** 2).mean()  # Smoother gradients than abs()
+
+            return output, decorr_loss
 
         return output
 
@@ -1798,10 +1820,18 @@ class HybridTransformerBlock(nn.Module):
         x: torch.Tensor,
         causal_mask: bool = True,
         intent_phase: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        x = self.attention(x, causal_mask, intent_phase=intent_phase)
-        x = self.ff(x)
-        return x
+        return_decorr_loss: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        if return_decorr_loss:
+            attn_out, decorr_loss = self.attention(
+                x, causal_mask, intent_phase=intent_phase, return_decorr_loss=True
+            )
+            x = self.ff(attn_out)
+            return x, decorr_loss
+        else:
+            x = self.attention(x, causal_mask, intent_phase=intent_phase)
+            x = self.ff(x)
+            return x
 
 
 class LocalTransformerBlock(nn.Module):
@@ -2362,6 +2392,7 @@ class HybridPhaseTransformer(nn.Module):
         extract_layers: Optional[List[int]] = None,
         return_last_hidden: bool = False,
         intent_phase: Optional[torch.Tensor] = None,
+        return_decorr_loss: bool = False,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass with efficient layer extraction.
@@ -2406,12 +2437,18 @@ class HybridPhaseTransformer(nn.Module):
 
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
+        decorr_losses = [] if return_decorr_loss else None
+
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
             is_hybrid_block = i >= self.local_layers
             block_intent = intent_phase if is_hybrid_block else None
 
-            if self.gradient_checkpointing and self.training:
+            # Decorrelation loss incompatible with gradient checkpointing
+            # (checkpoint can't handle tuple returns cleanly)
+            use_checkpoint = self.gradient_checkpointing and self.training and not return_decorr_loss
+
+            if use_checkpoint:
                 if is_hybrid_block and intent_phase is not None:
                     x = checkpoint(
                         block,
@@ -2428,8 +2465,15 @@ class HybridPhaseTransformer(nn.Module):
                         use_reentrant=False,
                     )
             else:
+                # Normal forward pass (potentially with decorr_loss)
                 if is_hybrid_block:
-                    x = block(x, causal_mask=True, intent_phase=block_intent)
+                    if return_decorr_loss:
+                        x, decorr_loss = block(
+                            x, causal_mask=True, intent_phase=block_intent, return_decorr_loss=True
+                        )
+                        decorr_losses.append(decorr_loss)
+                    else:
+                        x = block(x, causal_mask=True, intent_phase=block_intent)
                 else:
                     x = block(x, causal_mask=True)
 
@@ -2449,6 +2493,10 @@ class HybridPhaseTransformer(nn.Module):
 
         if return_last_hidden:
             result['last_hidden_state'] = x
+
+        if return_decorr_loss and decorr_losses:
+            # Average decorrelation loss across all hybrid layers
+            result['decorr_loss'] = torch.stack(decorr_losses).mean()
 
         return result
 
@@ -2674,6 +2722,7 @@ class OntologicalHybridTransformer(nn.Module):
         return_last_hidden: bool = False,
         reset_state: bool = False,
         external_delta_S: Optional[torch.Tensor] = None,
+        return_decorr_loss: bool = False,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass with Ontological → Hybrid integration.
@@ -2721,6 +2770,7 @@ class OntologicalHybridTransformer(nn.Module):
             extract_layers=extract_layers,
             return_last_hidden=return_last_hidden,
             intent_phase=intent_phase,
+            return_decorr_loss=return_decorr_loss,
         )
 
         # Add ontological outputs

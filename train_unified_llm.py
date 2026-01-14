@@ -9018,6 +9018,9 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # Decorrelation loss (to force phase and local to learn different features)
+    decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
+
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
     per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
@@ -13750,12 +13753,26 @@ def train(config: UnifiedTrainingConfig):
                 }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
-                outputs = model(x)  # Use 'outputs' consistently for hidden_state_extractor
+                # Enable decorrelation loss for hybrid/ontological_hybrid models
+                enable_decorr = (
+                    hasattr(config, 'decorr_loss_weight') and
+                    config.decorr_loss_weight > 0 and
+                    config.model_type in ('hybrid', 'ontological_hybrid')
+                )
+                outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
+
                 if isinstance(outputs, dict):
                     logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
                 else:
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Add decorrelation loss if enabled
+                if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
+                    decorr_loss = outputs['decorr_loss']
+                    loss = loss + config.decorr_loss_weight * decorr_loss
+                    metrics['decorr_loss'] = decorr_loss.item()
+                    metrics['decorr_weight'] = config.decorr_loss_weight
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
@@ -15169,6 +15186,10 @@ def train(config: UnifiedTrainingConfig):
                         f"LR: {lr:.2e} | "
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
+
+                    # Add decorr_loss if enabled
+                    if 'decorr_loss' in metrics:
+                        log_msg += f" | Decorr: {metrics['decorr_loss']:.4f}"
 
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
@@ -16876,6 +16897,10 @@ def main():
                        help="Final alpha_phase value after decay")
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
+
+    # Decorrelation loss (to force phase and local to learn different features)
+    parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
+                       help="Weight for decorrelation loss (0=disabled, 0.1=recommended)")
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
