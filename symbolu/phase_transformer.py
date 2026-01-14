@@ -206,6 +206,130 @@ def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
 
 
 # =============================================================================
+# V9.9.8: PARALLEL EMA SCAN - Optimized Exponential Moving Average
+# =============================================================================
+# Problem: Sequential for-loops for S_t = γ * S_{t-1} + x_t are slow in Python.
+# Solution: Chunked vectorization reduces N iterations to N/chunk_size iterations.
+#
+# For sequence length 2048 and chunk_size=64, this is 32x fewer loop iterations.
+
+def parallel_ema_scan(
+    x: torch.Tensor,
+    gamma: Union[float, torch.Tensor],
+    chunk_size: int = 64
+) -> torch.Tensor:
+    """
+    Compute exponential moving average efficiently using chunked vectorization.
+
+    Computes S_t = γ * S_{t-1} + x_t for all t in O(N/chunk_size) loop iterations
+    instead of O(N), with vectorized operations within each chunk.
+
+    Args:
+        x: Input tensor of shape [B, N, H, D] or [B, N, H, D] complex
+        gamma: Decay factor, either scalar or [H] tensor for per-head decay
+        chunk_size: Number of tokens to process per iteration (default 64)
+
+    Returns:
+        S: Output tensor of same shape as x with S_t = γ * S_{t-1} + x_t
+    """
+    B, N, H, D = x.shape
+    device = x.device
+    dtype = x.dtype
+
+    # Handle scalar vs per-head gamma
+    if isinstance(gamma, (int, float)):
+        gamma_is_scalar = True
+        gamma_val = float(gamma)
+    else:
+        gamma_is_scalar = False
+        # gamma is [H] shaped, ensure it's on correct device
+        gamma = gamma.to(device=device)
+
+    # Precompute powers of gamma for intra-chunk accumulation
+    # powers[i] = γ^i for i in 0..chunk_size-1
+    arange = torch.arange(chunk_size, device=device, dtype=torch.float32)
+
+    if gamma_is_scalar:
+        # powers shape: [chunk_size]
+        powers = torch.pow(gamma_val, arange)
+        # reverse powers for convolution-style accumulation
+        rev_powers = torch.pow(gamma_val, torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32))
+    else:
+        # gamma shape: [H], powers shape: [chunk_size, H]
+        powers = gamma.unsqueeze(0).float() ** arange.unsqueeze(1)  # [chunk_size, H]
+        rev_powers = gamma.unsqueeze(0).float() ** torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32).unsqueeze(1)
+
+    # Output buffer
+    S = torch.zeros_like(x)
+
+    # Running state between chunks
+    state = torch.zeros(B, 1, H, D, dtype=dtype, device=device)
+
+    # Process in chunks
+    num_chunks = (N + chunk_size - 1) // chunk_size
+
+    for c in range(num_chunks):
+        start_idx = c * chunk_size
+        end_idx = min(start_idx + chunk_size, N)
+        actual_chunk_size = end_idx - start_idx
+
+        # Extract chunk
+        x_chunk = x[:, start_idx:end_idx, :, :]  # [B, chunk, H, D]
+
+        if actual_chunk_size < chunk_size:
+            # Last chunk may be smaller, use simpler approach
+            for t in range(actual_chunk_size):
+                if gamma_is_scalar:
+                    state = gamma_val * state + x_chunk[:, t:t+1, :, :]
+                else:
+                    gamma_broadcast = gamma.view(1, 1, H, 1).to(dtype)
+                    state = gamma_broadcast * state + x_chunk[:, t:t+1, :, :]
+                S[:, start_idx + t:start_idx + t + 1, :, :] = state
+        else:
+            # Full chunk: use vectorized accumulation
+            # For S_t = γ * S_{t-1} + x_t, within a chunk starting from state S_prev:
+            # S[0] = γ * S_prev + x[0]
+            # S[1] = γ^2 * S_prev + γ * x[0] + x[1]
+            # S[i] = γ^(i+1) * S_prev + Σ_{j=0}^{i} γ^(i-j) * x[j]
+
+            # Contribution from previous state
+            if gamma_is_scalar:
+                # state_contrib[i] = γ^(i+1) * S_prev, shape: [B, chunk, H, D]
+                state_powers = torch.pow(gamma_val, arange[:chunk_size] + 1)  # [chunk]
+                state_contrib = state * state_powers.view(1, chunk_size, 1, 1).to(dtype)
+            else:
+                # Per-head: state_powers[i, h] = γ[h]^(i+1)
+                state_powers = gamma.unsqueeze(0).float() ** (arange[:chunk_size].unsqueeze(1) + 1)  # [chunk, H]
+                state_contrib = state * state_powers.view(1, chunk_size, H, 1).to(dtype)
+
+            # Contribution from chunk inputs: cumulative sum with decay
+            # We need Σ_{j=0}^{i} γ^(i-j) * x[j] for each i
+            # This is a causal convolution with kernel [γ^(chunk-1), ..., γ^1, γ^0]
+
+            if gamma_is_scalar:
+                # Scale inputs: x_scaled[j] = x[j] * γ^(-j)
+                inv_powers = torch.pow(gamma_val, -arange[:chunk_size])  # [chunk]
+                x_scaled = x_chunk * inv_powers.view(1, chunk_size, 1, 1).to(dtype)
+                # Cumsum and rescale
+                x_cumsum = torch.cumsum(x_scaled, dim=1)  # [B, chunk, H, D]
+                input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, 1, 1).to(dtype)
+            else:
+                # Per-head scaling
+                inv_powers = gamma.unsqueeze(0).float() ** (-arange[:chunk_size].unsqueeze(1))  # [chunk, H]
+                x_scaled = x_chunk * inv_powers.view(1, chunk_size, H, 1).to(dtype)
+                x_cumsum = torch.cumsum(x_scaled, dim=1)
+                input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, H, 1).to(dtype)
+
+            # Combine
+            S[:, start_idx:end_idx, :, :] = state_contrib + input_contrib
+
+            # Update state for next chunk
+            state = S[:, end_idx - 1:end_idx, :, :]
+
+    return S
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -604,25 +728,20 @@ class PhaseAttentionLayer(nn.Module):
             # Original: infinite memory via cumsum
             global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
         else:
+            # V9.9.8: Use parallel EMA scan for ~32x speedup over sequential loop
             # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
-            # Using loop for numerical stability (γ^(-j) overflows for large j)
-            B_size, N_size, H_size, D_size = kv_complex.shape
-            global_state = torch.zeros_like(kv_complex)
-            state = torch.zeros(B_size, 1, H_size, D_size,
-                              dtype=kv_complex.dtype, device=kv_complex.device)
+            H_size = kv_complex.shape[2]
 
             # V9.9.7: Per-head learned decay or fixed decay
             if self.learned_decay:
                 # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
                 # Higher values = longer memory, lower = focus on recent
                 gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
-                gamma = gamma.view(1, 1, H_size, 1).to(kv_complex.dtype)  # [1, 1, H, 1]
             else:
                 gamma = self.decay_gamma  # Scalar
 
-            for t in range(N_size):
-                state = gamma * state + kv_complex[:, t:t+1, :, :]
-                global_state[:, t:t+1, :, :] = state
+            # Use optimized parallel scan instead of sequential loop
+            global_state = parallel_ema_scan(kv_complex, gamma)
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -634,20 +753,13 @@ class PhaseAttentionLayer(nn.Module):
         if not use_decay:
             a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
-            # Stable decay accumulation for normalizer
-            B_size, N_size, H_size, D_size = a_k.shape
-            a_k_cumsum = torch.zeros_like(a_k)
-            state_ak = torch.zeros(B_size, 1, H_size, D_size,
-                                   dtype=a_k.dtype, device=a_k.device)
+            # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
             # Reuse gamma from above (already computed for learned_decay case)
             if self.learned_decay:
                 gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
-                gamma_norm = gamma_norm.view(1, 1, H_size, 1).to(a_k.dtype)  # [1, 1, H, 1]
             else:
                 gamma_norm = self.decay_gamma
-            for t in range(N_size):
-                state_ak = gamma_norm * state_ak + a_k[:, t:t+1, :, :]
-                a_k_cumsum[:, t:t+1, :, :] = state_ak
+            a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
@@ -671,19 +783,13 @@ class PhaseAttentionLayer(nn.Module):
 
             # Accumulator for the "+1" shift term: a_k * v
             # V9.6.13: Apply decay to shifted mode accumulator
+            # V9.9.8: Use parallel scan for shifted mode (note: this uses fixed decay, not learned)
             if self.decay_gamma == 1.0:
                 av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
             else:
-                # Stable decay accumulation for shifted mode
+                # Use optimized parallel EMA scan
                 av_input = a_k * v
-                B_size, N_size, H_size, D_size = av_input.shape
-                av_state = torch.zeros_like(av_input)
-                state_av = torch.zeros(B_size, 1, H_size, D_size,
-                                       dtype=av_input.dtype, device=av_input.device)
-                gamma = self.decay_gamma
-                for t in range(N_size):
-                    state_av = gamma * state_av + av_input[:, t:t+1, :, :]
-                    av_state[:, t:t+1, :, :] = state_av
+                av_state = parallel_ema_scan(av_input, self.decay_gamma)
 
             # Combined: shift_term + cos_term
             shift_term = a_q * av_state           # a_q * Σ(a_k * v)
