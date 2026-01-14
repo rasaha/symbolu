@@ -1768,8 +1768,10 @@ class HybridAttentionLayer(nn.Module):
 
             # Cosine similarity per batch element, then average
             # High similarity (close to 1.0) means redundant features
-            cos_sim = F.cosine_similarity(x_local_flat, x_phase_flat, dim=1)
-            decorr_loss = cos_sim.abs().mean()  # Penalize both positive and negative correlation
+            # We use squared similarity so both +1 (aligned) and -1 (opposite) are penalized
+            # Only orthogonal vectors (similarity=0) minimize this loss
+            cos_sim = F.cosine_similarity(x_local_flat, x_phase_flat, dim=1, eps=1e-8)
+            decorr_loss = (cos_sim ** 2).mean()  # Smoother gradients than abs()
 
             return output, decorr_loss
 
