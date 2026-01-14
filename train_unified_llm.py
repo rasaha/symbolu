@@ -8773,6 +8773,9 @@ class UnifiedTrainingConfig:
     enable_inverted_curriculum: bool = False  # Enable full inverted curriculum
     inverted_curriculum_stages: str = ""  # Custom stages: "3:9@256,5:7@512,6:6@768,9:3@2048"
     inverted_curriculum_ppl_triggers: str = ""  # PPL triggers: "300,200,120,75,45,25"
+    # V9.9.4: PPL Stability Check (ChatGPT's Readiness Index)
+    inverted_curriculum_stability_threshold: float = 5.0  # Max PPL slope for "stable"
+    inverted_curriculum_stability_stages: str = "2,3,4"  # Stages requiring stability (geometry shift zone)
 
     # Ontological-specific parameters
     bhava_embed_dim: int = 128
@@ -10312,6 +10315,9 @@ class InvertedLayerCurriculumController:
         transition_steps: int = 500,  # Steps for soft layer transition
         seq_len_curriculum: Optional['SequenceLengthCurriculum'] = None,  # Optional delegation
         default_seq_len: int = 1024,  # Used when no seq_len_curriculum provided
+        # V9.9.4: PPL Stability Check (ChatGPT recommendation)
+        ppl_stability_threshold: float = 5.0,  # Max PPL slope for "stable" (lower = stricter)
+        stability_required_stages: Optional[List[int]] = None,  # Stages requiring stability [2,3,4]
     ):
         """
         Initialize the Inverted Curriculum Controller.
@@ -10323,6 +10329,8 @@ class InvertedLayerCurriculumController:
             transition_steps: Steps for soft layer transitions
             seq_len_curriculum: Optional SequenceLengthCurriculum for seq_len delegation
             default_seq_len: Fixed seq_len when no curriculum provided
+            ppl_stability_threshold: Maximum PPL slope to consider "stable" (V9.9.4)
+            stability_required_stages: Which stages require stability check before advancing
         """
         self.stages = stages
         self.ppl_triggers = ppl_triggers
@@ -10330,6 +10338,11 @@ class InvertedLayerCurriculumController:
         self.transition_steps = transition_steps
         self.seq_len_curriculum = seq_len_curriculum
         self.default_seq_len = default_seq_len
+
+        # V9.9.4: PPL Stability (ChatGPT's "Readiness Index")
+        self.ppl_stability_threshold = ppl_stability_threshold
+        # Default: require stability for middle stages (geometry shift zone)
+        self.stability_required_stages = stability_required_stages or [2, 3, 4]
 
         # Current state
         self.current_stage_idx = 0
@@ -10393,6 +10406,55 @@ class InvertedLayerCurriculumController:
 
         return weights
 
+    def _compute_ppl_slope(self) -> float:
+        """
+        V9.9.4: Compute PPL slope (rate of change) from history.
+
+        Returns the average change per step. Negative = improving, positive = worsening.
+        A small absolute value indicates stability (plateauing).
+
+        ChatGPT's insight: "PPL can drop while geometry is still reconfiguring.
+        Advancing authority too early can slow fluency."
+        """
+        if len(self.ppl_history) < 3:
+            return float('inf')  # Not enough data, assume unstable
+
+        # Compute differences between consecutive PPL values
+        diffs = [self.ppl_history[i+1] - self.ppl_history[i]
+                 for i in range(len(self.ppl_history) - 1)]
+
+        # Average slope (negative = improving)
+        avg_slope = sum(diffs) / len(diffs)
+
+        return avg_slope
+
+    def _is_ppl_stable(self, next_stage_idx: int) -> Tuple[bool, float, str]:
+        """
+        V9.9.4: Check if PPL is stable enough to advance to next stage.
+
+        Args:
+            next_stage_idx: The stage we would advance to
+
+        Returns:
+            Tuple of (is_stable, slope, reason_string)
+        """
+        slope = self._compute_ppl_slope()
+
+        # Check if this stage requires stability
+        if next_stage_idx not in self.stability_required_stages:
+            return True, slope, "stability_not_required"
+
+        # Check stability: slope should be small (plateauing)
+        # We use absolute value because we care about magnitude, not direction
+        abs_slope = abs(slope)
+
+        if abs_slope <= self.ppl_stability_threshold:
+            return True, slope, "stable"
+        elif slope > 0:
+            return False, slope, "ppl_rising"
+        else:
+            return False, slope, "ppl_dropping_fast"
+
     def update(
         self,
         step: int,
@@ -10425,31 +10487,45 @@ class InvertedLayerCurriculumController:
                 self.ppl_history.pop(0)
 
         # Check for stage advancement (split evolution)
+        # V9.9.4: Now includes PPL stability check for middle stages
         if self.current_stage_idx < len(self.stages) - 1 and current_ppl is not None:
             smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else current_ppl
             next_trigger = self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else float('inf')
+            next_stage_idx = self.current_stage_idx + 1
 
             if smoothed_ppl < next_trigger:
-                # Advance to next stage
-                self.current_stage_idx += 1
-                new_split = self.stages[self.current_stage_idx]
+                # V9.9.4: Check PPL stability before advancing (ChatGPT's Readiness Index)
+                is_stable, slope, reason = self._is_ppl_stable(next_stage_idx)
 
-                if new_split != old_split:
-                    split_changed = True
-                    self._transition_to_split(new_split, step)
+                if is_stable:
+                    # Advance to next stage
+                    self.current_stage_idx = next_stage_idx
+                    new_split = self.stages[self.current_stage_idx]
 
-                # Record history
-                self.stage_history.append({
-                    'stage': self.current_stage_idx,
-                    'step': step,
-                    'ppl': smoothed_ppl,
-                    'split': new_split,
-                })
-                self.last_stage_change_step = step
+                    if new_split != old_split:
+                        split_changed = True
+                        self._transition_to_split(new_split, step)
 
-                print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!")
-                print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
-                print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
+                    # Record history
+                    self.stage_history.append({
+                        'stage': self.current_stage_idx,
+                        'step': step,
+                        'ppl': smoothed_ppl,
+                        'slope': slope,
+                        'split': new_split,
+                    })
+                    self.last_stage_change_step = step
+
+                    stability_note = f" (slope: {slope:+.2f})" if reason == "stable" else ""
+                    print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!{stability_note}")
+                    print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
+                    print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
+                else:
+                    # V9.9.4: PPL threshold met but not stable - wait for plateau
+                    # Only log occasionally to avoid spam
+                    if step % 500 == 0:
+                        print(f"  ⏳ [INVERTED CURRICULUM] Stage {next_stage_idx} pending: "
+                              f"PPL {smoothed_ppl:.1f} < {next_trigger:.0f} but {reason} (slope: {slope:+.2f})")
 
         # Update per-layer phase controller (for soft transitions)
         phase_result = self.phase_controller.update(step)
@@ -10547,6 +10623,8 @@ class InvertedLayerCurriculumController:
         - inverted_curriculum_ppl_triggers: "300,200,120,75,45,25"
         - layer_transition_steps: Steps for soft transitions (default: 500)
         - local_layers: Number of local attention layers (default: 4)
+        - inverted_curriculum_stability_threshold: Max PPL slope for "stable" (V9.9.4)
+        - inverted_curriculum_stability_stages: "2,3,4" - stages requiring stability
         """
         # Parse stages (splits only, no seq_len)
         if hasattr(config, 'inverted_curriculum_stages') and config.inverted_curriculum_stages:
@@ -10579,6 +10657,11 @@ class InvertedLayerCurriculumController:
             # Default triggers
             ppl_triggers = [300, 200, 120, 75, 45, 25]
 
+        # V9.9.4: Parse stability stages
+        stability_stages = None
+        if hasattr(config, 'inverted_curriculum_stability_stages') and config.inverted_curriculum_stability_stages:
+            stability_stages = [int(s.strip()) for s in config.inverted_curriculum_stability_stages.split(',')]
+
         return cls(
             stages=stages,
             ppl_triggers=ppl_triggers,
@@ -10586,6 +10669,9 @@ class InvertedLayerCurriculumController:
             transition_steps=getattr(config, 'layer_transition_steps', 500),
             seq_len_curriculum=seq_len_curriculum,
             default_seq_len=getattr(config, 'max_seq_len', 1024),
+            # V9.9.4: PPL Stability Check
+            ppl_stability_threshold=getattr(config, 'inverted_curriculum_stability_threshold', 5.0),
+            stability_required_stages=stability_stages,
         )
 
 
@@ -16461,6 +16547,11 @@ def main():
                        help="Custom curriculum stages: '3:9@256,5:7@512,6:6@768,9:3@2048' (split@seq_len)")
     parser.add_argument("--inverted_curriculum_ppl_triggers", type=str, default="",
                        help="PPL triggers for stage advancement: '300,200,120,75,45,25'")
+    # V9.9.4: PPL Stability Check (ChatGPT's Readiness Index)
+    parser.add_argument("--inverted_curriculum_stability_threshold", type=float, default=5.0,
+                       help="Max PPL slope to consider 'stable' for stage advancement (lower=stricter)")
+    parser.add_argument("--inverted_curriculum_stability_stages", type=str, default="2,3,4",
+                       help="Stages requiring PPL stability check: '2,3,4' (geometry shift zone)")
 
     # V9.6.12: Cosine mode for phase attention
     parser.add_argument("--cosine_mode", type=str, default="standard",
@@ -17512,6 +17603,9 @@ def main():
         enable_inverted_curriculum=args.enable_inverted_curriculum,
         inverted_curriculum_stages=args.inverted_curriculum_stages,
         inverted_curriculum_ppl_triggers=args.inverted_curriculum_ppl_triggers,
+        # V9.9.4: PPL Stability Check
+        inverted_curriculum_stability_threshold=args.inverted_curriculum_stability_threshold,
+        inverted_curriculum_stability_stages=args.inverted_curriculum_stability_stages,
         # V9.5.2 Emergency Stress-Probe (ChatGPT Guardrails)
         enable_stress_probe=args.enable_stress_probe,
         stress_probe_entropy_trigger=args.stress_probe_entropy_trigger,

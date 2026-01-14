@@ -1,6 +1,6 @@
 # Inverted Curriculum Evolution Design
 
-**Version**: 1.6.0
+**Version**: 1.7.0
 **Status**: IMPLEMENTED
 **Author**: Claude Code
 **Date**: 2026-01-13
@@ -36,6 +36,7 @@
 7. [Testing Strategy](#7-testing-strategy)
 8. [Sovereign Reset Protocol (V9.9.3)](#8-sovereign-reset-protocol-v993)
 9. [Changelog](#9-changelog)
+10. [PPL Readiness Index (V9.9.4)](#10-ppl-readiness-index-v994)
 
 ---
 
@@ -857,6 +858,72 @@ if ilc_result['completed_transitions']:
 | 1.4.0 | 2026-01-13 | Phase 6: Testing & validation (41 tests in scripts/test_inverted_curriculum.py) |
 | 1.5.0 | 2026-01-13 | V9.9.2: Refactored to delegate seq_len to SequenceLengthCurriculum |
 | 1.6.0 | 2026-01-13 | V9.9.3: Added Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations) |
+| 1.7.0 | 2026-01-14 | V9.9.4: Added PPL Stability Check (ChatGPT's "Readiness Index") |
+
+---
+
+## 10. PPL Readiness Index (V9.9.4)
+
+ChatGPT's insight: "PPL is the right signal—but in a hybrid AGI, it must be read as a changing language, not a single number."
+
+### 10.1 The Problem: PPL Means Different Things
+
+| Stage | Dominant Learning | What PPL Really Measures |
+|-------|-------------------|--------------------------|
+| 3:9 → 4:8 | Sensory / syntax | Token adjacency stability |
+| 5:7 → 6:6 | **Transition** | **Competing geometries** |
+| 7:5 → 9:3 | Authority / meaning | Semantic alignment |
+
+The middle stages (2-4) are the "geometry shift zone" where PPL can drop while internal structure is still reconfiguring. Advancing too early causes fluency degradation.
+
+### 10.2 The Solution: PPL Slope Stability
+
+Instead of just checking `PPL < threshold`, we now also verify that PPL is **plateauing** (not rapidly changing):
+
+```python
+def _is_ppl_stable(self, next_stage_idx: int) -> Tuple[bool, float, str]:
+    slope = self._compute_ppl_slope()  # Average change per step
+
+    # Only require stability for middle stages (geometry shift zone)
+    if next_stage_idx not in self.stability_required_stages:
+        return True, slope, "stability_not_required"
+
+    if abs(slope) <= self.ppl_stability_threshold:
+        return True, slope, "stable"
+    elif slope > 0:
+        return False, slope, "ppl_rising"
+    else:
+        return False, slope, "ppl_dropping_fast"
+```
+
+### 10.3 CLI Configuration
+
+```bash
+# V9.9.4: PPL Stability Check
+--inverted_curriculum_stability_threshold 5.0   # Max slope for "stable"
+--inverted_curriculum_stability_stages "2,3,4"  # Stages requiring stability
+```
+
+### 10.4 Expected Log Output
+
+When PPL threshold is met but not stable:
+```
+  ⏳ [INVERTED CURRICULUM] Stage 3 pending: PPL 115.2 < 120 but ppl_dropping_fast (slope: -12.50)
+```
+
+When both conditions are satisfied:
+```
+  🎓 [INVERTED CURRICULUM] Stage 3 reached! (slope: -2.30)
+      PPL 110.50 < 120
+      Split: 5:7 → 6:6
+```
+
+### 10.5 The "Student Ready for Algebra" Analogy
+
+ChatGPT's explanation:
+> "A student can score well on arithmetic (low PPL) but still not be ready for algebra. If you push abstraction too early, they hesitate and stutter."
+
+The stability check ensures the model is not just passing the test, but is **stable at that level** before advancing.
 
 ---
 
