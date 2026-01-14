@@ -1,7 +1,7 @@
 # Inverted Curriculum Evolution Design
 
-**Version**: 1.0.0
-**Status**: DRAFT
+**Version**: 1.7.0
+**Status**: IMPLEMENTED
 **Author**: Claude Code
 **Date**: 2026-01-13
 
@@ -34,7 +34,9 @@
 5. [Implementation Plan](#5-implementation-plan)
 6. [API Reference](#6-api-reference)
 7. [Testing Strategy](#7-testing-strategy)
-8. [Changelog](#8-changelog)
+8. [Sovereign Reset Protocol (V9.9.3)](#8-sovereign-reset-protocol-v993)
+9. [Changelog](#9-changelog)
+10. [PPL Readiness Index (V9.9.4)](#10-ppl-readiness-index-v994)
 
 ---
 
@@ -741,7 +743,111 @@ class SequenceLengthCurriculum:
 
 ---
 
-## 8. Changelog
+## 8. Sovereign Reset Protocol (V9.9.3)
+
+When transitioning between sequence lengths or completing layer transitions, the training state needs careful handling to prevent gradient corruption and momentum artifacts.
+
+### 8.1 The "Re-Loading Tax" Problem
+
+When switching sequence lengths mid-training:
+- **Gradient Accumulation**: If halfway through accumulation, old gradients are from different tensor shapes
+- **Optimizer Momentum**: AdamW tracks velocity per-parameter; sudden shape changes create "ghosts"
+- **VRAM Fragmentation**: Different tensor shapes cause memory fragmentation
+
+### 8.2 The Sovereign Reset Protocol
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           SOVEREIGN RESET PROTOCOL (V9.9.3)                 │
+│         "Soft-Reset" for Clean State Transitions            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. SYNC-POINT EVOLUTION                                    │
+│     └── Curriculum updates only at end of grad accumulation │
+│         (global_step only increments after full cycle)      │
+│                                                             │
+│  2. GRADIENT CLEAR                                          │
+│     └── optimizer.zero_grad(set_to_none=True)               │
+│         (Memory-efficient gradient clearing)                │
+│                                                             │
+│  3. CUDA CACHE CLEAR                                        │
+│     └── torch.cuda.empty_cache()                            │
+│         (Release fragmented memory)                         │
+│                                                             │
+│  4. MOMENTUM DAMPENING                                      │
+│     └── When layer transitions complete (α reaches 1.0):    │
+│         - Decay exp_avg by 50%                              │
+│         - Decay exp_avg_sq by 50%                           │
+│         (Allows layer to find new "ontological direction")  │
+│                                                             │
+│  5. SKIP STEP                                               │
+│     └── Skip one training step after seq_len reload         │
+│         (VRAM stabilization before next forward pass)       │
+│                                                             │
+│  6. HGS RE-CALIBRATION                                      │
+│     └── Force recalculation of gradient scaler targets      │
+│         after split change                                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 Implementation Functions
+
+```python
+# V9.9.3: Sovereign Reset Protocol Functions
+
+def on_seq_len_transition(optimizer, device, old_seq_len, new_seq_len, grad_accum_counter):
+    """Clear buffers and prepare for new sequence length."""
+    optimizer.zero_grad(set_to_none=True)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    return {'skip_step': True}  # Caller skips next step
+
+def dampen_layer_momentum(optimizer, model, layer_indices, dampen_factor=0.5):
+    """Decay momentum for layers that completed transition."""
+    for param in layer_parameters:
+        if param in optimizer.state:
+            optimizer.state[param]['exp_avg'].mul_(dampen_factor)
+            optimizer.state[param]['exp_avg_sq'].mul_(dampen_factor)
+```
+
+### 8.4 Training Loop Integration
+
+```python
+# In validation block after curriculum update:
+if ilc_result['seq_len_changed']:
+    # Sovereign Reset Protocol
+    reset_result = on_seq_len_transition(optimizer, device, old_seq, new_seq, accum_step)
+    # ... reload dataloader ...
+    _skip_next_step = reset_result['skip_step']
+
+if ilc_result['completed_transitions']:
+    # Momentum Dampening for layers that finished transitioning
+    dampen_layer_momentum(optimizer, model, ilc_result['completed_transitions'])
+```
+
+### 8.5 Expected Log Output
+
+```
+  🎓 [INVERTED CURRICULUM] Stage 2 reached!
+      PPL 85.50 < 100
+      Split: 4:8 → 5:7
+  🎛️  [MOMENTUM DAMPEN] Applied 50% decay to layers [4]
+     Parameters affected: 24
+  🧹 [SOVEREIGN RESET] Seq transition protocol:
+     Gradients: cleared (set_to_none=True)
+     CUDA cache: cleared
+     Next step: SKIP (VRAM stabilization)
+  📏 [INVERTED CURRICULUM] Reloading dataloader:
+     seq_len: 512 → 768
+     batch:   16 → 10
+  ✅ Dataloader reloaded. All buffers synchronized.
+  ⏭️  [SOVEREIGN RESET] Skipping step 5000 for VRAM stabilization
+```
+
+---
+
+## 9. Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
@@ -751,6 +857,92 @@ class SequenceLengthCurriculum:
 | 1.3.0 | 2026-01-13 | Phase 5: Training loop integration (init, update, HGS reconfigure) |
 | 1.4.0 | 2026-01-13 | Phase 6: Testing & validation (41 tests in scripts/test_inverted_curriculum.py) |
 | 1.5.0 | 2026-01-13 | V9.9.2: Refactored to delegate seq_len to SequenceLengthCurriculum |
+| 1.6.0 | 2026-01-13 | V9.9.3: Added Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations) |
+| 1.7.0 | 2026-01-14 | V9.9.4: Added PPL Stability Check (ChatGPT's "Readiness Index") |
+| 1.8.0 | 2026-01-14 | V9.9.4: Upgraded to composite ReadinessIndex (velocity + acceleration + geometry) |
+
+---
+
+## 10. PPL Readiness Index (V9.9.4)
+
+ChatGPT's insight: "Learning is stable when improvement slows AND the model stops re-orienting itself."
+
+### The Key Insight
+
+PPL can drop while the model is:
+- Memorizing patterns instead of generalizing
+- Learning punctuation/formatting shortcuts
+- Stuck in representation churn
+
+**True stability requires:**
+1. **ΔPPL → small** (velocity collapse - learning pressure reduced)
+2. **ΔΔPPL → small** (acceleration collapse - velocity stabilized)
+3. **Internal geometry stops rotating** (phase/state metrics stable)
+
+### The Bicycle Analogy
+
+ChatGPT: "Learning to ride a bicycle - true stability is when you are no longer correcting every second and your balance stops oscillating."
+
+This is **plateaued improvement under stable geometry**, not just low PPL.
+
+### 10.1 The Problem: PPL Means Different Things
+
+| Stage | Dominant Learning | What PPL Really Measures |
+|-------|-------------------|--------------------------|
+| 3:9 → 4:8 | Sensory / syntax | Token adjacency stability |
+| 5:7 → 6:6 | **Transition** | **Competing geometries** |
+| 7:5 → 9:3 | Authority / meaning | Semantic alignment |
+
+The middle stages (2-4) are the "geometry shift zone" where PPL can drop while internal structure is still reconfiguring. Advancing too early causes fluency degradation.
+
+### 10.2 The Solution: PPL Slope Stability
+
+Instead of just checking `PPL < threshold`, we now also verify that PPL is **plateauing** (not rapidly changing):
+
+```python
+def _is_ppl_stable(self, next_stage_idx: int) -> Tuple[bool, float, str]:
+    slope = self._compute_ppl_slope()  # Average change per step
+
+    # Only require stability for middle stages (geometry shift zone)
+    if next_stage_idx not in self.stability_required_stages:
+        return True, slope, "stability_not_required"
+
+    if abs(slope) <= self.ppl_stability_threshold:
+        return True, slope, "stable"
+    elif slope > 0:
+        return False, slope, "ppl_rising"
+    else:
+        return False, slope, "ppl_dropping_fast"
+```
+
+### 10.3 CLI Configuration
+
+```bash
+# V9.9.4: PPL Stability Check
+--inverted_curriculum_stability_threshold 5.0   # Max slope for "stable"
+--inverted_curriculum_stability_stages "2,3,4"  # Stages requiring stability
+```
+
+### 10.4 Expected Log Output
+
+When PPL threshold is met but not stable:
+```
+  ⏳ [INVERTED CURRICULUM] Stage 3 pending: PPL 115.2 < 120 but ppl_dropping_fast (slope: -12.50)
+```
+
+When both conditions are satisfied:
+```
+  🎓 [INVERTED CURRICULUM] Stage 3 reached! (slope: -2.30)
+      PPL 110.50 < 120
+      Split: 5:7 → 6:6
+```
+
+### 10.5 The "Student Ready for Algebra" Analogy
+
+ChatGPT's explanation:
+> "A student can score well on arithmetic (low PPL) but still not be ready for algebra. If you push abstraction too early, they hesitate and stutter."
+
+The stability check ensures the model is not just passing the test, but is **stable at that level** before advancing.
 
 ---
 
