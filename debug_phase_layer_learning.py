@@ -243,15 +243,41 @@ def load_model_and_config(checkpoint_path: str, device: torch.device):
     # Import training config and model creation
     from train_unified_llm import UnifiedTrainingConfig, create_model
 
-    # Restore config
-    config_dict = checkpoint.get('config', {})
+    # Restore config - try checkpoint first, then config.json
+    config_dict = checkpoint.get('config', None)
+
+    if config_dict is None:
+        # Try loading from config.json in checkpoint directory
+        checkpoint_dir = os.path.dirname(checkpoint_path)
+        config_json_path = os.path.join(checkpoint_dir, 'config.json')
+
+        if os.path.exists(config_json_path):
+            print(f"  Loading config from {config_json_path}")
+            with open(config_json_path, 'r') as f:
+                config_dict = json.load(f)
+        else:
+            print("  WARNING: No config found in checkpoint or config.json!")
+            print("  Creating model with default parameters - results may be incorrect!")
+            config_dict = {}
+
     config = UnifiedTrainingConfig(**config_dict)
 
     # Create model
     model = create_model(config, device)
 
     # Load weights
-    model.load_state_dict(checkpoint['model'], strict=False)
+    missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model'], strict=False)
+    if missing_keys:
+        print(f"  WARNING: Missing keys in checkpoint: {len(missing_keys)} parameters")
+        if len(missing_keys) <= 10:
+            for key in missing_keys:
+                print(f"    - {key}")
+    if unexpected_keys:
+        print(f"  WARNING: Unexpected keys in checkpoint: {len(unexpected_keys)} parameters")
+        if len(unexpected_keys) <= 10:
+            for key in unexpected_keys:
+                print(f"    - {key}")
+
     model.to(device)
     model.eval()
 
