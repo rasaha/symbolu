@@ -10982,14 +10982,17 @@ def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingCo
 
     Returns current alpha_phase value.
     """
-    if config.model_type not in ("phase", "hybrid"):
-        return config.alpha_phase  # No decay for ontological
+    # V9.8.10: Check if model type contains "hybrid" or "phase" (supports ontological_hybrid)
+    if "hybrid" not in config.model_type and "phase" not in config.model_type:
+        return config.alpha_phase  # No alpha scheduling for pure ontological/standard models
 
     # Calculate current alpha based on linear decay
-    if step >= config.alpha_decay_steps:
+    # V9.8.10: Use phase_ramp_steps if available (more intuitive), fallback to alpha_decay_steps
+    decay_steps = getattr(config, 'phase_ramp_steps', config.alpha_decay_steps)
+    if step >= decay_steps:
         current_alpha = config.alpha_phase_end
     else:
-        frac = step / config.alpha_decay_steps
+        frac = step / decay_steps
         current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
 
     # Update all HybridAttentionLayer modules
@@ -12288,9 +12291,18 @@ def train(config: UnifiedTrainingConfig):
         else:
             auto_max_batch = max(8, int(64 * combined_factor))
 
+        # V9.8.10: Use curriculum start length if enabled, otherwise max_seq_len
+        probe_seq_len = config.seq_len_start if config.enable_seq_curriculum else config.max_seq_len
+        if config.enable_seq_curriculum:
+            print(f"  📐 Seq Curriculum: Probing with START length {probe_seq_len} (will ramp to {config.max_seq_len})")
+            # Store probe length for later batch scaling reference
+            config.auto_batch_probed_seq_len = probe_seq_len
+        else:
+            config.auto_batch_probed_seq_len = config.max_seq_len
+
         auto_sizer = AutoBatchSizer(
             model=model,
-            seq_len=config.max_seq_len,
+            seq_len=probe_seq_len,
             vocab_size=config.vocab_size,
             target_utilization=config.auto_batch_target_utilization,
             safety_margin=config.auto_batch_safety_margin,
@@ -13238,7 +13250,9 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.4.5: Initialize Friction Controller with Corrective Actions
     friction_controller = None
-    if PIDV2_AVAILABLE and config.model_type == "hybrid" and not config.disable_friction:
+    # V9.8.10: Support both "hybrid" and "ontological_hybrid" models
+    has_hybrid_attention = "hybrid" in config.model_type
+    if PIDV2_AVAILABLE and has_hybrid_attention and not config.disable_friction:
         friction_config = FrictionControllerConfig(
             dom_high=config.friction_dom_high,
             dom_low=config.friction_dom_low,
@@ -13611,8 +13625,8 @@ def train(config: UnifiedTrainingConfig):
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
     current_seq_len = config.max_seq_len
-    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at max seq_len
-    seq_curriculum_ref_seq_len = config.max_seq_len  # Reference sequence length
+    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at probed seq_len
+    seq_curriculum_ref_seq_len = getattr(config, 'auto_batch_probed_seq_len', config.max_seq_len)  # Probed reference
     if config.enable_seq_curriculum:
         seq_len_curriculum = SequenceLengthCurriculum(
             seq_len_start=config.seq_len_start,
@@ -13623,23 +13637,30 @@ def train(config: UnifiedTrainingConfig):
         )
         current_seq_len = config.seq_len_start  # Start with short sequences
 
-        # V2.3.4: Calculate scaled batch size for initial short sequence length
+        # V9.8.10: Calculate scaled batch size for initial short sequence length
+        # AutoBatchSizer already probed at seq_len_start, so use that as reference
         # Memory scales ~linearly with seq_len, so batch can scale inversely
-        seq_curriculum_ref_batch = config.batch_size
-        seq_curriculum_ref_seq_len = config.seq_len_end  # Reference is the target/max
-        scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
-        scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
+        seq_curriculum_ref_batch = config.batch_size  # Probed at seq_len_start
+        seq_curriculum_ref_seq_len = getattr(config, 'auto_batch_probed_seq_len', config.seq_len_start)
+        # If we're at the probed length, use probed batch directly (no scaling needed)
+        if current_seq_len == seq_curriculum_ref_seq_len:
+            scaled_batch = seq_curriculum_ref_batch
+        else:
+            # Scale inversely with sequence length (longer seq = smaller batch)
+            scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+            scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
         config.batch_size = scaled_batch
 
         print(f"\n  📏 [SEQ CURRICULUM] Sequence Length Curriculum ENABLED")
         print(f"     Ramping: {config.seq_len_start} → {config.seq_len_end} tokens")
         print(f"     Ramp steps: {config.seq_len_ramp_steps}")
         print(f"     Mode: {config.seq_len_ramp_mode.upper()}")
-        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
+        print(f"     Probed batch: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok (AutoBatchSizer)")
+        print(f"     Starting batch: {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
         if config.seq_len_ppl_gate > 0:
             print(f"     PPL Gate: Only ramp when PPL < {config.seq_len_ppl_gate}")
-        print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences (batch={scaled_batch})")
-        print(f"     ⚠️  Will reload dataloader as sequence length increases\n")
+        print(f"\n     ✅ Starting with {current_seq_len}-token sequences (batch={scaled_batch})")
+        print(f"     📈 Batch will scale DOWN as sequences lengthen (memory-adaptive)\n")
 
         # Reload data with initial short sequence length and scaled batch
         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
@@ -14753,7 +14774,8 @@ def train(config: UnifiedTrainingConfig):
             friction_penalty = 1.0
             if PIDV2_AVAILABLE and global_step % 10 == 0:  # Every 10 steps to save compute
                 try:
-                    friction_alignment, friction_dominance = measure_friction(model, local_layers=6)
+                    # V9.8.10: Use config.local_layers instead of hardcoded value
+                    friction_alignment, friction_dominance = measure_friction(model, local_layers=config.local_layers)
                     # Update friction controller with corrective actions
                     if friction_controller is not None:
                         friction_penalty = friction_controller.update(friction_alignment, friction_dominance)
@@ -15170,8 +15192,9 @@ def train(config: UnifiedTrainingConfig):
                         if "level_3_coh" in metrics:
                             log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
 
-                    # Add alpha for phase/hybrid models
-                    if config.model_type in ("phase", "hybrid"):
+                    # Add alpha for phase/hybrid models (including ontological_hybrid)
+                    # V9.8.10: Check if model type contains "phase" or "hybrid"
+                    if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
 
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
@@ -16296,6 +16319,9 @@ def train(config: UnifiedTrainingConfig):
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
+                    # V9.8.10: Restore scheduled alpha before saving checkpoint
+                    # (InvertedLayerCurriculum may have modified it during validation)
+                    update_alpha_schedule(model, global_step, config)
                     save_checkpoint(
                         model, optimizer, scheduler, global_step, best_val_loss,
                         ckpt_dir / "best.pt",
@@ -16340,6 +16366,8 @@ def train(config: UnifiedTrainingConfig):
 
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
+                # V9.8.10: Ensure scheduled alpha is applied before saving
+                update_alpha_schedule(model, global_step, config)
                 save_checkpoint(
                     model, optimizer, scheduler, global_step, best_val_loss,
                     ckpt_dir / "last.pt",
@@ -16363,6 +16391,8 @@ def train(config: UnifiedTrainingConfig):
                     training_state_tracker.save_state()
 
     # Final save
+    # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
+    update_alpha_schedule(model, global_step, config)
     save_checkpoint(
         model, optimizer, scheduler, global_step, best_val_loss,
         ckpt_dir / "final.pt",

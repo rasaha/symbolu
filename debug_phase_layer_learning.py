@@ -69,6 +69,14 @@ except ImportError:
     HF_AVAILABLE = False
     print("Warning: transformers not available")
 
+# Try importing datasets for WikiText
+try:
+    from datasets import load_dataset
+    DATASETS_AVAILABLE = True
+except ImportError:
+    DATASETS_AVAILABLE = False
+    print("Warning: datasets not available - will use random tokens")
+
 
 # =============================================================================
 # PHASE POLICY FUNCTIONS
@@ -243,15 +251,41 @@ def load_model_and_config(checkpoint_path: str, device: torch.device):
     # Import training config and model creation
     from train_unified_llm import UnifiedTrainingConfig, create_model
 
-    # Restore config
-    config_dict = checkpoint.get('config', {})
+    # Restore config - try checkpoint first, then config.json
+    config_dict = checkpoint.get('config', None)
+
+    if config_dict is None:
+        # Try loading from config.json in checkpoint directory
+        checkpoint_dir = os.path.dirname(checkpoint_path)
+        config_json_path = os.path.join(checkpoint_dir, 'config.json')
+
+        if os.path.exists(config_json_path):
+            print(f"  Loading config from {config_json_path}")
+            with open(config_json_path, 'r') as f:
+                config_dict = json.load(f)
+        else:
+            print("  WARNING: No config found in checkpoint or config.json!")
+            print("  Creating model with default parameters - results may be incorrect!")
+            config_dict = {}
+
     config = UnifiedTrainingConfig(**config_dict)
 
     # Create model
     model = create_model(config, device)
 
     # Load weights
-    model.load_state_dict(checkpoint['model'], strict=False)
+    missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model'], strict=False)
+    if missing_keys:
+        print(f"  WARNING: Missing keys in checkpoint: {len(missing_keys)} parameters")
+        if len(missing_keys) <= 10:
+            for key in missing_keys:
+                print(f"    - {key}")
+    if unexpected_keys:
+        print(f"  WARNING: Unexpected keys in checkpoint: {len(unexpected_keys)} parameters")
+        if len(unexpected_keys) <= 10:
+            for key in unexpected_keys:
+                print(f"    - {key}")
+
     model.to(device)
     model.eval()
 
@@ -267,6 +301,53 @@ def get_tokenizer(model_name: str = "gpt2") -> Any:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     return tokenizer
+
+
+def load_wikitext_val_data(max_seq_len: int = 2048, cache_path: str = "data_cache/wikitext103_gpt2.pt") -> torch.Tensor:
+    """
+    Load tokenized WikiText-103 validation data.
+
+    V9.8.10: Load from cache if available, otherwise tokenize and cache.
+    This ensures the debug script uses the SAME data as training.
+
+    Returns:
+        torch.Tensor: Token IDs of shape (num_tokens,) - will be chunked as needed
+    """
+    if os.path.exists(cache_path):
+        print(f"  📂 Loading WikiText-103 val data from cache: {cache_path}")
+        cached = torch.load(cache_path, weights_only=False)
+        val_tokens = cached['val']
+        print(f"  ✅ Loaded {len(val_tokens):,} validation tokens")
+        return val_tokens
+
+    if not DATASETS_AVAILABLE:
+        print("  ⚠️  WARNING: datasets library not available")
+        print("  ⚠️  Falling back to RANDOM TOKENS - results will be meaningless!")
+        # Return random tokens as fallback
+        return torch.randint(0, 50257, (100000,))
+
+    print(f"  ⏳ Loading and tokenizing WikiText-103 validation set...")
+    tokenizer = get_tokenizer()
+
+    # Load WikiText-103
+    ds = load_dataset("wikitext", "wikitext-103-v1")
+
+    # Tokenize validation set
+    text = "\n".join(ds['validation']["text"])
+    tokens = tokenizer.encode(text)
+    val_tokens = torch.tensor(tokens, dtype=torch.long)
+
+    print(f"  ✅ Tokenized {len(val_tokens):,} validation tokens")
+
+    # Try to cache for future use
+    try:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        torch.save({'val': val_tokens}, cache_path)
+        print(f"  💾 Cached to {cache_path}")
+    except Exception as e:
+        print(f"  ⚠️  Could not cache: {e}")
+
+    return val_tokens
 
 
 # =============================================================================
@@ -443,14 +524,35 @@ def run_gradient_check(
 
     results = []
 
+    # Load real WikiText validation data
+    print(f"\n  Loading WikiText-103 validation data...")
+    val_tokens = load_wikitext_val_data(max_seq_len=seq_len)
+    val_tokens = val_tokens.to(device)
+
     print(f"\n  Running {num_steps} gradient check steps...")
     print(f"  {'Step':<6} {'Loss':<12} {'Phase Grad':<14} {'Total Grad':<14} {'Ratio':<10} {'Status'}")
     print(f"  {'-'*70}")
 
     for step in range(num_steps):
-        # Generate random batch
-        x = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
-        y = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+        # Get real data batch from WikiText validation set
+        # Each step uses a different chunk to avoid overfitting to one sequence
+        start_idx = (step * batch_size * seq_len) % (len(val_tokens) - batch_size * seq_len - 1)
+        batch_tokens = []
+        for b in range(batch_size):
+            chunk_start = start_idx + b * seq_len
+            chunk_end = chunk_start + seq_len
+            if chunk_end < len(val_tokens):
+                batch_tokens.append(val_tokens[chunk_start:chunk_end])
+
+        if len(batch_tokens) < batch_size:
+            # Wrap around if needed
+            for b in range(batch_size - len(batch_tokens)):
+                chunk_start = b * seq_len
+                chunk_end = chunk_start + seq_len
+                batch_tokens.append(val_tokens[chunk_start:chunk_end])
+
+        x = torch.stack(batch_tokens)
+        y = x.clone()  # y is shifted version of x for autoregressive loss
 
         # Zero gradients
         optimizer.zero_grad()
@@ -609,37 +711,36 @@ class PhaseEvalHarness:
 
     def _get_eval_data(self, seq_len: int, num_samples: int = 100) -> torch.Tensor:
         """
-        Generate or load evaluation data at specified sequence length.
+        Load evaluation data at specified sequence length from WikiText-103 validation set.
 
-        For now, uses random tokens. In production, use real validation data.
+        V9.8.10: Now uses REAL WikiText data instead of random tokens.
+        This ensures evaluation reflects actual model performance on structured text.
+
+        Returns:
+            torch.Tensor: Token IDs of shape (num_samples, seq_len)
         """
-        # Get vocab_size and max_seq_len from model's actual embedding layers
-        # Handle different model architectures
-        vocab_size = None
-        max_seq_len = None
-
-        # Try hybrid model structure
-        if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'token_embed'):
-            vocab_size = self.model.hybrid.token_embed.num_embeddings
-            max_seq_len = self.model.hybrid.pos_embed.num_embeddings
-        # Try direct token_embed
-        elif hasattr(self.model, 'token_embed'):
-            vocab_size = self.model.token_embed.num_embeddings
-            max_seq_len = self.model.pos_embed.num_embeddings if hasattr(self.model, 'pos_embed') else 2048
-        # Try SymbolU12 style (embed instead of token_embed)
-        elif hasattr(self.model, 'embed'):
-            vocab_size = self.model.embed.num_embeddings
-            max_seq_len = self.model.pos_embed.num_embeddings if hasattr(self.model, 'pos_embed') else 2048
-        # Fallback to config
-        else:
-            vocab_size = getattr(self.config, 'vocab_size', 50257)
-            max_seq_len = getattr(self.config, 'max_seq_len', 2048)
+        # Get max_seq_len from model
+        max_seq_len = getattr(self.config, 'max_seq_len', 2048)
 
         # Clamp seq_len to model's max
         effective_seq_len = min(seq_len, max_seq_len - 1)  # -1 for safety with x[:,:-1]/y[:,1:]
 
-        # Generate random data with valid token indices
-        data = torch.randint(0, vocab_size, (num_samples, effective_seq_len), device=self.device)
+        # Load WikiText validation data if not already loaded
+        if not hasattr(self, '_val_tokens') or self._val_tokens is None:
+            print(f"    📂 Loading WikiText-103 validation data...")
+            self._val_tokens = load_wikitext_val_data(max_seq_len=max_seq_len)
+            self._val_tokens = self._val_tokens.to(self.device)
+
+        # Chunk into samples of desired length
+        val_tokens = self._val_tokens
+        samples = []
+
+        for i in range(num_samples):
+            start_idx = (i * effective_seq_len) % (len(val_tokens) - effective_seq_len - 1)
+            end_idx = start_idx + effective_seq_len
+            samples.append(val_tokens[start_idx:end_idx])
+
+        data = torch.stack(samples)
         return data
 
     def _inject_phase_policy(self, mode: str, sigma: float):
