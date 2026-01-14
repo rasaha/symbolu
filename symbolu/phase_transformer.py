@@ -323,8 +323,8 @@ def parallel_ema_scan(
             # Combine
             S[:, start_idx:end_idx, :, :] = state_contrib + input_contrib
 
-            # Update state for next chunk
-            state = S[:, end_idx - 1:end_idx, :, :]
+            # Update state for next chunk (use clone to avoid in-place modification issues)
+            state = S[:, end_idx - 1:end_idx, :, :].clone()
 
     return S
 
