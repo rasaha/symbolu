@@ -13743,6 +13743,12 @@ def train(config: UnifiedTrainingConfig):
             hidden_state_extractor.clear()
 
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
+            # V9.9.6: Initialize decorr variables before model-type branching
+            # These may be set by hybrid/ontological_hybrid and used later by SRK
+            enable_decorr = False
+            decorr_loss_tensor = None
+            ortho_loss_tensor = None
+
             if config.model_type == "ontological":
                 outputs = model(x)
                 # Extract phase angles if available (for U1/U2 coherence)
@@ -13790,10 +13796,14 @@ def train(config: UnifiedTrainingConfig):
                 loss, metrics = compute_phase_loss(logits, y, config)
 
                 # Add decorrelation loss if enabled
+                # V9.9.6: Store tensor for re-adding after SRK (which replaces loss)
+                decorr_loss_tensor = None
+                ortho_loss_tensor = None
+
                 if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
-                    decorr_loss = outputs['decorr_loss']
-                    loss = loss + config.decorr_loss_weight * decorr_loss
-                    metrics['decorr_loss'] = decorr_loss.item()
+                    decorr_loss_tensor = outputs['decorr_loss']
+                    loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                    metrics['decorr_loss'] = decorr_loss_tensor.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
@@ -13801,9 +13811,9 @@ def train(config: UnifiedTrainingConfig):
                 # Unlike output decorrelation, this cannot be blocked by detach()
                 if enable_decorr and config.decorr_loss_weight > 0:
                     # Debug on first step only
-                    ortho_loss = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
-                    loss = loss + config.decorr_loss_weight * ortho_loss
-                    metrics['ortho_loss'] = ortho_loss.item()
+                    ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
+                    loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                    metrics['ortho_loss'] = ortho_loss_tensor.item()
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
@@ -13884,7 +13894,14 @@ def train(config: UnifiedTrainingConfig):
 
                     # Replace or augment loss with SRK loss
                     # SRK loss includes task loss (cross-entropy) + B1/U2/S8 terms
-                    loss = srk_loss  # SRK loss subsumes task loss
+                    # V9.9.6: Preserve decorr_loss and ortho_loss tensors (for gradient flow)
+                    # by re-adding them after SRK replaces the loss
+                    loss = srk_loss
+                    if enable_decorr and config.decorr_loss_weight > 0:
+                        if decorr_loss_tensor is not None:
+                            loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                        if ortho_loss_tensor is not None:
+                            loss = loss + config.decorr_loss_weight * ortho_loss_tensor
 
                     # Update karma state for O12→O1 carryover (Toroidal Loop)
                     with torch.no_grad():
