@@ -12220,6 +12220,16 @@ def train(config: UnifiedTrainingConfig):
         print(f"  Dynamic Relaxation: ENABLED ({config.authority_layers}:{config.sensory_layers} → {config.relaxation_target_authority}:{config.relaxation_target_sensory})")
         print(f"    Stability Threshold: {config.relaxation_stability_threshold} for {config.relaxation_stability_window} steps")
 
+    # V9.9.5: Warn if decorr_loss_weight is set but model type doesn't support it
+    if hasattr(config, 'decorr_loss_weight') and config.decorr_loss_weight > 0:
+        if config.model_type in ('hybrid', 'ontological_hybrid'):
+            print(f"  Decorrelation Loss: ENABLED (weight={config.decorr_loss_weight})")
+        else:
+            print(f"\n  ⚠️  WARNING: --decorr_loss_weight={config.decorr_loss_weight} IGNORED!")
+            print(f"     Decorrelation loss only works with --model_type hybrid or ontological_hybrid")
+            print(f"     Current model_type: {config.model_type}")
+            print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
+
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.model_max_length = int(1e12)
@@ -13756,6 +13766,16 @@ def train(config: UnifiedTrainingConfig):
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 # Enable decorrelation loss for hybrid/ontological_hybrid models
+
+                # DEBUG: Diagnose decorr_loss_weight issue
+                if global_step == 1:
+                    has_attr = hasattr(config, 'decorr_loss_weight')
+                    decorr_val = getattr(config, 'decorr_loss_weight', 'NOT_FOUND')
+                    model_type = config.model_type
+                    is_valid_type = model_type in ('hybrid', 'ontological_hybrid')
+                    print(f"DEBUG CONFIG: hasattr={has_attr}, value={decorr_val}, "
+                          f"model_type={model_type}, is_valid_type={is_valid_type}")
+
                 enable_decorr = (
                     hasattr(config, 'decorr_loss_weight') and
                     config.decorr_loss_weight > 0 and
@@ -13780,7 +13800,8 @@ def train(config: UnifiedTrainingConfig):
                 # This directly regularizes attention weights, guaranteeing gradient flow
                 # Unlike output decorrelation, this cannot be blocked by detach()
                 if enable_decorr and config.decorr_loss_weight > 0:
-                    ortho_loss = compute_weight_orthogonalization_loss(model)
+                    # Debug on first step only
+                    ortho_loss = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
                     loss = loss + config.decorr_loss_weight * ortho_loss
                     metrics['ortho_loss'] = ortho_loss.item()
 

@@ -1778,7 +1778,7 @@ class HybridAttentionLayer(nn.Module):
         return output
 
 
-def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
+def compute_weight_orthogonalization_loss(model: nn.Module, debug: bool = False) -> torch.Tensor:
     """
     Compute orthogonalization loss between local and phase attention weight matrices.
 
@@ -1795,14 +1795,24 @@ def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
 
     Args:
         model: Model containing HybridAttentionLayer modules
+        debug: If True, print diagnostic info on first call
 
     Returns:
         Scalar tensor with orthogonalization loss (lower = more orthogonal)
     """
-    ortho_losses = []
+    # Handle torch.compile wrapped models - get the original model
+    actual_model = model
+    if hasattr(model, '_orig_mod'):
+        actual_model = model._orig_mod
+        if debug:
+            print(f"DEBUG ORTHO: Detected torch.compile, using _orig_mod")
 
-    for module in model.modules():
+    ortho_losses = []
+    hybrid_layer_count = 0
+
+    for module in actual_model.modules():
         if isinstance(module, HybridAttentionLayer):
+            hybrid_layer_count += 1
             local_attn = module.local_attn
             phase_attn = module.phase_attn
 
@@ -1839,10 +1849,19 @@ def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
 
     if not ortho_losses:
         # No HybridAttentionLayers found, return zero loss
+        if debug:
+            print(f"DEBUG ORTHO: No HybridAttentionLayers found in model")
         return torch.tensor(0.0, device=next(model.parameters()).device)
 
     # Average across all weight pairs
-    return torch.stack(ortho_losses).mean()
+    result = torch.stack(ortho_losses).mean()
+
+    if debug:
+        print(f"DEBUG ORTHO: Found {hybrid_layer_count} HybridAttentionLayers, "
+              f"{len(ortho_losses)} weight pairs, mean_loss={result.item():.6f}, "
+              f"requires_grad={result.requires_grad}")
+
+    return result
 
 
 class HybridTransformerBlock(nn.Module):
