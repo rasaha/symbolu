@@ -14,8 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from symbolu.phase_transformer import OntologicalHybridTransformer
-from symbolu.config import UnifiedTrainingConfig
 import json
+
+
+class SimpleConfig:
+    """Simple config wrapper to avoid importing full training script."""
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 
 def load_model(checkpoint_path: str):
@@ -27,7 +33,13 @@ def load_model(checkpoint_path: str):
     with open(config_path, 'r') as f:
         config_dict = json.load(f)
 
-    config = UnifiedTrainingConfig(**config_dict)
+    config = SimpleConfig(**config_dict)
+
+    # Add defaults for potentially missing keys
+    if not hasattr(config, 'cosine_mode'):
+        config.cosine_mode = 'standard'
+    if not hasattr(config, 'local_backend'):
+        config.local_backend = 'auto'
 
     # Create model
     if config.model_type == "ontological_hybrid":
