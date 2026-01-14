@@ -119,6 +119,8 @@ from symbolu.phase_transformer import (
     VRITTI_SLICE,
     GUNA_SLICE,
     get_sovereign_state_summary,
+    # V9.9.5: Parameter orthogonalization for hybrid attention
+    compute_weight_orthogonalization_loss,
 )
 
 # Import ontological models
@@ -13774,6 +13776,14 @@ def train(config: UnifiedTrainingConfig):
                     metrics['decorr_loss'] = decorr_loss.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
 
+                # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
+                # This directly regularizes attention weights, guaranteeing gradient flow
+                # Unlike output decorrelation, this cannot be blocked by detach()
+                if enable_decorr and config.decorr_loss_weight > 0:
+                    ortho_loss = compute_weight_orthogonalization_loss(model)
+                    loss = loss + config.decorr_loss_weight * ortho_loss
+                    metrics['ortho_loss'] = ortho_loss.item()
+
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
             # =================================================================
@@ -15190,6 +15200,10 @@ def train(config: UnifiedTrainingConfig):
                     # Add decorr_loss if enabled
                     if 'decorr_loss' in metrics:
                         log_msg += f" | Decorr: {metrics['decorr_loss']:.4f}"
+
+                    # Add ortho_loss if enabled (weight orthogonalization)
+                    if 'ortho_loss' in metrics:
+                        log_msg += f" | Ortho: {metrics['ortho_loss']:.4f}"
 
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
