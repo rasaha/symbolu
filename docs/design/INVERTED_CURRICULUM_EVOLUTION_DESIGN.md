@@ -859,12 +859,31 @@ if ilc_result['completed_transitions']:
 | 1.5.0 | 2026-01-13 | V9.9.2: Refactored to delegate seq_len to SequenceLengthCurriculum |
 | 1.6.0 | 2026-01-13 | V9.9.3: Added Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations) |
 | 1.7.0 | 2026-01-14 | V9.9.4: Added PPL Stability Check (ChatGPT's "Readiness Index") |
+| 1.8.0 | 2026-01-14 | V9.9.4: Upgraded to composite ReadinessIndex (velocity + acceleration + geometry) |
 
 ---
 
 ## 10. PPL Readiness Index (V9.9.4)
 
-ChatGPT's insight: "PPL is the right signal—but in a hybrid AGI, it must be read as a changing language, not a single number."
+ChatGPT's insight: "Learning is stable when improvement slows AND the model stops re-orienting itself."
+
+### The Key Insight
+
+PPL can drop while the model is:
+- Memorizing patterns instead of generalizing
+- Learning punctuation/formatting shortcuts
+- Stuck in representation churn
+
+**True stability requires:**
+1. **ΔPPL → small** (velocity collapse - learning pressure reduced)
+2. **ΔΔPPL → small** (acceleration collapse - velocity stabilized)
+3. **Internal geometry stops rotating** (phase/state metrics stable)
+
+### The Bicycle Analogy
+
+ChatGPT: "Learning to ride a bicycle - true stability is when you are no longer correcting every second and your balance stops oscillating."
+
+This is **plateaued improvement under stable geometry**, not just low PPL.
 
 ### 10.1 The Problem: PPL Means Different Things
 

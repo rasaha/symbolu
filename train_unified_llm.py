@@ -6698,6 +6698,214 @@ class SequenceLengthCurriculum:
 
 
 # =============================================================================
+# V9.9.4: READINESS INDEX - COMPOSITE STABILITY MEASUREMENT
+# =============================================================================
+# ChatGPT's insight: "Learning is stable when improvement slows AND the model
+# stops re-orienting itself." PPL alone lies - it can drop during memorization,
+# overfitting, or representation churn.
+#
+# True stability requires:
+#   1. ΔPPL → small (velocity collapse)
+#   2. ΔΔPPL → small (acceleration collapse)
+#   3. Internal geometry stops rotating (phase/state stability)
+
+class ReadinessIndex:
+    """
+    V9.9.4: Composite stability measurement for curriculum transitions.
+
+    Combines surface metrics (PPL velocity/acceleration) with internal
+    geometry metrics (phase coherence, state-delta stability) to determine
+    true learning stability.
+
+    ChatGPT's analogy: "Learning to ride a bicycle - true stability is when
+    you are no longer correcting every second and your balance stops oscillating."
+
+    The index answers: "Has PPL stopped changing because the model has SETTLED?"
+    Not just: "Is PPL going down?"
+    """
+
+    def __init__(
+        self,
+        ppl_velocity_threshold: float = 5.0,      # Max |ΔPPL| for "settled"
+        ppl_accel_threshold: float = 2.0,         # Max |ΔΔPPL| for "settled"
+        phase_stability_threshold: float = 0.1,   # Max phase variance for stable
+        state_delta_threshold: float = 0.5,       # Max state-delta magnitude for stable
+        history_window: int = 10,                 # Steps to track
+        require_geometry_check: bool = True,      # Gate with internal metrics
+    ):
+        """
+        Initialize ReadinessIndex.
+
+        Args:
+            ppl_velocity_threshold: Maximum PPL velocity (ΔPPL) to consider stable
+            ppl_accel_threshold: Maximum PPL acceleration (ΔΔPPL) to consider stable
+            phase_stability_threshold: Maximum phase coherence variance for stable
+            state_delta_threshold: Maximum state-delta norm for stable geometry
+            history_window: Number of steps to track in history
+            require_geometry_check: If True, also check internal geometry metrics
+        """
+        self.ppl_velocity_threshold = ppl_velocity_threshold
+        self.ppl_accel_threshold = ppl_accel_threshold
+        self.phase_stability_threshold = phase_stability_threshold
+        self.state_delta_threshold = state_delta_threshold
+        self.history_window = history_window
+        self.require_geometry_check = require_geometry_check
+
+        # History tracking
+        self.ppl_history: List[float] = []
+        self.phase_coherence_history: List[float] = []
+        self.state_delta_history: List[float] = []
+
+    def update(
+        self,
+        ppl: float,
+        phase_coherence: Optional[float] = None,
+        state_delta_norm: Optional[float] = None,
+    ):
+        """
+        Update history with latest metrics.
+
+        Args:
+            ppl: Current perplexity
+            phase_coherence: Phase coherence from SPC diagnostics (0-1)
+            state_delta_norm: Magnitude of state-delta from Sovereign State
+        """
+        self.ppl_history.append(ppl)
+        if len(self.ppl_history) > self.history_window:
+            self.ppl_history.pop(0)
+
+        if phase_coherence is not None:
+            self.phase_coherence_history.append(phase_coherence)
+            if len(self.phase_coherence_history) > self.history_window:
+                self.phase_coherence_history.pop(0)
+
+        if state_delta_norm is not None:
+            self.state_delta_history.append(state_delta_norm)
+            if len(self.state_delta_history) > self.history_window:
+                self.state_delta_history.pop(0)
+
+    def compute_ppl_velocity(self) -> float:
+        """Compute ΔPPL (first derivative) - rate of PPL change."""
+        if len(self.ppl_history) < 2:
+            return float('inf')
+
+        # Average of differences
+        diffs = [self.ppl_history[i+1] - self.ppl_history[i]
+                 for i in range(len(self.ppl_history) - 1)]
+        return sum(diffs) / len(diffs)
+
+    def compute_ppl_acceleration(self) -> float:
+        """Compute ΔΔPPL (second derivative) - rate of velocity change."""
+        if len(self.ppl_history) < 3:
+            return float('inf')
+
+        # First differences (velocities)
+        velocities = [self.ppl_history[i+1] - self.ppl_history[i]
+                      for i in range(len(self.ppl_history) - 1)]
+
+        # Second differences (acceleration)
+        accels = [velocities[i+1] - velocities[i]
+                  for i in range(len(velocities) - 1)]
+
+        return sum(accels) / len(accels) if accels else float('inf')
+
+    def compute_phase_stability(self) -> float:
+        """Compute variance in phase coherence (lower = more stable)."""
+        if len(self.phase_coherence_history) < 3:
+            return float('inf')
+
+        mean = sum(self.phase_coherence_history) / len(self.phase_coherence_history)
+        variance = sum((x - mean) ** 2 for x in self.phase_coherence_history) / len(self.phase_coherence_history)
+        return variance ** 0.5  # Standard deviation
+
+    def compute_state_delta_stability(self) -> float:
+        """Compute average state-delta magnitude (lower = more settled)."""
+        if len(self.state_delta_history) < 2:
+            return float('inf')
+
+        return sum(self.state_delta_history) / len(self.state_delta_history)
+
+    def is_ready(self, require_geometry: Optional[bool] = None) -> Tuple[bool, Dict[str, any]]:
+        """
+        Check if model has truly settled (ready for curriculum advancement).
+
+        Returns:
+            Tuple of (is_ready, diagnostics_dict)
+        """
+        if require_geometry is None:
+            require_geometry = self.require_geometry_check
+
+        velocity = self.compute_ppl_velocity()
+        acceleration = self.compute_ppl_acceleration()
+        phase_std = self.compute_phase_stability()
+        state_delta_avg = self.compute_state_delta_stability()
+
+        diagnostics = {
+            'ppl_velocity': velocity,
+            'ppl_acceleration': acceleration,
+            'phase_stability': phase_std,
+            'state_delta_avg': state_delta_avg,
+            'checks': {},
+        }
+
+        # Check 1: PPL velocity collapsed (ΔPPL → 0)
+        velocity_ok = abs(velocity) <= self.ppl_velocity_threshold
+        diagnostics['checks']['velocity'] = velocity_ok
+
+        # Check 2: PPL acceleration collapsed (ΔΔPPL → 0)
+        accel_ok = abs(acceleration) <= self.ppl_accel_threshold
+        diagnostics['checks']['acceleration'] = accel_ok
+
+        # Check 3: Internal geometry stable (if required)
+        geometry_ok = True
+        if require_geometry:
+            phase_ok = phase_std <= self.phase_stability_threshold if phase_std != float('inf') else True
+            state_ok = state_delta_avg <= self.state_delta_threshold if state_delta_avg != float('inf') else True
+            geometry_ok = phase_ok and state_ok
+            diagnostics['checks']['phase_stable'] = phase_ok
+            diagnostics['checks']['state_settled'] = state_ok
+
+        diagnostics['checks']['geometry'] = geometry_ok
+
+        # All checks must pass
+        is_ready = velocity_ok and accel_ok and geometry_ok
+        diagnostics['ready'] = is_ready
+
+        # Generate reason string
+        if is_ready:
+            diagnostics['reason'] = "settled"
+        elif not velocity_ok:
+            if velocity > 0:
+                diagnostics['reason'] = "ppl_rising"
+            else:
+                diagnostics['reason'] = "ppl_dropping_fast"
+        elif not accel_ok:
+            diagnostics['reason'] = "ppl_unstable"
+        elif not geometry_ok:
+            diagnostics['reason'] = "geometry_rotating"
+        else:
+            diagnostics['reason'] = "unknown"
+
+        return is_ready, diagnostics
+
+    def get_composite_score(self) -> float:
+        """
+        Get a 0-1 readiness score (useful for logging/visualization).
+
+        Higher = more ready to advance.
+        """
+        velocity = abs(self.compute_ppl_velocity())
+        accel = abs(self.compute_ppl_acceleration())
+
+        # Normalize to 0-1 (higher = better)
+        velocity_score = max(0, 1 - velocity / (self.ppl_velocity_threshold * 3))
+        accel_score = max(0, 1 - accel / (self.ppl_accel_threshold * 3))
+
+        # Weight: velocity matters more than acceleration
+        return 0.6 * velocity_score + 0.4 * accel_score
+
+
+# =============================================================================
 # V9.9.3: SOVEREIGN RESET PROTOCOL FOR CURRICULUM TRANSITIONS
 # =============================================================================
 # Based on Gemini's "Soft-Reset" recommendations to preserve PPL progress
@@ -10344,6 +10552,15 @@ class InvertedLayerCurriculumController:
         # Default: require stability for middle stages (geometry shift zone)
         self.stability_required_stages = stability_required_stages or [2, 3, 4]
 
+        # V9.9.4: ReadinessIndex for composite stability check
+        # Combines PPL velocity + acceleration + internal geometry
+        self.readiness_index = ReadinessIndex(
+            ppl_velocity_threshold=ppl_stability_threshold,
+            ppl_accel_threshold=ppl_stability_threshold / 2,  # Stricter on acceleration
+            history_window=10,
+            require_geometry_check=True,
+        )
+
         # Current state
         self.current_stage_idx = 0
         self.current_split = stages[0]
@@ -10356,7 +10573,7 @@ class InvertedLayerCurriculumController:
             local_layers=local_layers,
         )
 
-        # PPL tracking for smooth triggers
+        # PPL tracking for smooth triggers (kept for smoothed_ppl calculation)
         self.ppl_history: List[float] = []
         self.ppl_window = 10  # Steps to average PPL
 
@@ -10459,13 +10676,22 @@ class InvertedLayerCurriculumController:
         self,
         step: int,
         current_ppl: Optional[float] = None,
+        phase_coherence: Optional[float] = None,
+        state_delta_norm: Optional[float] = None,
     ) -> Dict[str, any]:
         """
-        Update the curriculum based on current step and PPL.
+        Update the curriculum based on current step, PPL, and internal geometry.
+
+        V9.9.4: Now uses composite ReadinessIndex that checks:
+        1. ΔPPL → small (velocity collapse)
+        2. ΔΔPPL → small (acceleration collapse)
+        3. Phase/state metrics stable (geometry settled)
 
         Args:
             step: Current training step
             current_ppl: Current validation PPL (optional)
+            phase_coherence: Phase coherence from SPC diagnostics (0-1)
+            state_delta_norm: Magnitude of state-delta from Sovereign State
 
         Returns:
             Dict with:
@@ -10476,28 +10702,38 @@ class InvertedLayerCurriculumController:
                 - 'seq_len_changed': Whether seq_len changed (from delegate)
                 - 'transitioning_layers': Number of layers currently transitioning
                 - 'layer_weights': Current per-layer weights
+                - 'readiness_score': Composite readiness score (0-1)
         """
         split_changed = False
         old_split = self.current_split
 
-        # Update PPL history
+        # Update PPL history (for smoothed_ppl calculation)
         if current_ppl is not None:
             self.ppl_history.append(current_ppl)
             if len(self.ppl_history) > self.ppl_window:
                 self.ppl_history.pop(0)
 
+        # V9.9.4: Update ReadinessIndex with all available metrics
+        if current_ppl is not None:
+            self.readiness_index.update(
+                ppl=current_ppl,
+                phase_coherence=phase_coherence,
+                state_delta_norm=state_delta_norm,
+            )
+
         # Check for stage advancement (split evolution)
-        # V9.9.4: Now includes PPL stability check for middle stages
+        # V9.9.4: Now uses composite ReadinessIndex for true stability check
         if self.current_stage_idx < len(self.stages) - 1 and current_ppl is not None:
             smoothed_ppl = sum(self.ppl_history) / len(self.ppl_history) if self.ppl_history else current_ppl
             next_trigger = self.ppl_triggers[self.current_stage_idx] if self.current_stage_idx < len(self.ppl_triggers) else float('inf')
             next_stage_idx = self.current_stage_idx + 1
 
             if smoothed_ppl < next_trigger:
-                # V9.9.4: Check PPL stability before advancing (ChatGPT's Readiness Index)
-                is_stable, slope, reason = self._is_ppl_stable(next_stage_idx)
+                # V9.9.4: Use composite ReadinessIndex for middle stages
+                require_geometry = next_stage_idx in self.stability_required_stages
+                is_ready, diagnostics = self.readiness_index.is_ready(require_geometry=require_geometry)
 
-                if is_stable:
+                if is_ready or next_stage_idx not in self.stability_required_stages:
                     # Advance to next stage
                     self.current_stage_idx = next_stage_idx
                     new_split = self.stages[self.current_stage_idx]
@@ -10506,26 +10742,36 @@ class InvertedLayerCurriculumController:
                         split_changed = True
                         self._transition_to_split(new_split, step)
 
-                    # Record history
+                    # Record history with full diagnostics
                     self.stage_history.append({
                         'stage': self.current_stage_idx,
                         'step': step,
                         'ppl': smoothed_ppl,
-                        'slope': slope,
+                        'velocity': diagnostics['ppl_velocity'],
+                        'acceleration': diagnostics['ppl_acceleration'],
+                        'reason': diagnostics['reason'],
                         'split': new_split,
                     })
                     self.last_stage_change_step = step
 
-                    stability_note = f" (slope: {slope:+.2f})" if reason == "stable" else ""
+                    # Log with velocity/acceleration info
+                    vel = diagnostics['ppl_velocity']
+                    acc = diagnostics['ppl_acceleration']
+                    stability_note = f" (Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f})"
                     print(f"\n  🎓 [INVERTED CURRICULUM] Stage {self.current_stage_idx} reached!{stability_note}")
                     print(f"      PPL {smoothed_ppl:.2f} < {next_trigger:.0f}")
                     print(f"      Split: {old_split[0]}:{old_split[1]} → {new_split[0]}:{new_split[1]}")
+                    if require_geometry:
+                        print(f"      Readiness: {diagnostics['reason']} (geometry checked)")
                 else:
-                    # V9.9.4: PPL threshold met but not stable - wait for plateau
+                    # V9.9.4: PPL threshold met but not truly settled - wait
                     # Only log occasionally to avoid spam
                     if step % 500 == 0:
+                        vel = diagnostics['ppl_velocity']
+                        acc = diagnostics['ppl_acceleration']
                         print(f"  ⏳ [INVERTED CURRICULUM] Stage {next_stage_idx} pending: "
-                              f"PPL {smoothed_ppl:.1f} < {next_trigger:.0f} but {reason} (slope: {slope:+.2f})")
+                              f"PPL {smoothed_ppl:.1f} < {next_trigger:.0f} but {diagnostics['reason']}")
+                        print(f"      Δppl: {vel:+.2f}, ΔΔppl: {acc:+.2f}")
 
         # Update per-layer phase controller (for soft transitions)
         phase_result = self.phase_controller.update(step)
@@ -10547,6 +10793,7 @@ class InvertedLayerCurriculumController:
             'transitioning_layers': phase_result['active_transitions'],
             'layer_weights': phase_result['weights'],
             'completed_transitions': phase_result['completed'],  # V9.9.3: For momentum dampening
+            'readiness_score': self.readiness_index.get_composite_score(),  # V9.9.4: Composite readiness
         }
 
     def _transition_to_split(self, new_split: Tuple[int, int], step: int):
@@ -15219,8 +15466,23 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.9.1: Inverted Layer Curriculum Update
                 # V9.9.3: With Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations)
+                # V9.9.4: Now with composite ReadinessIndex (ChatGPT's insight)
                 if inverted_layer_curriculum is not None:
-                    ilc_result = inverted_layer_curriculum.update(global_step, val_ppl)
+                    # V9.9.4: Try to extract geometry metrics for composite readiness check
+                    # These come from val_metrics if available (phase coherence, state-delta)
+                    _phase_coherence = val_metrics.get('phase_coherence', None)
+                    _state_delta_norm = val_metrics.get('state_delta_norm', None)
+
+                    # Also try to get from sovereign diagnostics if computed
+                    if _state_delta_norm is None and 'sovereign_diag' in dir() and sovereign_diag:
+                        _state_delta_norm = sovereign_diag.get('delta_magnitude', None)
+
+                    ilc_result = inverted_layer_curriculum.update(
+                        step=global_step,
+                        current_ppl=val_ppl,
+                        phase_coherence=_phase_coherence,
+                        state_delta_norm=_state_delta_norm,
+                    )
 
                     # Apply updated per-layer weights to model
                     inverted_layer_curriculum.apply_to_model(model)
