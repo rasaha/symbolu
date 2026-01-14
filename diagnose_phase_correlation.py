@@ -55,10 +55,10 @@ def load_model(checkpoint_path: str):
     if config.model_type == "ontological_hybrid":
         model = OntologicalHybridTransformer(
             vocab_size=config.vocab_size,
-            d_model=config.d_model,
-            n_layers=config.n_layers,
-            n_heads=config.n_heads,
-            d_ff=config.d_ff,
+            embed_dim=config.d_model,
+            num_layers=config.n_layers,
+            num_heads=config.n_heads,
+            ff_dim=config.d_ff,
             dropout=config.dropout,
             max_seq_len=config.max_seq_len,
             state_dim=config.state_dim,
@@ -108,7 +108,7 @@ def analyze_phase_local_correlation(model, batch_size=4, seq_len=128):
 
     # Register hooks on hybrid layers
     hooks = []
-    for i in range(model.local_layers, model.n_layers):
+    for i in range(model.hybrid.local_layers, model.hybrid.config.num_layers):
         layer = model.hybrid.blocks[i].attention
 
         # Hook phase attention
@@ -145,7 +145,7 @@ def analyze_phase_local_correlation(model, batch_size=4, seq_len=128):
 
     results = {}
 
-    for i in range(model.local_layers, model.n_layers):
+    for i in range(model.hybrid.local_layers, model.hybrid.config.num_layers):
         layer_name = f'layer_{i}'
 
         if layer_name not in phase_outputs or layer_name not in local_outputs:
@@ -297,8 +297,8 @@ if __name__ == "__main__":
     model, config = load_model(checkpoint_path)
 
     print(f"\nModel loaded: {config.model_type}")
-    print(f"Local layers: {model.local_layers}")
-    print(f"Hybrid layers: {model.local_layers} to {model.n_layers-1}")
+    print(f"Local layers: {model.hybrid.local_layers}")
+    print(f"Hybrid layers: {model.hybrid.local_layers} to {model.hybrid.config.num_layers-1}")
 
     # Run correlation analysis
     results = analyze_phase_local_correlation(model, batch_size=4, seq_len=256)
