@@ -434,25 +434,27 @@ class PhaseEvalHarness:
 
         For now, uses random tokens. In production, use real validation data.
         """
-        # Get vocab_size from model's actual embedding layer (safest)
+        # Get vocab_size and max_seq_len from model's actual embedding layers
+        # Handle different model architectures
+        vocab_size = None
+        max_seq_len = None
+
+        # Try hybrid model structure
         if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'token_embed'):
             vocab_size = self.model.hybrid.token_embed.num_embeddings
+            max_seq_len = self.model.hybrid.pos_embed.num_embeddings
+        # Try direct token_embed
         elif hasattr(self.model, 'token_embed'):
             vocab_size = self.model.token_embed.num_embeddings
-        elif hasattr(self.config, 'vocab_size'):
-            vocab_size = self.config.vocab_size
+            max_seq_len = self.model.pos_embed.num_embeddings if hasattr(self.model, 'pos_embed') else 2048
+        # Try SymbolU12 style (embed instead of token_embed)
+        elif hasattr(self.model, 'embed'):
+            vocab_size = self.model.embed.num_embeddings
+            max_seq_len = self.model.pos_embed.num_embeddings if hasattr(self.model, 'pos_embed') else 2048
+        # Fallback to config
         else:
-            vocab_size = 50257  # GPT-2 default
-
-        # Get max_seq_len from model
-        if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'pos_embed'):
-            max_seq_len = self.model.hybrid.pos_embed.num_embeddings
-        elif hasattr(self.model, 'pos_embed'):
-            max_seq_len = self.model.pos_embed.num_embeddings
-        elif hasattr(self.config, 'max_seq_len'):
-            max_seq_len = self.config.max_seq_len
-        else:
-            max_seq_len = 2048
+            vocab_size = getattr(self.config, 'vocab_size', 50257)
+            max_seq_len = getattr(self.config, 'max_seq_len', 2048)
 
         # Clamp seq_len to model's max
         effective_seq_len = min(seq_len, max_seq_len - 1)  # -1 for safety with x[:,:-1]/y[:,1:]
@@ -616,12 +618,23 @@ class PhaseEvalHarness:
         print("=" * 70)
 
         # Detect model's max_seq_len and vocab_size
+        # Handle different model architectures
+        max_seq_len = None
+        vocab_size = None
+
+        # Try hybrid model structure
         if hasattr(self.model, 'hybrid') and hasattr(self.model.hybrid, 'pos_embed'):
             max_seq_len = self.model.hybrid.pos_embed.num_embeddings
             vocab_size = self.model.hybrid.token_embed.num_embeddings
-        elif hasattr(self.model, 'pos_embed'):
+        # Try direct pos_embed with token_embed
+        elif hasattr(self.model, 'pos_embed') and hasattr(self.model, 'token_embed'):
             max_seq_len = self.model.pos_embed.num_embeddings
             vocab_size = self.model.token_embed.num_embeddings
+        # Try SymbolU12 style (embed instead of token_embed)
+        elif hasattr(self.model, 'pos_embed') and hasattr(self.model, 'embed'):
+            max_seq_len = self.model.pos_embed.num_embeddings
+            vocab_size = self.model.embed.num_embeddings
+        # Fallback to config
         else:
             max_seq_len = getattr(self.config, 'max_seq_len', 2048)
             vocab_size = getattr(self.config, 'vocab_size', 50257)
