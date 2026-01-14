@@ -35,32 +35,32 @@ def load_model(checkpoint_path: str):
 
     config = SimpleConfig(**config_dict)
 
-    # Debug: Print key config values
-    print(f"Config keys check:")
-    print(f"  n_embd: {getattr(config, 'n_embd', 'NOT FOUND')}")
-    print(f"  d_model: {getattr(config, 'd_model', 'NOT FOUND')}")
-    print(f"  n_layer: {getattr(config, 'n_layer', 'NOT FOUND')}")
-    print(f"  n_head: {getattr(config, 'n_head', 'NOT FOUND')}")
+    # Model size presets (from train_unified_llm.py)
+    MODEL_PRESETS = {
+        "tiny": {"embed_dim": 256, "num_layers": 6, "num_heads": 4, "ff_dim": 1024},
+        "small": {"embed_dim": 512, "num_layers": 8, "num_heads": 8, "ff_dim": 2048},
+        "medium": {"embed_dim": 768, "num_layers": 12, "num_heads": 12, "ff_dim": 3072},
+        "large": {"embed_dim": 1024, "num_layers": 16, "num_heads": 16, "ff_dim": 4096},
+    }
 
-    # Map config keys (training script uses different names)
-    # Prefer n_embd over d_model
-    if hasattr(config, 'n_embd') and config.n_embd is not None:
-        config.d_model = config.n_embd
-    elif not hasattr(config, 'd_model') or config.d_model is None:
-        raise ValueError("Config must have either 'n_embd' or 'd_model'")
-
-    if hasattr(config, 'n_layer') and config.n_layer is not None:
-        config.n_layers = config.n_layer
-    elif not hasattr(config, 'n_layers') or config.n_layers is None:
-        raise ValueError("Config must have either 'n_layer' or 'n_layers'")
-
-    if hasattr(config, 'n_head') and config.n_head is not None:
-        config.n_heads = config.n_head
-    elif not hasattr(config, 'n_heads') or config.n_heads is None:
-        raise ValueError("Config must have either 'n_head' or 'n_heads'")
-
-    if not hasattr(config, 'd_ff') or config.d_ff is None:
-        config.d_ff = 4 * config.d_model  # Standard transformer ratio
+    # Resolve model_size to actual dimensions
+    if hasattr(config, 'model_size') and config.model_size in MODEL_PRESETS:
+        preset = MODEL_PRESETS[config.model_size]
+        config.d_model = preset["embed_dim"]
+        config.n_layers = preset["num_layers"]
+        config.n_heads = preset["num_heads"]
+        config.d_ff = preset["ff_dim"]
+        print(f"Using model_size '{config.model_size}': {config.d_model}d, {config.n_layers}L, {config.n_heads}H")
+    else:
+        # Fallback: Try to use explicit n_embd/n_layer/n_head
+        if hasattr(config, 'n_embd') and config.n_embd is not None:
+            config.d_model = config.n_embd
+        if hasattr(config, 'n_layer') and config.n_layer is not None:
+            config.n_layers = config.n_layer
+        if hasattr(config, 'n_head') and config.n_head is not None:
+            config.n_heads = config.n_head
+        if not hasattr(config, 'd_ff') or config.d_ff is None:
+            config.d_ff = 4 * config.d_model
 
     # Add defaults for potentially missing keys
     if not hasattr(config, 'cosine_mode'):
