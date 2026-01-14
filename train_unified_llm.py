@@ -16894,6 +16894,10 @@ def main():
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
 
+    # Decorrelation loss (to force phase and local to learn different features)
+    parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
+                       help="Weight for decorrelation loss (0=disabled, 0.1=recommended)")
+
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
                        help="Enable per-layer phase weight control (for inverted curriculum)")
