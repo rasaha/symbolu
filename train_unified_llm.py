@@ -16319,6 +16319,9 @@ def train(config: UnifiedTrainingConfig):
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
+                    # V9.8.10: Restore scheduled alpha before saving checkpoint
+                    # (InvertedLayerCurriculum may have modified it during validation)
+                    update_alpha_schedule(model, global_step, config)
                     save_checkpoint(
                         model, optimizer, scheduler, global_step, best_val_loss,
                         ckpt_dir / "best.pt",
@@ -16363,6 +16366,8 @@ def train(config: UnifiedTrainingConfig):
 
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0:
+                # V9.8.10: Ensure scheduled alpha is applied before saving
+                update_alpha_schedule(model, global_step, config)
                 save_checkpoint(
                     model, optimizer, scheduler, global_step, best_val_loss,
                     ckpt_dir / "last.pt",
@@ -16386,6 +16391,8 @@ def train(config: UnifiedTrainingConfig):
                     training_state_tracker.save_state()
 
     # Final save
+    # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
+    update_alpha_schedule(model, global_step, config)
     save_checkpoint(
         model, optimizer, scheduler, global_step, best_val_loss,
         ckpt_dir / "final.pt",
