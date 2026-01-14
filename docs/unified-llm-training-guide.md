@@ -907,14 +907,309 @@ If using architecture overrides and hitting OOM:
 - With gradient checkpointing: ~45GB (40% savings)
 - With both: ~38GB
 
+## Phase Layer Learning Diagnostics
+
+### Overview
+
+The `debug_phase_layer_learning.py` script provides definitive tests to verify that phase attention layers are actually learning and contributing to model performance. This is critical for ontological models where phase attention handles long-range dependencies.
+
+**When to Use:**
+- After training to verify phase layers learned meaningful representations
+- When PPL is unexpectedly high or not decreasing
+- When model outputs are repetitive despite training
+- Before deploying to confirm architecture is working correctly
+
+### Quick Start
+
+```bash
+# RECOMMENDED: Quick gradient flow check (runs 5 synthetic training steps)
+python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --check_gradients
+
+# Full evaluation harness (comprehensive phase ablation tests)
+python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --run_full_harness
+
+# Both gradient check + full harness
+python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt --check_gradients --run_full_harness
+```
+
+### CLI Parameters
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--checkpoint` | str | required | Path to model checkpoint (.pt file) |
+| `--device` | str | cuda | Device to use (cuda/cpu) |
+| `--batch_size` | int | 4 | Batch size for evaluation |
+| `--output` | str | None | Path to save results JSON |
+| `--check_gradients` | flag | False | Run gradient flow check (quick training step test) |
+| `--gradient_steps` | int | 5 | Number of steps for gradient check |
+| `--run_full_harness` | flag | False | Run complete phase evaluation harness |
+| `--phase_eval_mode` | str | normal | Phase evaluation mode: `normal`, `zero`, `noise`, `shuffle` |
+| `--phase_noise_sigma` | float | 0.03 | Standard deviation for noise mode |
+| `--phase_noise_sigmas` | str | 0.00,0.03,0.10,0.30 | Comma-separated noise sigmas for sweep |
+| `--phase_eval_lengths` | str | 128,256,512,1024 | Comma-separated sequence lengths (clamped to model's max_seq_len) |
+| `--phase_eval_runs` | int | 3 | Number of runs to average for noise mode |
+
+### Test 1: Gradient Flow Check (`--check_gradients`)
+
+**Purpose:** Verify gradients flow through phase layers during training.
+
+**What It Does:**
+1. Runs N synthetic training steps with backward passes
+2. Computes `phase_grad_norm` vs `total_grad_norm` ratio
+3. Identifies which phase layers have zero/tiny/healthy gradients
+4. Provides per-layer gradient breakdown
+
+**Example Output:**
+```
+======================================================================
+  PHASE GRADIENT FLOW CHECK
+======================================================================
+
+  [PhaseGradientMonitor] Identified 42 phase parameters
+    - layers_1_8.0.phase_attn.q_proj.weight
+    - layers_1_8.0.phase_attn.k_proj.weight
+    ...
+
+  Running 5 gradient check steps...
+  Step   Loss         Phase Grad     Total Grad     Ratio      Status
+  ----------------------------------------------------------------------
+  0      10.8234      0.012456       1.234567       0.0101     ✅ OK
+  1      10.7891      0.013201       1.198234       0.0110     ✅ OK
+  2      10.8012      0.011987       1.245678       0.0096     ✅ OK
+  3      10.7654      0.012789       1.201234       0.0106     ✅ OK
+  4      10.7432      0.013456       1.187654       0.0113     ✅ OK
+
+  Summary:
+    Average phase_grad_ratio: 0.010520
+    Average phase_grad_norm: 0.012778
+    Steps with zero phase grad: 0/5
+
+  Gradient Flow Verdict:
+    ✅ PASS: Phase gradients are flowing (ratio=0.0105)
+
+  Phase Parameter Gradient Breakdown:
+    layers_1_8.0.phase_attn: 0.003456 (8 params)
+    layers_1_8.1.phase_attn: 0.002987 (8 params)
+    ...
+```
+
+**Verdict Meanings:**
+
+| Verdict | Meaning | Action |
+|---------|---------|--------|
+| ❌ ZERO | Phase gradients are ALWAYS zero | Phase layers not connected to loss. Check model wiring. |
+| ⚠️ TINY | Phase gradient ratio < 0.001 | Phase contribution suppressed. Check `alpha_phase`, `aux_scale`. |
+| ✅ OK | Gradient ratio 0.001-0.3 | Healthy gradient flow. |
+| ⚠️ HUGE | Phase gradient ratio > 0.3 | Phase may dominate local attention. |
+
+### Test 2: Phase Ablation (`--phase_eval_mode zero`)
+
+**Purpose:** Prove phase attention is necessary for performance by zeroing it out.
+
+**Expected Result (if phase is learning):**
+- At long context (512-1024 tokens): PPL increases >5% when phase=0
+- At short context (128 tokens): Smaller or no effect (local attention sufficient)
+
+**Example:**
+```bash
+python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt \
+    --phase_eval_mode zero --phase_eval_lengths 128,512,1024
+```
+
+### Test 3: Phase Noise Sweep (`--phase_eval_mode noise`)
+
+**Purpose:** Prove model is sensitive to phase values (not just using phase as regularization).
+
+**Expected Result (if phase is learning):**
+- Monotonic PPL degradation as noise σ increases: 0.03 < 0.10 < 0.30
+- Effect stronger at longer sequences
+
+**Example:**
+```bash
+python debug_phase_layer_learning.py --checkpoint checkpoints/best.pt \
+    --phase_eval_mode noise --phase_noise_sigmas 0.00,0.03,0.10,0.30
+```
+
+### Test 4: Phase Shuffle (`--phase_eval_mode shuffle`)
+
+**Purpose:** Prove phase content is meaningful (alignment matters).
+
+**Expected Result (if phase is learning):**
+- Shuffling phase across batch/time degrades performance
+- If shuffle has no effect, phase may be redundant
+
+### Test 5: Full Evaluation Harness (`--run_full_harness`)
+
+**Purpose:** Run complete evaluation matrix across all modes and sequence lengths.
+
+**What It Does:**
+1. Evaluates at multiple sequence lengths (128, 256, 512, 1024)
+2. Tests all phase modes (normal, zero, noise@σ, shuffle)
+3. Computes ΔPPL and ΔRep vs baseline (normal)
+4. Generates automated verdict
+
+**Example Output:**
+```
+======================================================================
+  VERDICT TABLE: ΔPPL and ΔRep vs Normal
+======================================================================
+
+  Seq Len    Mode            PPL        ΔPPL         ΔRep
+  -------------------------------------------------------
+  128        zero            25.34      +0.52 (+2.1%)    -0.2%
+  512        zero            28.91      +2.45 (+9.3%)↑↑  +1.5%
+  1024       zero            32.67      +4.12 (+14.4%)↑↑ +2.8%↑
+  1024       noise@0.03      29.12      +0.57 (+2.0%)    +0.3%
+  1024       noise@0.10      30.45      +1.90 (+6.6%)↑   +0.8%
+  1024       noise@0.30      33.21      +4.66 (+16.3%)↑↑ +1.9%
+  1024       shuffle         31.89      +3.34 (+11.7%)↑↑ +2.1%↑
+
+======================================================================
+  FINAL VERDICT
+======================================================================
+
+  ✅ PHASE LAYERS ARE LEARNING
+
+  Evidence:
+    • PASS: Zero ablation at seq=1024 caused 14.4% PPL increase
+    • PASS: Shuffle test at seq=1024 caused 11.7% PPL increase
+    • PASS: Noise sweep shows monotonic PPL degradation
+    • PASS: Length-dependent sensitivity (short: 2.1%, long: 14.4%)
+```
+
+### Interpreting Results
+
+**✅ Phase IS Learning (All conditions met):**
+1. Zero ablation at long context causes >5% PPL increase
+2. Noise sweep shows monotonic degradation
+3. Shuffle is worse than normal
+4. Effect increases with sequence length
+
+**❌ Phase NOT Learning (Any condition fails):**
+1. Zero ablation has <5% effect → Phase not contributing
+2. Noise improves PPL → Phase may be harmful noise
+3. Shuffle has no effect → Phase content meaningless
+4. No length-dependent effect → Phase not handling long-range
+
+### Common Failure Patterns
+
+#### Pattern 1: PPL ~50,000+ (Near Random)
+
+**Symptom:** PPL is near vocab_size, entropy at maximum.
+
+```
+  [PHASE-EVAL] mode=normal | seq=1024 | ppl=58733.12 | entropy=10.66
+```
+
+**Diagnosis:** Model hasn't learned language modeling at all. Phase testing is meaningless until base model works.
+
+**Action:** Check training loss history. Resume training or fix data pipeline.
+
+#### Pattern 2: Zero Gradients
+
+**Symptom:** `--check_gradients` shows all zeros.
+
+```
+  Gradient Flow Verdict:
+    ❌ CRITICAL: Phase gradients are ALWAYS ZERO
+```
+
+**Diagnosis:** Phase layers not connected to loss path.
+
+**Action:**
+- Check if `phase_attn` is in forward path
+- Verify `intent_phase` is passed through hybrid layers
+- Check `alpha_phase` is not zero
+
+#### Pattern 3: Tiny Gradients
+
+**Symptom:** Phase gradient ratio < 0.001.
+
+```
+  Gradient Flow Verdict:
+    ⚠️  WARNING: Phase gradients are very small (ratio=0.000234)
+```
+
+**Diagnosis:** Phase contribution suppressed.
+
+**Action:**
+- Increase `--alpha_phase` (default 0.2, try 0.4)
+- Check `aux_scale` in PhaseAttentionLayer (should be 1.0, not 0.1)
+- Reduce double-dampening if present
+
+#### Pattern 4: No Length-Dependent Effect
+
+**Symptom:** Zero ablation has same effect at all lengths.
+
+```
+  128: zero → +1.2% PPL
+  512: zero → +1.1% PPL
+  1024: zero → +1.3% PPL
+```
+
+**Diagnosis:** Phase attention not handling long-range dependencies specifically.
+
+**Action:**
+- Phase may be acting as generic regularization
+- Check sync_steps and sync_lr parameters
+- Consider increasing phase temperature for sharper attention
+
+### Integration with Training
+
+You can use `PhaseGradientMonitor` during training to log gradient flow:
+
+```python
+from debug_phase_layer_learning import PhaseGradientMonitor
+
+# In training loop
+monitor = PhaseGradientMonitor(model)
+
+for step, batch in enumerate(dataloader):
+    loss.backward()
+
+    if step % 100 == 0:
+        stats = monitor.compute_gradient_stats()
+        print(f"Step {step}: phase_ratio={stats['phase_grad_ratio']:.4f}")
+
+        if stats['phase_grad_norm'] == 0:
+            print("WARNING: Phase gradients are zero!")
+```
+
+### Reference: Expected "Phase is Learning" Signatures
+
+| Metric | Healthy Range | Warning |
+|--------|---------------|---------|
+| Phase gradient ratio | 0.001 - 0.3 | <0.001 (suppressed) or >0.3 (dominating) |
+| Zero ablation ΔPPL (1024 tokens) | >5% increase | <2% (phase not contributing) |
+| Noise monotonicity | Strict degradation | PPL improves with noise (phase harmful) |
+| Shuffle effect | >3% PPL increase | <1% (alignment doesn't matter) |
+| Length-dependent sensitivity | Long > Short effect | Equal effect (not handling long-range) |
+
+### Example: Debugging a Failed Model
+
+```bash
+# Step 1: Check gradient flow first (quick)
+python debug_phase_layer_learning.py --checkpoint checkpoints_medium/best.pt --check_gradients
+
+# If gradients OK, run full harness
+python debug_phase_layer_learning.py --checkpoint checkpoints_medium/best.pt --run_full_harness
+
+# Save results for analysis
+python debug_phase_layer_learning.py --checkpoint checkpoints_medium/best.pt \
+    --check_gradients --run_full_harness --output phase_diagnostics.json
+```
+
 ## File Structure
 
 ```
 symbolu/
 ├── symbolu/ontological/
-│   ├── symbolu12_bhava.py          # SymbolU12 with Phase Attention
+│   ├── symbolu12_bhava.py              # SymbolU12 with Phase Attention
 │   └── ...
-├── train_unified_llm.py            # Main training script
+├── symbolu/phase_transformer.py        # Phase attention implementations
+├── train_unified_llm.py                # Main training script
+├── debug_phase_layer_learning.py       # Phase layer diagnostics (this guide)
+├── diagnose_phase_attention.py         # Phase attention analysis
 └── docs/
     ├── ontological-training-guide.md   # 100D Engine training
     └── unified-llm-training-guide.md   # This file
