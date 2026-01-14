@@ -10982,14 +10982,17 @@ def update_alpha_schedule(model: nn.Module, step: int, config: UnifiedTrainingCo
 
     Returns current alpha_phase value.
     """
-    if config.model_type not in ("phase", "hybrid"):
-        return config.alpha_phase  # No decay for ontological
+    # V9.8.10: Check if model type contains "hybrid" or "phase" (supports ontological_hybrid)
+    if "hybrid" not in config.model_type and "phase" not in config.model_type:
+        return config.alpha_phase  # No alpha scheduling for pure ontological/standard models
 
     # Calculate current alpha based on linear decay
-    if step >= config.alpha_decay_steps:
+    # V9.8.10: Use phase_ramp_steps if available (more intuitive), fallback to alpha_decay_steps
+    decay_steps = getattr(config, 'phase_ramp_steps', config.alpha_decay_steps)
+    if step >= decay_steps:
         current_alpha = config.alpha_phase_end
     else:
-        frac = step / config.alpha_decay_steps
+        frac = step / decay_steps
         current_alpha = config.alpha_phase_start + frac * (config.alpha_phase_end - config.alpha_phase_start)
 
     # Update all HybridAttentionLayer modules
