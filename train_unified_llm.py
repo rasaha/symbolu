@@ -12292,6 +12292,10 @@ def train(config: UnifiedTrainingConfig):
         probe_seq_len = config.seq_len_start if config.enable_seq_curriculum else config.max_seq_len
         if config.enable_seq_curriculum:
             print(f"  📐 Seq Curriculum: Probing with START length {probe_seq_len} (will ramp to {config.max_seq_len})")
+            # Store probe length for later batch scaling reference
+            config.auto_batch_probed_seq_len = probe_seq_len
+        else:
+            config.auto_batch_probed_seq_len = config.max_seq_len
 
         auto_sizer = AutoBatchSizer(
             model=model,
@@ -13616,8 +13620,8 @@ def train(config: UnifiedTrainingConfig):
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
     current_seq_len = config.max_seq_len
-    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at max seq_len
-    seq_curriculum_ref_seq_len = config.max_seq_len  # Reference sequence length
+    seq_curriculum_ref_batch = config.batch_size  # Reference batch size at probed seq_len
+    seq_curriculum_ref_seq_len = getattr(config, 'auto_batch_probed_seq_len', config.max_seq_len)  # Probed reference
     if config.enable_seq_curriculum:
         seq_len_curriculum = SequenceLengthCurriculum(
             seq_len_start=config.seq_len_start,
@@ -13628,23 +13632,30 @@ def train(config: UnifiedTrainingConfig):
         )
         current_seq_len = config.seq_len_start  # Start with short sequences
 
-        # V2.3.4: Calculate scaled batch size for initial short sequence length
+        # V9.8.10: Calculate scaled batch size for initial short sequence length
+        # AutoBatchSizer already probed at seq_len_start, so use that as reference
         # Memory scales ~linearly with seq_len, so batch can scale inversely
-        seq_curriculum_ref_batch = config.batch_size
-        seq_curriculum_ref_seq_len = config.seq_len_end  # Reference is the target/max
-        scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
-        scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
+        seq_curriculum_ref_batch = config.batch_size  # Probed at seq_len_start
+        seq_curriculum_ref_seq_len = getattr(config, 'auto_batch_probed_seq_len', config.seq_len_start)
+        # If we're at the probed length, use probed batch directly (no scaling needed)
+        if current_seq_len == seq_curriculum_ref_seq_len:
+            scaled_batch = seq_curriculum_ref_batch
+        else:
+            # Scale inversely with sequence length (longer seq = smaller batch)
+            scaled_batch = int(seq_curriculum_ref_batch * (seq_curriculum_ref_seq_len / current_seq_len))
+            scaled_batch = min(scaled_batch, config.batch_size_max)  # Cap at configurable max
         config.batch_size = scaled_batch
 
         print(f"\n  📏 [SEQ CURRICULUM] Sequence Length Curriculum ENABLED")
         print(f"     Ramping: {config.seq_len_start} → {config.seq_len_end} tokens")
         print(f"     Ramp steps: {config.seq_len_ramp_steps}")
         print(f"     Mode: {config.seq_len_ramp_mode.upper()}")
-        print(f"     Batch scaling: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok → {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
+        print(f"     Probed batch: {seq_curriculum_ref_batch} @ {seq_curriculum_ref_seq_len}tok (AutoBatchSizer)")
+        print(f"     Starting batch: {scaled_batch} @ {current_seq_len}tok (max: {config.batch_size_max})")
         if config.seq_len_ppl_gate > 0:
             print(f"     PPL Gate: Only ramp when PPL < {config.seq_len_ppl_gate}")
-        print(f"\n     ⚠️  Starting with {config.seq_len_start}-token sequences (batch={scaled_batch})")
-        print(f"     ⚠️  Will reload dataloader as sequence length increases\n")
+        print(f"\n     ✅ Starting with {current_seq_len}-token sequences (batch={scaled_batch})")
+        print(f"     📈 Batch will scale DOWN as sequences lengthen (memory-adaptive)\n")
 
         # Reload data with initial short sequence length and scaled batch
         train_loader, val_loader = load_data(config, tokenizer, seq_len_override=current_seq_len)
