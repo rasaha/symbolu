@@ -15187,6 +15187,10 @@ def train(config: UnifiedTrainingConfig):
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
 
+                    # Add decorr_loss if enabled
+                    if 'decorr_loss' in metrics:
+                        log_msg += f" | Decorr: {metrics['decorr_loss']:.4f}"
+
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
 
