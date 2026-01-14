@@ -1778,6 +1778,73 @@ class HybridAttentionLayer(nn.Module):
         return output
 
 
+def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
+    """
+    Compute orthogonalization loss between local and phase attention weight matrices.
+
+    This directly regularizes the PARAMETERS (not outputs) to encourage local and phase
+    attention to learn fundamentally different transformations.
+
+    For each HybridAttentionLayer, we penalize cosine similarity between:
+    - Local Q weights vs Phase Q weights (W_q_phase)
+    - Local K weights vs Phase K weights (W_k_phase)
+    - Local V weights vs Phase V weights
+
+    This ensures gradients flow directly through parameters, unlike output decorrelation
+    which can be blocked by detach() operations or competing gradients.
+
+    Args:
+        model: Model containing HybridAttentionLayer modules
+
+    Returns:
+        Scalar tensor with orthogonalization loss (lower = more orthogonal)
+    """
+    ortho_losses = []
+
+    for module in model.modules():
+        if isinstance(module, HybridAttentionLayer):
+            local_attn = module.local_attn
+            phase_attn = module.phase_attn
+
+            # Q weights: local.q_proj vs phase.W_q_phase
+            local_q = local_attn.q_proj.weight.flatten()
+            phase_q = phase_attn.W_q_phase.weight.flatten()
+            # Cosine similarity squared (penalize both +1 and -1 alignment)
+            cos_q = F.cosine_similarity(local_q.unsqueeze(0), phase_q.unsqueeze(0), eps=1e-8)
+            ortho_losses.append(cos_q ** 2)
+
+            # K weights: local.k_proj vs phase.W_k_phase
+            # Note: local.k_proj may have different shape due to GQA
+            local_k = local_attn.k_proj.weight.flatten()
+            phase_k = phase_attn.W_k_phase.weight.flatten()
+            # Handle shape mismatch by truncating to smaller
+            min_len = min(local_k.shape[0], phase_k.shape[0])
+            cos_k = F.cosine_similarity(
+                local_k[:min_len].unsqueeze(0),
+                phase_k[:min_len].unsqueeze(0),
+                eps=1e-8
+            )
+            ortho_losses.append(cos_k ** 2)
+
+            # V weights: local.v_proj vs phase.v_proj
+            local_v = local_attn.v_proj.weight.flatten()
+            phase_v = phase_attn.v_proj.weight.flatten()
+            min_len = min(local_v.shape[0], phase_v.shape[0])
+            cos_v = F.cosine_similarity(
+                local_v[:min_len].unsqueeze(0),
+                phase_v[:min_len].unsqueeze(0),
+                eps=1e-8
+            )
+            ortho_losses.append(cos_v ** 2)
+
+    if not ortho_losses:
+        # No HybridAttentionLayers found, return zero loss
+        return torch.tensor(0.0, device=next(model.parameters()).device)
+
+    # Average across all weight pairs
+    return torch.stack(ortho_losses).mean()
+
+
 class HybridTransformerBlock(nn.Module):
     """Transformer block with hybrid local + phase attention."""
 
