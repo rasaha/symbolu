@@ -9018,6 +9018,9 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # Decorrelation loss (to force phase and local to learn different features)
+    decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
+
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
     per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
@@ -13750,12 +13753,26 @@ def train(config: UnifiedTrainingConfig):
                 }
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
-                outputs = model(x)  # Use 'outputs' consistently for hidden_state_extractor
+                # Enable decorrelation loss for hybrid/ontological_hybrid models
+                enable_decorr = (
+                    hasattr(config, 'decorr_loss_weight') and
+                    config.decorr_loss_weight > 0 and
+                    config.model_type in ('hybrid', 'ontological_hybrid')
+                )
+                outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
+
                 if isinstance(outputs, dict):
                     logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
                 else:
                     logits = outputs
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Add decorrelation loss if enabled
+                if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
+                    decorr_loss = outputs['decorr_loss']
+                    loss = loss + config.decorr_loss_weight * decorr_loss
+                    metrics['decorr_loss'] = decorr_loss.item()
+                    metrics['decorr_weight'] = config.decorr_loss_weight
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
