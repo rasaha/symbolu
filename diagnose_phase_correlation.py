@@ -35,6 +35,16 @@ def load_model(checkpoint_path: str):
 
     config = SimpleConfig(**config_dict)
 
+    # Map config keys (training script uses different names)
+    if not hasattr(config, 'd_model') and hasattr(config, 'n_embd'):
+        config.d_model = config.n_embd
+    if not hasattr(config, 'n_layers') and hasattr(config, 'n_layer'):
+        config.n_layers = config.n_layer
+    if not hasattr(config, 'n_heads') and hasattr(config, 'n_head'):
+        config.n_heads = config.n_head
+    if not hasattr(config, 'd_ff'):
+        config.d_ff = 4 * config.d_model  # Standard transformer ratio
+
     # Add defaults for potentially missing keys
     if not hasattr(config, 'cosine_mode'):
         config.cosine_mode = 'standard'
