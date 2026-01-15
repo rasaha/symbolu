@@ -212,6 +212,19 @@ def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
 # Solution: Chunked vectorization reduces N iterations to N/chunk_size iterations.
 #
 # For sequence length 2048 and chunk_size=64, this is 32x fewer loop iterations.
+#
+# V9.9.12c: NUMERICAL STABILITY FIX (ChatGPT analysis)
+# The original algorithm uses γ^(-t) which can overflow for small γ and large t.
+# For γ=0.5, t=63: γ^(-63) = 2^63 ≈ 9.2×10^18 (overflow!)
+#
+# Fix: Use sequential loop within chunks when min(γ) < SAFE_GAMMA_THRESHOLD,
+# only use vectorized path when all γ values are high enough to be stable.
+
+# Threshold below which we use sequential loop to avoid γ^(-t) overflow
+# For chunk_size=64, γ^(-63) = 1.7×10^4 when γ=0.9 (safe)
+# but γ^(-63) = 9.2×10^18 when γ=0.5 (overflow)
+SAFE_GAMMA_THRESHOLD = 0.9
+
 
 def parallel_ema_scan(
     x: torch.Tensor,
@@ -223,6 +236,9 @@ def parallel_ema_scan(
 
     Computes S_t = γ * S_{t-1} + x_t for all t in O(N/chunk_size) loop iterations
     instead of O(N), with vectorized operations within each chunk.
+
+    V9.9.12c: Uses sequential loop when gamma < 0.9 to avoid numerical overflow
+    from γ^(-t) computation. This is slower but numerically stable.
 
     Args:
         x: Input tensor of shape [B, N, H, D] or [B, N, H, D] complex
@@ -240,24 +256,16 @@ def parallel_ema_scan(
     if isinstance(gamma, (int, float)):
         gamma_is_scalar = True
         gamma_val = float(gamma)
+        min_gamma = gamma_val
     else:
         gamma_is_scalar = False
         # gamma is [H] shaped, ensure it's on correct device
         gamma = gamma.to(device=device)
+        min_gamma = gamma.min().item()
 
-    # Precompute powers of gamma for intra-chunk accumulation
-    # powers[i] = γ^i for i in 0..chunk_size-1
-    arange = torch.arange(chunk_size, device=device, dtype=torch.float32)
-
-    if gamma_is_scalar:
-        # powers shape: [chunk_size]
-        powers = torch.pow(gamma_val, arange)
-        # reverse powers for convolution-style accumulation
-        rev_powers = torch.pow(gamma_val, torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32))
-    else:
-        # gamma shape: [H], powers shape: [chunk_size, H]
-        powers = gamma.unsqueeze(0).float() ** arange.unsqueeze(1)  # [chunk_size, H]
-        rev_powers = gamma.unsqueeze(0).float() ** torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32).unsqueeze(1)
+    # V9.9.12c: Check if gamma is safe for vectorized path
+    # If any head has gamma < threshold, use sequential to avoid overflow
+    use_vectorized = min_gamma >= SAFE_GAMMA_THRESHOLD
 
     # Output buffer
     S = torch.zeros_like(x)
@@ -268,6 +276,32 @@ def parallel_ema_scan(
     # Process in chunks
     num_chunks = (N + chunk_size - 1) // chunk_size
 
+    if not use_vectorized:
+        # V9.9.12c: Sequential path for numerical stability
+        # This is slower but avoids γ^(-t) overflow
+        for c in range(num_chunks):
+            start_idx = c * chunk_size
+            end_idx = min(start_idx + chunk_size, N)
+            x_chunk = x[:, start_idx:end_idx, :, :]
+
+            for t in range(end_idx - start_idx):
+                if gamma_is_scalar:
+                    state = gamma_val * state + x_chunk[:, t:t+1, :, :]
+                else:
+                    gamma_broadcast = gamma.view(1, 1, H, 1).to(dtype)
+                    state = gamma_broadcast * state + x_chunk[:, t:t+1, :, :]
+                S[:, start_idx + t:start_idx + t + 1, :, :] = state
+        return S
+
+    # Vectorized path: only used when gamma >= SAFE_GAMMA_THRESHOLD
+    # Precompute powers of gamma for intra-chunk accumulation
+    arange = torch.arange(chunk_size, device=device, dtype=torch.float32)
+
+    if gamma_is_scalar:
+        powers = torch.pow(gamma_val, arange)  # [chunk_size]
+    else:
+        powers = gamma.unsqueeze(0).float() ** arange.unsqueeze(1)  # [chunk_size, H]
+
     for c in range(num_chunks):
         start_idx = c * chunk_size
         end_idx = min(start_idx + chunk_size, N)
@@ -277,7 +311,7 @@ def parallel_ema_scan(
         x_chunk = x[:, start_idx:end_idx, :, :]  # [B, chunk, H, D]
 
         if actual_chunk_size < chunk_size:
-            # Last chunk may be smaller, use simpler approach
+            # Last chunk may be smaller, use sequential
             for t in range(actual_chunk_size):
                 if gamma_is_scalar:
                     state = gamma_val * state + x_chunk[:, t:t+1, :, :]
@@ -294,28 +328,23 @@ def parallel_ema_scan(
 
             # Contribution from previous state
             if gamma_is_scalar:
-                # state_contrib[i] = γ^(i+1) * S_prev, shape: [B, chunk, H, D]
                 state_powers = torch.pow(gamma_val, arange[:chunk_size] + 1)  # [chunk]
                 state_contrib = state * state_powers.view(1, chunk_size, 1, 1).to(dtype)
             else:
-                # Per-head: state_powers[i, h] = γ[h]^(i+1)
-                state_powers = gamma.unsqueeze(0).float() ** (arange[:chunk_size].unsqueeze(1) + 1)  # [chunk, H]
+                state_powers = gamma.unsqueeze(0).float() ** (arange[:chunk_size].unsqueeze(1) + 1)
                 state_contrib = state * state_powers.view(1, chunk_size, H, 1).to(dtype)
 
             # Contribution from chunk inputs: cumulative sum with decay
             # We need Σ_{j=0}^{i} γ^(i-j) * x[j] for each i
-            # This is a causal convolution with kernel [γ^(chunk-1), ..., γ^1, γ^0]
-
             if gamma_is_scalar:
                 # Scale inputs: x_scaled[j] = x[j] * γ^(-j)
+                # SAFE because gamma >= 0.9 guarantees γ^(-63) ≈ 1.7×10^4 (no overflow)
                 inv_powers = torch.pow(gamma_val, -arange[:chunk_size])  # [chunk]
                 x_scaled = x_chunk * inv_powers.view(1, chunk_size, 1, 1).to(dtype)
-                # Cumsum and rescale
-                x_cumsum = torch.cumsum(x_scaled, dim=1)  # [B, chunk, H, D]
+                x_cumsum = torch.cumsum(x_scaled, dim=1)
                 input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, 1, 1).to(dtype)
             else:
-                # Per-head scaling
-                inv_powers = gamma.unsqueeze(0).float() ** (-arange[:chunk_size].unsqueeze(1))  # [chunk, H]
+                inv_powers = gamma.unsqueeze(0).float() ** (-arange[:chunk_size].unsqueeze(1))
                 x_scaled = x_chunk * inv_powers.view(1, chunk_size, H, 1).to(dtype)
                 x_cumsum = torch.cumsum(x_scaled, dim=1)
                 input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, H, 1).to(dtype)
@@ -323,7 +352,7 @@ def parallel_ema_scan(
             # Combine
             S[:, start_idx:end_idx, :, :] = state_contrib + input_contrib
 
-            # Update state for next chunk (use clone to avoid in-place modification issues)
+            # Update state for next chunk
             state = S[:, end_idx - 1:end_idx, :, :].clone()
 
     return S
@@ -1032,14 +1061,10 @@ class PhaseAttentionLayer(nn.Module):
 
             self.decay_logit = nn.Parameter(init_logits)
         else:
-            # Non-learned decay: use uniform initialization from decay_gamma
-            if decay_gamma >= 0.99:
-                init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
-            else:
-                target_sigmoid = 2.0 * decay_gamma - 1.0
-                target_sigmoid = max(0.01, min(0.99, target_sigmoid))
-                init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
-            self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
+            # V9.9.12c: Don't create decay_logit when learned_decay=False
+            # (ChatGPT analysis: wasted parameters and optimizer state)
+            # Instead, just use self.decay_gamma directly in forward()
+            self.decay_logit = None
 
         # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
         # Distribute starting phases around the unit circle to shatter phase collapse.
