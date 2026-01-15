@@ -124,6 +124,8 @@ from symbolu.phase_transformer import (
     # V9.9.10: Phase diversity loss (combat phase collapse)
     enable_phase_diversity_capture,
     compute_model_phase_diversity_loss,
+    # V9.9.12: Adaptive phase diversity controller
+    AdaptivePhaseDiversityController,
 )
 
 # Import ontological models
@@ -9032,7 +9034,16 @@ class UnifiedTrainingConfig:
     # V9.9.10: Phase diversity loss (to combat phase collapse)
     # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
     phase_diversity_weight: float = 0.0  # Combined weight (0=disabled, 0.001=start, ramp to 0.01)
-    phase_diversity_ramp_steps: int = 5000  # Steps to ramp weight linearly
+    phase_diversity_ramp_steps: int = 5000  # Steps to ramp weight linearly (ignored if adaptive)
+
+    # V9.9.12: Adaptive Phase Diversity Controller (ChatGPT Universal Proposal)
+    # Replaces fixed λ and ramp with scale-free control loop based on R
+    enable_adaptive_phase_diversity: bool = False  # Use adaptive controller instead of fixed
+    phase_diversity_target_R: float = 0.25  # Target mean resultant length (0.25 = healthy)
+    phase_diversity_lambda_init: float = 0.0001  # Initial λ after ramp
+    phase_diversity_lambda_max: float = 0.1  # Maximum λ ceiling
+    phase_diversity_eta: float = 0.1  # Control gain (how fast λ adapts)
+    phase_diversity_ramp_multiplier: float = 5.0  # ramp_steps = multiplier * warmup_steps
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
@@ -13626,17 +13637,43 @@ def train(config: UnifiedTrainingConfig):
 
     model.train()
 
-    # V9.9.10: Enable phase diversity capture if phase_diversity_weight > 0
-    phase_diversity_enabled = (
+    # V9.9.10/V9.9.12: Phase diversity loss setup
+    # Check if adaptive mode (V9.9.12) or fixed mode (V9.9.10) is enabled
+    adaptive_phase_diversity = getattr(config, 'enable_adaptive_phase_diversity', False)
+    fixed_phase_diversity = (
         hasattr(config, 'phase_diversity_weight') and
-        config.phase_diversity_weight > 0 and
+        config.phase_diversity_weight > 0
+    )
+    phase_diversity_enabled = (
+        (adaptive_phase_diversity or fixed_phase_diversity) and
         config.model_type in ('phase', 'hybrid', 'ontological_hybrid')
     )
+
+    # Initialize adaptive controller if enabled
+    phase_diversity_controller = None
     if phase_diversity_enabled:
         num_phase_layers = enable_phase_diversity_capture(model, enable=True)
-        print(f"\n  🌀 [PHASE DIVERSITY V9.9.10] Enabled on {num_phase_layers} PhaseAttention layers")
-        print(f"     ├─ Weight: {config.phase_diversity_weight} (ramps over {config.phase_diversity_ramp_steps} steps)")
-        print(f"     └─ Losses: Uniformity |E[e^{{iφ}}]|² + Entropy Proxy R")
+
+        if adaptive_phase_diversity:
+            # V9.9.12: Adaptive controller (ChatGPT Universal Proposal)
+            phase_diversity_controller = AdaptivePhaseDiversityController(
+                warmup_steps=config.warmup_steps,
+                target_R=getattr(config, 'phase_diversity_target_R', 0.25),
+                lambda_init=getattr(config, 'phase_diversity_lambda_init', 0.0001),
+                lambda_max=getattr(config, 'phase_diversity_lambda_max', 0.1),
+                eta=getattr(config, 'phase_diversity_eta', 0.1),
+                ramp_multiplier=getattr(config, 'phase_diversity_ramp_multiplier', 5.0),
+            )
+            print(f"\n  🌀 [PHASE DIVERSITY V9.9.12] ADAPTIVE Controller enabled on {num_phase_layers} layers")
+            print(f"     ├─ Target R: {phase_diversity_controller.target_R} (mean resultant length)")
+            print(f"     ├─ Ramp steps: {phase_diversity_controller.ramp_steps} ({config.phase_diversity_ramp_multiplier}× warmup)")
+            print(f"     ├─ λ range: [{phase_diversity_controller.lambda_min:.0e}, {phase_diversity_controller.lambda_max:.0e}]")
+            print(f"     └─ Control: λ adapts via exp(η×(R-R_target)), η={phase_diversity_controller.eta}")
+        else:
+            # V9.9.10: Fixed weight mode
+            print(f"\n  🌀 [PHASE DIVERSITY V9.9.10] Fixed mode on {num_phase_layers} layers")
+            print(f"     ├─ Weight: {config.phase_diversity_weight} (ramps over {config.phase_diversity_ramp_steps} steps)")
+            print(f"     └─ Losses: Uniformity |E[e^{{iφ}}]|² + Entropy Proxy R")
 
     train_iter = iter(train_loader)
     step_start_time = time.time()
@@ -13876,32 +13913,48 @@ def train(config: UnifiedTrainingConfig):
                     loss = loss + config.decorr_loss_weight * ortho_loss_tensor
                     metrics['ortho_loss'] = ortho_loss_tensor.item()
 
-                # V9.9.10: Phase diversity loss (combat phase collapse)
+                # V9.9.10/V9.9.12: Phase diversity loss (combat phase collapse)
                 # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
                 if phase_diversity_enabled:
-                    # Compute ramped weight (ChatGPT: start small 1e-3, ramp to 1e-2)
-                    ramp_progress = min(1.0, global_step / max(1, config.phase_diversity_ramp_steps))
-                    current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
-
-                    # Compute phase diversity loss from captured phi_k tensors
-                    phase_div_loss, phase_div_metrics = compute_model_phase_diversity_loss(
+                    # First compute loss with weight=1 to get R metric
+                    phase_div_loss_raw, phase_div_metrics = compute_model_phase_diversity_loss(
                         model,
-                        lambda_uniform=current_weight,
-                        lambda_entropy=current_weight,
+                        lambda_uniform=1.0,
+                        lambda_entropy=1.0,
                     )
+
+                    # Get current R (entropy proxy) for adaptive controller
+                    current_R = phase_div_metrics['phase_entropy_proxy']
+
+                    # Determine weight: adaptive (V9.9.12) or fixed (V9.9.10)
+                    if phase_diversity_controller is not None:
+                        # V9.9.12: Adaptive controller
+                        current_weight = phase_diversity_controller.get_weight(global_step, current_R)
+                        controller_status = phase_diversity_controller.get_status()
+                        metrics['phase_div_R_ema'] = controller_status['phase_div_R_ema']
+                        metrics['phase_div_target_R'] = controller_status['phase_div_target_R']
+                    else:
+                        # V9.9.10: Fixed ramped weight
+                        ramp_progress = min(1.0, global_step / max(1, config.phase_diversity_ramp_steps))
+                        current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
+
+                    # Scale the loss by the computed weight
+                    phase_div_loss = phase_div_loss_raw * current_weight
 
                     if phase_div_loss.requires_grad:
                         loss = loss + phase_div_loss
                         metrics['phase_uniform_loss'] = phase_div_metrics['phase_uniform_loss']
-                        metrics['phase_entropy_proxy'] = phase_div_metrics['phase_entropy_proxy']
-                        metrics['phase_diversity_loss'] = phase_div_metrics['phase_diversity_loss']
+                        metrics['phase_entropy_proxy'] = current_R
+                        metrics['phase_diversity_loss'] = phase_div_loss.item()
                         metrics['phase_diversity_weight'] = current_weight
 
                         # One-time log when loss activates
                         if global_step == 1:
-                            print(f"\n  🌀 [PHASE DIVERSITY] Active!")
+                            mode = "ADAPTIVE" if phase_diversity_controller else "FIXED"
+                            print(f"\n  🌀 [PHASE DIVERSITY] {mode} mode active!")
                             print(f"     ├─ Uniform Loss: {phase_div_metrics['phase_uniform_loss']:.4f}")
-                            print(f"     ├─ Entropy Proxy R: {phase_div_metrics['phase_entropy_proxy']:.4f}")
+                            print(f"     ├─ Entropy Proxy R: {current_R:.4f}")
+                            print(f"     ├─ λ: {current_weight:.6f}")
                             print(f"     └─ Layers captured: {phase_div_metrics['num_layers_captured']}")
 
             # =================================================================
@@ -17052,7 +17105,22 @@ def main():
     parser.add_argument("--phase_diversity_weight", type=float, default=0.0,
                        help="Weight for phase diversity loss (0=disabled, 0.001=start, ramp to 0.01)")
     parser.add_argument("--phase_diversity_ramp_steps", type=int, default=5000,
-                       help="Steps to ramp phase diversity weight linearly")
+                       help="Steps to ramp phase diversity weight linearly (ignored if adaptive)")
+
+    # V9.9.12: Adaptive Phase Diversity Controller (ChatGPT Universal Proposal)
+    parser.add_argument("--enable_adaptive_phase_diversity", action="store_true",
+                       help="Use adaptive controller instead of fixed weight. "
+                            "Automatically adjusts λ based on R (mean resultant length).")
+    parser.add_argument("--phase_diversity_target_R", type=float, default=0.25,
+                       help="Target R for adaptive controller (0.25 = healthy diversity)")
+    parser.add_argument("--phase_diversity_lambda_init", type=float, default=0.0001,
+                       help="Initial λ value after ramp")
+    parser.add_argument("--phase_diversity_lambda_max", type=float, default=0.1,
+                       help="Maximum λ ceiling")
+    parser.add_argument("--phase_diversity_eta", type=float, default=0.1,
+                       help="Control gain (how fast λ adapts to R)")
+    parser.add_argument("--phase_diversity_ramp_multiplier", type=float, default=5.0,
+                       help="ramp_steps = multiplier * warmup_steps (universal ramp)")
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
@@ -18140,6 +18208,15 @@ def main():
         alpha_decay_steps=args.alpha_decay_steps,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
+        # V9.9.10/V9.9.12: Phase diversity loss
+        phase_diversity_weight=args.phase_diversity_weight,
+        phase_diversity_ramp_steps=args.phase_diversity_ramp_steps,
+        enable_adaptive_phase_diversity=args.enable_adaptive_phase_diversity,
+        phase_diversity_target_R=args.phase_diversity_target_R,
+        phase_diversity_lambda_init=args.phase_diversity_lambda_init,
+        phase_diversity_lambda_max=args.phase_diversity_lambda_max,
+        phase_diversity_eta=args.phase_diversity_eta,
+        phase_diversity_ramp_multiplier=args.phase_diversity_ramp_multiplier,
         # V9.9.1 Per-Layer Phase Control
         # V9.9.8: Auto-enable when per_layer_phase_weights is provided
         enable_per_layer_phase=args.enable_per_layer_phase or bool(args.per_layer_phase_weights),

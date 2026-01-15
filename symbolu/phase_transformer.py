@@ -586,6 +586,147 @@ def compute_model_phase_diversity_loss(
 
 
 # =============================================================================
+# V9.9.12: ADAPTIVE PHASE DIVERSITY CONTROLLER (ChatGPT Universal Proposal)
+# =============================================================================
+
+class AdaptivePhaseDiversityController:
+    """
+    Adaptive controller for phase diversity loss weight.
+
+    V9.9.12: Implements ChatGPT's "universal" proposal to replace fixed λ and ramp.
+
+    Key features:
+    1. Uses R (mean resultant length) as scale-free collapse metric
+       - R ≈ 0: Uniform phases (healthy)
+       - R ≈ 1: Collapsed phases (sick)
+
+    2. Adjusts λ automatically via control loop:
+       λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
+       - If R > target: λ increases (more pressure)
+       - If R < target: λ decreases (ease off)
+
+    3. Warmup-coupled ramp (universal):
+       - ramp_steps = 5 * warmup_steps (scales with training regime)
+       - Or token-based: ramp until N million tokens seen
+
+    Target bands for R:
+    - Healthy: R ∈ [0.05, 0.30]
+    - Borderline: R ∈ [0.30, 0.50]
+    - Collapsed: R > 0.50
+
+    Usage:
+        controller = AdaptivePhaseDiversityController(
+            warmup_steps=1000,  # From config
+            target_R=0.25,      # Universal default
+        )
+
+        # In training loop:
+        lambda_phase = controller.get_weight(global_step, current_R)
+    """
+
+    def __init__(
+        self,
+        warmup_steps: int = 1000,
+        target_R: float = 0.25,
+        lambda_init: float = 0.0001,
+        lambda_min: float = 1e-6,
+        lambda_max: float = 0.1,
+        eta: float = 0.1,  # Control gain (how fast λ adapts)
+        ema_decay: float = 0.95,  # Smooth R tracking
+        ramp_multiplier: float = 5.0,  # ramp_steps = ramp_multiplier * warmup_steps
+    ):
+        """
+        Args:
+            warmup_steps: LR warmup steps (used to derive ramp_steps)
+            target_R: Target mean resultant length (0.25 = healthy diversity)
+            lambda_init: Initial λ value after ramp
+            lambda_min: Minimum λ (floor)
+            lambda_max: Maximum λ (ceiling)
+            eta: Control gain for λ adjustment
+            ema_decay: EMA decay for smoothing R observations
+            ramp_multiplier: ramp_steps = ramp_multiplier * warmup_steps
+        """
+        self.warmup_steps = warmup_steps
+        self.target_R = target_R
+        self.lambda_init = lambda_init
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
+        self.eta = eta
+        self.ema_decay = ema_decay
+
+        # Warmup-coupled ramp (universal)
+        self.ramp_steps = int(ramp_multiplier * warmup_steps)
+
+        # State
+        self.current_lambda = 0.0  # Starts at 0, ramps up
+        self.R_ema = 0.5  # Initial estimate (neutral)
+        self.step_count = 0
+
+        # Diagnostics
+        self.lambda_history = []
+        self.R_history = []
+
+    def get_weight(self, global_step: int, current_R: float) -> float:
+        """
+        Get current phase diversity weight, adapting based on R.
+
+        Args:
+            global_step: Current training step
+            current_R: Current mean resultant length (phase_entropy_proxy)
+
+        Returns:
+            lambda: Adapted phase diversity weight
+        """
+        self.step_count = global_step
+
+        # Update R EMA for smooth tracking
+        self.R_ema = self.ema_decay * self.R_ema + (1 - self.ema_decay) * current_R
+        self.R_history.append(current_R)
+
+        # Phase 1: Ramp from 0 to lambda_init
+        if global_step < self.ramp_steps:
+            ramp_progress = global_step / max(1, self.ramp_steps)
+            self.current_lambda = self.lambda_init * ramp_progress
+        else:
+            # Phase 2: Adaptive control
+            # λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
+            error = self.R_ema - self.target_R
+            adjustment = math.exp(self.eta * error)
+
+            # Apply adjustment with clipping
+            self.current_lambda = max(
+                self.lambda_min,
+                min(self.lambda_max, self.current_lambda * adjustment)
+            )
+
+            # Ensure we're at least at lambda_init after ramp
+            if self.current_lambda < self.lambda_init:
+                self.current_lambda = self.lambda_init
+
+        self.lambda_history.append(self.current_lambda)
+        return self.current_lambda
+
+    def get_status(self) -> dict:
+        """Get controller status for logging."""
+        return {
+            'phase_div_lambda': self.current_lambda,
+            'phase_div_R_ema': self.R_ema,
+            'phase_div_target_R': self.target_R,
+            'phase_div_ramp_steps': self.ramp_steps,
+            'phase_div_ramp_progress': min(1.0, self.step_count / max(1, self.ramp_steps)),
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"AdaptivePhaseDiversityController("
+            f"target_R={self.target_R}, "
+            f"λ={self.current_lambda:.6f}, "
+            f"R_ema={self.R_ema:.3f}, "
+            f"ramp_steps={self.ramp_steps})"
+        )
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
