@@ -15795,6 +15795,38 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
+                # Runs during evaluation intervals to monitor behavioral stability
+                if config.model_type in ('phase', 'hybrid', 'ontological_hybrid'):
+                    try:
+                        enable_health_diagnostics_capture(model, True)
+                        # Run a single forward pass to capture phase tensors
+                        with torch.no_grad():
+                            if cached_val_batches and len(cached_val_batches) > 0:
+                                health_batch = cached_val_batches[0]
+                            else:
+                                health_batch = next(iter(val_loader))
+                            health_x = health_batch[0][:4].to(device)  # Small batch for efficiency
+                            _ = model(health_x)
+                        health_metrics = compute_phase_health_diagnostics(model)
+                        enable_health_diagnostics_capture(model, False)
+
+                        # Log health metrics
+                        print(f"\n  📊 [PHASE HEALTH] Step {global_step}")
+                        print(f"     ├─ R_k (key collapse):    {health_metrics['R_k']:.4f} {'⚠️' if health_metrics['R_k'] > 0.5 else '✓'}")
+                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f}")
+                        print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
+                        print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
+                        print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
+                        print(f"     └─ Phase Drift Std:       {health_metrics['phase_drift_std']:.4f}")
+
+                        # Add to metrics for tensorboard/wandb logging
+                        for k, v in health_metrics.items():
+                            metrics[f'health_{k}'] = v
+                    except Exception as e:
+                        print(f"\n  ⚠️ [PHASE HEALTH] Diagnostic failed: {e}")
+                        enable_health_diagnostics_capture(model, False)  # Ensure cleanup
+
                 # V9.9.1: Inverted Layer Curriculum Update
                 # V9.9.3: With Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations)
                 # V9.9.4: Now with composite ReadinessIndex (ChatGPT's insight)
