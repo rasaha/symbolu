@@ -37,6 +37,7 @@ class AblationMode(Enum):
     PHASE_SCRAMBLE = "scramble"     # Random permute phases per head
     PHASE_FROZEN = "frozen"         # Constant phase (no selectivity)
     PHASE_AMPLIFIED = "amplified"   # Double phase variance (stress test)
+    PHASE_OFF = "phase_off"         # Bypass phase entirely (uniform attention)
 
 
 @dataclass
@@ -137,6 +138,19 @@ class PhaseAblationHook:
 
         return phi_amplified
 
+    def _uniform_phases(self, phi: torch.Tensor) -> torch.Tensor:
+        """
+        Set phases to create uniform attention (bypass phase selectivity).
+
+        Effect: cos(φ_q - φ_k) = 1 everywhere when both φ_q = φ_k = 0
+        This makes the phase contribution uniform, effectively testing
+        whether the model can solve the task without phase-based selectivity.
+
+        Different from frozen: frozen keeps phases constant at the same value,
+        while phase_off ensures φ_q = φ_k for every position pair.
+        """
+        return torch.zeros_like(phi)
+
     def modify_phases(self, phi_q: torch.Tensor, phi_k: torch.Tensor):
         """
         Apply the configured ablation to query and key phases.
@@ -159,6 +173,9 @@ class PhaseAblationHook:
 
         elif self.mode == AblationMode.PHASE_AMPLIFIED:
             return self._amplify_phases(phi_q), self._amplify_phases(phi_k)
+
+        elif self.mode == AblationMode.PHASE_OFF:
+            return self._uniform_phases(phi_q), self._uniform_phases(phi_k)
 
         else:
             raise ValueError(f"Unknown ablation mode: {self.mode}")

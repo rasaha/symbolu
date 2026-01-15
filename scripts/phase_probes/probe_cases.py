@@ -32,6 +32,7 @@ class ProbeCategory(Enum):
     LONG_RANGE = "long_range"               # Entity persistence across distance
     INTERFERENCE = "interference"           # Same token, different sense
     NEGATION_POLARITY = "negation_polarity" # Polarity and scope resolution
+    AMPLITUDE_CONFLICT = "amplitude_conflict"  # Phase vs amplitude salience
 
 
 @dataclass
@@ -311,6 +312,67 @@ NP3 = SingleProbe(
 
 
 # =============================================================================
+# AMPLITUDE VS PHASE CONFLICT PROBES (AC1-AC3)
+# =============================================================================
+# These test whether the model uses phase for relational binding rather than
+# just high-amplitude (salient/repeated) tokens. If phase is working correctly,
+# relational binding should NOT be dominated by amplitude salience.
+
+AC1 = SingleProbe(
+    id="AC1",
+    category=ProbeCategory.AMPLITUDE_CONFLICT,
+    text="IMPORTANT IMPORTANT IMPORTANT. The quiet assistant fixed the bug. IMPORTANT IMPORTANT IMPORTANT. Later, he was promoted.",
+    question="Who was promoted?",
+    correct_answer="assistant",
+    target_tokens=["assistant", " assistant", "The assistant", " The assistant"],
+    distractor_tokens=["IMPORTANT", " IMPORTANT", "important"],
+    explanation="Tests whether amplitude (via repetition) dominates phase-based binding. "
+                "'IMPORTANT' has high salience due to repetition and caps, but 'he' must "
+                "bind to 'assistant' based on semantic role, not token frequency."
+)
+
+AC2 = SingleProbe(
+    id="AC2",
+    category=ProbeCategory.AMPLITUDE_CONFLICT,
+    text="URGENT URGENT URGENT. The technician repaired the server. CRITICAL CRITICAL CRITICAL. She received a bonus.",
+    question="Who received a bonus?",
+    correct_answer="technician",
+    target_tokens=["technician", " technician", "The technician", " The technician"],
+    distractor_tokens=["URGENT", " URGENT", "CRITICAL", " CRITICAL", "server", " server"],
+    explanation="Tests selective binding with amplitude noise. High-salience tokens surround "
+                "the reference, but 'she' must bind to the semantic agent 'technician'."
+)
+
+AC3 = SingleProbe(
+    id="AC3",
+    category=ProbeCategory.AMPLITUDE_CONFLICT,
+    text="ERROR ERROR ERROR. The developer debugged the code. WARNING WARNING WARNING. Finally, they shipped the feature.",
+    question="Who shipped the feature?",
+    correct_answer="developer",
+    target_tokens=["developer", " developer", "The developer", " The developer"],
+    distractor_tokens=["ERROR", " ERROR", "WARNING", " WARNING", "code", " code"],
+    explanation="Tests pronoun resolution against amplitude distractors. 'they' (used singularly) "
+                "must bind to 'developer' despite high-amplitude noise tokens."
+)
+
+AC4 = MinimalPairProbe(
+    id="AC4",
+    category=ProbeCategory.AMPLITUDE_CONFLICT,
+    text_a="The LOUD LOUD LOUD engineer designed the system. The quiet manager reviewed it. He approved the design.",
+    text_b="The quiet engineer designed the system. The LOUD LOUD LOUD manager reviewed it. He approved the design.",
+    question="Who approved the design?",
+    answer_a="manager",  # 'He approved' after 'manager reviewed'
+    answer_b="manager",  # Same - semantic role matters, not amplitude
+    target_tokens_a=["manager", " manager", "Manager"],
+    target_tokens_b=["manager", " manager", "Manager"],
+    distractor_tokens=["engineer", " engineer", "LOUD", " LOUD"],
+    explanation="Tests whether amplitude shifts binding. In both cases, 'He approved' follows "
+                "'manager reviewed', so semantic continuity should bind to manager. "
+                "If amplitude dominates, the model might wrongly bind to the LOUD-marked entity."
+)
+
+
+# =============================================================================
 # AGGREGATE PROBE COLLECTIONS
 # =============================================================================
 
@@ -318,6 +380,7 @@ NP3 = SingleProbe(
 MINIMAL_PAIR_PROBES: List[MinimalPairProbe] = [
     RB1, RB2, RB3, RB4, RB5,
     NP1, NP2,
+    AC4,
 ]
 
 # All single probes (for ablation testing)
@@ -325,6 +388,7 @@ SINGLE_PROBES: List[SingleProbe] = [
     LP1, LP2, LP3, LP4,
     SI1, SI2, SI3,
     NP3,
+    AC1, AC2, AC3,
 ]
 
 # All probes by category
@@ -333,6 +397,7 @@ PROBES_BY_CATEGORY = {
     ProbeCategory.LONG_RANGE: [LP1, LP2, LP3, LP4],
     ProbeCategory.INTERFERENCE: [SI1, SI2, SI3],
     ProbeCategory.NEGATION_POLARITY: [NP1, NP2, NP3],
+    ProbeCategory.AMPLITUDE_CONFLICT: [AC1, AC2, AC3, AC4],
 }
 
 
