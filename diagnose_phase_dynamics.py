@@ -448,19 +448,27 @@ def main():
         config_dict = checkpoint['config']
         config = UnifiedTrainingConfig(**config_dict)
     else:
-        print("  Warning: No config in checkpoint, using defaults")
-        config = UnifiedTrainingConfig()
+        # Try loading config from JSON file in same directory
+        config_path = Path(args.checkpoint).parent / "config.json"
+        if config_path.exists():
+            import json
+            with open(config_path) as f:
+                config_dict = json.load(f)
+            config = UnifiedTrainingConfig(**config_dict)
+            print(f"  Loaded config from {config_path}")
+        else:
+            print("  Warning: No config in checkpoint, using defaults")
+            config = UnifiedTrainingConfig(model_type="ontological_hybrid")
 
     # Create model
     print(f"  Creating model: {config.model_type}")
-    model = create_model(config)
+    model = create_model(config, device)
 
     # Load weights
     if 'model' in checkpoint:
         model.load_state_dict(checkpoint['model'], strict=False)
     print("  Model loaded")
 
-    model = model.to(device)
     model.eval()
 
     # Create simple dataloader with random data
