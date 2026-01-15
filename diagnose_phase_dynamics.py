@@ -60,9 +60,9 @@ def patch_phase_attention_for_diagnostics(model):
 
     original_forward = PhaseAttentionLayer.forward
 
-    def diagnostic_forward(self, x, intent_phase=None):
-        # Run original forward
-        result = original_forward(self, x, intent_phase)
+    def diagnostic_forward(self, x, causal_mask=True, phase_context=None, intent_phase=None):
+        # Run original forward with all arguments
+        result = original_forward(self, x, causal_mask, phase_context, intent_phase)
 
         # Capture diagnostic values (these are computed in forward)
         # We need to recompute them here since they're not stored
