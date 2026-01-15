@@ -126,6 +126,9 @@ from symbolu.phase_transformer import (
     compute_model_phase_diversity_loss,
     # V9.9.12: Adaptive phase diversity controller
     AdaptivePhaseDiversityController,
+    # V9.9.12c: Health dashboard (diagnostic only)
+    enable_health_diagnostics_capture,
+    compute_phase_health_diagnostics,
 )
 
 # Import ontological models
