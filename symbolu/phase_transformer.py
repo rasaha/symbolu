@@ -545,18 +545,32 @@ class PhaseAttentionLayer(nn.Module):
         # - Low decay (~0.5): Focus on last ~2 tokens
         # - High decay (~0.99): Remember ~100 tokens
         self.learned_decay = learned_decay
-        # Initialize decay_logit so sigmoid gives decay_gamma as default
-        # sigmoid(x) = decay_gamma => x = log(decay_gamma / (1 - decay_gamma))
-        # But we use 0.5 + 0.5*sigmoid for range [0.5, 1.0]
-        # So: 0.5 + 0.5*sigmoid(x) = decay_gamma => sigmoid(x) = 2*decay_gamma - 1
-        # For decay_gamma=1.0, we want sigmoid(x)=1, so x=large (use 5.0)
-        if decay_gamma >= 0.99:
-            init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
+
+        # V9.9.9: DIVERSE DECAY INITIALIZATION (Gemini's recommendation)
+        # Instead of initializing all heads to the same decay, spread them out
+        # so each head starts with a different memory span.
+        # This encourages head specialization from the start.
+        if learned_decay:
+            # Create diverse decay values: head 0 = long memory, head N-1 = short memory
+            # Target gammas spread from 0.99 (long) to 0.55 (short)
+            # γ = 0.5 + 0.5 * sigmoid(logit)
+            # For γ=0.99: sigmoid(x)=0.98 → x≈3.9
+            # For γ=0.55: sigmoid(x)=0.10 → x≈-2.2
+            init_logits = torch.linspace(3.9, -2.2, num_heads)
+            self.decay_logit = nn.Parameter(init_logits)
         else:
-            target_sigmoid = 2.0 * decay_gamma - 1.0
-            target_sigmoid = max(0.01, min(0.99, target_sigmoid))  # Clamp for stability
-            init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
-        self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
+            # Non-learned decay: use uniform initialization from decay_gamma
+            # sigmoid(x) = decay_gamma => x = log(decay_gamma / (1 - decay_gamma))
+            # But we use 0.5 + 0.5*sigmoid for range [0.5, 1.0]
+            # So: 0.5 + 0.5*sigmoid(x) = decay_gamma => sigmoid(x) = 2*decay_gamma - 1
+            # For decay_gamma=1.0, we want sigmoid(x)=1, so x=large (use 5.0)
+            if decay_gamma >= 0.99:
+                init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
+            else:
+                target_sigmoid = 2.0 * decay_gamma - 1.0
+                target_sigmoid = max(0.01, min(0.99, target_sigmoid))  # Clamp for stability
+                init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
+            self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
