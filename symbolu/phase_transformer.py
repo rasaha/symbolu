@@ -703,10 +703,10 @@ class PhaseAttentionLayer(nn.Module):
 
         # V9.9.9: Apply per-head phase offsets (Gemini's Phase Spread)
         # This shatters phase collapse by giving each head a unique starting angle.
-        # Broadcasts [H] → [B, N, H, D_h]
+        # Broadcasts [H] → [B, N, H, D_h]. Cast to match mixed precision dtype.
         if hasattr(self, 'phase_offset_q'):
-            phi_q = phi_q + self.phase_offset_q.view(1, 1, -1, 1)
-            phi_k = phi_k + self.phase_offset_k.view(1, 1, -1, 1)
+            phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
+            phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
