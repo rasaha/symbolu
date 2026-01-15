@@ -14877,7 +14877,12 @@ def train(config: UnifiedTrainingConfig):
                 adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
-            current_alpha = update_alpha_schedule(model, global_step, config)
+            # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
+            if not getattr(config, 'enable_per_layer_phase', False):
+                current_alpha = update_alpha_schedule(model, global_step, config)
+            else:
+                # Per-layer weights are managed by InvertedLayerCurriculumController
+                current_alpha = config.alpha_phase  # Just for logging
 
             global_step += 1
             avg_loss = running_loss / config.gradient_accumulation
