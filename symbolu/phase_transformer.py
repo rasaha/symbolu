@@ -546,31 +546,56 @@ class PhaseAttentionLayer(nn.Module):
         # - High decay (~0.99): Remember ~100 tokens
         self.learned_decay = learned_decay
 
-        # V9.9.9: DIVERSE DECAY INITIALIZATION (Gemini's recommendation)
+        # V9.9.9: DIVERSE DECAY INITIALIZATION (Gemini's log-space timescale)
         # Instead of initializing all heads to the same decay, spread them out
-        # so each head starts with a different memory span.
-        # This encourages head specialization from the start.
+        # using log-space timescale distribution for principled coverage.
+        # This gives more resolution near high decay (long memory).
         if learned_decay:
-            # Create diverse decay values: head 0 = long memory, head N-1 = short memory
-            # Target gammas spread from 0.99 (long) to 0.55 (short)
-            # γ = 0.5 + 0.5 * sigmoid(logit)
-            # For γ=0.99: sigmoid(x)=0.98 → x≈3.9
-            # For γ=0.55: sigmoid(x)=0.10 → x≈-2.2
-            init_logits = torch.linspace(3.9, -2.2, num_heads)
+            # Map timescales from ~2 tokens to ~max_seq_len tokens (log-space)
+            min_timescale = 2.0
+            max_timescale = 2048.0  # Effective memory span in tokens
+
+            # Distribute timescales exponentially (log-space)
+            # Head 0 = short memory (~2 tokens), Head N-1 = long memory (~2048 tokens)
+            log_timescales = torch.linspace(
+                math.log(min_timescale),
+                math.log(max_timescale),
+                num_heads
+            )
+            timescales = torch.exp(log_timescales)
+
+            # Convert timescales to decay: γ = 1 - (1/timescale)
+            # timescale=2 → γ=0.5, timescale=2048 → γ=0.9995
+            gamma = 1.0 - (1.0 / timescales)
+
+            # Clamp for numerical stability (prevents logit overflow)
+            gamma = torch.clamp(gamma, 0.001, 0.9995)
+
+            # Our decay formula is: γ = 0.5 + 0.5 * sigmoid(logit)
+            # So: sigmoid(logit) = (γ - 0.5) / 0.5 = 2γ - 1
+            # logit = log(sigmoid / (1 - sigmoid))
+            sigmoid_target = 2.0 * gamma - 1.0
+            sigmoid_target = torch.clamp(sigmoid_target, 0.01, 0.99)
+            init_logits = torch.log(sigmoid_target / (1.0 - sigmoid_target))
+
             self.decay_logit = nn.Parameter(init_logits)
         else:
             # Non-learned decay: use uniform initialization from decay_gamma
-            # sigmoid(x) = decay_gamma => x = log(decay_gamma / (1 - decay_gamma))
-            # But we use 0.5 + 0.5*sigmoid for range [0.5, 1.0]
-            # So: 0.5 + 0.5*sigmoid(x) = decay_gamma => sigmoid(x) = 2*decay_gamma - 1
-            # For decay_gamma=1.0, we want sigmoid(x)=1, so x=large (use 5.0)
             if decay_gamma >= 0.99:
                 init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
             else:
                 target_sigmoid = 2.0 * decay_gamma - 1.0
-                target_sigmoid = max(0.01, min(0.99, target_sigmoid))  # Clamp for stability
+                target_sigmoid = max(0.01, min(0.99, target_sigmoid))
                 init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
             self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
+
+        # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
+        # Distribute starting phases around the unit circle to shatter phase collapse.
+        # Each head gets a unique rotational offset to encourage semantic diversity.
+        # Head 0 = 0 rad, Head 1 = π/6 rad, ..., Head 11 = 11π/6 rad
+        phase_offsets = torch.linspace(0, 2 * math.pi * (num_heads - 1) / num_heads, num_heads)
+        self.phase_offset_q = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
+        self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -675,6 +700,13 @@ class PhaseAttentionLayer(nn.Module):
         # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
         phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # V9.9.9: Apply per-head phase offsets (Gemini's Phase Spread)
+        # This shatters phase collapse by giving each head a unique starting angle.
+        # Broadcasts [H] → [B, N, H, D_h]
+        if hasattr(self, 'phase_offset_q'):
+            phi_q = phi_q + self.phase_offset_q.view(1, 1, -1, 1)
+            phi_k = phi_k + self.phase_offset_k.view(1, 1, -1, 1)
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
