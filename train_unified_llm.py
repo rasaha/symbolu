@@ -9044,6 +9044,9 @@ class UnifiedTrainingConfig:
     phase_diversity_lambda_max: float = 0.1  # Maximum λ ceiling
     phase_diversity_eta: float = 0.1  # Control gain (how fast λ adapts)
     phase_diversity_ramp_multiplier: float = 5.0  # ramp_steps = multiplier * warmup_steps
+    # V9.9.12b: Task-loss scaling (ChatGPT's Lagrange multiplier approach)
+    phase_diversity_task_scaling: bool = True  # Scale λ by task loss (self-normalizing)
+    phase_diversity_task_alpha: float = 0.01  # Base coefficient for task-loss mode
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
@@ -13655,7 +13658,9 @@ def train(config: UnifiedTrainingConfig):
         num_phase_layers = enable_phase_diversity_capture(model, enable=True)
 
         if adaptive_phase_diversity:
-            # V9.9.12: Adaptive controller (ChatGPT Universal Proposal)
+            # V9.9.12/V9.9.12b: Adaptive controller (ChatGPT Universal Proposal)
+            task_scaling = getattr(config, 'phase_diversity_task_scaling', True)
+            task_alpha = getattr(config, 'phase_diversity_task_alpha', 0.01)
             phase_diversity_controller = AdaptivePhaseDiversityController(
                 warmup_steps=config.warmup_steps,
                 target_R=getattr(config, 'phase_diversity_target_R', 0.25),
@@ -13663,12 +13668,19 @@ def train(config: UnifiedTrainingConfig):
                 lambda_max=getattr(config, 'phase_diversity_lambda_max', 0.1),
                 eta=getattr(config, 'phase_diversity_eta', 0.1),
                 ramp_multiplier=getattr(config, 'phase_diversity_ramp_multiplier', 5.0),
+                task_loss_scaling=task_scaling,
+                task_loss_alpha=task_alpha,
             )
-            print(f"\n  🌀 [PHASE DIVERSITY V9.9.12] ADAPTIVE Controller enabled on {num_phase_layers} layers")
+            mode_str = "TASK-SCALED" if task_scaling else "R-ADAPTIVE"
+            print(f"\n  🌀 [PHASE DIVERSITY V9.9.12] {mode_str} Controller enabled on {num_phase_layers} layers")
             print(f"     ├─ Target R: {phase_diversity_controller.target_R} (mean resultant length)")
             print(f"     ├─ Ramp steps: {phase_diversity_controller.ramp_steps} ({config.phase_diversity_ramp_multiplier}× warmup)")
-            print(f"     ├─ λ range: [{phase_diversity_controller.lambda_min:.0e}, {phase_diversity_controller.lambda_max:.0e}]")
-            print(f"     └─ Control: λ adapts via exp(η×(R-R_target)), η={phase_diversity_controller.eta}")
+            if task_scaling:
+                print(f"     ├─ Mode: Task-loss scaling (Lagrange multiplier, α={task_alpha})")
+                print(f"     └─ λ = α × task_loss × collapse_pressure × ramp (self-normalizing)")
+            else:
+                print(f"     ├─ λ range: [{phase_diversity_controller.lambda_min:.0e}, {phase_diversity_controller.lambda_max:.0e}]")
+                print(f"     └─ Control: λ adapts via exp(η×(R-R_target)), η={phase_diversity_controller.eta}")
         else:
             # V9.9.10: Fixed weight mode
             print(f"\n  🌀 [PHASE DIVERSITY V9.9.10] Fixed mode on {num_phase_layers} layers")
@@ -13916,6 +13928,9 @@ def train(config: UnifiedTrainingConfig):
                 # V9.9.10/V9.9.12: Phase diversity loss (combat phase collapse)
                 # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
                 if phase_diversity_enabled:
+                    # Capture task loss BEFORE adding phase diversity (for self-scaling)
+                    task_loss_for_scaling = loss.detach().item()
+
                     # First compute loss with weight=1 to get R metric
                     phase_div_loss_raw, phase_div_metrics = compute_model_phase_diversity_loss(
                         model,
@@ -13928,11 +13943,15 @@ def train(config: UnifiedTrainingConfig):
 
                     # Determine weight: adaptive (V9.9.12) or fixed (V9.9.10)
                     if phase_diversity_controller is not None:
-                        # V9.9.12: Adaptive controller
-                        current_weight = phase_diversity_controller.get_weight(global_step, current_R)
+                        # V9.9.12/V9.9.12b: Adaptive controller with optional task-loss scaling
+                        # Pass task_loss for self-normalized scaling (ChatGPT's Lagrange approach)
+                        current_weight = phase_diversity_controller.get_weight(
+                            global_step, current_R, task_loss=task_loss_for_scaling
+                        )
                         controller_status = phase_diversity_controller.get_status()
                         metrics['phase_div_R_ema'] = controller_status['phase_div_R_ema']
                         metrics['phase_div_target_R'] = controller_status['phase_div_target_R']
+                        metrics['phase_div_collapse_pressure'] = controller_status.get('phase_div_collapse_pressure', 0.0)
                     else:
                         # V9.9.10: Fixed ramped weight
                         ramp_progress = min(1.0, global_step / max(1, config.phase_diversity_ramp_steps))
@@ -13950,11 +13969,14 @@ def train(config: UnifiedTrainingConfig):
 
                         # One-time log when loss activates
                         if global_step == 1:
-                            mode = "ADAPTIVE" if phase_diversity_controller else "FIXED"
+                            mode = "TASK-SCALED" if (phase_diversity_controller and phase_diversity_controller.task_loss_scaling) else \
+                                   "ADAPTIVE" if phase_diversity_controller else "FIXED"
                             print(f"\n  🌀 [PHASE DIVERSITY] {mode} mode active!")
                             print(f"     ├─ Uniform Loss: {phase_div_metrics['phase_uniform_loss']:.4f}")
                             print(f"     ├─ Entropy Proxy R: {current_R:.4f}")
                             print(f"     ├─ λ: {current_weight:.6f}")
+                            if phase_diversity_controller and phase_diversity_controller.task_loss_scaling:
+                                print(f"     ├─ Task Loss (for scaling): {task_loss_for_scaling:.4f}")
                             print(f"     └─ Layers captured: {phase_div_metrics['num_layers_captured']}")
 
             # =================================================================
@@ -17121,6 +17143,13 @@ def main():
                        help="Control gain (how fast λ adapts to R)")
     parser.add_argument("--phase_diversity_ramp_multiplier", type=float, default=5.0,
                        help="ramp_steps = multiplier * warmup_steps (universal ramp)")
+    # V9.9.12b: Task-loss scaling (ChatGPT's Lagrange multiplier approach)
+    parser.add_argument("--phase_diversity_task_scaling", action="store_true", default=True,
+                       help="Scale λ by task loss (self-normalizing, ChatGPT's Lagrange approach)")
+    parser.add_argument("--no_phase_diversity_task_scaling", action="store_true",
+                       help="Disable task-loss scaling (use pure R-adaptive mode)")
+    parser.add_argument("--phase_diversity_task_alpha", type=float, default=0.01,
+                       help="Base coefficient for task-loss scaling mode")
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
@@ -18217,6 +18246,9 @@ def main():
         phase_diversity_lambda_max=args.phase_diversity_lambda_max,
         phase_diversity_eta=args.phase_diversity_eta,
         phase_diversity_ramp_multiplier=args.phase_diversity_ramp_multiplier,
+        # V9.9.12b: Task-loss scaling
+        phase_diversity_task_scaling=args.phase_diversity_task_scaling and not args.no_phase_diversity_task_scaling,
+        phase_diversity_task_alpha=args.phase_diversity_task_alpha,
         # V9.9.1 Per-Layer Phase Control
         # V9.9.8: Auto-enable when per_layer_phase_weights is provided
         enable_per_layer_phase=args.enable_per_layer_phase or bool(args.per_layer_phase_weights),
