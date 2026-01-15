@@ -330,6 +330,403 @@ def parallel_ema_scan(
 
 
 # =============================================================================
+# V9.9.10: PHASE DIVERSITY LOSSES - Combat Phase Collapse (ChatGPT-Enhanced)
+# =============================================================================
+# Problem: Phase attention collapses to cos(φ_q - φ_k) ≈ 1 everywhere,
+#          turning the phase mechanism into a scalar gain (no selectivity).
+#
+# Solution (ChatGPT's recommendations):
+#   1. Uniformity Loss: |E[e^{iφ}]|² - penalizes non-uniform distribution
+#      (better than pairwise cosine which can cause bimodal collapse)
+#   2. Entropy Proxy: R = |E[e^{iφ}]| - mean resultant length
+#      (R→0 = uniform/high entropy, R→1 = collapsed/low entropy)
+#   3. Pool phases across D_h FIRST to prevent gaming via irrelevant dims
+#
+# These forces push phases toward uniform distribution around the unit circle.
+
+def compute_effective_phase(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Pool phase across D_h dimension to get effective phase per head.
+
+    φ_eff = atan2(Σ_d sin(φ_d), Σ_d cos(φ_d))
+
+    This prevents the model from gaming diversity loss by randomizing
+    useless dimensions while keeping a few collapsed for actual work.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        phi_eff: Effective phase [B, N, H]
+    """
+    # Sum sin and cos across D_h dimension
+    sin_sum = torch.sin(phi).sum(dim=-1)  # [B, N, H]
+    cos_sum = torch.cos(phi).sum(dim=-1)  # [B, N, H]
+
+    # Compute effective phase via atan2
+    phi_eff = torch.atan2(sin_sum, cos_sum)  # [B, N, H]
+
+    return phi_eff
+
+
+def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Uniformity loss: Penalize non-uniform phase distribution.
+
+    L_uniform = |E[e^{iφ}]|²
+
+    If phases are uniform around the circle → E[e^{iφ}] ≈ 0 → loss small
+    If phases collapse to one direction → |E[e^{iφ}]| large → loss large
+
+    This is better than cosine-pair repulsion which can cause bimodal collapse
+    (all phases split into two clusters at π apart).
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h] or effective phase [B, N, H]
+
+    Returns:
+        Scalar loss (minimize for uniform distribution)
+    """
+    # Pool across D_h if present
+    if phi.dim() == 4:
+        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+    else:
+        phi_eff = phi  # Already [B, N, H]
+
+    # Compute complex phasor e^{iφ}
+    # Use cos + i*sin instead of torch.polar for gradient stability
+    cos_phi = torch.cos(phi_eff)  # [B, N, H]
+    sin_phi = torch.sin(phi_eff)  # [B, N, H]
+
+    # Mean across batch, positions → [H]
+    mean_cos = cos_phi.mean(dim=(0, 1))  # [H]
+    mean_sin = sin_phi.mean(dim=(0, 1))  # [H]
+
+    # |E[e^{iφ}]|² per head
+    magnitude_sq = mean_cos ** 2 + mean_sin ** 2  # [H]
+
+    # Mean across heads
+    return magnitude_sq.mean()
+
+
+def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Entropy proxy via mean resultant length (circular statistics).
+
+    R = |E[e^{iφ}]|
+
+    Uniform distribution → R ≈ 0 (high entropy)
+    Collapsed distribution → R ≈ 1 (low entropy)
+
+    This is cheaper and more stable than KDE-based entropy estimation.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h] or effective phase [B, N, H]
+
+    Returns:
+        Scalar loss R (minimize to maximize entropy)
+    """
+    # Pool across D_h if present
+    if phi.dim() == 4:
+        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+    else:
+        phi_eff = phi
+
+    # Compute complex phasor components
+    cos_phi = torch.cos(phi_eff)
+    sin_phi = torch.sin(phi_eff)
+
+    # Mean across batch, positions → [H]
+    mean_cos = cos_phi.mean(dim=(0, 1))
+    mean_sin = sin_phi.mean(dim=(0, 1))
+
+    # Mean resultant length R = |E[e^{iφ}]| per head
+    R = torch.sqrt(mean_cos ** 2 + mean_sin ** 2 + 1e-8)  # [H]
+
+    # Mean across heads
+    return R.mean()
+
+
+def compute_phase_diversity_losses(
+    phi_k: torch.Tensor,
+    lambda_uniform: float = 0.001,
+    lambda_entropy: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute combined phase diversity losses for training.
+
+    V9.9.10: Uses ChatGPT's enhanced approach:
+    - Pool phase across D_h first (compute_effective_phase)
+    - Use uniformity loss instead of pairwise cosine repulsion
+    - Use mean resultant length as entropy proxy
+    - Start with small weights (1e-3), ramp to 1e-2 over training
+
+    Args:
+        phi_k: Key phase tensor [B, N, H, D_h]
+        lambda_uniform: Weight for uniformity loss (default 0.001)
+        lambda_entropy: Weight for entropy proxy loss (default 0.001)
+
+    Returns:
+        total_loss: Weighted sum of diversity losses
+        metrics: Dict with individual loss values for logging
+    """
+    # Uniformity loss: |E[e^{iφ}]|² (penalizes clustering)
+    loss_uniform = phase_uniformity_loss(phi_k)
+
+    # Entropy proxy: R = |E[e^{iφ}]| (minimize for high entropy)
+    loss_entropy = phase_entropy_proxy_loss(phi_k)
+
+    # Weighted combination
+    total_loss = lambda_uniform * loss_uniform + lambda_entropy * loss_entropy
+
+    # Metrics for logging
+    metrics = {
+        'phase_uniform_loss': loss_uniform.item(),
+        'phase_entropy_proxy': loss_entropy.item(),  # R value (0=uniform, 1=collapsed)
+        'phase_diversity_loss': total_loss.item(),
+    }
+
+    return total_loss, metrics
+
+
+def enable_phase_diversity_capture(model: nn.Module, enable: bool = True) -> int:
+    """
+    Enable or disable phase diversity capture on all PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+        enable: Whether to enable capture
+
+    Returns:
+        Number of PhaseAttentionLayer modules found
+    """
+    count = 0
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            module.capture_phase_for_diversity = enable
+            if not enable:
+                module._captured_phi_k = None  # Clear captured data
+            count += 1
+    return count
+
+
+def collect_captured_phases(model: nn.Module) -> List[torch.Tensor]:
+    """
+    Collect all captured phi_k tensors from PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+
+    Returns:
+        List of phi_k tensors [B, N, H, D_h] from each layer
+    """
+    phases = []
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            if hasattr(module, '_captured_phi_k') and module._captured_phi_k is not None:
+                phases.append(module._captured_phi_k)
+    return phases
+
+
+def compute_model_phase_diversity_loss(
+    model: nn.Module,
+    lambda_uniform: float = 0.001,
+    lambda_entropy: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute phase diversity loss across all PhaseAttentionLayer modules.
+
+    V9.9.10: Aggregates diversity losses from all captured phases.
+    Uses ChatGPT's enhanced uniformity + entropy proxy approach.
+
+    Args:
+        model: Model with captured phi_k tensors
+        lambda_uniform: Weight for uniformity loss (default 0.001)
+        lambda_entropy: Weight for entropy proxy loss (default 0.001)
+
+    Returns:
+        total_loss: Combined loss across all layers
+        metrics: Dict with aggregate metrics
+    """
+    phases = collect_captured_phases(model)
+
+    if not phases:
+        # No phases captured, return zero loss
+        device = next(model.parameters()).device
+        return torch.tensor(0.0, device=device, requires_grad=False), {
+            'phase_uniform_loss': 0.0,
+            'phase_entropy_proxy': 0.0,
+            'phase_diversity_loss': 0.0,
+            'num_layers_captured': 0,
+        }
+
+    # Compute loss for each layer and average
+    total_uniform = 0.0
+    total_entropy = 0.0
+    total_loss = None
+
+    for phi_k in phases:
+        loss, metrics = compute_phase_diversity_losses(phi_k, lambda_uniform, lambda_entropy)
+        total_uniform += metrics['phase_uniform_loss']
+        total_entropy += metrics['phase_entropy_proxy']
+        if total_loss is None:
+            total_loss = loss
+        else:
+            total_loss = total_loss + loss
+
+    num_layers = len(phases)
+    avg_loss = total_loss / num_layers if total_loss is not None else torch.tensor(0.0)
+
+    return avg_loss, {
+        'phase_uniform_loss': total_uniform / num_layers,
+        'phase_entropy_proxy': total_entropy / num_layers,
+        'phase_diversity_loss': avg_loss.item() if torch.is_tensor(avg_loss) else avg_loss,
+        'num_layers_captured': num_layers,
+    }
+
+
+# =============================================================================
+# V9.9.12: ADAPTIVE PHASE DIVERSITY CONTROLLER (ChatGPT Universal Proposal)
+# =============================================================================
+
+class AdaptivePhaseDiversityController:
+    """
+    Adaptive controller for phase diversity loss weight.
+
+    V9.9.12: Implements ChatGPT's "universal" proposal to replace fixed λ and ramp.
+
+    Key features:
+    1. Uses R (mean resultant length) as scale-free collapse metric
+       - R ≈ 0: Uniform phases (healthy)
+       - R ≈ 1: Collapsed phases (sick)
+
+    2. Adjusts λ automatically via control loop:
+       λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
+       - If R > target: λ increases (more pressure)
+       - If R < target: λ decreases (ease off)
+
+    3. Warmup-coupled ramp (universal):
+       - ramp_steps = 5 * warmup_steps (scales with training regime)
+       - Or token-based: ramp until N million tokens seen
+
+    Target bands for R:
+    - Healthy: R ∈ [0.05, 0.30]
+    - Borderline: R ∈ [0.30, 0.50]
+    - Collapsed: R > 0.50
+
+    Usage:
+        controller = AdaptivePhaseDiversityController(
+            warmup_steps=1000,  # From config
+            target_R=0.25,      # Universal default
+        )
+
+        # In training loop:
+        lambda_phase = controller.get_weight(global_step, current_R)
+    """
+
+    def __init__(
+        self,
+        warmup_steps: int = 1000,
+        target_R: float = 0.25,
+        lambda_init: float = 0.0001,
+        lambda_min: float = 1e-6,
+        lambda_max: float = 0.1,
+        eta: float = 0.1,  # Control gain (how fast λ adapts)
+        ema_decay: float = 0.95,  # Smooth R tracking
+        ramp_multiplier: float = 5.0,  # ramp_steps = ramp_multiplier * warmup_steps
+    ):
+        """
+        Args:
+            warmup_steps: LR warmup steps (used to derive ramp_steps)
+            target_R: Target mean resultant length (0.25 = healthy diversity)
+            lambda_init: Initial λ value after ramp
+            lambda_min: Minimum λ (floor)
+            lambda_max: Maximum λ (ceiling)
+            eta: Control gain for λ adjustment
+            ema_decay: EMA decay for smoothing R observations
+            ramp_multiplier: ramp_steps = ramp_multiplier * warmup_steps
+        """
+        self.warmup_steps = warmup_steps
+        self.target_R = target_R
+        self.lambda_init = lambda_init
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
+        self.eta = eta
+        self.ema_decay = ema_decay
+
+        # Warmup-coupled ramp (universal)
+        self.ramp_steps = int(ramp_multiplier * warmup_steps)
+
+        # State
+        self.current_lambda = 0.0  # Starts at 0, ramps up
+        self.R_ema = 0.5  # Initial estimate (neutral)
+        self.step_count = 0
+
+        # Diagnostics
+        self.lambda_history = []
+        self.R_history = []
+
+    def get_weight(self, global_step: int, current_R: float) -> float:
+        """
+        Get current phase diversity weight, adapting based on R.
+
+        Args:
+            global_step: Current training step
+            current_R: Current mean resultant length (phase_entropy_proxy)
+
+        Returns:
+            lambda: Adapted phase diversity weight
+        """
+        self.step_count = global_step
+
+        # Update R EMA for smooth tracking
+        self.R_ema = self.ema_decay * self.R_ema + (1 - self.ema_decay) * current_R
+        self.R_history.append(current_R)
+
+        # Phase 1: Ramp from 0 to lambda_init
+        if global_step < self.ramp_steps:
+            ramp_progress = global_step / max(1, self.ramp_steps)
+            self.current_lambda = self.lambda_init * ramp_progress
+        else:
+            # Phase 2: Adaptive control
+            # λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
+            error = self.R_ema - self.target_R
+            adjustment = math.exp(self.eta * error)
+
+            # Apply adjustment with clipping
+            self.current_lambda = max(
+                self.lambda_min,
+                min(self.lambda_max, self.current_lambda * adjustment)
+            )
+
+            # Ensure we're at least at lambda_init after ramp
+            if self.current_lambda < self.lambda_init:
+                self.current_lambda = self.lambda_init
+
+        self.lambda_history.append(self.current_lambda)
+        return self.current_lambda
+
+    def get_status(self) -> dict:
+        """Get controller status for logging."""
+        return {
+            'phase_div_lambda': self.current_lambda,
+            'phase_div_R_ema': self.R_ema,
+            'phase_div_target_R': self.target_R,
+            'phase_div_ramp_steps': self.ramp_steps,
+            'phase_div_ramp_progress': min(1.0, self.step_count / max(1, self.ramp_steps)),
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"AdaptivePhaseDiversityController("
+            f"target_R={self.target_R}, "
+            f"λ={self.current_lambda:.6f}, "
+            f"R_ema={self.R_ema:.3f}, "
+            f"ramp_steps={self.ramp_steps})"
+        )
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -518,12 +915,18 @@ class PhaseAttentionLayer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
+        self.bounded_phase = bounded_phase  # π*sin() bounds φ to S¹ manifold
+        self.zero_mean_cosine = zero_mean_cosine  # Center cosine to force selectivity
 
         # V9.6.12: Cosine mode for interaction kernel
         assert cosine_mode in ("standard", "shifted", "complex"), \
@@ -596,6 +999,11 @@ class PhaseAttentionLayer(nn.Module):
         phase_offsets = torch.linspace(0, 2 * math.pi * (num_heads - 1) / num_heads, num_heads)
         self.phase_offset_q = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
         self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
+
+        # V9.9.10: Phase diversity loss capture
+        # When enabled, captures phi_k for computing repulsion + entropy losses
+        self.capture_phase_for_diversity = False  # Set True during training
+        self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -694,12 +1102,22 @@ class PhaseAttentionLayer(nn.Module):
         # This allows asymmetric attention patterns (e.g., "The" → "Empire")
 
         # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_q = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        phi_q_raw = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
 
         # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
+        # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
+        # Without this, raw linear projections can drift unbounded and cause collapse.
+        if self.bounded_phase:
+            phi_q = math.pi * torch.sin(phi_q_raw)
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_q = phi_q_raw
+            phi_k = phi_k_raw
 
         # V9.9.9: Apply per-head phase offsets (Gemini's Phase Spread)
         # This shatters phase collapse by giving each head a unique starting angle.
@@ -707,6 +1125,11 @@ class PhaseAttentionLayer(nn.Module):
         if hasattr(self, 'phase_offset_q'):
             phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
             phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
+
+        # V9.9.10: Capture phi_k for phase diversity loss computation
+        # Only capture during training when flag is set (saves memory in eval)
+        if self.capture_phase_for_diversity and self.training:
+            self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
@@ -789,6 +1212,11 @@ class PhaseAttentionLayer(nn.Module):
             # Use optimized parallel scan instead of sequential loop
             global_state = parallel_ema_scan(kv_complex, gamma)
 
+            # V9.9.9: Capture state norm for cumsum health monitoring (Gemini's suggestion)
+            # If this grows linearly with sequence length, the leaky scan isn't working
+            with torch.no_grad():
+                self._diag_state_norm = global_state.abs().mean(dim=-1).mean(dim=-1)  # [B, N]
+
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
@@ -815,6 +1243,16 @@ class PhaseAttentionLayer(nn.Module):
             # Original: cos(φ_q - φ_k), range [-1, +1]
             # Can have destructive interference (negative cancellation)
             numerator = qk_product.real  # [B, N, H, D_h]
+
+            # V9.9.11: Zero-mean cosine per head (ChatGPT Fix 2 - mandatory)
+            # Without this, cosine is always positive-biased and collapse is inevitable.
+            # Centering forces the model to create both positive and negative contributions,
+            # making selectivity necessary instead of trivially keeping everything high.
+            if self.zero_mean_cosine:
+                # Compute mean across batch and sequence (keep per-head, per-dim)
+                cos_mean = numerator.mean(dim=(0, 1), keepdim=True)  # [1, 1, H, D_h]
+                numerator = numerator - cos_mean
+
             sync_output = numerator / normalizer
 
         elif self.cosine_mode == "shifted":
@@ -1866,6 +2304,8 @@ class HybridAttentionLayer(nn.Module):
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -1899,6 +2339,8 @@ class HybridAttentionLayer(nn.Module):
             cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
             decay_gamma=decay_gamma,  # V9.6.13: State decay factor
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -2069,6 +2511,8 @@ class HybridTransformerBlock(nn.Module):
         n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -2088,6 +2532,8 @@ class HybridTransformerBlock(nn.Module):
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
             layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -2513,8 +2959,14 @@ class HybridPhaseTransformer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
+
+        # V9.9.11: Store phase collapse fix flags
+        self.bounded_phase = bounded_phase
+        self.zero_mean_cosine = zero_mean_cosine
 
         config = TransformerConfig(
             vocab_size=vocab_size,
@@ -2563,6 +3015,8 @@ class HybridPhaseTransformer(nn.Module):
                     n_kv_heads=n_kv_heads,  # GQA support
                     layer_idx=i,  # V9.9.1: Layer index for per-layer control
                     learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+                    bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+                    zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
                 ))
 
         # Output
@@ -2869,6 +3323,8 @@ class OntologicalHybridTransformer(nn.Module):
         cosine_mode: str = "standard",
         decay_gamma: float = 1.0,
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
 
@@ -2891,6 +3347,8 @@ class OntologicalHybridTransformer(nn.Module):
             cosine_mode=cosine_mode,
             decay_gamma=decay_gamma,
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]

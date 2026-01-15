@@ -121,6 +121,11 @@ from symbolu.phase_transformer import (
     get_sovereign_state_summary,
     # V9.9.5: Parameter orthogonalization for hybrid attention
     compute_weight_orthogonalization_loss,
+    # V9.9.10: Phase diversity loss (combat phase collapse)
+    enable_phase_diversity_capture,
+    compute_model_phase_diversity_loss,
+    # V9.9.12: Adaptive phase diversity controller
+    AdaptivePhaseDiversityController,
 )
 
 # Import ontological models
@@ -9008,6 +9013,8 @@ class UnifiedTrainingConfig:
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     learned_decay: bool = False  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+    bounded_phase: bool = False  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix)
+    zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -9023,6 +9030,20 @@ class UnifiedTrainingConfig:
 
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
+
+    # V9.9.10: Phase diversity loss (to combat phase collapse)
+    # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
+    phase_diversity_weight: float = 0.0  # Combined weight (0=disabled, 0.001=start, ramp to 0.01)
+    phase_diversity_ramp_steps: int = 5000  # Steps to ramp weight linearly (ignored if adaptive)
+
+    # V9.9.12: Adaptive Phase Diversity Controller (ChatGPT Universal Proposal)
+    # Replaces fixed λ and ramp with scale-free control loop based on R
+    enable_adaptive_phase_diversity: bool = False  # Use adaptive controller instead of fixed
+    phase_diversity_target_R: float = 0.25  # Target mean resultant length (0.25 = healthy)
+    phase_diversity_lambda_init: float = 0.0001  # Initial λ after ramp
+    phase_diversity_lambda_max: float = 0.1  # Maximum λ ceiling
+    phase_diversity_eta: float = 0.1  # Control gain (how fast λ adapts)
+    phase_diversity_ramp_multiplier: float = 5.0  # ramp_steps = multiplier * warmup_steps
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
@@ -10186,11 +10207,17 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
             decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
         if config.learned_decay:
             print(f"  Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
+        if config.bounded_phase:
+            print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
+        if config.zero_mean_cosine:
+            print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -10260,6 +10287,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             cosine_mode=config.cosine_mode,
             decay_gamma=config.decay_gamma,
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10272,6 +10301,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
         if config.learned_decay:
             print(f"    Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
+        if config.bounded_phase:
+            print(f"    Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
+        if config.zero_mean_cosine:
+            print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     else:
@@ -13603,6 +13636,45 @@ def train(config: UnifiedTrainingConfig):
     print(f"{'='*70}\n", flush=True)
 
     model.train()
+
+    # V9.9.10/V9.9.12: Phase diversity loss setup
+    # Check if adaptive mode (V9.9.12) or fixed mode (V9.9.10) is enabled
+    adaptive_phase_diversity = getattr(config, 'enable_adaptive_phase_diversity', False)
+    fixed_phase_diversity = (
+        hasattr(config, 'phase_diversity_weight') and
+        config.phase_diversity_weight > 0
+    )
+    phase_diversity_enabled = (
+        (adaptive_phase_diversity or fixed_phase_diversity) and
+        config.model_type in ('phase', 'hybrid', 'ontological_hybrid')
+    )
+
+    # Initialize adaptive controller if enabled
+    phase_diversity_controller = None
+    if phase_diversity_enabled:
+        num_phase_layers = enable_phase_diversity_capture(model, enable=True)
+
+        if adaptive_phase_diversity:
+            # V9.9.12: Adaptive controller (ChatGPT Universal Proposal)
+            phase_diversity_controller = AdaptivePhaseDiversityController(
+                warmup_steps=config.warmup_steps,
+                target_R=getattr(config, 'phase_diversity_target_R', 0.25),
+                lambda_init=getattr(config, 'phase_diversity_lambda_init', 0.0001),
+                lambda_max=getattr(config, 'phase_diversity_lambda_max', 0.1),
+                eta=getattr(config, 'phase_diversity_eta', 0.1),
+                ramp_multiplier=getattr(config, 'phase_diversity_ramp_multiplier', 5.0),
+            )
+            print(f"\n  🌀 [PHASE DIVERSITY V9.9.12] ADAPTIVE Controller enabled on {num_phase_layers} layers")
+            print(f"     ├─ Target R: {phase_diversity_controller.target_R} (mean resultant length)")
+            print(f"     ├─ Ramp steps: {phase_diversity_controller.ramp_steps} ({config.phase_diversity_ramp_multiplier}× warmup)")
+            print(f"     ├─ λ range: [{phase_diversity_controller.lambda_min:.0e}, {phase_diversity_controller.lambda_max:.0e}]")
+            print(f"     └─ Control: λ adapts via exp(η×(R-R_target)), η={phase_diversity_controller.eta}")
+        else:
+            # V9.9.10: Fixed weight mode
+            print(f"\n  🌀 [PHASE DIVERSITY V9.9.10] Fixed mode on {num_phase_layers} layers")
+            print(f"     ├─ Weight: {config.phase_diversity_weight} (ramps over {config.phase_diversity_ramp_steps} steps)")
+            print(f"     └─ Losses: Uniformity |E[e^{{iφ}}]|² + Entropy Proxy R")
+
     train_iter = iter(train_loader)
     step_start_time = time.time()
     running_loss = 0.0
@@ -13840,6 +13912,50 @@ def train(config: UnifiedTrainingConfig):
                     ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
                     loss = loss + config.decorr_loss_weight * ortho_loss_tensor
                     metrics['ortho_loss'] = ortho_loss_tensor.item()
+
+                # V9.9.10/V9.9.12: Phase diversity loss (combat phase collapse)
+                # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
+                if phase_diversity_enabled:
+                    # First compute loss with weight=1 to get R metric
+                    phase_div_loss_raw, phase_div_metrics = compute_model_phase_diversity_loss(
+                        model,
+                        lambda_uniform=1.0,
+                        lambda_entropy=1.0,
+                    )
+
+                    # Get current R (entropy proxy) for adaptive controller
+                    current_R = phase_div_metrics['phase_entropy_proxy']
+
+                    # Determine weight: adaptive (V9.9.12) or fixed (V9.9.10)
+                    if phase_diversity_controller is not None:
+                        # V9.9.12: Adaptive controller
+                        current_weight = phase_diversity_controller.get_weight(global_step, current_R)
+                        controller_status = phase_diversity_controller.get_status()
+                        metrics['phase_div_R_ema'] = controller_status['phase_div_R_ema']
+                        metrics['phase_div_target_R'] = controller_status['phase_div_target_R']
+                    else:
+                        # V9.9.10: Fixed ramped weight
+                        ramp_progress = min(1.0, global_step / max(1, config.phase_diversity_ramp_steps))
+                        current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
+
+                    # Scale the loss by the computed weight
+                    phase_div_loss = phase_div_loss_raw * current_weight
+
+                    if phase_div_loss.requires_grad:
+                        loss = loss + phase_div_loss
+                        metrics['phase_uniform_loss'] = phase_div_metrics['phase_uniform_loss']
+                        metrics['phase_entropy_proxy'] = current_R
+                        metrics['phase_diversity_loss'] = phase_div_loss.item()
+                        metrics['phase_diversity_weight'] = current_weight
+
+                        # One-time log when loss activates
+                        if global_step == 1:
+                            mode = "ADAPTIVE" if phase_diversity_controller else "FIXED"
+                            print(f"\n  🌀 [PHASE DIVERSITY] {mode} mode active!")
+                            print(f"     ├─ Uniform Loss: {phase_div_metrics['phase_uniform_loss']:.4f}")
+                            print(f"     ├─ Entropy Proxy R: {current_R:.4f}")
+                            print(f"     ├─ λ: {current_weight:.6f}")
+                            print(f"     └─ Layers captured: {phase_div_metrics['num_layers_captured']}")
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
@@ -16985,6 +17101,27 @@ def main():
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
                        help="Weight for decorrelation loss (0=disabled, 0.1=recommended)")
 
+    # V9.9.10: Phase diversity loss (combat phase collapse)
+    parser.add_argument("--phase_diversity_weight", type=float, default=0.0,
+                       help="Weight for phase diversity loss (0=disabled, 0.001=start, ramp to 0.01)")
+    parser.add_argument("--phase_diversity_ramp_steps", type=int, default=5000,
+                       help="Steps to ramp phase diversity weight linearly (ignored if adaptive)")
+
+    # V9.9.12: Adaptive Phase Diversity Controller (ChatGPT Universal Proposal)
+    parser.add_argument("--enable_adaptive_phase_diversity", action="store_true",
+                       help="Use adaptive controller instead of fixed weight. "
+                            "Automatically adjusts λ based on R (mean resultant length).")
+    parser.add_argument("--phase_diversity_target_R", type=float, default=0.25,
+                       help="Target R for adaptive controller (0.25 = healthy diversity)")
+    parser.add_argument("--phase_diversity_lambda_init", type=float, default=0.0001,
+                       help="Initial λ value after ramp")
+    parser.add_argument("--phase_diversity_lambda_max", type=float, default=0.1,
+                       help="Maximum λ ceiling")
+    parser.add_argument("--phase_diversity_eta", type=float, default=0.1,
+                       help="Control gain (how fast λ adapts to R)")
+    parser.add_argument("--phase_diversity_ramp_multiplier", type=float, default=5.0,
+                       help="ramp_steps = multiplier * warmup_steps (universal ramp)")
+
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
                        help="Enable per-layer phase weight control (for inverted curriculum)")
@@ -17023,6 +17160,14 @@ def main():
                        help="Enable per-head learned decay (Mamba/S4-style). "
                             "Each attention head learns its own decay rate [0.5, 1.0] via gradient descent. "
                             "Adds 1 learnable parameter per head. Allows model to learn optimal attention span.")
+
+    # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
+    parser.add_argument("--bounded_phase", action="store_true",
+                       help="Constrain phase to [-π, π] via π*sin() for proper S¹ manifold geometry. "
+                            "Prevents raw linear phase projections from drifting unbounded and causing collapse.")
+    parser.add_argument("--zero_mean_cosine", action="store_true",
+                       help="Center cosine per head to force selectivity. "
+                            "Without this, cosine is always positive-biased and collapse is inevitable.")
 
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
@@ -17638,13 +17783,13 @@ def main():
     parser.add_argument("--adaptive_lr_decay", type=float, default=0.7,
                        help="LR decay multiplier when PPL spike detected")
     parser.add_argument("--adaptive_velocity_slow", type=float, default=-2.0,
-                       help="PPL velocity threshold (%) for 'too slow' detection")
+                       help="PPL velocity threshold (%%) for 'too slow' detection")
     parser.add_argument("--adaptive_velocity_spike", type=float, default=10.0,
-                       help="PPL velocity threshold (%) for 'spike' detection")
+                       help="PPL velocity threshold (%%) for 'spike' detection")
     parser.add_argument("--adaptive_plateau_window", type=int, default=5,
                        help="Number of evaluations to check for plateau")
     parser.add_argument("--adaptive_plateau_threshold", type=float, default=1.0,
-                       help="Minimum improvement (%) to avoid plateau detection")
+                       help="Minimum improvement (%%) to avoid plateau detection")
     parser.add_argument("--adaptive_min_interval", type=int, default=200,
                        help="Minimum steps between adaptive adjustments")
     # V9.8.2: Safeguards to prevent runaway LR
@@ -17938,6 +18083,8 @@ def main():
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
+        bounded_phase=args.bounded_phase,  # V9.9.11: Phase collapse fix 1
+        zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,
@@ -18061,6 +18208,15 @@ def main():
         alpha_decay_steps=args.alpha_decay_steps,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
+        # V9.9.10/V9.9.12: Phase diversity loss
+        phase_diversity_weight=args.phase_diversity_weight,
+        phase_diversity_ramp_steps=args.phase_diversity_ramp_steps,
+        enable_adaptive_phase_diversity=args.enable_adaptive_phase_diversity,
+        phase_diversity_target_R=args.phase_diversity_target_R,
+        phase_diversity_lambda_init=args.phase_diversity_lambda_init,
+        phase_diversity_lambda_max=args.phase_diversity_lambda_max,
+        phase_diversity_eta=args.phase_diversity_eta,
+        phase_diversity_ramp_multiplier=args.phase_diversity_ramp_multiplier,
         # V9.9.1 Per-Layer Phase Control
         # V9.9.8: Auto-enable when per_layer_phase_weights is provided
         enable_per_layer_phase=args.enable_per_layer_phase or bool(args.per_layer_phase_weights),

@@ -194,6 +194,23 @@ def analyze_layer(hook, layer_idx):
         results['gamma_max'] = gamma.max()
         results['gamma_per_head'] = gamma.tolist()
 
+    # State Norm Analysis (Gemini's cumsum health check)
+    if hook.global_state_norm is not None:
+        state_norm = hook.global_state_norm.numpy()
+        # Check if norm grows with position (bad) or stays bounded (good)
+        # state_norm is [B, N] - we want to see if it grows along N dimension
+        mean_norm = state_norm.mean()
+        # Check growth: compare first quarter vs last quarter
+        seq_len = state_norm.shape[1]
+        first_quarter = state_norm[:, :seq_len//4].mean()
+        last_quarter = state_norm[:, -seq_len//4:].mean()
+        growth_ratio = last_quarter / (first_quarter + 1e-6)
+
+        results['state_norm_mean'] = mean_norm
+        results['state_norm_first'] = first_quarter
+        results['state_norm_last'] = last_quarter
+        results['state_norm_growth'] = growth_ratio
+
     return results
 
 
@@ -257,6 +274,18 @@ def get_health_status(results):
             status.append(("Decay Diversity", "WARNING", f"std={gamma_std:.3f} - Limited specialization"))
         else:
             status.append(("Decay Diversity", "SICK", f"std={gamma_std:.3f} - All heads identical"))
+
+    # State Norm Growth Check (Gemini's cumsum health)
+    if 'state_norm_growth' in results:
+        growth = results['state_norm_growth']
+        # If growth ratio > 2, state is growing too fast (cumsum smear)
+        # If growth ratio ~1, state is bounded (leaky scan working)
+        if growth < 1.5:
+            status.append(("State Norm", "HEALTHY", f"growth={growth:.2f}x - Leaky scan bounded"))
+        elif growth < 3.0:
+            status.append(("State Norm", "WARNING", f"growth={growth:.2f}x - Moderate accumulation"))
+        else:
+            status.append(("State Norm", "SICK", f"growth={growth:.2f}x - Unbounded cumsum!"))
 
     return status
 
@@ -396,6 +425,13 @@ def print_diagnostic_report(results):
             print(f"    Std:   {layer_results['gamma_std']:.4f}")
             print(f"    Heads: {['%.3f' % g for g in gamma]}")
 
+        if 'state_norm_growth' in layer_results:
+            print("\n  State Norm (Cumsum Health):")
+            print(f"    Mean Norm:    {layer_results['state_norm_mean']:.4f}")
+            print(f"    First 25%:    {layer_results['state_norm_first']:.4f}")
+            print(f"    Last 25%:     {layer_results['state_norm_last']:.4f}")
+            print(f"    Growth Ratio: {layer_results['state_norm_growth']:.2f}x (1.0=bounded, >3.0=unbounded)")
+
         # Health Summary
         print("\n  Health Status:")
         for metric, status, detail in health:
@@ -421,6 +457,9 @@ def print_diagnostic_report(results):
 
   Decay Diversity:      High std = heads specializing
                         (some long-memory, some short-memory)
+
+  State Norm Growth:    ~1.0x = Leaky scan working (bounded)
+                        >3.0x = Cumsum unbounded (semantic smear)
     """)
 
 
