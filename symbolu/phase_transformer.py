@@ -634,6 +634,8 @@ class AdaptivePhaseDiversityController:
         eta: float = 0.1,  # Control gain (how fast λ adapts)
         ema_decay: float = 0.95,  # Smooth R tracking
         ramp_multiplier: float = 5.0,  # ramp_steps = ramp_multiplier * warmup_steps
+        task_loss_scaling: bool = True,  # V9.9.12b: Scale λ by task loss (ChatGPT)
+        task_loss_alpha: float = 0.01,  # Scaling coefficient for task-loss mode
     ):
         """
         Args:
@@ -645,6 +647,8 @@ class AdaptivePhaseDiversityController:
             eta: Control gain for λ adjustment
             ema_decay: EMA decay for smoothing R observations
             ramp_multiplier: ramp_steps = ramp_multiplier * warmup_steps
+            task_loss_scaling: If True, scale λ proportionally to task loss (self-normalizing)
+            task_loss_alpha: Base coefficient when task_loss_scaling is True
         """
         self.warmup_steps = warmup_steps
         self.target_R = target_R
@@ -653,6 +657,11 @@ class AdaptivePhaseDiversityController:
         self.lambda_max = lambda_max
         self.eta = eta
         self.ema_decay = ema_decay
+
+        # V9.9.12b: Task-loss scaling (ChatGPT's Lagrange multiplier approach)
+        self.task_loss_scaling = task_loss_scaling
+        self.task_loss_alpha = task_loss_alpha
+        self.task_loss_ema = 7.0  # Initialize to typical early training loss
 
         # Warmup-coupled ramp (universal)
         self.ramp_steps = int(ramp_multiplier * warmup_steps)
@@ -666,13 +675,22 @@ class AdaptivePhaseDiversityController:
         self.lambda_history = []
         self.R_history = []
 
-    def get_weight(self, global_step: int, current_R: float) -> float:
+    def get_weight(self, global_step: int, current_R: float, task_loss: float = None) -> float:
         """
-        Get current phase diversity weight, adapting based on R.
+        Get current phase diversity weight, adapting based on R and optionally task loss.
+
+        V9.9.12b Enhancement (ChatGPT's directive):
+        - If task_loss_scaling=True and task_loss provided:
+          λ_effective = α * task_loss * collapse_pressure
+          This makes phase diversity a "geometry preservation constraint" that:
+          1. Automatically weakens as task converges (lower loss)
+          2. Only activates when collapse occurs (R > target)
+          3. Acts like a Lagrange multiplier, not a heuristic
 
         Args:
             global_step: Current training step
             current_R: Current mean resultant length (phase_entropy_proxy)
+            task_loss: Optional task loss for self-normalized scaling
 
         Returns:
             lambda: Adapted phase diversity weight
@@ -683,42 +701,73 @@ class AdaptivePhaseDiversityController:
         self.R_ema = self.ema_decay * self.R_ema + (1 - self.ema_decay) * current_R
         self.R_history.append(current_R)
 
-        # Phase 1: Ramp from 0 to lambda_init
+        # Update task loss EMA if provided
+        if task_loss is not None:
+            self.task_loss_ema = self.ema_decay * self.task_loss_ema + (1 - self.ema_decay) * task_loss
+
+        # Compute collapse pressure: how much R exceeds target (0 if healthy)
+        # dispersion = 1 - R (R=0 is uniform/healthy, R=1 is collapsed)
+        # We want loss when R > target (collapsed)
+        collapse_pressure = max(0.0, self.R_ema - self.target_R)
+
+        # Phase 1: Ramp from 0 to full strength
         if global_step < self.ramp_steps:
             ramp_progress = global_step / max(1, self.ramp_steps)
-            self.current_lambda = self.lambda_init * ramp_progress
         else:
-            # Phase 2: Adaptive control
-            # λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
-            error = self.R_ema - self.target_R
-            adjustment = math.exp(self.eta * error)
+            ramp_progress = 1.0
 
-            # Apply adjustment with clipping
-            self.current_lambda = max(
-                self.lambda_min,
-                min(self.lambda_max, self.current_lambda * adjustment)
+        # Compute λ based on mode
+        if self.task_loss_scaling and task_loss is not None:
+            # V9.9.12b: Self-normalized scaling (ChatGPT's Lagrange approach)
+            # λ_effective = α * task_loss * collapse_pressure * ramp
+            # - Weakens as training converges (task_loss drops)
+            # - Only activates when collapsed (collapse_pressure > 0)
+            # - Ramps up during warmup
+            self.current_lambda = (
+                self.task_loss_alpha *
+                self.task_loss_ema *
+                collapse_pressure *
+                ramp_progress
             )
+        else:
+            # Original R-adaptive mode (V9.9.12a)
+            if global_step < self.ramp_steps:
+                self.current_lambda = self.lambda_init * ramp_progress
+            else:
+                # Adaptive control: λ_{t+1} = clip(λ_t * exp(η * (R - R_target)))
+                error = self.R_ema - self.target_R
+                adjustment = math.exp(self.eta * error)
+                self.current_lambda = max(
+                    self.lambda_min,
+                    min(self.lambda_max, self.current_lambda * adjustment)
+                )
+                if self.current_lambda < self.lambda_init:
+                    self.current_lambda = self.lambda_init
 
-            # Ensure we're at least at lambda_init after ramp
-            if self.current_lambda < self.lambda_init:
-                self.current_lambda = self.lambda_init
+        # Apply bounds
+        self.current_lambda = max(self.lambda_min, min(self.lambda_max, self.current_lambda))
 
         self.lambda_history.append(self.current_lambda)
         return self.current_lambda
 
     def get_status(self) -> dict:
         """Get controller status for logging."""
+        collapse_pressure = max(0.0, self.R_ema - self.target_R)
         return {
             'phase_div_lambda': self.current_lambda,
             'phase_div_R_ema': self.R_ema,
             'phase_div_target_R': self.target_R,
             'phase_div_ramp_steps': self.ramp_steps,
             'phase_div_ramp_progress': min(1.0, self.step_count / max(1, self.ramp_steps)),
+            'phase_div_collapse_pressure': collapse_pressure,
+            'phase_div_task_loss_ema': self.task_loss_ema if self.task_loss_scaling else 0.0,
         }
 
     def __repr__(self) -> str:
+        mode = "task-scaled" if self.task_loss_scaling else "R-adaptive"
         return (
             f"AdaptivePhaseDiversityController("
+            f"mode={mode}, "
             f"target_R={self.target_R}, "
             f"λ={self.current_lambda:.6f}, "
             f"R_ema={self.R_ema:.3f}, "
