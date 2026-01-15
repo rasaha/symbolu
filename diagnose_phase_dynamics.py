@@ -52,13 +52,13 @@ class PhaseAttentionHook:
 
 def patch_phase_attention_for_diagnostics(model):
     """
-    Monkey-patch PhaseAttention to capture diagnostic values.
+    Monkey-patch PhaseAttentionLayer to capture diagnostic values.
 
     This adds diagnostic capture to the forward pass without changing behavior.
     """
-    from symbolu.phase_transformer import PhaseAttention
+    from symbolu.phase_transformer import PhaseAttentionLayer
 
-    original_forward = PhaseAttention.forward
+    original_forward = PhaseAttentionLayer.forward
 
     def diagnostic_forward(self, x, intent_phase=None):
         # Run original forward
@@ -276,10 +276,10 @@ def run_diagnostic(model, dataloader, device, num_batches=5):
     """
     model.eval()
 
-    # Find all PhaseAttention modules
+    # Find all PhaseAttentionLayer modules
     phase_modules = []
     for name, module in model.named_modules():
-        if module.__class__.__name__ == 'PhaseAttention':
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
             phase_modules.append((name, module))
 
     if not phase_modules:
@@ -331,8 +331,8 @@ def run_diagnostic(model, dataloader, device, num_batches=5):
         handle.remove()
 
     # Restore original forward
-    from symbolu.phase_transformer import PhaseAttention
-    PhaseAttention.forward = original_forward
+    from symbolu.phase_transformer import PhaseAttentionLayer
+    PhaseAttentionLayer.forward = original_forward
 
     # Average results across batches
     averaged_results = {}
