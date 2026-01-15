@@ -13858,6 +13858,9 @@ def train(config: UnifiedTrainingConfig):
             enable_decorr = False
             decorr_loss_tensor = None
             ortho_loss_tensor = None
+            # V9.9.12c: Phase diversity loss tensor for re-adding after SRK
+            phase_div_loss_tensor = None
+            phase_div_weight_for_srk = 0.0
 
             if config.model_type == "ontological":
                 outputs = model(x)
@@ -13962,6 +13965,9 @@ def train(config: UnifiedTrainingConfig):
 
                     if phase_div_loss.requires_grad:
                         loss = loss + phase_div_loss
+                        # V9.9.12c: Store tensor for re-adding after SRK (which replaces loss)
+                        phase_div_loss_tensor = phase_div_loss_raw  # Store raw (unweighted)
+                        phase_div_weight_for_srk = current_weight   # Store weight separately
                         metrics['phase_uniform_loss'] = phase_div_metrics['phase_uniform_loss']
                         metrics['phase_entropy_proxy'] = current_R
                         metrics['phase_diversity_loss'] = phase_div_loss.item()
@@ -14066,6 +14072,10 @@ def train(config: UnifiedTrainingConfig):
                             loss = loss + config.decorr_loss_weight * decorr_loss_tensor
                         if ortho_loss_tensor is not None:
                             loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+
+                    # V9.9.12c: Re-add phase diversity loss (for gradient flow to W_k_phase)
+                    if phase_div_loss_tensor is not None and phase_div_weight_for_srk > 0:
+                        loss = loss + phase_div_weight_for_srk * phase_div_loss_tensor
 
                     # Update karma state for O12→O1 carryover (Toroidal Loop)
                     with torch.no_grad():
