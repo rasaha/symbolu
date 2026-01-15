@@ -9011,6 +9011,8 @@ class UnifiedTrainingConfig:
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     learned_decay: bool = False  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+    bounded_phase: bool = False  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix)
+    zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -10194,11 +10196,17 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
             decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
         if config.learned_decay:
             print(f"  Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
+        if config.bounded_phase:
+            print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
+        if config.zero_mean_cosine:
+            print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -10268,6 +10276,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             cosine_mode=config.cosine_mode,
             decay_gamma=config.decay_gamma,
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10280,6 +10290,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
         if config.learned_decay:
             print(f"    Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
+        if config.bounded_phase:
+            print(f"    Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
+        if config.zero_mean_cosine:
+            print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     else:
@@ -17079,6 +17093,14 @@ def main():
                             "Each attention head learns its own decay rate [0.5, 1.0] via gradient descent. "
                             "Adds 1 learnable parameter per head. Allows model to learn optimal attention span.")
 
+    # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
+    parser.add_argument("--bounded_phase", action="store_true",
+                       help="Constrain phase to [-π, π] via π*sin() for proper S¹ manifold geometry. "
+                            "Prevents raw linear phase projections from drifting unbounded and causing collapse.")
+    parser.add_argument("--zero_mean_cosine", action="store_true",
+                       help="Center cosine per head to force selectivity. "
+                            "Without this, cosine is always positive-biased and collapse is inevitable.")
+
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
                        help="Sovereign State dimension for ontological_hybrid model "
@@ -17993,6 +18015,8 @@ def main():
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
+        bounded_phase=args.bounded_phase,  # V9.9.11: Phase collapse fix 1
+        zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,

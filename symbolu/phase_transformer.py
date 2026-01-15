@@ -774,12 +774,18 @@ class PhaseAttentionLayer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
+        self.bounded_phase = bounded_phase  # π*sin() bounds φ to S¹ manifold
+        self.zero_mean_cosine = zero_mean_cosine  # Center cosine to force selectivity
 
         # V9.6.12: Cosine mode for interaction kernel
         assert cosine_mode in ("standard", "shifted", "complex"), \
@@ -955,12 +961,22 @@ class PhaseAttentionLayer(nn.Module):
         # This allows asymmetric attention patterns (e.g., "The" → "Empire")
 
         # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_q = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        phi_q_raw = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
 
         # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+
+        # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
+        # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
+        # Without this, raw linear projections can drift unbounded and cause collapse.
+        if self.bounded_phase:
+            phi_q = math.pi * torch.sin(phi_q_raw)
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_q = phi_q_raw
+            phi_k = phi_k_raw
 
         # V9.9.9: Apply per-head phase offsets (Gemini's Phase Spread)
         # This shatters phase collapse by giving each head a unique starting angle.
@@ -1086,6 +1102,16 @@ class PhaseAttentionLayer(nn.Module):
             # Original: cos(φ_q - φ_k), range [-1, +1]
             # Can have destructive interference (negative cancellation)
             numerator = qk_product.real  # [B, N, H, D_h]
+
+            # V9.9.11: Zero-mean cosine per head (ChatGPT Fix 2 - mandatory)
+            # Without this, cosine is always positive-biased and collapse is inevitable.
+            # Centering forces the model to create both positive and negative contributions,
+            # making selectivity necessary instead of trivially keeping everything high.
+            if self.zero_mean_cosine:
+                # Compute mean across batch and sequence (keep per-head, per-dim)
+                cos_mean = numerator.mean(dim=(0, 1), keepdim=True)  # [1, 1, H, D_h]
+                numerator = numerator - cos_mean
+
             sync_output = numerator / normalizer
 
         elif self.cosine_mode == "shifted":
@@ -2137,6 +2163,8 @@ class HybridAttentionLayer(nn.Module):
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -2170,6 +2198,8 @@ class HybridAttentionLayer(nn.Module):
             cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
             decay_gamma=decay_gamma,  # V9.6.13: State decay factor
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -2340,6 +2370,8 @@ class HybridTransformerBlock(nn.Module):
         n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -2359,6 +2391,8 @@ class HybridTransformerBlock(nn.Module):
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
             layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -2784,8 +2818,14 @@ class HybridPhaseTransformer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
+
+        # V9.9.11: Store phase collapse fix flags
+        self.bounded_phase = bounded_phase
+        self.zero_mean_cosine = zero_mean_cosine
 
         config = TransformerConfig(
             vocab_size=vocab_size,
@@ -2834,6 +2874,8 @@ class HybridPhaseTransformer(nn.Module):
                     n_kv_heads=n_kv_heads,  # GQA support
                     layer_idx=i,  # V9.9.1: Layer index for per-layer control
                     learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+                    bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+                    zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
                 ))
 
         # Output
