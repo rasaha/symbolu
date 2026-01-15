@@ -206,6 +206,130 @@ def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
 
 
 # =============================================================================
+# V9.9.8: PARALLEL EMA SCAN - Optimized Exponential Moving Average
+# =============================================================================
+# Problem: Sequential for-loops for S_t = γ * S_{t-1} + x_t are slow in Python.
+# Solution: Chunked vectorization reduces N iterations to N/chunk_size iterations.
+#
+# For sequence length 2048 and chunk_size=64, this is 32x fewer loop iterations.
+
+def parallel_ema_scan(
+    x: torch.Tensor,
+    gamma: Union[float, torch.Tensor],
+    chunk_size: int = 64
+) -> torch.Tensor:
+    """
+    Compute exponential moving average efficiently using chunked vectorization.
+
+    Computes S_t = γ * S_{t-1} + x_t for all t in O(N/chunk_size) loop iterations
+    instead of O(N), with vectorized operations within each chunk.
+
+    Args:
+        x: Input tensor of shape [B, N, H, D] or [B, N, H, D] complex
+        gamma: Decay factor, either scalar or [H] tensor for per-head decay
+        chunk_size: Number of tokens to process per iteration (default 64)
+
+    Returns:
+        S: Output tensor of same shape as x with S_t = γ * S_{t-1} + x_t
+    """
+    B, N, H, D = x.shape
+    device = x.device
+    dtype = x.dtype
+
+    # Handle scalar vs per-head gamma
+    if isinstance(gamma, (int, float)):
+        gamma_is_scalar = True
+        gamma_val = float(gamma)
+    else:
+        gamma_is_scalar = False
+        # gamma is [H] shaped, ensure it's on correct device
+        gamma = gamma.to(device=device)
+
+    # Precompute powers of gamma for intra-chunk accumulation
+    # powers[i] = γ^i for i in 0..chunk_size-1
+    arange = torch.arange(chunk_size, device=device, dtype=torch.float32)
+
+    if gamma_is_scalar:
+        # powers shape: [chunk_size]
+        powers = torch.pow(gamma_val, arange)
+        # reverse powers for convolution-style accumulation
+        rev_powers = torch.pow(gamma_val, torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32))
+    else:
+        # gamma shape: [H], powers shape: [chunk_size, H]
+        powers = gamma.unsqueeze(0).float() ** arange.unsqueeze(1)  # [chunk_size, H]
+        rev_powers = gamma.unsqueeze(0).float() ** torch.arange(chunk_size - 1, -1, -1, device=device, dtype=torch.float32).unsqueeze(1)
+
+    # Output buffer
+    S = torch.zeros_like(x)
+
+    # Running state between chunks
+    state = torch.zeros(B, 1, H, D, dtype=dtype, device=device)
+
+    # Process in chunks
+    num_chunks = (N + chunk_size - 1) // chunk_size
+
+    for c in range(num_chunks):
+        start_idx = c * chunk_size
+        end_idx = min(start_idx + chunk_size, N)
+        actual_chunk_size = end_idx - start_idx
+
+        # Extract chunk
+        x_chunk = x[:, start_idx:end_idx, :, :]  # [B, chunk, H, D]
+
+        if actual_chunk_size < chunk_size:
+            # Last chunk may be smaller, use simpler approach
+            for t in range(actual_chunk_size):
+                if gamma_is_scalar:
+                    state = gamma_val * state + x_chunk[:, t:t+1, :, :]
+                else:
+                    gamma_broadcast = gamma.view(1, 1, H, 1).to(dtype)
+                    state = gamma_broadcast * state + x_chunk[:, t:t+1, :, :]
+                S[:, start_idx + t:start_idx + t + 1, :, :] = state
+        else:
+            # Full chunk: use vectorized accumulation
+            # For S_t = γ * S_{t-1} + x_t, within a chunk starting from state S_prev:
+            # S[0] = γ * S_prev + x[0]
+            # S[1] = γ^2 * S_prev + γ * x[0] + x[1]
+            # S[i] = γ^(i+1) * S_prev + Σ_{j=0}^{i} γ^(i-j) * x[j]
+
+            # Contribution from previous state
+            if gamma_is_scalar:
+                # state_contrib[i] = γ^(i+1) * S_prev, shape: [B, chunk, H, D]
+                state_powers = torch.pow(gamma_val, arange[:chunk_size] + 1)  # [chunk]
+                state_contrib = state * state_powers.view(1, chunk_size, 1, 1).to(dtype)
+            else:
+                # Per-head: state_powers[i, h] = γ[h]^(i+1)
+                state_powers = gamma.unsqueeze(0).float() ** (arange[:chunk_size].unsqueeze(1) + 1)  # [chunk, H]
+                state_contrib = state * state_powers.view(1, chunk_size, H, 1).to(dtype)
+
+            # Contribution from chunk inputs: cumulative sum with decay
+            # We need Σ_{j=0}^{i} γ^(i-j) * x[j] for each i
+            # This is a causal convolution with kernel [γ^(chunk-1), ..., γ^1, γ^0]
+
+            if gamma_is_scalar:
+                # Scale inputs: x_scaled[j] = x[j] * γ^(-j)
+                inv_powers = torch.pow(gamma_val, -arange[:chunk_size])  # [chunk]
+                x_scaled = x_chunk * inv_powers.view(1, chunk_size, 1, 1).to(dtype)
+                # Cumsum and rescale
+                x_cumsum = torch.cumsum(x_scaled, dim=1)  # [B, chunk, H, D]
+                input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, 1, 1).to(dtype)
+            else:
+                # Per-head scaling
+                inv_powers = gamma.unsqueeze(0).float() ** (-arange[:chunk_size].unsqueeze(1))  # [chunk, H]
+                x_scaled = x_chunk * inv_powers.view(1, chunk_size, H, 1).to(dtype)
+                x_cumsum = torch.cumsum(x_scaled, dim=1)
+                input_contrib = x_cumsum * powers[:chunk_size].view(1, chunk_size, H, 1).to(dtype)
+
+            # Combine
+            S[:, start_idx:end_idx, :, :] = state_contrib + input_contrib
+
+            # Update state for next chunk (use clone to avoid in-place modification issues)
+            state = S[:, end_idx - 1:end_idx, :, :].clone()
+
+    return S
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -393,6 +517,7 @@ class PhaseAttentionLayer(nn.Module):
         aux_scale: float = 0.1,   # Output scaling for auxiliary path integration
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite memory, <1.0=local focus)
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -413,6 +538,64 @@ class PhaseAttentionLayer(nn.Module):
         assert 0.0 < decay_gamma <= 1.0, \
             f"decay_gamma must be in (0, 1], got {decay_gamma}"
         self.decay_gamma = decay_gamma
+
+        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        # Each head learns its own attention span via sigmoid-constrained decay
+        # Range: [0.5, 1.0] to ensure numerical stability
+        # - Low decay (~0.5): Focus on last ~2 tokens
+        # - High decay (~0.99): Remember ~100 tokens
+        self.learned_decay = learned_decay
+
+        # V9.9.9: DIVERSE DECAY INITIALIZATION (Gemini's log-space timescale)
+        # Instead of initializing all heads to the same decay, spread them out
+        # using log-space timescale distribution for principled coverage.
+        # This gives more resolution near high decay (long memory).
+        if learned_decay:
+            # Map timescales from ~2 tokens to ~max_seq_len tokens (log-space)
+            min_timescale = 2.0
+            max_timescale = 2048.0  # Effective memory span in tokens
+
+            # Distribute timescales exponentially (log-space)
+            # Head 0 = short memory (~2 tokens), Head N-1 = long memory (~2048 tokens)
+            log_timescales = torch.linspace(
+                math.log(min_timescale),
+                math.log(max_timescale),
+                num_heads
+            )
+            timescales = torch.exp(log_timescales)
+
+            # Convert timescales to decay: γ = 1 - (1/timescale)
+            # timescale=2 → γ=0.5, timescale=2048 → γ=0.9995
+            gamma = 1.0 - (1.0 / timescales)
+
+            # Clamp for numerical stability (prevents logit overflow)
+            gamma = torch.clamp(gamma, 0.001, 0.9995)
+
+            # Our decay formula is: γ = 0.5 + 0.5 * sigmoid(logit)
+            # So: sigmoid(logit) = (γ - 0.5) / 0.5 = 2γ - 1
+            # logit = log(sigmoid / (1 - sigmoid))
+            sigmoid_target = 2.0 * gamma - 1.0
+            sigmoid_target = torch.clamp(sigmoid_target, 0.01, 0.99)
+            init_logits = torch.log(sigmoid_target / (1.0 - sigmoid_target))
+
+            self.decay_logit = nn.Parameter(init_logits)
+        else:
+            # Non-learned decay: use uniform initialization from decay_gamma
+            if decay_gamma >= 0.99:
+                init_logit = 5.0  # sigmoid(5) ≈ 0.993 → decay ≈ 0.997
+            else:
+                target_sigmoid = 2.0 * decay_gamma - 1.0
+                target_sigmoid = max(0.01, min(0.99, target_sigmoid))
+                init_logit = math.log(target_sigmoid / (1.0 - target_sigmoid))
+            self.decay_logit = nn.Parameter(torch.full((num_heads,), init_logit))
+
+        # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
+        # Distribute starting phases around the unit circle to shatter phase collapse.
+        # Each head gets a unique rotational offset to encourage semantic diversity.
+        # Head 0 = 0 rad, Head 1 = π/6 rad, ..., Head 11 = 11π/6 rad
+        phase_offsets = torch.linspace(0, 2 * math.pi * (num_heads - 1) / num_heads, num_heads)
+        self.phase_offset_q = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
+        self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -518,6 +701,13 @@ class PhaseAttentionLayer(nn.Module):
         phi_k = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
         a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
 
+        # V9.9.9: Apply per-head phase offsets (Gemini's Phase Spread)
+        # This shatters phase collapse by giving each head a unique starting angle.
+        # Broadcasts [H] → [B, N, H, D_h]. Cast to match mixed precision dtype.
+        if hasattr(self, 'phase_offset_q'):
+            phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
+            phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
+
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
         # =====================================================================
@@ -577,20 +767,27 @@ class PhaseAttentionLayer(nn.Module):
 
         # O(n) Causal aggregation with optional decay
         # V9.6.13: State decay for memory horizon control
-        if self.decay_gamma == 1.0:
+        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        use_decay = self.learned_decay or self.decay_gamma < 1.0
+
+        if not use_decay:
             # Original: infinite memory via cumsum
             global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
         else:
+            # V9.9.8: Use parallel EMA scan for ~32x speedup over sequential loop
             # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
-            # Using loop for numerical stability (γ^(-j) overflows for large j)
-            B_size, N_size, H_size, D_size = kv_complex.shape
-            global_state = torch.zeros_like(kv_complex)
-            state = torch.zeros(B_size, 1, H_size, D_size,
-                              dtype=kv_complex.dtype, device=kv_complex.device)
-            gamma = self.decay_gamma
-            for t in range(N_size):
-                state = gamma * state + kv_complex[:, t:t+1, :, :]
-                global_state[:, t:t+1, :, :] = state
+            H_size = kv_complex.shape[2]
+
+            # V9.9.7: Per-head learned decay or fixed decay
+            if self.learned_decay:
+                # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
+                # Higher values = longer memory, lower = focus on recent
+                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+            else:
+                gamma = self.decay_gamma  # Scalar
+
+            # Use optimized parallel scan instead of sequential loop
+            global_state = parallel_ema_scan(kv_complex, gamma)
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -598,18 +795,17 @@ class PhaseAttentionLayer(nn.Module):
         # V9.6.11: Use amplitude-based normalization (always positive)
         # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
         # V9.6.13: Apply same decay to normalizer for consistency
-        if self.decay_gamma == 1.0:
+        # V9.9.7: Use same per-head learned decay as state accumulation
+        if not use_decay:
             a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
-            # Stable decay accumulation for normalizer
-            B_size, N_size, H_size, D_size = a_k.shape
-            a_k_cumsum = torch.zeros_like(a_k)
-            state_ak = torch.zeros(B_size, 1, H_size, D_size,
-                                   dtype=a_k.dtype, device=a_k.device)
-            gamma = self.decay_gamma
-            for t in range(N_size):
-                state_ak = gamma * state_ak + a_k[:, t:t+1, :, :]
-                a_k_cumsum[:, t:t+1, :, :] = state_ak
+            # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
+            # Reuse gamma from above (already computed for learned_decay case)
+            if self.learned_decay:
+                gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+            else:
+                gamma_norm = self.decay_gamma
+            a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
@@ -633,19 +829,13 @@ class PhaseAttentionLayer(nn.Module):
 
             # Accumulator for the "+1" shift term: a_k * v
             # V9.6.13: Apply decay to shifted mode accumulator
+            # V9.9.8: Use parallel scan for shifted mode (note: this uses fixed decay, not learned)
             if self.decay_gamma == 1.0:
                 av_state = torch.cumsum(a_k * v, dim=1)  # [B, N, H, D_h]
             else:
-                # Stable decay accumulation for shifted mode
+                # Use optimized parallel EMA scan
                 av_input = a_k * v
-                B_size, N_size, H_size, D_size = av_input.shape
-                av_state = torch.zeros_like(av_input)
-                state_av = torch.zeros(B_size, 1, H_size, D_size,
-                                       dtype=av_input.dtype, device=av_input.device)
-                gamma = self.decay_gamma
-                for t in range(N_size):
-                    state_av = gamma * state_av + av_input[:, t:t+1, :, :]
-                    av_state[:, t:t+1, :, :] = state_av
+                av_state = parallel_ema_scan(av_input, self.decay_gamma)
 
             # Combined: shift_term + cos_term
             shift_term = a_q * av_state           # a_q * Σ(a_k * v)
@@ -1675,6 +1865,7 @@ class HybridAttentionLayer(nn.Module):
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -1707,6 +1898,7 @@ class HybridAttentionLayer(nn.Module):
             aux_scale=1.0,  # V9.6.11: Full strength (was 0.1 causing 2% effective signal)
             cosine_mode=cosine_mode,  # V9.6.12: Cosine interaction mode
             decay_gamma=decay_gamma,  # V9.6.13: State decay factor
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -1778,7 +1970,7 @@ class HybridAttentionLayer(nn.Module):
         return output
 
 
-def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
+def compute_weight_orthogonalization_loss(model: nn.Module, debug: bool = False) -> torch.Tensor:
     """
     Compute orthogonalization loss between local and phase attention weight matrices.
 
@@ -1795,14 +1987,24 @@ def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
 
     Args:
         model: Model containing HybridAttentionLayer modules
+        debug: If True, print diagnostic info on first call
 
     Returns:
         Scalar tensor with orthogonalization loss (lower = more orthogonal)
     """
-    ortho_losses = []
+    # Handle torch.compile wrapped models - get the original model
+    actual_model = model
+    if hasattr(model, '_orig_mod'):
+        actual_model = model._orig_mod
+        if debug:
+            print(f"DEBUG ORTHO: Detected torch.compile, using _orig_mod")
 
-    for module in model.modules():
+    ortho_losses = []
+    hybrid_layer_count = 0
+
+    for module in actual_model.modules():
         if isinstance(module, HybridAttentionLayer):
+            hybrid_layer_count += 1
             local_attn = module.local_attn
             phase_attn = module.phase_attn
 
@@ -1839,10 +2041,19 @@ def compute_weight_orthogonalization_loss(model: nn.Module) -> torch.Tensor:
 
     if not ortho_losses:
         # No HybridAttentionLayers found, return zero loss
+        if debug:
+            print(f"DEBUG ORTHO: No HybridAttentionLayers found in model")
         return torch.tensor(0.0, device=next(model.parameters()).device)
 
     # Average across all weight pairs
-    return torch.stack(ortho_losses).mean()
+    result = torch.stack(ortho_losses).mean()
+
+    if debug:
+        print(f"DEBUG ORTHO: Found {hybrid_layer_count} HybridAttentionLayers, "
+              f"{len(ortho_losses)} weight pairs, mean_loss={result.item():.6f}, "
+              f"requires_grad={result.requires_grad}")
+
+    return result
 
 
 class HybridTransformerBlock(nn.Module):
@@ -1857,6 +2068,7 @@ class HybridTransformerBlock(nn.Module):
         alpha_phase: float = 0.2,
         n_kv_heads: Optional[int] = None,  # GQA: Number of KV heads
         layer_idx: int = -1,  # V9.9.1: Layer index for per-layer phase control
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -1875,6 +2087,7 @@ class HybridTransformerBlock(nn.Module):
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
             layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -2299,6 +2512,7 @@ class HybridPhaseTransformer(nn.Module):
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
     ):
         super().__init__()
 
@@ -2321,6 +2535,7 @@ class HybridPhaseTransformer(nn.Module):
         self.local_backend = local_backend
         self.tie_embeddings = tie_embeddings
         self.n_kv_heads = n_kv_heads  # Store for reference
+        self.learned_decay = learned_decay  # V9.9.7: Per-head learned decay
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -2347,6 +2562,7 @@ class HybridPhaseTransformer(nn.Module):
                     alpha_phase=alpha_phase,
                     n_kv_heads=n_kv_heads,  # GQA support
                     layer_idx=i,  # V9.9.1: Layer index for per-layer control
+                    learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
                 ))
 
         # Output
@@ -2652,6 +2868,7 @@ class OntologicalHybridTransformer(nn.Module):
         tie_embeddings: bool = True,
         cosine_mode: str = "standard",
         decay_gamma: float = 1.0,
+        learned_decay: bool = False,  # V9.9.7: Per-head learned decay
     ):
         super().__init__()
 
@@ -2673,6 +2890,7 @@ class OntologicalHybridTransformer(nn.Module):
             tie_embeddings=tie_embeddings,
             cosine_mode=cosine_mode,
             decay_gamma=decay_gamma,
+            learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]

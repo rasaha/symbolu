@@ -9007,6 +9007,7 @@ class UnifiedTrainingConfig:
     sync_lr: float = 0.1
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
+    learned_decay: bool = False  # V9.9.7: Per-head learned decay (Mamba/S4-style)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -10184,9 +10185,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,  # V9.6.12: Pass cosine mode
             decay_gamma=config.decay_gamma,  # V9.6.13: Pass decay factor
+            learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
+        if config.learned_decay:
+            print(f"  Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -10255,6 +10259,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
             cosine_mode=config.cosine_mode,
             decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10265,6 +10270,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
         print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")  # V9.9.7
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     else:
@@ -10465,6 +10472,7 @@ class PerLayerPhaseController:
 
         This updates each layer's alpha_phase parameter based on its layer_idx.
         """
+        applied_count = 0
         for module in model.modules():
             if hasattr(module, 'alpha_phase') and hasattr(module, 'layer_idx'):
                 layer_idx = module.layer_idx
@@ -10473,6 +10481,9 @@ class PerLayerPhaseController:
                     module.alpha_phase.data.fill_(weight)
                     if hasattr(module, 'alpha_local'):
                         module.alpha_local.data.fill_(1.0 - weight)
+                    applied_count += 1
+        if applied_count > 0:
+            print(f"      Applied per-layer weights to {applied_count} HybridAttentionLayer modules")
 
     def get_status(self) -> Dict[str, any]:
         """Get current controller status for logging."""
@@ -10577,6 +10588,8 @@ class InvertedLayerCurriculumController:
         # V9.9.4: PPL Stability Check (ChatGPT recommendation)
         ppl_stability_threshold: float = 5.0,  # Max PPL slope for "stable" (lower = stricter)
         stability_required_stages: Optional[List[int]] = None,  # Stages requiring stability [2,3,4]
+        # V9.9.8: Explicit per-layer phase weights (Gemini's Tapered Bridge)
+        initial_phase_weights: Optional[List[float]] = None,  # Override _split_to_weights if provided
     ):
         """
         Initialize the Inverted Curriculum Controller.
@@ -10617,7 +10630,12 @@ class InvertedLayerCurriculumController:
         self.current_split = stages[0]
 
         # Per-layer phase controller
-        initial_weights = self._split_to_weights(self.current_split)
+        # V9.9.8: Use explicit weights (Gemini's Tapered Bridge) if provided
+        if initial_phase_weights is not None:
+            initial_weights = initial_phase_weights
+            print(f"      Using explicit per-layer phase weights (Tapered Bridge)")
+        else:
+            initial_weights = self._split_to_weights(self.current_split)
         self.phase_controller = PerLayerPhaseController(
             num_layers=12,
             initial_weights=initial_weights,
@@ -10968,6 +10986,12 @@ class InvertedLayerCurriculumController:
         if hasattr(config, 'inverted_curriculum_stability_stages') and config.inverted_curriculum_stability_stages:
             stability_stages = [int(s.strip()) for s in config.inverted_curriculum_stability_stages.split(',')]
 
+        # V9.9.8: Parse explicit per-layer phase weights (Gemini's Tapered Bridge)
+        initial_phase_weights = None
+        if hasattr(config, 'per_layer_phase_weights') and config.per_layer_phase_weights:
+            initial_phase_weights = [float(w.strip()) for w in config.per_layer_phase_weights.split(',')]
+            print(f"  [TAPERED BRIDGE] Parsed per-layer weights: {initial_phase_weights}")
+
         return cls(
             stages=stages,
             ppl_triggers=ppl_triggers,
@@ -10978,6 +11002,8 @@ class InvertedLayerCurriculumController:
             # V9.9.4: PPL Stability Check
             ppl_stability_threshold=getattr(config, 'inverted_curriculum_stability_threshold', 5.0),
             stability_required_stages=stability_stages,
+            # V9.9.8: Gemini's Tapered Bridge
+            initial_phase_weights=initial_phase_weights,
         )
 
 
@@ -12219,6 +12245,16 @@ def train(config: UnifiedTrainingConfig):
     if config.enable_dynamic_relaxation:
         print(f"  Dynamic Relaxation: ENABLED ({config.authority_layers}:{config.sensory_layers} → {config.relaxation_target_authority}:{config.relaxation_target_sensory})")
         print(f"    Stability Threshold: {config.relaxation_stability_threshold} for {config.relaxation_stability_window} steps")
+
+    # V9.9.5: Warn if decorr_loss_weight is set but model type doesn't support it
+    if hasattr(config, 'decorr_loss_weight') and config.decorr_loss_weight > 0:
+        if config.model_type in ('hybrid', 'ontological_hybrid'):
+            print(f"  Decorrelation Loss: ENABLED (weight={config.decorr_loss_weight})")
+        else:
+            print(f"\n  ⚠️  WARNING: --decorr_loss_weight={config.decorr_loss_weight} IGNORED!")
+            print(f"     Decorrelation loss only works with --model_type hybrid or ontological_hybrid")
+            print(f"     Current model_type: {config.model_type}")
+            print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -13733,6 +13769,12 @@ def train(config: UnifiedTrainingConfig):
             hidden_state_extractor.clear()
 
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
+            # V9.9.6: Initialize decorr variables before model-type branching
+            # These may be set by hybrid/ontological_hybrid and used later by SRK
+            enable_decorr = False
+            decorr_loss_tensor = None
+            ortho_loss_tensor = None
+
             if config.model_type == "ontological":
                 outputs = model(x)
                 # Extract phase angles if available (for U1/U2 coherence)
@@ -13756,6 +13798,16 @@ def train(config: UnifiedTrainingConfig):
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 # Enable decorrelation loss for hybrid/ontological_hybrid models
+
+                # DEBUG: Diagnose decorr_loss_weight issue
+                if global_step == 1:
+                    has_attr = hasattr(config, 'decorr_loss_weight')
+                    decorr_val = getattr(config, 'decorr_loss_weight', 'NOT_FOUND')
+                    model_type = config.model_type
+                    is_valid_type = model_type in ('hybrid', 'ontological_hybrid')
+                    print(f"DEBUG CONFIG: hasattr={has_attr}, value={decorr_val}, "
+                          f"model_type={model_type}, is_valid_type={is_valid_type}")
+
                 enable_decorr = (
                     hasattr(config, 'decorr_loss_weight') and
                     config.decorr_loss_weight > 0 and
@@ -13770,19 +13822,24 @@ def train(config: UnifiedTrainingConfig):
                 loss, metrics = compute_phase_loss(logits, y, config)
 
                 # Add decorrelation loss if enabled
+                # V9.9.6: Store tensor for re-adding after SRK (which replaces loss)
+                decorr_loss_tensor = None
+                ortho_loss_tensor = None
+
                 if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
-                    decorr_loss = outputs['decorr_loss']
-                    loss = loss + config.decorr_loss_weight * decorr_loss
-                    metrics['decorr_loss'] = decorr_loss.item()
+                    decorr_loss_tensor = outputs['decorr_loss']
+                    loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                    metrics['decorr_loss'] = decorr_loss_tensor.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
                 # Unlike output decorrelation, this cannot be blocked by detach()
                 if enable_decorr and config.decorr_loss_weight > 0:
-                    ortho_loss = compute_weight_orthogonalization_loss(model)
-                    loss = loss + config.decorr_loss_weight * ortho_loss
-                    metrics['ortho_loss'] = ortho_loss.item()
+                    # Debug on first step only
+                    ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
+                    loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                    metrics['ortho_loss'] = ortho_loss_tensor.item()
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
@@ -13863,7 +13920,14 @@ def train(config: UnifiedTrainingConfig):
 
                     # Replace or augment loss with SRK loss
                     # SRK loss includes task loss (cross-entropy) + B1/U2/S8 terms
-                    loss = srk_loss  # SRK loss subsumes task loss
+                    # V9.9.6: Preserve decorr_loss and ortho_loss tensors (for gradient flow)
+                    # by re-adding them after SRK replaces the loss
+                    loss = srk_loss
+                    if enable_decorr and config.decorr_loss_weight > 0:
+                        if decorr_loss_tensor is not None:
+                            loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                        if ortho_loss_tensor is not None:
+                            loss = loss + config.decorr_loss_weight * ortho_loss_tensor
 
                     # Update karma state for O12→O1 carryover (Toroidal Loop)
                     with torch.no_grad():
@@ -14832,7 +14896,12 @@ def train(config: UnifiedTrainingConfig):
                 adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
-            current_alpha = update_alpha_schedule(model, global_step, config)
+            # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
+            if not getattr(config, 'enable_per_layer_phase', False):
+                current_alpha = update_alpha_schedule(model, global_step, config)
+            else:
+                # Per-layer weights are managed by InvertedLayerCurriculumController
+                current_alpha = config.alpha_phase  # Just for logging
 
             global_step += 1
             avg_loss = running_loss / config.gradient_accumulation
@@ -16949,6 +17018,11 @@ def main():
                        help="State decay factor for phase attention (1.0=infinite memory, "
                             "<1.0=local focus like Mamba/RWKV). "
                             "Example: 0.9 = ~10 token memory, 0.95 = ~20 token memory")
+    # V9.9.7: Learned per-head decay (Mamba/S4-style)
+    parser.add_argument("--learned_decay", action="store_true",
+                       help="Enable per-head learned decay (Mamba/S4-style). "
+                            "Each attention head learns its own decay rate [0.5, 1.0] via gradient descent. "
+                            "Adds 1 learnable parameter per head. Allows model to learn optimal attention span.")
 
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
@@ -17863,6 +17937,7 @@ def main():
         window_size=args.window_size,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
+        learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         bhava_lambda=args.bhava_lambda,
@@ -17987,7 +18062,8 @@ def main():
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.1 Per-Layer Phase Control
-        enable_per_layer_phase=args.enable_per_layer_phase,
+        # V9.9.8: Auto-enable when per_layer_phase_weights is provided
+        enable_per_layer_phase=args.enable_per_layer_phase or bool(args.per_layer_phase_weights),
         per_layer_phase_weights=args.per_layer_phase_weights,
         layer_transition_steps=args.layer_transition_steps,
         # V9.9.1 Inverted Curriculum

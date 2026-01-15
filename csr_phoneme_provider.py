@@ -388,8 +388,15 @@ def start_background_preload():
 
     V9.5.2 Optimization: This allows training to start immediately
     while G2P resources load in parallel.
+
+    Set CSR_DISABLE_G2P=1 environment variable to skip G2P preloading entirely.
     """
     global _PRELOAD_THREAD, _PRELOAD_STARTED
+
+    # V9.9.7: Allow disabling G2P preload via environment variable
+    if os.environ.get('CSR_DISABLE_G2P', '').lower() in ('1', 'true', 'yes'):
+        _PRELOAD_STARTED = True  # Mark as "done" to prevent future calls
+        return
 
     with _PRELOAD_LOCK:
         if _PRELOAD_STARTED:

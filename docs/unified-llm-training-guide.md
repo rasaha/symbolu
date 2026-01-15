@@ -179,6 +179,105 @@ Override `model_size` preset with custom architecture. All parameters are option
 - Local W=256: O(1024×256) = 262K ops (~3.8x faster), ~4GB VRAM
 - Local W=512: O(1024×512) = 524K ops (~2x faster), ~8GB VRAM
 
+### Hybrid Attention Diversity (V9.9.6-V9.9.7)
+
+Features to prevent feature collapse between local and phase attention in hybrid models.
+
+#### Decorrelation Loss (`--decorr_loss_weight`)
+
+Forces local and phase attention to learn **different features** by penalizing high correlation between their outputs.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--decorr_loss_weight` | float | 0.0 | Weight for decorrelation loss. 0=disabled, 0.1-1.0=recommended. Higher values = faster decorrelation but may destabilize training |
+
+**Problem Solved:** Without decorrelation, local and phase attention often produce ~93% identical outputs (feature collapse), making phase attention redundant.
+
+**How It Works:**
+1. **Output Decorrelation**: Computes cosine similarity between local and phase attention outputs per layer
+2. **Weight Orthogonalization**: Penalizes similarity between Q/K/V weight matrices of local and phase
+3. **Loss**: `decorr_loss = cos²(local_output, phase_output)` averaged across hybrid layers
+
+**Monitoring:**
+```
+Step 100 | Loss: 9.0126 | ... | Decorr: 0.9185 | Ortho: 0.0000
+```
+- **Decorr**: Output-level correlation (lower = more diverse). Target: < 0.7
+- **Ortho**: Weight-level orthogonality (usually 0 at random init)
+
+**Example:**
+```bash
+# Enable decorrelation loss for hybrid/ontological_hybrid models
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --decorr_loss_weight 1.0 \
+    ...
+```
+
+**Expected Progress:**
+| Steps | Decorr Value | Interpretation |
+|-------|--------------|----------------|
+| 0 | ~0.94 | High correlation (feature collapse) |
+| 500 | ~0.88 | Starting to diverge |
+| 2000 | ~0.70 | Meaningful diversity |
+| 5000 | ~0.50 | Excellent diversity |
+
+**Important Notes:**
+- Only works with `--model_type hybrid` or `--model_type ontological_hybrid`
+- If using `--enable_srk`, decorr_loss is added to SRK loss (not replaced)
+- Start with `1.0`, increase to `2.0-5.0` if Decorr decreases too slowly
+- Watch for PPL regression if weight too high
+
+#### Learned Decay (`--learned_decay`)
+
+Enables **per-head learned attention span** (Mamba/S4-style). Each attention head learns its own decay rate via gradient descent.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--learned_decay` | flag | False | Enable per-head learned decay. Each head learns decay rate γ ∈ [0.5, 1.0] |
+
+**Problem Solved:** Fixed decay (`--decay_gamma`) forces all heads to have the same attention span. Learned decay lets each head specialize:
+- Some heads focus on recent tokens (low γ ≈ 0.5 → ~2 token memory)
+- Other heads remember longer history (high γ ≈ 0.99 → ~100 token memory)
+
+**How It Works:**
+- Adds 1 learnable parameter per head (`decay_logit`)
+- Decay rate: `γ = 0.5 + 0.5 × sigmoid(decay_logit)` (constrained to [0.5, 1.0])
+- State accumulation: `State_t = γ × State_{t-1} + (K_t × V_t)`
+- Similar to Mamba/S4/RWKV/RetNet architectures
+
+**Benefits:**
+- Minimal parameters: Only +1 param per head (e.g., +12 params for 12-head model)
+- Model learns optimal attention span per head
+- Theoretically infinite memory (O(N)) but controllable span
+- No hard cutoffs like windowing - smooth exponential decay
+
+**Example:**
+```bash
+# Enable learned decay for phase attention
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --learned_decay \
+    ...
+```
+
+**Combining Both Features:**
+```bash
+# Recommended: Use both for maximum diversity and flexibility
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --decorr_loss_weight 1.0 \
+    --learned_decay \
+    --enable_srk \
+    --enable_rss \
+    --controller pidv2 \
+    ...
+```
+
+**When to Use:**
+- `--decorr_loss_weight`: Always for hybrid models (prevents feature collapse)
+- `--learned_decay`: When you want model to learn optimal attention spans (especially for long sequences)
+
 ### Loss Functions
 
 | Flag | Type | Default | Description |
