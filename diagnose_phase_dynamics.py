@@ -102,7 +102,7 @@ def patch_phase_attention_for_diagnostics(model):
 
         return result
 
-    PhaseAttention.forward = diagnostic_forward
+    PhaseAttentionLayer.forward = diagnostic_forward
     return original_forward  # Return for restoration
 
 
