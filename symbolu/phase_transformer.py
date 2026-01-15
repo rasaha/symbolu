@@ -789,6 +789,11 @@ class PhaseAttentionLayer(nn.Module):
             # Use optimized parallel scan instead of sequential loop
             global_state = parallel_ema_scan(kv_complex, gamma)
 
+            # V9.9.9: Capture state norm for cumsum health monitoring (Gemini's suggestion)
+            # If this grows linearly with sequence length, the leaky scan isn't working
+            with torch.no_grad():
+                self._diag_state_norm = global_state.abs().mean(dim=-1).mean(dim=-1)  # [B, N]
+
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
         # =====================================================================
