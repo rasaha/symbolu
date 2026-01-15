@@ -44,7 +44,7 @@ python phase_probe_runner.py --checkpoint checkpoints/best.pt --category role_bi
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --output results.json
 ```
 
-## Probe Categories
+## Probe Categories (25 Total)
 
 ### A. Role Binding (RB1-RB5)
 Tests whether the model can bind pronouns/references to the correct antecedent based on **semantic compatibility**, not just token proximity.
@@ -105,6 +105,28 @@ Tests whether the model uses phase for relational binding rather than just high-
 
 **Phase Isolation**: If the model relies on amplitude rather than phase for binding, these probes will fail. They directly test whether phase carries selectivity independent of token salience.
 
+### F. Control Probes (CTRL1-CTRL3) - NEW
+Tests simple factual recall where phase SHOULD NOT matter. These validate the ablation machinery itself.
+
+| Probe | Text | Expected Behavior |
+|-------|------|-------------------|
+| CTRL1 | Alice is a doctor. | Simple fact - all modes should pass |
+| CTRL2 | The sky is blue. | No binding needed - phase irrelevant |
+| CTRL3 | Paris is the capital of France. | Knowledge retrieval - phase irrelevant |
+
+**Expected**: Baseline ≈ Scramble ≈ Frozen ≈ Phase-Off. If control probes fail under ablation, the ablation machinery may be too aggressive.
+
+### G. Binding-Only Probes (BIND1-BIND3) - NEW
+Tests pure relational binding where token identity is symmetric. Only the relational structure differs.
+
+| Probe | Text A | Text B | What It Tests |
+|-------|--------|--------|---------------|
+| BIND1 | The key opened the door because it was **old**. | ...because it was **rusty**. | old→door, rusty→key |
+| BIND2 | The bottle fell because it was **slippery**. | ...because it was **tilted**. | slippery→bottle, tilted→table |
+| BIND3 | The woman told the girl that **she had won**. | ...that **she would receive**. | Both → girl (control) |
+
+**Phase Isolation**: These test whether phase captures subtle semantic compatibility. Same structure, same tokens, but binding shifts based on property semantics.
+
 ## Ablation Modes
 
 Each probe is run under **4 inference modes**:
@@ -138,8 +160,32 @@ Each probe is run under **4 inference modes**:
 ### Aggregate Metrics
 | Metric | Description |
 |--------|-------------|
-| `phase_sensitive_pct` | % probes where ablation hurts |
+| `phase_sensitive_pct` | % probes where ablation hurts (uses **relative** threshold) |
 | `phase_contribution_index` | avg(baseline_margin - scramble_margin) |
+
+### Per-Layer Metrics (NEW)
+The script now outputs **R_k per layer** to show WHERE phase is being used:
+
+```
+=============================================================
+PER-LAYER PHASE COLLAPSE (R_k, R_q)
+=============================================================
+Layer      R_k          R_q          Status
+Layer 0         0.1234       0.1567 healthy
+Layer 1         0.2345       0.2678 healthy
+Layer 2         0.5678       0.6012 COLLAPSED
+...
+```
+
+This helps identify if specific layers have collapsed while others are healthy.
+
+### Phase Sensitivity Threshold
+Phase sensitivity now uses **relative margin drop** (not absolute):
+```python
+rel_delta_scramble = delta_scramble / abs(baseline_margin)
+phase_sensitive = rel_delta_scramble > 0.3  # 30% relative drop
+```
+This makes the test invariant across probes with different entropy levels.
 
 ## Failure Signatures
 

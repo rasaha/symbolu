@@ -33,6 +33,8 @@ class ProbeCategory(Enum):
     INTERFERENCE = "interference"           # Same token, different sense
     NEGATION_POLARITY = "negation_polarity" # Polarity and scope resolution
     AMPLITUDE_CONFLICT = "amplitude_conflict"  # Phase vs amplitude salience
+    CONTROL = "control"                     # Probes where phase SHOULD NOT matter
+    BINDING_ONLY = "binding_only"           # Pure binding with symmetric tokens
 
 
 @dataclass
@@ -373,6 +375,105 @@ AC4 = MinimalPairProbe(
 
 
 # =============================================================================
+# CONTROL PROBES (CTRL1-CTRL3)
+# =============================================================================
+# These probes test simple factual recall where phase SHOULD NOT matter.
+# They serve as validation that the ablation machinery itself is working.
+# Expected: Baseline ≈ Scramble ≈ Frozen ≈ Phase-Off
+
+CTRL1 = SingleProbe(
+    id="CTRL1",
+    category=ProbeCategory.CONTROL,
+    text="Alice is a doctor.",
+    question="What is Alice?",
+    correct_answer="doctor",
+    target_tokens=["doctor", " doctor", "Doctor"],
+    distractor_tokens=["nurse", " nurse", "patient", " patient"],
+    explanation="Simple factual recall. No relational binding needed. "
+                "Phase disruption should NOT affect this probe significantly. "
+                "If it does, the ablation machinery may be too aggressive."
+)
+
+CTRL2 = SingleProbe(
+    id="CTRL2",
+    category=ProbeCategory.CONTROL,
+    text="The sky is blue.",
+    question="What color is the sky?",
+    correct_answer="blue",
+    target_tokens=["blue", " blue", "Blue"],
+    distractor_tokens=["red", " red", "green", " green"],
+    explanation="Basic attribute recall. No entity tracking or binding required. "
+                "Phase should not be necessary for this simple fact lookup."
+)
+
+CTRL3 = SingleProbe(
+    id="CTRL3",
+    category=ProbeCategory.CONTROL,
+    text="Paris is the capital of France.",
+    question="What is the capital of France?",
+    correct_answer="Paris",
+    target_tokens=["Paris", " Paris"],
+    distractor_tokens=["London", " London", "Berlin", " Berlin"],
+    explanation="Factual knowledge retrieval. No relational structure to track. "
+                "This validates that ablations don't break basic functionality."
+)
+
+
+# =============================================================================
+# BINDING-ONLY PROBES (BIND1-BIND3)
+# =============================================================================
+# These probes test pure relational binding where token identity is symmetric.
+# Only the relational structure differs, isolating phase-based binding.
+
+BIND1 = MinimalPairProbe(
+    id="BIND1",
+    category=ProbeCategory.BINDING_ONLY,
+    text_a="The key opened the door because it was old.",
+    text_b="The key opened the door because it was rusty.",
+    question="What does 'it' refer to?",
+    answer_a="door",  # old → door (doors get old, keys less so idiomatically)
+    answer_b="key",   # rusty → key (metal keys rust, doors less commonly)
+    target_tokens_a=["door", " door", "Door"],
+    target_tokens_b=["key", " key", "Key"],
+    distractor_tokens=[],
+    explanation="Pure binding test. Same structure, same tokens, but 'old' biases "
+                "toward door (aging) while 'rusty' biases toward key (metal). "
+                "Tests whether phase captures subtle semantic compatibility."
+)
+
+BIND2 = MinimalPairProbe(
+    id="BIND2",
+    category=ProbeCategory.BINDING_ONLY,
+    text_a="The bottle fell off the table because it was slippery.",
+    text_b="The bottle fell off the table because it was tilted.",
+    question="What was slippery/tilted?",
+    answer_a="bottle",  # slippery → bottle surface
+    answer_b="table",   # tilted → table orientation
+    target_tokens_a=["bottle", " bottle", "Bottle"],
+    target_tokens_b=["table", " table", "Table"],
+    distractor_tokens=[],
+    explanation="Binding shifts based on property compatibility. Slippery is a surface "
+                "property (bottle), tilted is an orientation property (table). "
+                "Same sentence structure, different binding based on semantics."
+)
+
+BIND3 = MinimalPairProbe(
+    id="BIND3",
+    category=ProbeCategory.BINDING_ONLY,
+    text_a="The woman told the girl that she had won the prize.",
+    text_b="The woman told the girl that she would receive a prize.",
+    question="Who won/will receive the prize?",
+    answer_a="girl",   # 'had won' → reporting news to the winner
+    answer_b="girl",   # 'would receive' → also the girl (same structure)
+    target_tokens_a=["girl", " girl", "Girl"],
+    target_tokens_b=["girl", " girl", "Girl"],
+    distractor_tokens=["woman", " woman", "Woman"],
+    explanation="Control: both variants should bind 'she' to 'girl' (recipient of news). "
+                "Tests consistency of binding under similar semantic frames."
+)
+
+
+# =============================================================================
 # AGGREGATE PROBE COLLECTIONS
 # =============================================================================
 
@@ -381,6 +482,7 @@ MINIMAL_PAIR_PROBES: List[MinimalPairProbe] = [
     RB1, RB2, RB3, RB4, RB5,
     NP1, NP2,
     AC4,
+    BIND1, BIND2, BIND3,
 ]
 
 # All single probes (for ablation testing)
@@ -389,6 +491,7 @@ SINGLE_PROBES: List[SingleProbe] = [
     SI1, SI2, SI3,
     NP3,
     AC1, AC2, AC3,
+    CTRL1, CTRL2, CTRL3,
 ]
 
 # All probes by category
@@ -398,6 +501,8 @@ PROBES_BY_CATEGORY = {
     ProbeCategory.INTERFERENCE: [SI1, SI2, SI3],
     ProbeCategory.NEGATION_POLARITY: [NP1, NP2, NP3],
     ProbeCategory.AMPLITUDE_CONFLICT: [AC1, AC2, AC3, AC4],
+    ProbeCategory.CONTROL: [CTRL1, CTRL2, CTRL3],
+    ProbeCategory.BINDING_ONLY: [BIND1, BIND2, BIND3],
 }
 
 
