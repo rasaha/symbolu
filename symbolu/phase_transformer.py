@@ -3182,6 +3182,8 @@ class OntologicalHybridTransformer(nn.Module):
         cosine_mode: str = "standard",
         decay_gamma: float = 1.0,
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
+        bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
     ):
         super().__init__()
 
@@ -3204,6 +3206,8 @@ class OntologicalHybridTransformer(nn.Module):
             cosine_mode=cosine_mode,
             decay_gamma=decay_gamma,
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
+            bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
+            zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
