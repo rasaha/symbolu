@@ -398,11 +398,36 @@ def compute_effective_phase(phi: torch.Tensor) -> torch.Tensor:
     return phi_eff
 
 
+def compute_pooled_phasor(phi: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    V9.9.12c: Compute mean phasor across D_h (ChatGPT's correct form).
+
+    z[b,n,h] = mean_d exp(i * phi[b,n,h,d])
+             = (mean_d cos(phi)) + i * (mean_d sin(phi))
+
+    This preserves magnitude information: |z| is small when D_h phases
+    are diverse (phasors cancel), large when collapsed (phasors align).
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        z_real: Real part of pooled phasor [B, N, H]
+        z_imag: Imaginary part of pooled phasor [B, N, H]
+    """
+    # Mean of exp(i*phi) across D_h
+    z_real = torch.cos(phi).mean(dim=-1)  # [B, N, H]
+    z_imag = torch.sin(phi).mean(dim=-1)  # [B, N, H]
+    return z_real, z_imag
+
+
 def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
     """
     Uniformity loss: Penalize non-uniform phase distribution.
 
-    L_uniform = |E[e^{iφ}]|²
+    V9.9.12c: Fixed to use ChatGPT's correct two-stage pooling:
+    1. z[b,n,h] = mean_d exp(i * phi[b,n,h,d])  -- pool over D_h first
+    2. L_uniform = |mean_{b,n} z[b,n,h]|²       -- then pool over samples
 
     If phases are uniform around the circle → E[e^{iφ}] ≈ 0 → loss small
     If phases collapse to one direction → |E[e^{iφ}]| large → loss large
@@ -416,23 +441,22 @@ def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
     Returns:
         Scalar loss (minimize for uniform distribution)
     """
-    # Pool across D_h if present
+    # V9.9.12c: Use correct two-stage pooling (ChatGPT's formula)
     if phi.dim() == 4:
-        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+        # Step 1: Pool over D_h to get z[b,n,h] = mean_d exp(i*phi)
+        # This preserves magnitude info (|z| < 1 when D_h diverse)
+        z_real, z_imag = compute_pooled_phasor(phi)  # [B, N, H] each
     else:
-        phi_eff = phi  # Already [B, N, H]
+        # Already [B, N, H], treat as unit phasors
+        z_real = torch.cos(phi)
+        z_imag = torch.sin(phi)
 
-    # Compute complex phasor e^{iφ}
-    # Use cos + i*sin instead of torch.polar for gradient stability
-    cos_phi = torch.cos(phi_eff)  # [B, N, H]
-    sin_phi = torch.sin(phi_eff)  # [B, N, H]
+    # Step 2: Mean across batch, positions → [H]
+    mean_real = z_real.mean(dim=(0, 1))  # [H]
+    mean_imag = z_imag.mean(dim=(0, 1))  # [H]
 
-    # Mean across batch, positions → [H]
-    mean_cos = cos_phi.mean(dim=(0, 1))  # [H]
-    mean_sin = sin_phi.mean(dim=(0, 1))  # [H]
-
-    # |E[e^{iφ}]|² per head
-    magnitude_sq = mean_cos ** 2 + mean_sin ** 2  # [H]
+    # |E[z]|² per head
+    magnitude_sq = mean_real ** 2 + mean_imag ** 2  # [H]
 
     # Mean across heads
     return magnitude_sq.mean()
@@ -442,7 +466,11 @@ def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
     """
     Entropy proxy via mean resultant length (circular statistics).
 
-    R = |E[e^{iφ}]|
+    V9.9.12c: Fixed to use ChatGPT's correct two-stage pooling:
+    1. z[b,n,h] = mean_d exp(i * phi[b,n,h,d])  -- pool over D_h first
+    2. R[h] = |mean_{b,n} z[b,n,h]|             -- then pool over samples
+
+    R = |E[z]| where z = mean_d exp(i*phi)
 
     Uniform distribution → R ≈ 0 (high entropy)
     Collapsed distribution → R ≈ 1 (low entropy)
@@ -455,22 +483,22 @@ def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
     Returns:
         Scalar loss R (minimize to maximize entropy)
     """
-    # Pool across D_h if present
+    # V9.9.12c: Use correct two-stage pooling (ChatGPT's formula)
     if phi.dim() == 4:
-        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+        # Step 1: Pool over D_h to get z[b,n,h] = mean_d exp(i*phi)
+        # This preserves magnitude info (|z| < 1 when D_h diverse)
+        z_real, z_imag = compute_pooled_phasor(phi)  # [B, N, H] each
     else:
-        phi_eff = phi
+        # Already [B, N, H], treat as unit phasors
+        z_real = torch.cos(phi)
+        z_imag = torch.sin(phi)
 
-    # Compute complex phasor components
-    cos_phi = torch.cos(phi_eff)
-    sin_phi = torch.sin(phi_eff)
+    # Step 2: Mean across batch, positions → [H]
+    mean_real = z_real.mean(dim=(0, 1))
+    mean_imag = z_imag.mean(dim=(0, 1))
 
-    # Mean across batch, positions → [H]
-    mean_cos = cos_phi.mean(dim=(0, 1))
-    mean_sin = sin_phi.mean(dim=(0, 1))
-
-    # Mean resultant length R = |E[e^{iφ}]| per head
-    R = torch.sqrt(mean_cos ** 2 + mean_sin ** 2 + 1e-8)  # [H]
+    # Mean resultant length R = |E[z]| per head
+    R = torch.sqrt(mean_real ** 2 + mean_imag ** 2 + 1e-8)  # [H]
 
     # Mean across heads
     return R.mean()
