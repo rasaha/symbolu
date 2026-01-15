@@ -10584,6 +10584,8 @@ class InvertedLayerCurriculumController:
         # V9.9.4: PPL Stability Check (ChatGPT recommendation)
         ppl_stability_threshold: float = 5.0,  # Max PPL slope for "stable" (lower = stricter)
         stability_required_stages: Optional[List[int]] = None,  # Stages requiring stability [2,3,4]
+        # V9.9.8: Explicit per-layer phase weights (Gemini's Tapered Bridge)
+        initial_phase_weights: Optional[List[float]] = None,  # Override _split_to_weights if provided
     ):
         """
         Initialize the Inverted Curriculum Controller.
@@ -10624,7 +10626,12 @@ class InvertedLayerCurriculumController:
         self.current_split = stages[0]
 
         # Per-layer phase controller
-        initial_weights = self._split_to_weights(self.current_split)
+        # V9.9.8: Use explicit weights (Gemini's Tapered Bridge) if provided
+        if initial_phase_weights is not None:
+            initial_weights = initial_phase_weights
+            print(f"      Using explicit per-layer phase weights (Tapered Bridge)")
+        else:
+            initial_weights = self._split_to_weights(self.current_split)
         self.phase_controller = PerLayerPhaseController(
             num_layers=12,
             initial_weights=initial_weights,
@@ -10975,6 +10982,12 @@ class InvertedLayerCurriculumController:
         if hasattr(config, 'inverted_curriculum_stability_stages') and config.inverted_curriculum_stability_stages:
             stability_stages = [int(s.strip()) for s in config.inverted_curriculum_stability_stages.split(',')]
 
+        # V9.9.8: Parse explicit per-layer phase weights (Gemini's Tapered Bridge)
+        initial_phase_weights = None
+        if hasattr(config, 'per_layer_phase_weights') and config.per_layer_phase_weights:
+            initial_phase_weights = [float(w.strip()) for w in config.per_layer_phase_weights.split(',')]
+            print(f"  [TAPERED BRIDGE] Parsed per-layer weights: {initial_phase_weights}")
+
         return cls(
             stages=stages,
             ppl_triggers=ppl_triggers,
@@ -10985,6 +10998,8 @@ class InvertedLayerCurriculumController:
             # V9.9.4: PPL Stability Check
             ppl_stability_threshold=getattr(config, 'inverted_curriculum_stability_threshold', 5.0),
             stability_required_stages=stability_stages,
+            # V9.9.8: Gemini's Tapered Bridge
+            initial_phase_weights=initial_phase_weights,
         )
 
 
