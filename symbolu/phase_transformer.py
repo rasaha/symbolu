@@ -330,6 +330,262 @@ def parallel_ema_scan(
 
 
 # =============================================================================
+# V9.9.10: PHASE DIVERSITY LOSSES - Combat Phase Collapse (ChatGPT-Enhanced)
+# =============================================================================
+# Problem: Phase attention collapses to cos(φ_q - φ_k) ≈ 1 everywhere,
+#          turning the phase mechanism into a scalar gain (no selectivity).
+#
+# Solution (ChatGPT's recommendations):
+#   1. Uniformity Loss: |E[e^{iφ}]|² - penalizes non-uniform distribution
+#      (better than pairwise cosine which can cause bimodal collapse)
+#   2. Entropy Proxy: R = |E[e^{iφ}]| - mean resultant length
+#      (R→0 = uniform/high entropy, R→1 = collapsed/low entropy)
+#   3. Pool phases across D_h FIRST to prevent gaming via irrelevant dims
+#
+# These forces push phases toward uniform distribution around the unit circle.
+
+def compute_effective_phase(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Pool phase across D_h dimension to get effective phase per head.
+
+    φ_eff = atan2(Σ_d sin(φ_d), Σ_d cos(φ_d))
+
+    This prevents the model from gaming diversity loss by randomizing
+    useless dimensions while keeping a few collapsed for actual work.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        phi_eff: Effective phase [B, N, H]
+    """
+    # Sum sin and cos across D_h dimension
+    sin_sum = torch.sin(phi).sum(dim=-1)  # [B, N, H]
+    cos_sum = torch.cos(phi).sum(dim=-1)  # [B, N, H]
+
+    # Compute effective phase via atan2
+    phi_eff = torch.atan2(sin_sum, cos_sum)  # [B, N, H]
+
+    return phi_eff
+
+
+def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Uniformity loss: Penalize non-uniform phase distribution.
+
+    L_uniform = |E[e^{iφ}]|²
+
+    If phases are uniform around the circle → E[e^{iφ}] ≈ 0 → loss small
+    If phases collapse to one direction → |E[e^{iφ}]| large → loss large
+
+    This is better than cosine-pair repulsion which can cause bimodal collapse
+    (all phases split into two clusters at π apart).
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h] or effective phase [B, N, H]
+
+    Returns:
+        Scalar loss (minimize for uniform distribution)
+    """
+    # Pool across D_h if present
+    if phi.dim() == 4:
+        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+    else:
+        phi_eff = phi  # Already [B, N, H]
+
+    # Compute complex phasor e^{iφ}
+    # Use cos + i*sin instead of torch.polar for gradient stability
+    cos_phi = torch.cos(phi_eff)  # [B, N, H]
+    sin_phi = torch.sin(phi_eff)  # [B, N, H]
+
+    # Mean across batch, positions → [H]
+    mean_cos = cos_phi.mean(dim=(0, 1))  # [H]
+    mean_sin = sin_phi.mean(dim=(0, 1))  # [H]
+
+    # |E[e^{iφ}]|² per head
+    magnitude_sq = mean_cos ** 2 + mean_sin ** 2  # [H]
+
+    # Mean across heads
+    return magnitude_sq.mean()
+
+
+def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
+    """
+    Entropy proxy via mean resultant length (circular statistics).
+
+    R = |E[e^{iφ}]|
+
+    Uniform distribution → R ≈ 0 (high entropy)
+    Collapsed distribution → R ≈ 1 (low entropy)
+
+    This is cheaper and more stable than KDE-based entropy estimation.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h] or effective phase [B, N, H]
+
+    Returns:
+        Scalar loss R (minimize to maximize entropy)
+    """
+    # Pool across D_h if present
+    if phi.dim() == 4:
+        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+    else:
+        phi_eff = phi
+
+    # Compute complex phasor components
+    cos_phi = torch.cos(phi_eff)
+    sin_phi = torch.sin(phi_eff)
+
+    # Mean across batch, positions → [H]
+    mean_cos = cos_phi.mean(dim=(0, 1))
+    mean_sin = sin_phi.mean(dim=(0, 1))
+
+    # Mean resultant length R = |E[e^{iφ}]| per head
+    R = torch.sqrt(mean_cos ** 2 + mean_sin ** 2 + 1e-8)  # [H]
+
+    # Mean across heads
+    return R.mean()
+
+
+def compute_phase_diversity_losses(
+    phi_k: torch.Tensor,
+    lambda_uniform: float = 0.001,
+    lambda_entropy: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute combined phase diversity losses for training.
+
+    V9.9.10: Uses ChatGPT's enhanced approach:
+    - Pool phase across D_h first (compute_effective_phase)
+    - Use uniformity loss instead of pairwise cosine repulsion
+    - Use mean resultant length as entropy proxy
+    - Start with small weights (1e-3), ramp to 1e-2 over training
+
+    Args:
+        phi_k: Key phase tensor [B, N, H, D_h]
+        lambda_uniform: Weight for uniformity loss (default 0.001)
+        lambda_entropy: Weight for entropy proxy loss (default 0.001)
+
+    Returns:
+        total_loss: Weighted sum of diversity losses
+        metrics: Dict with individual loss values for logging
+    """
+    # Uniformity loss: |E[e^{iφ}]|² (penalizes clustering)
+    loss_uniform = phase_uniformity_loss(phi_k)
+
+    # Entropy proxy: R = |E[e^{iφ}]| (minimize for high entropy)
+    loss_entropy = phase_entropy_proxy_loss(phi_k)
+
+    # Weighted combination
+    total_loss = lambda_uniform * loss_uniform + lambda_entropy * loss_entropy
+
+    # Metrics for logging
+    metrics = {
+        'phase_uniform_loss': loss_uniform.item(),
+        'phase_entropy_proxy': loss_entropy.item(),  # R value (0=uniform, 1=collapsed)
+        'phase_diversity_loss': total_loss.item(),
+    }
+
+    return total_loss, metrics
+
+
+def enable_phase_diversity_capture(model: nn.Module, enable: bool = True) -> int:
+    """
+    Enable or disable phase diversity capture on all PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+        enable: Whether to enable capture
+
+    Returns:
+        Number of PhaseAttentionLayer modules found
+    """
+    count = 0
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            module.capture_phase_for_diversity = enable
+            if not enable:
+                module._captured_phi_k = None  # Clear captured data
+            count += 1
+    return count
+
+
+def collect_captured_phases(model: nn.Module) -> List[torch.Tensor]:
+    """
+    Collect all captured phi_k tensors from PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+
+    Returns:
+        List of phi_k tensors [B, N, H, D_h] from each layer
+    """
+    phases = []
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            if hasattr(module, '_captured_phi_k') and module._captured_phi_k is not None:
+                phases.append(module._captured_phi_k)
+    return phases
+
+
+def compute_model_phase_diversity_loss(
+    model: nn.Module,
+    lambda_uniform: float = 0.001,
+    lambda_entropy: float = 0.001,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Compute phase diversity loss across all PhaseAttentionLayer modules.
+
+    V9.9.10: Aggregates diversity losses from all captured phases.
+    Uses ChatGPT's enhanced uniformity + entropy proxy approach.
+
+    Args:
+        model: Model with captured phi_k tensors
+        lambda_uniform: Weight for uniformity loss (default 0.001)
+        lambda_entropy: Weight for entropy proxy loss (default 0.001)
+
+    Returns:
+        total_loss: Combined loss across all layers
+        metrics: Dict with aggregate metrics
+    """
+    phases = collect_captured_phases(model)
+
+    if not phases:
+        # No phases captured, return zero loss
+        device = next(model.parameters()).device
+        return torch.tensor(0.0, device=device, requires_grad=False), {
+            'phase_uniform_loss': 0.0,
+            'phase_entropy_proxy': 0.0,
+            'phase_diversity_loss': 0.0,
+            'num_layers_captured': 0,
+        }
+
+    # Compute loss for each layer and average
+    total_uniform = 0.0
+    total_entropy = 0.0
+    total_loss = None
+
+    for phi_k in phases:
+        loss, metrics = compute_phase_diversity_losses(phi_k, lambda_uniform, lambda_entropy)
+        total_uniform += metrics['phase_uniform_loss']
+        total_entropy += metrics['phase_entropy_proxy']
+        if total_loss is None:
+            total_loss = loss
+        else:
+            total_loss = total_loss + loss
+
+    num_layers = len(phases)
+    avg_loss = total_loss / num_layers if total_loss is not None else torch.tensor(0.0)
+
+    return avg_loss, {
+        'phase_uniform_loss': total_uniform / num_layers,
+        'phase_entropy_proxy': total_entropy / num_layers,
+        'phase_diversity_loss': avg_loss.item() if torch.is_tensor(avg_loss) else avg_loss,
+        'num_layers_captured': num_layers,
+    }
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -597,6 +853,11 @@ class PhaseAttentionLayer(nn.Module):
         self.phase_offset_q = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
         self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
 
+        # V9.9.10: Phase diversity loss capture
+        # When enabled, captures phi_k for computing repulsion + entropy losses
+        self.capture_phase_for_diversity = False  # Set True during training
+        self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
+
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
         self.temperature = temperature
@@ -707,6 +968,11 @@ class PhaseAttentionLayer(nn.Module):
         if hasattr(self, 'phase_offset_q'):
             phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
             phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
+
+        # V9.9.10: Capture phi_k for phase diversity loss computation
+        # Only capture during training when flag is set (saves memory in eval)
+        if self.capture_phase_for_diversity and self.training:
+            self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)

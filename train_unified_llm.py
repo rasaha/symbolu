@@ -121,6 +121,9 @@ from symbolu.phase_transformer import (
     get_sovereign_state_summary,
     # V9.9.5: Parameter orthogonalization for hybrid attention
     compute_weight_orthogonalization_loss,
+    # V9.9.10: Phase diversity loss (combat phase collapse)
+    enable_phase_diversity_capture,
+    compute_model_phase_diversity_loss,
 )
 
 # Import ontological models
@@ -9024,6 +9027,11 @@ class UnifiedTrainingConfig:
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
 
+    # V9.9.10: Phase diversity loss (to combat phase collapse)
+    # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
+    phase_diversity_weight: float = 0.0  # Combined weight (0=disabled, 0.001=start, ramp to 0.01)
+    phase_diversity_ramp_steps: int = 5000  # Steps to ramp weight linearly
+
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     enable_per_layer_phase: bool = False  # Enable per-layer phase weight control
     per_layer_phase_weights: str = ""  # Initial weights: "0,0,0,0,0,0,0,0,0,0,0,0" (12 values)
@@ -13603,6 +13611,19 @@ def train(config: UnifiedTrainingConfig):
     print(f"{'='*70}\n", flush=True)
 
     model.train()
+
+    # V9.9.10: Enable phase diversity capture if phase_diversity_weight > 0
+    phase_diversity_enabled = (
+        hasattr(config, 'phase_diversity_weight') and
+        config.phase_diversity_weight > 0 and
+        config.model_type in ('phase', 'hybrid', 'ontological_hybrid')
+    )
+    if phase_diversity_enabled:
+        num_phase_layers = enable_phase_diversity_capture(model, enable=True)
+        print(f"\n  🌀 [PHASE DIVERSITY V9.9.10] Enabled on {num_phase_layers} PhaseAttention layers")
+        print(f"     ├─ Weight: {config.phase_diversity_weight} (ramps over {config.phase_diversity_ramp_steps} steps)")
+        print(f"     └─ Losses: Uniformity |E[e^{{iφ}}]|² + Entropy Proxy R")
+
     train_iter = iter(train_loader)
     step_start_time = time.time()
     running_loss = 0.0
@@ -13840,6 +13861,34 @@ def train(config: UnifiedTrainingConfig):
                     ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
                     loss = loss + config.decorr_loss_weight * ortho_loss_tensor
                     metrics['ortho_loss'] = ortho_loss_tensor.item()
+
+                # V9.9.10: Phase diversity loss (combat phase collapse)
+                # Uses uniformity loss |E[e^{iφ}]|² and entropy proxy R = |E[e^{iφ}]|
+                if phase_diversity_enabled:
+                    # Compute ramped weight (ChatGPT: start small 1e-3, ramp to 1e-2)
+                    ramp_progress = min(1.0, global_step / max(1, config.phase_diversity_ramp_steps))
+                    current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
+
+                    # Compute phase diversity loss from captured phi_k tensors
+                    phase_div_loss, phase_div_metrics = compute_model_phase_diversity_loss(
+                        model,
+                        lambda_uniform=current_weight,
+                        lambda_entropy=current_weight,
+                    )
+
+                    if phase_div_loss.requires_grad:
+                        loss = loss + phase_div_loss
+                        metrics['phase_uniform_loss'] = phase_div_metrics['phase_uniform_loss']
+                        metrics['phase_entropy_proxy'] = phase_div_metrics['phase_entropy_proxy']
+                        metrics['phase_diversity_loss'] = phase_div_metrics['phase_diversity_loss']
+                        metrics['phase_diversity_weight'] = current_weight
+
+                        # One-time log when loss activates
+                        if global_step == 1:
+                            print(f"\n  🌀 [PHASE DIVERSITY] Active!")
+                            print(f"     ├─ Uniform Loss: {phase_div_metrics['phase_uniform_loss']:.4f}")
+                            print(f"     ├─ Entropy Proxy R: {phase_div_metrics['phase_entropy_proxy']:.4f}")
+                            print(f"     └─ Layers captured: {phase_div_metrics['num_layers_captured']}")
 
             # =================================================================
             # V9.8.0: RSS (Rational Sovereign Sequence) Weight Calculation
@@ -16984,6 +17033,12 @@ def main():
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
                        help="Weight for decorrelation loss (0=disabled, 0.1=recommended)")
+
+    # V9.9.10: Phase diversity loss (combat phase collapse)
+    parser.add_argument("--phase_diversity_weight", type=float, default=0.0,
+                       help="Weight for phase diversity loss (0=disabled, 0.001=start, ramp to 0.01)")
+    parser.add_argument("--phase_diversity_ramp_steps", type=int, default=5000,
+                       help="Steps to ramp phase diversity weight linearly")
 
     # V9.9.1 Per-Layer Phase Control (for Inverted Curriculum)
     parser.add_argument("--enable_per_layer_phase", action="store_true",
