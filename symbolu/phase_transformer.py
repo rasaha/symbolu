@@ -398,11 +398,36 @@ def compute_effective_phase(phi: torch.Tensor) -> torch.Tensor:
     return phi_eff
 
 
+def compute_pooled_phasor(phi: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    V9.9.12c: Compute mean phasor across D_h (ChatGPT's correct form).
+
+    z[b,n,h] = mean_d exp(i * phi[b,n,h,d])
+             = (mean_d cos(phi)) + i * (mean_d sin(phi))
+
+    This preserves magnitude information: |z| is small when D_h phases
+    are diverse (phasors cancel), large when collapsed (phasors align).
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        z_real: Real part of pooled phasor [B, N, H]
+        z_imag: Imaginary part of pooled phasor [B, N, H]
+    """
+    # Mean of exp(i*phi) across D_h
+    z_real = torch.cos(phi).mean(dim=-1)  # [B, N, H]
+    z_imag = torch.sin(phi).mean(dim=-1)  # [B, N, H]
+    return z_real, z_imag
+
+
 def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
     """
     Uniformity loss: Penalize non-uniform phase distribution.
 
-    L_uniform = |E[e^{iφ}]|²
+    V9.9.12c: Fixed to use ChatGPT's correct two-stage pooling:
+    1. z[b,n,h] = mean_d exp(i * phi[b,n,h,d])  -- pool over D_h first
+    2. L_uniform = |mean_{b,n} z[b,n,h]|²       -- then pool over samples
 
     If phases are uniform around the circle → E[e^{iφ}] ≈ 0 → loss small
     If phases collapse to one direction → |E[e^{iφ}]| large → loss large
@@ -416,23 +441,22 @@ def phase_uniformity_loss(phi: torch.Tensor) -> torch.Tensor:
     Returns:
         Scalar loss (minimize for uniform distribution)
     """
-    # Pool across D_h if present
+    # V9.9.12c: Use correct two-stage pooling (ChatGPT's formula)
     if phi.dim() == 4:
-        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+        # Step 1: Pool over D_h to get z[b,n,h] = mean_d exp(i*phi)
+        # This preserves magnitude info (|z| < 1 when D_h diverse)
+        z_real, z_imag = compute_pooled_phasor(phi)  # [B, N, H] each
     else:
-        phi_eff = phi  # Already [B, N, H]
+        # Already [B, N, H], treat as unit phasors
+        z_real = torch.cos(phi)
+        z_imag = torch.sin(phi)
 
-    # Compute complex phasor e^{iφ}
-    # Use cos + i*sin instead of torch.polar for gradient stability
-    cos_phi = torch.cos(phi_eff)  # [B, N, H]
-    sin_phi = torch.sin(phi_eff)  # [B, N, H]
+    # Step 2: Mean across batch, positions → [H]
+    mean_real = z_real.mean(dim=(0, 1))  # [H]
+    mean_imag = z_imag.mean(dim=(0, 1))  # [H]
 
-    # Mean across batch, positions → [H]
-    mean_cos = cos_phi.mean(dim=(0, 1))  # [H]
-    mean_sin = sin_phi.mean(dim=(0, 1))  # [H]
-
-    # |E[e^{iφ}]|² per head
-    magnitude_sq = mean_cos ** 2 + mean_sin ** 2  # [H]
+    # |E[z]|² per head
+    magnitude_sq = mean_real ** 2 + mean_imag ** 2  # [H]
 
     # Mean across heads
     return magnitude_sq.mean()
@@ -442,7 +466,11 @@ def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
     """
     Entropy proxy via mean resultant length (circular statistics).
 
-    R = |E[e^{iφ}]|
+    V9.9.12c: Fixed to use ChatGPT's correct two-stage pooling:
+    1. z[b,n,h] = mean_d exp(i * phi[b,n,h,d])  -- pool over D_h first
+    2. R[h] = |mean_{b,n} z[b,n,h]|             -- then pool over samples
+
+    R = |E[z]| where z = mean_d exp(i*phi)
 
     Uniform distribution → R ≈ 0 (high entropy)
     Collapsed distribution → R ≈ 1 (low entropy)
@@ -455,22 +483,22 @@ def phase_entropy_proxy_loss(phi: torch.Tensor) -> torch.Tensor:
     Returns:
         Scalar loss R (minimize to maximize entropy)
     """
-    # Pool across D_h if present
+    # V9.9.12c: Use correct two-stage pooling (ChatGPT's formula)
     if phi.dim() == 4:
-        phi_eff = compute_effective_phase(phi)  # [B, N, H]
+        # Step 1: Pool over D_h to get z[b,n,h] = mean_d exp(i*phi)
+        # This preserves magnitude info (|z| < 1 when D_h diverse)
+        z_real, z_imag = compute_pooled_phasor(phi)  # [B, N, H] each
     else:
-        phi_eff = phi
+        # Already [B, N, H], treat as unit phasors
+        z_real = torch.cos(phi)
+        z_imag = torch.sin(phi)
 
-    # Compute complex phasor components
-    cos_phi = torch.cos(phi_eff)
-    sin_phi = torch.sin(phi_eff)
+    # Step 2: Mean across batch, positions → [H]
+    mean_real = z_real.mean(dim=(0, 1))
+    mean_imag = z_imag.mean(dim=(0, 1))
 
-    # Mean across batch, positions → [H]
-    mean_cos = cos_phi.mean(dim=(0, 1))
-    mean_sin = sin_phi.mean(dim=(0, 1))
-
-    # Mean resultant length R = |E[e^{iφ}]| per head
-    R = torch.sqrt(mean_cos ** 2 + mean_sin ** 2 + 1e-8)  # [H]
+    # Mean resultant length R = |E[z]| per head
+    R = torch.sqrt(mean_real ** 2 + mean_imag ** 2 + 1e-8)  # [H]
 
     # Mean across heads
     return R.mean()
@@ -611,6 +639,279 @@ def compute_model_phase_diversity_loss(
         'phase_entropy_proxy': total_entropy / num_layers,
         'phase_diversity_loss': avg_loss.item() if torch.is_tensor(avg_loss) else avg_loss,
         'num_layers_captured': num_layers,
+    }
+
+
+# =============================================================================
+# V9.9.12c: PHASEATTENTION HEALTH DASHBOARD (Diagnostic Only)
+# =============================================================================
+# Behavioral audit dashboard for PhaseAttention stability analysis.
+#
+# This is READ-ONLY diagnostics:
+# - No gradients, no losses, no optimizer interaction
+# - No effect on training dynamics
+# - Safe to call every N steps (e.g. eval/log interval)
+#
+# Metrics:
+#   R_k              - Key phase collapse (using correct pooled phasor)
+#   R_q              - Query phase collapse (logged only, not regularized)
+#   amp_phase_corr   - Correlation between |z| and a_k (entanglement check)
+#   head_redundancy  - Mean cosine similarity between per-head z̄_h
+#   phase_drift_mean - Mean |Δφ_k| across time (dynamic behavior)
+#   phase_drift_std  - Std of |Δφ_k| across time (stability)
+
+
+def enable_health_diagnostics_capture(model: nn.Module, enable: bool = True) -> int:
+    """
+    Enable or disable health diagnostics capture on all PhaseAttentionLayer modules.
+
+    When enabled, captures phi_q, phi_k, and a_k (all detached) for health analysis.
+    This has NO effect on training - all captures are detached.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+        enable: Whether to enable capture
+
+    Returns:
+        Number of PhaseAttentionLayer modules found
+    """
+    count = 0
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            module.capture_for_health_diagnostics = enable
+            if not enable:
+                # Clear captured data to free memory
+                module._captured_phi_k = None
+                module._captured_phi_q = None
+                module._captured_a_k = None
+            count += 1
+    return count
+
+
+def _collect_health_captures(model: nn.Module) -> List[Dict[str, torch.Tensor]]:
+    """
+    Collect captured tensors from all PhaseAttentionLayer modules for health analysis.
+
+    Returns:
+        List of dicts, each with 'phi_k', 'phi_q', 'a_k' tensors
+    """
+    captures = []
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            if (hasattr(module, '_captured_phi_k') and module._captured_phi_k is not None and
+                hasattr(module, '_captured_phi_q') and module._captured_phi_q is not None and
+                hasattr(module, '_captured_a_k') and module._captured_a_k is not None):
+                captures.append({
+                    'phi_k': module._captured_phi_k,
+                    'phi_q': module._captured_phi_q,
+                    'a_k': module._captured_a_k,
+                })
+    return captures
+
+
+def _compute_R_from_phi(phi: torch.Tensor) -> float:
+    """
+    Compute mean resultant length R from phase tensor.
+
+    Uses correct two-stage pooling:
+    1. z[b,n,h] = mean_d exp(i * phi[b,n,h,d])
+    2. R[h] = |mean_{b,n} z[b,n,h]|
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        Scalar R value (0 = uniform/healthy, 1 = collapsed)
+    """
+    # Pool over D_h: z = mean_d exp(i*phi)
+    z_real = torch.cos(phi).mean(dim=-1)  # [B, N, H]
+    z_imag = torch.sin(phi).mean(dim=-1)  # [B, N, H]
+
+    # Pool over batch, positions: mean_{b,n} z
+    mean_real = z_real.mean(dim=(0, 1))  # [H]
+    mean_imag = z_imag.mean(dim=(0, 1))  # [H]
+
+    # R = |mean z| per head, then average
+    R_per_head = torch.sqrt(mean_real ** 2 + mean_imag ** 2 + 1e-8)
+    return R_per_head.mean().item()
+
+
+def _compute_amp_phase_correlation(phi: torch.Tensor, a_k: torch.Tensor) -> float:
+    """
+    Compute correlation between |z[b,n,h]| and a_k.
+
+    If high, amplitude is compensating for phase collapse.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+        a_k: Amplitude tensor [B, N, H, D_h]
+
+    Returns:
+        Correlation coefficient (scalar)
+    """
+    # Compute |z| = |mean_d exp(i*phi)| per (b,n,h)
+    z_real = torch.cos(phi).mean(dim=-1)  # [B, N, H]
+    z_imag = torch.sin(phi).mean(dim=-1)  # [B, N, H]
+    z_mag = torch.sqrt(z_real ** 2 + z_imag ** 2 + 1e-8)  # [B, N, H]
+
+    # Mean amplitude per (b,n,h)
+    a_mean = a_k.mean(dim=-1)  # [B, N, H]
+
+    # Flatten for correlation
+    z_flat = z_mag.flatten()
+    a_flat = a_mean.flatten()
+
+    # Pearson correlation
+    z_centered = z_flat - z_flat.mean()
+    a_centered = a_flat - a_flat.mean()
+
+    numerator = (z_centered * a_centered).sum()
+    denominator = torch.sqrt((z_centered ** 2).sum() * (a_centered ** 2).sum() + 1e-8)
+
+    return (numerator / denominator).item()
+
+
+def _compute_head_redundancy(phi: torch.Tensor) -> float:
+    """
+    Compute mean cosine similarity between per-head z̄_h vectors.
+
+    If high, multiple heads have converged to same phase manifold.
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        Mean pairwise cosine similarity (scalar)
+    """
+    # z[b,n,h] = mean_d exp(i*phi)
+    z_real = torch.cos(phi).mean(dim=-1)  # [B, N, H]
+    z_imag = torch.sin(phi).mean(dim=-1)  # [B, N, H]
+
+    # z̄_h = mean_{b,n} z[b,n,h] for each head
+    z_bar_real = z_real.mean(dim=(0, 1))  # [H]
+    z_bar_imag = z_imag.mean(dim=(0, 1))  # [H]
+
+    # Stack as 2D vectors for cosine similarity: [H, 2]
+    z_bar = torch.stack([z_bar_real, z_bar_imag], dim=-1)  # [H, 2]
+
+    # Normalize
+    z_bar_norm = z_bar / (z_bar.norm(dim=-1, keepdim=True) + 1e-8)
+
+    # Pairwise cosine similarity
+    H = z_bar_norm.shape[0]
+    if H < 2:
+        return 0.0
+
+    # Compute all pairs
+    sim_matrix = z_bar_norm @ z_bar_norm.T  # [H, H]
+
+    # Mean of upper triangle (excluding diagonal)
+    mask = torch.triu(torch.ones(H, H, device=sim_matrix.device), diagonal=1).bool()
+    pairwise_sims = sim_matrix[mask]
+
+    return pairwise_sims.mean().item() if pairwise_sims.numel() > 0 else 0.0
+
+
+def _compute_phase_drift(phi: torch.Tensor) -> Tuple[float, float]:
+    """
+    Compute phase drift statistics: |Δφ_k(t)| = |φ_k(t) - φ_k(t-1)|.
+
+    Healthy: small but non-zero drift (using phase as state variable)
+    Unhealthy: Δφ ≈ 0 everywhere (frozen) or Δφ >> noise (unstable)
+
+    Args:
+        phi: Phase tensor [B, N, H, D_h]
+
+    Returns:
+        (mean_drift, std_drift) - both scalars
+    """
+    if phi.shape[1] < 2:
+        return 0.0, 0.0
+
+    # Compute temporal differences: φ(t) - φ(t-1)
+    delta_phi = phi[:, 1:, :, :] - phi[:, :-1, :, :]  # [B, N-1, H, D_h]
+
+    # Wrap to [-π, π] for proper circular distance
+    delta_phi = torch.atan2(torch.sin(delta_phi), torch.cos(delta_phi))
+
+    # |Δφ| across all dimensions
+    abs_delta = delta_phi.abs()
+
+    mean_drift = abs_delta.mean().item()
+    std_drift = abs_delta.std().item()
+
+    return mean_drift, std_drift
+
+
+@torch.no_grad()
+def compute_phase_health_diagnostics(model: nn.Module) -> Dict[str, float]:
+    """
+    Compute PhaseAttention health diagnostics from captured tensors.
+
+    This is a READ-ONLY diagnostic function:
+    - No gradients (wrapped in torch.no_grad)
+    - No losses returned
+    - No optimizer interaction
+    - Safe to call every N steps
+
+    Prerequisites:
+        1. Call enable_health_diagnostics_capture(model, True)
+        2. Run a forward pass
+        3. Call this function
+        4. Optionally: enable_health_diagnostics_capture(model, False) to free memory
+
+    Returns:
+        Dict with 6 scalar metrics:
+        - R_k: Key phase collapse (0=healthy, 1=collapsed)
+        - R_q: Query phase collapse (0=healthy, 1=collapsed)
+        - amp_phase_corr: Amplitude-phase correlation (-1 to 1)
+        - head_redundancy: Inter-head similarity (0=diverse, 1=redundant)
+        - phase_drift_mean: Mean |Δφ| across time
+        - phase_drift_std: Std of |Δφ| across time
+    """
+    captures = _collect_health_captures(model)
+
+    if not captures:
+        return {
+            'R_k': 0.0,
+            'R_q': 0.0,
+            'amp_phase_corr': 0.0,
+            'head_redundancy': 0.0,
+            'phase_drift_mean': 0.0,
+            'phase_drift_std': 0.0,
+        }
+
+    # Aggregate metrics across all layers
+    R_k_total = 0.0
+    R_q_total = 0.0
+    amp_corr_total = 0.0
+    head_red_total = 0.0
+    drift_mean_total = 0.0
+    drift_std_total = 0.0
+
+    for capture in captures:
+        phi_k = capture['phi_k']
+        phi_q = capture['phi_q']
+        a_k = capture['a_k']
+
+        R_k_total += _compute_R_from_phi(phi_k)
+        R_q_total += _compute_R_from_phi(phi_q)
+        amp_corr_total += _compute_amp_phase_correlation(phi_k, a_k)
+        head_red_total += _compute_head_redundancy(phi_k)
+
+        drift_mean, drift_std = _compute_phase_drift(phi_k)
+        drift_mean_total += drift_mean
+        drift_std_total += drift_std
+
+    num_layers = len(captures)
+
+    return {
+        'R_k': R_k_total / num_layers,
+        'R_q': R_q_total / num_layers,
+        'amp_phase_corr': amp_corr_total / num_layers,
+        'head_redundancy': head_red_total / num_layers,
+        'phase_drift_mean': drift_mean_total / num_layers,
+        'phase_drift_std': drift_std_total / num_layers,
     }
 
 
@@ -1079,6 +1380,12 @@ class PhaseAttentionLayer(nn.Module):
         self.capture_phase_for_diversity = False  # Set True during training
         self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
 
+        # V9.9.12c: Health dashboard capture (diagnostic only, no gradients)
+        # Captures additional tensors needed for behavioral auditing
+        self.capture_for_health_diagnostics = False
+        self._captured_phi_q = None  # [B, N, H, D_h] query phases
+        self._captured_a_k = None    # [B, N, H, D_h] key amplitudes
+
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
         self.temperature = temperature
@@ -1204,6 +1511,12 @@ class PhaseAttentionLayer(nn.Module):
         # Only capture during training when flag is set (saves memory in eval)
         if self.capture_phase_for_diversity and self.training:
             self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
+
+        # V9.9.12c: Capture for health diagnostics (read-only, detached)
+        if self.capture_for_health_diagnostics:
+            self._captured_phi_k = phi_k.detach()  # [B, N, H, D_h]
+            self._captured_phi_q = phi_q.detach()  # [B, N, H, D_h]
+            self._captured_a_k = a_k.detach()      # [B, N, H, D_h]
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
