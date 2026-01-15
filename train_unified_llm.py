@@ -17783,13 +17783,13 @@ def main():
     parser.add_argument("--adaptive_lr_decay", type=float, default=0.7,
                        help="LR decay multiplier when PPL spike detected")
     parser.add_argument("--adaptive_velocity_slow", type=float, default=-2.0,
-                       help="PPL velocity threshold (%) for 'too slow' detection")
+                       help="PPL velocity threshold (%%) for 'too slow' detection")
     parser.add_argument("--adaptive_velocity_spike", type=float, default=10.0,
-                       help="PPL velocity threshold (%) for 'spike' detection")
+                       help="PPL velocity threshold (%%) for 'spike' detection")
     parser.add_argument("--adaptive_plateau_window", type=int, default=5,
                        help="Number of evaluations to check for plateau")
     parser.add_argument("--adaptive_plateau_threshold", type=float, default=1.0,
-                       help="Minimum improvement (%) to avoid plateau detection")
+                       help="Minimum improvement (%%) to avoid plateau detection")
     parser.add_argument("--adaptive_min_interval", type=int, default=200,
                        help="Minimum steps between adaptive adjustments")
     # V9.8.2: Safeguards to prevent runaway LR
