@@ -10472,6 +10472,7 @@ class PerLayerPhaseController:
 
         This updates each layer's alpha_phase parameter based on its layer_idx.
         """
+        applied_count = 0
         for module in model.modules():
             if hasattr(module, 'alpha_phase') and hasattr(module, 'layer_idx'):
                 layer_idx = module.layer_idx
@@ -10480,6 +10481,9 @@ class PerLayerPhaseController:
                     module.alpha_phase.data.fill_(weight)
                     if hasattr(module, 'alpha_local'):
                         module.alpha_local.data.fill_(1.0 - weight)
+                    applied_count += 1
+        if applied_count > 0:
+            print(f"      Applied per-layer weights to {applied_count} HybridAttentionLayer modules")
 
     def get_status(self) -> Dict[str, any]:
         """Get current controller status for logging."""
@@ -18058,7 +18062,8 @@ def main():
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.1 Per-Layer Phase Control
-        enable_per_layer_phase=args.enable_per_layer_phase,
+        # V9.9.8: Auto-enable when per_layer_phase_weights is provided
+        enable_per_layer_phase=args.enable_per_layer_phase or bool(args.per_layer_phase_weights),
         per_layer_phase_weights=args.per_layer_phase_weights,
         layer_transition_steps=args.layer_transition_steps,
         # V9.9.1 Inverted Curriculum
