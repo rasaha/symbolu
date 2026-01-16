@@ -73,6 +73,10 @@ class Config:
     samples_per_schema: int = 2000
     test_samples_per_schema: int = 200
 
+    # Schema difficulty parameters
+    num_bindings: int = 3        # For BIND schema
+    filler_length: int = 2       # For LP schema
+
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -490,6 +494,8 @@ def create_combined_dataset(
     vocab: Vocabulary,
     max_seq_len: int,
     samples_per_schema: int,
+    num_bindings: int = 3,
+    filler_length: int = 2,
     seed: int = 42,
 ) -> Dataset:
     """
@@ -497,9 +503,9 @@ def create_combined_dataset(
     """
     generators = {
         SchemaType.RB: RBGenerator(vocab, max_seq_len),
-        SchemaType.BIND: BINDGenerator(vocab, max_seq_len, num_bindings=3),
+        SchemaType.BIND: BINDGenerator(vocab, max_seq_len, num_bindings=num_bindings),
         SchemaType.NP: NPGenerator(vocab, max_seq_len),
-        SchemaType.LP: LPGenerator(vocab, max_seq_len, filler_length=2),
+        SchemaType.LP: LPGenerator(vocab, max_seq_len, filler_length=filler_length),
         SchemaType.SI: SIGenerator(vocab, max_seq_len),
     }
 
@@ -767,6 +773,8 @@ def main():
     parser.add_argument("--d-model", type=int, default=64)
     parser.add_argument("--num-layers", type=int, default=2)
     parser.add_argument("--samples-per-schema", type=int, default=2000)
+    parser.add_argument("--num-bindings", type=int, default=3, help="Number of bindings for BIND schema (increases difficulty)")
+    parser.add_argument("--filler-length", type=int, default=2, help="Filler length for LP schema (increases difficulty)")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -776,6 +784,8 @@ def main():
         d_model=args.d_model,
         num_layers=args.num_layers,
         samples_per_schema=args.samples_per_schema,
+        num_bindings=args.num_bindings,
+        filler_length=args.filler_length,
         device=args.device,
     )
 
@@ -788,9 +798,16 @@ def main():
     print(f"Vocabulary: {vocab.vocab_size} tokens")
 
     # Datasets
-    print("\nCreating datasets with 5 schema types...")
-    train_ds = create_combined_dataset(vocab, config.max_seq_len, config.samples_per_schema, seed=42)
-    test_ds = create_combined_dataset(vocab, config.max_seq_len, config.test_samples_per_schema, seed=999)
+    print(f"\nCreating datasets with 5 schema types...")
+    print(f"Difficulty: num_bindings={config.num_bindings}, filler_length={config.filler_length}")
+    train_ds = create_combined_dataset(
+        vocab, config.max_seq_len, config.samples_per_schema,
+        num_bindings=config.num_bindings, filler_length=config.filler_length, seed=42
+    )
+    test_ds = create_combined_dataset(
+        vocab, config.max_seq_len, config.test_samples_per_schema,
+        num_bindings=config.num_bindings, filler_length=config.filler_length, seed=999
+    )
 
     train_loader = DataLoader(train_ds, batch_size=config.batch_size, shuffle=True, collate_fn=collate_fn)
     test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate_fn)
