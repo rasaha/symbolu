@@ -1277,9 +1277,24 @@ class ProtectedPhaseAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self._ablation_mode = "none"
 
+        # Health tracking: R_k (amplitude) statistics
+        self._last_r_k_mean = 0.0
+        self._last_r_k_std = 0.0
+        self._last_r_k_min = 0.0
+        self._last_r_k_max = 0.0
+
     def set_ablation(self, mode: str, seed: int = 42):
         self._ablation_mode = mode
         self._scramble_seed = seed
+
+    def get_health_metrics(self) -> dict:
+        """Return Phase health metrics (R_k statistics)."""
+        return {
+            "r_k_mean": self._last_r_k_mean,
+            "r_k_std": self._last_r_k_std,
+            "r_k_min": self._last_r_k_min,
+            "r_k_max": self._last_r_k_max,
+        }
 
     def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None) -> torch.Tensor:
         """
@@ -1293,6 +1308,13 @@ class ProtectedPhaseAttention(nn.Module):
         phi_k = math.pi * torch.sin(self.W_k_phase(x).view(B, N, self.num_heads, self.head_dim))
         a_k = torch.sigmoid(self.W_k_amp(x)).view(B, N, self.num_heads, self.head_dim)
         v = self.W_v(x).view(B, N, self.num_heads, self.head_dim)
+
+        # Track R_k health metrics (amplitude statistics)
+        with torch.no_grad():
+            self._last_r_k_mean = a_k.mean().item()
+            self._last_r_k_std = a_k.std().item()
+            self._last_r_k_min = a_k.min().item()
+            self._last_r_k_max = a_k.max().item()
 
         # Apply operation-conditioned phase shifts
         if self.op_phase_shifts is not None and token_ids is not None:
@@ -1505,9 +1527,37 @@ class ProtectedPhaseTransformer(nn.Module):
         """Enable/disable phase diagnostics (placeholder for compatibility)."""
         pass
 
+    def get_phase_health(self) -> dict:
+        """
+        Aggregate Phase health metrics (R_k statistics) from all layers.
+
+        Interpretation:
+        - R_k → 0: Phase collapsed (bad)
+        - R_k → 1: Phase degenerate (bad)
+        - R_k stable in (0.3, 0.7): Healthy
+        """
+        metrics = {
+            "r_k_mean": [],
+            "r_k_std": [],
+            "r_k_min": [],
+            "r_k_max": [],
+        }
+        for layer in self.layers:
+            layer_metrics = layer.phase_memory.get_health_metrics()
+            for k, v in layer_metrics.items():
+                metrics[k].append(v)
+
+        # Average across layers
+        return {
+            "r_k_mean": sum(metrics["r_k_mean"]) / len(metrics["r_k_mean"]) if metrics["r_k_mean"] else 0.0,
+            "r_k_std": sum(metrics["r_k_std"]) / len(metrics["r_k_std"]) if metrics["r_k_std"] else 0.0,
+            "r_k_min": min(metrics["r_k_min"]) if metrics["r_k_min"] else 0.0,
+            "r_k_max": max(metrics["r_k_max"]) if metrics["r_k_max"] else 0.0,
+        }
+
     def get_R_k(self) -> float:
-        """Get R_k metric (placeholder for compatibility)."""
-        return 0.0
+        """Get mean R_k metric for backward compatibility."""
+        return self.get_phase_health()["r_k_mean"]
 
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -1959,6 +2009,15 @@ Examples:
     train_iter = iter(train_loader)
     step = 0
 
+    # Loss tracking for training dynamics analysis
+    loss_history = {
+        "quad": [],
+        "phase": [],
+        "hybrid": [],
+        "hybrid_std": [],
+        "protected": [],
+    }
+
     while step < config.num_steps:
         try:
             ids, targets, _ = next(train_iter)
@@ -2005,6 +2064,7 @@ Examples:
             opt_hybrid_std.step()
 
         # Train protected phase (v5)
+        loss_prot = None
         if model_protected is not None:
             model_protected.train()
             opt_protected.zero_grad()
@@ -2012,23 +2072,108 @@ Examples:
             loss_prot.backward()
             opt_protected.step()
 
+        # Track losses for training dynamics
+        loss_history["quad"].append(loss_q.item())
+        loss_history["phase"].append(loss_p.item())
+        if model_hybrid is not None:
+            loss_history["hybrid"].append(loss_h.item())
+        if model_hybrid_std is not None:
+            loss_history["hybrid_std"].append(loss_hs.item())
+        if model_protected is not None:
+            loss_history["protected"].append(loss_prot.item())
+
         step += 1
 
         if step % config.eval_every == 0 or step == config.num_steps:
             # Quick train accuracy check
             train_acc_q = evaluate(model_quad, train_loader, vocab, config.device)
             train_acc_p = evaluate(model_phase, train_loader, vocab, config.device)
-            msg = f"Step {step:5d} | Train: Quad={train_acc_q:.3f} Phase={train_acc_p:.3f}"
+
+            # Compute recent average loss (last eval_every steps)
+            window = config.eval_every
+            recent_loss_q = sum(loss_history["quad"][-window:]) / window
+            recent_loss_p = sum(loss_history["phase"][-window:]) / window
+
+            msg = f"Step {step:5d} | Acc: Q={train_acc_q:.3f} P={train_acc_p:.3f}"
+            loss_msg = f" | Loss: Q={recent_loss_q:.3f} P={recent_loss_p:.3f}"
+
             if model_hybrid is not None:
                 train_acc_h = evaluate(model_hybrid, train_loader, vocab, config.device)
-                msg += f" Hybrid={train_acc_h:.3f}"
+                recent_loss_h = sum(loss_history["hybrid"][-window:]) / window
+                msg += f" H={train_acc_h:.3f}"
+                loss_msg += f" H={recent_loss_h:.3f}"
             if model_hybrid_std is not None:
                 train_acc_hs = evaluate(model_hybrid_std, train_loader, vocab, config.device)
-                msg += f" HybridStd={train_acc_hs:.3f}"
+                recent_loss_hs = sum(loss_history["hybrid_std"][-window:]) / window
+                msg += f" Hs={train_acc_hs:.3f}"
+                loss_msg += f" Hs={recent_loss_hs:.3f}"
             if model_protected is not None:
                 train_acc_prot = evaluate(model_protected, train_loader, vocab, config.device)
-                msg += f" Protected={train_acc_prot:.3f}"
-            print(msg)
+                recent_loss_prot = sum(loss_history["protected"][-window:]) / window
+                msg += f" Prot={train_acc_prot:.3f}"
+                loss_msg += f" Prot={recent_loss_prot:.3f}"
+
+                # R_k health metrics
+                health = model_protected.get_phase_health()
+                msg += f" | R_k={health['r_k_mean']:.3f}±{health['r_k_std']:.3f}"
+
+            print(msg + loss_msg)
+
+    # ==========================================================================
+    # TRAINING DYNAMICS ANALYSIS
+    # ==========================================================================
+    print("\n" + "=" * 70)
+    print("TRAINING DYNAMICS ANALYSIS")
+    print("=" * 70)
+
+    def compute_loss_stats(losses, name, window=1000):
+        """Compute loss statistics for training dynamics."""
+        if not losses:
+            return None
+        early = losses[:window] if len(losses) >= window else losses
+        late = losses[-window:] if len(losses) >= window else losses
+        return {
+            "name": name,
+            "early_mean": sum(early) / len(early),
+            "late_mean": sum(late) / len(late),
+            "final": losses[-1],
+            "improvement": (sum(early) / len(early)) - (sum(late) / len(late)),
+        }
+
+    print(f"\n--- Loss Dynamics (early vs late {min(1000, len(loss_history['quad']))} steps) ---")
+    print(f"{'Model':<12} {'Early Loss':>12} {'Late Loss':>12} {'Improvement':>12}")
+    print("-" * 50)
+
+    for model_name in ["quad", "phase", "protected"]:
+        if loss_history[model_name]:
+            stats = compute_loss_stats(loss_history[model_name], model_name)
+            print(f"{stats['name']:<12} {stats['early_mean']:>12.4f} {stats['late_mean']:>12.4f} {stats['improvement']:>+12.4f}")
+
+    # Check for Phase plateau (red flag)
+    if loss_history["protected"]:
+        early_phase_loss = sum(loss_history["protected"][:min(2000, len(loss_history["protected"]))]) / min(2000, len(loss_history["protected"]))
+        late_phase_loss = sum(loss_history["protected"][-1000:]) / min(1000, len(loss_history["protected"]))
+        if early_phase_loss - late_phase_loss < 0.1:
+            print(f"\n  ⚠️  WARNING: Protected Phase loss barely improved ({early_phase_loss:.4f} → {late_phase_loss:.4f})")
+            print(f"     This may indicate Phase is not learning or Quad is bypassing Phase.")
+
+    # R_k Health Report
+    if model_protected is not None:
+        print(f"\n--- Phase Health (R_k = amplitude) ---")
+        health = model_protected.get_phase_health()
+        print(f"  R_k mean:  {health['r_k_mean']:.4f}")
+        print(f"  R_k std:   {health['r_k_std']:.4f}")
+        print(f"  R_k range: [{health['r_k_min']:.4f}, {health['r_k_max']:.4f}]")
+
+        # Interpret health
+        if health['r_k_mean'] < 0.1:
+            print(f"\n  🚨 R_k → 0: Phase COLLAPSED (amplitude too small)")
+        elif health['r_k_mean'] > 0.9:
+            print(f"\n  🚨 R_k → 1: Phase DEGENERATE (amplitude saturated)")
+        elif 0.3 <= health['r_k_mean'] <= 0.7:
+            print(f"\n  ✅ R_k in healthy range (0.3-0.7)")
+        else:
+            print(f"\n  ⚠️  R_k outside ideal range but not critical")
 
     # ==========================================================================
     # FINAL EVALUATION (SEPARATE REPORTING - NO AVERAGING)
