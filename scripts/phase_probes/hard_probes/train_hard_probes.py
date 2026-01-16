@@ -23,6 +23,19 @@ KEY ENHANCEMENTS (v2):
    - Isolates "memory" from "logic"
    - Shows Phase's clean O(n) advantage
 
+KEY ENHANCEMENT (v3): INVERTED CURRICULUM
+-----------------------------------------
+Evidence from v2 shows Phase wins ONLY on test_persist (pure memory task).
+This reveals: PhaseAttention is NOT a better attention mechanism.
+              PhaseAttention IS a better STATE mechanism.
+
+ARCHITECTURAL IMPLICATION:
+- Early layers (close to input): Phase-heavy → capture and persist state
+- Late layers (close to output): Quadratic-heavy → relational reasoning
+
+The INVERTED CURRICULUM places Phase early for O(n) state persistence,
+then Quadratic late for complex relational reasoning over that state.
+
 WHY THE PREVIOUS DATASET FAILED:
 ---------------------------------
 The easy dataset allowed quadratic attention to succeed because:
@@ -1062,6 +1075,156 @@ class TransformerBlock(nn.Module):
         return x
 
 
+class HybridTransformerBlock(nn.Module):
+    """
+    Hybrid block that MIXES Phase and Quadratic attention outputs.
+
+    WHY MIXING (not switching):
+    ---------------------------
+    Instead of choosing one attention type per layer, we combine both:
+      output = phase_ratio * phase_out + (1 - phase_ratio) * quad_out
+
+    This allows smooth interpolation and lets the model learn to leverage
+    Phase for state persistence and Quadratic for reasoning within each layer.
+
+    The INVERTED CURRICULUM sets:
+    - Early layers: phase_ratio ≈ 0.9 (mostly Phase for state capture)
+    - Late layers: phase_ratio ≈ 0.1 (mostly Quadratic for reasoning)
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dropout: float,
+        phase_ratio: float = 0.5,  # 0.0 = pure Quadratic, 1.0 = pure Phase
+        operation_tokens: List[int] = None,
+    ):
+        super().__init__()
+        self.phase_ratio = phase_ratio
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+
+        # Both attention types
+        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens)
+        self.quad_attn = QuadraticAttention(d_model, num_heads, dropout)
+
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, d_ff), nn.GELU(), nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model), nn.Dropout(dropout)
+        )
+
+    def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None) -> torch.Tensor:
+        normed = self.norm1(x)
+
+        # Run both attention types
+        phase_out = self.phase_attn(normed, token_ids)
+        quad_out = self.quad_attn(normed)
+
+        # Mix outputs according to phase_ratio
+        attn_out = self.phase_ratio * phase_out + (1 - self.phase_ratio) * quad_out
+
+        x = x + attn_out
+        x = x + self.ff(self.norm2(x))
+        return x
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set ablation mode for Phase attention component."""
+        self.phase_attn.set_ablation(mode, seed)
+
+
+class HybridTransformer(nn.Module):
+    """
+    Transformer with per-layer Phase/Quadratic mixing (INVERTED CURRICULUM).
+
+    INVERTED CURRICULUM RATIONALE:
+    ------------------------------
+    Evidence shows PhaseAttention excels at STATE PERSISTENCE, not reasoning.
+    Therefore:
+    - Early layers: Phase-heavy → capture input state with O(n) efficiency
+    - Late layers: Quadratic-heavy → reason over persisted state
+
+    Curriculum format: List of phase_ratios per layer
+    - [0.9, 0.7, 0.3, 0.1] = Inverted (Phase early, Quad late) ← RECOMMENDED
+    - [0.1, 0.3, 0.7, 0.9] = Standard (Quad early, Phase late)
+    - [0.5, 0.5, 0.5, 0.5] = Balanced
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        num_classes: int,
+        curriculum: List[float],  # phase_ratio per layer
+        operation_tokens: List[int] = None,
+    ):
+        super().__init__()
+        self.curriculum = curriculum
+        self.operation_tokens = operation_tokens
+
+        assert len(curriculum) == num_layers, \
+            f"Curriculum length ({len(curriculum)}) must match num_layers ({num_layers})"
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        self.layers = nn.ModuleList([
+            HybridTransformerBlock(
+                d_model, num_heads, d_ff, dropout,
+                phase_ratio=curriculum[i],
+                operation_tokens=operation_tokens
+            )
+            for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.classifier = nn.Linear(d_model, num_classes)
+
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        for layer in self.layers:
+            x = layer(x, input_ids)
+
+        return self.classifier(self.norm(x[:, -1, :]))
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set ablation mode for all Phase attention components."""
+        for layer in self.layers:
+            layer.set_ablation(mode, seed)
+
+    def enable_diagnostics(self, enable: bool = True):
+        """Enable/disable phase diagnostics capture."""
+        for layer in self.layers:
+            layer.phase_attn.capture_diagnostics = enable
+
+    def get_R_k(self) -> float:
+        """Get mean R_k across all Phase attention layers."""
+        r_values = []
+        for layer in self.layers:
+            r_values.append(layer.phase_attn.get_R_k())
+        return sum(r_values) / len(r_values) if r_values else 0.0
+
+    def count_params(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    def describe_curriculum(self) -> str:
+        """Return human-readable curriculum description."""
+        parts = []
+        for i, ratio in enumerate(self.curriculum):
+            parts.append(f"L{i}:{ratio*100:.0f}%P")
+        return " → ".join(parts)
+
+
 class HardProbeTransformer(nn.Module):
     """Transformer for hard probe classification with operation-conditioned phase shifts."""
 
@@ -1222,7 +1385,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Default run
+  # Default run (Quadratic vs Phase)
   python train_hard_probes.py
 
   # BIND-dominant curriculum (recommended)
@@ -1233,6 +1396,15 @@ Examples:
 
   # Longer chains for harder test
   python train_hard_probes.py --test-chain-min 6 --test-chain-max 8
+
+  # v3: Test INVERTED CURRICULUM hypothesis (Phase=state, Quad=reasoning)
+  python train_hard_probes.py --compare-curricula
+
+  # v3: Custom curriculum (90% Phase L0 → 10% Phase L3)
+  python train_hard_probes.py --run-hybrid --curriculum 0.9,0.7,0.3,0.1
+
+  # Full scientific comparison
+  python train_hard_probes.py --compare-curricula --bind-ratio 0.7 --match-params
         """
     )
 
@@ -1272,11 +1444,27 @@ Examples:
     parser.add_argument("--match-params", action="store_true",
                         help="Add extra FF params to quadratic to match phase param count")
 
+    # Hybrid curriculum (v3)
+    parser.add_argument("--run-hybrid", action="store_true",
+                        help="Also run Hybrid model with inverted curriculum")
+    parser.add_argument("--curriculum", type=str, default="0.9,0.7,0.3,0.1",
+                        help="Phase ratios per layer (comma-separated). "
+                             "Inverted=0.9,0.7,0.3,0.1 (Phase early, Quad late)")
+    parser.add_argument("--compare-curricula", action="store_true",
+                        help="Compare inverted vs standard curriculum")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
 
     args = parser.parse_args()
+
+    # Parse curriculum
+    curriculum = [float(x) for x in args.curriculum.split(",")]
+    # Pad/truncate to match num_layers
+    while len(curriculum) < args.num_layers:
+        curriculum.append(curriculum[-1] if curriculum else 0.5)
+    curriculum = curriculum[:args.num_layers]
 
     # Build config
     config = Config(
@@ -1405,6 +1593,48 @@ Examples:
         diff = abs(model_phase.count_params() - model_quad.count_params())
         print(f"  Param difference: {diff:,} ({diff / model_phase.count_params() * 100:.1f}%)")
 
+    # Hybrid model with inverted curriculum (v3)
+    model_hybrid = None
+    model_hybrid_std = None  # For curriculum comparison
+    opt_hybrid = None
+    opt_hybrid_std = None
+
+    if args.run_hybrid or args.compare_curricula:
+        # Inverted curriculum: Phase-heavy early, Quadratic-heavy late
+        inverted_curriculum = curriculum  # From CLI arg
+        print(f"\n--- Hybrid Model (INVERTED CURRICULUM) ---")
+        print(f"  Curriculum: {' → '.join(f'L{i}:{r*100:.0f}%P' for i, r in enumerate(inverted_curriculum))}")
+        print(f"  Interpretation: Phase-heavy early (state capture) → Quadratic-heavy late (reasoning)")
+
+        model_hybrid = HybridTransformer(
+            vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
+            config.d_ff, config.dropout, config.max_seq_len, num_classes,
+            curriculum=inverted_curriculum,
+            operation_tokens=operation_tokens
+        ).to(config.device)
+        print(f"  Hybrid params: {model_hybrid.count_params():,}")
+
+        opt_hybrid = torch.optim.AdamW(model_hybrid.parameters(), lr=config.lr,
+                                        weight_decay=config.weight_decay)
+
+    if args.compare_curricula:
+        # Standard curriculum: Quadratic-heavy early, Phase-heavy late (for comparison)
+        standard_curriculum = list(reversed(curriculum))
+        print(f"\n--- Hybrid Model (STANDARD CURRICULUM - for comparison) ---")
+        print(f"  Curriculum: {' → '.join(f'L{i}:{r*100:.0f}%P' for i, r in enumerate(standard_curriculum))}")
+        print(f"  Interpretation: Quadratic-heavy early → Phase-heavy late")
+
+        model_hybrid_std = HybridTransformer(
+            vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
+            config.d_ff, config.dropout, config.max_seq_len, num_classes,
+            curriculum=standard_curriculum,
+            operation_tokens=operation_tokens
+        ).to(config.device)
+        print(f"  Standard Hybrid params: {model_hybrid_std.count_params():,}")
+
+        opt_hybrid_std = torch.optim.AdamW(model_hybrid_std.parameters(), lr=config.lr,
+                                            weight_decay=config.weight_decay)
+
     # Optimizers
     opt_quad = torch.optim.AdamW(model_quad.parameters(), lr=config.lr,
                                   weight_decay=config.weight_decay)
@@ -1445,13 +1675,36 @@ Examples:
         loss_p.backward()
         opt_phase.step()
 
+        # Train hybrid (inverted curriculum)
+        if model_hybrid is not None:
+            model_hybrid.train()
+            opt_hybrid.zero_grad()
+            loss_h = F.cross_entropy(model_hybrid(ids), target_idx)
+            loss_h.backward()
+            opt_hybrid.step()
+
+        # Train hybrid (standard curriculum - for comparison)
+        if model_hybrid_std is not None:
+            model_hybrid_std.train()
+            opt_hybrid_std.zero_grad()
+            loss_hs = F.cross_entropy(model_hybrid_std(ids), target_idx)
+            loss_hs.backward()
+            opt_hybrid_std.step()
+
         step += 1
 
         if step % config.eval_every == 0 or step == config.num_steps:
             # Quick train accuracy check
             train_acc_q = evaluate(model_quad, train_loader, vocab, config.device)
             train_acc_p = evaluate(model_phase, train_loader, vocab, config.device)
-            print(f"Step {step:5d} | Train: Quad={train_acc_q:.3f} Phase={train_acc_p:.3f}")
+            msg = f"Step {step:5d} | Train: Quad={train_acc_q:.3f} Phase={train_acc_p:.3f}"
+            if model_hybrid is not None:
+                train_acc_h = evaluate(model_hybrid, train_loader, vocab, config.device)
+                msg += f" Hybrid={train_acc_h:.3f}"
+            if model_hybrid_std is not None:
+                train_acc_hs = evaluate(model_hybrid_std, train_loader, vocab, config.device)
+                msg += f" HybridStd={train_acc_hs:.3f}"
+            print(msg)
 
     # ==========================================================================
     # FINAL EVALUATION (SEPARATE REPORTING - NO AVERAGING)
@@ -1463,26 +1716,83 @@ Examples:
     # Train accuracy
     train_acc_q = evaluate(model_quad, train_loader, vocab, config.device)
     train_acc_p = evaluate(model_phase, train_loader, vocab, config.device)
+    train_acc_h = evaluate(model_hybrid, train_loader, vocab, config.device) if model_hybrid else None
+    train_acc_hs = evaluate(model_hybrid_std, train_loader, vocab, config.device) if model_hybrid_std else None
 
-    print(f"\n--- Training Accuracy (should be high for both) ---")
-    print(f"Quadratic: {train_acc_q*100:.1f}%")
-    print(f"Phase:     {train_acc_p*100:.1f}%")
+    print(f"\n--- Training Accuracy (should be high for all) ---")
+    print(f"Quadratic:        {train_acc_q*100:.1f}%")
+    print(f"Phase:            {train_acc_p*100:.1f}%")
+    if train_acc_h is not None:
+        print(f"Hybrid (Inv):     {train_acc_h*100:.1f}%")
+    if train_acc_hs is not None:
+        print(f"Hybrid (Std):     {train_acc_hs*100:.1f}%")
 
     # Per-split test accuracy (NO AVERAGING)
-    print(f"\n--- Test Accuracy by Generalization Type (NO AVERAGING) ---")
-    print(f"{'Split':<20} {'Quadratic':>12} {'Phase':>12} {'Delta':>12}")
-    print("-" * 56)
-
     results_quad = evaluate_all_splits(model_quad, test_loaders, vocab, config.device)
     results_phase = evaluate_all_splits(model_phase, test_loaders, vocab, config.device)
+    results_hybrid = evaluate_all_splits(model_hybrid, test_loaders, vocab, config.device) if model_hybrid else None
+    results_hybrid_std = evaluate_all_splits(model_hybrid_std, test_loaders, vocab, config.device) if model_hybrid_std else None
 
-    for split in [SplitType.TEST_ROLES, SplitType.TEST_ENTITIES,
-                  SplitType.TEST_BOTH, SplitType.TEST_LONG, SplitType.TEST_PERSIST]:
-        q = results_quad[split.value]
-        p = results_phase[split.value]
-        delta = p - q
-        marker = "**" if delta > 0.1 else ""
-        print(f"{split.value:<20} {q*100:>11.1f}% {p*100:>11.1f}% {delta*100:>+11.1f}% {marker}")
+    if model_hybrid is not None:
+        print(f"\n--- Test Accuracy by Generalization Type (FULL COMPARISON) ---")
+        if model_hybrid_std is not None:
+            print(f"{'Split':<16} {'Quad':>8} {'Phase':>8} {'HybInv':>8} {'HybStd':>8} {'Best':>8}")
+            print("-" * 64)
+        else:
+            print(f"{'Split':<16} {'Quad':>8} {'Phase':>8} {'HybInv':>8} {'Best':>8}")
+            print("-" * 52)
+
+        for split in [SplitType.TEST_ROLES, SplitType.TEST_ENTITIES,
+                      SplitType.TEST_BOTH, SplitType.TEST_LONG, SplitType.TEST_PERSIST]:
+            q = results_quad[split.value]
+            p = results_phase[split.value]
+            h = results_hybrid[split.value]
+            scores = {"Quad": q, "Phase": p, "HybInv": h}
+
+            if model_hybrid_std is not None:
+                hs = results_hybrid_std[split.value]
+                scores["HybStd"] = hs
+                best = max(scores, key=scores.get)
+                print(f"{split.value:<16} {q*100:>7.1f}% {p*100:>7.1f}% {h*100:>7.1f}% {hs*100:>7.1f}% {best:>8}")
+            else:
+                best = max(scores, key=scores.get)
+                print(f"{split.value:<16} {q*100:>7.1f}% {p*100:>7.1f}% {h*100:>7.1f}% {best:>8}")
+
+        # Summary: Which curriculum wins?
+        if model_hybrid_std is not None:
+            print(f"\n--- CURRICULUM COMPARISON SUMMARY ---")
+            inv_avg = sum(results_hybrid.values()) / len(results_hybrid)
+            std_avg = sum(results_hybrid_std.values()) / len(results_hybrid_std)
+            q_avg = sum(results_quad.values()) / len(results_quad)
+            p_avg = sum(results_phase.values()) / len(results_phase)
+
+            print(f"Average Test Accuracy:")
+            print(f"  Quadratic:        {q_avg*100:.1f}%")
+            print(f"  Pure Phase:       {p_avg*100:.1f}%")
+            print(f"  Hybrid (Inv):     {inv_avg*100:.1f}%  [Phase early → Quad late]")
+            print(f"  Hybrid (Std):     {std_avg*100:.1f}%  [Quad early → Phase late]")
+
+            if inv_avg > std_avg + 0.02:
+                print(f"\n  → INVERTED CURRICULUM WINS by {(inv_avg - std_avg)*100:.1f}%")
+                print(f"    Supports: Phase = STATE mechanism, Quadratic = REASONING mechanism")
+            elif std_avg > inv_avg + 0.02:
+                print(f"\n  → STANDARD CURRICULUM WINS by {(std_avg - inv_avg)*100:.1f}%")
+                print(f"    Counter-evidence: Original hypothesis may be correct")
+            else:
+                print(f"\n  → CURRICULA ARE COMPARABLE (diff: {abs(inv_avg - std_avg)*100:.1f}%)")
+    else:
+        # Original output format without hybrid
+        print(f"\n--- Test Accuracy by Generalization Type (NO AVERAGING) ---")
+        print(f"{'Split':<20} {'Quadratic':>12} {'Phase':>12} {'Delta':>12}")
+        print("-" * 56)
+
+        for split in [SplitType.TEST_ROLES, SplitType.TEST_ENTITIES,
+                      SplitType.TEST_BOTH, SplitType.TEST_LONG, SplitType.TEST_PERSIST]:
+            q = results_quad[split.value]
+            p = results_phase[split.value]
+            delta = p - q
+            marker = "**" if delta > 0.1 else ""
+            print(f"{split.value:<20} {q*100:>11.1f}% {p*100:>11.1f}% {delta*100:>+11.1f}% {marker}")
 
     # Phase diagnostics
     print(f"\n--- Phase Health ---")
@@ -1518,6 +1828,8 @@ Examples:
     # Compute average test accuracy
     avg_test_q = sum(results_quad.values()) / len(results_quad)
     avg_test_p = sum(results_phase.values()) / len(results_phase)
+    avg_test_h = sum(results_hybrid.values()) / len(results_hybrid) if results_hybrid else None
+    avg_test_hs = sum(results_hybrid_std.values()) / len(results_hybrid_std) if results_hybrid_std else None
 
     # Criteria
     quad_memorizes = train_acc_q > 0.85
@@ -1531,7 +1843,42 @@ Examples:
     print(f"  [{'PASS' if phase_generalizes else 'FAIL'}] Phase outperforms quadratic by >15% ({(avg_test_p - avg_test_q)*100:.1f}%)")
     print(f"  [{'PASS' if phase_is_causal else 'FAIL'}] Phase ablation causes significant drops")
 
-    if quad_memorizes and quad_fails_generalization and phase_generalizes and phase_is_causal:
+    # NEW: Inverted curriculum hypothesis (v3)
+    if results_hybrid is not None:
+        hybrid_beats_both = avg_test_h > max(avg_test_q, avg_test_p) + 0.02
+        print(f"  [{'PASS' if hybrid_beats_both else 'FAIL'}] Hybrid (inverted) beats both pure models ({avg_test_h*100:.1f}% > {max(avg_test_q, avg_test_p)*100:.1f}%)")
+
+        if results_hybrid_std is not None:
+            inverted_beats_standard = avg_test_h > avg_test_hs + 0.02
+            print(f"  [{'PASS' if inverted_beats_standard else 'FAIL'}] Inverted curriculum beats standard ({avg_test_h*100:.1f}% > {avg_test_hs*100:.1f}%)")
+
+    # Verdict logic
+    if results_hybrid is not None and results_hybrid_std is not None:
+        # v3 verdict: Test the STATE vs REASONING hypothesis
+        if avg_test_h > max(avg_test_q, avg_test_p, avg_test_hs) + 0.02:
+            print("\n" + "=" * 70)
+            print("[INVERTED CURRICULUM HYPOTHESIS SUPPORTED]")
+            print("=" * 70)
+            print("The Hybrid model with INVERTED curriculum achieves best generalization:")
+            print(f"  - Phase early (state capture): {curriculum[0]*100:.0f}% → {curriculum[-1]*100:.0f}%")
+            print(f"  - Quadratic late (reasoning):  {(1-curriculum[0])*100:.0f}% → {(1-curriculum[-1])*100:.0f}%")
+            print(f"\nThis supports the hypothesis:")
+            print(f"  PhaseAttention = STATE mechanism (O(n) memory)")
+            print(f"  Quadratic      = REASONING mechanism (O(n²) attention)")
+            print(f"\nOptimal architecture: Phase-heavy early layers + Quadratic-heavy late layers")
+        elif avg_test_h > avg_test_hs + 0.02:
+            print("\n[INVERTED > STANDARD]")
+            print("Inverted curriculum outperforms standard, supporting Phase-as-state hypothesis.")
+            print("But hybrid doesn't beat pure models — consider tuning curriculum ratios.")
+        elif avg_test_hs > avg_test_h + 0.02:
+            print("\n[STANDARD > INVERTED]")
+            print("Standard curriculum outperforms inverted — counter to the hypothesis.")
+            print("Phase may be better for reasoning after all, or task requires different mixing.")
+        else:
+            print("\n[CURRICULA COMPARABLE]")
+            print("No significant difference between inverted and standard curriculum.")
+            print("Try more extreme ratios: --curriculum 0.95,0.8,0.2,0.05")
+    elif quad_memorizes and quad_fails_generalization and phase_generalizes and phase_is_causal:
         print("\n" + "=" * 70)
         print("[HYPOTHESIS STRONGLY SUPPORTED]")
         print("=" * 70)
@@ -1552,6 +1899,8 @@ Examples:
     else:
         print("\n[INCONCLUSIVE]")
         print("Results do not clearly support or refute the hypothesis.")
+        if results_hybrid is None:
+            print("\nTry: --compare-curricula to test Phase-as-state hypothesis")
 
     print("=" * 70)
 
