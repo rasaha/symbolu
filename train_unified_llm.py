@@ -14008,9 +14008,9 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     logits = outputs
 
-                # DEBUG: Check logits on first step
-                if global_step == 1 and accumulation_step == 0:
-                    print(f"\n[DEBUG LOGITS] Step 1 diagnostic:")
+                # DEBUG: Check logits on step 50 (matches first log output)
+                if global_step == 50 and accumulation_step == 0:
+                    print(f"\n[DEBUG LOGITS] Step 50 diagnostic:")
                     print(f"  logits shape: {logits.shape}")
                     print(f"  logits dtype: {logits.dtype}")
                     print(f"  logits min/max: {logits.min().item():.4f} / {logits.max().item():.4f}")
@@ -14023,6 +14023,13 @@ def train(config: UnifiedTrainingConfig):
                     # Sample some logits
                     sample_logits = logits[0, 0, :10].tolist()
                     print(f"  sample logits[0,0,:10]: {[f'{x:.2f}' for x in sample_logits]}")
+                    # Check softmax distribution
+                    probs = torch.softmax(logits[0, 0], dim=-1)
+                    print(f"  softmax max prob: {probs.max().item():.6f}")
+                    print(f"  softmax entropy: {-(probs * torch.log(probs + 1e-9)).sum().item():.4f}")
+                    # Compute loss manually to verify
+                    manual_loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), y.view(-1), ignore_index=-100)
+                    print(f"  manual CE loss: {manual_loss.item():.4f}")
 
                 loss, metrics = compute_phase_loss(logits, y, config)
 
