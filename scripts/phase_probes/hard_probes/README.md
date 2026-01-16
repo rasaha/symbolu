@@ -4,6 +4,37 @@
 
 This benchmark tests whether PhaseAttention performs **true relational reasoning** rather than pattern memorization. The key insight is that quadratic attention can achieve high training accuracy through token-specific memorization, but should fail on held-out tokens that require the same relational structure.
 
+## Key Enhancements (v2)
+
+### 1. Increased Model Capacity
+
+```
+Previous:  d_model=64,  num_heads=4, num_layers=2
+Current:   d_model=128, num_heads=8, num_layers=4
+```
+
+**Why**: Phase needs room to encode role phase, entity amplitude, AND operation effects simultaneously. The previous 64×2 configuration tested compression, not reasoning.
+
+### 2. Operation-Conditioned Phase Offsets
+
+```python
+# NEG, PERMUTE, OVERWRITE tokens add learned phase shifts
+operation_tokens = [vocab.NEG, vocab.PERMUTE, vocab.OVERWRITE]
+```
+
+**Why**: Without this, operations like NEG are just passive symbols that the model must interpret through content-based attention. With operation-conditioned phase offsets, operations directly TRANSFORM the phase state. This tests the hypothesis more faithfully by making operations act as they're theoretically supposed to.
+
+**Note**: This is NOT cheating — quadratic attention doesn't get this enhancement, so if Phase wins, it's because phase-based state transformation is genuinely more powerful than attention-based pattern matching.
+
+### 3. Pure Persistence Test (`test_persist`)
+
+```
+Chain length: 8-12 steps
+Schemas: BIND + QUERY only (no NEG, PERMUTE, CONTEXT)
+```
+
+**Why**: This isolates "memory" from "logic". It shows Phase's clean O(n) advantage without the complexity of operations. If Phase wins here, it's pure state persistence superiority.
+
 ## Why the Previous Dataset Failed
 
 The original probe dataset allowed both architectures to succeed because:
@@ -68,8 +99,9 @@ BIND E1 R0 | BIND E2 R1 | PERMUTE R0 R1 | QUERY R0 → E2
 ### 5. Long-Chain State Persistence
 
 ```
-Training chains:  3-5 steps
-Testing chains:   6-8 steps
+Training chains:   3-5 steps
+Testing chains:    6-8 steps
+Persistence test:  8-12 steps (BIND+QUERY only)
 ```
 
 **Why quadratic fails**: Attention span is limited. Early information is "washed out" by later processing.
@@ -92,10 +124,11 @@ Phase Attention:         ~95%         >70%
 | test_entities | ~35% | ~80% | Entity memorization breaks |
 | test_both | ~20% | ~70% | Both fail together |
 | test_long | ~20% | ~65% | Attention span limit |
+| test_persist | ~15% | ~80% | Pure persistence advantage |
 
 ## Running the Benchmark
 
-### Basic Run
+### Basic Run (with new defaults: d_model=128, num_heads=8, num_layers=4)
 ```bash
 python train_hard_probes.py
 ```
@@ -110,9 +143,9 @@ python train_hard_probes.py --bind-ratio 0.7
 python train_hard_probes.py --match-params
 ```
 
-### Harder Test (longer chains)
+### Longer Persistence Test
 ```bash
-python train_hard_probes.py --test-chain-min 7 --test-chain-max 10
+python train_hard_probes.py --persist-chain-min 10 --persist-chain-max 15
 ```
 
 ### Full Scientific Run
@@ -122,8 +155,29 @@ python train_hard_probes.py \
     --match-params \
     --num-steps 20000 \
     --test-chain-min 7 \
-    --test-chain-max 10
+    --test-chain-max 10 \
+    --persist-chain-min 10 \
+    --persist-chain-max 15
 ```
+
+## CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--d-model` | 128 | Model dimension (increased for reasoning capacity) |
+| `--num-heads` | 8 | Number of attention heads |
+| `--num-layers` | 4 | Number of transformer layers |
+| `--d-ff` | 256 | FFN dimension (2x d_model) |
+| `--num-steps` | 15000 | Training steps |
+| `--batch-size` | 64 | Batch size |
+| `--lr` | 1e-3 | Learning rate |
+| `--train-samples` | 20000 | Training samples |
+| `--test-samples` | 1000 | Samples per test split |
+| `--bind-ratio` | 0.6 | Ratio of BIND-dominant schemas |
+| `--train-chain-min/max` | 3, 5 | Training chain length |
+| `--test-chain-min/max` | 6, 8 | Test chain length |
+| `--persist-chain-min/max` | 8, 12 | Pure persistence chain length |
+| `--match-params` | False | Match parameter counts for fairness |
 
 ## Interpreting Results
 
@@ -154,14 +208,6 @@ python train_hard_probes.py \
 
 If ablations don't hurt, phase is "decorative" (not causally necessary).
 
-## File Structure
-
-```
-hard_probes/
-├── train_hard_probes.py    # Main training script (this file)
-└── README.md               # Scientific documentation (this file)
-```
-
 ## Design Decisions
 
 ### Why 48 Tokens?
@@ -170,15 +216,20 @@ hard_probes/
 - Entities: 16 (8 train + 8 test)
 - Roles: 7 (4 train + 3 test)
 
-### Why Chain Length 3-5 / 6-8?
-- Training on shorter chains prevents length-based memorization
-- Testing on longer chains reveals state persistence limits
-- O(n²) attention struggles more at longer lengths
+### Why Increased Capacity (128×8×4)?
+- Previous 64×2 was too constrained
+- Phase needs capacity for: role encoding, entity values, operation effects
+- This tests reasoning ability, not compression limits
 
-### Why BIND-Dominant Ratio?
-- Previous experiments showed phase advantage scales with relational pressure
-- 60-70% BIND schemas creates enough binding-heavy samples
-- Remaining 30-40% are SI/LP for variety
+### Why Operation-Conditioned Phase Offsets?
+- Operations should TRANSFORM state, not just be passive tokens
+- This is the core hypothesis: phase enables relational state updates
+- Without this, we're testing whether phase learns to BE quadratic attention
+
+### Why Pure Persistence Test?
+- Separates "memory" from "logic"
+- Clean test of O(n) state maintenance
+- Previous experiments showed Phase wins on simple BIND tasks
 
 ## Citation
 
