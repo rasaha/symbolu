@@ -526,16 +526,75 @@ def get_probe_by_id(probe_id: str) -> Optional[MinimalPairProbe | SingleProbe]:
 # PROMPT CONSTRUCTION UTILITIES
 # =============================================================================
 
-def construct_qa_prompt(text: str, question: str) -> str:
+# Few-shot examples to demonstrate expected single-word answer format
+FEW_SHOT_EXAMPLES = [
+    {
+        "context": "The cat sat on the mat. It was very comfortable.",
+        "question": "What was comfortable?",
+        "answer": "cat"
+    },
+    {
+        "context": "Bob gave the book to Sarah. She read it quickly.",
+        "question": "Who read the book?",
+        "answer": "Sarah"
+    },
+]
+
+
+def construct_qa_prompt(
+    text: str,
+    question: str,
+    few_shot: bool = True,
+    prompt_style: str = "standard"
+) -> str:
     """
     Construct a QA-style prompt for the model.
 
-    Format:
+    Args:
+        text: The context text
+        question: The question to ask
+        few_shot: Whether to include few-shot examples (recommended for base LLMs)
+        prompt_style: One of:
+            - "standard": Context/Question/Answer format
+            - "fill_blank": Fill-in-the-blank style (e.g., "The answer is ___")
+            - "direct": Simple question after text
+
+    Format (standard with few-shot):
+        Context: {example1.context}
+        Question: {example1.question}
+        Answer: {example1.answer}
+
         Context: {text}
         Question: {question}
         Answer:
     """
-    return f"Context: {text}\nQuestion: {question}\nAnswer:"
+    if prompt_style == "fill_blank":
+        # Fill-in-the-blank encourages single-word answers
+        return f"{text}\n\n{question} The answer is:"
+
+    elif prompt_style == "direct":
+        # Very direct format
+        return f"{text}\n\nQ: {question}\nA:"
+
+    else:  # standard
+        if few_shot:
+            # Build few-shot prompt
+            prompt_parts = []
+            for ex in FEW_SHOT_EXAMPLES:
+                prompt_parts.append(
+                    f"Context: {ex['context']}\n"
+                    f"Question: {ex['question']}\n"
+                    f"Answer: {ex['answer']}"
+                )
+            # Add the actual question
+            prompt_parts.append(
+                f"Context: {text}\n"
+                f"Question: {question}\n"
+                f"Answer:"
+            )
+            return "\n\n".join(prompt_parts)
+        else:
+            return f"Context: {text}\nQuestion: {question}\nAnswer:"
 
 
 def construct_completion_prompt(text: str, continuation_start: str = "") -> str:

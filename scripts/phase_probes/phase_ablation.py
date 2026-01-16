@@ -441,8 +441,13 @@ def run_ablated_inference(
                 with phase_ablation_context(model, mode, scramble_seed=scramble_seed):
                     outputs = model(input_ids)
 
-            # Extract logits
-            if isinstance(outputs, dict):
+            # Extract logits - handle various model output formats
+            logits = None
+
+            # HuggingFace models return ModelOutput with .logits attribute
+            if hasattr(outputs, 'logits'):
+                logits = outputs.logits
+            elif isinstance(outputs, dict):
                 logits = outputs.get('logits', outputs.get('output', None))
                 if logits is None:
                     # Try first tensor value
@@ -452,8 +457,11 @@ def run_ablated_inference(
                             break
             elif isinstance(outputs, tuple):
                 logits = outputs[0]
-            else:
+            elif isinstance(outputs, torch.Tensor):
                 logits = outputs
+
+            if logits is None:
+                raise ValueError(f"Could not extract logits from model output: {type(outputs)}")
 
             # Get health metrics
             health = {}

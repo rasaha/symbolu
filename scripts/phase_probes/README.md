@@ -28,14 +28,21 @@ Before asking whether phase can learn emotional propensities or complex semantic
 ## Usage
 
 ```bash
-# Run full probe suite
+# Run full probe suite with PhaseAttention checkpoint
 python phase_probe_runner.py --checkpoint checkpoints/best.pt
+
+# Run with a pre-trained HuggingFace model (no phase, baseline comparison)
+# This tests the probe infrastructure and establishes a baseline
+python phase_probe_runner.py --pretrained gpt2
+python phase_probe_runner.py --pretrained gpt2-medium
 
 # Run with verbose output (shows all ablation modes)
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --verbose
+python phase_probe_runner.py --pretrained gpt2 --verbose
 
 # Run specific probe
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --probe RB1
+python phase_probe_runner.py --pretrained gpt2 --probe RB1
 
 # Run specific category
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --category role_binding
@@ -43,6 +50,11 @@ python phase_probe_runner.py --checkpoint checkpoints/best.pt --category role_bi
 # Save results to JSON
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --output results.json
 ```
+
+**Note**: When using `--pretrained`, phase metrics (R_k, R_q, etc.) will be N/A since standard attention models don't have phase components. The ablation modes will also have no effect (no phase to ablate). This is useful for:
+1. Testing that the probe infrastructure works correctly
+2. Establishing a baseline for what standard attention achieves on these probes
+3. Later comparing PhaseAttention results against standard attention
 
 ## Probe Categories (25 Total)
 

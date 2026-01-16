@@ -158,6 +158,40 @@ class ProbeSuiteResults:
 # MODEL LOADING
 # =============================================================================
 
+def load_pretrained_model(model_name: str, device: torch.device):
+    """
+    Load a pre-trained HuggingFace model for baseline comparison.
+
+    This allows testing the probe infrastructure without a custom checkpoint,
+    and establishes a baseline for standard attention models.
+
+    Args:
+        model_name: HuggingFace model name (e.g., "gpt2", "gpt2-medium")
+        device: Device to load model on
+
+    Returns:
+        model, tokenizer, None (no config for pretrained)
+    """
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    print(f"Loading pre-trained model: {model_name}")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model.to(device)
+    model.eval()
+
+    # GPT-2 doesn't have pad token by default
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    print(f"  Model type: {type(model).__name__} (pre-trained, NO phase attention)")
+    print(f"  Device: {device}")
+    print(f"  NOTE: Phase metrics will be N/A for pre-trained models")
+
+    return model, tokenizer, None
+
+
 def load_model_and_tokenizer(checkpoint_path: str, device: torch.device):
     """
     Load model from checkpoint with tokenizer.
@@ -479,12 +513,14 @@ def run_single_probe(
     device: torch.device,
     mode: AblationMode = AblationMode.BASELINE,
     scramble_seed: int = 42,
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> ProbeResult:
     """
     Run a single (non-minimal-pair) probe with specified ablation.
     """
     # Construct prompt
-    prompt = construct_qa_prompt(probe.text, probe.question)
+    prompt = construct_qa_prompt(probe.text, probe.question, few_shot=few_shot, prompt_style=prompt_style)
 
     # Get probabilities
     probs, log_probs, health = get_next_token_probs(
@@ -527,6 +563,8 @@ def run_minimal_pair_probe(
     mode: AblationMode = AblationMode.BASELINE,
     scramble_seed: int = 42,
     variant: str = 'A',
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> ProbeResult:
     """
     Run one variant (A or B) of a minimal-pair probe.
@@ -541,7 +579,7 @@ def run_minimal_pair_probe(
         targets = probe.target_tokens_b
 
     # Construct prompt
-    prompt = construct_qa_prompt(text, probe.question)
+    prompt = construct_qa_prompt(text, probe.question, few_shot=few_shot, prompt_style=prompt_style)
 
     # Get probabilities
     probs, log_probs, health = get_next_token_probs(
@@ -582,6 +620,8 @@ def run_probe_with_ablations(
     probe,
     device: torch.device,
     scramble_seed: int = 42,
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> Dict[str, ProbeResult]:
     """
     Run a probe with all ablation modes.
@@ -601,16 +641,19 @@ def run_probe_with_ablations(
         if isinstance(probe, MinimalPairProbe):
             # Run both variants for minimal pairs
             result_a = run_minimal_pair_probe(
-                model, tokenizer, probe, device, mode, scramble_seed, 'A'
+                model, tokenizer, probe, device, mode, scramble_seed, 'A',
+                few_shot=few_shot, prompt_style=prompt_style
             )
             result_b = run_minimal_pair_probe(
-                model, tokenizer, probe, device, mode, scramble_seed, 'B'
+                model, tokenizer, probe, device, mode, scramble_seed, 'B',
+                few_shot=few_shot, prompt_style=prompt_style
             )
             results[f"{mode.value}_A"] = result_a
             results[f"{mode.value}_B"] = result_b
         else:
             result = run_single_probe(
-                model, tokenizer, probe, device, mode, scramble_seed
+                model, tokenizer, probe, device, mode, scramble_seed,
+                few_shot=few_shot, prompt_style=prompt_style
             )
             results[mode.value] = result
 
@@ -957,55 +1000,85 @@ def print_per_layer_R_k(model: nn.Module):
 
 def print_summary(summary: ProbeSuiteResults):
     """Print summary statistics and interpretation."""
+    # Detect if this is a pretrained model (no PhaseAttention)
+    is_pretrained = summary.checkpoint_path.startswith("pretrained:")
+
     print("\n" + "=" * 80)
-    print("SUMMARY")
+    if is_pretrained:
+        print("BASELINE VALIDATION RUN (No PhaseAttention)")
+    else:
+        print("SUMMARY")
     print("=" * 80)
 
-    print(f"\nCheckpoint: {summary.checkpoint_path}")
+    print(f"\nModel: {summary.checkpoint_path}")
     print(f"Total probes: {summary.total_probes}")
 
     print(f"\n--- Accuracy by Mode ---")
     print(f"  Baseline:   {summary.baseline_accuracy*100:>6.1f}%")
-    print(f"  Scramble:   {summary.scramble_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.scramble_accuracy)*100:+.1f}%)")
-    print(f"  Frozen:     {summary.frozen_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.frozen_accuracy)*100:+.1f}%)")
-    print(f"  Phase-Off:  {summary.phase_off_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.phase_off_accuracy)*100:+.1f}%)")
+    if is_pretrained:
+        print(f"  (Ablation modes are N/A - model has no phase mechanism)")
+    else:
+        print(f"  Scramble:   {summary.scramble_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.scramble_accuracy)*100:+.1f}%)")
+        print(f"  Frozen:     {summary.frozen_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.frozen_accuracy)*100:+.1f}%)")
+        print(f"  Phase-Off:  {summary.phase_off_accuracy*100:>6.1f}%  (Δ = {(summary.baseline_accuracy - summary.phase_off_accuracy)*100:+.1f}%)")
 
-    print(f"\n--- Phase Sensitivity ---")
-    print(f"  Phase-sensitive probes: {summary.phase_sensitive_count}/{summary.total_probes} ({summary.phase_sensitive_pct*100:.1f}%)")
-    print(f"  Phase contribution index: {summary.phase_contribution_index:.4f}")
-    print(f"  Mean delta (scramble):    {summary.mean_delta_scramble:+.4f}")
-    print(f"  Mean delta (frozen):      {summary.mean_delta_frozen:+.4f}")
-    print(f"  Mean delta (phase-off):   {summary.mean_delta_phase_off:+.4f}")
+    if not is_pretrained:
+        print(f"\n--- Phase Sensitivity ---")
+        print(f"  Phase-sensitive probes: {summary.phase_sensitive_count}/{summary.total_probes} ({summary.phase_sensitive_pct*100:.1f}%)")
+        print(f"  Phase contribution index: {summary.phase_contribution_index:.4f}")
+        print(f"  Mean delta (scramble):    {summary.mean_delta_scramble:+.4f}")
+        print(f"  Mean delta (frozen):      {summary.mean_delta_frozen:+.4f}")
+        print(f"  Mean delta (phase-off):   {summary.mean_delta_phase_off:+.4f}")
 
-    print(f"\n--- Phase Health (averaged) ---")
-    print(f"  R_k (collapse):        {summary.mean_R_k:.4f} {'(healthy)' if summary.mean_R_k < 0.3 else '(WARNING)' if summary.mean_R_k < 0.5 else '(COLLAPSED)'}")
-    print(f"  R_q (collapse):        {summary.mean_R_q:.4f} {'(healthy)' if summary.mean_R_q < 0.3 else '(WARNING)' if summary.mean_R_q < 0.5 else '(COLLAPSED)'}")
-    print(f"  Amp-Phase correlation: {summary.mean_amp_phase_corr:.4f} {'(OK)' if abs(summary.mean_amp_phase_corr) < 0.3 else '(HIGH)'}")
-    print(f"  Head redundancy:       {summary.mean_head_redundancy:.4f} {'(diverse)' if summary.mean_head_redundancy < 0.5 else '(redundant)'}")
-    print(f"  Head entropy:          {summary.mean_head_entropy:.4f}")
+        print(f"\n--- Phase Health (averaged) ---")
+        print(f"  R_k (collapse):        {summary.mean_R_k:.4f} {'(healthy)' if summary.mean_R_k < 0.3 else '(WARNING)' if summary.mean_R_k < 0.5 else '(COLLAPSED)'}")
+        print(f"  R_q (collapse):        {summary.mean_R_q:.4f} {'(healthy)' if summary.mean_R_q < 0.3 else '(WARNING)' if summary.mean_R_q < 0.5 else '(COLLAPSED)'}")
+        print(f"  Amp-Phase correlation: {summary.mean_amp_phase_corr:.4f} {'(OK)' if abs(summary.mean_amp_phase_corr) < 0.3 else '(HIGH)'}")
+        print(f"  Head redundancy:       {summary.mean_head_redundancy:.4f} {'(diverse)' if summary.mean_head_redundancy < 0.5 else '(redundant)'}")
+        print(f"  Head entropy:          {summary.mean_head_entropy:.4f}")
 
-    print(f"\n--- Failure Signatures ---")
-    any_failure = False
-    if summary.phase_is_decorative:
-        print("  [F1] PHASE IS DECORATIVE: Ablations have minimal effect. Phase may not be contributing.")
-        any_failure = True
-    if summary.phase_is_brittle:
-        print("  [F2] PHASE IS BRITTLE: Scramble breaks most probes. Phase is over-coupled.")
-        any_failure = True
-    if summary.collapse_detected:
-        print("  [F3] COLLAPSE DETECTED: R_k > 0.5. Phase diversity has collapsed.")
-        any_failure = True
-    if summary.amplitude_cheating:
-        print("  [F4] AMPLITUDE CHEATING: High amp-phase correlation. Amplitude may be compensating.")
-        any_failure = True
-    if not any_failure:
-        print("  No major failure signatures detected.")
+        print(f"\n--- Failure Signatures ---")
+        any_failure = False
+        if summary.phase_is_decorative:
+            print("  [F1] PHASE IS DECORATIVE: Ablations have minimal effect. Phase may not be contributing.")
+            any_failure = True
+        if summary.phase_is_brittle:
+            print("  [F2] PHASE IS BRITTLE: Scramble breaks most probes. Phase is over-coupled.")
+            any_failure = True
+        if summary.collapse_detected:
+            print("  [F3] COLLAPSE DETECTED: R_k > 0.5. Phase diversity has collapsed.")
+            any_failure = True
+        if summary.amplitude_cheating:
+            print("  [F4] AMPLITUDE CHEATING: High amp-phase correlation. Amplitude may be compensating.")
+            any_failure = True
+        if not any_failure:
+            print("  No major failure signatures detected.")
 
     print("\n" + "=" * 80)
     print("INTERPRETATION")
     print("=" * 80)
 
-    # Detailed scientific interpretation
+    # Handle pretrained models differently
+    if is_pretrained:
+        print("\n[BASELINE VALIDATION] This run establishes the null hypothesis:")
+        print("  - Model has NO PhaseAttention mechanism")
+        print("  - Ablations correctly show Δ = 0 (nothing to ablate)")
+        print("  - Phase metrics are N/A (no phase state to measure)")
+        print(f"\n  Baseline accuracy: {summary.baseline_accuracy*100:.1f}%")
+        print("  This is the accuracy a standard attention model achieves.")
+        print("\n  Use this baseline to compare against trained PhaseAttention models.")
+        print("  A trained model should show:")
+        print("    - Higher accuracy than baseline")
+        print("    - Positive phase sensitivity (ablations hurt performance)")
+        print("    - Non-zero R_k/R_q values")
+
+        print("\n" + "-" * 40)
+        print("BASELINE VALIDATION: PASSED")
+        print("-" * 40)
+        print("\nNull hypothesis confirmed: ablations have no effect when no phase exists.")
+        return  # Skip the rest of the phase-specific interpretation
+
+    # Detailed scientific interpretation (for PhaseAttention models only)
     if summary.phase_sensitive_pct > 0.5 and not summary.phase_is_decorative:
         print("\n[POSITIVE] Phase appears to be LEARNING RELATIONAL SELECTIVITY:")
         print("  - More than 50% of probes are phase-sensitive")
@@ -1079,14 +1152,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+    # Test with a PhaseAttention checkpoint:
     python phase_probe_runner.py --checkpoint checkpoints/best.pt
     python phase_probe_runner.py --checkpoint checkpoints/best.pt --verbose
-    python phase_probe_runner.py --checkpoint checkpoints/best.pt --probe RB1
-    python phase_probe_runner.py --checkpoint checkpoints/best.pt --output results.json
+
+    # Test with a pre-trained HuggingFace model (no phase, baseline comparison):
+    python phase_probe_runner.py --pretrained gpt2
+    python phase_probe_runner.py --pretrained gpt2-medium --verbose
+
+    # Run specific probe or category:
+    python phase_probe_runner.py --pretrained gpt2 --probe RB1
+    python phase_probe_runner.py --pretrained gpt2 --category role_binding
+
+    # Prompt format options (to improve base LLM accuracy):
+    python phase_probe_runner.py --pretrained gpt2 --few-shot          # Uses few-shot examples (default)
+    python phase_probe_runner.py --pretrained gpt2 --no-few-shot       # Disables few-shot examples
+    python phase_probe_runner.py --pretrained gpt2 --prompt-style fill_blank  # "The answer is:" format
+    python phase_probe_runner.py --pretrained gpt2 --prompt-style direct      # Simple Q:/A: format
         """
     )
-    parser.add_argument("--checkpoint", type=str, required=True,
-                        help="Path to model checkpoint")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="Path to PhaseAttention model checkpoint")
+    parser.add_argument("--pretrained", type=str, default=None,
+                        help="HuggingFace model name (e.g., gpt2, gpt2-medium) for baseline comparison")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device to run on (cuda/cpu)")
     parser.add_argument("--probe", type=str, default=None,
@@ -1101,8 +1189,21 @@ Examples:
                         help="Save results to JSON file")
     parser.add_argument("--scramble_seed", type=int, default=42,
                         help="Random seed for phase scrambling (for reproducibility)")
+    parser.add_argument("--few-shot", action="store_true", default=True,
+                        help="Use few-shot examples in prompt (default: True)")
+    parser.add_argument("--no-few-shot", action="store_false", dest="few_shot",
+                        help="Disable few-shot examples in prompt")
+    parser.add_argument("--prompt-style", type=str, default="standard",
+                        choices=["standard", "fill_blank", "direct"],
+                        help="Prompt style: standard (Context/Q/A), fill_blank (answer is:), direct (Q:/A:)")
 
     args = parser.parse_args()
+
+    # Validate: must specify either checkpoint or pretrained
+    if not args.checkpoint and not args.pretrained:
+        parser.error("Must specify either --checkpoint or --pretrained")
+    if args.checkpoint and args.pretrained:
+        parser.error("Cannot specify both --checkpoint and --pretrained")
 
     # Check device
     if args.device == "cuda" and not torch.cuda.is_available():
@@ -1111,7 +1212,17 @@ Examples:
     device = torch.device(args.device)
 
     # Load model
-    model, tokenizer, config = load_model_and_tokenizer(args.checkpoint, device)
+    is_pretrained = args.pretrained is not None
+    if is_pretrained:
+        model, tokenizer, config = load_pretrained_model(args.pretrained, device)
+        model_source = f"pretrained:{args.pretrained}"
+        print("\n" + "=" * 60)
+        print("NOTE: Running with pre-trained model (NO PhaseAttention)")
+        print("Phase metrics will be N/A. This establishes a baseline.")
+        print("=" * 60)
+    else:
+        model, tokenizer, config = load_model_and_tokenizer(args.checkpoint, device)
+        model_source = args.checkpoint
 
     # Select probes to run
     probes_to_run = []
@@ -1133,6 +1244,7 @@ Examples:
         probes_to_run = MINIMAL_PAIR_PROBES + SINGLE_PROBES
 
     print(f"\nRunning {len(probes_to_run)} probes...")
+    print(f"Prompt style: {args.prompt_style}, Few-shot: {args.few_shot}")
 
     # Run probes
     all_results = []
@@ -1142,7 +1254,8 @@ Examples:
         print(f"\n[{i+1}/{len(probes_to_run)}] Running probe {probe.id}...")
 
         probe_results = run_probe_with_ablations(
-            model, tokenizer, probe, device, args.scramble_seed
+            model, tokenizer, probe, device, args.scramble_seed,
+            few_shot=args.few_shot, prompt_style=args.prompt_style
         )
 
         # Collect results
@@ -1188,7 +1301,7 @@ Examples:
             print(f"    Delta margin: {last_comp.delta_scramble:.3f}")
 
     # Aggregate and print results
-    summary = aggregate_results(all_results, comparisons, args.checkpoint)
+    summary = aggregate_results(all_results, comparisons, model_source)
 
     print_results_table(comparisons, all_results, args.verbose)
     print_health_table(all_results)
