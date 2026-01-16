@@ -14007,6 +14007,23 @@ def train(config: UnifiedTrainingConfig):
                     logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
                 else:
                     logits = outputs
+
+                # DEBUG: Check logits on first step
+                if global_step == 1 and accumulation_step == 0:
+                    print(f"\n[DEBUG LOGITS] Step 1 diagnostic:")
+                    print(f"  logits shape: {logits.shape}")
+                    print(f"  logits dtype: {logits.dtype}")
+                    print(f"  logits min/max: {logits.min().item():.4f} / {logits.max().item():.4f}")
+                    print(f"  logits mean/std: {logits.mean().item():.4f} / {logits.std().item():.4f}")
+                    print(f"  logits has NaN: {torch.isnan(logits).any().item()}")
+                    print(f"  logits has Inf: {torch.isinf(logits).any().item()}")
+                    # Check expected loss for uniform logits
+                    expected_loss = math.log(logits.shape[-1])
+                    print(f"  expected random loss: {expected_loss:.4f}")
+                    # Sample some logits
+                    sample_logits = logits[0, 0, :10].tolist()
+                    print(f"  sample logits[0,0,:10]: {[f'{x:.2f}' for x in sample_logits]}")
+
                 loss, metrics = compute_phase_loss(logits, y, config)
 
                 # Add decorrelation loss if enabled
