@@ -208,9 +208,8 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device):
     config = UnifiedTrainingConfig(**config_dict)
 
     # Create model
-    model = create_model(config)
+    model = create_model(config, device)
     model.load_state_dict(checkpoint['model'], strict=False)
-    model.to(device)
     model.eval()
 
     # Get tokenizer
