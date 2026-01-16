@@ -2230,7 +2230,10 @@ class LocalWindowAttention(nn.Module):
         """
         B, N, D = x.shape
         H, D_h = self.num_heads, self.head_dim
-        W = min(self.window_size, N)
+        # V10.1.1: Dynamic window = min(max_window, seq_len // 2)
+        # This ensures local attention stays local for long sequences
+        # while covering half the sequence for short ones
+        W = min(self.window_size, max(1, N // 2))
 
         x_norm = self.norm(x)
 
@@ -2292,7 +2295,7 @@ class BindingCacheBlock(nn.Module):
         bounded_phase: bool = True,
         top_k: int = 64,
         use_cache: bool = True,
-        local_window_size: int = 128,  # V10.1: Local attention window
+        local_window_size: int = 256,  # V10.1.1: Max local window (actual = min(this, seq_len//2))
     ):
         super().__init__()
 
