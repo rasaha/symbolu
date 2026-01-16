@@ -108,6 +108,7 @@ from symbolu.phase_transformer import (
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
     OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
+    BindingCacheTransformer,  # V10.0: Protected Phase + Top-K Query (validated by probes)
     # V9.8.0: 32D Sovereign State (replaces 124D CognitiveState)
     SOVEREIGN_STATE_DIM,
     BHAVA_NAMES,
@@ -9019,6 +9020,10 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = False  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # V10.0: Binding Cache architecture (validated by diagnostic probes)
+    binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
+    no_binding_cache: bool = False  # Disable cache (use full attention)
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256
@@ -10312,6 +10317,40 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.zero_mean_cosine:
             print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
+
+    elif config.model_type == "binding_cache":
+        # V10.0: Binding Cache architecture (validated by diagnostic probes)
+        # Protected Phase + Top-K Query - prevents Phase decorativeness
+        # Reference: train_hard_probes.py --protected-phase showed -50% ablation drop
+        tie_emb = not config.untie_embeddings
+
+        # Determine if cache should be used
+        use_cache = not config.no_binding_cache
+        top_k = config.binding_cache_top_k if use_cache else 0
+
+        model = BindingCacheTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,
+            bounded_phase=True,  # Always enabled (mandatory from probes)
+            top_k=top_k,
+            use_cache=use_cache,
+            tie_embeddings=tie_emb,
+        )
+        print(f"\n  [Binding Cache V10.0] Protected Phase + Top-K Query")
+        print(f"    Architecture: Phase (O(n) cumsum) → Quad (O(nk) query)")
+        print(f"    Validated by diagnostic probes: -50% Phase ablation drop")
+        print(f"    Top-K cache size: {top_k} (use_cache: {use_cache})")
+        print(f"    Bounded Phase: ENABLED (mandatory)")
+        print(f"    Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -17067,8 +17106,9 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid"],
-                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache"],
+                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
+                            "binding_cache = Protected Phase + Top-K Query [V10.0])")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -17242,6 +17282,15 @@ def main():
     parser.add_argument("--zero_mean_cosine", action="store_true",
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
+
+    # V10.0: Binding Cache architecture (validated by diagnostic probes)
+    parser.add_argument("--binding_cache_top_k", type=int, default=64,
+                       help="Top-K cache size per head for binding_cache model. "
+                            "Reduces O(n²) attention to O(nk). Use 0 for full attention.")
+    parser.add_argument("--binding_cache_use_cache", action="store_true", default=True,
+                       help="Use Top-K cache in binding_cache model (default: True)")
+    parser.add_argument("--no_binding_cache", action="store_true",
+                       help="Disable Top-K cache in binding_cache model (use full O(n²) attention)")
 
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
