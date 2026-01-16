@@ -208,9 +208,8 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device):
     config = UnifiedTrainingConfig(**config_dict)
 
     # Create model
-    model = create_model(config)
+    model = create_model(config, device)
     model.load_state_dict(checkpoint['model'], strict=False)
-    model.to(device)
     model.eval()
 
     # Get tokenizer
@@ -1142,6 +1141,8 @@ def print_summary(summary: ProbeSuiteResults):
             print("  - Phase diversity has collapsed")
 
 
+
+
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
@@ -1199,7 +1200,7 @@ Examples:
 
     args = parser.parse_args()
 
-    # Validate: must specify either checkpoint or pretrained
+    # Validate arguments
     if not args.checkpoint and not args.pretrained:
         parser.error("Must specify either --checkpoint or --pretrained")
     if args.checkpoint and args.pretrained:
