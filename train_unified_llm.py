@@ -9025,6 +9025,12 @@ class UnifiedTrainingConfig:
     binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
     no_binding_cache: bool = False  # Disable cache (use full attention)
 
+    # V10.0: Binding Annotation (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+    use_binding_annotator: bool = True  # Enable OntologicalBindingAnnotator
+    use_csr_annotation: bool = True  # CSR affects binding salience (phonological grounding)
+    use_kosha_annotation: bool = True  # Kosha affects binding salience (consciousness sheaths)
+    use_srk_annotation: bool = True  # SRK affects binding salience (Sovereign State)
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256
@@ -10377,6 +10383,11 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
             tie_embeddings=tie_emb,
+            # V10.0: Binding Annotation (CSR/Kosha/SRK as SELECTORS, not modifiers)
+            use_binding_annotator=config.use_binding_annotator,
+            use_csr_annotation=config.use_csr_annotation,
+            use_kosha_annotation=config.use_kosha_annotation,
+            use_srk_annotation=config.use_srk_annotation,
         )
         print(f"\n  [Ontological Binding Cache V10.0] AGI Architecture")
         print(f"    Combines: Protected Phase + Top-K Query + 32D Sovereign State")
@@ -10390,6 +10401,15 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.learned_decay:
             print(f"    Learned Decay: ENABLED (per-head attention span)")
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
+        # V10.0: Binding Annotation status
+        if config.use_binding_annotator:
+            print(f"    Binding Annotator: ENABLED (semantics → Top-K selection)")
+            print(f"      CSR: {'ON' if config.use_csr_annotation else 'OFF'} | "
+                  f"Kosha: {'ON' if config.use_kosha_annotation else 'OFF'} | "
+                  f"SRK: {'ON' if config.use_srk_annotation else 'OFF'}")
+            print(f"      Clean separation: Attention=physics, Annotator=semantics")
+        else:
+            print(f"    Binding Annotator: DISABLED (pure attention, no semantic selection)")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -17332,6 +17352,25 @@ def main():
     parser.add_argument("--no_binding_cache", action="store_true",
                        help="Disable Top-K cache in binding_cache model (use full O(n²) attention)")
 
+    # V10.0: Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+    # Clean separation: Attention = physics, Annotator = semantics
+    parser.add_argument("--use_binding_annotator", action="store_true", default=True,
+                       help="Enable OntologicalBindingAnnotator for binding salience (Top-K selection bias)")
+    parser.add_argument("--no_binding_annotator", action="store_true",
+                       help="Disable OntologicalBindingAnnotator (pure attention, no semantic selection)")
+    parser.add_argument("--use_csr_annotation", action="store_true", default=True,
+                       help="Enable CSR (phonological grounding) in binding annotation")
+    parser.add_argument("--no_csr_annotation", action="store_true",
+                       help="Disable CSR in binding annotation")
+    parser.add_argument("--use_kosha_annotation", action="store_true", default=True,
+                       help="Enable Kosha (consciousness sheaths) in binding annotation")
+    parser.add_argument("--no_kosha_annotation", action="store_true",
+                       help="Disable Kosha in binding annotation")
+    parser.add_argument("--use_srk_annotation", action="store_true", default=True,
+                       help="Enable SRK (Sovereign State) in binding annotation")
+    parser.add_argument("--no_srk_annotation", action="store_true",
+                       help="Disable SRK in binding annotation")
+
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
                        help="Sovereign State dimension for ontological_hybrid model "
@@ -18250,6 +18289,14 @@ def main():
         zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
+        # V10.0: Binding Cache options
+        binding_cache_top_k=args.binding_cache_top_k,
+        no_binding_cache=args.no_binding_cache,
+        # V10.0: Binding Annotation (CSR/Kosha/SRK as selectors, not modifiers)
+        use_binding_annotator=args.use_binding_annotator and not args.no_binding_annotator,
+        use_csr_annotation=args.use_csr_annotation and not args.no_csr_annotation,
+        use_kosha_annotation=args.use_kosha_annotation and not args.no_kosha_annotation,
+        use_srk_annotation=args.use_srk_annotation and not args.no_srk_annotation,
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,

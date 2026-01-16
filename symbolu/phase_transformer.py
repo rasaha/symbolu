@@ -1744,6 +1744,113 @@ class PhaseAttentionLayer(nn.Module):
 # =============================================================================
 
 
+class OntologicalBindingAnnotator(nn.Module):
+    """
+    Ontological Binding Annotator - computes binding salience for Top-K selection.
+
+    CSR/Kosha/SRK act as BINDING SELECTORS, not live attention modifiers.
+    They compute salience scores that bias WHICH bindings get retrieved,
+    without modifying the core attention computation.
+
+    Design Principle (ChatGPT recommendation):
+        - CSR/Kosha/Ontological should NOT be continuous forces in attention
+        - They are best used as binding selectors and annotators
+        - Salience is computed ONCE at encoding, not token-by-token at inference
+
+    Usage:
+        annotator = OntologicalBindingAnnotator(embed_dim, state_dim)
+        salience = annotator(hidden_states, sovereign_state)  # [B, N]
+        # Pass salience to BindingCacheQuadQuery for Top-K biasing
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        state_dim: int = 32,  # 32D Sovereign State
+        num_heads: int = 12,
+        use_csr: bool = True,
+        use_kosha: bool = True,
+        use_srk: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.state_dim = state_dim
+        self.use_csr = use_csr
+        self.use_kosha = use_kosha
+        self.use_srk = use_srk
+
+        # Salience projection from hidden states
+        # Projects hidden → per-position salience score
+        self.hidden_salience = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim // 4),
+            nn.GELU(),
+            nn.Linear(embed_dim // 4, 1),
+        )
+
+        # Ontological state influence on salience
+        # If SRK enabled, state modulates what's "important"
+        if use_srk and state_dim > 0:
+            self.state_salience = nn.Sequential(
+                nn.Linear(state_dim, state_dim),
+                nn.GELU(),
+                nn.Linear(state_dim, num_heads),
+            )
+        else:
+            self.state_salience = None
+
+        # Kosha sheath weights (5 sheaths affect salience differently)
+        # [Material, Vital, Mental, Intellectual, Blissful]
+        if use_kosha:
+            self.kosha_weights = nn.Parameter(torch.ones(5))
+        else:
+            self.kosha_weights = None
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        sovereign_state: Optional[torch.Tensor] = None,  # [B, 32]
+        kosha_activations: Optional[torch.Tensor] = None,  # [B, 5]
+        csr_mask: Optional[torch.Tensor] = None,  # [B, N] binary mask
+    ) -> torch.Tensor:
+        """
+        Compute binding salience scores.
+
+        Args:
+            hidden_states: [B, N, D] - hidden representations
+            sovereign_state: [B, 32] - 32D Sovereign State (optional)
+            kosha_activations: [B, 5] - Kosha sheath activations (optional)
+            csr_mask: [B, N] - CSR content word mask (optional)
+
+        Returns:
+            salience: [B, N] - per-position binding salience (higher = more important)
+        """
+        B, N, D = hidden_states.shape
+
+        # Base salience from hidden states
+        salience = self.hidden_salience(hidden_states).squeeze(-1)  # [B, N]
+
+        # Ontological state modulation (SRK)
+        if self.state_salience is not None and sovereign_state is not None:
+            # State affects what's considered "important" globally
+            state_bias = self.state_salience(sovereign_state)  # [B, num_heads]
+            # Average across heads for per-position bias
+            state_bias_scalar = state_bias.mean(dim=-1, keepdim=True)  # [B, 1]
+            salience = salience + state_bias_scalar
+
+        # Kosha sheath modulation
+        if self.kosha_weights is not None and kosha_activations is not None:
+            # Weighted kosha influence
+            kosha_influence = (kosha_activations * self.kosha_weights).sum(dim=-1, keepdim=True)  # [B, 1]
+            salience = salience * (1 + 0.1 * kosha_influence)
+
+        # CSR content word boost
+        if self.use_csr and csr_mask is not None:
+            # Boost salience for content words (phonologically grounded)
+            salience = salience + 0.5 * csr_mask.float()
+
+        return salience
+
+
 class BindingCachePhaseState(nn.Module):
     """
     Phase attention that outputs ONLY a memory state (no attention output).
@@ -1974,6 +2081,7 @@ class BindingCacheQuadQuery(nn.Module):
         x: torch.Tensor,
         memory_state: torch.Tensor,
         causal_mask: bool = True,
+        binding_salience: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Query Phase's memory state.
@@ -1982,6 +2090,10 @@ class BindingCacheQuadQuery(nn.Module):
             x: Input tensor [B, N, D] - source for queries
             memory_state: [B, N, D] - from BindingCachePhaseState
             causal_mask: Apply causal masking
+            binding_salience: Optional [B, N] - per-position salience scores from
+                             OntologicalBindingAnnotator. Biases Top-K selection
+                             WITHOUT modifying core attention math.
+                             Higher salience = more likely to be in Top-K cache.
 
         Returns:
             output: [B, N, D] - attention-weighted retrieval from memory
@@ -2014,15 +2126,31 @@ class BindingCacheQuadQuery(nn.Module):
         if self.use_cache and self.top_k < N:
             # For each query position, keep only top-k keys
             # This reduces O(n²) to O(nk)
-            top_scores, top_indices = scores.topk(
+
+            # BINDING SALIENCE: Bias Top-K selection WITHOUT modifying attention math
+            # Salience affects WHICH positions are selected, not HOW they're weighted
+            if binding_salience is not None:
+                # binding_salience: [B, N] → [B, 1, 1, N] for broadcasting
+                salience_bias = binding_salience.unsqueeze(1).unsqueeze(1)  # [B, 1, 1, N]
+                # Use salience-biased scores for TOP-K SELECTION ONLY
+                selection_scores = scores + salience_bias
+            else:
+                selection_scores = scores
+
+            # Select Top-K using (possibly biased) selection scores
+            _, top_indices = selection_scores.topk(
                 min(self.top_k, N), dim=-1, largest=True
             )  # [B, H, N, k]
+
+            # IMPORTANT: Gather ORIGINAL scores for attention weights (pure physics)
+            # This ensures attention math is unmodified - salience only affects selection
+            top_scores = torch.gather(scores, -1, top_indices)  # [B, H, N, k]
 
             # Track cache hit rate (what fraction of sequence we attend to)
             with torch.no_grad():
                 self._cache_hit_rate = min(self.top_k, N) / N
 
-            # Softmax over top-k only
+            # Softmax over top-k only (using ORIGINAL scores, not biased)
             attn_weights = F.softmax(top_scores, dim=-1)  # [B, H, N, k]
             attn_weights = self.dropout(attn_weights)
 
@@ -2117,6 +2245,7 @@ class BindingCacheBlock(nn.Module):
         self,
         x: torch.Tensor,
         intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass with protected Phase → Quad flow.
@@ -2124,15 +2253,19 @@ class BindingCacheBlock(nn.Module):
         Args:
             x: Input tensor [B, N, D]
             intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
+            binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
+                             Biases Top-K selection in Quad WITHOUT modifying attention math.
 
         Returns:
             output: [B, N, D]
         """
         # Step 1: Phase accumulates memory state (with optional intent rotation)
+        # Phase is PURE - no auxiliary systems act here
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
-        # Step 2: Quad queries memory state
-        attn_out = self.quad_query(x, memory_state)
+        # Step 2: Quad queries memory state (with optional salience bias for Top-K)
+        # Salience affects SELECTION, not attention weights
+        attn_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
 
         # Residual connection
         x = x + attn_out
@@ -2240,6 +2373,7 @@ class BindingCacheTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass returning hidden states BEFORE LM head.
@@ -2250,6 +2384,8 @@ class BindingCacheTransformer(nn.Module):
         Args:
             input_ids: [B, N] token IDs
             intent_phase: Optional phase rotation from Ontological State Delta
+            binding_salience: Optional [B, N] - per-position salience from
+                             OntologicalBindingAnnotator for Top-K selection bias
 
         Returns:
             hidden: [B, N, embed_dim] - normalized hidden states before LM head
@@ -2260,9 +2396,9 @@ class BindingCacheTransformer(nn.Module):
         pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
 
-        # Transformer blocks (with optional intent_phase)
+        # Transformer blocks (with optional intent_phase and binding_salience)
         for block in self.blocks:
-            x = block(x, intent_phase=intent_phase)
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
 
         # Return normalized hidden states
         return self.norm(x)
@@ -2272,16 +2408,20 @@ class BindingCacheTransformer(nn.Module):
         input_ids: torch.Tensor,
         labels: Optional[torch.Tensor] = None,
         intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
         return_hidden: bool = False,
         return_last_hidden: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Dict[str, torch.Tensor]]:
         """
-        Forward pass with optional intent phase rotation.
+        Forward pass with optional intent phase rotation and binding salience.
 
         Args:
             input_ids: [B, N] token IDs
             labels: Optional [B, N] labels for loss computation
             intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta
+            binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
+                             Biases Top-K selection in Quad WITHOUT modifying attention math.
+                             This is where CSR/Kosha/SRK act - as binding selectors, not attention modifiers.
             return_hidden: Return dict with hidden states
             return_last_hidden: Return dict with last hidden state
 
@@ -2295,10 +2435,11 @@ class BindingCacheTransformer(nn.Module):
         pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
 
-        # Transformer blocks (with optional intent_phase)
+        # Transformer blocks (with optional intent_phase and binding_salience)
+        # Core attention is PURE - binding_salience only affects Top-K selection
         hidden_states = [] if return_hidden else None
         for block in self.blocks:
-            x = block(x, intent_phase=intent_phase)
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
             if return_hidden:
                 hidden_states.append(x)
 
@@ -2392,12 +2533,20 @@ class OntologicalBindingCacheTransformer(nn.Module):
         state_dim: int = SOVEREIGN_STATE_DIM,  # 32D Sovereign State
         project_per_head_dim: bool = False,
         tie_embeddings: bool = True,
+        # Binding Annotation params (CSR/Kosha/SRK as selectors, not modifiers)
+        use_binding_annotator: bool = True,
+        use_csr_annotation: bool = True,
+        use_kosha_annotation: bool = True,
+        use_srk_annotation: bool = True,
     ):
         super().__init__()
 
         # Default ff_dim
         if ff_dim is None:
             ff_dim = embed_dim * 4
+
+        # Store annotation flags
+        self.use_binding_annotator = use_binding_annotator
 
         # The Binding Cache (generation) model
         self.binding_cache = BindingCacheTransformer(
@@ -2447,6 +2596,21 @@ class OntologicalBindingCacheTransformer(nn.Module):
         self.state_dim = state_dim
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+
+        # Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+        # This computes binding salience that biases Top-K selection
+        # Clean separation: Attention = physics, Annotator = semantics
+        if use_binding_annotator:
+            self.binding_annotator = OntologicalBindingAnnotator(
+                embed_dim=embed_dim,
+                state_dim=state_dim,
+                num_heads=num_heads,
+                use_csr=use_csr_annotation,
+                use_kosha=use_kosha_annotation,
+                use_srk=use_srk_annotation,
+            )
+        else:
+            self.binding_annotator = None
 
         # Previous state for delta computation
         self.register_buffer('prev_state', None, persistent=False)
@@ -2520,6 +2684,7 @@ class OntologicalBindingCacheTransformer(nn.Module):
         return_last_hidden: bool = False,
         reset_state: bool = False,
         external_delta_S: Optional[torch.Tensor] = None,
+        csr_mask: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass with Ontological → Binding Cache integration.
@@ -2527,7 +2692,12 @@ class OntologicalBindingCacheTransformer(nn.Module):
         Two-pass architecture:
         1. First pass: Get hidden states WITHOUT intent phase
         2. Compute state delta from hidden states
-        3. Second pass: Full forward WITH intent phase
+        3. Compute binding salience from OntologicalBindingAnnotator
+        4. Second pass: Full forward WITH intent phase AND binding salience
+
+        Clean separation:
+        - Attention = physics (pure, domain-agnostic)
+        - Binding Annotator = semantics (CSR/Kosha/SRK as selectors)
 
         Args:
             input_ids: [B, N] token indices
@@ -2537,6 +2707,7 @@ class OntologicalBindingCacheTransformer(nn.Module):
             return_last_hidden: Return final hidden state
             reset_state: Reset Ontological state (new sequence)
             external_delta_S: [B, state_dim] external state delta
+            csr_mask: [B, N] optional CSR content word mask for binding annotation
 
         Returns:
             Dict with:
@@ -2546,7 +2717,7 @@ class OntologicalBindingCacheTransformer(nn.Module):
             - 'intent_phase': [B, H] or [B, H, D_h] phase rotation
             - 'loss': Optional, if labels provided
         """
-        # First pass: Get hidden states WITHOUT intent phase
+        # First pass: Get hidden states WITHOUT intent phase or salience
         with torch.no_grad():
             hidden = self.binding_cache.forward_hidden(input_ids, intent_phase=None)
 
@@ -2560,11 +2731,30 @@ class OntologicalBindingCacheTransformer(nn.Module):
         # Convert delta_S to intent phase rotation
         intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
 
-        # Second pass: Full forward WITH intent phase
+        # Compute binding salience using OntologicalBindingAnnotator
+        # This is where CSR/Kosha/SRK act as SELECTORS (semantics), not attention modifiers
+        # Salience biases Top-K selection without changing attention math
+        binding_salience = None
+        if self.binding_annotator is not None:
+            # Extract Kosha activations from state if available
+            kosha_activations = None
+            if self.state_dim >= 17:
+                # Kosha is in positions [12:17] of Sovereign State
+                kosha_activations = state[:, 12:17]  # [B, 5]
+
+            binding_salience = self.binding_annotator(
+                hidden_states=hidden,
+                sovereign_state=state,
+                kosha_activations=kosha_activations,
+                csr_mask=csr_mask,  # CSR content word mask for phonological grounding
+            )
+
+        # Second pass: Full forward WITH intent phase AND binding salience
         result = self.binding_cache(
             input_ids,
             labels=labels,
             intent_phase=intent_phase,
+            binding_salience=binding_salience,
             return_hidden=return_hidden,
             return_last_hidden=return_last_hidden,
         )
@@ -2583,6 +2773,8 @@ class OntologicalBindingCacheTransformer(nn.Module):
         output['state'] = state
         output['delta_S'] = delta_S
         output['intent_phase'] = intent_phase
+        if binding_salience is not None:
+            output['binding_salience'] = binding_salience
 
         return output
 
