@@ -1,297 +1,348 @@
-# PhaseAttention Behavioral Probe Suite
+# PhaseAttention Diagnostic Probe Suite
 
-A standalone diagnostic script to scientifically test what PhaseAttention layers are learning behaviorally.
+A comprehensive suite of diagnostic tools to scientifically test what PhaseAttention layers are learning and whether they provide advantages over standard quadratic attention.
 
-## Purpose
+## Overview
 
-This is a **mechanism verification** tool, not a training improvement or visualization task.
+This suite contains three types of diagnostic tools:
 
-The goal is to answer:
+| Tool Type | Purpose | Key Question |
+|-----------|---------|--------------|
+| **Behavioral Probes** | Test trained models on relational reasoning tasks | "Does this checkpoint exhibit relational selectivity?" |
+| **Training Probes** | Train small models on synthetic binding tasks | "Can phase learn relational structure from scratch?" |
+| **Hard Generalization Probes** | Test true generalization vs memorization | "Does phase generalize relationally or memorize tokens?" |
+
+## File Structure
+
+```
+scripts/phase_probes/
+├── README.md                    # This file
+├── __init__.py                  # Package init
+│
+├── # Behavioral Probes (test trained checkpoints)
+├── phase_probe_runner.py        # Main behavioral probe runner
+├── probe_cases.py               # 25+ synthetic probe definitions
+├── phase_ablation.py            # Ablation utilities
+│
+├── # Training Probes (train from scratch)
+├── train_binding_probe.py       # Simple BIND-only training
+├── train_probe_schemas.py       # Multi-schema training (5 types)
+│
+└── hard_probes/                 # Hard generalization benchmark
+    ├── README.md                # Detailed scientific rationale
+    └── train_hard_probes.py     # Hard generalization training
+```
+
+---
+
+## 1. Behavioral Probes (Post-Training Analysis)
+
+### Purpose
+
+Test whether a **trained checkpoint** exhibits relational selectivity. This answers:
 > "Can PhaseAttention bind roles, persist entities, and resist interference **by itself**?"
 
-Before asking whether phase can learn emotional propensities or complex semantics, we must first verify that it performs basic relational selectivity.
-
-## Key Questions Answered
-
-1. Does PhaseAttention enable correct pronoun/reference resolution?
-2. Does phase disruption (scramble/freeze) break relational reasoning?
-3. Is phase actually contributing, or is it decorative?
-
-## Hard Constraints
-
-- Does **NOT** modify model architecture
-- Does **NOT** add or change any loss
-- Does **NOT** depend on CSR/SRK internals for scoring
-- Runs **POST-TRAINING** on a checkpoint
-- Outputs **MEASURABLE, COMPARABLE** metrics
-
-## Usage
+### Usage
 
 ```bash
 # Run full probe suite with PhaseAttention checkpoint
 python phase_probe_runner.py --checkpoint checkpoints/best.pt
 
-# Run with a pre-trained HuggingFace model (no phase, baseline comparison)
-# This tests the probe infrastructure and establishes a baseline
+# Run with a pre-trained HuggingFace model (baseline comparison)
 python phase_probe_runner.py --pretrained gpt2
 python phase_probe_runner.py --pretrained gpt2-medium
 
-# Run with verbose output (shows all ablation modes)
+# Run with verbose output
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --verbose
-python phase_probe_runner.py --pretrained gpt2 --verbose
 
-# Run specific probe
+# Run specific probe or category
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --probe RB1
-python phase_probe_runner.py --pretrained gpt2 --probe RB1
-
-# Run specific category
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --category role_binding
 
 # Save results to JSON
 python phase_probe_runner.py --checkpoint checkpoints/best.pt --output results.json
 ```
 
-**Note**: When using `--pretrained`, phase metrics (R_k, R_q, etc.) will be N/A since standard attention models don't have phase components. The ablation modes will also have no effect (no phase to ablate). This is useful for:
-1. Testing that the probe infrastructure works correctly
-2. Establishing a baseline for what standard attention achieves on these probes
-3. Later comparing PhaseAttention results against standard attention
+### CLI Options
 
-## Probe Categories (25 Total)
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--checkpoint` | Path to PhaseAttention checkpoint | Required (or --pretrained) |
+| `--pretrained` | Use HuggingFace model (gpt2, gpt2-medium, etc.) | None |
+| `--probe` | Run specific probe by ID (RB1, LP1, etc.) | All probes |
+| `--category` | Run specific category (role_binding, long_range, etc.) | All categories |
+| `--verbose` | Show detailed per-probe ablation results | False |
+| `--output` | Save results to JSON file | None |
 
-### A. Role Binding (RB1-RB5)
-Tests whether the model can bind pronouns/references to the correct antecedent based on **semantic compatibility**, not just token proximity.
+### Probe Categories (25 Total)
 
-| Probe | Text A | Text B | What It Tests |
-|-------|--------|--------|---------------|
-| RB1 | Alice blamed Bob because **she** was angry. | Alice blamed Bob because **he** was angry. | Pronoun gender → role binding |
-| RB2 | John thanked Mark because **he** helped. | John thanked Mark because **John** helped. | Implicit vs explicit reference |
-| RB3 | Sarah apologized to Emma because **she** felt guilty. | ...because **Emma** felt guilty. | Semantic role (apologizer = guilty) |
-| RB4 | The lawyer called the client because **he** was late. | ...because **the client** was late. | Ambiguity handling |
-| RB5 | Tom warned Jim that **he** was in danger. | ...that **Jim** was in danger. | Control (both should → Jim) |
+| Category | Probes | What It Tests |
+|----------|--------|---------------|
+| **Role Binding (RB1-RB5)** | Pronoun resolution | Semantic role → antecedent binding |
+| **Long-Range Persistence (LP1-LP4)** | Entity tracking | Salience across filler material |
+| **Semantic Interference (SI1-SI3)** | Sense disambiguation | Same token, different meanings |
+| **Negation/Polarity (NP1-NP3)** | Clause polarity | Negation scope tracking |
+| **Amplitude vs Phase (AC1-AC4)** | Phase vs salience | Binding despite high-amplitude distractors |
+| **Control (CTRL1-CTRL3)** | Baseline sanity | Simple facts (phase should NOT matter) |
+| **Binding-Only (BIND1-BIND3)** | Pure binding | Token-symmetric, structure-different |
 
-**Phase Isolation**: These probes require binding pronouns to semantically compatible antecedents. If phase is learning relational selectivity, scrambling phases should break this binding.
+### Ablation Modes
 
-### B. Long-Range Persistence (LP1-LP4)
-Tests whether the model maintains entity salience across filler material.
-
-| Probe | Structure | What It Tests |
-|-------|-----------|---------------|
-| LP1 | John entered. Mary left. [filler]. After delay, **he** spoke. | Entity persistence (he→John, not Mary) |
-| LP2 | Maria picked up violin. [filler]. **She** played. | Action continuity across distance |
-| LP3 | Captain spoke to crew. [filler]. **He** relaxed. | Role-based persistence (singular vs plural) |
-| LP4 | John spoke to Mary. Assistant took notes. **He** signed. | Decoy suppression (assistant is closer) |
-
-**Phase Isolation**: Phase should enable selective persistence of the correct entity across intervening tokens. Recency bias alone would pick the wrong referent.
-
-### C. Semantic Interference (SI1-SI3)
-Tests whether phase prevents semantic blending when the same token appears with different meanings.
-
-| Probe | Ambiguous Token | What It Tests |
-|-------|-----------------|---------------|
-| SI1 | "bank" (financial vs river) | Sense disambiguation from context |
-| SI2 | "bass" (fish vs instrument) | Sense selection with interference |
-| SI3 | "crane" (bird vs machine) | Local continuity over initial sense |
-
-**Phase Isolation**: Phase should encode the appropriate sense for each occurrence. Without phase selectivity, meanings would blur together.
-
-### D. Negation/Polarity (NP1-NP3)
-Tests whether phase helps preserve clause-level polarity and scope.
-
-| Probe | Structure | What It Tests |
-|-------|-----------|---------------|
-| NP1 | Trophy doesn't fit because it's too **big/small**. | Winograd schema (size→object mapping) |
-| NP2 | Council refused because they **feared/advocated** violence. | Reason-based role binding |
-| NP3 | He didn't say it would fail **until later**. | Negation scope (did say it later) |
-
-**Phase Isolation**: These require tracking polarity across the clause structure. Phase should help maintain logical relationships.
-
-### E. Amplitude vs Phase Conflict (AC1-AC4)
-Tests whether the model uses phase for relational binding rather than just high-amplitude (salient/repeated) tokens.
-
-| Probe | High-Amplitude Noise | What It Tests |
-|-------|---------------------|---------------|
-| AC1 | IMPORTANT IMPORTANT IMPORTANT | Binding despite amplitude distractor |
-| AC2 | URGENT URGENT URGENT + CRITICAL CRITICAL | Multiple amplitude sources |
-| AC3 | ERROR ERROR ERROR + WARNING WARNING | Pronoun resolution against noise |
-| AC4 | LOUD LOUD LOUD on different entities | Amplitude shouldn't shift binding |
-
-**Phase Isolation**: If the model relies on amplitude rather than phase for binding, these probes will fail. They directly test whether phase carries selectivity independent of token salience.
-
-### F. Control Probes (CTRL1-CTRL3) - NEW
-Tests simple factual recall where phase SHOULD NOT matter. These validate the ablation machinery itself.
-
-| Probe | Text | Expected Behavior |
-|-------|------|-------------------|
-| CTRL1 | Alice is a doctor. | Simple fact - all modes should pass |
-| CTRL2 | The sky is blue. | No binding needed - phase irrelevant |
-| CTRL3 | Paris is the capital of France. | Knowledge retrieval - phase irrelevant |
-
-**Expected**: Baseline ≈ Scramble ≈ Frozen ≈ Phase-Off. If control probes fail under ablation, the ablation machinery may be too aggressive.
-
-### G. Binding-Only Probes (BIND1-BIND3) - NEW
-Tests pure relational binding where token identity is symmetric. Only the relational structure differs.
-
-| Probe | Text A | Text B | What It Tests |
-|-------|--------|--------|---------------|
-| BIND1 | The key opened the door because it was **old**. | ...because it was **rusty**. | old→door, rusty→key |
-| BIND2 | The bottle fell because it was **slippery**. | ...because it was **tilted**. | slippery→bottle, tilted→table |
-| BIND3 | The woman told the girl that **she had won**. | ...that **she would receive**. | Both → girl (control) |
-
-**Phase Isolation**: These test whether phase captures subtle semantic compatibility. Same structure, same tokens, but binding shifts based on property semantics.
-
-## Ablation Modes
-
-Each probe is run under **4 inference modes**:
-
-| Mode | Description | Effect |
-|------|-------------|--------|
-| `baseline` | Normal inference | Full phase functionality |
-| `scramble` | Randomly permute φ_k, φ_q per head | Destroys position-phase relationships |
+| Mode | Effect | Expected Result |
+|------|--------|-----------------|
+| `baseline` | Normal inference | Best performance |
+| `scramble` | Permute phases randomly | Destroys position-phase relationships |
 | `frozen` | Set all phases to constant | cos(φ_q - φ_k) = 1 everywhere |
 | `phase_off` | Set φ_q = φ_k = 0 | Uniform attention weights |
 
-**Key Insight**: If phase is learning real selectivity:
-- Baseline should outperform ablations
-- Scramble/frozen/phase_off should degrade relational resolution
-- The degradation should be **selective** (not everything breaks)
+---
 
-## Metrics
+## 2. Training Probes (Train From Scratch)
 
-### Per-Probe Metrics
-| Metric | Description |
-|--------|-------------|
-| `margin` | log P(correct) - log P(best_wrong) |
-| `confidence` | P(predicted_token) |
-| `R_k` | Key phase collapse (0=uniform, 1=collapsed) |
-| `R_q` | Query phase collapse |
-| `amp_phase_corr` | Correlation between |z| and a_k |
-| `head_redundancy` | Mean cosine similarity between heads |
-| `head_entropy` | Diversity of head contributions |
-| `phase_drift` | Mean |Δφ_k| across time |
+### Purpose
 
-### Aggregate Metrics
-| Metric | Description |
-|--------|-------------|
-| `phase_sensitive_pct` | % probes where ablation hurts (uses **relative** threshold) |
-| `phase_contribution_index` | avg(baseline_margin - scramble_margin) |
+Train small transformers on synthetic relational binding tasks to test whether PhaseAttention can **learn** relational structure better than quadratic attention.
 
-### Per-Layer Metrics (NEW)
-The script now outputs **R_k per layer** to show WHERE phase is being used:
+### 2a. Simple BIND Training (`train_binding_probe.py`)
 
-```
-=============================================================
-PER-LAYER PHASE COLLAPSE (R_k, R_q)
-=============================================================
-Layer      R_k          R_q          Status
-Layer 0         0.1234       0.1567 healthy
-Layer 1         0.2345       0.2678 healthy
-Layer 2         0.5678       0.6012 COLLAPSED
-...
+Single-schema training focused on explicit entity-role binding.
+
+```bash
+# Basic run
+python train_binding_probe.py
+
+# With custom settings
+python train_binding_probe.py --num-steps 5000 --d-model 32 --num-bindings 4
 ```
 
-This helps identify if specific layers have collapsed while others are healthy.
+#### CLI Options
 
-### Phase Sensitivity Threshold
-Phase sensitivity now uses **relative margin drop** (not absolute):
-```python
-rel_delta_scramble = delta_scramble / abs(baseline_margin)
-phase_sensitive = rel_delta_scramble > 0.3  # 30% relative drop
-```
-This makes the test invariant across probes with different entropy levels.
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--num-steps` | Training steps | 10000 |
+| `--batch-size` | Batch size | 64 |
+| `--d-model` | Model dimension | 64 |
+| `--num-layers` | Number of layers | 2 |
+| `--num-bindings` | Bindings per sample | 3 |
+| `--device` | Device (cuda/cpu) | Auto-detect |
 
-## Failure Signatures
+### 2b. Multi-Schema Training (`train_probe_schemas.py`)
 
-The script detects 4 failure modes:
+Trains on 5 schema types simultaneously for comprehensive evaluation.
 
-| Signature | Detection | Meaning |
-|-----------|-----------|---------|
-| **F1: Decorative** | Δ ≈ 0 everywhere | Phase not contributing |
-| **F2: Brittle** | Scramble breaks >70% | Phase over-coupled |
-| **F3: Collapsed** | R_k > 0.5 | Phase diversity lost |
-| **F4: Amplitude Cheating** | |amp_phase_corr| > 0.6 | Amplitude compensating |
+```bash
+# Basic run
+python train_probe_schemas.py
 
-## Scientific Interpretation
+# Higher difficulty
+python train_probe_schemas.py --num-bindings 6 --filler-length 4
 
-The script provides a **scientific verdict**:
-
-```
-CAN demonstrate that PhaseAttention is learning relational selectivity.
-  Evidence:
-    - Phase-sensitive probes: 75%
-    - Phase contribution: 0.45
-    - Baseline outperforms ablations by 15%
+# Smaller model, more samples
+python train_probe_schemas.py --d-model 32 --samples-per-schema 5000
 ```
 
-OR
+#### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--num-steps` | Training steps | 10000 |
+| `--batch-size` | Batch size | 64 |
+| `--d-model` | Model dimension | 64 |
+| `--num-layers` | Number of layers | 2 |
+| `--samples-per-schema` | Samples per schema type | 2000 |
+| `--num-bindings` | BIND schema complexity | 3 |
+| `--filler-length` | LP schema filler length | 2 |
+| `--device` | Device (cuda/cpu) | Auto-detect |
+
+#### Schema Types
+
+| Schema | Pattern | What It Tests |
+|--------|---------|---------------|
+| **RB** (Relational Binding) | `E1 V E2 SEP PRON V2 SEP Q PRON →` | Pronoun resolution via verb semantics |
+| **BIND** (Entity-Role) | `BIND E R BIND E R ... SEP Q R →` | Explicit binding and retrieval |
+| **NP** (Negation Polarity) | `E V [NEG] CTX SEP Q V →` | Negation scope affects answer |
+| **LP** (Long Persistence) | `E V SEP [filler] SEP PRON V SEP Q PRON →` | Entity tracking across distance |
+| **SI** (Symbol Indirection) | `E CTX SEP E CTX SEP Q E →` | Same symbol, different referent |
+
+---
+
+## 3. Hard Generalization Probes (`hard_probes/`)
+
+### Purpose
+
+Test **true relational generalization** vs token memorization. This is the definitive test for whether PhaseAttention learns relational structure.
+
+### Why This Exists
+
+Previous probe datasets were "too easy" — both architectures achieved ~100% accuracy because quadratic attention could memorize token-specific patterns. This benchmark systematically removes memorization shortcuts.
+
+### Key Constraints
+
+| Constraint | Implementation | Why Quadratic Fails |
+|------------|----------------|---------------------|
+| **Held-out Roles** | Train: R0-R3, Test: R4-R6 | Learns token-specific patterns |
+| **Open-world Entities** | Train: E0-E7, Test: E8-E15 | Memorizes entity-output mappings |
+| **Schema Composition** | Multi-step chains with overwrites | Single-pattern matching fails |
+| **Role Permutation** | PERMUTE R0 R1 swaps bindings | Cannot dynamically swap meanings |
+| **Long Chains** | Train: 3-5 steps, Test: 6-8 steps | Attention span is limited |
+
+### Usage
+
+```bash
+# Basic run
+python hard_probes/train_hard_probes.py
+
+# BIND-dominant curriculum (recommended)
+python hard_probes/train_hard_probes.py --bind-ratio 0.7
+
+# Parameter-matched comparison (fairness control)
+python hard_probes/train_hard_probes.py --match-params
+
+# Maximum difficulty
+python hard_probes/train_hard_probes.py \
+    --bind-ratio 0.8 \
+    --test-chain-min 7 \
+    --test-chain-max 10 \
+    --match-params
+
+# Full scientific run
+python hard_probes/train_hard_probes.py \
+    --bind-ratio 0.7 \
+    --match-params \
+    --num-steps 20000 \
+    --test-chain-min 7 \
+    --test-chain-max 10
+```
+
+#### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--d-model` | Model dimension | 64 |
+| `--num-heads` | Attention heads | 4 |
+| `--num-layers` | Number of layers | 2 |
+| `--d-ff` | FFN dimension | 128 |
+| `--num-steps` | Training steps | 15000 |
+| `--batch-size` | Batch size | 64 |
+| `--lr` | Learning rate | 1e-3 |
+| `--train-samples` | Training samples | 20000 |
+| `--test-samples` | Samples per test split | 1000 |
+| `--bind-ratio` | Ratio of BIND-dominant schemas (0.0-1.0) | 0.6 |
+| `--train-chain-min` | Min chain length for training | 3 |
+| `--train-chain-max` | Max chain length for training | 5 |
+| `--test-chain-min` | Min chain length for testing | 6 |
+| `--test-chain-max` | Max chain length for testing | 8 |
+| `--match-params` | Add extra FF to quadratic for fair comparison | False |
+| `--device` | Device (cuda/cpu) | Auto-detect |
+
+#### Test Splits (Reported Separately)
+
+| Split | Entities | Roles | Chain Length | Tests |
+|-------|----------|-------|--------------|-------|
+| `train` | E0-E7 | R0-R3 | 3-5 | Training accuracy |
+| `test_roles` | E0-E7 | **R4-R6** | 3-5 | Role generalization |
+| `test_entities` | **E8-E15** | R0-R3 | 3-5 | Entity generalization |
+| `test_both` | **E8-E15** | **R4-R6** | 3-5 | Full generalization |
+| `test_long` | E0-E7 | R0-R3 | **6-8** | State persistence |
+
+#### Schema Types
+
+| Schema | Description | Why Quadratic Fails |
+|--------|-------------|---------------------|
+| **BIND_CHAIN** | Multiple bindings with overwrites | Returns first binding, not last |
+| **BIND_NEG** | Scoped negation of specific roles | Cannot track per-role negation |
+| **CHAIN_DEEP** | 4-8 step chains with filler | Attention span limits |
+| **PERMUTE_BIND** | Role swapping | Fixed token-attention patterns |
+| **SI_BIND** | Context-varied bindings | Cannot distinguish contexts |
+| **LP_BIND** | Long persistence + binding | Entity salience decays |
+
+#### Expected Results
 
 ```
-CANNOT conclusively demonstrate that PhaseAttention is learning
-relational selectivity with this checkpoint.
-  Reasons:
-    - Only 30% probes are phase-sensitive (<50%)
-    - Phase contribution index (0.05) is too low
+                         Train Acc    Test Acc (avg)
+Quadratic Attention:     ~95%         <40%
+Phase Attention:         ~95%         >70%
 ```
 
-## Design Principles
+#### Success Criteria
 
-### Constructive Counter-Examples
-Each probe is designed such that:
-1. **Token identity alone is insufficient** to solve it
-2. **Recency bias would give wrong answer**
-3. **Correct behavior must degrade specifically when phase is disrupted**
+1. **Quadratic memorizes training**: Train accuracy > 85%
+2. **Quadratic fails generalization**: Average test accuracy < 50%
+3. **Phase generalizes**: Phase > Quadratic + 15% on test
+4. **Phase is causal**: Ablation (scramble/freeze) drops accuracy significantly
 
-### Minimal Pairs
-Minimal-pair probes keep tokens, length, and structure constant while changing exactly one relational variable. This isolates phase contribution from confounds.
+---
 
-### Pass Criteria
-A probe "supports phase learning" if:
-- Baseline margin ≥ +0.5
-- Scramble OR Frozen margin drops by ≥ 0.5
-- Phase-off does not outperform baseline
+## Interpreting Results
 
-## File Structure
+### Behavioral Probes Verdict
 
-```
-scripts/phase_probes/
-├── phase_probe_runner.py  # Main script
-├── probe_cases.py         # 19 synthetic probes (pure data)
-├── phase_ablation.py      # Ablation utilities
-└── README.md              # This file
-```
+| Verdict | Meaning |
+|---------|---------|
+| **CAN demonstrate relational selectivity** | >50% probes phase-sensitive, ablations hurt |
+| **CANNOT conclusively demonstrate** | <50% sensitive, low contribution index |
 
-## Example Output
+### Training Probes Verdict
 
-```
-================================================================================
-ABLATION COMPARISON SUMMARY
-================================================================================
-Probe        BL       SC       FR      OFF │    Δ_SC    Δ_FR   Δ_OFF Sens
---------------------------------------------------------------------------------
-RB1_A       0.823    0.312    0.445   0.298 │  +0.511  +0.378  +0.525 YES
-RB1_B       0.756    0.289    0.401   0.267 │  +0.467  +0.355  +0.489 YES
-LP1         0.654    0.187    0.234   0.145 │  +0.467  +0.420  +0.509 YES
-...
+| Verdict | Meaning |
+|---------|---------|
+| **HYPOTHESIS SUPPORTED** | Phase outperforms + ablations hurt significantly |
+| **PARTIAL SUPPORT** | Phase is causal but doesn't outperform quadratic |
+| **HYPOTHESIS FALSIFIED** | No advantage, phase may be decorative |
 
-================================================================================
-SUMMARY
-================================================================================
---- Accuracy by Mode ---
-  Baseline:    78.9%
-  Scramble:    42.1%  (Δ = +36.8%)
-  Frozen:      47.4%  (Δ = +31.5%)
-  Phase-Off:   36.8%  (Δ = +42.1%)
+### Hard Probes Verdict
 
---- Phase Sensitivity ---
-  Phase-sensitive probes: 15/19 (78.9%)
-  Phase contribution index: 0.4521
+| Verdict | Meaning |
+|---------|---------|
+| **HYPOTHESIS STRONGLY SUPPORTED** | All 4 criteria pass — true relational generalization |
+| **HYPOTHESIS SUPPORTED** | Phase wins but quadratic didn't fail hard enough |
+| **DATASET TOO EASY** | Quadratic > 50% on test — increase difficulty |
+| **INCONCLUSIVE** | Mixed results, need more analysis |
 
---- Scientific Verdict ---
-CAN demonstrate that PhaseAttention is learning relational selectivity.
-```
+---
+
+## Phase Health Metrics
+
+| Metric | Healthy Range | Meaning |
+|--------|---------------|---------|
+| **R_k** (Mean Resultant Length) | < 0.3 | Phase diversity (0=uniform, 1=collapsed) |
+| **R_q** | < 0.3 | Query phase diversity |
+| **Phase Drift** | > 0.1 | Phases change across positions |
+| **Head Entropy** | > 0.5 | Heads contribute diversely |
+
+---
+
+## Scientific Rationale
+
+### Why These Probes Matter
+
+1. **Behavioral Probes**: Verify that trained models use phase for relational tasks
+2. **Training Probes**: Test if phase can *learn* relational structure
+3. **Hard Probes**: Distinguish memorization from true generalization
+
+### Evolution of the Suite
+
+| Stage | Finding | Next Step |
+|-------|---------|-----------|
+| Behavioral probes | Phase is used, but need controlled comparison | Create training probes |
+| Training probes (easy) | Both achieve 100%, "PARTIAL SUPPORT" | Phase is causal but task too easy |
+| Training probes (hard) | Need to break memorization shortcuts | Create hard generalization probes |
+| Hard probes | Tests true relational generalization | Definitive evidence |
+
+### Key Insight
+
+> The goal is not just "does phase help?" but "does phase enable a *different kind* of learning?"
+
+Quadratic attention can memorize token-specific patterns. PhaseAttention should learn relational structure that generalizes to new tokens. The hard probes test exactly this distinction.
+
+---
 
 ## Citation
 
-This diagnostic suite was designed to answer the fundamental question:
+This diagnostic suite was designed to answer:
 > Is PhaseAttention learning real relational selectivity, or is it decorative?
 
-The probes are based on established psycholinguistic test paradigms (Winograd schemas, minimal pairs) adapted for neural network mechanism verification.
+The probes are based on:
+- Psycholinguistic test paradigms (Winograd schemas, minimal pairs)
+- Compositional generalization literature
+- State space models vs attention comparisons
