@@ -941,9 +941,29 @@ class PhaseAttention(nn.Module):
         self._phi_k = None
         self._phi_q = None
 
+        # Rotation test: add a global phase rotation to φ_q
+        self._rotation_angle = 0.0  # in radians
+
     def set_ablation(self, mode: str, seed: int = 42):
         self._ablation_mode = mode
         self._scramble_seed = seed
+
+    def set_rotation(self, angle_radians: float):
+        """
+        Set a global phase rotation to apply to φ_q.
+
+        This tests whether phase encodes relational structure:
+        - If roles are phase-encoded, rotating φ_q should shift which bindings are retrieved
+        - If phase is decorative, rotation should have minimal effect
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
+        """
+        self._rotation_angle = angle_radians
+
+    def clear_rotation(self):
+        """Clear any applied rotation."""
+        self._rotation_angle = 0.0
 
     def _ablate(self, phi: torch.Tensor) -> torch.Tensor:
         if self._ablation_mode == "none":
@@ -1005,6 +1025,10 @@ class PhaseAttention(nn.Module):
 
         phi_q = self._ablate(phi_q)
         phi_k = self._ablate(phi_k)
+
+        # Apply rotation to φ_q (tests phase selectivity)
+        if self._rotation_angle != 0.0:
+            phi_q = phi_q + self._rotation_angle
 
         if self.capture_diagnostics:
             self._phi_k = phi_k.detach()
@@ -1133,6 +1157,14 @@ class HybridTransformerBlock(nn.Module):
         """Set ablation mode for Phase attention component."""
         self.phase_attn.set_ablation(mode, seed)
 
+    def set_rotation(self, angle_radians: float):
+        """Set rotation angle for Phase attention component."""
+        self.phase_attn.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from Phase attention component."""
+        self.phase_attn.clear_rotation()
+
 
 class HybridTransformer(nn.Module):
     """
@@ -1201,6 +1233,16 @@ class HybridTransformer(nn.Module):
         """Set ablation mode for all Phase attention components."""
         for layer in self.layers:
             layer.set_ablation(mode, seed)
+
+    def set_rotation(self, angle_radians: float):
+        """Set rotation angle for all Phase attention layers."""
+        for layer in self.layers:
+            layer.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from all Phase attention layers."""
+        for layer in self.layers:
+            layer.clear_rotation()
 
     def enable_diagnostics(self, enable: bool = True):
         """Enable/disable phase diagnostics capture."""
@@ -1523,6 +1565,20 @@ class ProtectedPhaseTransformer(nn.Module):
         for layer in self.layers:
             layer.set_ablation(mode, seed)
 
+    def set_rotation(self, angle_radians: float):
+        """
+        Set rotation angle (not applicable for Protected architecture).
+
+        Note: ProtectedPhaseTransformer uses phi_k only (for memory accumulation),
+        not phi_q. Rotation test is designed for architectures with query phases.
+        This method exists for API compatibility but has no effect.
+        """
+        pass  # Protected architecture doesn't use phi_q
+
+    def clear_rotation(self):
+        """Clear rotation (no-op for Protected architecture)."""
+        pass
+
     def enable_diagnostics(self, enable: bool = True):
         """Enable/disable phase diagnostics (placeholder for compatibility)."""
         pass
@@ -1609,6 +1665,18 @@ class HardProbeTransformer(nn.Module):
         for layer in self.layers:
             if hasattr(layer.attn, 'set_ablation'):
                 layer.attn.set_ablation(mode, seed)
+
+    def set_rotation(self, angle_radians: float):
+        """Set rotation angle for all Phase attention layers."""
+        for layer in self.layers:
+            if hasattr(layer.attn, 'set_rotation'):
+                layer.attn.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from all Phase attention layers."""
+        for layer in self.layers:
+            if hasattr(layer.attn, 'clear_rotation'):
+                layer.attn.clear_rotation()
 
     def enable_diagnostics(self, enable: bool = True):
         for layer in self.layers:
@@ -1713,6 +1781,136 @@ def run_ablation(
     return results
 
 
+def run_rotation_test(
+    model: nn.Module,
+    loader: DataLoader,
+    vocab: HardVocabulary,
+    device: str,
+    angles_degrees: List[float] = None,
+) -> Dict[str, Dict[str, float]]:
+    """
+    Run phase rotation tests to verify phase encodes relational structure.
+
+    HYPOTHESIS:
+    -----------
+    If roles are encoded as phase offsets (e.g., R0 → φ=0, R1 → φ=π/2):
+    - Rotating φ_q by θ should shift which role's binding is retrieved
+    - Larger rotations should cause larger accuracy drops
+    - Specific rotations might "swap" roles (retrieve R1 when querying R0)
+
+    If phase is decorative:
+    - Rotation should have minimal/random effect on accuracy
+    - No systematic relationship between rotation angle and accuracy
+
+    Args:
+        model: Model with phase attention (must have set_rotation method)
+        loader: DataLoader for evaluation
+        vocab: Vocabulary for decoding
+        device: Device to run on
+        angles_degrees: List of rotation angles in degrees (default: 0, 45, 90, 135, 180)
+
+    Returns:
+        Dictionary with:
+        - 'accuracy': {angle: accuracy} for each angle
+        - 'delta': {angle: accuracy_change} relative to baseline
+        - 'sensitivity': float (mean absolute delta, higher = more sensitive)
+        - 'systematic': bool (True if accuracy decreases monotonically with angle)
+    """
+    if angles_degrees is None:
+        angles_degrees = [0, 45, 90, 135, 180, 270]
+
+    if not hasattr(model, 'set_rotation'):
+        return {
+            'accuracy': {0: evaluate(model, loader, vocab, device)},
+            'delta': {0: 0.0},
+            'sensitivity': 0.0,
+            'systematic': False,
+            'error': 'Model does not support rotation (no set_rotation method)'
+        }
+
+    results = {'accuracy': {}, 'delta': {}}
+
+    # Get baseline (0° rotation)
+    model.set_rotation(0.0)
+    baseline = evaluate(model, loader, vocab, device)
+    results['accuracy'][0] = baseline
+    results['delta'][0] = 0.0
+
+    # Test each rotation angle
+    for angle_deg in angles_degrees:
+        if angle_deg == 0:
+            continue  # Already computed
+
+        angle_rad = math.radians(angle_deg)
+        model.set_rotation(angle_rad)
+        acc = evaluate(model, loader, vocab, device)
+        results['accuracy'][angle_deg] = acc
+        results['delta'][angle_deg] = acc - baseline
+
+    # Clear rotation
+    model.clear_rotation()
+
+    # Compute sensitivity metrics
+    deltas = [abs(d) for a, d in results['delta'].items() if a != 0]
+    results['sensitivity'] = sum(deltas) / len(deltas) if deltas else 0.0
+
+    # Check if accuracy drops systematically with angle (up to 180°)
+    angles_sorted = sorted([a for a in results['accuracy'].keys() if a <= 180])
+    accs_sorted = [results['accuracy'][a] for a in angles_sorted]
+    # Systematic if accuracy generally decreases (allowing small fluctuations)
+    decreasing_pairs = sum(1 for i in range(len(accs_sorted)-1) if accs_sorted[i] >= accs_sorted[i+1] - 0.02)
+    results['systematic'] = decreasing_pairs >= (len(accs_sorted) - 2) if len(accs_sorted) > 2 else False
+
+    # Additional analysis: find angle of maximum disruption
+    if results['delta']:
+        min_delta_angle = min(results['delta'].items(), key=lambda x: x[1])
+        results['max_disruption_angle'] = min_delta_angle[0]
+        results['max_disruption_delta'] = min_delta_angle[1]
+
+    return results
+
+
+def print_rotation_test_results(
+    results: Dict[str, Dict[str, float]],
+    model_name: str = "Phase",
+) -> None:
+    """Pretty-print rotation test results."""
+    print(f"\n--- PHASE ROTATION TEST: {model_name} ---")
+
+    if 'error' in results:
+        print(f"  ERROR: {results['error']}")
+        return
+
+    print(f"\n  {'Angle':>8}  {'Accuracy':>10}  {'Δ from 0°':>10}")
+    print(f"  {'-'*8}  {'-'*10}  {'-'*10}")
+
+    for angle in sorted(results['accuracy'].keys()):
+        acc = results['accuracy'][angle]
+        delta = results['delta'][angle]
+        delta_str = f"{delta*100:+.1f}%" if angle != 0 else "baseline"
+        print(f"  {angle:>6}°  {acc*100:>9.1f}%  {delta_str:>10}")
+
+    print(f"\n  Sensitivity (mean |Δ|): {results['sensitivity']*100:.2f}%")
+    print(f"  Systematic decrease:    {'Yes' if results['systematic'] else 'No'}")
+
+    if 'max_disruption_angle' in results:
+        print(f"  Max disruption at:      {results['max_disruption_angle']}° ({results['max_disruption_delta']*100:+.1f}%)")
+
+    # Interpretation
+    print(f"\n  INTERPRETATION:")
+    if results['sensitivity'] > 0.10:
+        print(f"    → Phase is SENSITIVE to rotation (sensitivity > 10%)")
+        print(f"    → Phase likely encodes meaningful relational structure")
+        if results['systematic']:
+            print(f"    → Systematic decrease suggests phase offset = role encoding")
+    elif results['sensitivity'] > 0.03:
+        print(f"    → Phase shows MODERATE sensitivity to rotation")
+        print(f"    → Phase may partially encode relational structure")
+    else:
+        print(f"    → Phase is INSENSITIVE to rotation (sensitivity < 3%)")
+        print(f"    → Phase appears DECORATIVE (not encoding relations)")
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -1743,6 +1941,12 @@ Examples:
 
   # Full scientific comparison
   python train_hard_probes.py --compare-curricula --bind-ratio 0.7 --match-params
+
+  # Phase rotation test (verify phase encodes relational structure)
+  python train_hard_probes.py --rotation-test
+
+  # Custom rotation angles
+  python train_hard_probes.py --rotation-test --rotation-angles 0,30,60,90,120,150,180
         """
     )
 
@@ -1794,6 +1998,12 @@ Examples:
     # Protected Phase (v5)
     parser.add_argument("--protected-phase", action="store_true",
                         help="Run Protected Phase model (Phase accumulates, Quad queries)")
+
+    # Phase Rotation Test
+    parser.add_argument("--rotation-test", action="store_true",
+                        help="Run phase rotation test after training to verify phase encodes relations")
+    parser.add_argument("--rotation-angles", type=str, default="0,45,90,135,180,270",
+                        help="Comma-separated rotation angles in degrees for rotation test")
 
     # Device
     parser.add_argument("--device", type=str,
@@ -2402,6 +2612,62 @@ Examples:
             print(f"  → Phase CONTRIBUTES in protected architecture")
         else:
             print(f"  → Phase still decorative even when protected")
+
+    # ==========================================================================
+    # PHASE ROTATION TEST - Does phase encode relational structure?
+    # ==========================================================================
+    if args.rotation_test:
+        rotation_angles = [float(x) for x in args.rotation_angles.split(",")]
+        print(f"\n" + "=" * 70)
+        print("PHASE ROTATION TEST")
+        print("=" * 70)
+        print("\nHypothesis: If phase encodes roles, rotating φ_q should shift bindings.")
+        print(f"Testing angles: {rotation_angles}")
+
+        # Test pure Phase model
+        rotation_phase = run_rotation_test(
+            model_phase, test_roles_loader, vocab, config.device, rotation_angles
+        )
+        print_rotation_test_results(rotation_phase, "Pure Phase")
+
+        # Test Hybrid models if available
+        if model_hybrid is not None:
+            rotation_hybrid = run_rotation_test(
+                model_hybrid, test_roles_loader, vocab, config.device, rotation_angles
+            )
+            print_rotation_test_results(rotation_hybrid, "Hybrid (Inverted)")
+
+        if model_hybrid_std is not None:
+            rotation_hybrid_std = run_rotation_test(
+                model_hybrid_std, test_roles_loader, vocab, config.device, rotation_angles
+            )
+            print_rotation_test_results(rotation_hybrid_std, "Hybrid (Standard)")
+
+        if model_protected is not None:
+            rotation_protected = run_rotation_test(
+                model_protected, test_roles_loader, vocab, config.device, rotation_angles
+            )
+            print_rotation_test_results(rotation_protected, "Protected Phase")
+
+        # Summary
+        print(f"\n--- ROTATION TEST SUMMARY ---")
+        print(f"  Pure Phase sensitivity:     {rotation_phase['sensitivity']*100:.2f}%")
+        if model_hybrid is not None:
+            print(f"  Hybrid (Inv) sensitivity:   {rotation_hybrid['sensitivity']*100:.2f}%")
+        if model_hybrid_std is not None:
+            print(f"  Hybrid (Std) sensitivity:   {rotation_hybrid_std['sensitivity']*100:.2f}%")
+        if model_protected is not None:
+            print(f"  Protected sensitivity:      {rotation_protected['sensitivity']*100:.2f}%")
+
+        if rotation_phase['sensitivity'] > 0.10:
+            print(f"\n  CONCLUSION: Phase encodes MEANINGFUL relational structure")
+            print(f"             (rotation significantly affects binding retrieval)")
+        elif rotation_phase['sensitivity'] > 0.03:
+            print(f"\n  CONCLUSION: Phase shows PARTIAL relational encoding")
+            print(f"             (moderate sensitivity to rotation)")
+        else:
+            print(f"\n  CONCLUSION: Phase is DECORATIVE (rotation has no effect)")
+            print(f"             (phase not encoding relational structure)")
 
     # Summary comparison of ablation impacts
     if ablation_hybrid_inv is not None and ablation_hybrid_std is not None:
