@@ -108,6 +108,8 @@ from symbolu.phase_transformer import (
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
     OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
+    BindingCacheTransformer,  # V10.0: Protected Phase + Top-K Query (validated by probes)
+    OntologicalBindingCacheTransformer,  # V10.0: AGI Architecture (Binding Cache + 32D Sovereign State)
     # V9.8.0: 32D Sovereign State (replaces 124D CognitiveState)
     SOVEREIGN_STATE_DIM,
     BHAVA_NAMES,
@@ -9019,6 +9021,16 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = False  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # V10.0: Binding Cache architecture (validated by diagnostic probes)
+    binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
+    no_binding_cache: bool = False  # Disable cache (use full attention)
+
+    # V10.0: Binding Annotation (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+    use_binding_annotator: bool = True  # Enable OntologicalBindingAnnotator
+    use_csr_annotation: bool = True  # CSR affects binding salience (phonological grounding)
+    use_kosha_annotation: bool = True  # Kosha affects binding salience (consciousness sheaths)
+    use_srk_annotation: bool = True  # SRK affects binding salience (Sovereign State)
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256
@@ -10312,6 +10324,92 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.zero_mean_cosine:
             print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
+
+    elif config.model_type == "binding_cache":
+        # V10.0: Binding Cache architecture (validated by diagnostic probes)
+        # Protected Phase + Top-K Query - prevents Phase decorativeness
+        # Reference: train_hard_probes.py --protected-phase showed -50% ablation drop
+        tie_emb = not config.untie_embeddings
+
+        # Determine if cache should be used
+        use_cache = not config.no_binding_cache
+        top_k = config.binding_cache_top_k if use_cache else 0
+
+        model = BindingCacheTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,
+            bounded_phase=True,  # Always enabled (mandatory from probes)
+            top_k=top_k,
+            use_cache=use_cache,
+            tie_embeddings=tie_emb,
+        )
+        print(f"\n  [Binding Cache V10.0] Protected Phase + Top-K Query")
+        print(f"    Architecture: Phase (O(n) cumsum) → Quad (O(nk) query)")
+        print(f"    Validated by diagnostic probes: -50% Phase ablation drop")
+        print(f"    Top-K cache size: {top_k} (use_cache: {use_cache})")
+        print(f"    Bounded Phase: ENABLED (mandatory)")
+        print(f"    Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")
+
+    elif config.model_type == "ontological_binding_cache":
+        # V10.0: AGI Architecture - Binding Cache + 32D Sovereign State
+        # Combines validated Protected Phase with ontological reasoning
+        tie_emb = not config.untie_embeddings
+
+        # Determine if cache should be used
+        use_cache = not config.no_binding_cache
+        top_k = config.binding_cache_top_k if use_cache else 0
+
+        model = OntologicalBindingCacheTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,
+            top_k=top_k,
+            use_cache=use_cache,
+            state_dim=config.state_dim,
+            project_per_head_dim=config.project_per_head_dim,
+            tie_embeddings=tie_emb,
+            # V10.0: Binding Annotation (CSR/Kosha/SRK as SELECTORS, not modifiers)
+            use_binding_annotator=config.use_binding_annotator,
+            use_csr_annotation=config.use_csr_annotation,
+            use_kosha_annotation=config.use_kosha_annotation,
+            use_srk_annotation=config.use_srk_annotation,
+        )
+        print(f"\n  [Ontological Binding Cache V10.0] AGI Architecture")
+        print(f"    Combines: Protected Phase + Top-K Query + 32D Sovereign State")
+        print(f"    Architecture: ΔS → Phase rotation → Memory binding → Query")
+        print(f"    Sovereign State Dimension: {config.state_dim}D")
+        if config.state_dim == SOVEREIGN_STATE_DIM:
+            print(f"      [0:12] 12 Bhavas | [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia | [28:32] Reserved")
+        print(f"    Top-K cache size: {top_k} (use_cache: {use_cache})")
+        print(f"    Bounded Phase: ENABLED (mandatory from probes)")
+        print(f"    Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")
+        print(f"    Project Per Head Dim: {config.project_per_head_dim}")
+        # V10.0: Binding Annotation status
+        if config.use_binding_annotator:
+            print(f"    Binding Annotator: ENABLED (semantics → Top-K selection)")
+            print(f"      CSR: {'ON' if config.use_csr_annotation else 'OFF'} | "
+                  f"Kosha: {'ON' if config.use_kosha_annotation else 'OFF'} | "
+                  f"SRK: {'ON' if config.use_srk_annotation else 'OFF'}")
+            print(f"      Clean separation: Attention=physics, Annotator=semantics")
+        else:
+            print(f"    Binding Annotator: DISABLED (pure attention, no semantic selection)")
 
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
@@ -13909,6 +14007,30 @@ def train(config: UnifiedTrainingConfig):
                     logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
                 else:
                     logits = outputs
+
+                # DEBUG: Check logits on step 50 (matches first log output)
+                if global_step == 50 and accumulation_step == 0:
+                    print(f"\n[DEBUG LOGITS] Step 50 diagnostic:")
+                    print(f"  logits shape: {logits.shape}")
+                    print(f"  logits dtype: {logits.dtype}")
+                    print(f"  logits min/max: {logits.min().item():.4f} / {logits.max().item():.4f}")
+                    print(f"  logits mean/std: {logits.mean().item():.4f} / {logits.std().item():.4f}")
+                    print(f"  logits has NaN: {torch.isnan(logits).any().item()}")
+                    print(f"  logits has Inf: {torch.isinf(logits).any().item()}")
+                    # Check expected loss for uniform logits
+                    expected_loss = math.log(logits.shape[-1])
+                    print(f"  expected random loss: {expected_loss:.4f}")
+                    # Sample some logits
+                    sample_logits = logits[0, 0, :10].tolist()
+                    print(f"  sample logits[0,0,:10]: {[f'{x:.2f}' for x in sample_logits]}")
+                    # Check softmax distribution
+                    probs = torch.softmax(logits[0, 0], dim=-1)
+                    print(f"  softmax max prob: {probs.max().item():.6f}")
+                    print(f"  softmax entropy: {-(probs * torch.log(probs + 1e-9)).sum().item():.4f}")
+                    # Compute loss manually to verify
+                    manual_loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), y.view(-1), ignore_index=-100)
+                    print(f"  manual CE loss: {manual_loss.item():.4f}")
+
                 loss, metrics = compute_phase_loss(logits, y, config)
 
                 # Add decorrelation loss if enabled
@@ -17067,8 +17189,10 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid"],
-                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI)")
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache"],
+                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
+                            "binding_cache = Protected Phase + Top-K Query [V10.0], "
+                            "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State])")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -17242,6 +17366,34 @@ def main():
     parser.add_argument("--zero_mean_cosine", action="store_true",
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
+
+    # V10.0: Binding Cache architecture (validated by diagnostic probes)
+    parser.add_argument("--binding_cache_top_k", type=int, default=64,
+                       help="Top-K cache size per head for binding_cache model. "
+                            "Reduces O(n²) attention to O(nk). Use 0 for full attention.")
+    parser.add_argument("--binding_cache_use_cache", action="store_true", default=True,
+                       help="Use Top-K cache in binding_cache model (default: True)")
+    parser.add_argument("--no_binding_cache", action="store_true",
+                       help="Disable Top-K cache in binding_cache model (use full O(n²) attention)")
+
+    # V10.0: Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+    # Clean separation: Attention = physics, Annotator = semantics
+    parser.add_argument("--use_binding_annotator", action="store_true", default=True,
+                       help="Enable OntologicalBindingAnnotator for binding salience (Top-K selection bias)")
+    parser.add_argument("--no_binding_annotator", action="store_true",
+                       help="Disable OntologicalBindingAnnotator (pure attention, no semantic selection)")
+    parser.add_argument("--use_csr_annotation", action="store_true", default=True,
+                       help="Enable CSR (phonological grounding) in binding annotation")
+    parser.add_argument("--no_csr_annotation", action="store_true",
+                       help="Disable CSR in binding annotation")
+    parser.add_argument("--use_kosha_annotation", action="store_true", default=True,
+                       help="Enable Kosha (consciousness sheaths) in binding annotation")
+    parser.add_argument("--no_kosha_annotation", action="store_true",
+                       help="Disable Kosha in binding annotation")
+    parser.add_argument("--use_srk_annotation", action="store_true", default=True,
+                       help="Enable SRK (Sovereign State) in binding annotation")
+    parser.add_argument("--no_srk_annotation", action="store_true",
+                       help="Disable SRK in binding annotation")
 
     # V9.8.0: Ontological Hybrid (Two-Tier AGI) with 32D Sovereign State
     parser.add_argument("--state_dim", type=int, default=SOVEREIGN_STATE_DIM,
@@ -18161,6 +18313,14 @@ def main():
         zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
+        # V10.0: Binding Cache options
+        binding_cache_top_k=args.binding_cache_top_k,
+        no_binding_cache=args.no_binding_cache,
+        # V10.0: Binding Annotation (CSR/Kosha/SRK as selectors, not modifiers)
+        use_binding_annotator=args.use_binding_annotator and not args.no_binding_annotator,
+        use_csr_annotation=args.use_csr_annotation and not args.no_csr_annotation,
+        use_kosha_annotation=args.use_kosha_annotation and not args.no_kosha_annotation,
+        use_srk_annotation=args.use_srk_annotation and not args.no_srk_annotation,
         bhava_lambda=args.bhava_lambda,
         coherence_lambda=args.coherence_lambda,
         log_every=args.log_every,

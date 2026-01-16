@@ -1728,6 +1728,1084 @@ class PhaseAttentionLayer(nn.Module):
             return result, None
         return result
 
+
+# =============================================================================
+# BINDING CACHE ARCHITECTURE (V10.0) - Protected Phase + Top-K Query
+# =============================================================================
+# Validated by diagnostic probe experiments:
+# - Protected Phase ablation: -50% to -54% drop (Phase is ESSENTIAL)
+# - Mixed hybrid ablation: ~0% drop (Phase is DECORATIVE)
+#
+# Architecture insight: Phase and Quadratic must have NON-COMPETING roles:
+# - Phase: O(n) STATE accumulator via cumsum/EMA
+# - Quadratic: O(nk) QUERY mechanism via Top-K cache
+#
+# Reference: train_hard_probes.py --protected-phase experiment results
+# =============================================================================
+
+
+class OntologicalBindingAnnotator(nn.Module):
+    """
+    Ontological Binding Annotator - computes binding salience for Top-K selection.
+
+    CSR/Kosha/SRK act as BINDING SELECTORS, not live attention modifiers.
+    They compute salience scores that bias WHICH bindings get retrieved,
+    without modifying the core attention computation.
+
+    Design Principle (ChatGPT recommendation):
+        - CSR/Kosha/Ontological should NOT be continuous forces in attention
+        - They are best used as binding selectors and annotators
+        - Salience is computed ONCE at encoding, not token-by-token at inference
+
+    Usage:
+        annotator = OntologicalBindingAnnotator(embed_dim, state_dim)
+        salience = annotator(hidden_states, sovereign_state)  # [B, N]
+        # Pass salience to BindingCacheQuadQuery for Top-K biasing
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        state_dim: int = 32,  # 32D Sovereign State
+        num_heads: int = 12,
+        use_csr: bool = True,
+        use_kosha: bool = True,
+        use_srk: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.state_dim = state_dim
+        self.use_csr = use_csr
+        self.use_kosha = use_kosha
+        self.use_srk = use_srk
+
+        # Salience projection from hidden states
+        # Projects hidden → per-position salience score
+        self.hidden_salience = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim // 4),
+            nn.GELU(),
+            nn.Linear(embed_dim // 4, 1),
+        )
+
+        # Ontological state influence on salience
+        # If SRK enabled, state modulates what's "important"
+        if use_srk and state_dim > 0:
+            self.state_salience = nn.Sequential(
+                nn.Linear(state_dim, state_dim),
+                nn.GELU(),
+                nn.Linear(state_dim, num_heads),
+            )
+        else:
+            self.state_salience = None
+
+        # Kosha sheath weights (5 sheaths affect salience differently)
+        # [Material, Vital, Mental, Intellectual, Blissful]
+        if use_kosha:
+            self.kosha_weights = nn.Parameter(torch.ones(5))
+        else:
+            self.kosha_weights = None
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        sovereign_state: Optional[torch.Tensor] = None,  # [B, 32]
+        kosha_activations: Optional[torch.Tensor] = None,  # [B, 5]
+        csr_mask: Optional[torch.Tensor] = None,  # [B, N] binary mask
+    ) -> torch.Tensor:
+        """
+        Compute binding salience scores.
+
+        Args:
+            hidden_states: [B, N, D] - hidden representations
+            sovereign_state: [B, 32] - 32D Sovereign State (optional)
+            kosha_activations: [B, 5] - Kosha sheath activations (optional)
+            csr_mask: [B, N] - CSR content word mask (optional)
+
+        Returns:
+            salience: [B, N] - per-position binding salience (higher = more important)
+        """
+        B, N, D = hidden_states.shape
+
+        # Base salience from hidden states
+        salience = self.hidden_salience(hidden_states).squeeze(-1)  # [B, N]
+
+        # Ontological state modulation (SRK)
+        if self.state_salience is not None and sovereign_state is not None:
+            # State affects what's considered "important" globally
+            state_bias = self.state_salience(sovereign_state)  # [B, num_heads]
+            # Average across heads for per-position bias
+            state_bias_scalar = state_bias.mean(dim=-1, keepdim=True)  # [B, 1]
+            salience = salience + state_bias_scalar
+
+        # Kosha sheath modulation
+        if self.kosha_weights is not None and kosha_activations is not None:
+            # Weighted kosha influence
+            kosha_influence = (kosha_activations * self.kosha_weights).sum(dim=-1, keepdim=True)  # [B, 1]
+            salience = salience * (1 + 0.1 * kosha_influence)
+
+        # CSR content word boost
+        if self.use_csr and csr_mask is not None:
+            # Boost salience for content words (phonologically grounded)
+            salience = salience + 0.5 * csr_mask.float()
+
+        return salience
+
+
+class BindingCachePhaseState(nn.Module):
+    """
+    Phase attention that outputs ONLY a memory state (no attention output).
+
+    Phase's EXCLUSIVE role: Accumulate key-value pairs into persistent state.
+    This is NOT mixed with quadratic - it feeds INTO BindingCacheQuadQuery.
+
+    Validated architecture from diagnostic probes:
+    - memory_state = cumsum(k_phasor * v_complex) [O(n) STATE]
+    - When protected, Phase shows -50% ablation drop (ESSENTIAL)
+    - When mixed with Quad, Phase shows ~0% drop (DECORATIVE)
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 1.0,
+        learned_decay: bool = False,
+        bounded_phase: bool = True,  # Default True - mandatory fix from probes
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.bounded_phase = bounded_phase
+        self.decay_gamma = decay_gamma
+        self.learned_decay = learned_decay
+
+        # Phase projections for keys (NOT queries - Quad handles queries)
+        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Layer norm for input
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Learned decay (per-head) if enabled
+        if learned_decay:
+            # Log-space timescale initialization (2 to 2048 tokens)
+            log_timescales = torch.linspace(
+                math.log(2.0), math.log(2048.0), num_heads
+            )
+            timescales = torch.exp(log_timescales)
+            gamma = 1.0 - (1.0 / timescales)
+            gamma = torch.clamp(gamma, 0.001, 0.9995)
+            sigmoid_target = 2.0 * gamma - 1.0
+            sigmoid_target = torch.clamp(sigmoid_target, 0.01, 0.99)
+            init_logits = torch.log(sigmoid_target / (1.0 - sigmoid_target))
+            self.decay_logit = nn.Parameter(init_logits)
+        else:
+            self.decay_logit = None
+
+        # Health tracking (R_k statistics)
+        self._last_r_k_mean = 0.0
+        self._last_r_k_std = 0.0
+
+        # Ablation mode
+        self._ablation_mode = "none"
+
+        # Initialize phase with uniform [-π, π]
+        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set ablation mode: none, scramble, freeze, off."""
+        self._ablation_mode = mode
+        self._ablation_seed = seed
+
+    def get_health_metrics(self) -> dict:
+        """Return R_k health statistics."""
+        return {
+            "r_k_mean": self._last_r_k_mean,
+            "r_k_std": self._last_r_k_std,
+        }
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Compute Phase memory state via cumsum/EMA.
+
+        Args:
+            x: Input tensor [B, N, D]
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
+                         Rotates key phases to change how bindings are stored based on intent/understanding.
+
+        Returns:
+            memory_state: [B, N, D] - accumulated state for Quad to query
+        """
+        B, N, D = x.shape
+
+        # Pre-norm
+        x_norm = self.norm(x)
+
+        # Compute phase and amplitude for keys
+        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim)
+
+        # Bounded phase (mandatory fix from probes)
+        if self.bounded_phase:
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_k = phi_k_raw
+
+        # Apply intent phase rotation (from Ontological State Delta)
+        # This changes HOW bindings are stored based on semantic understanding
+        if intent_phase is not None:
+            # Handle different intent_phase shapes:
+            # [B, H] → broadcast to [B, 1, H, 1] for all positions and dims
+            # [B, H, D_h] → broadcast to [B, 1, H, D_h] for all positions
+            if intent_phase.dim() == 2:
+                intent_phase = intent_phase.unsqueeze(1).unsqueeze(-1)  # [B, 1, H, 1]
+            elif intent_phase.dim() == 3:
+                intent_phase = intent_phase.unsqueeze(1)  # [B, 1, H, D_h]
+            phi_k = phi_k + intent_phase
+
+        # Track R_k health
+        with torch.no_grad():
+            self._last_r_k_mean = a_k.mean().item()
+            self._last_r_k_std = a_k.std().item()
+
+        # Ablation
+        if self._ablation_mode == "scramble":
+            torch.manual_seed(self._ablation_seed)
+            for b in range(B):
+                for h in range(self.num_heads):
+                    perm = torch.randperm(N, device=phi_k.device)
+                    phi_k[b, :, h, :] = phi_k[b, perm, h, :]
+        elif self._ablation_mode in ["freeze", "off"]:
+            phi_k = torch.zeros_like(phi_k)
+
+        # Convert to float32 for complex ops if needed
+        orig_dtype = phi_k.dtype
+        if orig_dtype == torch.bfloat16:
+            phi_k = phi_k.float()
+            a_k = a_k.float()
+            v = v.float()
+
+        # Form complex phasors
+        k_phasor = torch.polar(a_k, -phi_k)  # [B, N, H, D_h]
+        v_complex = torch.complex(v, torch.zeros_like(v))
+        kv = k_phasor * v_complex
+
+        # O(n) State accumulation
+        if not self.learned_decay and self.decay_gamma == 1.0:
+            # Infinite memory via cumsum
+            memory_state = torch.cumsum(kv, dim=1)
+        else:
+            # EMA with decay
+            if self.learned_decay:
+                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)
+            else:
+                gamma = self.decay_gamma
+            memory_state = parallel_ema_scan(kv, gamma)
+
+        # Return real part as memory state
+        memory_state = memory_state.real
+
+        if orig_dtype == torch.bfloat16:
+            memory_state = memory_state.to(orig_dtype)
+
+        return memory_state.reshape(B, N, D)
+
+
+class BindingCacheQuadQuery(nn.Module):
+    """
+    Quadratic attention that queries ONLY from Phase's memory state.
+
+    Quad's EXCLUSIVE role: Query memory via O(n²) attention or O(nk) Top-K cache.
+    Keys and Values come from memory_state, NOT from input tokens.
+
+    This prevents gradient competition that causes Phase to become decorative.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        top_k: int = 64,  # Cache size per head
+        use_cache: bool = True,  # If False, use full O(n²) attention
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.top_k = top_k
+        self.use_cache = use_cache
+        self.scale = self.head_dim ** -0.5
+
+        # Query projection (from input - "what am I looking for?")
+        self.W_q = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Key/Value projections (from memory_state - "what can I retrieve?")
+        self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Output projection
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        # Layer norms
+        self.norm_q = nn.LayerNorm(embed_dim)
+        self.norm_mem = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Binding score interpolation: α(t) * dot + (1-α(t)) * cos
+        # Learned per query (linear + sigmoid)
+        self.alpha_proj = nn.Linear(embed_dim, num_heads, bias=True)
+
+        # Instrumentation
+        self._cache_hit_rate = 0.0
+        self._mean_alpha = 0.0
+
+    def get_instrumentation(self) -> dict:
+        """Return instrumentation metrics."""
+        return {
+            "cache_hit_rate": self._cache_hit_rate,
+            "mean_alpha": self._mean_alpha,
+        }
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+        causal_mask: bool = True,
+        binding_salience: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Query Phase's memory state.
+
+        Args:
+            x: Input tensor [B, N, D] - source for queries
+            memory_state: [B, N, D] - from BindingCachePhaseState
+            causal_mask: Apply causal masking
+            binding_salience: Optional [B, N] - per-position salience scores from
+                             OntologicalBindingAnnotator. Biases Top-K selection
+                             WITHOUT modifying core attention math.
+                             Higher salience = more likely to be in Top-K cache.
+
+        Returns:
+            output: [B, N, D] - attention-weighted retrieval from memory
+        """
+        B, N, D = x.shape
+        H, D_h = self.num_heads, self.head_dim
+
+        # Normalize inputs
+        x_norm = self.norm_q(x)
+        mem_norm = self.norm_mem(memory_state)
+
+        # Project queries from input, K/V from memory state
+        Q = self.W_q(x_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+        K = self.W_k(mem_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+        V = self.W_v(mem_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Compute binding scores
+        # Standard dot product: Q @ K^T
+        scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Apply causal mask
+        if causal_mask:
+            mask = torch.triu(
+                torch.ones(N, N, device=x.device, dtype=torch.bool),
+                diagonal=1
+            )
+            scores = scores.masked_fill(mask, float('-inf'))
+
+        # Top-K cache (optional)
+        if self.use_cache and self.top_k < N:
+            # For each query position, keep only top-k keys
+            # This reduces O(n²) to O(nk)
+
+            # BINDING SALIENCE: Bias Top-K selection WITHOUT modifying attention math
+            # Salience affects WHICH positions are selected, not HOW they're weighted
+            if binding_salience is not None:
+                # binding_salience: [B, N] → [B, 1, 1, N] for broadcasting
+                salience_bias = binding_salience.unsqueeze(1).unsqueeze(1)  # [B, 1, 1, N]
+                # Use salience-biased scores for TOP-K SELECTION ONLY
+                selection_scores = scores + salience_bias
+            else:
+                selection_scores = scores
+
+            # Select Top-K using (possibly biased) selection scores
+            _, top_indices = selection_scores.topk(
+                min(self.top_k, N), dim=-1, largest=True
+            )  # [B, H, N, k]
+
+            # IMPORTANT: Gather ORIGINAL scores for attention weights (pure physics)
+            # This ensures attention math is unmodified - salience only affects selection
+            top_scores = torch.gather(scores, -1, top_indices)  # [B, H, N, k]
+
+            # Track cache hit rate (what fraction of sequence we attend to)
+            with torch.no_grad():
+                self._cache_hit_rate = min(self.top_k, N) / N
+
+            # Softmax over top-k only (using ORIGINAL scores, not biased)
+            attn_weights = F.softmax(top_scores, dim=-1)  # [B, H, N, k]
+            attn_weights = self.dropout(attn_weights)
+
+            # Gather corresponding values
+            # Expand indices for value gathering
+            top_indices_expanded = top_indices.unsqueeze(-1).expand(-1, -1, -1, -1, D_h)
+            V_expanded = V.unsqueeze(2).expand(-1, -1, N, -1, -1)  # [B, H, N, N, D_h]
+            top_V = torch.gather(V_expanded, 3, top_indices_expanded)  # [B, H, N, k, D_h]
+
+            # Weighted sum
+            out = torch.einsum('bhqk,bhqkd->bhqd', attn_weights, top_V)  # [B, H, N, D_h]
+        else:
+            # Full O(n²) attention
+            attn_weights = F.softmax(scores, dim=-1)  # [B, H, N, N]
+            attn_weights = self.dropout(attn_weights)
+            out = torch.matmul(attn_weights, V)  # [B, H, N, D_h]
+
+            with torch.no_grad():
+                self._cache_hit_rate = 1.0  # Using full attention
+
+        # Track mean alpha (for instrumentation)
+        with torch.no_grad():
+            alpha = torch.sigmoid(self.alpha_proj(x_norm))  # [B, N, H]
+            self._mean_alpha = alpha.mean().item()
+
+        # Reshape and project output
+        out = out.transpose(1, 2).reshape(B, N, D)  # [B, N, D]
+        out = self.out_proj(out)
+
+        return out
+
+
+class BindingCacheBlock(nn.Module):
+    """
+    Transformer block with PROTECTED Phase and Quad roles.
+
+    Sequential collaboration (validated by diagnostic probes):
+    1. Phase accumulates memory state [O(n)]
+    2. Quad queries memory state [O(nk) with cache]
+
+    No gradient competition - they collaborate instead of compete.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 1.0,
+        learned_decay: bool = False,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+    ):
+        super().__init__()
+
+        # Phase: memory state accumulator
+        self.phase_state = BindingCachePhaseState(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            decay_gamma=decay_gamma,
+            learned_decay=learned_decay,
+            bounded_phase=bounded_phase,
+        )
+
+        # Quad: memory state query
+        self.quad_query = BindingCacheQuadQuery(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            top_k=top_k,
+            use_cache=use_cache,
+        )
+
+        # Feed-forward
+        self.norm_ff = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout),
+        )
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set Phase ablation mode."""
+        self.phase_state.set_ablation(mode, seed)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass with protected Phase → Quad flow.
+
+        Args:
+            x: Input tensor [B, N, D]
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
+            binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
+                             Biases Top-K selection in Quad WITHOUT modifying attention math.
+
+        Returns:
+            output: [B, N, D]
+        """
+        # Step 1: Phase accumulates memory state (with optional intent rotation)
+        # Phase is PURE - no auxiliary systems act here
+        memory_state = self.phase_state(x, intent_phase=intent_phase)
+
+        # Step 2: Quad queries memory state (with optional salience bias for Top-K)
+        # Salience affects SELECTION, not attention weights
+        attn_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+
+        # Residual connection
+        x = x + attn_out
+
+        # Feed-forward with residual
+        x = x + self.ff(self.norm_ff(x))
+
+        return x
+
+
+class BindingCacheTransformer(nn.Module):
+    """
+    Transformer with Binding Cache architecture.
+
+    Validated by diagnostic probes to prevent Phase decorativeness:
+    - Phase: O(n) state accumulator (exclusive role)
+    - Quad: O(nk) memory query via Top-K cache (exclusive role)
+
+    Reference: --protected-phase experiment showed -50% ablation drop
+    when Phase has protected role (vs ~0% when mixed with Quad).
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embed_dim: int,
+        num_layers: int,
+        num_heads: int,
+        ff_dim: int,
+        max_seq_len: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 1.0,
+        learned_decay: bool = False,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+        tie_embeddings: bool = True,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.embed_dim = embed_dim
+        self.num_layers = num_layers
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Binding Cache blocks
+        self.blocks = nn.ModuleList([
+            BindingCacheBlock(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                ff_dim=ff_dim,
+                dropout=dropout,
+                decay_gamma=decay_gamma,
+                learned_decay=learned_decay,
+                bounded_phase=bounded_phase,
+                top_k=top_k,
+                use_cache=use_cache,
+            )
+            for _ in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Tie embeddings
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set Phase ablation mode for all blocks."""
+        for block in self.blocks:
+            block.set_ablation(mode, seed)
+
+    def get_phase_health(self) -> dict:
+        """Aggregate Phase health metrics from all blocks."""
+        r_k_means = []
+        for block in self.blocks:
+            metrics = block.phase_state.get_health_metrics()
+            r_k_means.append(metrics["r_k_mean"])
+
+        return {
+            "r_k_mean": sum(r_k_means) / len(r_k_means) if r_k_means else 0.0,
+            "r_k_per_layer": r_k_means,
+        }
+
+    def get_instrumentation(self) -> dict:
+        """Aggregate instrumentation metrics from all blocks."""
+        cache_hit_rates = []
+        mean_alphas = []
+        for block in self.blocks:
+            inst = block.quad_query.get_instrumentation()
+            cache_hit_rates.append(inst["cache_hit_rate"])
+            mean_alphas.append(inst["mean_alpha"])
+
+        return {
+            "cache_hit_rate": sum(cache_hit_rates) / len(cache_hit_rates) if cache_hit_rates else 0.0,
+            "mean_alpha": sum(mean_alphas) / len(mean_alphas) if mean_alphas else 0.0,
+        }
+
+    def forward_hidden(
+        self,
+        input_ids: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass returning hidden states BEFORE LM head.
+
+        Use this for Ontological integration - compute state delta from hidden,
+        then call full forward with intent_phase.
+
+        Args:
+            input_ids: [B, N] token IDs
+            intent_phase: Optional phase rotation from Ontological State Delta
+            binding_salience: Optional [B, N] - per-position salience from
+                             OntologicalBindingAnnotator for Top-K selection bias
+
+        Returns:
+            hidden: [B, N, embed_dim] - normalized hidden states before LM head
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
+
+        # Transformer blocks (with optional intent_phase and binding_salience)
+        for block in self.blocks:
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
+
+        # Return normalized hidden states
+        return self.norm(x)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        intent_phase: Optional[torch.Tensor] = None,
+        binding_salience: Optional[torch.Tensor] = None,
+        return_hidden: bool = False,
+        return_last_hidden: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Dict[str, torch.Tensor]]:
+        """
+        Forward pass with optional intent phase rotation and binding salience.
+
+        Args:
+            input_ids: [B, N] token IDs
+            labels: Optional [B, N] labels for loss computation
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta
+            binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
+                             Biases Top-K selection in Quad WITHOUT modifying attention math.
+                             This is where CSR/Kosha/SRK act - as binding selectors, not attention modifiers.
+            return_hidden: Return dict with hidden states
+            return_last_hidden: Return dict with last hidden state
+
+        Returns:
+            logits: [B, N, vocab_size] or (loss, logits) if labels provided
+            Or Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state'
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
+
+        # Transformer blocks (with optional intent_phase and binding_salience)
+        # Core attention is PURE - binding_salience only affects Top-K selection
+        hidden_states = [] if return_hidden else None
+        for block in self.blocks:
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
+            if return_hidden:
+                hidden_states.append(x)
+
+        # Output
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        # Return format depends on options
+        if return_hidden or return_last_hidden:
+            result = {'logits': logits}
+            if return_hidden:
+                result['hidden_states'] = hidden_states
+            if return_last_hidden:
+                result['last_hidden_state'] = x
+            return result
+
+        if labels is not None:
+            loss = F.cross_entropy(
+                logits.view(-1, self.vocab_size),
+                labels.view(-1),
+                ignore_index=-100,
+            )
+            return loss, logits
+
+        return logits
+
+    def count_params(self) -> int:
+        """Count trainable parameters."""
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# =============================================================================
+# ONTOLOGICAL BINDING CACHE (V10.0) - AGI Architecture
+# =============================================================================
+# Combines:
+# 1. Binding Cache: Protected Phase + Top-K Query (validated by probes)
+# 2. 32D Sovereign State: Ontological reasoning (Bhava, Kosha, Vritti, Guna)
+#
+# This is the canonical architecture for AGI:
+# - Phase: O(n) state accumulator with intent modulation
+# - Quad: O(nk) query mechanism
+# - Sovereign State: 32D semantic understanding that modulates Phase
+# =============================================================================
+
+
+class OntologicalBindingCacheTransformer(nn.Module):
+    """
+    AGI Architecture: Binding Cache + 32D Sovereign State.
+
+    Combines:
+    1. Binding Cache (validated by probes): Protected Phase + Top-K Query
+       - Phase ablation drop: -50% to -54% (Phase is ESSENTIAL)
+       - No gradient competition between Phase and Quad
+
+    2. 32D Sovereign State (ontological reasoning):
+       - [0:12]  12 Bhavas (Ontological Aspects)
+       - [12:17] 5 Koshas (Consciousness Sheaths)
+       - [17:22] 5 Vrittis (Mental Modifications)
+       - [22:28] 6 Gunas (Energy States)
+       - [28:32] 4 Reserved (Toroidal Feedback)
+
+    Theory:
+        - System 2 (Ontological): Slow, deliberate semantic reasoning → ΔS
+        - System 1 (Binding Cache): Fast pattern completion with intent modulation
+        - ΔS → Phase Rotation: Intent changes HOW bindings are stored/retrieved
+
+    From diagnostic probes:
+        - When Phase has protected role: -50% ablation drop (ESSENTIAL)
+        - When Phase is mixed with Quad: ~0% drop (DECORATIVE)
+
+    Usage:
+        model = OntologicalBindingCacheTransformer(...)
+        output = model(input_ids)  # Computes ΔS and applies to Protected Phase
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        # Binding Cache params
+        decay_gamma: float = 1.0,
+        learned_decay: bool = False,
+        top_k: int = 64,
+        use_cache: bool = True,
+        # Ontological params
+        state_dim: int = SOVEREIGN_STATE_DIM,  # 32D Sovereign State
+        project_per_head_dim: bool = False,
+        tie_embeddings: bool = True,
+        # Binding Annotation params (CSR/Kosha/SRK as selectors, not modifiers)
+        use_binding_annotator: bool = True,
+        use_csr_annotation: bool = True,
+        use_kosha_annotation: bool = True,
+        use_srk_annotation: bool = True,
+    ):
+        super().__init__()
+
+        # Default ff_dim
+        if ff_dim is None:
+            ff_dim = embed_dim * 4
+
+        # Store annotation flags
+        self.use_binding_annotator = use_binding_annotator
+
+        # The Binding Cache (generation) model
+        self.binding_cache = BindingCacheTransformer(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            decay_gamma=decay_gamma,
+            learned_decay=learned_decay,
+            bounded_phase=True,  # Always enabled (mandatory from probes)
+            top_k=top_k,
+            use_cache=use_cache,
+            tie_embeddings=tie_embeddings,
+        )
+
+        # State projector: hidden[embed_dim] → SovereignState[32]
+        if SOVEREIGN_PROJECTOR_AVAILABLE:
+            self.state_projector = SovereignStateProjector(
+                hidden_dim=embed_dim,
+                state_dim=state_dim,
+                intermediate_dim=embed_dim // 2,
+                dropout=0.1,
+                use_layer_norm=True,
+            )
+        else:
+            # Fallback to raw projection
+            self.state_projector = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim // 2),
+                nn.GELU(),
+                nn.Linear(embed_dim // 2, state_dim),
+            )
+            self._init_absolute_potential_bias()
+
+        # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
+        head_dim = embed_dim // num_heads
+        self.intent_projector = IntentPhaseProjector(
+            state_dim=state_dim,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            project_per_head_dim=project_per_head_dim,
+        )
+
+        # Store config
+        self.state_dim = state_dim
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+
+        # Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
+        # This computes binding salience that biases Top-K selection
+        # Clean separation: Attention = physics, Annotator = semantics
+        if use_binding_annotator:
+            self.binding_annotator = OntologicalBindingAnnotator(
+                embed_dim=embed_dim,
+                state_dim=state_dim,
+                num_heads=num_heads,
+                use_csr=use_csr_annotation,
+                use_kosha=use_kosha_annotation,
+                use_srk=use_srk_annotation,
+            )
+        else:
+            self.binding_annotator = None
+
+        # Previous state for delta computation
+        self.register_buffer('prev_state', None, persistent=False)
+
+    def _init_absolute_potential_bias(self):
+        """Initialize state projector to bias toward 'Absolute Potential' state."""
+        with torch.no_grad():
+            final_layer = self.state_projector[-1]
+            if hasattr(final_layer, 'bias') and final_layer.bias is not None:
+                final_layer.bias.fill_(0.0)
+                if final_layer.bias.shape[0] > 11:
+                    final_layer.bias[11] = 1.0  # O12_ABS
+                if final_layer.bias.shape[0] > 12:
+                    final_layer.bias[12] = 0.8  # Material
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set Phase ablation mode for all blocks."""
+        self.binding_cache.set_ablation(mode, seed)
+
+    def get_phase_health(self) -> dict:
+        """Get Phase health metrics from Binding Cache."""
+        return self.binding_cache.get_phase_health()
+
+    def get_instrumentation(self) -> dict:
+        """Get instrumentation metrics from Binding Cache."""
+        return self.binding_cache.get_instrumentation()
+
+    def compute_state_delta(
+        self,
+        hidden: torch.Tensor,
+        reset_state: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute 32D Sovereign State and its delta from hidden states.
+
+        Args:
+            hidden: [B, N, embed_dim] - hidden states from binding cache
+            reset_state: Reset prev_state (use at start of new sequence)
+
+        Returns:
+            state: [B, 32] - current Sovereign State (pooled)
+            delta_S: [B, 32] - change from previous state
+        """
+        # Pool hidden states
+        pooled = hidden.mean(dim=1)  # [B, embed_dim]
+
+        # Project to Sovereign State
+        state = self.state_projector(pooled)  # [B, state_dim]
+
+        # Compute delta
+        batch_size_changed = (
+            self.prev_state is not None and
+            self.prev_state.shape[0] != state.shape[0]
+        )
+        if reset_state or self.prev_state is None or batch_size_changed:
+            delta_S = torch.zeros_like(state)
+        else:
+            delta_S = state - self.prev_state
+
+        # Update prev_state
+        self.prev_state = state.detach()
+
+        return state, delta_S
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        return_hidden: bool = False,
+        return_last_hidden: bool = False,
+        reset_state: bool = False,
+        external_delta_S: Optional[torch.Tensor] = None,
+        csr_mask: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with Ontological → Binding Cache integration.
+
+        Two-pass architecture:
+        1. First pass: Get hidden states WITHOUT intent phase
+        2. Compute state delta from hidden states
+        3. Compute binding salience from OntologicalBindingAnnotator
+        4. Second pass: Full forward WITH intent phase AND binding salience
+
+        Clean separation:
+        - Attention = physics (pure, domain-agnostic)
+        - Binding Annotator = semantics (CSR/Kosha/SRK as selectors)
+
+        Args:
+            input_ids: [B, N] token indices
+            attention_mask: [B, N] optional mask (currently unused)
+            labels: Optional [B, N] labels for loss computation
+            return_hidden: Return all hidden states
+            return_last_hidden: Return final hidden state
+            reset_state: Reset Ontological state (new sequence)
+            external_delta_S: [B, state_dim] external state delta
+            csr_mask: [B, N] optional CSR content word mask for binding annotation
+
+        Returns:
+            Dict with:
+            - 'logits': [B, N, V] output logits
+            - 'state': [B, 32] current Sovereign State
+            - 'delta_S': [B, 32] state delta
+            - 'intent_phase': [B, H] or [B, H, D_h] phase rotation
+            - 'loss': Optional, if labels provided
+        """
+        # First pass: Get hidden states WITHOUT intent phase or salience
+        with torch.no_grad():
+            hidden = self.binding_cache.forward_hidden(input_ids, intent_phase=None)
+
+        # Compute state delta (or use external)
+        if external_delta_S is not None:
+            delta_S = external_delta_S
+            state = self.state_projector(hidden.mean(dim=1))
+        else:
+            state, delta_S = self.compute_state_delta(hidden, reset_state)
+
+        # Convert delta_S to intent phase rotation
+        intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
+
+        # Compute binding salience using OntologicalBindingAnnotator
+        # This is where CSR/Kosha/SRK act as SELECTORS (semantics), not attention modifiers
+        # Salience biases Top-K selection without changing attention math
+        binding_salience = None
+        if self.binding_annotator is not None:
+            # Extract Kosha activations from state if available
+            kosha_activations = None
+            if self.state_dim >= 17:
+                # Kosha is in positions [12:17] of Sovereign State
+                kosha_activations = state[:, 12:17]  # [B, 5]
+
+            binding_salience = self.binding_annotator(
+                hidden_states=hidden,
+                sovereign_state=state,
+                kosha_activations=kosha_activations,
+                csr_mask=csr_mask,  # CSR content word mask for phonological grounding
+            )
+
+        # Second pass: Full forward WITH intent phase AND binding salience
+        result = self.binding_cache(
+            input_ids,
+            labels=labels,
+            intent_phase=intent_phase,
+            binding_salience=binding_salience,
+            return_hidden=return_hidden,
+            return_last_hidden=return_last_hidden,
+        )
+
+        # Handle different return types from binding_cache
+        if isinstance(result, dict):
+            output = result
+        elif isinstance(result, tuple):
+            # (loss, logits) format
+            output = {'logits': result[1], 'loss': result[0]}
+        else:
+            # Just logits
+            output = {'logits': result}
+
+        # Add ontological outputs
+        output['state'] = state
+        output['delta_S'] = delta_S
+        output['intent_phase'] = intent_phase
+        if binding_salience is not None:
+            output['binding_salience'] = binding_salience
+
+        return output
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Generation with Ontological state tracking."""
+        self.prev_state = None
+
+        for _ in range(max_new_tokens):
+            result = self(input_ids, reset_state=(self.prev_state is None))
+            logits = result['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+        return input_ids
+
+    def count_params(self) -> int:
+        """Count trainable parameters."""
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 # =============================================================================
 # STANDARD ATTENTION (O(n²)) - For Comparison
 # =============================================================================
