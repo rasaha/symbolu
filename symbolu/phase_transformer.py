@@ -2068,12 +2068,20 @@ class BindingCacheQuadQuery(nn.Module):
         # Instrumentation
         self._cache_hit_rate = 0.0
         self._mean_alpha = 0.0
+        # Cache health metrics (per ChatGPT recommendation)
+        self._cache_key_cosine_mean = 0.0
+        self._cache_key_cosine_max = 0.0
 
     def get_instrumentation(self) -> dict:
         """Return instrumentation metrics."""
         return {
             "cache_hit_rate": self._cache_hit_rate,
             "mean_alpha": self._mean_alpha,
+            # Cache health: cosine similarity between keys
+            # mean > 0.85 = redundancy building
+            # max > 0.95 = slot collision
+            "cache_key_cosine_mean": self._cache_key_cosine_mean,
+            "cache_key_cosine_max": self._cache_key_cosine_max,
         }
 
     def forward(
@@ -2175,6 +2183,27 @@ class BindingCacheQuadQuery(nn.Module):
         with torch.no_grad():
             alpha = torch.sigmoid(self.alpha_proj(x_norm))  # [B, N, H]
             self._mean_alpha = alpha.mean().item()
+
+            # Cache health: key cosine similarity (sampled for efficiency)
+            # High cosine = redundancy in memory state
+            # Sample every 16th key to avoid O(n²) cost
+            sample_stride = max(1, N // 32)
+            K_sample = K[:, :, ::sample_stride, :]  # [B, H, N_sample, D_h]
+            K_norm = F.normalize(K_sample, dim=-1)  # Unit vectors
+            # Pairwise cosine: [B, H, N_sample, N_sample]
+            cosine_matrix = torch.matmul(K_norm, K_norm.transpose(-2, -1))
+            # Zero out diagonal (self-similarity = 1)
+            n_sample = K_sample.shape[2]
+            diag_mask = torch.eye(n_sample, device=K.device, dtype=torch.bool)
+            cosine_off_diag = cosine_matrix.masked_fill(diag_mask, 0.0)
+            # Track mean and max (excluding diagonal)
+            n_pairs = n_sample * (n_sample - 1)
+            if n_pairs > 0:
+                self._cache_key_cosine_mean = cosine_off_diag.sum().item() / (B * H * n_pairs)
+                self._cache_key_cosine_max = cosine_off_diag.max().item()
+            else:
+                self._cache_key_cosine_mean = 0.0
+                self._cache_key_cosine_max = 0.0
 
         # Reshape and project output
         out = out.transpose(1, 2).reshape(B, N, D)  # [B, N, D]
@@ -2448,6 +2477,10 @@ class BindingCacheTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
+        # Logit scaling (same principle as QK scaling in attention)
+        # Prevents overconfident early logits without disrupting Phase/Binding dynamics
+        self.logit_scale = 1.0 / math.sqrt(embed_dim)
+
         # Tie embeddings
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -2473,14 +2506,23 @@ class BindingCacheTransformer(nn.Module):
         """Aggregate instrumentation metrics from all blocks."""
         cache_hit_rates = []
         mean_alphas = []
+        cosine_means = []
+        cosine_maxes = []
         for block in self.blocks:
             inst = block.quad_query.get_instrumentation()
             cache_hit_rates.append(inst["cache_hit_rate"])
             mean_alphas.append(inst["mean_alpha"])
+            cosine_means.append(inst["cache_key_cosine_mean"])
+            cosine_maxes.append(inst["cache_key_cosine_max"])
 
         return {
             "cache_hit_rate": sum(cache_hit_rates) / len(cache_hit_rates) if cache_hit_rates else 0.0,
             "mean_alpha": sum(mean_alphas) / len(mean_alphas) if mean_alphas else 0.0,
+            # Cache health (per ChatGPT recommendation):
+            # mean > 0.85 = redundancy building
+            # max > 0.95 = slot collision
+            "cache_key_cosine_mean": sum(cosine_means) / len(cosine_means) if cosine_means else 0.0,
+            "cache_key_cosine_max": max(cosine_maxes) if cosine_maxes else 0.0,
         }
 
     def forward_hidden(
@@ -2559,7 +2601,7 @@ class BindingCacheTransformer(nn.Module):
 
         # Output
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         # Return format depends on options
         if return_hidden or return_last_hidden:
