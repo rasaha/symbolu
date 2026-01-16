@@ -125,6 +125,9 @@ class Config:
     # Parameter matching
     match_params: bool = False  # If True, adjust to match parameter counts
 
+    # Phase collapse fix
+    bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -907,11 +910,12 @@ class PhaseAttention(nn.Module):
     """
 
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.1,
-                 operation_tokens: List[int] = None):
+                 operation_tokens: List[int] = None, bounded_phase: bool = True):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
+        self.bounded_phase = bounded_phase  # V9.9.11: Constrain φ to [-π, π] via π*sin()
 
         self.W_q_phase = nn.Linear(d_model, d_model)
         self.W_k_phase = nn.Linear(d_model, d_model)
@@ -1017,8 +1021,17 @@ class PhaseAttention(nn.Module):
         """
         B, N, D = x.shape
 
-        phi_q = math.pi * torch.sin(self.W_q_phase(x).view(B, N, self.num_heads, self.head_dim))
-        phi_k = math.pi * torch.sin(self.W_k_phase(x).view(B, N, self.num_heads, self.head_dim))
+        # Compute phase projections
+        phi_q_raw = self.W_q_phase(x).view(B, N, self.num_heads, self.head_dim)
+        phi_k_raw = self.W_k_phase(x).view(B, N, self.num_heads, self.head_dim)
+
+        # V9.9.11: Bounded phase parameterization (constrain φ to [-π, π] via π*sin())
+        if self.bounded_phase:
+            phi_q = math.pi * torch.sin(phi_q_raw)
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_q = phi_q_raw
+            phi_k = phi_k_raw
 
         # Apply operation-conditioned phase shifts BEFORE ablation
         phi_k = self._apply_operation_phase_shifts(phi_k, token_ids)
@@ -1070,14 +1083,15 @@ class PhaseAttention(nn.Module):
 
 class TransformerBlock(nn.Module):
     def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float,
-                 use_phase: bool, extra_ff: int = 0, operation_tokens: List[int] = None):
+                 use_phase: bool, extra_ff: int = 0, operation_tokens: List[int] = None,
+                 bounded_phase: bool = True):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
 
         # PhaseAttention gets operation_tokens for conditioned phase shifts
         if use_phase:
-            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens)
+            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
         else:
             self.attn = QuadraticAttention(d_model, num_heads, dropout)
 
@@ -1124,6 +1138,7 @@ class HybridTransformerBlock(nn.Module):
         dropout: float,
         phase_ratio: float = 0.5,  # 0.0 = pure Quadratic, 1.0 = pure Phase
         operation_tokens: List[int] = None,
+        bounded_phase: bool = True,
     ):
         super().__init__()
         self.phase_ratio = phase_ratio
@@ -1131,7 +1146,7 @@ class HybridTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
         # Both attention types
-        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens)
+        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
         self.quad_attn = QuadraticAttention(d_model, num_heads, dropout)
 
         self.ff = nn.Sequential(
@@ -1195,6 +1210,7 @@ class HybridTransformer(nn.Module):
         num_classes: int,
         curriculum: List[float],  # phase_ratio per layer
         operation_tokens: List[int] = None,
+        bounded_phase: bool = True,
     ):
         super().__init__()
         self.curriculum = curriculum
@@ -1211,7 +1227,8 @@ class HybridTransformer(nn.Module):
             HybridTransformerBlock(
                 d_model, num_heads, d_ff, dropout,
                 phase_ratio=curriculum[i],
-                operation_tokens=operation_tokens
+                operation_tokens=operation_tokens,
+                bounded_phase=bounded_phase,
             )
             for i in range(num_layers)
         ])
@@ -1294,11 +1311,12 @@ class ProtectedPhaseAttention(nn.Module):
     """
 
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.1,
-                 operation_tokens: List[int] = None):
+                 operation_tokens: List[int] = None, bounded_phase: bool = True):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
+        self.bounded_phase = bounded_phase  # V9.9.11: Constrain φ to [-π, π] via π*sin()
 
         # Phase projections for keys
         self.W_k_phase = nn.Linear(d_model, d_model)
@@ -1346,8 +1364,15 @@ class ProtectedPhaseAttention(nn.Module):
         """
         B, N, D = x.shape
 
-        # Compute phase and amplitude for keys
-        phi_k = math.pi * torch.sin(self.W_k_phase(x).view(B, N, self.num_heads, self.head_dim))
+        # Compute phase projection for keys
+        phi_k_raw = self.W_k_phase(x).view(B, N, self.num_heads, self.head_dim)
+
+        # V9.9.11: Bounded phase parameterization (constrain φ to [-π, π] via π*sin())
+        if self.bounded_phase:
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_k = phi_k_raw
+
         a_k = torch.sigmoid(self.W_k_amp(x)).view(B, N, self.num_heads, self.head_dim)
         v = self.W_v(x).view(B, N, self.num_heads, self.head_dim)
 
@@ -1473,6 +1498,7 @@ class ProtectedPhaseBlock(nn.Module):
         d_ff: int,
         dropout: float,
         operation_tokens: List[int] = None,
+        bounded_phase: bool = True,
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
@@ -1480,7 +1506,7 @@ class ProtectedPhaseBlock(nn.Module):
         self.norm_mem = nn.LayerNorm(d_model)
 
         # Protected Phase: accumulates memory state
-        self.phase_memory = ProtectedPhaseAttention(d_model, num_heads, dropout, operation_tokens)
+        self.phase_memory = ProtectedPhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
         # Protected Quad: queries memory state
         self.quad_query = ProtectedQuadAttention(d_model, num_heads, dropout)
 
@@ -1534,6 +1560,7 @@ class ProtectedPhaseTransformer(nn.Module):
         max_seq_len: int,
         num_classes: int,
         operation_tokens: List[int] = None,
+        bounded_phase: bool = True,
     ):
         super().__init__()
         self.operation_tokens = operation_tokens
@@ -1543,7 +1570,7 @@ class ProtectedPhaseTransformer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         self.layers = nn.ModuleList([
-            ProtectedPhaseBlock(d_model, num_heads, d_ff, dropout, operation_tokens)
+            ProtectedPhaseBlock(d_model, num_heads, d_ff, dropout, operation_tokens, bounded_phase)
             for _ in range(num_layers)
         ])
 
@@ -1635,6 +1662,7 @@ class HardProbeTransformer(nn.Module):
         use_phase: bool,
         extra_ff_per_layer: int = 0,  # For parameter matching
         operation_tokens: List[int] = None,  # Tokens that trigger phase shifts
+        bounded_phase: bool = True,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
     ):
         super().__init__()
         self.use_phase = use_phase
@@ -1644,7 +1672,7 @@ class HardProbeTransformer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.layers = nn.ModuleList([
             TransformerBlock(d_model, num_heads, d_ff, dropout, use_phase,
-                           extra_ff_per_layer, operation_tokens)
+                           extra_ff_per_layer, operation_tokens, bounded_phase)
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(d_model)
@@ -2005,6 +2033,12 @@ Examples:
     parser.add_argument("--rotation-angles", type=str, default="0,45,90,135,180,270",
                         help="Comma-separated rotation angles in degrees for rotation test")
 
+    # Phase collapse fix (V9.9.11)
+    parser.add_argument("--bounded-phase", action="store_true", default=True,
+                        help="Constrain phase to [-π, π] via π*sin() (default: True)")
+    parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
+                        help="Disable bounded phase (use raw linear projection)")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -2034,6 +2068,7 @@ Examples:
         test_chain_length=(args.test_chain_min, args.test_chain_max),
         persist_chain_length=(args.persist_chain_min, args.persist_chain_max),
         match_params=args.match_params,
+        bounded_phase=args.bounded_phase,
         device=args.device,
     )
 
@@ -2136,11 +2171,16 @@ Examples:
         vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
         config.d_ff, config.dropout, config.max_seq_len, num_classes,
         use_phase=True, extra_ff_per_layer=0,
-        operation_tokens=operation_tokens  # Enable operation-conditioned phase shifts
+        operation_tokens=operation_tokens,  # Enable operation-conditioned phase shifts
+        bounded_phase=config.bounded_phase,  # V9.9.11: Constrain φ to [-π, π]
     ).to(config.device)
 
     print(f"Quadratic params: {model_quad.count_params():,}")
     print(f"Phase params:     {model_phase.count_params():,}")
+    if config.bounded_phase:
+        print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")
+    else:
+        print(f"  Bounded Phase: DISABLED (raw linear projection)")
     if config.match_params:
         diff = abs(model_phase.count_params() - model_quad.count_params())
         print(f"  Param difference: {diff:,} ({diff / model_phase.count_params() * 100:.1f}%)")
@@ -2162,7 +2202,8 @@ Examples:
             vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
             config.d_ff, config.dropout, config.max_seq_len, num_classes,
             curriculum=inverted_curriculum,
-            operation_tokens=operation_tokens
+            operation_tokens=operation_tokens,
+            bounded_phase=config.bounded_phase,
         ).to(config.device)
         print(f"  Hybrid params: {model_hybrid.count_params():,}")
 
@@ -2180,7 +2221,8 @@ Examples:
             vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
             config.d_ff, config.dropout, config.max_seq_len, num_classes,
             curriculum=standard_curriculum,
-            operation_tokens=operation_tokens
+            operation_tokens=operation_tokens,
+            bounded_phase=config.bounded_phase,
         ).to(config.device)
         print(f"  Standard Hybrid params: {model_hybrid_std.count_params():,}")
 
@@ -2201,7 +2243,8 @@ Examples:
         model_protected = ProtectedPhaseTransformer(
             vocab.vocab_size, config.d_model, config.num_heads, config.num_layers,
             config.d_ff, config.dropout, config.max_seq_len, num_classes,
-            operation_tokens=operation_tokens
+            operation_tokens=operation_tokens,
+            bounded_phase=config.bounded_phase,
         ).to(config.device)
         print(f"  Protected params: {model_protected.count_params():,}")
 
