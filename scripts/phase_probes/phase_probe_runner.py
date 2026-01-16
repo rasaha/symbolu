@@ -158,6 +158,40 @@ class ProbeSuiteResults:
 # MODEL LOADING
 # =============================================================================
 
+def load_pretrained_model(model_name: str, device: torch.device):
+    """
+    Load a pre-trained HuggingFace model for baseline comparison.
+
+    This allows testing the probe infrastructure without a custom checkpoint,
+    and establishes a baseline for standard attention models.
+
+    Args:
+        model_name: HuggingFace model name (e.g., "gpt2", "gpt2-medium")
+        device: Device to load model on
+
+    Returns:
+        model, tokenizer, None (no config for pretrained)
+    """
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    print(f"Loading pre-trained model: {model_name}")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model.to(device)
+    model.eval()
+
+    # GPT-2 doesn't have pad token by default
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    print(f"  Model type: {type(model).__name__} (pre-trained, NO phase attention)")
+    print(f"  Device: {device}")
+    print(f"  NOTE: Phase metrics will be N/A for pre-trained models")
+
+    return model, tokenizer, None
+
+
 def load_model_and_tokenizer(checkpoint_path: str, device: torch.device):
     """
     Load model from checkpoint with tokenizer.
@@ -1079,14 +1113,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+    # Test with a PhaseAttention checkpoint:
     python phase_probe_runner.py --checkpoint checkpoints/best.pt
     python phase_probe_runner.py --checkpoint checkpoints/best.pt --verbose
-    python phase_probe_runner.py --checkpoint checkpoints/best.pt --probe RB1
-    python phase_probe_runner.py --checkpoint checkpoints/best.pt --output results.json
+
+    # Test with a pre-trained HuggingFace model (no phase, baseline comparison):
+    python phase_probe_runner.py --pretrained gpt2
+    python phase_probe_runner.py --pretrained gpt2-medium --verbose
+
+    # Run specific probe or category:
+    python phase_probe_runner.py --pretrained gpt2 --probe RB1
+    python phase_probe_runner.py --pretrained gpt2 --category role_binding
         """
     )
-    parser.add_argument("--checkpoint", type=str, required=True,
-                        help="Path to model checkpoint")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="Path to PhaseAttention model checkpoint")
+    parser.add_argument("--pretrained", type=str, default=None,
+                        help="HuggingFace model name (e.g., gpt2, gpt2-medium) for baseline comparison")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device to run on (cuda/cpu)")
     parser.add_argument("--probe", type=str, default=None,
@@ -1104,6 +1147,12 @@ Examples:
 
     args = parser.parse_args()
 
+    # Validate: must specify either checkpoint or pretrained
+    if not args.checkpoint and not args.pretrained:
+        parser.error("Must specify either --checkpoint or --pretrained")
+    if args.checkpoint and args.pretrained:
+        parser.error("Cannot specify both --checkpoint and --pretrained")
+
     # Check device
     if args.device == "cuda" and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU")
@@ -1111,7 +1160,17 @@ Examples:
     device = torch.device(args.device)
 
     # Load model
-    model, tokenizer, config = load_model_and_tokenizer(args.checkpoint, device)
+    is_pretrained = args.pretrained is not None
+    if is_pretrained:
+        model, tokenizer, config = load_pretrained_model(args.pretrained, device)
+        model_source = f"pretrained:{args.pretrained}"
+        print("\n" + "=" * 60)
+        print("NOTE: Running with pre-trained model (NO PhaseAttention)")
+        print("Phase metrics will be N/A. This establishes a baseline.")
+        print("=" * 60)
+    else:
+        model, tokenizer, config = load_model_and_tokenizer(args.checkpoint, device)
+        model_source = args.checkpoint
 
     # Select probes to run
     probes_to_run = []
@@ -1188,7 +1247,7 @@ Examples:
             print(f"    Delta margin: {last_comp.delta_scramble:.3f}")
 
     # Aggregate and print results
-    summary = aggregate_results(all_results, comparisons, args.checkpoint)
+    summary = aggregate_results(all_results, comparisons, model_source)
 
     print_results_table(comparisons, all_results, args.verbose)
     print_health_table(all_results)
