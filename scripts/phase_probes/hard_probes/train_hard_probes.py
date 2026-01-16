@@ -1819,6 +1819,80 @@ Examples:
         print(f"{mode:<12} {acc*100:>11.1f}% {delta*100:>+11.1f}%")
 
     # ==========================================================================
+    # HYBRID ABLATION TESTS (v4) - Is Phase decorative or useful in hybrids?
+    # ==========================================================================
+    ablation_hybrid_inv = None
+    ablation_hybrid_std = None
+
+    if model_hybrid is not None:
+        print(f"\n--- HYBRID ABLATION: HybridInv (Phase early → Quad late) ---")
+        print(f"    Testing if Phase in EARLY layers contributes or is decorative")
+        ablation_hybrid_inv = run_ablation(model_hybrid, test_roles_loader, vocab, config.device)
+        baseline_inv = ablation_hybrid_inv["none"]
+
+        print(f"{'Mode':<12} {'Accuracy':>12} {'Delta':>12} {'Interpretation':<30}")
+        print("-" * 70)
+        for mode, acc in ablation_hybrid_inv.items():
+            delta = acc - baseline_inv
+            if mode == "none":
+                interp = ""
+            elif abs(delta) < 0.05:
+                interp = "← Phase is DECORATIVE"
+            elif delta < -0.15:
+                interp = "← Phase is CRITICAL"
+            else:
+                interp = "← Phase contributes"
+            print(f"{mode:<12} {acc*100:>11.1f}% {delta*100:>+11.1f}% {interp}")
+
+    if model_hybrid_std is not None:
+        print(f"\n--- HYBRID ABLATION: HybridStd (Quad early → Phase late) ---")
+        print(f"    Testing if Phase in LATE layers contributes or is decorative")
+        ablation_hybrid_std = run_ablation(model_hybrid_std, test_roles_loader, vocab, config.device)
+        baseline_std = ablation_hybrid_std["none"]
+
+        print(f"{'Mode':<12} {'Accuracy':>12} {'Delta':>12} {'Interpretation':<30}")
+        print("-" * 70)
+        for mode, acc in ablation_hybrid_std.items():
+            delta = acc - baseline_std
+            if mode == "none":
+                interp = ""
+            elif abs(delta) < 0.05:
+                interp = "← Phase is DECORATIVE"
+            elif delta < -0.15:
+                interp = "← Phase is CRITICAL"
+            else:
+                interp = "← Phase contributes"
+            print(f"{mode:<12} {acc*100:>11.1f}% {delta*100:>+11.1f}% {interp}")
+
+    # Summary comparison of ablation impacts
+    if ablation_hybrid_inv is not None and ablation_hybrid_std is not None:
+        print(f"\n--- ABLATION SUMMARY: Is Phase Decorative? ---")
+        drop_pure = baseline - ablation["scramble"]
+        drop_inv = ablation_hybrid_inv["none"] - ablation_hybrid_inv["scramble"]
+        drop_std = ablation_hybrid_std["none"] - ablation_hybrid_std["scramble"]
+
+        print(f"  Ablation drop (scramble):")
+        print(f"    Pure Phase:   {drop_pure*100:>+6.1f}%  {'← Phase is PRIMARY' if drop_pure > 0.15 else ''}")
+        print(f"    HybridInv:    {drop_inv*100:>+6.1f}%  {'← Phase EARLY matters' if drop_inv > 0.10 else '← Phase early is weak'}")
+        print(f"    HybridStd:    {drop_std*100:>+6.1f}%  {'← Phase LATE matters' if drop_std > 0.10 else '← Phase late is DECORATIVE'}")
+
+        print(f"\n  Conclusion:")
+        if drop_std < 0.05:
+            print(f"    → Phase is DECORATIVE when Quadratic dominates early")
+            print(f"    → Quadratic 'steals' the learning signal")
+            print(f"    → Consider: Protected Phase, Sequential, or Different Tasks")
+        elif drop_inv < 0.05:
+            print(f"    → Phase is DECORATIVE when it comes first")
+            print(f"    → Phase can't establish useful representations alone")
+            print(f"    → Quadratic late can compensate")
+        elif drop_inv > drop_std:
+            print(f"    → Phase EARLY contributes more than Phase LATE")
+            print(f"    → Supports: Phase = state capture mechanism")
+        else:
+            print(f"    → Phase LATE contributes more than Phase EARLY")
+            print(f"    → Supports: Phase = retrieval mechanism")
+
+    # ==========================================================================
     # SCIENTIFIC VERDICT
     # ==========================================================================
     print("\n" + "=" * 70)
