@@ -104,18 +104,18 @@ class Vocabulary:
 
     Design: Use abstract symbols to prevent semantic shortcuts.
 
-    Tokens (total: 28, under 30 limit):
+    Tokens (total: 30, at ≤30 limit):
         0: PAD
         1: SEP (separator)
         2: QUERY
         3: ANS
         4-9: Entities (E0-E5)
-        10-13: Roles (R0-R3)
-        14-17: Pronouns (PRON0-PRON3: he/she/it/they abstract)
-        18-21: Verbs (V0-V3)
-        22-25: Contexts (CTX0-CTX3)
-        26: NEG (negation marker)
-        27: BIND (binding marker)
+        10-15: Roles (R0-R5) - expanded to match entities
+        16-19: Pronouns (PRON0-PRON3: he/she/it/they abstract)
+        20-23: Verbs (V0-V3)
+        24-27: Contexts (CTX0-CTX3)
+        28: NEG (negation marker)
+        29: BIND (binding marker)
     """
 
     def __init__(self):
@@ -128,23 +128,23 @@ class Vocabulary:
         # Entities
         self.entities = list(range(4, 10))  # E0-E5
 
-        # Roles
-        self.roles = list(range(10, 14))  # R0-R3
+        # Roles (expanded to 6 to match entities for high-difficulty BIND)
+        self.roles = list(range(10, 16))  # R0-R5
 
         # Pronouns (abstract - no gender semantics)
-        self.pronouns = list(range(14, 18))  # PRON0-PRON3
+        self.pronouns = list(range(16, 20))  # PRON0-PRON3
 
         # Verbs
-        self.verbs = list(range(18, 22))  # V0-V3
+        self.verbs = list(range(20, 24))  # V0-V3
 
         # Contexts (for SI - sense disambiguation)
-        self.contexts = list(range(22, 26))  # CTX0-CTX3
+        self.contexts = list(range(24, 28))  # CTX0-CTX3
 
         # Special markers
-        self.NEG = 26
-        self.BIND = 27
+        self.NEG = 28
+        self.BIND = 29
 
-        self.vocab_size = 28
+        self.vocab_size = 30
 
         # Human-readable names
         self._build_names()
