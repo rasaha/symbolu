@@ -109,6 +109,7 @@ from symbolu.phase_transformer import (
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
     OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
     BindingCacheTransformer,  # V10.0: Protected Phase + Top-K Query (validated by probes)
+    OntologicalBindingCacheTransformer,  # V10.0: AGI Architecture (Binding Cache + 32D Sovereign State)
     # V9.8.0: 32D Sovereign State (replaces 124D CognitiveState)
     SOVEREIGN_STATE_DIM,
     BHAVA_NAMES,
@@ -10352,6 +10353,44 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.learned_decay:
             print(f"    Learned Decay: ENABLED (per-head attention span)")
 
+    elif config.model_type == "ontological_binding_cache":
+        # V10.0: AGI Architecture - Binding Cache + 32D Sovereign State
+        # Combines validated Protected Phase with ontological reasoning
+        tie_emb = not config.untie_embeddings
+
+        # Determine if cache should be used
+        use_cache = not config.no_binding_cache
+        top_k = config.binding_cache_top_k if use_cache else 0
+
+        model = OntologicalBindingCacheTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=preset["embed_dim"],
+            num_layers=preset["num_layers"],
+            num_heads=preset["num_heads"],
+            ff_dim=preset["ff_dim"],
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,
+            top_k=top_k,
+            use_cache=use_cache,
+            state_dim=config.state_dim,
+            project_per_head_dim=config.project_per_head_dim,
+            tie_embeddings=tie_emb,
+        )
+        print(f"\n  [Ontological Binding Cache V10.0] AGI Architecture")
+        print(f"    Combines: Protected Phase + Top-K Query + 32D Sovereign State")
+        print(f"    Architecture: ΔS → Phase rotation → Memory binding → Query")
+        print(f"    Sovereign State Dimension: {config.state_dim}D")
+        if config.state_dim == SOVEREIGN_STATE_DIM:
+            print(f"      [0:12] 12 Bhavas | [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia | [28:32] Reserved")
+        print(f"    Top-K cache size: {top_k} (use_cache: {use_cache})")
+        print(f"    Bounded Phase: ENABLED (mandatory from probes)")
+        print(f"    Decay Gamma: {config.decay_gamma}")
+        if config.learned_decay:
+            print(f"    Learned Decay: ENABLED (per-head attention span)")
+        print(f"    Project Per Head Dim: {config.project_per_head_dim}")
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -17106,9 +17145,10 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache"],
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache"],
                        help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
-                            "binding_cache = Protected Phase + Top-K Query [V10.0])")
+                            "binding_cache = Protected Phase + Top-K Query [V10.0], "
+                            "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State])")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")

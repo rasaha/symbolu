@@ -1821,12 +1821,18 @@ class BindingCachePhaseState(nn.Module):
             "r_k_std": self._last_r_k_std,
         }
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
         Compute Phase memory state via cumsum/EMA.
 
         Args:
             x: Input tensor [B, N, D]
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
+                         Rotates key phases to change how bindings are stored based on intent/understanding.
 
         Returns:
             memory_state: [B, N, D] - accumulated state for Quad to query
@@ -1846,6 +1852,18 @@ class BindingCachePhaseState(nn.Module):
             phi_k = math.pi * torch.sin(phi_k_raw)
         else:
             phi_k = phi_k_raw
+
+        # Apply intent phase rotation (from Ontological State Delta)
+        # This changes HOW bindings are stored based on semantic understanding
+        if intent_phase is not None:
+            # Handle different intent_phase shapes:
+            # [B, H] → broadcast to [B, 1, H, 1] for all positions and dims
+            # [B, H, D_h] → broadcast to [B, 1, H, D_h] for all positions
+            if intent_phase.dim() == 2:
+                intent_phase = intent_phase.unsqueeze(1).unsqueeze(-1)  # [B, 1, H, 1]
+            elif intent_phase.dim() == 3:
+                intent_phase = intent_phase.unsqueeze(1)  # [B, 1, H, D_h]
+            phi_k = phi_k + intent_phase
 
         # Track R_k health
         with torch.no_grad():
@@ -2095,18 +2113,23 @@ class BindingCacheBlock(nn.Module):
         """Set Phase ablation mode."""
         self.phase_state.set_ablation(mode, seed)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
         Forward pass with protected Phase → Quad flow.
 
         Args:
             x: Input tensor [B, N, D]
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
 
         Returns:
             output: [B, N, D]
         """
-        # Step 1: Phase accumulates memory state
-        memory_state = self.phase_state(x)
+        # Step 1: Phase accumulates memory state (with optional intent rotation)
+        memory_state = self.phase_state(x, intent_phase=intent_phase)
 
         # Step 2: Quad queries memory state
         attn_out = self.quad_query(x, memory_state)
@@ -2213,20 +2236,23 @@ class BindingCacheTransformer(nn.Module):
             "mean_alpha": sum(mean_alphas) / len(mean_alphas) if mean_alphas else 0.0,
         }
 
-    def forward(
+    def forward_hidden(
         self,
         input_ids: torch.Tensor,
-        labels: Optional[torch.Tensor] = None,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
-        Forward pass.
+        Forward pass returning hidden states BEFORE LM head.
+
+        Use this for Ontological integration - compute state delta from hidden,
+        then call full forward with intent_phase.
 
         Args:
             input_ids: [B, N] token IDs
-            labels: Optional [B, N] labels for loss computation
+            intent_phase: Optional phase rotation from Ontological State Delta
 
         Returns:
-            logits: [B, N, vocab_size] or (loss, logits) if labels provided
+            hidden: [B, N, embed_dim] - normalized hidden states before LM head
         """
         B, N = input_ids.shape
 
@@ -2234,13 +2260,60 @@ class BindingCacheTransformer(nn.Module):
         pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
 
-        # Transformer blocks
+        # Transformer blocks (with optional intent_phase)
         for block in self.blocks:
-            x = block(x)
+            x = block(x, intent_phase=intent_phase)
+
+        # Return normalized hidden states
+        return self.norm(x)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        intent_phase: Optional[torch.Tensor] = None,
+        return_hidden: bool = False,
+        return_last_hidden: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Dict[str, torch.Tensor]]:
+        """
+        Forward pass with optional intent phase rotation.
+
+        Args:
+            input_ids: [B, N] token IDs
+            labels: Optional [B, N] labels for loss computation
+            intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta
+            return_hidden: Return dict with hidden states
+            return_last_hidden: Return dict with last hidden state
+
+        Returns:
+            logits: [B, N, vocab_size] or (loss, logits) if labels provided
+            Or Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state'
+        """
+        B, N = input_ids.shape
+
+        # Embeddings
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
+
+        # Transformer blocks (with optional intent_phase)
+        hidden_states = [] if return_hidden else None
+        for block in self.blocks:
+            x = block(x, intent_phase=intent_phase)
+            if return_hidden:
+                hidden_states.append(x)
 
         # Output
         x = self.norm(x)
         logits = self.lm_head(x)
+
+        # Return format depends on options
+        if return_hidden or return_last_hidden:
+            result = {'logits': logits}
+            if return_hidden:
+                result['hidden_states'] = hidden_states
+            if return_last_hidden:
+                result['last_hidden_state'] = x
+            return result
 
         if labels is not None:
             loss = F.cross_entropy(
@@ -2251,6 +2324,290 @@ class BindingCacheTransformer(nn.Module):
             return loss, logits
 
         return logits
+
+    def count_params(self) -> int:
+        """Count trainable parameters."""
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# =============================================================================
+# ONTOLOGICAL BINDING CACHE (V10.0) - AGI Architecture
+# =============================================================================
+# Combines:
+# 1. Binding Cache: Protected Phase + Top-K Query (validated by probes)
+# 2. 32D Sovereign State: Ontological reasoning (Bhava, Kosha, Vritti, Guna)
+#
+# This is the canonical architecture for AGI:
+# - Phase: O(n) state accumulator with intent modulation
+# - Quad: O(nk) query mechanism
+# - Sovereign State: 32D semantic understanding that modulates Phase
+# =============================================================================
+
+
+class OntologicalBindingCacheTransformer(nn.Module):
+    """
+    AGI Architecture: Binding Cache + 32D Sovereign State.
+
+    Combines:
+    1. Binding Cache (validated by probes): Protected Phase + Top-K Query
+       - Phase ablation drop: -50% to -54% (Phase is ESSENTIAL)
+       - No gradient competition between Phase and Quad
+
+    2. 32D Sovereign State (ontological reasoning):
+       - [0:12]  12 Bhavas (Ontological Aspects)
+       - [12:17] 5 Koshas (Consciousness Sheaths)
+       - [17:22] 5 Vrittis (Mental Modifications)
+       - [22:28] 6 Gunas (Energy States)
+       - [28:32] 4 Reserved (Toroidal Feedback)
+
+    Theory:
+        - System 2 (Ontological): Slow, deliberate semantic reasoning → ΔS
+        - System 1 (Binding Cache): Fast pattern completion with intent modulation
+        - ΔS → Phase Rotation: Intent changes HOW bindings are stored/retrieved
+
+    From diagnostic probes:
+        - When Phase has protected role: -50% ablation drop (ESSENTIAL)
+        - When Phase is mixed with Quad: ~0% drop (DECORATIVE)
+
+    Usage:
+        model = OntologicalBindingCacheTransformer(...)
+        output = model(input_ids)  # Computes ΔS and applies to Protected Phase
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        # Binding Cache params
+        decay_gamma: float = 1.0,
+        learned_decay: bool = False,
+        top_k: int = 64,
+        use_cache: bool = True,
+        # Ontological params
+        state_dim: int = SOVEREIGN_STATE_DIM,  # 32D Sovereign State
+        project_per_head_dim: bool = False,
+        tie_embeddings: bool = True,
+    ):
+        super().__init__()
+
+        # Default ff_dim
+        if ff_dim is None:
+            ff_dim = embed_dim * 4
+
+        # The Binding Cache (generation) model
+        self.binding_cache = BindingCacheTransformer(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            decay_gamma=decay_gamma,
+            learned_decay=learned_decay,
+            bounded_phase=True,  # Always enabled (mandatory from probes)
+            top_k=top_k,
+            use_cache=use_cache,
+            tie_embeddings=tie_embeddings,
+        )
+
+        # State projector: hidden[embed_dim] → SovereignState[32]
+        if SOVEREIGN_PROJECTOR_AVAILABLE:
+            self.state_projector = SovereignStateProjector(
+                hidden_dim=embed_dim,
+                state_dim=state_dim,
+                intermediate_dim=embed_dim // 2,
+                dropout=0.1,
+                use_layer_norm=True,
+            )
+        else:
+            # Fallback to raw projection
+            self.state_projector = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim // 2),
+                nn.GELU(),
+                nn.Linear(embed_dim // 2, state_dim),
+            )
+            self._init_absolute_potential_bias()
+
+        # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
+        head_dim = embed_dim // num_heads
+        self.intent_projector = IntentPhaseProjector(
+            state_dim=state_dim,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            project_per_head_dim=project_per_head_dim,
+        )
+
+        # Store config
+        self.state_dim = state_dim
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+
+        # Previous state for delta computation
+        self.register_buffer('prev_state', None, persistent=False)
+
+    def _init_absolute_potential_bias(self):
+        """Initialize state projector to bias toward 'Absolute Potential' state."""
+        with torch.no_grad():
+            final_layer = self.state_projector[-1]
+            if hasattr(final_layer, 'bias') and final_layer.bias is not None:
+                final_layer.bias.fill_(0.0)
+                if final_layer.bias.shape[0] > 11:
+                    final_layer.bias[11] = 1.0  # O12_ABS
+                if final_layer.bias.shape[0] > 12:
+                    final_layer.bias[12] = 0.8  # Material
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        """Set Phase ablation mode for all blocks."""
+        self.binding_cache.set_ablation(mode, seed)
+
+    def get_phase_health(self) -> dict:
+        """Get Phase health metrics from Binding Cache."""
+        return self.binding_cache.get_phase_health()
+
+    def get_instrumentation(self) -> dict:
+        """Get instrumentation metrics from Binding Cache."""
+        return self.binding_cache.get_instrumentation()
+
+    def compute_state_delta(
+        self,
+        hidden: torch.Tensor,
+        reset_state: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute 32D Sovereign State and its delta from hidden states.
+
+        Args:
+            hidden: [B, N, embed_dim] - hidden states from binding cache
+            reset_state: Reset prev_state (use at start of new sequence)
+
+        Returns:
+            state: [B, 32] - current Sovereign State (pooled)
+            delta_S: [B, 32] - change from previous state
+        """
+        # Pool hidden states
+        pooled = hidden.mean(dim=1)  # [B, embed_dim]
+
+        # Project to Sovereign State
+        state = self.state_projector(pooled)  # [B, state_dim]
+
+        # Compute delta
+        batch_size_changed = (
+            self.prev_state is not None and
+            self.prev_state.shape[0] != state.shape[0]
+        )
+        if reset_state or self.prev_state is None or batch_size_changed:
+            delta_S = torch.zeros_like(state)
+        else:
+            delta_S = state - self.prev_state
+
+        # Update prev_state
+        self.prev_state = state.detach()
+
+        return state, delta_S
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        return_hidden: bool = False,
+        return_last_hidden: bool = False,
+        reset_state: bool = False,
+        external_delta_S: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass with Ontological → Binding Cache integration.
+
+        Two-pass architecture:
+        1. First pass: Get hidden states WITHOUT intent phase
+        2. Compute state delta from hidden states
+        3. Second pass: Full forward WITH intent phase
+
+        Args:
+            input_ids: [B, N] token indices
+            attention_mask: [B, N] optional mask (currently unused)
+            labels: Optional [B, N] labels for loss computation
+            return_hidden: Return all hidden states
+            return_last_hidden: Return final hidden state
+            reset_state: Reset Ontological state (new sequence)
+            external_delta_S: [B, state_dim] external state delta
+
+        Returns:
+            Dict with:
+            - 'logits': [B, N, V] output logits
+            - 'state': [B, 32] current Sovereign State
+            - 'delta_S': [B, 32] state delta
+            - 'intent_phase': [B, H] or [B, H, D_h] phase rotation
+            - 'loss': Optional, if labels provided
+        """
+        # First pass: Get hidden states WITHOUT intent phase
+        with torch.no_grad():
+            hidden = self.binding_cache.forward_hidden(input_ids, intent_phase=None)
+
+        # Compute state delta (or use external)
+        if external_delta_S is not None:
+            delta_S = external_delta_S
+            state = self.state_projector(hidden.mean(dim=1))
+        else:
+            state, delta_S = self.compute_state_delta(hidden, reset_state)
+
+        # Convert delta_S to intent phase rotation
+        intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
+
+        # Second pass: Full forward WITH intent phase
+        result = self.binding_cache(
+            input_ids,
+            labels=labels,
+            intent_phase=intent_phase,
+            return_hidden=return_hidden,
+            return_last_hidden=return_last_hidden,
+        )
+
+        # Handle different return types from binding_cache
+        if isinstance(result, dict):
+            output = result
+        elif isinstance(result, tuple):
+            # (loss, logits) format
+            output = {'logits': result[1], 'loss': result[0]}
+        else:
+            # Just logits
+            output = {'logits': result}
+
+        # Add ontological outputs
+        output['state'] = state
+        output['delta_S'] = delta_S
+        output['intent_phase'] = intent_phase
+
+        return output
+
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """Generation with Ontological state tracking."""
+        self.prev_state = None
+
+        for _ in range(max_new_tokens):
+            result = self(input_ids, reset_state=(self.prev_state is None))
+            logits = result['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+        return input_ids
 
     def count_params(self) -> int:
         """Count trainable parameters."""
