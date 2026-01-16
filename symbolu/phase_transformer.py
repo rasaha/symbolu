@@ -2183,15 +2183,102 @@ class BindingCacheQuadQuery(nn.Module):
         return out
 
 
+class LocalWindowAttention(nn.Module):
+    """
+    Local windowed causal attention for learning syntax/local patterns.
+
+    This provides the LOCAL context that Phase+Quad lacks:
+    - Phase compresses into memory_state (loses token-level detail)
+    - Quad queries memory_state (global but compressed)
+    - LocalWindow attends directly to recent tokens (local, full detail)
+
+    Combined: local_attn + mem_attn allows both syntax AND semantic learning.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        window_size: int = 128,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.window_size = window_size
+        self.scale = self.head_dim ** -0.5
+
+        # Standard QKV projections
+        self.W_q = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Local causal attention within window_size.
+
+        Args:
+            x: [B, N, D] input tensor
+
+        Returns:
+            out: [B, N, D] attention output
+        """
+        B, N, D = x.shape
+        H, D_h = self.num_heads, self.head_dim
+        W = min(self.window_size, N)
+
+        x_norm = self.norm(x)
+
+        # Project to Q, K, V
+        Q = self.W_q(x_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+        K = self.W_k(x_norm).view(B, N, H, D_h).transpose(1, 2)
+        V = self.W_v(x_norm).view(B, N, H, D_h).transpose(1, 2)
+
+        # Compute attention scores
+        scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Create windowed causal mask
+        # Each position can only attend to positions within window_size before it
+        positions = torch.arange(N, device=x.device)
+        row_idx = positions.unsqueeze(1)  # [N, 1]
+        col_idx = positions.unsqueeze(0)  # [1, N]
+
+        # Causal: can only attend to past (col <= row)
+        # Window: can only attend to recent (row - col < window_size)
+        causal_mask = col_idx > row_idx  # Future positions
+        window_mask = (row_idx - col_idx) >= W  # Too far in past
+        mask = causal_mask | window_mask
+
+        scores = scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        # Softmax and weighted sum
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        out = torch.matmul(attn_weights, V)  # [B, H, N, D_h]
+        out = out.transpose(1, 2).reshape(B, N, D)
+        out = self.out_proj(out)
+
+        return out
+
+
 class BindingCacheBlock(nn.Module):
     """
-    Transformer block with PROTECTED Phase and Quad roles.
+    Transformer block with PROTECTED Phase and Quad roles + LOCAL attention.
 
-    Sequential collaboration (validated by diagnostic probes):
-    1. Phase accumulates memory state [O(n)]
-    2. Quad queries memory state [O(nk) with cache]
+    V10.1: Added LocalWindowAttention for syntax learning.
 
-    No gradient competition - they collaborate instead of compete.
+    Three-path collaboration:
+    1. Phase accumulates memory state [O(n)] - global compression
+    2. Quad queries memory state [O(nk) with cache] - global retrieval
+    3. Local attention [O(n*w)] - direct token-to-token for syntax
+
+    Combined: local_out + mem_out allows fast syntax + slow semantic learning.
     """
 
     def __init__(
@@ -2205,10 +2292,20 @@ class BindingCacheBlock(nn.Module):
         bounded_phase: bool = True,
         top_k: int = 64,
         use_cache: bool = True,
+        local_window_size: int = 128,  # V10.1: Local attention window
     ):
         super().__init__()
 
-        # Phase: memory state accumulator
+        # V10.1: Local attention for syntax learning (direct token-to-token)
+        # This is what allows "the → cat" pattern learning
+        self.local_attn = LocalWindowAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            window_size=local_window_size,
+            dropout=dropout,
+        )
+
+        # Phase: memory state accumulator (global compression)
         self.phase_state = BindingCachePhaseState(
             embed_dim=embed_dim,
             num_heads=num_heads,
@@ -2218,7 +2315,7 @@ class BindingCacheBlock(nn.Module):
             bounded_phase=bounded_phase,
         )
 
-        # Quad: memory state query
+        # Quad: memory state query (global retrieval)
         self.quad_query = BindingCacheQuadQuery(
             embed_dim=embed_dim,
             num_heads=num_heads,
@@ -2248,7 +2345,14 @@ class BindingCacheBlock(nn.Module):
         binding_salience: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
-        Forward pass with protected Phase → Quad flow.
+        Forward pass with LOCAL + GLOBAL attention paths (V10.1).
+
+        Three-path architecture:
+        1. Local: Direct token-to-token for syntax (the → cat)
+        2. Phase: Accumulate memory state (global compression)
+        3. Quad: Query memory state (global retrieval)
+
+        Combined: local_out + mem_out (no gradient competition)
 
         Args:
             x: Input tensor [B, N, D]
@@ -2259,13 +2363,20 @@ class BindingCacheBlock(nn.Module):
         Returns:
             output: [B, N, D]
         """
-        # Step 1: Phase accumulates memory state (with optional intent rotation)
+        # Step 1: LOCAL attention for syntax learning (direct, no compression)
+        # This is what makes PPL drop quickly at start of training
+        local_out = self.local_attn(x)
+
+        # Step 2: Phase accumulates memory state (with optional intent rotation)
         # Phase is PURE - no auxiliary systems act here
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
-        # Step 2: Quad queries memory state (with optional salience bias for Top-K)
+        # Step 3: Quad queries memory state (with optional salience bias for Top-K)
         # Salience affects SELECTION, not attention weights
-        attn_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+        mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+
+        # Combine: local (syntax) + memory (semantics) - no competition
+        attn_out = local_out + mem_out
 
         # Residual connection
         x = x + attn_out
