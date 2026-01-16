@@ -376,8 +376,11 @@ class BindNegGenerator(ComposedSchemaGenerator):
         state = BindingState()
         ids = []
 
-        # Generate base bindings
-        n_bindings = random.randint(self.chain_min, min(self.chain_max, len(self.roles)))
+        # Generate base bindings (allow role reuse if chain > available roles)
+        max_unique = min(len(self.roles), len(self.entities))
+        effective_min = min(self.chain_min, max_unique)
+        effective_max = min(self.chain_max, max_unique)
+        n_bindings = random.randint(effective_min, effective_max)
         used_roles = random.sample(self.roles, n_bindings)
         used_entities = random.sample(self.entities, n_bindings)
 
