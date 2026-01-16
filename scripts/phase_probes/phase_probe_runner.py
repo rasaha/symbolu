@@ -513,12 +513,14 @@ def run_single_probe(
     device: torch.device,
     mode: AblationMode = AblationMode.BASELINE,
     scramble_seed: int = 42,
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> ProbeResult:
     """
     Run a single (non-minimal-pair) probe with specified ablation.
     """
     # Construct prompt
-    prompt = construct_qa_prompt(probe.text, probe.question)
+    prompt = construct_qa_prompt(probe.text, probe.question, few_shot=few_shot, prompt_style=prompt_style)
 
     # Get probabilities
     probs, log_probs, health = get_next_token_probs(
@@ -561,6 +563,8 @@ def run_minimal_pair_probe(
     mode: AblationMode = AblationMode.BASELINE,
     scramble_seed: int = 42,
     variant: str = 'A',
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> ProbeResult:
     """
     Run one variant (A or B) of a minimal-pair probe.
@@ -575,7 +579,7 @@ def run_minimal_pair_probe(
         targets = probe.target_tokens_b
 
     # Construct prompt
-    prompt = construct_qa_prompt(text, probe.question)
+    prompt = construct_qa_prompt(text, probe.question, few_shot=few_shot, prompt_style=prompt_style)
 
     # Get probabilities
     probs, log_probs, health = get_next_token_probs(
@@ -616,6 +620,8 @@ def run_probe_with_ablations(
     probe,
     device: torch.device,
     scramble_seed: int = 42,
+    few_shot: bool = True,
+    prompt_style: str = "standard",
 ) -> Dict[str, ProbeResult]:
     """
     Run a probe with all ablation modes.
@@ -635,16 +641,19 @@ def run_probe_with_ablations(
         if isinstance(probe, MinimalPairProbe):
             # Run both variants for minimal pairs
             result_a = run_minimal_pair_probe(
-                model, tokenizer, probe, device, mode, scramble_seed, 'A'
+                model, tokenizer, probe, device, mode, scramble_seed, 'A',
+                few_shot=few_shot, prompt_style=prompt_style
             )
             result_b = run_minimal_pair_probe(
-                model, tokenizer, probe, device, mode, scramble_seed, 'B'
+                model, tokenizer, probe, device, mode, scramble_seed, 'B',
+                few_shot=few_shot, prompt_style=prompt_style
             )
             results[f"{mode.value}_A"] = result_a
             results[f"{mode.value}_B"] = result_b
         else:
             result = run_single_probe(
-                model, tokenizer, probe, device, mode, scramble_seed
+                model, tokenizer, probe, device, mode, scramble_seed,
+                few_shot=few_shot, prompt_style=prompt_style
             )
             results[mode.value] = result
 
@@ -1124,6 +1133,12 @@ Examples:
     # Run specific probe or category:
     python phase_probe_runner.py --pretrained gpt2 --probe RB1
     python phase_probe_runner.py --pretrained gpt2 --category role_binding
+
+    # Prompt format options (to improve base LLM accuracy):
+    python phase_probe_runner.py --pretrained gpt2 --few-shot          # Uses few-shot examples (default)
+    python phase_probe_runner.py --pretrained gpt2 --no-few-shot       # Disables few-shot examples
+    python phase_probe_runner.py --pretrained gpt2 --prompt-style fill_blank  # "The answer is:" format
+    python phase_probe_runner.py --pretrained gpt2 --prompt-style direct      # Simple Q:/A: format
         """
     )
     parser.add_argument("--checkpoint", type=str, default=None,
@@ -1144,6 +1159,13 @@ Examples:
                         help="Save results to JSON file")
     parser.add_argument("--scramble_seed", type=int, default=42,
                         help="Random seed for phase scrambling (for reproducibility)")
+    parser.add_argument("--few-shot", action="store_true", default=True,
+                        help="Use few-shot examples in prompt (default: True)")
+    parser.add_argument("--no-few-shot", action="store_false", dest="few_shot",
+                        help="Disable few-shot examples in prompt")
+    parser.add_argument("--prompt-style", type=str, default="standard",
+                        choices=["standard", "fill_blank", "direct"],
+                        help="Prompt style: standard (Context/Q/A), fill_blank (answer is:), direct (Q:/A:)")
 
     args = parser.parse_args()
 
@@ -1192,6 +1214,7 @@ Examples:
         probes_to_run = MINIMAL_PAIR_PROBES + SINGLE_PROBES
 
     print(f"\nRunning {len(probes_to_run)} probes...")
+    print(f"Prompt style: {args.prompt_style}, Few-shot: {args.few_shot}")
 
     # Run probes
     all_results = []
@@ -1201,7 +1224,8 @@ Examples:
         print(f"\n[{i+1}/{len(probes_to_run)}] Running probe {probe.id}...")
 
         probe_results = run_probe_with_ablations(
-            model, tokenizer, probe, device, args.scramble_seed
+            model, tokenizer, probe, device, args.scramble_seed,
+            few_shot=args.few_shot, prompt_style=args.prompt_style
         )
 
         # Collect results
