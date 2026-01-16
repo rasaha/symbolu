@@ -1336,6 +1336,7 @@ class ProtectedPhaseAttention(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self._ablation_mode = "none"
+        self._rotation_angle = 0.0  # For rotation test (applied to phi_k)
 
         # Health tracking: R_k (amplitude) statistics
         self._last_r_k_mean = 0.0
@@ -1346,6 +1347,27 @@ class ProtectedPhaseAttention(nn.Module):
     def set_ablation(self, mode: str, seed: int = 42):
         self._ablation_mode = mode
         self._scramble_seed = seed
+
+    def set_rotation(self, angle_radians: float):
+        """
+        Set a global phase rotation to apply to φ_k.
+
+        For Protected Phase, we rotate φ_k (not φ_q) because:
+        - Protected Phase uses φ_k for memory accumulation (cumsum)
+        - There is no φ_q in this architecture (Quadratic handles queries)
+
+        This tests whether phase encodes relational structure:
+        - If roles are phase-encoded in keys, rotating φ_k should disrupt retrieval
+        - If phase is decorative, rotation should have minimal effect
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
+        """
+        self._rotation_angle = angle_radians
+
+    def clear_rotation(self):
+        """Clear any applied rotation."""
+        self._rotation_angle = 0.0
 
     def get_health_metrics(self) -> dict:
         """Return Phase health metrics (R_k statistics)."""
@@ -1400,6 +1422,11 @@ class ProtectedPhaseAttention(nn.Module):
                     phi_k[b, :, h, :] = phi_k[b, perm, h, :]
         elif self._ablation_mode in ["freeze", "off"]:
             phi_k = torch.zeros_like(phi_k)
+
+        # Apply rotation to φ_k (tests phase selectivity for Protected Phase)
+        # Note: We rotate φ_k here because Protected Phase has no φ_q
+        if self._rotation_angle != 0.0:
+            phi_k = phi_k + self._rotation_angle
 
         # Compute complex phasor and accumulate via cumsum
         dtype = phi_k.dtype
@@ -1533,6 +1560,14 @@ class ProtectedPhaseBlock(nn.Module):
         """Set ablation mode for Phase component."""
         self.phase_memory.set_ablation(mode, seed)
 
+    def set_rotation(self, angle_radians: float):
+        """Set rotation angle for Phase component (applied to φ_k)."""
+        self.phase_memory.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from Phase component."""
+        self.phase_memory.clear_rotation()
+
 
 class ProtectedPhaseTransformer(nn.Module):
     """
@@ -1594,17 +1629,21 @@ class ProtectedPhaseTransformer(nn.Module):
 
     def set_rotation(self, angle_radians: float):
         """
-        Set rotation angle (not applicable for Protected architecture).
+        Set rotation angle for all Phase components (applied to φ_k).
 
-        Note: ProtectedPhaseTransformer uses phi_k only (for memory accumulation),
-        not phi_q. Rotation test is designed for architectures with query phases.
-        This method exists for API compatibility but has no effect.
+        Note: ProtectedPhaseTransformer uses φ_k only (for memory accumulation),
+        not φ_q. So we rotate φ_k to test whether phase encodes relational structure.
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
         """
-        pass  # Protected architecture doesn't use phi_q
+        for layer in self.layers:
+            layer.set_rotation(angle_radians)
 
     def clear_rotation(self):
-        """Clear rotation (no-op for Protected architecture)."""
-        pass
+        """Clear rotation from all Phase components."""
+        for layer in self.layers:
+            layer.clear_rotation()
 
     def enable_diagnostics(self, enable: bool = True):
         """Enable/disable phase diagnostics (placeholder for compatibility)."""
