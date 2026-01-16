@@ -76,6 +76,10 @@ try:
         SchemaType,
         Config as HardProbeConfig,
         collate_fn as hard_probe_collate_fn,
+        # Import proper evaluation functions from train_hard_probes.py
+        evaluate as hard_probe_evaluate,
+        evaluate_all_splits as hard_probe_evaluate_all_splits,
+        run_ablation as hard_probe_run_ablation,
     )
     HARD_PROBES_AVAILABLE = True
 except ImportError as e:
@@ -1160,7 +1164,7 @@ def print_summary(summary: ProbeSuiteResults):
 
 
 # =============================================================================
-# HARD PROBE EVALUATION (from train_hard_probes.py)
+# HARD PROBE EVALUATION (using functions from train_hard_probes.py)
 # =============================================================================
 
 @dataclass
@@ -1207,61 +1211,6 @@ class HardProbeSuiteResults:
     phase_helps_persistence: bool
     generalizes_to_new_roles: bool
     generalizes_to_new_entities: bool
-
-
-def evaluate_hard_probes(
-    model: nn.Module,
-    loader,
-    vocab,
-    device: torch.device,
-) -> float:
-    """Evaluate model on hard probe dataset, returning accuracy."""
-    model.eval()
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for ids, targets, explanations in loader:
-            ids, targets = ids.to(device), targets.to(device)
-
-            # Model forward pass
-            logits = model(ids)  # [B, N, num_classes] or [B, num_classes]
-
-            # Handle different output shapes
-            if logits.dim() == 3:
-                # Sequence output - take last position
-                logits = logits[:, -1, :]
-
-            # Convert targets to class indices
-            # targets are entity token IDs, need to convert to class index
-            target_idx = targets - vocab.entities[0]
-
-            preds = logits.argmax(dim=-1)
-            correct += (preds == target_idx).sum().item()
-            total += targets.size(0)
-
-    return correct / max(total, 1)
-
-
-def run_hard_probe_ablation(
-    model: nn.Module,
-    loader,
-    vocab,
-    device: torch.device,
-) -> Dict[str, float]:
-    """Run ablation tests on hard probes."""
-    results = {}
-    for mode in ["none", "scramble", "freeze", "off"]:
-        if hasattr(model, 'set_ablation'):
-            model.set_ablation(mode)
-        acc = evaluate_hard_probes(model, loader, vocab, device)
-        results[mode] = acc
-
-    # Reset ablation
-    if hasattr(model, 'set_ablation'):
-        model.set_ablation("none")
-
-    return results
 
 
 def get_model_R_k(model: nn.Module) -> float:
@@ -1358,19 +1307,20 @@ def run_hard_probe_evaluation(
             print(f"  {split.value}: {vocab.decode(ids)} → {vocab.id2name[target]}")
             print(f"    {explanation}")
 
-    # Evaluate each split
+    # Evaluate each split using the proper evaluate function from train_hard_probes.py
     print("\n--- Evaluating Splits ---")
     results = {}
 
     for split, loader in loaders.items():
-        acc = evaluate_hard_probes(model, loader, vocab, device)
+        acc = hard_probe_evaluate(model, loader, vocab, str(device))
         results[split] = acc
         print(f"  {split.value:<20}: {acc*100:6.2f}%")
 
     # Run ablation on TEST_PERSIST (most important for Phase)
+    # Using the proper run_ablation function from train_hard_probes.py
     print("\n--- Phase Ablation on TEST_PERSIST ---")
-    persist_ablation = run_hard_probe_ablation(
-        model, loaders[SplitType.TEST_PERSIST], vocab, device
+    persist_ablation = hard_probe_run_ablation(
+        model, loaders[SplitType.TEST_PERSIST], vocab, str(device)
     )
 
     print(f"  {'Mode':<12} {'Accuracy':>10} {'Delta':>10}")
