@@ -142,12 +142,36 @@ class PhaseAblationHook:
         """
         Set phases to create uniform attention (bypass phase selectivity).
 
-        Effect: cos(φ_q - φ_k) = 1 everywhere when both φ_q = φ_k = 0
-        This makes the phase contribution uniform, effectively testing
-        whether the model can solve the task without phase-based selectivity.
+        SEMANTICS (IMPORTANT):
+        ----------------------
+        This sets φ_q = φ_k = 0 for all positions.
 
-        Different from frozen: frozen keeps phases constant at the same value,
-        while phase_off ensures φ_q = φ_k for every position pair.
+        Effect on attention:
+            cos(φ_q - φ_k) = cos(0 - 0) = cos(0) = 1.0 for ALL position pairs
+
+        This means the phase term contributes equally everywhere, effectively
+        removing position-selective weighting from the phase mechanism.
+
+        What PHASE_OFF tests:
+            Whether the model can solve the task using ONLY:
+            - Learned amplitude weights (a_k)
+            - State decay (γ)
+            - Value projections (W_v)
+            WITHOUT phase-based position selection.
+
+        What PHASE_OFF does NOT do:
+            - It does NOT disable the phase computation entirely
+            - It does NOT remove amplitude weighting
+            - It does NOT bypass the PhaseAttention layer
+
+        Distinction from FROZEN:
+            FROZEN: φ = constant (e.g., 0) for all positions at init time
+                    Phase DYNAMICS are disabled (no learned phase movement)
+            PHASE_OFF: φ_q = φ_k = 0, ensuring cos(Δφ) = 1 always
+                       Phase SELECTIVITY is disabled (uniform weighting)
+
+        If accuracy drops significantly under PHASE_OFF but not FROZEN,
+        it suggests phase selectivity (not just phase dynamics) matters.
         """
         return torch.zeros_like(phi)
 

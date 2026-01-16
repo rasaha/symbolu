@@ -240,6 +240,67 @@ def compute_head_entropy(model: nn.Module) -> float:
         return 0.0
 
 
+def compute_R_k_per_layer(model: nn.Module) -> List[float]:
+    """
+    Compute R_k (phase collapse metric) for each PhaseAttention layer.
+
+    Returns:
+        List of R_k values, one per layer. Empty list if no captures available.
+
+    This shows WHERE phase is being used across the model depth.
+    Lower layers might have different phase patterns than upper layers.
+    """
+    try:
+        from symbolu.phase_transformer import _collect_health_captures, _compute_R_from_phi
+
+        captures = _collect_health_captures(model)
+        if not captures:
+            return []
+
+        R_k_per_layer = []
+        for capture in captures:
+            phi_k = capture.get('phi_k')
+            if phi_k is None:
+                R_k_per_layer.append(0.0)
+                continue
+
+            # Use the same R computation as health dashboard
+            R_k = _compute_R_from_phi(phi_k)
+            R_k_per_layer.append(R_k)
+
+        return R_k_per_layer
+
+    except Exception:
+        return []
+
+
+def compute_R_q_per_layer(model: nn.Module) -> List[float]:
+    """
+    Compute R_q (query phase collapse metric) for each PhaseAttention layer.
+    """
+    try:
+        from symbolu.phase_transformer import _collect_health_captures, _compute_R_from_phi
+
+        captures = _collect_health_captures(model)
+        if not captures:
+            return []
+
+        R_q_per_layer = []
+        for capture in captures:
+            phi_q = capture.get('phi_q')
+            if phi_q is None:
+                R_q_per_layer.append(0.0)
+                continue
+
+            R_q = _compute_R_from_phi(phi_q)
+            R_q_per_layer.append(R_q)
+
+        return R_q_per_layer
+
+    except Exception:
+        return []
+
+
 # =============================================================================
 # INFERENCE UTILITIES
 # =============================================================================
@@ -287,15 +348,42 @@ def get_next_token_probs(
     return probs, log_probs, health
 
 
+def validate_single_token_targets(target_tokens: List[str], tokenizer) -> Tuple[bool, List[str]]:
+    """
+    Validate that target tokens are single-token in the tokenizer's vocabulary.
+
+    Returns:
+        (all_single_token, warnings): Whether all targets are single-token, and warning messages
+    """
+    warnings = []
+    all_single = True
+
+    for t in target_tokens:
+        for variant in [t, " " + t.strip(), t.strip()]:
+            try:
+                encoded = tokenizer.encode(variant, add_special_tokens=False)
+                if len(encoded) > 1:
+                    all_single = False
+                    warnings.append(f"'{variant}' tokenizes to {len(encoded)} tokens: {encoded}")
+            except:
+                pass
+
+    return all_single, warnings
+
+
 def compute_answer_metrics(
     probs: torch.Tensor,
     log_probs: torch.Tensor,
     target_tokens: List[str],
     distractor_tokens: List[str],
     tokenizer,
+    warn_multi_token: bool = True,
 ) -> Dict[str, Any]:
     """
     Compute answer metrics given probability distribution.
+
+    IMPORTANT: This function works best with single-token answers.
+    Multi-token answers can contaminate margin calculations.
 
     Returns:
         Dict with:
@@ -304,12 +392,22 @@ def compute_answer_metrics(
         - target_log_prob: Max log prob among target tokens
         - margin: log(target) - log(best_non_target)
         - is_correct: Whether top token is in targets
+        - multi_token_warning: Warning if targets have multi-token issues
     """
+    # Validate single-token targets
+    is_single, token_warnings = validate_single_token_targets(target_tokens, tokenizer)
+    if not is_single and warn_multi_token and token_warnings:
+        # Log warning but don't fail - just note it in results
+        multi_token_warning = f"Multi-token targets detected: {token_warnings[:2]}"
+    else:
+        multi_token_warning = None
+
     # Get top prediction
     top_prob, top_idx = probs.max(dim=0)
     top_token = tokenizer.decode([top_idx.item()]).strip()
 
     # Get target token IDs and probabilities
+    # ONLY use first token of multi-token sequences to avoid margin contamination
     target_ids = []
     for t in target_tokens:
         try:
@@ -317,7 +415,8 @@ def compute_answer_metrics(
             for variant in [t, " " + t.strip(), t.strip()]:
                 encoded = tokenizer.encode(variant, add_special_tokens=False)
                 if encoded:
-                    target_ids.extend(encoded)
+                    # Only take first token to avoid multi-token contamination
+                    target_ids.append(encoded[0])
         except:
             pass
     target_ids = list(set(target_ids))
@@ -365,6 +464,7 @@ def compute_answer_metrics(
         'target_log_prob': target_log_prob,
         'margin': margin,
         'is_correct': is_correct,
+        'multi_token_warning': multi_token_warning,
     }
 
 
@@ -551,12 +651,23 @@ def compute_ablation_comparison(
         phase_off_correct = False
         phase_off_confidence = 0.0
 
-    # Phase is "sensitive" if ANY ablation hurts margin by > 0.3
-    # or changes correctness from correct to incorrect
+    # Phase is "sensitive" if ANY ablation hurts margin significantly
+    # Use RELATIVE drop (invariant across probes with different entropy)
+    # Threshold: > 30% relative drop OR correctness change
+    base_margin_abs = abs(baseline_result.margin) if baseline_result.margin != 0 else 1e-6
+
+    # Compute relative drops (as fraction of baseline margin)
+    rel_delta_scramble = delta_scramble / base_margin_abs if baseline_result.margin > 0 else 0
+    rel_delta_frozen = delta_frozen / base_margin_abs if baseline_result.margin > 0 else 0
+    rel_delta_phase_off = delta_phase_off / base_margin_abs if baseline_result.margin > 0 else 0
+
+    # Phase is sensitive if:
+    # 1. Relative margin drops by > 30% under ANY ablation, OR
+    # 2. Correctness flips from correct to incorrect
     phase_sensitive = (
-        delta_scramble > 0.3 or
-        delta_frozen > 0.3 or
-        delta_phase_off > 0.3 or
+        rel_delta_scramble > 0.3 or
+        rel_delta_frozen > 0.3 or
+        rel_delta_phase_off > 0.3 or
         (baseline_result.is_correct and not scramble_result.is_correct) or
         (baseline_result.is_correct and not frozen_result.is_correct) or
         (phase_off_result is not None and baseline_result.is_correct and not phase_off_correct)
@@ -791,6 +902,59 @@ def print_health_table(results: List[ProbeResult]):
     print("-" * 100)
 
 
+def print_per_layer_R_k(model: nn.Module):
+    """
+    Print R_k values per layer to show WHERE phase is being used.
+
+    This addresses ChatGPT's suggestion: "Log φ variance per layer"
+    to understand which layers actually utilize phase.
+    """
+    R_k_values = compute_R_k_per_layer(model)
+    R_q_values = compute_R_q_per_layer(model)
+
+    if not R_k_values:
+        print("\n(No per-layer R_k data available - health capture may be disabled)")
+        return
+
+    print("\n" + "=" * 60)
+    print("PER-LAYER PHASE COLLAPSE (R_k, R_q)")
+    print("=" * 60)
+    print("R values: 0 = uniform/diverse (healthy), 1 = collapsed")
+    print("-" * 60)
+
+    header = f"{'Layer':<10} {'R_k':>12} {'R_q':>12} {'Status':<20}"
+    print(header)
+    print("-" * 60)
+
+    for i, (rk, rq) in enumerate(zip(R_k_values, R_q_values)):
+        # Determine status
+        if rk < 0.3 and rq < 0.3:
+            status = "healthy"
+        elif rk < 0.5 and rq < 0.5:
+            status = "warning"
+        else:
+            status = "COLLAPSED"
+
+        row = f"Layer {i:<4} {rk:>12.4f} {rq:>12.4f} {status:<20}"
+        print(row)
+
+    # Print summary statistics
+    print("-" * 60)
+    avg_rk = sum(R_k_values) / len(R_k_values)
+    avg_rq = sum(R_q_values) / len(R_q_values)
+    max_rk = max(R_k_values)
+    min_rk = min(R_k_values)
+    print(f"{'Average':<10} {avg_rk:>12.4f} {avg_rq:>12.4f}")
+    print(f"{'Range R_k':<10} {min_rk:>12.4f} → {max_rk:.4f}")
+
+    # Identify problematic layers
+    collapsed_layers = [i for i, rk in enumerate(R_k_values) if rk > 0.5]
+    if collapsed_layers:
+        print(f"\nCollapsed layers (R_k > 0.5): {collapsed_layers}")
+
+    print("-" * 60)
+
+
 def print_summary(summary: ProbeSuiteResults):
     """Print summary statistics and interpretation."""
     print("\n" + "=" * 80)
@@ -928,7 +1092,8 @@ Examples:
     parser.add_argument("--probe", type=str, default=None,
                         help="Run only specific probe ID (e.g., RB1)")
     parser.add_argument("--category", type=str, default=None,
-                        choices=['role_binding', 'long_range', 'interference', 'negation_polarity', 'amplitude_conflict'],
+                        choices=['role_binding', 'long_range', 'interference', 'negation_polarity',
+                                 'amplitude_conflict', 'control', 'binding_only'],
                         help="Run only probes from specific category")
     parser.add_argument("--verbose", action="store_true",
                         help="Print detailed per-probe output")
@@ -1027,6 +1192,7 @@ Examples:
 
     print_results_table(comparisons, all_results, args.verbose)
     print_health_table(all_results)
+    print_per_layer_R_k(model)  # Show WHERE phase is used across layers
     print_summary(summary)
 
     # Save to file if requested
