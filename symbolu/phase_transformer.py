@@ -1912,6 +1912,11 @@ class BindingCachePhaseState(nn.Module):
 
         # Ablation mode
         self._ablation_mode = "none"
+        self._ablation_seed = 42
+
+        # Rotation test: apply a global phase rotation to φ_k
+        # This tests whether phase encodes relational structure
+        self._rotation_angle = 0.0  # in radians
 
         # Initialize phase with uniform [-π, π]
         nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
@@ -1920,6 +1925,27 @@ class BindingCachePhaseState(nn.Module):
         """Set ablation mode: none, scramble, freeze, off."""
         self._ablation_mode = mode
         self._ablation_seed = seed
+
+    def set_rotation(self, angle_radians: float):
+        """
+        Set a global phase rotation to apply to φ_k.
+
+        For Protected Phase / Binding Cache, we rotate φ_k (not φ_q) because:
+        - Protected Phase uses φ_k for memory accumulation (cumsum)
+        - There is no φ_q in this architecture (Quadratic handles queries)
+
+        This tests whether phase encodes relational structure:
+        - If roles are phase-encoded in keys, rotating φ_k should disrupt retrieval
+        - If phase is decorative, rotation should have minimal effect
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
+        """
+        self._rotation_angle = angle_radians
+
+    def clear_rotation(self):
+        """Clear any applied rotation."""
+        self._rotation_angle = 0.0
 
     def get_health_metrics(self) -> dict:
         """Return R_k health statistics."""
@@ -1986,6 +2012,11 @@ class BindingCachePhaseState(nn.Module):
                     phi_k[b, :, h, :] = phi_k[b, perm, h, :]
         elif self._ablation_mode in ["freeze", "off"]:
             phi_k = torch.zeros_like(phi_k)
+
+        # Apply rotation to φ_k (tests phase selectivity for Protected Phase)
+        # Note: We rotate φ_k here because Protected Phase has no φ_q
+        if self._rotation_angle != 0.0:
+            phi_k = phi_k + self._rotation_angle
 
         # Convert to float32 for complex ops if needed
         orig_dtype = phi_k.dtype
@@ -2370,6 +2401,14 @@ class BindingCacheBlock(nn.Module):
         """Set Phase ablation mode."""
         self.phase_state.set_ablation(mode, seed)
 
+    def set_rotation(self, angle_radians: float):
+        """Set rotation angle for Phase component (applied to φ_k)."""
+        self.phase_state.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from Phase component."""
+        self.phase_state.clear_rotation()
+
     def forward(
         self,
         x: torch.Tensor,
@@ -2489,6 +2528,24 @@ class BindingCacheTransformer(nn.Module):
         """Set Phase ablation mode for all blocks."""
         for block in self.blocks:
             block.set_ablation(mode, seed)
+
+    def set_rotation(self, angle_radians: float):
+        """
+        Set rotation angle for all Phase components (applied to φ_k).
+
+        Note: BindingCacheTransformer uses φ_k only (for memory accumulation),
+        not φ_q. So we rotate φ_k to test whether phase encodes relational structure.
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
+        """
+        for block in self.blocks:
+            block.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from all Phase components."""
+        for block in self.blocks:
+            block.clear_rotation()
 
     def get_phase_health(self) -> dict:
         """Aggregate Phase health metrics from all blocks."""
@@ -2785,6 +2842,22 @@ class OntologicalBindingCacheTransformer(nn.Module):
     def set_ablation(self, mode: str, seed: int = 42):
         """Set Phase ablation mode for all blocks."""
         self.binding_cache.set_ablation(mode, seed)
+
+    def set_rotation(self, angle_radians: float):
+        """
+        Set rotation angle for all Phase components (applied to φ_k).
+
+        Note: OntologicalBindingCacheTransformer uses φ_k only (for memory accumulation),
+        not φ_q. So we rotate φ_k to test whether phase encodes relational structure.
+
+        Args:
+            angle_radians: Rotation angle in radians (e.g., π/4 = 45°)
+        """
+        self.binding_cache.set_rotation(angle_radians)
+
+    def clear_rotation(self):
+        """Clear rotation from all Phase components."""
+        self.binding_cache.clear_rotation()
 
     def get_phase_health(self) -> dict:
         """Get Phase health metrics from Binding Cache."""

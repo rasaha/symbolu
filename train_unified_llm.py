@@ -9018,7 +9018,7 @@ class UnifiedTrainingConfig:
     cosine_mode: str = "standard"  # V9.6.12: "standard", "shifted", or "complex"
     decay_gamma: float = 1.0  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
     learned_decay: bool = False  # V9.9.7: Per-head learned decay (Mamba/S4-style)
-    bounded_phase: bool = False  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix)
+    bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix - enabled by default)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
     # V10.0: Binding Cache architecture (validated by diagnostic probes)
@@ -17360,9 +17360,12 @@ def main():
                             "Adds 1 learnable parameter per head. Allows model to learn optimal attention span.")
 
     # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
-    parser.add_argument("--bounded_phase", action="store_true",
+    parser.add_argument("--bounded_phase", action="store_true", default=True,
                        help="Constrain phase to [-π, π] via π*sin() for proper S¹ manifold geometry. "
-                            "Prevents raw linear phase projections from drifting unbounded and causing collapse.")
+                            "Prevents raw linear phase projections from drifting unbounded and causing collapse. (default: True)")
+    parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
+                       help="Disable bounded phase (use raw linear projection). "
+                            "WARNING: May cause phase collapse and decorative phase behavior.")
     parser.add_argument("--zero_mean_cosine", action="store_true",
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
