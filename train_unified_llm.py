@@ -9893,6 +9893,7 @@ class UnifiedTrainingConfig:
     # SRK Annealing (Lambda Warmup)
     srk_total_steps: int = 50000             # Total training steps for annealing
     srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
+    srk_invert_annealing: bool = False       # Invert: start strong, ramp DOWN (phase-first)
 
     # ==========================================================================
     # V9.8.8: Sovereign Phase Controller (SPC) Configuration
@@ -13262,10 +13263,11 @@ def train(config: UnifiedTrainingConfig):
         )
         srk_loss_fn = SRKLoss(srk_loss_config).to(device)
 
-        # Create SRK Annealer (Lambda Warmup)
+        # Create SRK Annealer (Lambda Warmup/Rampdown)
         srk_annealer = SovereignAnnealer(
             total_steps=config.srk_total_steps,
             warmup_steps=config.srk_warmup_steps,
+            invert=config.srk_invert_annealing,
         )
 
         # Create Phase Extraction Hook for Layer 7 (CSR alignment)
@@ -13297,7 +13299,8 @@ def train(config: UnifiedTrainingConfig):
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Loss Configuration (B1/U2/S8):                                  ║")
         print(f"  ║    λ_task={config.srk_lambda_task:.1f}  λ_c={config.srk_lambda_c:.1f}  λ_ent={config.srk_lambda_entropy:.1f}  λ_coh={config.srk_lambda_coherence:.1f}         ║")
-        print(f"  ║  Annealing: {config.srk_warmup_steps:,} warmup → {config.srk_total_steps:,} total steps          ║")
+        anneal_mode = "INVERTED (phase-first)" if config.srk_invert_annealing else "NORMAL (ramp-up)"
+        print(f"  ║  Annealing: {anneal_mode:<20} ({config.srk_total_steps:,} steps)    ║")
         print(f"  ╚══════════════════════════════════════════════════════════════════╝\n")
     elif config.enable_srk and not SRK_AVAILABLE:
         print(f"\n  ⚠️  SRK REQUESTED but module not available!")
@@ -18733,6 +18736,8 @@ def main():
                        help="Total training steps for SRK annealing")
     parser.add_argument("--srk_warmup_steps", type=int, default=5000,
                        help="Steps for System 1 warmup phase (Learn to Speak)")
+    parser.add_argument("--srk_invert_annealing", action="store_true",
+                       help="Invert SRK annealing: start STRONG, ramp DOWN (phase-first learning)")
 
     # ==========================================================================
     # V9.8.8: Sovereign Phase Controller (SPC)
@@ -19320,6 +19325,7 @@ def main():
         # SRK Annealing
         srk_total_steps=args.srk_total_steps,
         srk_warmup_steps=args.srk_warmup_steps,
+        srk_invert_annealing=args.srk_invert_annealing,
         # V9.8.8: Sovereign Phase Controller (SPC)
         enable_sovereign_phase_controller=args.enable_sovereign_phase_controller,
         spc_entropy_critical=args.spc_entropy_critical,
