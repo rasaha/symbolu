@@ -15322,19 +15322,35 @@ def train(config: UnifiedTrainingConfig):
 
             optimizer.zero_grad()
 
-            # Update scheduler
-            # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
-            # The scheduler resets LR every step, undoing adaptive boosts
-            if not config.enable_adaptive_training:
-                # Pass PPL to adaptive scheduler (ignored by SequentialLR)
-                current_ppl = metrics.get('ppl', float('inf'))
-                if use_adaptive_warmup:
-                    scheduler.step(current_ppl)
-                else:
-                    scheduler.step()
+            # Update scheduler - warmup ALWAYS runs, even with adaptive training
+            # Adaptive training only takes over AFTER warmup ends
+            current_ppl = metrics.get('ppl', float('inf'))
+            warmup_complete = False
+
+            if use_adaptive_warmup:
+                # PPL-based adaptive warmup
+                scheduler.step(current_ppl)
+                warmup_complete = scheduler.warmup_ended
+            else:
+                # Fixed-step warmup using SequentialLR
+                scheduler.step()
+                warmup_complete = global_step >= config.warmup_steps
+
+            # V9.8.4: Adaptive training only kicks in AFTER warmup
+            # During warmup, we use the scheduler's LR ramp
+            if config.enable_adaptive_training and warmup_complete:
+                # Adaptive controller can now adjust LR
+                pass  # Controller will adjust in its own step below
+            elif config.enable_adaptive_training and not warmup_complete:
+                # During warmup, override adaptive controller's LR with scheduler's LR
+                # This ensures proper warmup ramp even with adaptive training enabled
+                current_lr = scheduler.get_last_lr()[0]
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
-            if adaptive_controller is not None:
+            # Only enforce after warmup to not interfere with warmup ramp
+            if adaptive_controller is not None and warmup_complete:
                 adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
@@ -16830,18 +16846,31 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("relax/saturation_triggered", 1.0 if relaxation_controller.saturation_triggered else 0.0, global_step)
 
                 # Adaptive Training Controller (dynamic LR/Kp adjustment)
+                # Only active AFTER warmup completes (warmup uses scheduler's LR ramp)
                 if adaptive_controller is not None:
-                    # Get recent train loss (average of last 10 steps)
-                    recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
-
-                    adaptive_adjustments = adaptive_controller.update(
-                        train_loss=recent_train_loss,
-                        val_loss=val_loss,
-                        val_ppl=val_ppl,
-                        coherence=val_metrics.get('coherence', 0.75),
-                        global_step=global_step,
-                        authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                    # Check if warmup is complete
+                    warmup_done = (
+                        (use_adaptive_warmup and scheduler.warmup_ended) or
+                        (not use_adaptive_warmup and global_step >= config.warmup_steps)
                     )
+
+                    if not warmup_done:
+                        # During warmup, skip LR adjustments (let scheduler handle it)
+                        if global_step == config.eval_every:  # Log once at first eval
+                            print(f"  [AdaptiveTraining] Waiting for warmup (PPL: {val_ppl:.1f}, target: <{config.warmup_until_ppl:.0f})")
+                        adaptive_adjustments = {"actions": []}
+                    else:
+                        # Get recent train loss (average of last 10 steps)
+                        recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
+
+                        adaptive_adjustments = adaptive_controller.update(
+                            train_loss=recent_train_loss,
+                            val_loss=val_loss,
+                            val_ppl=val_ppl,
+                            coherence=val_metrics.get('coherence', 0.75),
+                            global_step=global_step,
+                            authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                        )
 
                     # Log adaptive controller status
                     if adaptive_adjustments.get("actions"):
