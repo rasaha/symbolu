@@ -6118,12 +6118,23 @@ class PPLAlphaCurriculum:
         ppl_high: float = 1000.0,
         ppl_low: float = 100.0,
         ema_decay: float = 0.95,  # EMA smoothing for PPL
+        # Adaptive window size
+        enable_adaptive_window: bool = False,
+        window_size_high_ppl: int = 128,  # Small window when PPL high (fast phase)
+        window_size_low_ppl: int = 256,   # Large window when PPL low (local context)
     ):
         self.alpha_high = alpha_high
         self.alpha_low = alpha_low
         self.ppl_high = ppl_high
         self.ppl_low = ppl_low
         self.ema_decay = ema_decay
+
+        # Adaptive window
+        self.enable_adaptive_window = enable_adaptive_window
+        self.window_size_high_ppl = window_size_high_ppl
+        self.window_size_low_ppl = window_size_low_ppl
+        self.current_window_size = window_size_high_ppl if enable_adaptive_window else None
+        self.window_transition_logged = False
 
         # State
         self.ppl_ema = None
@@ -6172,17 +6183,37 @@ class PPLAlphaCurriculum:
         self.current_alpha_phase = alpha_phase
         self.current_alpha_local = alpha_local
 
+        # Adaptive window size (step change at midpoint)
+        if self.enable_adaptive_window:
+            old_window = self.current_window_size
+            if ppl >= midpoint_ppl:
+                self.current_window_size = self.window_size_high_ppl
+            else:
+                self.current_window_size = self.window_size_low_ppl
+
+            # Log window transition
+            if not self.window_transition_logged and old_window != self.current_window_size:
+                print(f"📐 [PPL-Alpha] Window size transition: {old_window} → {self.current_window_size}")
+                self.window_transition_logged = True
+
         return alpha_phase, alpha_local
 
     def get_alphas(self) -> tuple:
         """Return current alpha values."""
         return self.current_alpha_phase, self.current_alpha_local
 
+    def get_window_size(self) -> int:
+        """Return current window size (None if adaptive window disabled)."""
+        return self.current_window_size
+
     def get_status(self) -> str:
         """Return status string for logging."""
         if self.ppl_ema is None:
             return "PPL-Alpha: not initialized"
-        return f"PPL-Alpha: EMA={self.ppl_ema:.1f}, α_phase={self.current_alpha_phase:.2f}, α_local={self.current_alpha_local:.2f}"
+        status = f"PPL-Alpha: EMA={self.ppl_ema:.1f}, α_phase={self.current_alpha_phase:.2f}, α_local={self.current_alpha_local:.2f}"
+        if self.enable_adaptive_window:
+            status += f", window={self.current_window_size}"
+        return status
 
     def state_dict(self) -> dict:
         """Return state for checkpointing."""
@@ -9314,6 +9345,10 @@ class UnifiedTrainingConfig:
     alpha_phase_ppl_low: float = 0.3    # alpha_phase when PPL <= ppl_low_threshold
     ppl_high_threshold: float = 1000.0  # PPL threshold for max phase weight
     ppl_low_threshold: float = 100.0    # PPL threshold for min phase weight
+    # Adaptive window size (small early for fast phase, large later for local context)
+    enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
+    window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
+    window_size_low_ppl: int = 256        # Window size when PPL <= ppl_low_threshold
 
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
@@ -14156,11 +14191,18 @@ def train(config: UnifiedTrainingConfig):
             alpha_low=config.alpha_phase_ppl_low,
             ppl_high=config.ppl_high_threshold,
             ppl_low=config.ppl_low_threshold,
+            enable_adaptive_window=config.enable_adaptive_window,
+            window_size_high_ppl=config.window_size_high_ppl,
+            window_size_low_ppl=config.window_size_low_ppl,
         )
         print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
         print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
         print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
-        print(f"     └─ Linear interpolation between thresholds\n")
+        print(f"     └─ Linear interpolation between thresholds")
+        if config.enable_adaptive_window:
+            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)\n")
+        else:
+            print()
 
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
@@ -15517,6 +15559,13 @@ def train(config: UnifiedTrainingConfig):
                             if hasattr(module, 'alpha_local'):
                                 module.alpha_local.data.fill_(alpha_local)
                     current_alpha = alpha_phase
+
+                    # Update window size if adaptive window is enabled
+                    if ppl_alpha_curriculum.enable_adaptive_window:
+                        new_window_size = ppl_alpha_curriculum.get_window_size()
+                        for module in model.modules():
+                            if hasattr(module, 'window_size'):
+                                module.window_size = new_window_size
                 else:
                     # Fall back to step-based decay
                     current_alpha = update_alpha_schedule(model, global_step, config)
@@ -17847,6 +17896,13 @@ def main():
                        help="PPL threshold for max phase weight")
     parser.add_argument("--ppl_low_threshold", type=float, default=100.0,
                        help="PPL threshold for min phase weight")
+    # Adaptive window size (small early for fast phase, large later for local context)
+    parser.add_argument("--enable_adaptive_window", action="store_true",
+                       help="Adapt window size based on PPL (small when high, large when low)")
+    parser.add_argument("--window_size_high_ppl", type=int, default=128,
+                       help="Window size when PPL >= ppl_high_threshold (fast phase learning)")
+    parser.add_argument("--window_size_low_ppl", type=int, default=256,
+                       help="Window size when PPL <= ppl_low_threshold (better local context)")
 
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
@@ -19021,6 +19077,10 @@ def main():
         alpha_phase_ppl_low=args.alpha_phase_ppl_low,
         ppl_high_threshold=args.ppl_high_threshold,
         ppl_low_threshold=args.ppl_low_threshold,
+        # Adaptive window size
+        enable_adaptive_window=args.enable_adaptive_window,
+        window_size_high_ppl=args.window_size_high_ppl,
+        window_size_low_ppl=args.window_size_low_ppl,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.10/V9.9.12: Phase diversity loss
