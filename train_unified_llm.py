@@ -14119,8 +14119,8 @@ def train(config: UnifiedTrainingConfig):
             # =================================================================
             rss_weights = {'evoflow': 0.0, 'toroidal': 0.0, 'csr': 0.0, 'kosha': 0.0}
             if rss_controller is not None:
-                # Calculate training PPL for this step
-                train_ppl = torch.exp(loss.detach()).item()
+                # Use metrics["ppl"] from LM loss, not total loss (which includes auxiliary terms)
+                train_ppl = metrics.get("ppl", float("inf"))
                 rss_weights = rss_controller.get_gate_weights(
                     current_ppl=train_ppl,
                     global_step=global_step,

@@ -2516,9 +2516,13 @@ class BindingCacheTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (same principle as QK scaling in attention)
-        # Prevents overconfident early logits without disrupting Phase/Binding dynamics
-        self.logit_scale = 1.0 / math.sqrt(embed_dim)
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        # Using 1/sqrt(sqrt(d)) ~= 0.19 for d=768, balances stability vs learning speed
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
+        # GPT-style weight initialization for embeddings (prevents variance explosion)
+        torch.nn.init.normal_(self.token_embed.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(self.pos_embed.weight, mean=0.0, std=0.02)
 
         # Tie embeddings
         if tie_embeddings:
@@ -3906,6 +3910,9 @@ class GroupedHybridTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -3951,7 +3958,7 @@ class GroupedHybridTransformer(nn.Module):
                 hidden_states.append(x)
 
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         output = {"logits": logits}
         if return_hidden:
@@ -4413,6 +4420,9 @@ class PhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
         if tie_embeddings:
@@ -4566,7 +4576,7 @@ class PhaseTransformer(nn.Module):
 
         # Output
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
 
@@ -4716,6 +4726,9 @@ class HybridPhaseTransformer(nn.Module):
         # Output
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -4915,7 +4928,7 @@ class HybridPhaseTransformer(nn.Module):
 
         # Output
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
 
@@ -5300,6 +5313,9 @@ class LocalOnlyTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -5374,7 +5390,7 @@ class LocalOnlyTransformer(nn.Module):
 
         # Output
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
 
@@ -5453,6 +5469,9 @@ class StandardTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -5511,7 +5530,7 @@ class StandardTransformer(nn.Module):
                     hidden_states.append(x)
 
         x = self.norm(x)
-        logits = self.lm_head(x)
+        logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
 
