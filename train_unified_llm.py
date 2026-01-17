@@ -18865,6 +18865,7 @@ def main():
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         warmup_steps=args.warmup_steps,
+        warmup_until_ppl=args.warmup_until_ppl,
         weight_decay=args.weight_decay,
         max_grad_norm=args.max_grad_norm,
         dataset=args.dataset,
@@ -19014,6 +19015,12 @@ def main():
         alpha_phase_start=args.alpha_phase_start,
         alpha_phase_end=args.alpha_phase_end,
         alpha_decay_steps=args.alpha_decay_steps,
+        # PPL-gated alpha curriculum
+        enable_ppl_alpha_curriculum=args.enable_ppl_alpha_curriculum,
+        alpha_phase_ppl_high=args.alpha_phase_ppl_high,
+        alpha_phase_ppl_low=args.alpha_phase_ppl_low,
+        ppl_high_threshold=args.ppl_high_threshold,
+        ppl_low_threshold=args.ppl_low_threshold,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.10/V9.9.12: Phase diversity loss
