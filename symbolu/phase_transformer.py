@@ -4452,6 +4452,7 @@ class HybridTransformerBlock(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -4467,6 +4468,7 @@ class HybridTransformerBlock(nn.Module):
             alpha_phase=alpha_phase,
             local_backend=local_backend,
             temperature=getattr(config, 'temperature', 1.0),  # Sharper attention
+            protected_phase=protected_phase,  # V10.2.1: Protected Phase pattern
             cosine_mode=getattr(config, 'cosine_mode', 'standard'),  # V9.6.12
             decay_gamma=getattr(config, 'decay_gamma', 1.0),  # V9.6.13
             layer_idx=layer_idx,  # V9.9.1: Pass layer index to attention
@@ -4920,12 +4922,16 @@ class HybridPhaseTransformer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
     ):
         super().__init__()
 
         # V9.9.11: Store phase collapse fix flags
         self.bounded_phase = bounded_phase
         self.zero_mean_cosine = zero_mean_cosine
+
+        # V10.2.1: Protected Phase pattern - Local cross-attends to Phase memory
+        self.protected_phase = protected_phase
 
         config = TransformerConfig(
             vocab_size=vocab_size,
@@ -4976,6 +4982,7 @@ class HybridPhaseTransformer(nn.Module):
                     learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
                     bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
                     zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+                    protected_phase=protected_phase,  # V10.2.1: Protected Phase for chunking
                 ))
 
         # Output
