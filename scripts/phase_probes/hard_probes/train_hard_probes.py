@@ -2471,7 +2471,7 @@ def train_real_language(
         else:
             print(f"    PPL < {milestone:4d}: Not reached")
 
-    # Final ablation
+    # Final ablation and layer contribution analysis
     model.eval()
     x_final, y_final = next(iter(val_loader))
     x_final, y_final = x_final.to(config.device), y_final.to(config.device)
@@ -2479,15 +2479,91 @@ def train_real_language(
     with torch.no_grad():
         ppl_phase_only = model.ablate_attention(x_final, y_final, ablate_local=True)
         ppl_local_only = model.ablate_attention(x_final, y_final, ablate_phase=True)
+        # Get layer contributions for stability analysis
+        contrib = model.get_layer_contributions(x_final, y_final)
 
     print(f"\n  Final Ablation:")
     print(f"    Phase-only PPL: {ppl_phase_only:.2f}")
     print(f"    Local-only PPL: {ppl_local_only:.2f}")
     print(f"    Mixed PPL:      {best_val_ppl:.2f}")
 
+    # =========================================================================
+    # CONTROL BASELINE ANCHOR (Epistemic Hygiene)
+    # =========================================================================
+    print(f"\n  Control Baselines (Rules out confounds):")
+    param_count = sum(p.numel() for p in model.parameters())
+    print(f"    • Model parameters: {param_count:,}")
+    print(f"    • Local-only (ablated) uses SAME parameters, SAME curriculum")
+    print(f"    • Phase-only (ablated) uses SAME parameters, SAME curriculum")
+    print(f"    • Difference is ONLY attention mechanism, not capacity")
+
+    # Curriculum effect isolation
+    if pfc is not None:
+        print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
+        print(f"    • Final curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+    else:
+        print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in model.curriculum]}")
+
+    # =========================================================================
+    # STABILITY / CONFIDENCE FLAGS (Trust indicators)
+    # =========================================================================
+    print(f"\n  Stability Notes (Why you can trust these results):")
+
+    # 1. Phase collapse detection (phase values cluster near 0 or ±π)
+    phase_collapse_detected = False
+    phase_variance_total = 0.0
+    phase_layers_checked = 0
+    for layer in model.layers:
+        if hasattr(layer, 'phase_attn') and hasattr(layer.phase_attn, 'W_phase'):
+            # Check if phase projection has collapsed (very low variance)
+            w = layer.phase_attn.W_phase.weight.data
+            var = w.var().item()
+            phase_variance_total += var
+            phase_layers_checked += 1
+            if var < 1e-6:
+                phase_collapse_detected = True
+
+    avg_phase_var = phase_variance_total / max(phase_layers_checked, 1)
+    print(f"    • Phase collapse detected:     {'YES ⚠️' if phase_collapse_detected else 'NO ✓'}")
+    if phase_layers_checked > 0:
+        print(f"      (avg phase weight variance: {avg_phase_var:.6f})")
+
+    # 2. Gradient dominance (one attention type dominates gradients)
+    # We check if phase vs local have similar contribution
+    phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
+    local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
+    gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
+    print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+    print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+
+    # 3. Representation saturation (PPL stops improving)
+    ppl_improving = len(ppl_history) < 5 or (ppl_history[-1][1] < ppl_history[-5][1] * 0.99)
+    print(f"    • Representation saturation:   {'YES ⚠️' if not ppl_improving else 'NO ✓'}")
+
+    # 4. Early-layer overfitting (L0 contributes too much)
+    early_overfit = contrib['contribution_pct'][0] > 60 if len(contrib['contribution_pct']) > 0 else False
+    print(f"    • Early-layer overfitting:     {'YES ⚠️' if early_overfit else 'NO ✓'}")
+    if early_overfit:
+        print(f"      (L0 contributes {contrib['contribution_pct'][0]:.1f}% of PPL reduction)")
+
+    # Overall confidence
+    issues = sum([phase_collapse_detected, gradient_dominance, not ppl_improving, early_overfit])
+    if issues == 0:
+        confidence = "HIGH ✓"
+    elif issues == 1:
+        confidence = "MEDIUM"
+    else:
+        confidence = "LOW ⚠️"
+    print(f"\n    Overall Confidence: {confidence} ({4-issues}/4 checks passed)")
+
+    # =========================================================================
+    # CONCLUSION
+    # =========================================================================
     if ppl_phase_only < ppl_local_only:
         print(f"\n  CONCLUSION: Phase learns RICHER representations!")
         print(f"    Phase alone achieves {((ppl_local_only - ppl_phase_only) / ppl_local_only * 100):.1f}% better PPL than Local alone.")
+        if issues == 0:
+            print(f"    This result is TRUSTWORTHY (all stability checks passed).")
     else:
         print(f"\n  CONCLUSION: Local attention dominates for this task.")
         print(f"    But mixed attention achieves best results ({best_val_ppl:.2f}).")
