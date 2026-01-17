@@ -6079,6 +6079,131 @@ class AdaptiveWarmupScheduler:
 
 
 # =============================================================================
+# PPL-GATED ALPHA CURRICULUM: Phase dominates early, local refines later
+# =============================================================================
+
+class PPLAlphaCurriculum:
+    """
+    Dynamically adjusts alpha_phase/alpha_local based on current PPL.
+
+    Philosophy:
+    - High PPL (early training): Phase attention dominates to establish stable patterns
+    - Low PPL (later training): Local/quadratic attention takes over for refinement
+
+    The phase attention is slower but builds the "state scaffold" that quadratic
+    attention needs. By letting phase dominate early, we ensure stable foundations
+    before the faster quadratic attention refines the details.
+
+    Formula:
+        if ppl >= ppl_high:
+            alpha_phase = alpha_high (e.g., 0.8)
+        elif ppl <= ppl_low:
+            alpha_phase = alpha_low (e.g., 0.3)
+        else:
+            # Linear interpolation
+            alpha_phase = alpha_low + (ppl - ppl_low) * (alpha_high - alpha_low) / (ppl_high - ppl_low)
+        alpha_local = 1.0 - alpha_phase
+
+    Usage:
+        curriculum = PPLAlphaCurriculum(config)
+        # In training loop:
+        alpha_phase, alpha_local = curriculum.get_alphas(current_ppl)
+        update_model_alphas(model, alpha_phase, alpha_local)
+    """
+
+    def __init__(
+        self,
+        alpha_high: float = 0.8,
+        alpha_low: float = 0.3,
+        ppl_high: float = 1000.0,
+        ppl_low: float = 100.0,
+        ema_decay: float = 0.95,  # EMA smoothing for PPL
+    ):
+        self.alpha_high = alpha_high
+        self.alpha_low = alpha_low
+        self.ppl_high = ppl_high
+        self.ppl_low = ppl_low
+        self.ema_decay = ema_decay
+
+        # State
+        self.ppl_ema = None
+        self.current_alpha_phase = alpha_high  # Start with phase dominant
+        self.current_alpha_local = 1.0 - alpha_high
+        self.last_transition_ppl = None
+        self.transition_logged = False
+
+    def update(self, current_ppl: float) -> tuple:
+        """
+        Update alpha values based on current PPL.
+
+        Args:
+            current_ppl: Current training PPL
+
+        Returns:
+            (alpha_phase, alpha_local) tuple
+        """
+        # Update EMA
+        if self.ppl_ema is None:
+            self.ppl_ema = current_ppl
+        else:
+            self.ppl_ema = self.ema_decay * self.ppl_ema + (1 - self.ema_decay) * current_ppl
+
+        ppl = self.ppl_ema
+
+        # Compute alpha_phase based on PPL
+        if ppl >= self.ppl_high:
+            alpha_phase = self.alpha_high
+        elif ppl <= self.ppl_low:
+            alpha_phase = self.alpha_low
+        else:
+            # Linear interpolation
+            alpha_phase = self.alpha_low + (ppl - self.ppl_low) * (self.alpha_high - self.alpha_low) / (self.ppl_high - self.ppl_low)
+
+        alpha_local = 1.0 - alpha_phase
+
+        # Log transition when we cross the midpoint (PPL ~550)
+        midpoint_ppl = (self.ppl_high + self.ppl_low) / 2
+        if not self.transition_logged and self.ppl_ema < midpoint_ppl:
+            print(f"🔄 [PPL-Alpha] Phase→Local transition: PPL={self.ppl_ema:.1f} < {midpoint_ppl:.0f}")
+            print(f"   α_phase: {self.alpha_high:.2f} → {alpha_phase:.2f}, α_local: {1-self.alpha_high:.2f} → {alpha_local:.2f}")
+            self.transition_logged = True
+            self.last_transition_ppl = self.ppl_ema
+
+        self.current_alpha_phase = alpha_phase
+        self.current_alpha_local = alpha_local
+
+        return alpha_phase, alpha_local
+
+    def get_alphas(self) -> tuple:
+        """Return current alpha values."""
+        return self.current_alpha_phase, self.current_alpha_local
+
+    def get_status(self) -> str:
+        """Return status string for logging."""
+        if self.ppl_ema is None:
+            return "PPL-Alpha: not initialized"
+        return f"PPL-Alpha: EMA={self.ppl_ema:.1f}, α_phase={self.current_alpha_phase:.2f}, α_local={self.current_alpha_local:.2f}"
+
+    def state_dict(self) -> dict:
+        """Return state for checkpointing."""
+        return {
+            "ppl_ema": self.ppl_ema,
+            "current_alpha_phase": self.current_alpha_phase,
+            "current_alpha_local": self.current_alpha_local,
+            "transition_logged": self.transition_logged,
+            "last_transition_ppl": self.last_transition_ppl,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Restore state from checkpoint."""
+        self.ppl_ema = state.get("ppl_ema")
+        self.current_alpha_phase = state.get("current_alpha_phase", self.alpha_high)
+        self.current_alpha_local = state.get("current_alpha_local", 1.0 - self.alpha_high)
+        self.transition_logged = state.get("transition_logged", False)
+        self.last_transition_ppl = state.get("last_transition_ppl")
+
+
+# =============================================================================
 # SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
 # =============================================================================
 
@@ -9178,6 +9303,17 @@ class UnifiedTrainingConfig:
     alpha_phase_start: float = 0.6
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
+
+    # PPL-gated alpha curriculum (phase dominates early, local refines later)
+    # When enabled, alpha_phase is computed based on current PPL:
+    #   PPL >= ppl_high: alpha_phase = alpha_phase_ppl_high (phase dominates)
+    #   PPL <= ppl_low:  alpha_phase = alpha_phase_ppl_low (local refines)
+    #   In between: linear interpolation
+    enable_ppl_alpha_curriculum: bool = False
+    alpha_phase_ppl_high: float = 0.8   # alpha_phase when PPL >= ppl_high_threshold
+    alpha_phase_ppl_low: float = 0.3    # alpha_phase when PPL <= ppl_low_threshold
+    ppl_high_threshold: float = 1000.0  # PPL threshold for max phase weight
+    ppl_low_threshold: float = 100.0    # PPL threshold for min phase weight
 
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
@@ -14012,6 +14148,20 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
         print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
 
+    # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
+    ppl_alpha_curriculum = None
+    if config.enable_ppl_alpha_curriculum:
+        ppl_alpha_curriculum = PPLAlphaCurriculum(
+            alpha_high=config.alpha_phase_ppl_high,
+            alpha_low=config.alpha_phase_ppl_low,
+            ppl_high=config.ppl_high_threshold,
+            ppl_low=config.ppl_low_threshold,
+        )
+        print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
+        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
+        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
+        print(f"     └─ Linear interpolation between thresholds\n")
+
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
     current_seq_len = config.max_seq_len
@@ -15356,7 +15506,20 @@ def train(config: UnifiedTrainingConfig):
             # Update alpha schedule for phase/hybrid models
             # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
             if not getattr(config, 'enable_per_layer_phase', False):
-                current_alpha = update_alpha_schedule(model, global_step, config)
+                # PPL-gated alpha curriculum takes precedence over step-based decay
+                if ppl_alpha_curriculum is not None:
+                    # Use PPL to determine alpha_phase/alpha_local
+                    alpha_phase, alpha_local = ppl_alpha_curriculum.update(current_ppl)
+                    # Update all HybridAttentionLayer modules
+                    for module in model.modules():
+                        if hasattr(module, 'alpha_phase') and isinstance(module.alpha_phase, nn.Parameter):
+                            module.alpha_phase.data.fill_(alpha_phase)
+                            if hasattr(module, 'alpha_local'):
+                                module.alpha_local.data.fill_(alpha_local)
+                    current_alpha = alpha_phase
+                else:
+                    # Fall back to step-based decay
+                    current_alpha = update_alpha_schedule(model, global_step, config)
             else:
                 # Per-layer weights are managed by InvertedLayerCurriculumController
                 current_alpha = config.alpha_phase  # Just for logging
@@ -17672,6 +17835,18 @@ def main():
                        help="Final alpha_phase value after decay")
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
+
+    # PPL-gated alpha curriculum (phase dominates early, local refines later)
+    parser.add_argument("--enable_ppl_alpha_curriculum", action="store_true",
+                       help="Adjust alpha_phase based on PPL (phase dominates when PPL high)")
+    parser.add_argument("--alpha_phase_ppl_high", type=float, default=0.8,
+                       help="alpha_phase when PPL >= ppl_high_threshold")
+    parser.add_argument("--alpha_phase_ppl_low", type=float, default=0.3,
+                       help="alpha_phase when PPL <= ppl_low_threshold")
+    parser.add_argument("--ppl_high_threshold", type=float, default=1000.0,
+                       help="PPL threshold for max phase weight")
+    parser.add_argument("--ppl_low_threshold", type=float, default=100.0,
+                       help="PPL threshold for min phase weight")
 
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
