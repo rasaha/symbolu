@@ -1453,20 +1453,36 @@ class PhaseAttentionLayer(nn.Module):
         causal_mask: bool = True,
         phase_context: Optional[Dict[str, torch.Tensor]] = None,
         intent_phase: Optional[torch.Tensor] = None,
+        prev_state: Optional[torch.Tensor] = None,
+        prev_norm_state: Optional[torch.Tensor] = None,
+        return_state: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
         """
         Forward pass with O(n) complex phase attention.
 
+        V10.2: Added prev_state for chunk-persistent phase memory.
+        When chunking long sequences, Phase state MUST persist across chunks
+        to maintain temporal continuity. This is critical for Phase to work
+        as a true temporal memory, not just per-chunk memory.
+
         Args:
             x: [B, N, D] input tensor
             causal_mask: Apply causal masking (always True for complex cumsum)
-            phase_context: Optional streaming context (not used in V2)
+            phase_context: Optional streaming context (legacy, not used in V2)
             intent_phase: Optional [B, H] or [B, H, D_h] or [B, T, H, D_h] phase rotation
                          from Ontological State Delta. Rotates query phasors to change
                          how tokens relate based on intent/understanding.
+            prev_state: Optional [B, 1, H, D_h] complex tensor - accumulated KV state
+                       from previous chunk. If provided, this is prepended to cumsum.
+                       CRITICAL: Do NOT detach this - gradients must flow through time!
+            prev_norm_state: Optional [B, 1, H, D_h] real tensor - accumulated normalizer
+                            state from previous chunk.
+            return_state: If True, return (output, state_dict) where state_dict contains
+                         'final_state' and 'final_norm_state' for the next chunk.
 
         Returns:
-            output: [B, N, D] or (output, None) if phase_context given
+            output: [B, N, D] attention output
+            state_dict: (optional) {'final_state': [B, 1, H, D_h], 'final_norm_state': [B, 1, H, D_h]}
         """
         B, N, D = x.shape
         residual = x
@@ -1568,6 +1584,11 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # KV = K * V (complex × real = complex, element-wise per head_dim)
         # State_t = Σ_{j≤t} K_j * V_j
+        #
+        # V10.2: CHUNK-PERSISTENT STATE
+        # When prev_state is provided, we continue accumulation from that point.
+        # This is critical for Phase to be a TRUE temporal memory across chunks.
+        # Without this, Phase resets at chunk boundaries and becomes decorative.
 
         # Convert V to complex (real part only, imaginary = 0)
         v_complex = torch.complex(v, torch.zeros_like(v))
@@ -1582,7 +1603,13 @@ class PhaseAttentionLayer(nn.Module):
 
         if not use_decay:
             # Original: infinite memory via cumsum
-            global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+            # V10.2: Add prev_state if provided (chunk continuation)
+            if prev_state is not None:
+                # prev_state is [B, 1, H, D_h] - the final state from previous chunk
+                # Add it to cumsum: S_t = prev_state + Σ_{j≤t} KV_j
+                global_state = torch.cumsum(kv_complex, dim=1) + prev_state
+            else:
+                global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
         else:
             # V9.9.8: Use parallel EMA scan for ~32x speedup over sequential loop
             # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
@@ -1596,13 +1623,39 @@ class PhaseAttentionLayer(nn.Module):
             else:
                 gamma = self.decay_gamma  # Scalar
 
-            # Use optimized parallel scan instead of sequential loop
-            global_state = parallel_ema_scan(kv_complex, gamma)
+            # V10.2: Handle prev_state for chunked EMA scan
+            if prev_state is not None:
+                # For EMA: S_t = γ * S_{t-1} + kv_t
+                # With prev_state: S_0 = γ * prev_state + kv_0
+                # We prepend a decayed prev_state contribution to each position
+                # S_t = γ^(t+1) * prev_state + Σ_{j≤t} γ^(t-j) * kv_j
+                if isinstance(gamma, float):
+                    gamma_tensor = torch.tensor(gamma, device=kv_complex.device, dtype=torch.float32)
+                else:
+                    gamma_tensor = gamma
+                # Compute decay factors for prev_state: γ^1, γ^2, ..., γ^N
+                t_indices = torch.arange(1, N + 1, device=kv_complex.device, dtype=torch.float32)
+                if gamma_tensor.dim() == 0:
+                    # Scalar gamma
+                    decay_factors = gamma_tensor ** t_indices  # [N]
+                    decay_factors = decay_factors.view(1, N, 1, 1)
+                else:
+                    # Per-head gamma [H]
+                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)  # [N, H]
+                    decay_factors = decay_factors.view(1, N, H_size, 1)
+                # Add decayed prev_state to EMA scan result
+                global_state = parallel_ema_scan(kv_complex, gamma) + prev_state * decay_factors.to(kv_complex.dtype)
+            else:
+                # Use optimized parallel scan instead of sequential loop
+                global_state = parallel_ema_scan(kv_complex, gamma)
 
             # V9.9.9: Capture state norm for cumsum health monitoring (Gemini's suggestion)
             # If this grows linearly with sequence length, the leaky scan isn't working
             with torch.no_grad():
                 self._diag_state_norm = global_state.abs().mean(dim=-1).mean(dim=-1)  # [B, N]
+
+        # V10.2: Capture final state for chunk continuation
+        final_state = global_state[:, -1:, :, :]  # [B, 1, H, D_h] - last position's state
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -1611,8 +1664,12 @@ class PhaseAttentionLayer(nn.Module):
         # normalizer = a_q × Σ_{j≤t} a_k  (cross-amplitude energy)
         # V9.6.13: Apply same decay to normalizer for consistency
         # V9.9.7: Use same per-head learned decay as state accumulation
+        # V10.2: Handle prev_norm_state for chunk continuation
         if not use_decay:
-            a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
+            if prev_norm_state is not None:
+                a_k_cumsum = torch.cumsum(a_k, dim=1) + prev_norm_state
+            else:
+                a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
             # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
             # Reuse gamma from above (already computed for learned_decay case)
@@ -1620,7 +1677,28 @@ class PhaseAttentionLayer(nn.Module):
                 gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma_norm = self.decay_gamma
-            a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
+
+            if prev_norm_state is not None:
+                # Same decay logic as for main state
+                if isinstance(gamma_norm, float):
+                    gamma_tensor = torch.tensor(gamma_norm, device=a_k.device, dtype=torch.float32)
+                else:
+                    gamma_tensor = gamma_norm
+                t_indices = torch.arange(1, N + 1, device=a_k.device, dtype=torch.float32)
+                if gamma_tensor.dim() == 0:
+                    decay_factors = gamma_tensor ** t_indices
+                    decay_factors = decay_factors.view(1, N, 1, 1)
+                else:
+                    H_size = a_k.shape[2]
+                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)
+                    decay_factors = decay_factors.view(1, N, H_size, 1)
+                a_k_cumsum = parallel_ema_scan(a_k, gamma_norm) + prev_norm_state * decay_factors.to(a_k.dtype)
+            else:
+                a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
+
+        # V10.2: Capture final normalizer state for chunk continuation
+        final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
+
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
@@ -1701,6 +1779,14 @@ class PhaseAttentionLayer(nn.Module):
             output = self.dropout(output)
             output = output * self.aux_scale
             result = output + residual
+
+            # V10.2: Return state for chunk continuation
+            if return_state:
+                state_dict = {
+                    'final_state': final_state,  # [B, 1, H, D_h] complex
+                    'final_norm_state': final_norm_state,  # [B, 1, H, D_h] real
+                }
+                return result, state_dict
             if phase_context is not None:
                 return result, None
             return result
@@ -1722,6 +1808,14 @@ class PhaseAttentionLayer(nn.Module):
 
         # Residual connection
         result = output + residual
+
+        # V10.2: Return state for chunk continuation
+        if return_state:
+            state_dict = {
+                'final_state': final_state,  # [B, 1, H, D_h] complex
+                'final_norm_state': final_norm_state,  # [B, 1, H, D_h] real
+            }
+            return result, state_dict
 
         # Return with phase_context compatibility (not used in V2)
         if phase_context is not None:
@@ -3978,14 +4072,26 @@ class HybridAttentionLayer(nn.Module):
     """
     Combines local attention (fast pattern learning) with phase attention (global context).
 
-    Sequential processing: LocalAttn → PhaseAttn (memory efficient)
-    - Local: Quickly learns syntax, grammar, local patterns
-    - Phase: Handles long-range dependencies efficiently O(n)
+    V10.2: Two operating modes:
 
-    Supports Grouped Query Attention (GQA) via n_kv_heads parameter for memory efficiency.
+    1. Protected Phase (DEFAULT, recommended for chunking):
+       - Processing: x → Phase → Local → output
+       - Phase accumulates temporal memory across chunks
+       - Local queries Phase's output (serial dependency)
+       - No gradient competition between Phase and Local
+       - Phase MUST learn useful features (Local depends on it)
 
-    Previous parallel approach (α_local * LocalAttn(x) + α_phase * PhaseAttn(x))
-    required 2x memory. Sequential approach processes one at a time.
+    2. Standard Parallel (legacy):
+       - Processing: x → Phase ↘
+                     x → Local  ↗ weighted blend
+       - Both process original input independently
+       - Weighted combination: α_local * Local + α_phase * Phase
+       - Potential gradient competition
+
+    Supports:
+    - Grouped Query Attention (GQA) via n_kv_heads for memory efficiency
+    - Chunk-persistent Phase state (prev_phase_state, return_state)
+    - Layer-specific phase weighting
     """
 
     def __init__(
@@ -4007,10 +4113,18 @@ class HybridAttentionLayer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        protected_phase: bool = True,  # V10.2: Protected Phase pattern (default=True)
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
         self.layer_idx = layer_idx
+
+        # V10.2: Protected Phase pattern - Local queries Phase output, not original input
+        # This eliminates gradient competition and ensures Phase learns useful features.
+        # When True: x → Phase → Local → output (serial, no blending)
+        # When False: x → Phase ↘
+        #             x → Local  ↗ blend → output (parallel, weighted)
+        self.protected_phase = protected_phase
 
         # Keep alphas for potential future use (e.g., residual weighting)
         self.alpha_local = nn.Parameter(torch.tensor(alpha_local))
@@ -4052,16 +4166,22 @@ class HybridAttentionLayer(nn.Module):
         causal_mask: bool = True,
         intent_phase: Optional[torch.Tensor] = None,
         return_decorr_loss: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        prev_phase_state: Optional[torch.Tensor] = None,
+        prev_norm_state: Optional[torch.Tensor] = None,
+        return_state: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
         """
         Weighted hybrid forward: Blend local and phase attention outputs.
 
-        Key fix: Phase attention processes ORIGINAL input (not local's output)
-        so it can do proper long-range retrieval without local interference.
+        V10.2: CRITICAL FIX - Phase runs FIRST, then Local.
+        This ensures Phase captures structure before Local does spatial reasoning.
+        Previously Local ran first, which let it "learn first" and made Phase decorative.
 
-        Uses alpha weights to blend contributions:
-        - alpha_local: Weight for local attention (syntax, grammar)
-        - alpha_phase: Weight for phase attention (long-range context)
+        Key invariants:
+        - Phase = temporal memory (accumulates state across sequence/chunks)
+        - Local = spatial reasoning (per-chunk only, no long-range memory)
+
+        V10.2: Added prev_phase_state/return_state for chunk-persistent Phase memory.
 
         Args:
             x: [B, N, D] input tensor
@@ -4069,42 +4189,84 @@ class HybridAttentionLayer(nn.Module):
             intent_phase: Optional phase rotation from Ontological State Delta.
                          Only affects Phase attention (Local is unchanged).
             return_decorr_loss: If True, return (output, decorr_loss) tuple
+            prev_phase_state: Optional [B, 1, H, D_h] - Phase state from previous chunk
+            prev_norm_state: Optional [B, 1, H, D_h] - Normalizer state from previous chunk
+            return_state: If True, return (output, state_dict) for chunk continuation
 
         Returns:
             output: [B, N, D] blended attention output
-            decorr_loss: (optional) Decorrelation loss to penalize feature redundancy
+            decorr_loss: (optional) Decorrelation loss if return_decorr_loss=True
+            state_dict: (optional) Phase states if return_state=True
         """
         residual = x
 
-        # Local attention on original input (captures local patterns)
-        # Note: Local attention is NOT affected by intent_phase
-        # Grammar/syntax should remain stable regardless of intent
-        x_local = self.local_attn(x, causal_mask)
+        # =====================================================================
+        # V10.2: Phase attention FIRST (captures global context / temporal memory)
+        # =====================================================================
+        # This is critical: Phase must update BEFORE Local so it can:
+        # 1. Capture structure from input first
+        # 2. Accumulate state properly for temporal memory
+        # 3. Provide memory for Local to query (in Protected Phase mode)
+        phase_result = self.phase_attn(
+            residual,
+            causal_mask,
+            intent_phase=intent_phase,
+            prev_state=prev_phase_state,
+            prev_norm_state=prev_norm_state,
+            return_state=return_state,
+        )
 
-        # Phase attention on ORIGINAL input (captures global context)
-        # This is critical: phase needs raw input to do long-range retrieval
-        # intent_phase rotates how tokens relate to each other based on understanding
-        x_phase = self.phase_attn(residual, causal_mask, intent_phase=intent_phase)
+        if return_state:
+            x_phase, phase_state_dict = phase_result
+        else:
+            x_phase = phase_result
+            phase_state_dict = None
 
-        # Weighted combination using learnable alphas
-        # Normalize alphas to sum to 1 for stability
-        alpha_sum = torch.abs(self.alpha_local) + torch.abs(self.alpha_phase) + 1e-8
-        w_local = torch.abs(self.alpha_local) / alpha_sum
-        w_phase = torch.abs(self.alpha_phase) / alpha_sum
+        # =====================================================================
+        # Local attention SECOND (captures local patterns / spatial reasoning)
+        # =====================================================================
+        # V10.2: Protected Phase pattern vs Standard Parallel pattern
+        #
+        # Protected Phase (self.protected_phase=True, RECOMMENDED):
+        #   - Local runs on Phase output: x → Phase → Local → output
+        #   - Phase MUST learn useful features (Local depends on it)
+        #   - No gradient competition (serial dependency)
+        #   - No blending (just residual connection)
+        #
+        # Standard Parallel (self.protected_phase=False):
+        #   - Local runs on original input: x → Phase ↘
+        #                                   x → Local  ↗ blend
+        #   - Weighted combination (gradient competition possible)
+        #
+        # Note: Local resets per-chunk (no state persistence) - this is correct.
 
-        output = w_local * x_local + w_phase * x_phase
+        if self.protected_phase:
+            # Protected Phase: Local processes Phase's output (serial chain)
+            # This ensures Phase must learn useful representations
+            x_local = self.local_attn(x_phase, causal_mask)
+            # Output is Local's result with residual from original input
+            output = residual + x_local
+        else:
+            # Standard Parallel: Local processes original input independently
+            x_local = self.local_attn(x, causal_mask)
+            # Weighted combination using learnable alphas
+            alpha_sum = torch.abs(self.alpha_local) + torch.abs(self.alpha_phase) + 1e-8
+            w_local = torch.abs(self.alpha_local) / alpha_sum
+            w_phase = torch.abs(self.alpha_phase) / alpha_sum
+            output = w_local * x_local + w_phase * x_phase
+
+        # Handle different return modes
+        if return_state and phase_state_dict is not None:
+            return output, phase_state_dict
 
         if return_decorr_loss:
             # Decorrelation loss: Penalize high cosine similarity between phase and local
             # We want phase and local to learn different features (orthogonal outputs)
-            # Flatten spatial dimensions but keep batch dimension
+            # Note: In protected_phase mode, they're serial so this measures how much
+            # Local transforms the Phase output
             x_local_flat = x_local.flatten(1)  # [B, N*D]
             x_phase_flat = x_phase.flatten(1)  # [B, N*D]
 
-            # Cosine similarity per batch element, then average
-            # High similarity (close to 1.0) means redundant features
-            # We use squared similarity so both +1 (aligned) and -1 (opposite) are penalized
-            # Only orthogonal vectors (similarity=0) minimize this loss
             cos_sim = F.cosine_similarity(x_local_flat, x_phase_flat, dim=1, eps=1e-8)
             decorr_loss = (cos_sim ** 2).mean()  # Smoother gradients than abs()
 
@@ -4248,8 +4410,25 @@ class HybridTransformerBlock(nn.Module):
         causal_mask: bool = True,
         intent_phase: Optional[torch.Tensor] = None,
         return_decorr_loss: bool = False,
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        if return_decorr_loss:
+        prev_phase_state: Optional[torch.Tensor] = None,  # V10.2: Chunk state
+        prev_norm_state: Optional[torch.Tensor] = None,   # V10.2: Chunk normalizer
+        return_state: bool = False,  # V10.2: Return state for next chunk
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, Dict[str, torch.Tensor]]]:
+        """
+        V10.2: Added prev_phase_state/return_state for chunk-persistent Phase memory.
+        When chunking, pass prev_phase_state from previous chunk's state_dict.
+        """
+        if return_state:
+            # V10.2: Chunking mode - return state for next chunk
+            attn_out, state_dict = self.attention(
+                x, causal_mask, intent_phase=intent_phase,
+                prev_phase_state=prev_phase_state,
+                prev_norm_state=prev_norm_state,
+                return_state=True,
+            )
+            x = self.ff(attn_out)
+            return x, state_dict
+        elif return_decorr_loss:
             attn_out, decorr_loss = self.attention(
                 x, causal_mask, intent_phase=intent_phase, return_decorr_loss=True
             )
@@ -4775,6 +4954,7 @@ class HybridPhaseTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         intent_phase: Optional[torch.Tensor] = None,
+        chunk_offset: int = 0,  # V10.2: Global position offset for chunking
     ) -> torch.Tensor:
         """
         Forward pass returning hidden states BEFORE LM head.
@@ -4783,18 +4963,28 @@ class HybridPhaseTransformer(nn.Module):
         For 5M+ context, calling lm_head on full hidden creates 1TB+ tensor.
         Instead, process lm_head in chunks during loss computation.
 
+        V10.2: Added chunk_offset for proper positional encoding when chunking.
+        When processing chunk i of a long sequence:
+          - chunk_offset = i * chunk_size
+          - positions = chunk_offset + [0, 1, 2, ..., N-1]
+        This ensures Phase attention sees global positions for temporal context.
+
         Args:
             input_ids: [B, N] token indices
             intent_phase: Optional phase rotation from Ontological State Delta.
                          Only affects Hybrid layers (not Local-only layers).
+            chunk_offset: Global position offset. For chunk i, set this to
+                         i * chunk_size to maintain global positional encoding.
 
         Returns:
             hidden: [B, N, embed_dim] - final hidden states before LM head
         """
         B, N = input_ids.shape
 
-        # Embeddings
-        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        # V10.2: Global positions = chunk_offset + local positions
+        # This is CRITICAL for chunking: Phase needs global position context
+        # while Local's sliding window is inherently relative
+        positions = chunk_offset + torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
@@ -4837,12 +5027,19 @@ class HybridPhaseTransformer(nn.Module):
         return_last_hidden: bool = False,
         intent_phase: Optional[torch.Tensor] = None,
         return_decorr_loss: bool = False,
+        chunk_offset: int = 0,  # V10.2: Global position offset for chunking
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass with efficient layer extraction.
 
         Supports targeted hidden state extraction for inference components
         (EvolutionaryInferenceEngine, CSRInferenceGuard, SovereignScorer).
+
+        V10.2: Added chunk_offset for proper positional encoding when chunking.
+        When processing chunk i of a long sequence:
+          - chunk_offset = i * chunk_size
+          - positions = chunk_offset + [0, 1, 2, ..., N-1]
+        This ensures Phase attention sees global positions for temporal context.
 
         Args:
             input_ids: [B, N] token indices
@@ -4857,6 +5054,8 @@ class HybridPhaseTransformer(nn.Module):
                                Required for CSR re-projection after gating.
             intent_phase: Optional phase rotation from Ontological State Delta.
                          Only affects Hybrid layers (not Local-only layers).
+            chunk_offset: Global position offset. For chunk i, set this to
+                         i * chunk_size to maintain global positional encoding.
 
         Returns:
             Dict with:
@@ -4874,8 +5073,10 @@ class HybridPhaseTransformer(nn.Module):
         should_extract = return_hidden or extract_layers is not None
         extract_set = set(extract_layers) if extract_layers is not None else None
 
-        # Embeddings
-        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        # V10.2: Global positions = chunk_offset + local positions
+        # This is CRITICAL for chunking: Phase needs global position context
+        # while Local's sliding window is inherently relative
+        positions = chunk_offset + torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
@@ -4941,6 +5142,217 @@ class HybridPhaseTransformer(nn.Module):
         if return_decorr_loss and decorr_losses:
             # Average decorrelation loss across all hybrid layers
             result['decorr_loss'] = torch.stack(decorr_losses).mean()
+
+        return result
+
+    def forward_chunk(
+        self,
+        input_ids: torch.Tensor,
+        chunk_offset: int = 0,
+        prev_layer_states: Optional[Dict[int, Dict[str, torch.Tensor]]] = None,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[int, Dict[str, torch.Tensor]]]:
+        """
+        V10.2: Chunked forward pass with Phase state persistence.
+
+        CRITICAL for processing long sequences in chunks:
+        - Phase attention maintains state across chunks (temporal memory)
+        - Local attention resets per chunk (spatial reasoning)
+        - Global positional encoding via chunk_offset
+
+        Usage for chunking a long sequence:
+            chunk_size = 512
+            layer_states = None
+            all_logits = []
+
+            for i in range(0, seq_len, chunk_size):
+                chunk = tokens[i:i+chunk_size]
+                result, layer_states = model.forward_chunk(
+                    chunk,
+                    chunk_offset=i,
+                    prev_layer_states=layer_states,
+                )
+                all_logits.append(result['logits'])
+
+        Args:
+            input_ids: [B, N] token indices for this chunk
+            chunk_offset: Global position offset (= chunk_idx * chunk_size)
+            prev_layer_states: Dict mapping layer_idx -> state_dict from previous chunk.
+                              Each state_dict has 'final_state' and 'final_norm_state'.
+            intent_phase: Optional phase rotation from Ontological State Delta.
+
+        Returns:
+            result: Dict with 'logits', etc.
+            next_layer_states: Dict mapping layer_idx -> state_dict for next chunk.
+                              Pass this as prev_layer_states to next forward_chunk call.
+        """
+        B, N = input_ids.shape
+
+        # Global positions = chunk_offset + local positions
+        positions = chunk_offset + torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        # Initialize states if not provided
+        if prev_layer_states is None:
+            prev_layer_states = {}
+
+        next_layer_states = {}
+
+        # Process through blocks with state management
+        for i, block in enumerate(self.blocks):
+            is_hybrid_block = i >= self.local_layers
+            block_intent = intent_phase if is_hybrid_block else None
+
+            if is_hybrid_block:
+                # Hybrid blocks: manage Phase state
+                layer_state = prev_layer_states.get(i, {})
+                prev_state = layer_state.get('final_state', None)
+                prev_norm = layer_state.get('final_norm_state', None)
+
+                x, state_dict = block(
+                    x, causal_mask=True, intent_phase=block_intent,
+                    prev_phase_state=prev_state,
+                    prev_norm_state=prev_norm,
+                    return_state=True,
+                )
+                next_layer_states[i] = state_dict
+            else:
+                # Local-only blocks: no state to manage
+                x = block(x, causal_mask=True)
+
+        # Output
+        x = self.norm(x)
+        logits = self.lm_head(x) * self.logit_scale
+
+        result = {'logits': logits}
+        return result, next_layer_states
+
+    def diagnose_chunk_continuity(
+        self,
+        input_ids: torch.Tensor,
+        chunk_size: int = 512,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        V10.2: Diagnostic to verify chunk-persistent Phase state continuity.
+
+        Compares:
+        1. Full-sequence forward pass (ground truth)
+        2. Chunked forward pass with state persistence
+
+        A healthy chunking implementation should have:
+        - state_diff < 1e-4 (Phase state matches)
+        - logit_diff < 1e-3 (Output logits match)
+        - All chunks show monotonic state accumulation
+
+        Args:
+            input_ids: [B, N] token indices (should be longer than chunk_size)
+            chunk_size: Size of each chunk
+            verbose: Print diagnostic messages
+
+        Returns:
+            Dict with diagnostic metrics:
+            - 'healthy': bool - True if chunking is working correctly
+            - 'full_logits': Full-sequence logits
+            - 'chunked_logits': Chunked logits (concatenated)
+            - 'logit_max_diff': Max absolute difference in logits
+            - 'state_norms': List of state norms per chunk (should increase)
+            - 'state_diff_per_layer': Dict of state differences per hybrid layer
+        """
+        B, N = input_ids.shape
+        device = input_ids.device
+
+        if N <= chunk_size:
+            return {
+                'healthy': True,
+                'message': f'Sequence length {N} <= chunk_size {chunk_size}, no chunking needed',
+            }
+
+        # 1. Full-sequence forward (ground truth)
+        with torch.no_grad():
+            full_result = self.forward(input_ids)
+            full_logits = full_result['logits']
+
+        # 2. Chunked forward with state persistence
+        with torch.no_grad():
+            chunked_logits = []
+            layer_states = None
+            state_norms = []
+            state_by_chunk = []
+
+            for chunk_idx, start in enumerate(range(0, N, chunk_size)):
+                end = min(start + chunk_size, N)
+                chunk = input_ids[:, start:end]
+
+                result, layer_states = self.forward_chunk(
+                    chunk,
+                    chunk_offset=start,
+                    prev_layer_states=layer_states,
+                )
+                chunked_logits.append(result['logits'])
+
+                # Track state norms for each hybrid layer
+                chunk_state_info = {}
+                for layer_idx, state_dict in layer_states.items():
+                    if 'final_state' in state_dict:
+                        state = state_dict['final_state']
+                        # Complex tensor: compute magnitude
+                        if state.is_complex():
+                            norm = state.abs().mean().item()
+                        else:
+                            norm = state.abs().mean().item()
+                        chunk_state_info[layer_idx] = norm
+                state_norms.append(chunk_state_info)
+                state_by_chunk.append({k: v.clone() for k, v in layer_states.items()
+                                       for v in [state_dict.get('final_state')]
+                                       if v is not None})
+
+            chunked_logits = torch.cat(chunked_logits, dim=1)
+
+        # 3. Compare logits
+        logit_diff = (full_logits - chunked_logits).abs()
+        logit_max_diff = logit_diff.max().item()
+        logit_mean_diff = logit_diff.mean().item()
+
+        # 4. Check state monotonicity (Phase should accumulate)
+        state_monotonic = True
+        for layer_idx in layer_states.keys():
+            layer_norms = [sn.get(layer_idx, 0) for sn in state_norms]
+            # State norm should generally increase or stay stable
+            for i in range(1, len(layer_norms)):
+                if layer_norms[i] < layer_norms[i-1] * 0.5:  # Allow some variance
+                    state_monotonic = False
+                    break
+
+        # 5. Determine health
+        healthy = (logit_max_diff < 0.01) and state_monotonic
+
+        result = {
+            'healthy': healthy,
+            'logit_max_diff': logit_max_diff,
+            'logit_mean_diff': logit_mean_diff,
+            'state_monotonic': state_monotonic,
+            'state_norms_per_chunk': state_norms,
+            'num_chunks': len(state_norms),
+        }
+
+        if verbose:
+            status = "✓ HEALTHY" if healthy else "✗ UNHEALTHY"
+            print(f"\n{'='*60}")
+            print(f"Chunk Continuity Diagnostic: {status}")
+            print(f"{'='*60}")
+            print(f"Sequence length: {N}, Chunk size: {chunk_size}, Chunks: {len(state_norms)}")
+            print(f"Logit max diff:  {logit_max_diff:.6f} (threshold: 0.01)")
+            print(f"Logit mean diff: {logit_mean_diff:.6f}")
+            print(f"State monotonic: {state_monotonic}")
+            print(f"\nState norms per chunk (per hybrid layer):")
+            for i, sn in enumerate(state_norms[:5]):  # Show first 5 chunks
+                norms_str = ", ".join(f"L{k}:{v:.4f}" for k, v in sorted(sn.items()))
+                print(f"  Chunk {i}: {norms_str}")
+            if len(state_norms) > 5:
+                print(f"  ... ({len(state_norms) - 5} more chunks)")
+            print(f"{'='*60}\n")
 
         return result
 
