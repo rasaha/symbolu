@@ -2129,6 +2129,90 @@ class HybridLMTransformer(nn.Module):
 
         return layer_ppls
 
+    def get_layer_contributions(self, input_ids: torch.Tensor, targets: torch.Tensor) -> Dict[str, List[float]]:
+        """
+        Compute detailed per-layer metrics to see if phase learns faster/richer.
+
+        Returns:
+            - 'ppl': PPL after each layer
+            - 'ppl_delta': PPL reduction from each layer (positive = layer helps)
+            - 'phase_ratio': Current phase ratio per layer
+            - 'contribution_pct': % of total PPL reduction from each layer
+        """
+        layer_ppls = self.get_layer_ppl(input_ids, targets)
+
+        # Compute PPL before any layer (just embeddings)
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+        x_normed = self.norm(x)
+        logits = self.lm_head(x_normed)
+        loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+        ppl_embed = torch.exp(loss).item()
+
+        # PPL delta (reduction) per layer
+        ppl_deltas = []
+        prev_ppl = ppl_embed
+        for ppl in layer_ppls:
+            delta = prev_ppl - ppl  # Positive = layer reduced PPL
+            ppl_deltas.append(delta)
+            prev_ppl = ppl
+
+        # Total PPL reduction
+        total_reduction = ppl_embed - layer_ppls[-1]
+
+        # Contribution percentage per layer
+        contribution_pcts = []
+        for delta in ppl_deltas:
+            if total_reduction > 0:
+                pct = (delta / total_reduction) * 100
+            else:
+                pct = 0.0
+            contribution_pcts.append(pct)
+
+        return {
+            'ppl': layer_ppls,
+            'ppl_delta': ppl_deltas,
+            'phase_ratio': self.curriculum.copy(),
+            'contribution_pct': contribution_pcts,
+            'ppl_embed': ppl_embed,
+            'total_reduction': total_reduction,
+        }
+
+    def ablate_attention(self, input_ids: torch.Tensor, targets: torch.Tensor,
+                         ablate_phase: bool = False, ablate_local: bool = False) -> float:
+        """
+        Compute PPL with phase or local attention ablated (zeroed out).
+
+        This shows what each attention type contributes:
+        - ablate_phase=True: Only local attention active
+        - ablate_local=True: Only phase attention active
+        """
+        # Store original ratios
+        original_curriculum = self.curriculum.copy()
+
+        if ablate_phase:
+            # Set all phase ratios to 0 (only local)
+            ablated_curriculum = [0.0] * self.num_layers
+        elif ablate_local:
+            # Set all phase ratios to 1 (only phase)
+            ablated_curriculum = [1.0] * self.num_layers
+        else:
+            ablated_curriculum = original_curriculum
+
+        self.update_curriculum(ablated_curriculum)
+
+        # Compute PPL
+        with torch.no_grad():
+            logits = self.forward(input_ids)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+
+        # Restore original
+        self.update_curriculum(original_curriculum)
+
+        return ppl
+
 
 class PhaseFirstCurriculum:
     """
@@ -2249,6 +2333,11 @@ def train_real_language(
     train_iter = iter(train_loader)
     best_val_ppl = float('inf')
 
+    # Convergence milestones tracking (to measure learning speed)
+    ppl_milestones = [500, 200, 100, 50]
+    milestone_steps = {m: None for m in ppl_milestones}
+    ppl_history = []  # Track PPL over time
+
     while step < config.num_steps:
         try:
             x, y = next(train_iter)
@@ -2276,6 +2365,15 @@ def train_real_language(
             avg_loss = total_loss / log_interval
             ppl = math.exp(avg_loss)
             total_loss = 0.0
+
+            # Track PPL history
+            ppl_history.append((step, ppl))
+
+            # Check milestones (convergence speed tracking)
+            for milestone in ppl_milestones:
+                if milestone_steps[milestone] is None and ppl < milestone:
+                    milestone_steps[milestone] = step
+                    print(f"  ★ MILESTONE: PPL dropped below {milestone} at step {step}!")
 
             # Update phase-first curriculum
             if pfc is not None:
@@ -2310,25 +2408,89 @@ def train_real_language(
                 best_val_ppl = val_ppl
                 print(f"      ★ New best Val PPL!")
 
-            # Layer-wise probing
+            # Layer-wise probing with detailed metrics
             if args.probe_layers:
-                print(f"\n      Layer-wise PPL (early exit):")
                 x_sample, y_sample = next(iter(val_loader))
                 x_sample, y_sample = x_sample.to(config.device), y_sample.to(config.device)
-                layer_ppls = model.get_layer_ppl(x_sample, y_sample)
-                for i, lppl in enumerate(layer_ppls):
-                    phase_ratio = model.curriculum[i]
-                    print(f"        L{i} (phase={phase_ratio:.2f}): PPL={lppl:.2f}")
+
+                # Get detailed layer contributions
+                contrib = model.get_layer_contributions(x_sample, y_sample)
+
+                print(f"\n      Layer Contributions (Does Phase Learn Faster/Richer?):")
+                print(f"      {'Layer':<8} {'Phase%':<8} {'PPL':<10} {'Δ PPL':<10} {'Contrib%':<10}")
+                print(f"      {'-'*46}")
+                for i in range(model.num_layers):
+                    phase_pct = contrib['phase_ratio'][i] * 100
+                    ppl = contrib['ppl'][i]
+                    delta = contrib['ppl_delta'][i]
+                    contrib_pct = contrib['contribution_pct'][i]
+                    # Highlight layers that contribute most
+                    marker = "★" if contrib_pct > 100 / model.num_layers * 1.5 else " "
+                    print(f"      L{i:<6} {phase_pct:>6.1f}%  {ppl:>8.1f}  {delta:>+8.1f}  {contrib_pct:>8.1f}% {marker}")
+
+                print(f"\n      Summary:")
+                print(f"        Embed-only PPL: {contrib['ppl_embed']:.1f}")
+                print(f"        Final PPL:      {contrib['ppl'][-1]:.1f}")
+                print(f"        Total Reduction: {contrib['total_reduction']:.1f}")
+
+                # Ablation test: Phase-only vs Local-only
+                print(f"\n      Ablation Test (Phase vs Local contribution):")
+                ppl_normal = val_ppl
+                ppl_phase_only = model.ablate_attention(x_sample, y_sample, ablate_local=True)
+                ppl_local_only = model.ablate_attention(x_sample, y_sample, ablate_phase=True)
+
+                print(f"        Normal (mixed):    PPL = {ppl_normal:.1f}")
+                print(f"        Phase-only:        PPL = {ppl_phase_only:.1f}")
+                print(f"        Local-only:        PPL = {ppl_local_only:.1f}")
+
+                # Interpretation
+                phase_better = ppl_phase_only < ppl_local_only
+                if phase_better:
+                    improvement = ((ppl_local_only - ppl_phase_only) / ppl_local_only) * 100
+                    print(f"        → Phase is {improvement:.1f}% BETTER than Local alone!")
+                else:
+                    improvement = ((ppl_phase_only - ppl_local_only) / ppl_phase_only) * 100
+                    print(f"        → Local is {improvement:.1f}% better than Phase alone")
 
             print()
             model.train()
 
-    # Final evaluation
+    # Final evaluation with comprehensive analysis
     print("\n" + "=" * 70)
-    print("FINAL RESULTS")
+    print("FINAL RESULTS: Phase Learning Analysis")
     print("=" * 70)
     print(f"  Best Val PPL: {best_val_ppl:.2f}")
-    print(f"  Final Curriculum: {model.curriculum}")
+    print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+
+    # Convergence speed summary
+    print(f"\n  Convergence Speed (steps to reach PPL milestone):")
+    for milestone in ppl_milestones:
+        steps = milestone_steps[milestone]
+        if steps is not None:
+            print(f"    PPL < {milestone:4d}: {steps:5d} steps ✓")
+        else:
+            print(f"    PPL < {milestone:4d}: Not reached")
+
+    # Final ablation
+    model.eval()
+    x_final, y_final = next(iter(val_loader))
+    x_final, y_final = x_final.to(config.device), y_final.to(config.device)
+
+    with torch.no_grad():
+        ppl_phase_only = model.ablate_attention(x_final, y_final, ablate_local=True)
+        ppl_local_only = model.ablate_attention(x_final, y_final, ablate_phase=True)
+
+    print(f"\n  Final Ablation:")
+    print(f"    Phase-only PPL: {ppl_phase_only:.2f}")
+    print(f"    Local-only PPL: {ppl_local_only:.2f}")
+    print(f"    Mixed PPL:      {best_val_ppl:.2f}")
+
+    if ppl_phase_only < ppl_local_only:
+        print(f"\n  CONCLUSION: Phase learns RICHER representations!")
+        print(f"    Phase alone achieves {((ppl_local_only - ppl_phase_only) / ppl_local_only * 100):.1f}% better PPL than Local alone.")
+    else:
+        print(f"\n  CONCLUSION: Local attention dominates for this task.")
+        print(f"    But mixed attention achieves best results ({best_val_ppl:.2f}).")
 
     return model, best_val_ppl
 
