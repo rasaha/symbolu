@@ -9335,6 +9335,17 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
+    # ==========================================================================
+    # Master toggle that enables optimal phase-first learning configuration:
+    #   - SRK inverted annealing (strong early, ramp down)
+    #   - PPL-alpha curriculum (phase high when PPL high)
+    #   - Adaptive window size (small early, large later)
+    #   - Layerwise: lower layers keep phase longer
+    # Individual settings below can override defaults when phase_first_curriculum=True
+    phase_first_curriculum: bool = False
+
     # PPL-gated alpha curriculum (phase dominates early, local refines later)
     # When enabled, alpha_phase is computed based on current PPL:
     #   PPL >= ppl_high: alpha_phase = alpha_phase_ppl_high (phase dominates)
@@ -17888,6 +17899,12 @@ def main():
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
 
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM (unified inverse curriculum)
+    # ==========================================================================
+    parser.add_argument("--phase_first_curriculum", action="store_true",
+                       help="Enable phase-first learning: SRK strong→weak, alpha high→low, window small→large")
+
     # PPL-gated alpha curriculum (phase dominates early, local refines later)
     parser.add_argument("--enable_ppl_alpha_curriculum", action="store_true",
                        help="Adjust alpha_phase based on PPL (phase dominates when PPL high)")
@@ -19076,6 +19093,8 @@ def main():
         alpha_phase_start=args.alpha_phase_start,
         alpha_phase_end=args.alpha_phase_end,
         alpha_decay_steps=args.alpha_decay_steps,
+        # Phase-first curriculum (unified inverse curriculum)
+        phase_first_curriculum=args.phase_first_curriculum,
         # PPL-gated alpha curriculum
         enable_ppl_alpha_curriculum=args.enable_ppl_alpha_curriculum,
         alpha_phase_ppl_high=args.alpha_phase_ppl_high,
@@ -19385,6 +19404,40 @@ def main():
         jepa_enable_karma_injection=args.jepa_enable_karma_injection,
         jepa_karma_gate_bias=args.jepa_karma_gate_bias,
     )
+
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM: Enable sub-components when master flag is set
+    # ==========================================================================
+    if config.phase_first_curriculum:
+        print("\n" + "=" * 70)
+        print("  PHASE-FIRST CURRICULUM ENABLED")
+        print("  Configuring optimal phase-first learning settings...")
+        print("=" * 70)
+
+        # Enable PPL-alpha curriculum (phase high when PPL high)
+        if not config.enable_ppl_alpha_curriculum:
+            config.enable_ppl_alpha_curriculum = True
+            print("  ✓ PPL-Alpha Curriculum: ENABLED (phase dominates when PPL high)")
+
+        # Enable adaptive window (small early, large later)
+        if not config.enable_adaptive_window:
+            config.enable_adaptive_window = True
+            print(f"  ✓ Adaptive Window: ENABLED ({config.window_size_high_ppl}→{config.window_size_low_ppl})")
+
+        # Enable SRK with inverted annealing (strong early, ramp down)
+        if not config.enable_srk:
+            config.enable_srk = True
+            print("  ✓ SRK: ENABLED (auxiliary phase support)")
+        if not config.srk_invert_annealing:
+            config.srk_invert_annealing = True
+            print("  ✓ SRK Annealing: INVERTED (strong→weak for phase-first)")
+
+        # Summary
+        print("-" * 70)
+        print(f"  Phase-First Schedule:")
+        print(f"    PPL >= {config.ppl_high_threshold}: alpha_phase={config.alpha_phase_ppl_high}, window={config.window_size_high_ppl}, SRK=STRONG")
+        print(f"    PPL <= {config.ppl_low_threshold}: alpha_phase={config.alpha_phase_ppl_low}, window={config.window_size_low_ppl}, SRK=WEAK")
+        print("=" * 70 + "\n")
 
     # V9.8.0: Build SRK config from legacy flags (backward compatibility)
     srk_config, srk_warnings = build_srk_config_from_legacy(args, config)
