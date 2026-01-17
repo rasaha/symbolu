@@ -9021,6 +9021,10 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix - enabled by default)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # Phase Rotation Test (validates phase encodes relational structure)
+    phase_rotation: bool = False  # Run phase rotation test after training
+    phase_rotation_angles: str = "0,45,90,135,180,270"  # Angles to test (degrees)
+
     # V10.0: Binding Cache architecture (validated by diagnostic probes)
     binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
     no_binding_cache: bool = False  # Disable cache (use full attention)
@@ -16837,6 +16841,34 @@ def train(config: UnifiedTrainingConfig):
         print(f"  Final Authority: {authority_controller.A:.3f}")
     print(f"  Final Checkpoint: {ckpt_dir / 'final.pt'}")
 
+    # ==========================================================================
+    # Phase Rotation Test (if enabled)
+    # ==========================================================================
+    if config.phase_rotation:
+        print(f"\n{'='*70}")
+        print("PHASE ROTATION TEST")
+        print(f"{'='*70}")
+        print("\nRunning phase rotation test to verify phase encodes relations...")
+
+        # Parse rotation angles
+        rotation_angles = [float(x) for x in config.phase_rotation_angles.split(",")]
+        print(f"Testing angles: {rotation_angles}")
+
+        # Run rotation test
+        rotation_results = run_phase_rotation_test(
+            model=model,
+            val_loader=val_loader,
+            device=device,
+            config=config,
+            autocast_dtype=autocast_dtype,
+            angles_degrees=rotation_angles,
+            cached_val_batches=cached_val_batches if 'cached_val_batches' in dir() else None,
+        )
+
+        # Print results
+        model_name = config.model_type.replace("_", " ").title()
+        print_phase_rotation_results(rotation_results, model_name)
+
 
 def evaluate(
     model: nn.Module,
@@ -16904,6 +16936,163 @@ def evaluate(
 
     avg_loss = total_loss / total_batches
     return avg_loss, {"ppl": math.exp(min(avg_loss, 20))}
+
+
+# =============================================================================
+# Phase Rotation Test (validates phase encodes relational structure)
+# =============================================================================
+
+def run_phase_rotation_test(
+    model: nn.Module,
+    val_loader: DataLoader,
+    device: torch.device,
+    config: 'UnifiedTrainingConfig',
+    autocast_dtype: torch.dtype,
+    angles_degrees: List[float] = None,
+    cached_val_batches: Optional[list] = None,
+) -> Dict[str, Any]:
+    """
+    Run phase rotation test to verify phase encodes relational structure.
+
+    HYPOTHESIS:
+    -----------
+    If roles/relations are encoded as phase offsets:
+    - Rotating φ_k by θ should shift which bindings are retrieved
+    - Larger rotations should cause larger perplexity increases
+    - 180° rotation should cause maximum disruption
+
+    If phase is decorative:
+    - Rotation should have minimal/random effect on perplexity
+    - No systematic relationship between rotation angle and perplexity
+
+    Args:
+        model: Model with phase attention (must have set_rotation method)
+        val_loader: Validation DataLoader
+        device: Device to run on
+        config: Training configuration
+        autocast_dtype: Autocast dtype for mixed precision
+        angles_degrees: List of rotation angles in degrees (default: 0, 45, 90, 135, 180, 270)
+        cached_val_batches: Optional pre-cached validation batches
+
+    Returns:
+        Dictionary with:
+        - 'perplexity': {angle: ppl} for each angle
+        - 'loss': {angle: loss} for each angle
+        - 'delta_ppl': {angle: ppl_change} relative to baseline
+        - 'sensitivity': float (mean absolute ppl delta, higher = more sensitive)
+        - 'systematic': bool (True if ppl increases with angle up to 180°)
+    """
+    if angles_degrees is None:
+        angles_degrees = [0, 45, 90, 135, 180, 270]
+
+    if not hasattr(model, 'set_rotation'):
+        return {
+            'perplexity': {0: float('nan')},
+            'loss': {0: float('nan')},
+            'delta_ppl': {0: 0.0},
+            'sensitivity': 0.0,
+            'systematic': False,
+            'error': 'Model does not support rotation (no set_rotation method)'
+        }
+
+    results = {'perplexity': {}, 'loss': {}, 'delta_ppl': {}}
+
+    # Get baseline (0° rotation)
+    model.set_rotation(0.0)
+    baseline_loss, baseline_metrics = evaluate(
+        model, val_loader, device, config, autocast_dtype,
+        cached_val_batches=cached_val_batches
+    )
+    baseline_ppl = baseline_metrics['ppl']
+    results['perplexity'][0] = baseline_ppl
+    results['loss'][0] = baseline_loss
+    results['delta_ppl'][0] = 0.0
+
+    # Test each rotation angle
+    for angle_deg in angles_degrees:
+        if angle_deg == 0:
+            continue  # Already computed
+
+        angle_rad = math.radians(angle_deg)
+        model.set_rotation(angle_rad)
+        loss, metrics = evaluate(
+            model, val_loader, device, config, autocast_dtype,
+            cached_val_batches=cached_val_batches
+        )
+        ppl = metrics['ppl']
+        results['perplexity'][angle_deg] = ppl
+        results['loss'][angle_deg] = loss
+        results['delta_ppl'][angle_deg] = ppl - baseline_ppl
+
+    # Clear rotation
+    model.clear_rotation()
+
+    # Compute sensitivity metrics (normalized by baseline)
+    deltas = [abs(d) / baseline_ppl for a, d in results['delta_ppl'].items() if a != 0]
+    results['sensitivity'] = sum(deltas) / len(deltas) if deltas else 0.0
+
+    # Check if perplexity increases systematically with angle (up to 180°)
+    angles_sorted = sorted([a for a in results['perplexity'].keys() if a <= 180])
+    ppls_sorted = [results['perplexity'][a] for a in angles_sorted]
+    # Systematic if ppl generally increases (allowing small fluctuations)
+    increasing_pairs = sum(1 for i in range(len(ppls_sorted)-1) if ppls_sorted[i] <= ppls_sorted[i+1] * 1.02)
+    results['systematic'] = increasing_pairs >= (len(ppls_sorted) - 2) if len(ppls_sorted) > 2 else False
+
+    # Additional analysis: find angle of maximum disruption
+    if results['delta_ppl']:
+        max_delta = max(results['delta_ppl'].items(), key=lambda x: x[1])
+        results['max_disruption_angle'] = max_delta[0]
+        results['max_disruption_delta'] = max_delta[1]
+
+    return results
+
+
+def print_phase_rotation_results(
+    results: Dict[str, Any],
+    model_name: str = "Model",
+) -> None:
+    """Pretty-print phase rotation test results."""
+    print(f"\n{'='*70}")
+    print(f"PHASE ROTATION TEST: {model_name}")
+    print(f"{'='*70}")
+
+    if 'error' in results:
+        print(f"  ERROR: {results['error']}")
+        return
+
+    baseline_ppl = results['perplexity'].get(0, 1.0)
+
+    print(f"\nHypothesis: If phase encodes relations, rotating φ_k should disrupt retrieval.")
+    print(f"\n  {'Angle':>8}  {'Perplexity':>12}  {'Δ PPL':>10}  {'Δ %':>8}")
+    print(f"  {'-'*8}  {'-'*12}  {'-'*10}  {'-'*8}")
+
+    for angle in sorted(results['perplexity'].keys()):
+        ppl = results['perplexity'][angle]
+        delta = results['delta_ppl'][angle]
+        delta_pct = (delta / baseline_ppl) * 100 if baseline_ppl > 0 else 0
+        delta_str = f"{delta:+.2f}" if angle != 0 else "baseline"
+        pct_str = f"{delta_pct:+.1f}%" if angle != 0 else ""
+        print(f"  {angle:>6}°  {ppl:>12.2f}  {delta_str:>10}  {pct_str:>8}")
+
+    print(f"\n  Sensitivity (mean |Δ|/baseline): {results['sensitivity']*100:.2f}%")
+    print(f"  Systematic increase:             {'Yes' if results['systematic'] else 'No'}")
+
+    if 'max_disruption_angle' in results:
+        print(f"  Max disruption at:               {results['max_disruption_angle']}° (+{results['max_disruption_delta']:.2f} PPL)")
+
+    # Interpretation
+    print(f"\n  INTERPRETATION:")
+    if results['sensitivity'] > 0.10:
+        print(f"    → Phase is SENSITIVE to rotation (sensitivity > 10%)")
+        print(f"    → Phase likely encodes meaningful relational structure")
+        if results['systematic']:
+            print(f"    → Systematic increase suggests phase offset = relation encoding")
+    elif results['sensitivity'] > 0.05:
+        print(f"    → Phase shows MODERATE sensitivity to rotation")
+        print(f"    → Phase may partially encode relational structure")
+    else:
+        print(f"    → Phase is INSENSITIVE to rotation (sensitivity < 5%)")
+        print(f"    → Phase may be DECORATIVE (not encoding relations)")
 
 
 def save_checkpoint(
@@ -17369,6 +17558,14 @@ def main():
     parser.add_argument("--zero_mean_cosine", action="store_true",
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
+
+    # Phase Rotation Test (validates phase encodes relational structure)
+    parser.add_argument("--phase_rotation", action="store_true",
+                       help="Run phase rotation test after training to verify phase encodes relations. "
+                            "Rotates φ_k by various angles and measures accuracy/perplexity change.")
+    parser.add_argument("--phase_rotation_angles", type=str, default="0,45,90,135,180,270",
+                       help="Comma-separated rotation angles in degrees for --phase_rotation test. "
+                            "(default: 0,45,90,135,180,270)")
 
     # V10.0: Binding Cache architecture (validated by diagnostic probes)
     parser.add_argument("--binding_cache_top_k", type=int, default=64,
@@ -18314,6 +18511,9 @@ def main():
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
         bounded_phase=args.bounded_phase,  # V9.9.11: Phase collapse fix 1
         zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+        # Phase Rotation Test
+        phase_rotation=args.phase_rotation,
+        phase_rotation_angles=args.phase_rotation_angles,
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         # V10.0: Binding Cache options
