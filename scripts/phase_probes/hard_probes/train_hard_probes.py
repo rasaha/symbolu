@@ -1979,6 +1979,361 @@ def print_rotation_test_results(
 
 
 # =============================================================================
+# REAL LANGUAGE MODE: WikiText Dataset and LM Training
+# =============================================================================
+
+class WikiTextDataset(Dataset):
+    """WikiText dataset for language modeling with layer probing."""
+
+    def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
+        """
+        Args:
+            split: "train", "validation", or "test"
+            seq_len: Sequence length for chunks
+            dataset_name: "wikitext2" or "wikitext103"
+        """
+        try:
+            from datasets import load_dataset
+            from transformers import GPT2Tokenizer
+        except ImportError:
+            raise ImportError("Install: pip install datasets transformers")
+
+        self.seq_len = seq_len
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # Load dataset
+        if dataset_name == "wikitext2":
+            ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
+        else:
+            ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+
+        # Tokenize all text
+        all_text = " ".join([t for t in ds["text"] if t.strip()])
+        self.tokens = self.tokenizer.encode(all_text)
+        print(f"  [WikiText] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
+
+    def __len__(self):
+        return max(1, len(self.tokens) // self.seq_len - 1)
+
+    def __getitem__(self, idx):
+        start = idx * self.seq_len
+        end = start + self.seq_len + 1  # +1 for target
+        chunk = self.tokens[start:end]
+
+        # Pad if needed
+        if len(chunk) < self.seq_len + 1:
+            chunk = chunk + [self.tokenizer.pad_token_id] * (self.seq_len + 1 - len(chunk))
+
+        x = torch.tensor(chunk[:-1], dtype=torch.long)
+        y = torch.tensor(chunk[1:], dtype=torch.long)
+        return x, y
+
+
+class HybridLMTransformer(nn.Module):
+    """
+    Language Modeling Transformer with per-layer Phase/Quadratic mixing.
+
+    Supports:
+    - Phase-first curriculum (phase_ratio adjustable per layer)
+    - Layer-wise probing (can ablate individual layers)
+    - Real language modeling (cross-entropy loss)
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        curriculum: List[float],  # phase_ratio per layer
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.d_model = d_model
+        self.num_layers = num_layers
+        self.curriculum = curriculum  # Mutable for phase-first curriculum
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        # Create hybrid layers
+        self.layers = nn.ModuleList([
+            HybridTransformerBlock(
+                d_model, num_heads, d_ff, dropout,
+                phase_ratio=curriculum[i],
+                operation_tokens=None,
+                bounded_phase=bounded_phase,
+            )
+            for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+
+        # Weight tying
+        self.lm_head.weight = self.token_emb.weight
+
+        # Layer-wise probing storage
+        self.layer_outputs = []
+        self.probe_mode = False
+
+    def update_curriculum(self, new_curriculum: List[float]):
+        """Update phase ratios for phase-first curriculum."""
+        self.curriculum = new_curriculum
+        for i, layer in enumerate(self.layers):
+            layer.phase_ratio = new_curriculum[i]
+
+    def forward(self, input_ids: torch.Tensor, probe_layers: bool = False) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        self.layer_outputs = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if probe_layers:
+                # Store intermediate output for layer probing
+                self.layer_outputs.append(x.detach().clone())
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    def get_layer_ppl(self, input_ids: torch.Tensor, targets: torch.Tensor) -> List[float]:
+        """
+        Compute PPL contribution from each layer by early-exiting.
+
+        Returns list of PPLs: [ppl_after_layer_0, ppl_after_layer_1, ...]
+        """
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_ppls = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            # Early exit: compute PPL after this layer
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+            layer_ppls.append(ppl)
+
+        return layer_ppls
+
+
+class PhaseFirstCurriculum:
+    """
+    Adjusts per-layer phase ratios based on current PPL.
+
+    High PPL (early training): More phase in all layers
+    Low PPL (later training): Phase only in early layers, local in later layers
+    """
+
+    def __init__(
+        self,
+        num_layers: int,
+        alpha_high: float = 0.8,
+        alpha_low: float = 0.3,
+        ppl_high: float = 1000.0,
+        ppl_low: float = 100.0,
+    ):
+        self.num_layers = num_layers
+        self.alpha_high = alpha_high
+        self.alpha_low = alpha_low
+        self.ppl_high = ppl_high
+        self.ppl_low = ppl_low
+        self.current_ppl = float('inf')
+
+    def update(self, ppl: float) -> List[float]:
+        """
+        Compute per-layer phase ratios based on PPL.
+
+        Returns: curriculum list [phase_ratio_L0, phase_ratio_L1, ...]
+        """
+        self.current_ppl = ppl
+
+        # Compute base alpha from PPL
+        if ppl >= self.ppl_high:
+            base_alpha = self.alpha_high
+        elif ppl <= self.ppl_low:
+            base_alpha = self.alpha_low
+        else:
+            # Linear interpolation
+            ratio = (ppl - self.ppl_low) / (self.ppl_high - self.ppl_low)
+            base_alpha = self.alpha_low + ratio * (self.alpha_high - self.alpha_low)
+
+        # Per-layer curriculum: early layers keep more phase
+        # Layer 0: base_alpha, Layer N-1: base_alpha * 0.5
+        curriculum = []
+        for i in range(self.num_layers):
+            layer_factor = 1.0 - (i / (self.num_layers - 1)) * 0.5  # 1.0 → 0.5
+            layer_alpha = base_alpha * layer_factor
+            curriculum.append(layer_alpha)
+
+        return curriculum
+
+
+def train_real_language(
+    args,
+    config: Config,
+    curriculum: List[float],
+):
+    """
+    Train with real language data (WikiText) and layer probing.
+    """
+    print("\n" + "=" * 70)
+    print("REAL LANGUAGE MODE: WikiText Language Modeling")
+    print("=" * 70)
+
+    # Load dataset
+    print(f"\nLoading {args.dataset} dataset...")
+    train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
+    val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
+
+    # Create model
+    print(f"\nCreating HybridLMTransformer...")
+    print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+    print(f"  Initial curriculum: {curriculum}")
+
+    model = HybridLMTransformer(
+        vocab_size=args.lm_vocab_size,
+        d_model=config.d_model,
+        num_heads=config.num_heads,
+        num_layers=config.num_layers,
+        d_ff=config.d_ff,
+        dropout=config.dropout,
+        max_seq_len=args.seq_len,
+        curriculum=curriculum,
+        bounded_phase=config.bounded_phase,
+    ).to(config.device)
+
+    param_count = sum(p.numel() for p in model.parameters())
+    print(f"  Parameters: {param_count:,}")
+
+    # Phase-first curriculum controller
+    pfc = None
+    if args.phase_first_curriculum:
+        pfc = PhaseFirstCurriculum(
+            num_layers=config.num_layers,
+            alpha_high=args.alpha_phase_high,
+            alpha_low=args.alpha_phase_low,
+            ppl_high=args.ppl_high,
+            ppl_low=args.ppl_low,
+        )
+        print(f"\n  Phase-First Curriculum: ENABLED")
+        print(f"    alpha_high={args.alpha_phase_high}, alpha_low={args.alpha_phase_low}")
+        print(f"    ppl_high={args.ppl_high}, ppl_low={args.ppl_low}")
+
+    # Optimizer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+
+    # Training loop
+    print(f"\nTraining for {config.num_steps} steps...")
+    model.train()
+    step = 0
+    total_loss = 0.0
+    log_interval = 100
+
+    train_iter = iter(train_loader)
+    best_val_ppl = float('inf')
+
+    while step < config.num_steps:
+        try:
+            x, y = next(train_iter)
+        except StopIteration:
+            train_iter = iter(train_loader)
+            x, y = next(train_iter)
+
+        x, y = x.to(config.device), y.to(config.device)
+
+        # Forward
+        logits = model(x)
+        loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
+
+        total_loss += loss.item()
+        step += 1
+
+        # Logging
+        if step % log_interval == 0:
+            avg_loss = total_loss / log_interval
+            ppl = math.exp(avg_loss)
+            total_loss = 0.0
+
+            # Update phase-first curriculum
+            if pfc is not None:
+                new_curriculum = pfc.update(ppl)
+                model.update_curriculum(new_curriculum)
+                curr_str = ",".join([f"{c:.2f}" for c in new_curriculum])
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Curriculum: [{curr_str}]")
+            else:
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
+
+        # Evaluation
+        if step % config.eval_every == 0:
+            model.eval()
+            val_loss = 0.0
+            val_batches = 0
+
+            with torch.no_grad():
+                for x, y in val_loader:
+                    x, y = x.to(config.device), y.to(config.device)
+                    logits = model(x)
+                    val_loss += F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1)).item()
+                    val_batches += 1
+                    if val_batches >= 50:  # Limit eval batches
+                        break
+
+            val_loss /= val_batches
+            val_ppl = math.exp(val_loss)
+            print(f"\n  === Validation @ Step {step} ===")
+            print(f"      Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+            if val_ppl < best_val_ppl:
+                best_val_ppl = val_ppl
+                print(f"      ★ New best Val PPL!")
+
+            # Layer-wise probing
+            if args.probe_layers:
+                print(f"\n      Layer-wise PPL (early exit):")
+                x_sample, y_sample = next(iter(val_loader))
+                x_sample, y_sample = x_sample.to(config.device), y_sample.to(config.device)
+                layer_ppls = model.get_layer_ppl(x_sample, y_sample)
+                for i, lppl in enumerate(layer_ppls):
+                    phase_ratio = model.curriculum[i]
+                    print(f"        L{i} (phase={phase_ratio:.2f}): PPL={lppl:.2f}")
+
+            print()
+            model.train()
+
+    # Final evaluation
+    print("\n" + "=" * 70)
+    print("FINAL RESULTS")
+    print("=" * 70)
+    print(f"  Best Val PPL: {best_val_ppl:.2f}")
+    print(f"  Final Curriculum: {model.curriculum}")
+
+    return model, best_val_ppl
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -2078,6 +2433,35 @@ Examples:
     parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
                         help="Disable bounded phase (use raw linear projection)")
 
+    # ==========================================================================
+    # REAL LANGUAGE MODE (WikiText/FineWeb)
+    # ==========================================================================
+    parser.add_argument("--real-language", action="store_true",
+                        help="Use real language data (WikiText) instead of synthetic data")
+    parser.add_argument("--dataset", type=str, default="wikitext2",
+                        choices=["wikitext2", "wikitext103"],
+                        help="Dataset for real language mode")
+    parser.add_argument("--seq-len", type=int, default=256,
+                        help="Sequence length for language modeling")
+    parser.add_argument("--lm-vocab-size", type=int, default=50257,
+                        help="Vocabulary size for language modeling (GPT-2: 50257)")
+
+    # Phase-first curriculum (from train_unified_llm.py)
+    parser.add_argument("--phase-first-curriculum", action="store_true",
+                        help="Enable phase-first learning: phase dominates early, local later")
+    parser.add_argument("--alpha-phase-high", type=float, default=0.8,
+                        help="alpha_phase when PPL >= ppl_high_threshold")
+    parser.add_argument("--alpha-phase-low", type=float, default=0.3,
+                        help="alpha_phase when PPL <= ppl_low_threshold")
+    parser.add_argument("--ppl-high", type=float, default=1000.0,
+                        help="PPL threshold for max phase weight")
+    parser.add_argument("--ppl-low", type=float, default=100.0,
+                        help="PPL threshold for min phase weight")
+
+    # Layer-wise probing
+    parser.add_argument("--probe-layers", action="store_true",
+                        help="Probe each layer's contribution to PPL (real-language mode only)")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -2110,6 +2494,13 @@ Examples:
         bounded_phase=args.bounded_phase,
         device=args.device,
     )
+
+    # ==========================================================================
+    # REAL LANGUAGE MODE: Route to WikiText training
+    # ==========================================================================
+    if args.real_language:
+        train_real_language(args, config, curriculum)
+        return
 
     print("=" * 70)
     print("HARD DIAGNOSTIC PROBE: PhaseAttention vs Quadratic Attention")
