@@ -1979,6 +1979,599 @@ def print_rotation_test_results(
 
 
 # =============================================================================
+# REAL LANGUAGE MODE: WikiText Dataset and LM Training
+# =============================================================================
+
+class WikiTextDataset(Dataset):
+    """WikiText dataset for language modeling with layer probing."""
+
+    def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
+        """
+        Args:
+            split: "train", "validation", or "test"
+            seq_len: Sequence length for chunks
+            dataset_name: "wikitext2" or "wikitext103"
+        """
+        try:
+            from datasets import load_dataset
+            from transformers import GPT2Tokenizer
+        except ImportError:
+            raise ImportError("Install: pip install datasets transformers")
+
+        self.seq_len = seq_len
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # Load dataset
+        if dataset_name == "wikitext2":
+            ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
+        else:
+            ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+
+        # Tokenize all text
+        all_text = " ".join([t for t in ds["text"] if t.strip()])
+        self.tokens = self.tokenizer.encode(all_text)
+        print(f"  [WikiText] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
+
+    def __len__(self):
+        return max(1, len(self.tokens) // self.seq_len - 1)
+
+    def __getitem__(self, idx):
+        start = idx * self.seq_len
+        end = start + self.seq_len + 1  # +1 for target
+        chunk = self.tokens[start:end]
+
+        # Pad if needed
+        if len(chunk) < self.seq_len + 1:
+            chunk = chunk + [self.tokenizer.pad_token_id] * (self.seq_len + 1 - len(chunk))
+
+        x = torch.tensor(chunk[:-1], dtype=torch.long)
+        y = torch.tensor(chunk[1:], dtype=torch.long)
+        return x, y
+
+
+class HybridLMTransformer(nn.Module):
+    """
+    Language Modeling Transformer with per-layer Phase/Quadratic mixing.
+
+    Supports:
+    - Phase-first curriculum (phase_ratio adjustable per layer)
+    - Layer-wise probing (can ablate individual layers)
+    - Real language modeling (cross-entropy loss)
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        curriculum: List[float],  # phase_ratio per layer
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.d_model = d_model
+        self.num_layers = num_layers
+        self.curriculum = curriculum  # Mutable for phase-first curriculum
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        # Create hybrid layers
+        self.layers = nn.ModuleList([
+            HybridTransformerBlock(
+                d_model, num_heads, d_ff, dropout,
+                phase_ratio=curriculum[i],
+                operation_tokens=None,
+                bounded_phase=bounded_phase,
+            )
+            for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+
+        # Weight tying
+        self.lm_head.weight = self.token_emb.weight
+
+        # Layer-wise probing storage
+        self.layer_outputs = []
+        self.probe_mode = False
+
+    def update_curriculum(self, new_curriculum: List[float]):
+        """Update phase ratios for phase-first curriculum."""
+        self.curriculum = new_curriculum
+        for i, layer in enumerate(self.layers):
+            layer.phase_ratio = new_curriculum[i]
+
+    def forward(self, input_ids: torch.Tensor, probe_layers: bool = False) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        self.layer_outputs = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if probe_layers:
+                # Store intermediate output for layer probing
+                self.layer_outputs.append(x.detach().clone())
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    def get_layer_ppl(self, input_ids: torch.Tensor, targets: torch.Tensor) -> List[float]:
+        """
+        Compute PPL contribution from each layer by early-exiting.
+
+        Returns list of PPLs: [ppl_after_layer_0, ppl_after_layer_1, ...]
+        """
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_ppls = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            # Early exit: compute PPL after this layer
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+            layer_ppls.append(ppl)
+
+        return layer_ppls
+
+    def get_layer_contributions(self, input_ids: torch.Tensor, targets: torch.Tensor) -> Dict[str, List[float]]:
+        """
+        Compute detailed per-layer metrics to see if phase learns faster/richer.
+
+        Returns:
+            - 'ppl': PPL after each layer
+            - 'ppl_delta': PPL reduction from each layer (positive = layer helps)
+            - 'phase_ratio': Current phase ratio per layer
+            - 'contribution_pct': % of total PPL reduction from each layer
+        """
+        layer_ppls = self.get_layer_ppl(input_ids, targets)
+
+        # Compute PPL before any layer (just embeddings)
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+        x_normed = self.norm(x)
+        logits = self.lm_head(x_normed)
+        loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+        ppl_embed = torch.exp(loss).item()
+
+        # PPL delta (reduction) per layer
+        ppl_deltas = []
+        prev_ppl = ppl_embed
+        for ppl in layer_ppls:
+            delta = prev_ppl - ppl  # Positive = layer reduced PPL
+            ppl_deltas.append(delta)
+            prev_ppl = ppl
+
+        # Total PPL reduction
+        total_reduction = ppl_embed - layer_ppls[-1]
+
+        # Contribution percentage per layer
+        contribution_pcts = []
+        for delta in ppl_deltas:
+            if total_reduction > 0:
+                pct = (delta / total_reduction) * 100
+            else:
+                pct = 0.0
+            contribution_pcts.append(pct)
+
+        return {
+            'ppl': layer_ppls,
+            'ppl_delta': ppl_deltas,
+            'phase_ratio': self.curriculum.copy(),
+            'contribution_pct': contribution_pcts,
+            'ppl_embed': ppl_embed,
+            'total_reduction': total_reduction,
+        }
+
+    def ablate_attention(self, input_ids: torch.Tensor, targets: torch.Tensor,
+                         ablate_phase: bool = False, ablate_local: bool = False) -> float:
+        """
+        Compute PPL with phase or local attention ablated (zeroed out).
+
+        This shows what each attention type contributes:
+        - ablate_phase=True: Only local attention active
+        - ablate_local=True: Only phase attention active
+        """
+        # Store original ratios
+        original_curriculum = self.curriculum.copy()
+
+        if ablate_phase:
+            # Set all phase ratios to 0 (only local)
+            ablated_curriculum = [0.0] * self.num_layers
+        elif ablate_local:
+            # Set all phase ratios to 1 (only phase)
+            ablated_curriculum = [1.0] * self.num_layers
+        else:
+            ablated_curriculum = original_curriculum
+
+        self.update_curriculum(ablated_curriculum)
+
+        # Compute PPL
+        with torch.no_grad():
+            logits = self.forward(input_ids)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+
+        # Restore original
+        self.update_curriculum(original_curriculum)
+
+        return ppl
+
+
+class PhaseFirstCurriculum:
+    """
+    Adjusts per-layer phase ratios based on current PPL.
+
+    High PPL (early training): More phase in all layers
+    Low PPL (later training): Phase only in early layers, local in later layers
+    """
+
+    def __init__(
+        self,
+        num_layers: int,
+        alpha_high: float = 0.8,
+        alpha_low: float = 0.3,
+        ppl_high: float = 1000.0,
+        ppl_low: float = 100.0,
+    ):
+        self.num_layers = num_layers
+        self.alpha_high = alpha_high
+        self.alpha_low = alpha_low
+        self.ppl_high = ppl_high
+        self.ppl_low = ppl_low
+        self.current_ppl = float('inf')
+
+    def update(self, ppl: float) -> List[float]:
+        """
+        Compute per-layer phase ratios based on PPL.
+
+        Returns: curriculum list [phase_ratio_L0, phase_ratio_L1, ...]
+        """
+        self.current_ppl = ppl
+
+        # Compute base alpha from PPL
+        if ppl >= self.ppl_high:
+            base_alpha = self.alpha_high
+        elif ppl <= self.ppl_low:
+            base_alpha = self.alpha_low
+        else:
+            # Linear interpolation
+            ratio = (ppl - self.ppl_low) / (self.ppl_high - self.ppl_low)
+            base_alpha = self.alpha_low + ratio * (self.alpha_high - self.alpha_low)
+
+        # Per-layer curriculum: early layers keep more phase
+        # Layer 0: base_alpha, Layer N-1: base_alpha * 0.5
+        curriculum = []
+        for i in range(self.num_layers):
+            layer_factor = 1.0 - (i / (self.num_layers - 1)) * 0.5  # 1.0 → 0.5
+            layer_alpha = base_alpha * layer_factor
+            curriculum.append(layer_alpha)
+
+        return curriculum
+
+
+def train_real_language(
+    args,
+    config: Config,
+    curriculum: List[float],
+):
+    """
+    Train with real language data (WikiText) and layer probing.
+    """
+    print("\n" + "=" * 70)
+    print("REAL LANGUAGE MODE: WikiText Language Modeling")
+    print("=" * 70)
+
+    # Load dataset
+    print(f"\nLoading {args.dataset} dataset...")
+    train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
+    val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
+
+    # Create model
+    print(f"\nCreating HybridLMTransformer...")
+    print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+    print(f"  Initial curriculum: {curriculum}")
+
+    model = HybridLMTransformer(
+        vocab_size=args.lm_vocab_size,
+        d_model=config.d_model,
+        num_heads=config.num_heads,
+        num_layers=config.num_layers,
+        d_ff=config.d_ff,
+        dropout=config.dropout,
+        max_seq_len=args.seq_len,
+        curriculum=curriculum,
+        bounded_phase=config.bounded_phase,
+    ).to(config.device)
+
+    param_count = sum(p.numel() for p in model.parameters())
+    print(f"  Parameters: {param_count:,}")
+
+    # Phase-first curriculum controller
+    pfc = None
+    if args.phase_first_curriculum:
+        pfc = PhaseFirstCurriculum(
+            num_layers=config.num_layers,
+            alpha_high=args.alpha_phase_high,
+            alpha_low=args.alpha_phase_low,
+            ppl_high=args.ppl_high,
+            ppl_low=args.ppl_low,
+        )
+        print(f"\n  Phase-First Curriculum: ENABLED")
+        print(f"    alpha_high={args.alpha_phase_high}, alpha_low={args.alpha_phase_low}")
+        print(f"    ppl_high={args.ppl_high}, ppl_low={args.ppl_low}")
+
+    # Optimizer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+
+    # Training loop
+    print(f"\nTraining for {config.num_steps} steps...")
+    model.train()
+    step = 0
+    total_loss = 0.0
+    log_interval = 100
+
+    train_iter = iter(train_loader)
+    best_val_ppl = float('inf')
+
+    # Convergence milestones tracking (to measure learning speed)
+    ppl_milestones = [500, 200, 100, 50]
+    milestone_steps = {m: None for m in ppl_milestones}
+    ppl_history = []  # Track PPL over time
+
+    while step < config.num_steps:
+        try:
+            x, y = next(train_iter)
+        except StopIteration:
+            train_iter = iter(train_loader)
+            x, y = next(train_iter)
+
+        x, y = x.to(config.device), y.to(config.device)
+
+        # Forward
+        logits = model(x)
+        loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
+
+        total_loss += loss.item()
+        step += 1
+
+        # Logging
+        if step % log_interval == 0:
+            avg_loss = total_loss / log_interval
+            ppl = math.exp(avg_loss)
+            total_loss = 0.0
+
+            # Track PPL history
+            ppl_history.append((step, ppl))
+
+            # Check milestones (convergence speed tracking)
+            for milestone in ppl_milestones:
+                if milestone_steps[milestone] is None and ppl < milestone:
+                    milestone_steps[milestone] = step
+                    print(f"  ★ MILESTONE: PPL dropped below {milestone} at step {step}!")
+
+            # Update phase-first curriculum
+            if pfc is not None:
+                new_curriculum = pfc.update(ppl)
+                model.update_curriculum(new_curriculum)
+                curr_str = ",".join([f"{c:.2f}" for c in new_curriculum])
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Curriculum: [{curr_str}]")
+            else:
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
+
+        # Evaluation
+        if step % config.eval_every == 0:
+            model.eval()
+            val_loss = 0.0
+            val_batches = 0
+
+            with torch.no_grad():
+                for x, y in val_loader:
+                    x, y = x.to(config.device), y.to(config.device)
+                    logits = model(x)
+                    val_loss += F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1)).item()
+                    val_batches += 1
+                    if val_batches >= 50:  # Limit eval batches
+                        break
+
+            val_loss /= val_batches
+            val_ppl = math.exp(val_loss)
+            print(f"\n  === Validation @ Step {step} ===")
+            print(f"      Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+            if val_ppl < best_val_ppl:
+                best_val_ppl = val_ppl
+                print(f"      ★ New best Val PPL!")
+
+            # Layer-wise probing with detailed metrics
+            if args.probe_layers:
+                x_sample, y_sample = next(iter(val_loader))
+                x_sample, y_sample = x_sample.to(config.device), y_sample.to(config.device)
+
+                # Get detailed layer contributions
+                contrib = model.get_layer_contributions(x_sample, y_sample)
+
+                print(f"\n      Layer Contributions (Does Phase Learn Faster/Richer?):")
+                print(f"      {'Layer':<8} {'Phase%':<8} {'PPL':<10} {'Δ PPL':<10} {'Contrib%':<10}")
+                print(f"      {'-'*46}")
+                for i in range(model.num_layers):
+                    phase_pct = contrib['phase_ratio'][i] * 100
+                    ppl = contrib['ppl'][i]
+                    delta = contrib['ppl_delta'][i]
+                    contrib_pct = contrib['contribution_pct'][i]
+                    # Highlight layers that contribute most
+                    marker = "★" if contrib_pct > 100 / model.num_layers * 1.5 else " "
+                    print(f"      L{i:<6} {phase_pct:>6.1f}%  {ppl:>8.1f}  {delta:>+8.1f}  {contrib_pct:>8.1f}% {marker}")
+
+                print(f"\n      Summary:")
+                print(f"        Embed-only PPL: {contrib['ppl_embed']:.1f}")
+                print(f"        Final PPL:      {contrib['ppl'][-1]:.1f}")
+                print(f"        Total Reduction: {contrib['total_reduction']:.1f}")
+
+                # Ablation test: Phase-only vs Local-only
+                print(f"\n      Ablation Test (Phase vs Local contribution):")
+                ppl_normal = val_ppl
+                ppl_phase_only = model.ablate_attention(x_sample, y_sample, ablate_local=True)
+                ppl_local_only = model.ablate_attention(x_sample, y_sample, ablate_phase=True)
+
+                print(f"        Normal (mixed):    PPL = {ppl_normal:.1f}")
+                print(f"        Phase-only:        PPL = {ppl_phase_only:.1f}")
+                print(f"        Local-only:        PPL = {ppl_local_only:.1f}")
+
+                # Interpretation
+                phase_better = ppl_phase_only < ppl_local_only
+                if phase_better:
+                    improvement = ((ppl_local_only - ppl_phase_only) / ppl_local_only) * 100
+                    print(f"        → Phase is {improvement:.1f}% BETTER than Local alone!")
+                else:
+                    improvement = ((ppl_phase_only - ppl_local_only) / ppl_phase_only) * 100
+                    print(f"        → Local is {improvement:.1f}% better than Phase alone")
+
+            print()
+            model.train()
+
+    # Final evaluation with comprehensive analysis
+    print("\n" + "=" * 70)
+    print("FINAL RESULTS: Phase Learning Analysis")
+    print("=" * 70)
+    print(f"  Best Val PPL: {best_val_ppl:.2f}")
+    print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+
+    # Convergence speed summary
+    print(f"\n  Convergence Speed (steps to reach PPL milestone):")
+    for milestone in ppl_milestones:
+        steps = milestone_steps[milestone]
+        if steps is not None:
+            print(f"    PPL < {milestone:4d}: {steps:5d} steps ✓")
+        else:
+            print(f"    PPL < {milestone:4d}: Not reached")
+
+    # Final ablation and layer contribution analysis
+    model.eval()
+    x_final, y_final = next(iter(val_loader))
+    x_final, y_final = x_final.to(config.device), y_final.to(config.device)
+
+    with torch.no_grad():
+        ppl_phase_only = model.ablate_attention(x_final, y_final, ablate_local=True)
+        ppl_local_only = model.ablate_attention(x_final, y_final, ablate_phase=True)
+        # Get layer contributions for stability analysis
+        contrib = model.get_layer_contributions(x_final, y_final)
+
+    print(f"\n  Final Ablation:")
+    print(f"    Phase-only PPL: {ppl_phase_only:.2f}")
+    print(f"    Local-only PPL: {ppl_local_only:.2f}")
+    print(f"    Mixed PPL:      {best_val_ppl:.2f}")
+
+    # =========================================================================
+    # CONTROL BASELINE ANCHOR (Epistemic Hygiene)
+    # =========================================================================
+    print(f"\n  Control Baselines (Rules out confounds):")
+    param_count = sum(p.numel() for p in model.parameters())
+    print(f"    • Model parameters: {param_count:,}")
+    print(f"    • Local-only (ablated) uses SAME parameters, SAME curriculum")
+    print(f"    • Phase-only (ablated) uses SAME parameters, SAME curriculum")
+    print(f"    • Difference is ONLY attention mechanism, not capacity")
+
+    # Curriculum effect isolation
+    if pfc is not None:
+        print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
+        print(f"    • Final curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+    else:
+        print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in model.curriculum]}")
+
+    # =========================================================================
+    # STABILITY / CONFIDENCE FLAGS (Trust indicators)
+    # =========================================================================
+    print(f"\n  Stability Notes (Why you can trust these results):")
+
+    # 1. Phase collapse detection (phase values cluster near 0 or ±π)
+    phase_collapse_detected = False
+    phase_variance_total = 0.0
+    phase_layers_checked = 0
+    for layer in model.layers:
+        if hasattr(layer, 'phase_attn') and hasattr(layer.phase_attn, 'W_phase'):
+            # Check if phase projection has collapsed (very low variance)
+            w = layer.phase_attn.W_phase.weight.data
+            var = w.var().item()
+            phase_variance_total += var
+            phase_layers_checked += 1
+            if var < 1e-6:
+                phase_collapse_detected = True
+
+    avg_phase_var = phase_variance_total / max(phase_layers_checked, 1)
+    print(f"    • Phase collapse detected:     {'YES ⚠️' if phase_collapse_detected else 'NO ✓'}")
+    if phase_layers_checked > 0:
+        print(f"      (avg phase weight variance: {avg_phase_var:.6f})")
+
+    # 2. Gradient dominance (one attention type dominates gradients)
+    # We check if phase vs local have similar contribution
+    phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
+    local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
+    gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
+    print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+    print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+
+    # 3. Representation saturation (PPL stops improving)
+    ppl_improving = len(ppl_history) < 5 or (ppl_history[-1][1] < ppl_history[-5][1] * 0.99)
+    print(f"    • Representation saturation:   {'YES ⚠️' if not ppl_improving else 'NO ✓'}")
+
+    # 4. Early-layer overfitting (L0 contributes too much)
+    early_overfit = contrib['contribution_pct'][0] > 60 if len(contrib['contribution_pct']) > 0 else False
+    print(f"    • Early-layer overfitting:     {'YES ⚠️' if early_overfit else 'NO ✓'}")
+    if early_overfit:
+        print(f"      (L0 contributes {contrib['contribution_pct'][0]:.1f}% of PPL reduction)")
+
+    # Overall confidence
+    issues = sum([phase_collapse_detected, gradient_dominance, not ppl_improving, early_overfit])
+    if issues == 0:
+        confidence = "HIGH ✓"
+    elif issues == 1:
+        confidence = "MEDIUM"
+    else:
+        confidence = "LOW ⚠️"
+    print(f"\n    Overall Confidence: {confidence} ({4-issues}/4 checks passed)")
+
+    # =========================================================================
+    # CONCLUSION
+    # =========================================================================
+    if ppl_phase_only < ppl_local_only:
+        print(f"\n  CONCLUSION: Phase learns RICHER representations!")
+        print(f"    Phase alone achieves {((ppl_local_only - ppl_phase_only) / ppl_local_only * 100):.1f}% better PPL than Local alone.")
+        if issues == 0:
+            print(f"    This result is TRUSTWORTHY (all stability checks passed).")
+    else:
+        print(f"\n  CONCLUSION: Local attention dominates for this task.")
+        print(f"    But mixed attention achieves best results ({best_val_ppl:.2f}).")
+
+    return model, best_val_ppl
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -2078,6 +2671,35 @@ Examples:
     parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
                         help="Disable bounded phase (use raw linear projection)")
 
+    # ==========================================================================
+    # REAL LANGUAGE MODE (WikiText/FineWeb)
+    # ==========================================================================
+    parser.add_argument("--real-language", action="store_true",
+                        help="Use real language data (WikiText) instead of synthetic data")
+    parser.add_argument("--dataset", type=str, default="wikitext2",
+                        choices=["wikitext2", "wikitext103"],
+                        help="Dataset for real language mode")
+    parser.add_argument("--seq-len", type=int, default=256,
+                        help="Sequence length for language modeling")
+    parser.add_argument("--lm-vocab-size", type=int, default=50257,
+                        help="Vocabulary size for language modeling (GPT-2: 50257)")
+
+    # Phase-first curriculum (from train_unified_llm.py)
+    parser.add_argument("--phase-first-curriculum", action="store_true",
+                        help="Enable phase-first learning: phase dominates early, local later")
+    parser.add_argument("--alpha-phase-high", type=float, default=0.8,
+                        help="alpha_phase when PPL >= ppl_high_threshold")
+    parser.add_argument("--alpha-phase-low", type=float, default=0.3,
+                        help="alpha_phase when PPL <= ppl_low_threshold")
+    parser.add_argument("--ppl-high", type=float, default=1000.0,
+                        help="PPL threshold for max phase weight")
+    parser.add_argument("--ppl-low", type=float, default=100.0,
+                        help="PPL threshold for min phase weight")
+
+    # Layer-wise probing
+    parser.add_argument("--probe-layers", action="store_true",
+                        help="Probe each layer's contribution to PPL (real-language mode only)")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -2110,6 +2732,13 @@ Examples:
         bounded_phase=args.bounded_phase,
         device=args.device,
     )
+
+    # ==========================================================================
+    # REAL LANGUAGE MODE: Route to WikiText training
+    # ==========================================================================
+    if args.real_language:
+        train_real_language(args, config, curriculum)
+        return
 
     print("=" * 70)
     print("HARD DIAGNOSTIC PROBE: PhaseAttention vs Quadratic Attention")

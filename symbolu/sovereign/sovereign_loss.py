@@ -336,22 +336,28 @@ class SovereignLoss(nn.Module):
 
 class SovereignAnnealer:
     """
-    Ramps up Ontological constraints (Backward Score) only after
-    Linguistic competence (Forward Score) is established.
+    Anneals Ontological constraints (Backward Score) during training.
 
-    Phase 1 (Steps 0-warmup): System 1 dominant (learn to speak)
-    Phase 2 (Steps warmup+): System 2 engaged (learn to reason)
+    Default mode (invert=False):
+        Phase 1 (Steps 0-warmup): System 1 dominant (learn to speak)
+        Phase 2 (Steps warmup+): System 2 engaged (learn to reason)
+        This prevents early training collapse from Lagrangian explosion.
 
-    This prevents early training collapse from Lagrangian explosion.
+    Inverted mode (invert=True) - for phase-first learning:
+        Phase 1 (Early): Strong SRK/ontological support for phase attention
+        Phase 2 (Later): Ramp DOWN as local attention takes over
+        Use this when phase attention should dominate early training.
     """
 
     def __init__(
         self,
         total_steps: int = 50000,
         warmup_steps: int = 5000,
+        invert: bool = False,
     ):
         self.total_steps = total_steps
         self.warmup_steps = warmup_steps
+        self.invert = invert
 
     def get_lambdas(self, current_step: int) -> Dict[str, float]:
         """
@@ -363,6 +369,15 @@ class SovereignAnnealer:
         Returns:
             Dict of lambda values for each loss component
         """
+        if self.invert:
+            # INVERTED MODE: Strong early, ramp down later (phase-first learning)
+            return self._get_inverted_lambdas(current_step)
+        else:
+            # DEFAULT MODE: Ramp up (linguistic first, then ontological)
+            return self._get_default_lambdas(current_step)
+
+    def _get_default_lambdas(self, current_step: int) -> Dict[str, float]:
+        """Default mode: ramp UP ontological constraints."""
         if current_step < self.warmup_steps:
             # Phase 1: Learn to Speak (System 1 dominant)
             progress = current_step / self.warmup_steps
@@ -376,11 +391,6 @@ class SovereignAnnealer:
             }
         else:
             # Phase 2: Learn to Reason (System 2 engaged)
-            post_warmup_progress = (
-                (current_step - self.warmup_steps) /
-                (self.total_steps - self.warmup_steps)
-            )
-
             return {
                 'lambda_f': 1.0,
                 'lambda_b': 1.0,
@@ -389,18 +399,69 @@ class SovereignAnnealer:
                 'lambda_coherence': 0.2,
             }
 
+    def _get_inverted_lambdas(self, current_step: int) -> Dict[str, float]:
+        """Inverted mode: start STRONG, ramp DOWN (phase-first learning)."""
+        # Calculate overall progress (0.0 -> 1.0)
+        progress = min(current_step / self.total_steps, 1.0)
+
+        # Early phase (first 20% of training): Full ontological support
+        # Mid phase (20-60%): Gradual ramp down
+        # Late phase (60%+): Minimal ontological, local attention dominates
+
+        if progress < 0.2:
+            # PHASE_DOMINANT: Strong SRK support for phase attention
+            return {
+                'lambda_f': 1.0,                        # Linguistic always full
+                'lambda_b': 1.0,                        # Ontological full
+                'lambda_c': 0.5,                        # Divergence penalty
+                'lambda_entropy': 0.3,                  # SCC constraint
+                'lambda_coherence': 0.3,                # USE constraint (high for phase)
+            }
+        elif progress < 0.6:
+            # TRANSITION: Gradual ramp down
+            # Map progress 0.2->0.6 to decay 1.0->0.2
+            decay = 1.0 - ((progress - 0.2) / 0.4) * 0.8
+
+            return {
+                'lambda_f': 1.0,
+                'lambda_b': decay,                      # Ramp down
+                'lambda_c': 0.5 * decay,                # Ramp down
+                'lambda_entropy': 0.1 + 0.2 * decay,    # Ramp down
+                'lambda_coherence': 0.1 + 0.2 * decay,  # Ramp down
+            }
+        else:
+            # LOCAL_DOMINANT: Minimal SRK, local attention takes over
+            return {
+                'lambda_f': 1.0,
+                'lambda_b': 0.2,                        # Minimal ontological
+                'lambda_c': 0.1,                        # Minimal divergence
+                'lambda_entropy': 0.1,                  # Minimal SCC
+                'lambda_coherence': 0.1,                # Minimal USE
+            }
+
     def get_phase_name(self, current_step: int) -> str:
         """Return human-readable phase name for logging."""
-        if current_step < self.warmup_steps * 0.2:
-            return "CALIBRATION"
-        elif current_step < self.warmup_steps:
-            return "LINGUISTIC_FOUNDATION"
-        elif current_step < self.warmup_steps * 2:
-            return "ONTOLOGICAL_ALIGNMENT"
-        elif current_step < self.total_steps * 0.5:
-            return "STABILIZATION"
+        if self.invert:
+            # Inverted mode phase names
+            progress = min(current_step / self.total_steps, 1.0)
+            if progress < 0.2:
+                return "PHASE_DOMINANT"
+            elif progress < 0.6:
+                return "TRANSITION"
+            else:
+                return "LOCAL_DOMINANT"
         else:
-            return "MATURATION"
+            # Default mode phase names
+            if current_step < self.warmup_steps * 0.2:
+                return "CALIBRATION"
+            elif current_step < self.warmup_steps:
+                return "LINGUISTIC_FOUNDATION"
+            elif current_step < self.warmup_steps * 2:
+                return "ONTOLOGICAL_ALIGNMENT"
+            elif current_step < self.total_steps * 0.5:
+                return "STABILIZATION"
+            else:
+                return "MATURATION"
 
     def update_loss_config(
         self,

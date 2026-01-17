@@ -83,7 +83,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
 # Hugging Face imports
 try:
@@ -5947,6 +5947,294 @@ class AdaptiveTrainingController:
 
 
 # =============================================================================
+# ADAPTIVE WARMUP SCHEDULER: PPL-based warmup transition
+# =============================================================================
+
+class AdaptiveWarmupScheduler:
+    """
+    Learning rate scheduler with PPL-based warmup transition.
+
+    Instead of a fixed warmup period, warmup ends when:
+    1. PPL drops below warmup_until_ppl threshold, OR
+    2. max_warmup_steps is reached (fallback)
+
+    This ensures the model reaches a stable learning state before
+    transitioning to cosine decay.
+
+    LR trajectory:
+    - Warmup phase: Linear ramp from start_factor * lr to lr
+    - Decay phase: Cosine decay from lr to eta_min
+
+    Usage:
+        scheduler = AdaptiveWarmupScheduler(optimizer, config)
+        # In training loop:
+        scheduler.step(current_ppl)  # Pass current PPL
+    """
+
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        base_lr: float,
+        max_steps: int,
+        max_warmup_steps: int = 500,
+        warmup_until_ppl: float = 500.0,
+        start_factor: float = 0.1,
+        eta_min_factor: float = 0.1,
+    ):
+        self.optimizer = optimizer
+        self.base_lr = base_lr
+        self.max_steps = max_steps
+        self.max_warmup_steps = max_warmup_steps
+        self.warmup_until_ppl = warmup_until_ppl
+        self.start_factor = start_factor
+        self.eta_min = base_lr * eta_min_factor
+
+        # State
+        self.current_step = 0
+        self.warmup_ended = False
+        self.warmup_end_step = None
+        self.warmup_end_ppl = None
+
+        # Set initial LR
+        self._set_lr(base_lr * start_factor)
+
+    def _set_lr(self, lr: float):
+        """Set learning rate for all param groups."""
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+
+    def _get_warmup_lr(self) -> float:
+        """Linear warmup from start_factor * base_lr to base_lr."""
+        if self.max_warmup_steps == 0:
+            return self.base_lr
+        progress = min(1.0, self.current_step / self.max_warmup_steps)
+        return self.base_lr * (self.start_factor + progress * (1.0 - self.start_factor))
+
+    def _get_cosine_lr(self) -> float:
+        """Cosine decay from base_lr to eta_min."""
+        if self.warmup_end_step is None:
+            return self.base_lr
+
+        # Steps since warmup ended
+        decay_step = self.current_step - self.warmup_end_step
+        decay_total = self.max_steps - self.warmup_end_step
+
+        if decay_total <= 0:
+            return self.eta_min
+
+        progress = min(1.0, decay_step / decay_total)
+        # Cosine decay: lr * (1 + cos(pi * progress)) / 2, scaled to [eta_min, base_lr]
+        cosine_factor = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return self.eta_min + (self.base_lr - self.eta_min) * cosine_factor
+
+    def step(self, current_ppl: float = float('inf')):
+        """
+        Update learning rate based on current step and PPL.
+
+        Args:
+            current_ppl: Current training PPL (pass inf if unknown)
+        """
+        self.current_step += 1
+
+        # Check if warmup should end
+        if not self.warmup_ended:
+            ppl_condition = self.warmup_until_ppl > 0 and current_ppl < self.warmup_until_ppl
+            step_condition = self.current_step >= self.max_warmup_steps
+
+            if ppl_condition or step_condition:
+                self.warmup_ended = True
+                self.warmup_end_step = self.current_step
+                self.warmup_end_ppl = current_ppl
+                trigger = "PPL" if ppl_condition else "steps"
+                print(f"🔥 [LR] Warmup ended at step {self.current_step} (trigger: {trigger}, "
+                      f"PPL: {current_ppl:.1f}) - switching to cosine decay")
+
+        # Compute and set LR
+        if self.warmup_ended:
+            lr = self._get_cosine_lr()
+        else:
+            lr = self._get_warmup_lr()
+
+        self._set_lr(lr)
+
+    def get_last_lr(self) -> list:
+        """Return last computed LR (for compatibility with PyTorch schedulers)."""
+        return [param_group['lr'] for param_group in self.optimizer.param_groups]
+
+    def state_dict(self) -> dict:
+        """Return scheduler state for checkpointing."""
+        return {
+            "current_step": self.current_step,
+            "warmup_ended": self.warmup_ended,
+            "warmup_end_step": self.warmup_end_step,
+            "warmup_end_ppl": self.warmup_end_ppl,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Restore scheduler state from checkpoint."""
+        self.current_step = state.get("current_step", 0)
+        self.warmup_ended = state.get("warmup_ended", False)
+        self.warmup_end_step = state.get("warmup_end_step")
+        self.warmup_end_ppl = state.get("warmup_end_ppl")
+
+
+# =============================================================================
+# PPL-GATED ALPHA CURRICULUM: Phase dominates early, local refines later
+# =============================================================================
+
+class PPLAlphaCurriculum:
+    """
+    Dynamically adjusts alpha_phase/alpha_local based on current PPL.
+
+    Philosophy:
+    - High PPL (early training): Phase attention dominates to establish stable patterns
+    - Low PPL (later training): Local/quadratic attention takes over for refinement
+
+    The phase attention is slower but builds the "state scaffold" that quadratic
+    attention needs. By letting phase dominate early, we ensure stable foundations
+    before the faster quadratic attention refines the details.
+
+    Formula:
+        if ppl >= ppl_high:
+            alpha_phase = alpha_high (e.g., 0.8)
+        elif ppl <= ppl_low:
+            alpha_phase = alpha_low (e.g., 0.3)
+        else:
+            # Linear interpolation
+            alpha_phase = alpha_low + (ppl - ppl_low) * (alpha_high - alpha_low) / (ppl_high - ppl_low)
+        alpha_local = 1.0 - alpha_phase
+
+    Usage:
+        curriculum = PPLAlphaCurriculum(config)
+        # In training loop:
+        alpha_phase, alpha_local = curriculum.get_alphas(current_ppl)
+        update_model_alphas(model, alpha_phase, alpha_local)
+    """
+
+    def __init__(
+        self,
+        alpha_high: float = 0.8,
+        alpha_low: float = 0.3,
+        ppl_high: float = 1000.0,
+        ppl_low: float = 100.0,
+        ema_decay: float = 0.95,  # EMA smoothing for PPL
+        # Adaptive window size
+        enable_adaptive_window: bool = False,
+        window_size_high_ppl: int = 128,  # Small window when PPL high (fast phase)
+        window_size_low_ppl: int = 256,   # Large window when PPL low (local context)
+    ):
+        self.alpha_high = alpha_high
+        self.alpha_low = alpha_low
+        self.ppl_high = ppl_high
+        self.ppl_low = ppl_low
+        self.ema_decay = ema_decay
+
+        # Adaptive window
+        self.enable_adaptive_window = enable_adaptive_window
+        self.window_size_high_ppl = window_size_high_ppl
+        self.window_size_low_ppl = window_size_low_ppl
+        self.current_window_size = window_size_high_ppl if enable_adaptive_window else None
+        self.window_transition_logged = False
+
+        # State
+        self.ppl_ema = None
+        self.current_alpha_phase = alpha_high  # Start with phase dominant
+        self.current_alpha_local = 1.0 - alpha_high
+        self.last_transition_ppl = None
+        self.transition_logged = False
+
+    def update(self, current_ppl: float) -> tuple:
+        """
+        Update alpha values based on current PPL.
+
+        Args:
+            current_ppl: Current training PPL
+
+        Returns:
+            (alpha_phase, alpha_local) tuple
+        """
+        # Update EMA
+        if self.ppl_ema is None:
+            self.ppl_ema = current_ppl
+        else:
+            self.ppl_ema = self.ema_decay * self.ppl_ema + (1 - self.ema_decay) * current_ppl
+
+        ppl = self.ppl_ema
+
+        # Compute alpha_phase based on PPL
+        if ppl >= self.ppl_high:
+            alpha_phase = self.alpha_high
+        elif ppl <= self.ppl_low:
+            alpha_phase = self.alpha_low
+        else:
+            # Linear interpolation
+            alpha_phase = self.alpha_low + (ppl - self.ppl_low) * (self.alpha_high - self.alpha_low) / (self.ppl_high - self.ppl_low)
+
+        alpha_local = 1.0 - alpha_phase
+
+        # Log transition when we cross the midpoint (PPL ~550)
+        midpoint_ppl = (self.ppl_high + self.ppl_low) / 2
+        if not self.transition_logged and self.ppl_ema < midpoint_ppl:
+            print(f"🔄 [PPL-Alpha] Phase→Local transition: PPL={self.ppl_ema:.1f} < {midpoint_ppl:.0f}")
+            print(f"   α_phase: {self.alpha_high:.2f} → {alpha_phase:.2f}, α_local: {1-self.alpha_high:.2f} → {alpha_local:.2f}")
+            self.transition_logged = True
+            self.last_transition_ppl = self.ppl_ema
+
+        self.current_alpha_phase = alpha_phase
+        self.current_alpha_local = alpha_local
+
+        # Adaptive window size (step change at midpoint)
+        if self.enable_adaptive_window:
+            old_window = self.current_window_size
+            if ppl >= midpoint_ppl:
+                self.current_window_size = self.window_size_high_ppl
+            else:
+                self.current_window_size = self.window_size_low_ppl
+
+            # Log window transition
+            if not self.window_transition_logged and old_window != self.current_window_size:
+                print(f"📐 [PPL-Alpha] Window size transition: {old_window} → {self.current_window_size}")
+                self.window_transition_logged = True
+
+        return alpha_phase, alpha_local
+
+    def get_alphas(self) -> tuple:
+        """Return current alpha values."""
+        return self.current_alpha_phase, self.current_alpha_local
+
+    def get_window_size(self) -> int:
+        """Return current window size (None if adaptive window disabled)."""
+        return self.current_window_size
+
+    def get_status(self) -> str:
+        """Return status string for logging."""
+        if self.ppl_ema is None:
+            return "PPL-Alpha: not initialized"
+        status = f"PPL-Alpha: EMA={self.ppl_ema:.1f}, α_phase={self.current_alpha_phase:.2f}, α_local={self.current_alpha_local:.2f}"
+        if self.enable_adaptive_window:
+            status += f", window={self.current_window_size}"
+        return status
+
+    def state_dict(self) -> dict:
+        """Return state for checkpointing."""
+        return {
+            "ppl_ema": self.ppl_ema,
+            "current_alpha_phase": self.current_alpha_phase,
+            "current_alpha_local": self.current_alpha_local,
+            "transition_logged": self.transition_logged,
+            "last_transition_ppl": self.last_transition_ppl,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Restore state from checkpoint."""
+        self.ppl_ema = state.get("ppl_ema")
+        self.current_alpha_phase = state.get("current_alpha_phase", self.alpha_high)
+        self.current_alpha_local = state.get("current_alpha_local", 1.0 - self.alpha_high)
+        self.transition_logged = state.get("transition_logged", False)
+        self.last_transition_ppl = state.get("last_transition_ppl")
+
+
+# =============================================================================
 # SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
 # =============================================================================
 
@@ -9047,6 +9335,32 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
+    # ==========================================================================
+    # Master toggle that enables optimal phase-first learning configuration:
+    #   - SRK inverted annealing (strong early, ramp down)
+    #   - PPL-alpha curriculum (phase high when PPL high)
+    #   - Adaptive window size (small early, large later)
+    #   - Layerwise: lower layers keep phase longer
+    # Individual settings below can override defaults when phase_first_curriculum=True
+    phase_first_curriculum: bool = False
+
+    # PPL-gated alpha curriculum (phase dominates early, local refines later)
+    # When enabled, alpha_phase is computed based on current PPL:
+    #   PPL >= ppl_high: alpha_phase = alpha_phase_ppl_high (phase dominates)
+    #   PPL <= ppl_low:  alpha_phase = alpha_phase_ppl_low (local refines)
+    #   In between: linear interpolation
+    enable_ppl_alpha_curriculum: bool = False
+    alpha_phase_ppl_high: float = 0.8   # alpha_phase when PPL >= ppl_high_threshold
+    alpha_phase_ppl_low: float = 0.3    # alpha_phase when PPL <= ppl_low_threshold
+    ppl_high_threshold: float = 1000.0  # PPL threshold for max phase weight
+    ppl_low_threshold: float = 100.0    # PPL threshold for min phase weight
+    # Adaptive window size (small early for fast phase, large later for local context)
+    enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
+    window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
+    window_size_low_ppl: int = 256        # Window size when PPL <= ppl_low_threshold
+
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
 
@@ -9097,7 +9411,8 @@ class UnifiedTrainingConfig:
     vram_threshold: float = 0.95  # VRAM % to trigger batch reduction (0.95 = 95%)
     vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
     max_steps: int = 10000
-    warmup_steps: int = 500
+    warmup_steps: int = 500  # Max warmup steps (fallback if PPL doesn't drop)
+    warmup_until_ppl: float = 500.0  # End warmup when PPL < this (0 = disabled, use fixed steps)
 
     # Optimizer
     learning_rate: float = 3e-4
@@ -9589,6 +9904,7 @@ class UnifiedTrainingConfig:
     # SRK Annealing (Lambda Warmup)
     srk_total_steps: int = 50000             # Total training steps for annealing
     srk_warmup_steps: int = 5000             # Steps for System 1 warmup phase
+    srk_invert_annealing: bool = False       # Invert: start strong, ramp DOWN (phase-first)
 
     # ==========================================================================
     # V9.8.8: Sovereign Phase Controller (SPC) Configuration
@@ -12958,10 +13274,11 @@ def train(config: UnifiedTrainingConfig):
         )
         srk_loss_fn = SRKLoss(srk_loss_config).to(device)
 
-        # Create SRK Annealer (Lambda Warmup)
+        # Create SRK Annealer (Lambda Warmup/Rampdown)
         srk_annealer = SovereignAnnealer(
             total_steps=config.srk_total_steps,
             warmup_steps=config.srk_warmup_steps,
+            invert=config.srk_invert_annealing,
         )
 
         # Create Phase Extraction Hook for Layer 7 (CSR alignment)
@@ -12993,7 +13310,8 @@ def train(config: UnifiedTrainingConfig):
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Loss Configuration (B1/U2/S8):                                  ║")
         print(f"  ║    λ_task={config.srk_lambda_task:.1f}  λ_c={config.srk_lambda_c:.1f}  λ_ent={config.srk_lambda_entropy:.1f}  λ_coh={config.srk_lambda_coherence:.1f}         ║")
-        print(f"  ║  Annealing: {config.srk_warmup_steps:,} warmup → {config.srk_total_steps:,} total steps          ║")
+        anneal_mode = "INVERTED (phase-first)" if config.srk_invert_annealing else "NORMAL (ramp-up)"
+        print(f"  ║  Annealing: {anneal_mode:<20} ({config.srk_total_steps:,} steps)    ║")
         print(f"  ╚══════════════════════════════════════════════════════════════════╝\n")
     elif config.enable_srk and not SRK_AVAILABLE:
         print(f"\n  ⚠️  SRK REQUESTED but module not available!")
@@ -13093,12 +13411,39 @@ def train(config: UnifiedTrainingConfig):
             betas=(config.beta1, config.beta2),
         )
 
-    # Scheduler
-    scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=config.max_steps - config.warmup_steps,
-        eta_min=config.learning_rate * 0.1,
-    )
+    # Scheduler with warmup
+    use_adaptive_warmup = config.warmup_until_ppl > 0
+    if use_adaptive_warmup:
+        # PPL-based adaptive warmup: ends when PPL < threshold OR max_warmup_steps reached
+        scheduler = AdaptiveWarmupScheduler(
+            optimizer=optimizer,
+            base_lr=config.learning_rate,
+            max_steps=config.max_steps,
+            max_warmup_steps=config.warmup_steps,
+            warmup_until_ppl=config.warmup_until_ppl,
+            start_factor=0.1,
+            eta_min_factor=0.1,
+        )
+        print(f"  LR Schedule: Adaptive warmup (until PPL < {config.warmup_until_ppl:.0f} or {config.warmup_steps} steps)")
+    else:
+        # Fixed-step warmup using SequentialLR
+        warmup_scheduler = LinearLR(
+            optimizer,
+            start_factor=0.1,
+            end_factor=1.0,
+            total_iters=config.warmup_steps,
+        )
+        cosine_scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=config.max_steps - config.warmup_steps,
+            eta_min=config.learning_rate * 0.1,
+        )
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[config.warmup_steps],
+        )
+        print(f"  LR Schedule: Fixed warmup ({config.warmup_steps} steps) + cosine decay")
 
     # Resume from checkpoint if specified
     resume_step = 0
@@ -13852,6 +14197,27 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
         print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
 
+    # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
+    ppl_alpha_curriculum = None
+    if config.enable_ppl_alpha_curriculum:
+        ppl_alpha_curriculum = PPLAlphaCurriculum(
+            alpha_high=config.alpha_phase_ppl_high,
+            alpha_low=config.alpha_phase_ppl_low,
+            ppl_high=config.ppl_high_threshold,
+            ppl_low=config.ppl_low_threshold,
+            enable_adaptive_window=config.enable_adaptive_window,
+            window_size_high_ppl=config.window_size_high_ppl,
+            window_size_low_ppl=config.window_size_low_ppl,
+        )
+        print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
+        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
+        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
+        print(f"     └─ Linear interpolation between thresholds")
+        if config.enable_adaptive_window:
+            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)\n")
+        else:
+            print()
+
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
     current_seq_len = config.max_seq_len
@@ -14119,8 +14485,8 @@ def train(config: UnifiedTrainingConfig):
             # =================================================================
             rss_weights = {'evoflow': 0.0, 'toroidal': 0.0, 'csr': 0.0, 'kosha': 0.0}
             if rss_controller is not None:
-                # Calculate training PPL for this step
-                train_ppl = torch.exp(loss.detach()).item()
+                # Use metrics["ppl"] from LM loss, not total loss (which includes auxiliary terms)
+                train_ppl = metrics.get("ppl", float("inf"))
                 rss_weights = rss_controller.get_gate_weights(
                     current_ppl=train_ppl,
                     global_step=global_step,
@@ -15162,20 +15528,61 @@ def train(config: UnifiedTrainingConfig):
 
             optimizer.zero_grad()
 
-            # Update scheduler after warmup
-            # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
-            # The scheduler resets LR every step, undoing adaptive boosts
-            if global_step >= config.warmup_steps and not config.enable_adaptive_training:
+            # Update scheduler - warmup ALWAYS runs, even with adaptive training
+            # Adaptive training only takes over AFTER warmup ends
+            current_ppl = metrics.get('ppl', float('inf'))
+            warmup_complete = False
+
+            if use_adaptive_warmup:
+                # PPL-based adaptive warmup
+                scheduler.step(current_ppl)
+                warmup_complete = scheduler.warmup_ended
+            else:
+                # Fixed-step warmup using SequentialLR
                 scheduler.step()
+                warmup_complete = global_step >= config.warmup_steps
+
+            # V9.8.4: Adaptive training only kicks in AFTER warmup
+            # During warmup, we use the scheduler's LR ramp
+            if config.enable_adaptive_training and warmup_complete:
+                # Adaptive controller can now adjust LR
+                pass  # Controller will adjust in its own step below
+            elif config.enable_adaptive_training and not warmup_complete:
+                # During warmup, override adaptive controller's LR with scheduler's LR
+                # This ensures proper warmup ramp even with adaptive training enabled
+                current_lr = scheduler.get_last_lr()[0]
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
-            if adaptive_controller is not None:
+            # Only enforce after warmup to not interfere with warmup ramp
+            if adaptive_controller is not None and warmup_complete:
                 adaptive_controller.enforce_lr_bounds(global_step)
 
             # Update alpha schedule for phase/hybrid models
             # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
             if not getattr(config, 'enable_per_layer_phase', False):
-                current_alpha = update_alpha_schedule(model, global_step, config)
+                # PPL-gated alpha curriculum takes precedence over step-based decay
+                if ppl_alpha_curriculum is not None:
+                    # Use PPL to determine alpha_phase/alpha_local
+                    alpha_phase, alpha_local = ppl_alpha_curriculum.update(current_ppl)
+                    # Update all HybridAttentionLayer modules
+                    for module in model.modules():
+                        if hasattr(module, 'alpha_phase') and isinstance(module.alpha_phase, nn.Parameter):
+                            module.alpha_phase.data.fill_(alpha_phase)
+                            if hasattr(module, 'alpha_local'):
+                                module.alpha_local.data.fill_(alpha_local)
+                    current_alpha = alpha_phase
+
+                    # Update window size if adaptive window is enabled
+                    if ppl_alpha_curriculum.enable_adaptive_window:
+                        new_window_size = ppl_alpha_curriculum.get_window_size()
+                        for module in model.modules():
+                            if hasattr(module, 'window_size'):
+                                module.window_size = new_window_size
+                else:
+                    # Fall back to step-based decay
+                    current_alpha = update_alpha_schedule(model, global_step, config)
             else:
                 # Per-layer weights are managed by InvertedLayerCurriculumController
                 current_alpha = config.alpha_phase  # Just for logging
@@ -16665,18 +17072,31 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("relax/saturation_triggered", 1.0 if relaxation_controller.saturation_triggered else 0.0, global_step)
 
                 # Adaptive Training Controller (dynamic LR/Kp adjustment)
+                # Only active AFTER warmup completes (warmup uses scheduler's LR ramp)
                 if adaptive_controller is not None:
-                    # Get recent train loss (average of last 10 steps)
-                    recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
-
-                    adaptive_adjustments = adaptive_controller.update(
-                        train_loss=recent_train_loss,
-                        val_loss=val_loss,
-                        val_ppl=val_ppl,
-                        coherence=val_metrics.get('coherence', 0.75),
-                        global_step=global_step,
-                        authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                    # Check if warmup is complete
+                    warmup_done = (
+                        (use_adaptive_warmup and scheduler.warmup_ended) or
+                        (not use_adaptive_warmup and global_step >= config.warmup_steps)
                     )
+
+                    if not warmup_done:
+                        # During warmup, skip LR adjustments (let scheduler handle it)
+                        if global_step == config.eval_every:  # Log once at first eval
+                            print(f"  [AdaptiveTraining] Waiting for warmup (PPL: {val_ppl:.1f}, target: <{config.warmup_until_ppl:.0f})")
+                        adaptive_adjustments = {"actions": []}
+                    else:
+                        # Get recent train loss (average of last 10 steps)
+                        recent_train_loss = sum(train_losses[-10:]) / len(train_losses[-10:]) if train_losses else 0.0
+
+                        adaptive_adjustments = adaptive_controller.update(
+                            train_loss=recent_train_loss,
+                            val_loss=val_loss,
+                            val_ppl=val_ppl,
+                            coherence=val_metrics.get('coherence', 0.75),
+                            global_step=global_step,
+                            authority_controller=authority_controller,  # Pass PIDv2 for Kp adjustment
+                        )
 
                     # Log adaptive controller status
                     if adaptive_adjustments.get("actions"):
@@ -17418,7 +17838,9 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
     parser.add_argument("--warmup_steps", type=int, default=500,
-                       help="Learning rate warmup steps")
+                       help="Max warmup steps (fallback if PPL doesn't drop)")
+    parser.add_argument("--warmup_until_ppl", type=float, default=500.0,
+                       help="End warmup when PPL < this (0 = disabled, use fixed steps)")
     parser.add_argument("--weight_decay", type=float, default=0.1,
                        help="Weight decay (L2 regularization)")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
@@ -17476,6 +17898,31 @@ def main():
                        help="Final alpha_phase value after decay")
     parser.add_argument("--alpha_decay_steps", type=int, default=10000,
                        help="Steps over which alpha_phase decays from start to end")
+
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM (unified inverse curriculum)
+    # ==========================================================================
+    parser.add_argument("--phase_first_curriculum", action="store_true",
+                       help="Enable phase-first learning: SRK strong→weak, alpha high→low, window small→large")
+
+    # PPL-gated alpha curriculum (phase dominates early, local refines later)
+    parser.add_argument("--enable_ppl_alpha_curriculum", action="store_true",
+                       help="Adjust alpha_phase based on PPL (phase dominates when PPL high)")
+    parser.add_argument("--alpha_phase_ppl_high", type=float, default=0.8,
+                       help="alpha_phase when PPL >= ppl_high_threshold")
+    parser.add_argument("--alpha_phase_ppl_low", type=float, default=0.3,
+                       help="alpha_phase when PPL <= ppl_low_threshold")
+    parser.add_argument("--ppl_high_threshold", type=float, default=1000.0,
+                       help="PPL threshold for max phase weight")
+    parser.add_argument("--ppl_low_threshold", type=float, default=100.0,
+                       help="PPL threshold for min phase weight")
+    # Adaptive window size (small early for fast phase, large later for local context)
+    parser.add_argument("--enable_adaptive_window", action="store_true",
+                       help="Adapt window size based on PPL (small when high, large when low)")
+    parser.add_argument("--window_size_high_ppl", type=int, default=128,
+                       help="Window size when PPL >= ppl_high_threshold (fast phase learning)")
+    parser.add_argument("--window_size_low_ppl", type=int, default=256,
+                       help="Window size when PPL <= ppl_low_threshold (better local context)")
 
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
@@ -18306,6 +18753,8 @@ def main():
                        help="Total training steps for SRK annealing")
     parser.add_argument("--srk_warmup_steps", type=int, default=5000,
                        help="Steps for System 1 warmup phase (Learn to Speak)")
+    parser.add_argument("--srk_invert_annealing", action="store_true",
+                       help="Invert SRK annealing: start STRONG, ramp DOWN (phase-first learning)")
 
     # ==========================================================================
     # V9.8.8: Sovereign Phase Controller (SPC)
@@ -18494,6 +18943,7 @@ def main():
         max_steps=args.max_steps,
         learning_rate=args.learning_rate,
         warmup_steps=args.warmup_steps,
+        warmup_until_ppl=args.warmup_until_ppl,
         weight_decay=args.weight_decay,
         max_grad_norm=args.max_grad_norm,
         dataset=args.dataset,
@@ -18643,6 +19093,18 @@ def main():
         alpha_phase_start=args.alpha_phase_start,
         alpha_phase_end=args.alpha_phase_end,
         alpha_decay_steps=args.alpha_decay_steps,
+        # Phase-first curriculum (unified inverse curriculum)
+        phase_first_curriculum=args.phase_first_curriculum,
+        # PPL-gated alpha curriculum
+        enable_ppl_alpha_curriculum=args.enable_ppl_alpha_curriculum,
+        alpha_phase_ppl_high=args.alpha_phase_ppl_high,
+        alpha_phase_ppl_low=args.alpha_phase_ppl_low,
+        ppl_high_threshold=args.ppl_high_threshold,
+        ppl_low_threshold=args.ppl_low_threshold,
+        # Adaptive window size
+        enable_adaptive_window=args.enable_adaptive_window,
+        window_size_high_ppl=args.window_size_high_ppl,
+        window_size_low_ppl=args.window_size_low_ppl,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.10/V9.9.12: Phase diversity loss
@@ -18882,6 +19344,7 @@ def main():
         # SRK Annealing
         srk_total_steps=args.srk_total_steps,
         srk_warmup_steps=args.srk_warmup_steps,
+        srk_invert_annealing=args.srk_invert_annealing,
         # V9.8.8: Sovereign Phase Controller (SPC)
         enable_sovereign_phase_controller=args.enable_sovereign_phase_controller,
         spc_entropy_critical=args.spc_entropy_critical,
@@ -18941,6 +19404,40 @@ def main():
         jepa_enable_karma_injection=args.jepa_enable_karma_injection,
         jepa_karma_gate_bias=args.jepa_karma_gate_bias,
     )
+
+    # ==========================================================================
+    # PHASE-FIRST CURRICULUM: Enable sub-components when master flag is set
+    # ==========================================================================
+    if config.phase_first_curriculum:
+        print("\n" + "=" * 70)
+        print("  PHASE-FIRST CURRICULUM ENABLED")
+        print("  Configuring optimal phase-first learning settings...")
+        print("=" * 70)
+
+        # Enable PPL-alpha curriculum (phase high when PPL high)
+        if not config.enable_ppl_alpha_curriculum:
+            config.enable_ppl_alpha_curriculum = True
+            print("  ✓ PPL-Alpha Curriculum: ENABLED (phase dominates when PPL high)")
+
+        # Enable adaptive window (small early, large later)
+        if not config.enable_adaptive_window:
+            config.enable_adaptive_window = True
+            print(f"  ✓ Adaptive Window: ENABLED ({config.window_size_high_ppl}→{config.window_size_low_ppl})")
+
+        # Enable SRK with inverted annealing (strong early, ramp down)
+        if not config.enable_srk:
+            config.enable_srk = True
+            print("  ✓ SRK: ENABLED (auxiliary phase support)")
+        if not config.srk_invert_annealing:
+            config.srk_invert_annealing = True
+            print("  ✓ SRK Annealing: INVERTED (strong→weak for phase-first)")
+
+        # Summary
+        print("-" * 70)
+        print(f"  Phase-First Schedule:")
+        print(f"    PPL >= {config.ppl_high_threshold}: alpha_phase={config.alpha_phase_ppl_high}, window={config.window_size_high_ppl}, SRK=STRONG")
+        print(f"    PPL <= {config.ppl_low_threshold}: alpha_phase={config.alpha_phase_ppl_low}, window={config.window_size_low_ppl}, SRK=WEAK")
+        print("=" * 70 + "\n")
 
     # V9.8.0: Build SRK config from legacy flags (backward compatibility)
     srk_config, srk_warnings = build_srk_config_from_legacy(args, config)
