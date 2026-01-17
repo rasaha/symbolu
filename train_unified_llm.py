@@ -5947,6 +5947,138 @@ class AdaptiveTrainingController:
 
 
 # =============================================================================
+# ADAPTIVE WARMUP SCHEDULER: PPL-based warmup transition
+# =============================================================================
+
+class AdaptiveWarmupScheduler:
+    """
+    Learning rate scheduler with PPL-based warmup transition.
+
+    Instead of a fixed warmup period, warmup ends when:
+    1. PPL drops below warmup_until_ppl threshold, OR
+    2. max_warmup_steps is reached (fallback)
+
+    This ensures the model reaches a stable learning state before
+    transitioning to cosine decay.
+
+    LR trajectory:
+    - Warmup phase: Linear ramp from start_factor * lr to lr
+    - Decay phase: Cosine decay from lr to eta_min
+
+    Usage:
+        scheduler = AdaptiveWarmupScheduler(optimizer, config)
+        # In training loop:
+        scheduler.step(current_ppl)  # Pass current PPL
+    """
+
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        base_lr: float,
+        max_steps: int,
+        max_warmup_steps: int = 500,
+        warmup_until_ppl: float = 500.0,
+        start_factor: float = 0.1,
+        eta_min_factor: float = 0.1,
+    ):
+        self.optimizer = optimizer
+        self.base_lr = base_lr
+        self.max_steps = max_steps
+        self.max_warmup_steps = max_warmup_steps
+        self.warmup_until_ppl = warmup_until_ppl
+        self.start_factor = start_factor
+        self.eta_min = base_lr * eta_min_factor
+
+        # State
+        self.current_step = 0
+        self.warmup_ended = False
+        self.warmup_end_step = None
+        self.warmup_end_ppl = None
+
+        # Set initial LR
+        self._set_lr(base_lr * start_factor)
+
+    def _set_lr(self, lr: float):
+        """Set learning rate for all param groups."""
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+
+    def _get_warmup_lr(self) -> float:
+        """Linear warmup from start_factor * base_lr to base_lr."""
+        if self.max_warmup_steps == 0:
+            return self.base_lr
+        progress = min(1.0, self.current_step / self.max_warmup_steps)
+        return self.base_lr * (self.start_factor + progress * (1.0 - self.start_factor))
+
+    def _get_cosine_lr(self) -> float:
+        """Cosine decay from base_lr to eta_min."""
+        if self.warmup_end_step is None:
+            return self.base_lr
+
+        # Steps since warmup ended
+        decay_step = self.current_step - self.warmup_end_step
+        decay_total = self.max_steps - self.warmup_end_step
+
+        if decay_total <= 0:
+            return self.eta_min
+
+        progress = min(1.0, decay_step / decay_total)
+        # Cosine decay: lr * (1 + cos(pi * progress)) / 2, scaled to [eta_min, base_lr]
+        cosine_factor = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return self.eta_min + (self.base_lr - self.eta_min) * cosine_factor
+
+    def step(self, current_ppl: float = float('inf')):
+        """
+        Update learning rate based on current step and PPL.
+
+        Args:
+            current_ppl: Current training PPL (pass inf if unknown)
+        """
+        self.current_step += 1
+
+        # Check if warmup should end
+        if not self.warmup_ended:
+            ppl_condition = self.warmup_until_ppl > 0 and current_ppl < self.warmup_until_ppl
+            step_condition = self.current_step >= self.max_warmup_steps
+
+            if ppl_condition or step_condition:
+                self.warmup_ended = True
+                self.warmup_end_step = self.current_step
+                self.warmup_end_ppl = current_ppl
+                trigger = "PPL" if ppl_condition else "steps"
+                print(f"🔥 [LR] Warmup ended at step {self.current_step} (trigger: {trigger}, "
+                      f"PPL: {current_ppl:.1f}) - switching to cosine decay")
+
+        # Compute and set LR
+        if self.warmup_ended:
+            lr = self._get_cosine_lr()
+        else:
+            lr = self._get_warmup_lr()
+
+        self._set_lr(lr)
+
+    def get_last_lr(self) -> list:
+        """Return last computed LR (for compatibility with PyTorch schedulers)."""
+        return [param_group['lr'] for param_group in self.optimizer.param_groups]
+
+    def state_dict(self) -> dict:
+        """Return scheduler state for checkpointing."""
+        return {
+            "current_step": self.current_step,
+            "warmup_ended": self.warmup_ended,
+            "warmup_end_step": self.warmup_end_step,
+            "warmup_end_ppl": self.warmup_end_ppl,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Restore scheduler state from checkpoint."""
+        self.current_step = state.get("current_step", 0)
+        self.warmup_ended = state.get("warmup_ended", False)
+        self.warmup_end_step = state.get("warmup_end_step")
+        self.warmup_end_ppl = state.get("warmup_end_ppl")
+
+
+# =============================================================================
 # SOVEREIGN PHASE CONTROLLER (RSS): Rational Sovereign Sequence
 # =============================================================================
 
@@ -9097,7 +9229,8 @@ class UnifiedTrainingConfig:
     vram_threshold: float = 0.95  # VRAM % to trigger batch reduction (0.95 = 95%)
     vram_recovery_buffer: float = 0.12  # Recovery when VRAM < (threshold - buffer)
     max_steps: int = 10000
-    warmup_steps: int = 500
+    warmup_steps: int = 500  # Max warmup steps (fallback if PPL doesn't drop)
+    warmup_until_ppl: float = 500.0  # End warmup when PPL < this (0 = disabled, use fixed steps)
 
     # Optimizer
     learning_rate: float = 3e-4
@@ -13094,25 +13227,38 @@ def train(config: UnifiedTrainingConfig):
         )
 
     # Scheduler with warmup
-    # 1. Warmup: Linear ramp from 0.1x to 1.0x LR over warmup_steps
-    warmup_scheduler = LinearLR(
-        optimizer,
-        start_factor=0.1,  # Start at 10% of LR
-        end_factor=1.0,    # Ramp to 100% of LR
-        total_iters=config.warmup_steps,
-    )
-    # 2. Cosine decay: From 1.0x to 0.1x LR over remaining steps
-    cosine_scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=config.max_steps - config.warmup_steps,
-        eta_min=config.learning_rate * 0.1,
-    )
-    # 3. Chain them: warmup first, then cosine
-    scheduler = SequentialLR(
-        optimizer,
-        schedulers=[warmup_scheduler, cosine_scheduler],
-        milestones=[config.warmup_steps],
-    )
+    use_adaptive_warmup = config.warmup_until_ppl > 0
+    if use_adaptive_warmup:
+        # PPL-based adaptive warmup: ends when PPL < threshold OR max_warmup_steps reached
+        scheduler = AdaptiveWarmupScheduler(
+            optimizer=optimizer,
+            base_lr=config.learning_rate,
+            max_steps=config.max_steps,
+            max_warmup_steps=config.warmup_steps,
+            warmup_until_ppl=config.warmup_until_ppl,
+            start_factor=0.1,
+            eta_min_factor=0.1,
+        )
+        print(f"  LR Schedule: Adaptive warmup (until PPL < {config.warmup_until_ppl:.0f} or {config.warmup_steps} steps)")
+    else:
+        # Fixed-step warmup using SequentialLR
+        warmup_scheduler = LinearLR(
+            optimizer,
+            start_factor=0.1,
+            end_factor=1.0,
+            total_iters=config.warmup_steps,
+        )
+        cosine_scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=config.max_steps - config.warmup_steps,
+            eta_min=config.learning_rate * 0.1,
+        )
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[config.warmup_steps],
+        )
+        print(f"  LR Schedule: Fixed warmup ({config.warmup_steps} steps) + cosine decay")
 
     # Resume from checkpoint if specified
     resume_step = 0
@@ -15176,11 +15322,16 @@ def train(config: UnifiedTrainingConfig):
 
             optimizer.zero_grad()
 
-            # Update scheduler (SequentialLR handles warmup + cosine decay internally)
+            # Update scheduler
             # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
             # The scheduler resets LR every step, undoing adaptive boosts
             if not config.enable_adaptive_training:
-                scheduler.step()
+                # Pass PPL to adaptive scheduler (ignored by SequentialLR)
+                current_ppl = metrics.get('ppl', float('inf'))
+                if use_adaptive_warmup:
+                    scheduler.step(current_ppl)
+                else:
+                    scheduler.step()
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
             if adaptive_controller is not None:
@@ -17432,7 +17583,9 @@ def main():
     parser.add_argument("--learning_rate", type=float, default=3e-4,
                        help="Peak learning rate")
     parser.add_argument("--warmup_steps", type=int, default=500,
-                       help="Learning rate warmup steps")
+                       help="Max warmup steps (fallback if PPL doesn't drop)")
+    parser.add_argument("--warmup_until_ppl", type=float, default=500.0,
+                       help="End warmup when PPL < this (0 = disabled, use fixed steps)")
     parser.add_argument("--weight_decay", type=float, default=0.1,
                        help="Weight decay (L2 regularization)")
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
