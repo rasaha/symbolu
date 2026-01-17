@@ -83,7 +83,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
 # Hugging Face imports
 try:
@@ -13093,11 +13093,25 @@ def train(config: UnifiedTrainingConfig):
             betas=(config.beta1, config.beta2),
         )
 
-    # Scheduler
-    scheduler = CosineAnnealingLR(
+    # Scheduler with warmup
+    # 1. Warmup: Linear ramp from 0.1x to 1.0x LR over warmup_steps
+    warmup_scheduler = LinearLR(
+        optimizer,
+        start_factor=0.1,  # Start at 10% of LR
+        end_factor=1.0,    # Ramp to 100% of LR
+        total_iters=config.warmup_steps,
+    )
+    # 2. Cosine decay: From 1.0x to 0.1x LR over remaining steps
+    cosine_scheduler = CosineAnnealingLR(
         optimizer,
         T_max=config.max_steps - config.warmup_steps,
         eta_min=config.learning_rate * 0.1,
+    )
+    # 3. Chain them: warmup first, then cosine
+    scheduler = SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, cosine_scheduler],
+        milestones=[config.warmup_steps],
     )
 
     # Resume from checkpoint if specified
@@ -15162,10 +15176,10 @@ def train(config: UnifiedTrainingConfig):
 
             optimizer.zero_grad()
 
-            # Update scheduler after warmup
+            # Update scheduler (SequentialLR handles warmup + cosine decay internally)
             # V9.8.4: Skip scheduler when adaptive training is enabled (they conflict)
             # The scheduler resets LR every step, undoing adaptive boosts
-            if global_step >= config.warmup_steps and not config.enable_adaptive_training:
+            if not config.enable_adaptive_training:
                 scheduler.step()
 
             # V9.8.3: Enforce LR bounds EVERY STEP (catches scheduler/checkpoint runaway)
