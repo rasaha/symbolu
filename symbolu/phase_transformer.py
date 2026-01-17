@@ -2516,9 +2516,9 @@ class BindingCacheTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (same principle as QK scaling in attention)
-        # Prevents overconfident early logits without disrupting Phase/Binding dynamics
-        self.logit_scale = 1.0 / math.sqrt(embed_dim)
+        # Logit scaling - disabled (was 1/sqrt(embed_dim) which caused very high initial PPL)
+        # The QK scaling principle doesn't apply to logits - they're already properly scaled
+        self.logit_scale = 1.0
 
         # Tie embeddings
         if tie_embeddings:
