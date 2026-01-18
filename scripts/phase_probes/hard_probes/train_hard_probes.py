@@ -4590,6 +4590,143 @@ class BindingCacheLMTransformer(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+# =============================================================================
+# SAMPLE GENERATION FOR QUALITY MONITORING
+# =============================================================================
+# V10.3.5: Generate text samples every N steps to monitor quality
+
+SAMPLE_PROMPTS = (
+    "The",                                          # Simple completion
+    "In the beginning",                             # Narrative
+    "The cat sat on",                               # Simple syntax
+    "Scientists have discovered that",              # Factual
+    "Once upon a time, there was a",               # Story
+)
+
+
+def generate_sample(
+    model: nn.Module,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 64,
+    temperature: float = 0.9,
+    top_p: float = 0.95,
+    top_k: int = 50,
+    repetition_penalty: float = 1.15,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            # Forward pass
+            outputs = model(generated)
+
+            # Handle different output formats
+            if isinstance(outputs, dict):
+                logits = outputs.get('logits', outputs.get('output', None))
+            elif isinstance(outputs, (tuple, list)):
+                logits = outputs[0]
+            else:
+                logits = outputs
+
+            if logits is None:
+                break
+
+            # Get next token logits
+            next_logits = logits[:, -1, :].clone()
+
+            # Apply repetition penalty
+            if repetition_penalty != 1.0:
+                for token_id in set(generated[0].tolist()):
+                    if next_logits[0, token_id] > 0:
+                        next_logits[0, token_id] /= repetition_penalty
+                    else:
+                        next_logits[0, token_id] *= repetition_penalty
+
+            # Apply temperature
+            next_logits = next_logits / temperature
+
+            # Top-k filtering
+            if top_k > 0:
+                top_k_vals, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+                threshold = top_k_vals[0, -1]
+                next_logits[next_logits < threshold] = float('-inf')
+
+            # Top-p (nucleus) sampling
+            sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+            cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above threshold
+            sorted_indices_to_remove = cumsum > top_p
+            sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+            sorted_indices_to_remove[:, 0] = False
+
+            indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+            next_logits[indices_to_remove] = float('-inf')
+
+            # Sample next token
+            probs = F.softmax(next_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Append to sequence
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Check for EOS
+            if hasattr(tokenizer, 'eos_token_id') and next_token.item() == tokenizer.eos_token_id:
+                break
+
+    # Decode and return
+    return tokenizer.decode(generated[0], skip_special_tokens=True)
+
+
+def run_quality_samples(
+    model: nn.Module,
+    tokenizer,
+    device: torch.device,
+    step: int,
+    prompts: tuple = SAMPLE_PROMPTS,
+):
+    """Generate and display quality samples."""
+    print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+    print(f"      ║  QUALITY SAMPLES @ Step {step:<6}                                 ║")
+    print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+    model.eval()
+    for i, prompt in enumerate(prompts):
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=64,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.15,
+            )
+            # Clean up for display
+            generated = generated.strip().replace('\n', ' ')[:150]
+            print(f"      ║  [{i+1}] Prompt: \"{prompt}\"")
+            print(f"      ║      Output: \"{generated}\"")
+            print(f"      ║")
+        except Exception as e:
+            print(f"      ║  [{i+1}] Error: {e}")
+            print(f"      ║")
+
+    print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
+    model.train()
+
+
 def train_real_language(
     args,
     config: Config,
@@ -5148,6 +5285,19 @@ def train_real_language(
                     witness_diagnostics.print_report(step)
 
             print()
+            model.train()
+
+        # V10.3.6: Quality sample generation
+        sample_every = getattr(args, 'sample_every', 500)
+        if sample_every > 0 and step % sample_every == 0 and step > 0:
+            # Get tokenizer from dataset
+            tokenizer = train_dataset.tokenizer
+            # Parse custom prompts if provided
+            prompts = SAMPLE_PROMPTS
+            custom_prompts = getattr(args, 'sample_prompts', None)
+            if custom_prompts:
+                prompts = tuple(p.strip() for p in custom_prompts.split(","))
+            run_quality_samples(model, tokenizer, config.device, step, prompts)
             model.train()
 
     # Final evaluation with comprehensive analysis
@@ -6356,6 +6506,14 @@ Examples:
                         help="Layers for Witness observation (default: 2 = same as Kosha)")
     parser.add_argument("--synthesis-domain-layers", type=str, default="3",
                         help="Layers for Synthesis Gate (default: 3 = output integration)")
+
+    # ==========================================================================
+    # V10.3.6: SAMPLE GENERATION FOR QUALITY MONITORING
+    # ==========================================================================
+    parser.add_argument("--sample-every", type=int, default=500,
+                        help="Generate quality samples every N steps (0 to disable, default: 500)")
+    parser.add_argument("--sample-prompts", type=str, default=None,
+                        help="Comma-separated custom prompts for sampling (uses defaults if not set)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
