@@ -2268,6 +2268,82 @@ class BindingCachePhaseState(nn.Module):
 
         return memory_state.reshape(B, N, D)
 
+    def compute_confidence(self, memory_state: torch.Tensor) -> torch.Tensor:
+        """
+        V10.4: Compute phase confidence for conditional quad invocation.
+
+        High confidence means phase state is stable/consistent, so quad
+        retrieval can potentially be skipped to save compute.
+
+        Args:
+            memory_state: [B, N, D] - current phase memory state
+
+        Returns:
+            confidence: [B, N] - per-position confidence in [0, 1]
+        """
+        # Confidence based on inverse variance of memory state
+        # Low variance = high confidence (stable state)
+        # High variance = low confidence (uncertain state)
+        var = memory_state.var(dim=-1)  # [B, N]
+
+        # Normalize to [0, 1] using sigmoid
+        # Scale factor chosen so variance ~1 gives confidence ~0.5
+        confidence = torch.sigmoid(-var + 1.0)  # [B, N]
+
+        return confidence
+
+    def integrate_proposals(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+        proposals: torch.Tensor,
+        proposal_scores: torch.Tensor,
+        gamma: float = 0.9,
+    ) -> torch.Tensor:
+        """
+        V10.4: Integrate quad proposals into phase state.
+
+        This implements the "phase-as-integrator" pattern where phase
+        decides which proposals survive and integrates them into state.
+
+        Args:
+            x: Input tensor [B, N, D]
+            memory_state: Current phase state [B, N, D]
+            proposals: [B, N, K, D] - K proposals from quad
+            proposal_scores: [B, N, K] - retrieval scores for each proposal
+            gamma: Decay factor for state (0 < gamma < 1)
+
+        Returns:
+            integrated_output: [B, N, D] - integrated state update
+        """
+        B, N, K, D = proposals.shape
+
+        # Phase computes gating weights (NOT quad softmax)
+        # Use sigmoid + normalize for smoother gradients than softmax
+        gate_input = torch.cat([
+            x.unsqueeze(2).expand(-1, -1, K, -1),  # [B, N, K, D]
+            memory_state.unsqueeze(2).expand(-1, -1, K, -1),  # [B, N, K, D]
+            proposals,  # [B, N, K, D]
+        ], dim=-1)  # [B, N, K, 3D]
+
+        # Simple gating: project to scalar, sigmoid, normalize
+        # For now, use proposal_scores as gate logits (can learn separate projection later)
+        gate_logits = proposal_scores  # [B, N, K]
+
+        # Sigmoid + normalize (not winner-take-all like softmax)
+        gate_weights_raw = torch.sigmoid(gate_logits)  # [B, N, K]
+        gate_weights = gate_weights_raw / (gate_weights_raw.sum(dim=-1, keepdim=True) + 1e-8)  # [B, N, K]
+
+        # Weighted sum of proposals
+        # [B, N, K, 1] * [B, N, K, D] -> [B, N, K, D] -> sum -> [B, N, D]
+        weighted_proposals = (gate_weights.unsqueeze(-1) * proposals).sum(dim=2)  # [B, N, D]
+
+        # State update: decay old state + integrate new proposals
+        # S_{t+1} = gamma * S_t + (1 - gamma) * weighted_proposals
+        integrated = gamma * memory_state + (1 - gamma) * weighted_proposals
+
+        return integrated
+
 
 class BindingCacheQuadQuery(nn.Module):
     """
@@ -2286,6 +2362,7 @@ class BindingCacheQuadQuery(nn.Module):
         dropout: float = 0.1,
         top_k: int = 64,  # Cache size per head
         use_cache: bool = True,  # If False, use full O(n²) attention
+        proposal_mode: bool = False,  # V10.4: Return proposals instead of attended output
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -2293,6 +2370,7 @@ class BindingCacheQuadQuery(nn.Module):
         self.head_dim = embed_dim // num_heads
         self.top_k = top_k
         self.use_cache = use_cache
+        self.proposal_mode = proposal_mode
         self.scale = self.head_dim ** -0.5
 
         # Query projection (from input - "what am I looking for?")
@@ -2302,7 +2380,7 @@ class BindingCacheQuadQuery(nn.Module):
         self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
         self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
 
-        # Output projection
+        # Output projection (not used in proposal_mode)
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=False)
 
         # Layer norms
@@ -2332,6 +2410,83 @@ class BindingCacheQuadQuery(nn.Module):
             "cache_key_cosine_mean": self._cache_key_cosine_mean,
             "cache_key_cosine_max": self._cache_key_cosine_max,
         }
+
+    def get_proposals(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+        causal_mask: bool = True,
+        binding_salience: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        V10.4: Get TopK proposals WITHOUT softmax mixing.
+
+        Instead of returning attention-weighted output, returns raw proposals
+        for Phase to integrate. This implements the "quad-as-proposer" pattern.
+
+        Args:
+            x: Input tensor [B, N, D] - source for queries
+            memory_state: [B, N, D] - from BindingCachePhaseState
+            causal_mask: Apply causal masking
+            binding_salience: Optional [B, N] - biases Top-K selection
+
+        Returns:
+            proposals: [B, N, K, D] - K proposal values per position
+            scores: [B, N, K] - retrieval scores (before softmax) for each proposal
+        """
+        B, N, D = x.shape
+        H, D_h = self.num_heads, self.head_dim
+        K = min(self.top_k, N)
+
+        # Normalize inputs
+        x_norm = self.norm_q(x)
+        mem_norm = self.norm_mem(memory_state)
+
+        # Project queries from input, K/V from memory state
+        Q = self.W_q(x_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+        Keys = self.W_k(mem_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+        V = self.W_v(mem_norm).view(B, N, H, D_h).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Compute scores: Q @ K^T
+        scores = torch.matmul(Q, Keys.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Apply causal mask
+        if causal_mask:
+            mask = torch.triu(
+                torch.ones(N, N, device=x.device, dtype=torch.bool),
+                diagonal=1
+            )
+            scores = scores.masked_fill(mask, float('-inf'))
+
+        # Binding salience for selection bias
+        if binding_salience is not None:
+            salience_bias = binding_salience.unsqueeze(1).unsqueeze(1)  # [B, 1, 1, N]
+            selection_scores = scores + salience_bias
+        else:
+            selection_scores = scores
+
+        # TopK selection - NO SOFTMAX
+        top_scores, top_indices = selection_scores.topk(K, dim=-1, largest=True)  # [B, H, N, K]
+
+        # Gather original scores (not biased) for return
+        original_top_scores = torch.gather(scores, -1, top_indices)  # [B, H, N, K]
+
+        # Gather corresponding values
+        top_indices_expanded = top_indices.unsqueeze(-1).expand(-1, -1, -1, -1, D_h)
+        V_expanded = V.unsqueeze(2).expand(-1, -1, N, -1, -1)  # [B, H, N, N, D_h]
+        top_V = torch.gather(V_expanded, 3, top_indices_expanded)  # [B, H, N, K, D_h]
+
+        # Reshape: [B, H, N, K, D_h] -> [B, N, K, H*D_h] = [B, N, K, D]
+        proposals = top_V.permute(0, 2, 3, 1, 4).reshape(B, N, K, D)
+
+        # Scores: [B, H, N, K] -> [B, N, K] (mean across heads)
+        proposal_scores = original_top_scores.permute(0, 2, 3, 1).mean(dim=-1)  # [B, N, K]
+
+        # Track instrumentation
+        with torch.no_grad():
+            self._cache_hit_rate = K / N
+
+        return proposals, proposal_scores
 
     def forward(
         self,
@@ -2574,8 +2729,12 @@ class BindingCacheBlock(nn.Module):
         top_k: int = 64,
         use_cache: bool = True,
         local_window_size: int = 256,  # V10.1.1: Max local window (actual = min(this, seq_len//2))
+        proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
+        confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
     ):
         super().__init__()
+        self.proposal_mode = proposal_mode
+        self.confidence_threshold = confidence_threshold
 
         # V10.1: Local attention for syntax learning (direct token-to-token)
         # This is what allows "the → cat" pattern learning
@@ -2603,6 +2762,7 @@ class BindingCacheBlock(nn.Module):
             dropout=dropout,
             top_k=top_k,
             use_cache=use_cache,
+            proposal_mode=proposal_mode,
         )
 
         # Feed-forward
@@ -2615,6 +2775,10 @@ class BindingCacheBlock(nn.Module):
             nn.Dropout(dropout),
         )
 
+        # V10.4: Instrumentation for proposal mode
+        self._last_confidence_mean = 0.0
+        self._last_skip_rate = 0.0
+
     def set_ablation(self, mode: str, seed: int = 42):
         """Set Phase ablation mode."""
         self.phase_state.set_ablation(mode, seed)
@@ -2626,6 +2790,13 @@ class BindingCacheBlock(nn.Module):
     def clear_rotation(self):
         """Clear rotation from Phase component."""
         self.phase_state.clear_rotation()
+
+    def get_proposal_metrics(self) -> dict:
+        """V10.4: Return proposal mode instrumentation."""
+        return {
+            "confidence_mean": self._last_confidence_mean,
+            "skip_rate": self._last_skip_rate,
+        }
 
     def forward(
         self,
@@ -2640,6 +2811,11 @@ class BindingCacheBlock(nn.Module):
         1. Local: Direct token-to-token for syntax (the → cat)
         2. Phase: Accumulate memory state (global compression)
         3. Quad: Query memory state (global retrieval)
+
+        V10.4 Proposal Mode:
+        - Quad returns proposals (no softmax mixing)
+        - Phase integrates proposals with gating
+        - Conditional skip: if phase confident, skip quad
 
         Combined: local_out + mem_out (no gradient competition)
 
@@ -2660,9 +2836,27 @@ class BindingCacheBlock(nn.Module):
         # Phase is PURE - no auxiliary systems act here
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
-        # Step 3: Quad queries memory state (with optional salience bias for Top-K)
-        # Salience affects SELECTION, not attention weights
-        mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+        if self.proposal_mode:
+            # V10.4: Proposal Mode - quad proposes, phase integrates
+            # Check confidence for conditional skip
+            confidence = self.phase_state.compute_confidence(memory_state)
+
+            with torch.no_grad():
+                self._last_confidence_mean = confidence.mean().item()
+                self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
+
+            # Get proposals from quad (no softmax mixing)
+            proposals, proposal_scores = self.quad_query.get_proposals(
+                x, memory_state, binding_salience=binding_salience
+            )
+
+            # Phase integrates proposals
+            mem_out = self.phase_state.integrate_proposals(
+                x, memory_state, proposals, proposal_scores
+            )
+        else:
+            # Original mode: Quad queries memory state with softmax attention
+            mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
 
         # Combine: local (syntax) + memory (semantics) - no competition
         attn_out = local_out + mem_out
@@ -2703,11 +2897,14 @@ class BindingCacheTransformer(nn.Module):
         top_k: int = 64,
         use_cache: bool = True,
         tie_embeddings: bool = True,
+        proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
+        confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
     ):
         super().__init__()
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
         self.num_layers = num_layers
+        self.proposal_mode = proposal_mode
 
         # Embeddings
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
@@ -2726,6 +2923,8 @@ class BindingCacheTransformer(nn.Module):
                 bounded_phase=bounded_phase,
                 top_k=top_k,
                 use_cache=use_cache,
+                proposal_mode=proposal_mode,
+                confidence_threshold=confidence_threshold,
             )
             for _ in range(num_layers)
         ])
@@ -2802,6 +3001,39 @@ class BindingCacheTransformer(nn.Module):
             # max > 0.95 = slot collision
             "cache_key_cosine_mean": sum(cosine_means) / len(cosine_means) if cosine_means else 0.0,
             "cache_key_cosine_max": max(cosine_maxes) if cosine_maxes else 0.0,
+        }
+
+    def get_proposal_metrics(self) -> dict:
+        """
+        V10.4: Aggregate proposal mode metrics from all blocks.
+
+        Returns:
+            dict with:
+            - confidence_mean: Average phase confidence across layers
+            - skip_rate: Fraction of positions that could skip quad
+            - per_layer_confidence: List of confidence means per layer
+            - per_layer_skip_rate: List of skip rates per layer
+        """
+        if not self.proposal_mode:
+            return {
+                "confidence_mean": 0.0,
+                "skip_rate": 0.0,
+                "per_layer_confidence": [],
+                "per_layer_skip_rate": [],
+            }
+
+        confidence_means = []
+        skip_rates = []
+        for block in self.blocks:
+            metrics = block.get_proposal_metrics()
+            confidence_means.append(metrics["confidence_mean"])
+            skip_rates.append(metrics["skip_rate"])
+
+        return {
+            "confidence_mean": sum(confidence_means) / len(confidence_means) if confidence_means else 0.0,
+            "skip_rate": sum(skip_rates) / len(skip_rates) if skip_rates else 0.0,
+            "per_layer_confidence": confidence_means,
+            "per_layer_skip_rate": skip_rates,
         }
 
     def forward_hidden(
