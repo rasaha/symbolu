@@ -4998,8 +4998,8 @@ def train_real_language(
         print(f"  ║                                                                    ║")
         print(f"  ║  Layer  Component              Domain         Role                ║")
         print(f"  ║  ─────────────────────────────────────────────────────────────    ║")
-        print(f"  ║  L0     DNA Bridge            CSR/SRK        Foundational Ontology║")
-        print(f"  ║  L1     CSR Alignment         CSR/SRK        Phase Extraction     ║")
+        print(f"  ║  L0     DNA Bridge            ONTOLOGY       Foundational Ontology║")
+        print(f"  ║  L1     CSR Alignment         CSR            Phase Extraction     ║")
         print(f"  ║  L2     Kosha + Witness       KOSHA          Consciousness        ║")
         print(f"  ║  L3     Synthesis Gate        SYNTHESIS      Output Integration   ║")
         print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
@@ -6492,14 +6492,14 @@ Examples:
 
     # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
     # Layer assignments (4-layer model):
-    #   L0: DNA Bridge (Foundational Ontology)       → CSR/SRK domain
-    #   L1: CSR Alignment (Phase Extraction Hook)    → CSR/SRK domain
-    #   L2: Kosha + Witness (Consciousness/attention) → Kosha domain
-    #   L3: Synthesis Gate (Output integration)       → Synthesis domain
+    #   L0: DNA Bridge (Foundational Ontology)       → ONTOLOGY domain
+    #   L1: CSR Alignment (Phase Extraction Hook)    → CSR domain
+    #   L2: Kosha + Witness (Consciousness/attention) → KOSHA domain
+    #   L3: Synthesis Gate (Output integration)       → SYNTHESIS domain
     parser.add_argument("--domain-separation", action="store_true",
                         help="Enable domain separation: each component governs its assigned layer")
     parser.add_argument("--csr-domain-layers", type=str, default="0,1",
-                        help="Layers for CSR/SRK (default: 0,1 = DNA Bridge + CSR Alignment)")
+                        help="Layers for Ontology+CSR (default: 0=DNA Bridge, 1=CSR Alignment)")
     parser.add_argument("--kosha-domain-layers", type=str, default="2",
                         help="Layers for Kosha consciousness (default: 2)")
     parser.add_argument("--witness-domain-layers", type=str, default="2",
