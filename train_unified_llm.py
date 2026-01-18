@@ -10528,6 +10528,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     elif config.model_type == "hybrid":
         # V9.6.0: Untie embeddings when CSR is enabled to prevent vocabulary corruption
         tie_emb = not config.untie_embeddings
+        # V10.2.1: Determine protected_phase setting
+        use_protected_phase = config.protected_phase and not config.no_protected_phase
         model = HybridPhaseTransformer(
             vocab_size=config.vocab_size,
             embed_dim=preset["embed_dim"],
@@ -10547,6 +10549,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            protected_phase=use_protected_phase,  # V10.2.1: Protected Phase for chunking
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
@@ -10556,6 +10559,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
         if config.zero_mean_cosine:
             print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
+        # V10.2.1: Log chunking settings
+        if config.enable_chunking:
+            print(f"  Chunking: ENABLED (chunk_size={config.chunk_size})")
+            print(f"  Protected Phase: {'ENABLED' if use_protected_phase else 'DISABLED (legacy parallel)'}")
 
     elif config.model_type == "gen2":
         if not GEN2_AVAILABLE:
@@ -14289,6 +14296,36 @@ def train(config: UnifiedTrainingConfig):
         status = inverted_layer_curriculum.get_status()
         print(f"      Seq len mode: {status['seq_len_mode']} ({status['seq_len']} tokens)")
 
+    # =========================================================================
+    # V10.2.1: Run Chunk Continuity Diagnostic (if requested)
+    # =========================================================================
+    if config.run_chunk_diagnostic and config.model_type == "hybrid":
+        print(f"\n  🔍 [CHUNK DIAGNOSTIC] Running chunk continuity diagnostic...")
+        print(f"      Test sequence length: {config.chunk_diagnostic_seq_len}")
+        print(f"      Chunk size: {config.chunk_size}")
+        try:
+            # Create test input
+            test_ids = torch.randint(
+                0, config.vocab_size,
+                (1, config.chunk_diagnostic_seq_len),
+                device=device
+            )
+            # Run diagnostic
+            diag_result = model.diagnose_chunk_continuity(
+                test_ids,
+                chunk_size=config.chunk_size,
+                verbose=True
+            )
+            if not diag_result['healthy']:
+                print(f"\n  ⚠️  [CHUNK DIAGNOSTIC] WARNING: Chunk continuity issues detected!")
+                print(f"      Check the diagnostic output above for details.")
+                print(f"      Training will continue, but chunking may not work correctly.\n")
+            else:
+                print(f"\n  ✅ [CHUNK DIAGNOSTIC] All checks passed - chunking is healthy!\n")
+        except Exception as e:
+            print(f"\n  ❌ [CHUNK DIAGNOSTIC] Failed to run diagnostic: {e}")
+            print(f"      Training will continue without diagnostic validation.\n")
+
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
         # This allows VRAM to stabilize after memory reallocation
@@ -17890,6 +17927,31 @@ def main():
                        help="Weight for local attention in hybrid layers")
     parser.add_argument("--alpha_phase", type=float, default=0.2,
                        help="Weight for phase attention in hybrid layers")
+
+    # ==========================================================================
+    # V10.2.1: CHUNKING FOR LONG SEQUENCES
+    # ==========================================================================
+    # Enables processing sequences longer than max_seq_len by chunking
+    # Phase attention persists state across chunks (temporal memory)
+    # Local attention resets per chunk (spatial reasoning)
+    parser.add_argument("--enable_chunking", action="store_true",
+                       help="Enable chunked training for long sequences. "
+                            "Phase state persists across chunks, Local resets per chunk.")
+    parser.add_argument("--chunk_size", type=int, default=512,
+                       help="Size of each chunk when chunking is enabled. "
+                            "Should be <= max_seq_len. Smaller = less memory, more chunks.")
+    parser.add_argument("--protected_phase", action="store_true", default=True,
+                       help="Use Protected Phase pattern (RECOMMENDED). "
+                            "Local cross-attends to Phase memory instead of parallel blending. "
+                            "Ensures Phase learns useful representations.")
+    parser.add_argument("--no_protected_phase", action="store_true",
+                       help="Disable Protected Phase (use legacy parallel blending). "
+                            "NOT recommended for chunking - causes gradient competition.")
+    parser.add_argument("--run_chunk_diagnostic", action="store_true",
+                       help="Run chunk continuity diagnostic at start of training. "
+                            "Verifies: Phase continuity, attention source, amplitude health.")
+    parser.add_argument("--chunk_diagnostic_seq_len", type=int, default=2048,
+                       help="Sequence length for chunk diagnostic test")
 
     # Alpha decay schedule (for phase/hybrid attention)
     parser.add_argument("--alpha_phase_start", type=float, default=0.6,
