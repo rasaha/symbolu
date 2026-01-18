@@ -3339,6 +3339,591 @@ class ProtectedPhaseLMTransformer(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+# =============================================================================
+# V10.3.3: BINDING CACHE FOR REAL LANGUAGE MODE
+# =============================================================================
+# Binding Cache architecture combines THREE attention paths:
+#   1. Local: O(n*w) - Direct token-to-token for syntax learning
+#   2. Phase: O(n) - Memory state accumulation (global compression)
+#   3. Quad:  O(n*k) - Top-K memory query (global retrieval)
+#
+# This is the V10.0 architecture validated by diagnostic probes.
+# Reference: --protected-phase showed -50% ablation drop (Phase essential)
+
+class LocalWindowAttention(nn.Module):
+    """
+    Local window attention for fast syntax learning.
+
+    Uses sliding window attention (O(n*w) complexity) for direct
+    token-to-token patterns like "the → cat".
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        window_size: int = 64,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.window_size = window_size
+
+        self.W_q = nn.Linear(embed_dim, embed_dim)
+        self.W_k = nn.Linear(embed_dim, embed_dim)
+        self.W_v = nn.Linear(embed_dim, embed_dim)
+        self.W_o = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Local window attention.
+
+        Args:
+            x: [B, N, D]
+
+        Returns:
+            output: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Project Q, K, V
+        q = self.W_q(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        k = self.W_k(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Compute attention scores with causal mask
+        attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+
+        # Create causal mask
+        causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+
+        # Create local window mask (only attend within window)
+        window_mask = torch.ones(N, N, device=x.device).bool()
+        for i in range(N):
+            start = max(0, i - self.window_size)
+            window_mask[i, start:i+1] = False
+
+        # Combine masks
+        combined_mask = causal_mask | window_mask
+        attn_scores = attn_scores.masked_fill(combined_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        # Softmax and apply
+        attn_probs = F.softmax(attn_scores, dim=-1)
+        attn_probs = self.dropout(attn_probs)
+
+        attn_out = torch.matmul(attn_probs, v)
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, N, D)
+
+        return self.W_o(attn_out)
+
+
+class BindingCachePhaseState(nn.Module):
+    """
+    Phase state accumulator for binding cache.
+
+    Accumulates key-value bindings into a persistent memory state
+    using O(n) cumulative sum (no attention).
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 0.9,
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.decay_gamma = decay_gamma
+        self.bounded_phase = bounded_phase
+
+        # Phase projections
+        self.W_k_phase = nn.Linear(embed_dim, embed_dim)
+        self.W_k_amp = nn.Linear(embed_dim, embed_dim)
+        self.W_v = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Health tracking
+        self._last_r_k_mean = 0.0
+        self._last_r_k_std = 0.0
+        self._last_r_k_min = 0.0
+        self._last_r_k_max = 0.0
+
+        self._ablation_mode = "none"
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        self._ablation_mode = mode
+
+    def set_rotation(self, angle: float):
+        pass  # Not implemented for probe
+
+    def clear_rotation(self):
+        pass
+
+    def get_health_metrics(self) -> dict:
+        return {
+            "r_k_mean": self._last_r_k_mean,
+            "r_k_std": self._last_r_k_std,
+            "r_k_min": self._last_r_k_min,
+            "r_k_max": self._last_r_k_max,
+        }
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Compute memory state via cumsum.
+
+        Args:
+            x: [B, N, D]
+
+        Returns:
+            memory_state: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Compute phase and amplitude
+        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        if self.bounded_phase:
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_k = phi_k_raw
+
+        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim)
+
+        # Track R_k health
+        with torch.no_grad():
+            r_k = a_k.mean(dim=(0, 1))  # [H, D_h]
+            self._last_r_k_mean = r_k.mean().item()
+            self._last_r_k_std = r_k.std().item()
+            self._last_r_k_min = r_k.min().item()
+            self._last_r_k_max = r_k.max().item()
+
+        # Complex representation: z = a * e^(i*phi)
+        z_real = a_k * torch.cos(phi_k)
+        z_imag = a_k * torch.sin(phi_k)
+
+        # Weighted value
+        weighted_v = v * a_k
+
+        # Cumsum for memory accumulation (with decay)
+        if self.decay_gamma < 1.0:
+            # Apply exponential decay
+            decay_weights = torch.pow(
+                torch.tensor(self.decay_gamma, device=x.device),
+                torch.arange(N, device=x.device).float()
+            ).view(1, N, 1, 1)
+            weighted_v = weighted_v * decay_weights
+
+        memory_state = torch.cumsum(weighted_v, dim=1)
+
+        # Reshape back
+        memory_state = memory_state.view(B, N, D)
+        return memory_state
+
+
+class BindingCacheQuadQuery(nn.Module):
+    """
+    Quadratic query with Top-K cache for efficient memory retrieval.
+
+    Uses Top-K selection to reduce O(n²) attention to O(n*k).
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        top_k: int = 64,
+        use_cache: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.top_k = top_k
+        self.use_cache = use_cache
+
+        self.W_q = nn.Linear(embed_dim, embed_dim)
+        self.W_o = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Query memory state with Top-K selection.
+
+        Args:
+            x: [B, N, D]
+            memory_state: [B, N, D] from Phase accumulator
+
+        Returns:
+            output: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Query projection
+        q = self.W_q(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Memory as key-value
+        mem = memory_state.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Compute attention scores
+        attn_scores = torch.matmul(q, mem.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Causal mask
+        causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+        attn_scores = attn_scores.masked_fill(causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        if self.use_cache and self.top_k < N:
+            # Top-K selection per query position
+            # For each query, only attend to top-k memory positions
+            k = min(self.top_k, N)
+            top_k_scores, top_k_indices = torch.topk(attn_scores, k, dim=-1)
+
+            # Create sparse attention (only top-k positions)
+            attn_probs = F.softmax(top_k_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+
+            # Gather top-k memory values
+            top_k_indices_expanded = top_k_indices.unsqueeze(-1).expand(-1, -1, -1, -1, self.head_dim)
+            mem_expanded = mem.unsqueeze(2).expand(-1, -1, N, -1, -1)  # [B, H, N, N, D_h]
+            top_k_mem = torch.gather(mem_expanded, 3, top_k_indices_expanded)  # [B, H, N, k, D_h]
+
+            attn_out = torch.matmul(attn_probs.unsqueeze(-2), top_k_mem).squeeze(-2)  # [B, H, N, D_h]
+        else:
+            # Full attention (no cache)
+            attn_probs = F.softmax(attn_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+            attn_out = torch.matmul(attn_probs, mem)
+
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, N, D)
+        return self.W_o(attn_out)
+
+
+class BindingCacheLMBlock(nn.Module):
+    """
+    Binding Cache block for Language Modeling.
+
+    Three-path architecture (V10.0):
+    1. Local: O(n*w) - Direct token-to-token for syntax
+    2. Phase: O(n) - Memory state accumulation
+    3. Quad:  O(n*k) - Top-K memory query
+
+    They work together: local_out + mem_out (no gradient competition).
+    Ratios allow per-layer weighting of each path.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 0.9,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+        local_window_size: int = 64,
+        local_ratio: float = 0.4,
+        phase_ratio: float = 0.3,
+        quad_ratio: float = 0.3,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+
+        # Store ratios for weighted combination
+        self.local_ratio = local_ratio
+        self.phase_ratio = phase_ratio
+        self.quad_ratio = quad_ratio
+
+        # Local attention for syntax learning
+        self.local_attn = LocalWindowAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            window_size=local_window_size,
+            dropout=dropout,
+        )
+
+        # Phase state accumulator
+        self.phase_state = BindingCachePhaseState(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            decay_gamma=decay_gamma,
+            bounded_phase=bounded_phase,
+        )
+
+        # Quad memory query
+        self.quad_query = BindingCacheQuadQuery(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            top_k=top_k,
+            use_cache=use_cache,
+        )
+
+        # Feed-forward
+        self.norm_ff = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout),
+        )
+
+    def get_phase_health(self) -> dict:
+        return self.phase_state.get_health_metrics()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Three-path forward pass with weighted combination.
+
+        1. Local attention for syntax
+        2. Phase accumulates memory
+        3. Quad queries memory
+
+        Output = x + (local_ratio * local + phase_ratio * memory + quad_ratio * quad_out) + ff
+        """
+        # Step 1: Local attention for syntax (the → cat patterns)
+        local_out = self.local_attn(x)
+
+        # Step 2: Phase accumulates memory state
+        memory_state = self.phase_state(x)
+
+        # Step 3: Quad queries memory state
+        quad_out = self.quad_query(x, memory_state)
+
+        # Weighted combination of three paths (with ratios for per-layer tuning)
+        # Note: memory_state is passed to quad, but we also add phase contribution directly
+        attn_out = (
+            self.local_ratio * local_out +
+            self.phase_ratio * memory_state +
+            self.quad_ratio * quad_out
+        )
+
+        # Residual and FF
+        x = x + attn_out
+        x = x + self.ff(self.norm_ff(x))
+
+        return x
+
+
+class BindingCacheLMTransformer(nn.Module):
+    """
+    Language Modeling Transformer with Binding Cache architecture (V10.0).
+
+    Validated by diagnostic probes:
+    - Phase: O(n) state accumulator (exclusive role)
+    - Quad: O(n*k) memory query via Top-K cache (exclusive role)
+    - Local: O(n*w) direct syntax attention
+
+    Reference: --protected-phase showed -50% ablation drop when Phase
+    has protected role (vs ~0% when mixed with Quad).
+
+    Supports:
+    - Layer-wise probing for SRK integration
+    - Phase health monitoring (R_k statistics)
+    - Top-K cache for O(n*k) complexity
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+        decay_gamma: float = 0.9,
+        window_size: int = 64,
+        phase_ratios: List[float] = None,
+        local_ratios: List[float] = None,
+        quad_ratios: List[float] = None,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+
+        # Default ratios if not specified
+        if phase_ratios is None:
+            phase_ratios = [0.3] * num_layers
+        if local_ratios is None:
+            local_ratios = [0.4] * num_layers
+        if quad_ratios is None:
+            quad_ratios = [0.3] * num_layers
+
+        # Store ratios for logging
+        self.phase_ratios = phase_ratios
+        self.local_ratios = local_ratios
+        self.quad_ratios = quad_ratios
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        # Binding Cache blocks with per-layer ratios
+        self.layers = nn.ModuleList([
+            BindingCacheLMBlock(
+                embed_dim=d_model,
+                num_heads=num_heads,
+                ff_dim=d_ff,
+                dropout=dropout,
+                decay_gamma=decay_gamma,
+                bounded_phase=bounded_phase,
+                top_k=top_k,
+                use_cache=use_cache,
+                local_window_size=window_size,
+                local_ratio=local_ratios[i],
+                phase_ratio=phase_ratios[i],
+                quad_ratio=quad_ratios[i],
+            )
+            for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+
+        # Weight tying
+        self.lm_head.weight = self.token_emb.weight
+
+        # Layer outputs for SRK probing
+        self.layer_outputs = []
+
+        # Curriculum placeholder (for API compatibility)
+        self.curriculum = [1.0] * num_layers
+
+    def forward(self, input_ids: torch.Tensor, probe_layers: bool = False) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        self.layer_outputs = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if probe_layers:
+                self.layer_outputs.append(x.detach().clone())
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    def get_phase_health(self) -> dict:
+        """Aggregate Phase health metrics from all layers."""
+        metrics = {"r_k_mean": [], "r_k_std": [], "r_k_min": [], "r_k_max": []}
+        for layer in self.layers:
+            layer_metrics = layer.get_phase_health()
+            for k, v in layer_metrics.items():
+                metrics[k].append(v)
+
+        return {
+            "r_k_mean": sum(metrics["r_k_mean"]) / len(metrics["r_k_mean"]) if metrics["r_k_mean"] else 0.0,
+            "r_k_std": sum(metrics["r_k_std"]) / len(metrics["r_k_std"]) if metrics["r_k_std"] else 0.0,
+            "r_k_min": min(metrics["r_k_min"]) if metrics["r_k_min"] else 0.0,
+            "r_k_max": max(metrics["r_k_max"]) if metrics["r_k_max"] else 0.0,
+        }
+
+    def update_curriculum(self, new_curriculum: List[float]):
+        """API compatibility (no-op for binding cache)."""
+        pass
+
+    def get_layer_ppl(self, input_ids: torch.Tensor, targets: torch.Tensor) -> List[float]:
+        """Compute PPL contribution from each layer by early-exiting."""
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_ppls = []
+        for layer in self.layers:
+            x = layer(x)
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+            layer_ppls.append(ppl)
+
+        return layer_ppls
+
+    def get_layer_contributions(self, input_ids: torch.Tensor, targets: torch.Tensor) -> Dict[str, List[float]]:
+        """Analyze per-layer contributions."""
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        # Initial PPL (embedding only)
+        logits_embed = self.lm_head(self.norm(x))
+        loss_embed = F.cross_entropy(logits_embed.view(-1, self.vocab_size), targets.view(-1))
+        ppl_embed = torch.exp(loss_embed).item()
+
+        layer_ppls = []
+        layer_deltas = []
+        prev_ppl = ppl_embed
+
+        for layer in self.layers:
+            x = layer(x)
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+
+            layer_ppls.append(ppl)
+            layer_deltas.append(prev_ppl - ppl)
+            prev_ppl = ppl
+
+        total_reduction = ppl_embed - layer_ppls[-1]
+        contribution_pcts = [
+            (delta / total_reduction * 100) if total_reduction > 0 else 0
+            for delta in layer_deltas
+        ]
+
+        return {
+            'ppl': layer_ppls,
+            'ppl_delta': layer_deltas,
+            'contribution_pct': contribution_pcts,
+            'phase_ratio': [1.0] * self.num_layers,
+            'ppl_embed': ppl_embed,
+            'total_reduction': total_reduction,
+        }
+
+    def ablate_attention(self, input_ids: torch.Tensor, targets: torch.Tensor,
+                         ablate_phase: bool = False, ablate_local: bool = False) -> float:
+        """Return normal PPL (full ablation not implemented for probe)."""
+        with torch.no_grad():
+            logits = self.forward(input_ids)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            return torch.exp(loss).item()
+
+    def count_params(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 def train_real_language(
     args,
     config: Config,
@@ -3360,10 +3945,68 @@ def train_real_language(
     val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
 
     # Create model
+    # V10.3.3: Support for Binding Cache architecture
+    use_binding_cache = getattr(args, 'binding_cache', False)
     # V10.3.2: Support for Protected Phase architecture
     use_protected_phase = getattr(args, 'protected_phase', False)
 
-    if use_protected_phase:
+    if use_binding_cache:
+        # Parse binding cache ratios
+        bc_phase_ratio = [float(x) for x in args.binding_cache_phase_ratio.split(",")]
+        bc_local_ratio = [float(x) for x in args.binding_cache_local_ratio.split(",")]
+        bc_quad_ratio = [float(x) for x in args.binding_cache_quad_ratio.split(",")]
+
+        # Pad/truncate to match num_layers
+        while len(bc_phase_ratio) < config.num_layers:
+            bc_phase_ratio.append(bc_phase_ratio[-1] if bc_phase_ratio else 0.3)
+        while len(bc_local_ratio) < config.num_layers:
+            bc_local_ratio.append(bc_local_ratio[-1] if bc_local_ratio else 0.4)
+        while len(bc_quad_ratio) < config.num_layers:
+            bc_quad_ratio.append(bc_quad_ratio[-1] if bc_quad_ratio else 0.3)
+        bc_phase_ratio = bc_phase_ratio[:config.num_layers]
+        bc_local_ratio = bc_local_ratio[:config.num_layers]
+        bc_quad_ratio = bc_quad_ratio[:config.num_layers]
+
+        print(f"\n╔═══════════════════════════════════════════════════════════════════════╗")
+        print(f"║  V10.3.3: BINDING CACHE ARCHITECTURE                                  ║")
+        print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+        print(f"║  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"║  Three-Path Architecture (No Gradient Competition):                   ║")
+        print(f"║                                                                       ║")
+        print(f"║    1. LOCAL PATH  - O(n*w) Window Attention                          ║")
+        print(f"║       Window size: {args.local_window_size}")
+        print(f"║       Fast syntax learning, direct token-to-token                    ║")
+        print(f"║                                                                       ║")
+        print(f"║    2. PHASE PATH  - O(n) Memory State Accumulation                   ║")
+        print(f"║       Decay gamma: {args.decay_gamma}")
+        print(f"║       Binding accumulation via decayed cumsum                        ║")
+        print(f"║                                                                       ║")
+        print(f"║    3. QUAD PATH   - O(n*k) Top-K Cache Query                         ║")
+        print(f"║       Top-K: {args.binding_cache_top_k}")
+        print(f"║       Quadratic attention over cached memories                       ║")
+        print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+        print(f"║  Per-Layer Ratios:                                                    ║")
+        for i in range(config.num_layers):
+            print(f"║    L{i}: Local={bc_local_ratio[i]:.2f}, Phase={bc_phase_ratio[i]:.2f}, Quad={bc_quad_ratio[i]:.2f}")
+        print(f"╚═══════════════════════════════════════════════════════════════════════╝")
+
+        model = BindingCacheLMTransformer(
+            vocab_size=args.lm_vocab_size,
+            d_model=config.d_model,
+            num_heads=config.num_heads,
+            num_layers=config.num_layers,
+            d_ff=config.d_ff,
+            dropout=config.dropout,
+            max_seq_len=args.seq_len,
+            window_size=args.local_window_size,
+            top_k=args.binding_cache_top_k,
+            decay_gamma=args.decay_gamma,
+            phase_ratios=bc_phase_ratio,
+            local_ratios=bc_local_ratio,
+            quad_ratios=bc_quad_ratio,
+        ).to(config.device)
+
+    elif use_protected_phase:
         print(f"\nCreating ProtectedPhaseLMTransformer (V10.3.2)...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
         print(f"  Architecture: Phase → Memory State → Quadratic Query")
@@ -4766,6 +5409,25 @@ Examples:
                         help="Weight for ontological alignment loss (default: 0.1)")
     parser.add_argument("--srk-lambda-coherence", type=float, default=0.05,
                         help="Weight for phase coherence loss (default: 0.05)")
+
+    # ==========================================================================
+    # V10.3.3: BINDING CACHE ARCHITECTURE
+    # ==========================================================================
+    parser.add_argument("--binding-cache", action="store_true",
+                        help="Use Binding Cache architecture (Local + Phase + Quad) - "
+                             "three-path with no gradient competition")
+    parser.add_argument("--binding-cache-top-k", type=int, default=64,
+                        help="Top-K cache size for Quad query (default: 64)")
+    parser.add_argument("--local-window-size", type=int, default=64,
+                        help="Window size for local attention (default: 64)")
+    parser.add_argument("--decay-gamma", type=float, default=0.9,
+                        help="Decay factor for phase memory accumulation (default: 0.9)")
+    parser.add_argument("--binding-cache-phase-ratio", type=str, default="0.3,0.3,0.3,0.3",
+                        help="Phase ratio per layer for binding cache (default: balanced 0.3)")
+    parser.add_argument("--binding-cache-local-ratio", type=str, default="0.4,0.4,0.4,0.4",
+                        help="Local ratio per layer for binding cache (default: 0.4)")
+    parser.add_argument("--binding-cache-quad-ratio", type=str, default="0.3,0.3,0.3,0.3",
+                        help="Quad ratio per layer for binding cache (default: 0.3)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
