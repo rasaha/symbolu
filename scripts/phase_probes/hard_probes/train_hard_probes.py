@@ -127,6 +127,38 @@ except ImportError as e:
 
 
 # =============================================================================
+# KOSHA SYSTEM IMPORTS (V10.3.4)
+# =============================================================================
+# The 5-layer Kosha model (from Vedantic philosophy):
+#   - Annamaya (Physical/Material): Token/syntax grounding
+#   - Pranamaya (Vital/Energy): Gradient/attention flow
+#   - Manomaya (Mental): Semantic binding
+#   - Vijnanamaya (Intellectual/Wisdom): Abstract reasoning
+#   - Anandamaya (Blissful): Coherence/integration
+
+try:
+    from symbolu.losses.kosha_gyroscope import (
+        KoshaGyroscopicLoss,
+        KoshaPhaseCorrector,
+        KoshaPhaseCorrectorConfig,
+    )
+    from symbolu.sovereign.reasoning_kernel import KoshaShiftController
+    KOSHA_AVAILABLE = True
+except ImportError as e:
+    KOSHA_AVAILABLE = False
+    print(f"Note: Kosha modules not available for import: {e}")
+    print("      Kosha system will use local implementations.")
+
+# Kosha names and indices in 32D Sovereign State
+KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+KOSHA_VEDIC_NAMES = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+KOSHA_INDICES = {
+    'MATERIAL': 12, 'VITAL': 13, 'MENTAL': 14, 'INTELLECTUAL': 15, 'BLISSFUL': 16
+}
+KOSHA_SLICE = slice(12, 17)  # Indices [12:17] in 32D state
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -354,6 +386,640 @@ if not SRK_AVAILABLE:
                     'synthesis_quality': quality.mean().item(),
                 }
             return gated, metrics
+
+
+# =============================================================================
+# LOCAL KOSHA SYSTEM IMPLEMENTATIONS (V10.3.4)
+# =============================================================================
+# Full Kosha (5-sheath) consciousness model with diagnostics
+
+if not KOSHA_AVAILABLE:
+    class KoshaShiftController(nn.Module):
+        """
+        Kosha steering controller - shifts state toward target consciousness layer.
+
+        The 5 Koshas (consciousness sheaths):
+        - MATERIAL (Annamaya): Physical grounding, syntax, data layer
+        - VITAL (Pranamaya): Energy flow, momentum, activation patterns
+        - MENTAL (Manomaya): Semantic meaning, pattern recognition
+        - INTELLECTUAL (Vijnanamaya): Deep reasoning, wisdom patterns
+        - BLISSFUL (Anandamaya): Unity, coherence, creative synthesis
+        """
+
+        def __init__(
+            self,
+            state_dim: int = 32,
+            target_kosha: str = 'INTELLECTUAL',
+            dampen_material: float = 0.5,
+            boost_target: float = 0.4,
+        ):
+            super().__init__()
+            self.state_dim = state_dim
+            self.target_kosha = target_kosha
+            self.dampen_material = dampen_material
+            self.boost_target = boost_target
+
+            # Kosha indices in 32D state [12:17]
+            self.kosha_indices = {
+                'MATERIAL': 12, 'VITAL': 13, 'MENTAL': 14,
+                'INTELLECTUAL': 15, 'BLISSFUL': 16
+            }
+
+            # Learnable steering weights
+            self.kosha_steering = nn.Parameter(torch.zeros(5))
+
+        def get_kosha_activations(self, state: torch.Tensor) -> torch.Tensor:
+            """Extract kosha activations from 32D state. Returns [B, 5]."""
+            return state[:, 12:17]
+
+        def get_dominant_kosha(self, state: torch.Tensor) -> Tuple[str, int]:
+            """Return name and index of dominant kosha."""
+            kosha_acts = self.get_kosha_activations(state)
+            dominant_idx = kosha_acts.mean(dim=0).argmax().item()
+            names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+            return names[dominant_idx], dominant_idx
+
+        def escalate_to_intellect(self, state: torch.Tensor) -> torch.Tensor:
+            """Shift state toward intellectual kosha for reasoning."""
+            state = state.clone()
+            # Dampen material layer
+            state[:, 12] = state[:, 12] * (1 - self.dampen_material)
+            # Boost intellectual layer
+            state[:, 15] = state[:, 15] + self.boost_target
+            return state
+
+        def forward(
+            self,
+            state: torch.Tensor,
+            target: str = None,
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Apply kosha steering to state.
+
+            Args:
+                state: [B, 32] Sovereign state
+                target: Target kosha name (default: self.target_kosha)
+
+            Returns:
+                steered_state: [B, 32]
+                metrics: dict with kosha diagnostics
+            """
+            target = target or self.target_kosha
+
+            # Get current kosha activations
+            kosha_acts = self.get_kosha_activations(state)
+
+            with torch.no_grad():
+                dominant_name, dominant_idx = self.get_dominant_kosha(state)
+                metrics = {
+                    'dominant_kosha': dominant_idx,
+                    'kosha_material': kosha_acts[:, 0].mean().item(),
+                    'kosha_vital': kosha_acts[:, 1].mean().item(),
+                    'kosha_mental': kosha_acts[:, 2].mean().item(),
+                    'kosha_intellectual': kosha_acts[:, 3].mean().item(),
+                    'kosha_blissful': kosha_acts[:, 4].mean().item(),
+                }
+
+            # Apply steering based on target
+            if target == 'INTELLECTUAL':
+                steered_state = self.escalate_to_intellect(state)
+            else:
+                steered_state = state
+
+            return steered_state, metrics
+
+    class KoshaGyroscopicLoss(nn.Module):
+        """
+        Homeostatic self-regulation for Kosha balance.
+
+        Implements harmonic pentad constraints to keep koshas in healthy ranges:
+        - Floor/ceiling for each kosha prevents collapse/dominance
+        - Three-stage logic: Bliss damper → Physical gate → Reality rip
+        - Dynamic gain scheduling based on PPL
+        """
+
+        def __init__(
+            self,
+            # v2.3.0: Floor/Ceiling for each Kosha (harmonic pentad)
+            floor_material: float = 0.382,
+            ceiling_material: float = 0.618,
+            floor_vital: float = 0.236,
+            ceiling_vital: float = 0.786,
+            floor_mental: float = 0.236,
+            ceiling_mental: float = 0.382,
+            floor_intellectual: float = 0.250,
+            ceiling_intellectual: float = 0.618,
+            floor_bliss: float = 0.236,
+            ceiling_bliss: float = 0.618,
+            # Dynamic gain scheduling
+            base_gain: float = 0.15,
+            max_gain: float = 3.0,
+            ppl_ceiling: float = 100.0,
+            target_ppl: float = 30.0,
+        ):
+            super().__init__()
+
+            # Store floor/ceiling constraints
+            self.floors = torch.tensor([
+                floor_material, floor_vital, floor_mental,
+                floor_intellectual, floor_bliss
+            ])
+            self.ceilings = torch.tensor([
+                ceiling_material, ceiling_vital, ceiling_mental,
+                ceiling_intellectual, ceiling_bliss
+            ])
+
+            # Gain scheduling
+            self.base_gain = base_gain
+            self.max_gain = max_gain
+            self.ppl_ceiling = ppl_ceiling
+            self.target_ppl = target_ppl
+
+            # Current gain (updated by set_ppl)
+            self.current_gain = base_gain
+
+        def set_ppl(self, ppl: float):
+            """Update gain based on current PPL."""
+            # Linear interpolation from base_gain (high PPL) to max_gain (target PPL)
+            if ppl >= self.ppl_ceiling:
+                self.current_gain = self.base_gain
+            elif ppl <= self.target_ppl:
+                self.current_gain = self.max_gain
+            else:
+                t = (self.ppl_ceiling - ppl) / (self.ppl_ceiling - self.target_ppl)
+                self.current_gain = self.base_gain + t * (self.max_gain - self.base_gain)
+
+        def forward(
+            self,
+            kosha_activations: torch.Tensor,  # [B, 5]
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Compute gyroscopic loss to maintain kosha homeostasis.
+
+            Returns:
+                loss: scalar
+                metrics: dict with violation counts
+            """
+            device = kosha_activations.device
+            floors = self.floors.to(device)
+            ceilings = self.ceilings.to(device)
+
+            # Floor violations (kosha too low)
+            floor_violations = F.relu(floors - kosha_activations)
+            floor_loss = floor_violations.sum(dim=-1).mean()
+
+            # Ceiling violations (kosha too high)
+            ceiling_violations = F.relu(kosha_activations - ceilings)
+            ceiling_loss = ceiling_violations.sum(dim=-1).mean()
+
+            # Total loss with gain
+            total_loss = self.current_gain * (floor_loss + ceiling_loss)
+
+            with torch.no_grad():
+                metrics = {
+                    'kosha_floor_violations': (floor_violations > 0).sum().item(),
+                    'kosha_ceiling_violations': (ceiling_violations > 0).sum().item(),
+                    'kosha_gyro_loss': total_loss.item(),
+                    'kosha_gyro_gain': self.current_gain,
+                }
+
+            return total_loss, metrics
+
+    class KoshaPhaseCorrector(nn.Module):
+        """
+        Inference-time phase correction for Kosha stability.
+
+        Applies direct phase rotation when a kosha becomes overactive,
+        forcing re-grounding in the appropriate consciousness layer.
+        """
+
+        def __init__(
+            self,
+            overactive_threshold: float = 0.75,
+            correction_strength: float = 0.3,
+            max_correction_per_step: float = 0.2,
+        ):
+            super().__init__()
+            self.overactive_threshold = overactive_threshold
+            self.correction_strength = correction_strength
+            self.max_correction_per_step = max_correction_per_step
+
+        def forward(
+            self,
+            kosha_activations: torch.Tensor,  # [B, 5]
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Apply phase correction for overactive koshas.
+
+            Returns:
+                corrected: [B, 5] corrected activations
+                metrics: dict with correction stats
+            """
+            # Detect overactive koshas
+            overactive = kosha_activations > self.overactive_threshold
+
+            # Apply correction (scale down overactive)
+            correction = torch.where(
+                overactive,
+                kosha_activations * (1 - self.correction_strength),
+                kosha_activations
+            )
+
+            # Clamp correction magnitude
+            delta = (correction - kosha_activations).clamp(
+                -self.max_correction_per_step,
+                self.max_correction_per_step
+            )
+            corrected = kosha_activations + delta
+
+            with torch.no_grad():
+                metrics = {
+                    'kosha_corrections': overactive.sum().item(),
+                    'kosha_correction_magnitude': delta.abs().mean().item(),
+                }
+
+            return corrected, metrics
+
+
+# =============================================================================
+# KOSHA DIAGNOSTICS (V10.3.4)
+# =============================================================================
+
+class KoshaDiagnostics(nn.Module):
+    """
+    Full diagnostic tracking for the 5-layer Kosha consciousness model.
+
+    Tracks:
+    - Per-kosha activation levels over training
+    - Kosha transitions (shifts between consciousness layers)
+    - Homeostatic health (floor/ceiling violations)
+    - Dominant kosha per layer
+
+    Maps transformer layers to koshas:
+    - L0-L2:  MATERIAL (Annamaya) - syntax, tokens
+    - L3-L4:  VITAL (Pranamaya) - energy flow
+    - L5-L6:  MENTAL (Manomaya) - semantics
+    - L7-L8:  INTELLECTUAL (Vijnanamaya) - reasoning
+    - L9+:    BLISSFUL (Anandamaya) - integration
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        num_layers: int,
+        state_dim: int = 32,
+        device: torch.device = None,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.state_dim = state_dim
+
+        # Kosha projector: hidden → 5D kosha space
+        self.kosha_projector = nn.Linear(hidden_dim, 5)
+
+        # Kosha shift controller
+        self.kosha_controller = KoshaShiftController(state_dim=state_dim)
+
+        # Gyroscopic loss for homeostasis
+        self.gyroscope = KoshaGyroscopicLoss()
+
+        # Phase corrector
+        self.corrector = KoshaPhaseCorrector()
+
+        # History for trend analysis
+        self.history = {
+            'kosha_activations': [],  # List of [5] tensors
+            'dominant_kosha': [],     # List of kosha names
+            'gyro_loss': [],
+            'transitions': [],        # (from_kosha, to_kosha, step)
+        }
+
+        self._last_dominant = None
+
+        if device:
+            self.to(device)
+
+    def layer_to_expected_kosha(self, layer_idx: int) -> str:
+        """Map layer index to expected dominant kosha."""
+        if layer_idx <= 2:
+            return 'MATERIAL'
+        elif layer_idx <= 4:
+            return 'VITAL'
+        elif layer_idx <= 6:
+            return 'MENTAL'
+        elif layer_idx <= 8:
+            return 'INTELLECTUAL'
+        else:
+            return 'BLISSFUL'
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        layer_idx: int,
+        step: int = 0,
+    ) -> Dict[str, float]:
+        """
+        Compute kosha diagnostics for a layer's hidden states.
+
+        Returns dict with:
+        - kosha_<name>: activation level for each kosha
+        - dominant_kosha: index of dominant kosha
+        - kosha_alignment: whether dominant matches expected for layer
+        - gyro_loss: homeostatic loss value
+        """
+        # Project to kosha space
+        kosha_acts = torch.sigmoid(self.kosha_projector(hidden_states))  # [B, N, 5]
+        kosha_acts = kosha_acts.mean(dim=1)  # [B, 5] - average over sequence
+
+        # Get dominant kosha
+        dominant_idx = kosha_acts.mean(dim=0).argmax().item()
+        kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+        dominant_name = kosha_names[dominant_idx]
+
+        # Check alignment with expected
+        expected = self.layer_to_expected_kosha(layer_idx)
+        aligned = (dominant_name == expected)
+
+        # Compute gyroscopic loss
+        gyro_loss, gyro_metrics = self.gyroscope(kosha_acts)
+
+        # Track transitions
+        if self._last_dominant is not None and dominant_name != self._last_dominant:
+            self.history['transitions'].append((self._last_dominant, dominant_name, step))
+        self._last_dominant = dominant_name
+
+        # Build metrics
+        metrics = {
+            'kosha_material': kosha_acts[:, 0].mean().item(),
+            'kosha_vital': kosha_acts[:, 1].mean().item(),
+            'kosha_mental': kosha_acts[:, 2].mean().item(),
+            'kosha_intellectual': kosha_acts[:, 3].mean().item(),
+            'kosha_blissful': kosha_acts[:, 4].mean().item(),
+            'dominant_kosha': dominant_idx,
+            'dominant_kosha_name': dominant_name,
+            'expected_kosha': expected,
+            'kosha_alignment': 1.0 if aligned else 0.0,
+            'gyro_loss': gyro_loss.item(),
+            **gyro_metrics,
+        }
+
+        # Store history
+        self.history['kosha_activations'].append(
+            kosha_acts.mean(dim=0).detach().cpu().tolist()
+        )
+        self.history['dominant_kosha'].append(dominant_name)
+        self.history['gyro_loss'].append(gyro_loss.item())
+
+        return metrics
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary statistics over training history."""
+        if not self.history['kosha_activations']:
+            return {}
+
+        # Convert to arrays
+        acts = torch.tensor(self.history['kosha_activations'])  # [num_obs, 5]
+
+        # Compute trends
+        if len(acts) >= 2:
+            early = acts[:len(acts)//2].mean(dim=0)
+            late = acts[len(acts)//2:].mean(dim=0)
+            trends = late - early
+        else:
+            trends = torch.zeros(5)
+
+        # Count dominant kosha occurrences
+        from collections import Counter
+        dominant_counts = Counter(self.history['dominant_kosha'])
+
+        return {
+            'mean_activations': acts.mean(dim=0).tolist(),
+            'std_activations': acts.std(dim=0).tolist(),
+            'trends': trends.tolist(),
+            'dominant_counts': dict(dominant_counts),
+            'num_transitions': len(self.history['transitions']),
+            'transitions': self.history['transitions'][-10:],  # Last 10
+            'mean_gyro_loss': sum(self.history['gyro_loss']) / max(1, len(self.history['gyro_loss'])),
+        }
+
+    def print_report(self, step: int):
+        """Print formatted kosha diagnostics report."""
+        summary = self.get_summary()
+        if not summary:
+            return
+
+        kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+        vedic_names = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+
+        print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  KOSHA CONSCIOUSNESS DIAGNOSTICS @ Step {step:<6}                 ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Layer    Kosha (Sheath)      Activation   Trend    Status       ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        means = summary['mean_activations']
+        trends = summary['trends']
+
+        for i, (name, vedic, mean, trend) in enumerate(zip(kosha_names, vedic_names, means, trends)):
+            trend_symbol = "↑" if trend > 0.01 else ("↓" if trend < -0.01 else "→")
+            health = "HEALTHY" if 0.2 < mean < 0.8 else ("LOW" if mean < 0.2 else "HIGH")
+            health_symbol = "✓" if health == "HEALTHY" else "⚠️"
+            print(f"      ║  {i:2}    {name:12} ({vedic:11})  {mean:5.3f}    {trend:+.3f}{trend_symbol}  {health} {health_symbol}  ║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        # Dominant kosha statistics
+        counts = summary.get('dominant_counts', {})
+        total = sum(counts.values()) or 1
+        print(f"      ║  Dominant Kosha Distribution:                                     ║")
+        for name in kosha_names:
+            count = counts.get(name, 0)
+            pct = 100 * count / total
+            bar = "█" * int(pct / 5)
+            print(f"      ║    {name:12}: {pct:5.1f}% {bar:<20}                  ║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Transitions: {summary['num_transitions']}  |  Gyro Loss: {summary['mean_gyro_loss']:.4f}                  ║")
+        print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
+
+
+# =============================================================================
+# WITNESS DIAGNOSTICS (V10.3.4)
+# =============================================================================
+
+class WitnessDiagnostics(nn.Module):
+    """
+    Full diagnostic tracking for the Witness (Sakshi) observer system.
+
+    The Witness observes thought patterns without attachment, detecting:
+    - Domain arbitration (cross-domain reasoning quality)
+    - Constraint identification (bottleneck detection)
+    - Vritti status (epistemic reliability)
+    - Meta-cognitive monitoring
+
+    Vritti indices in 32D state [17:22]:
+    - FACT: Verified truth
+    - MISCONCEPTION: Believed but wrong
+    - IMAGINATION: Creative/hypothetical
+    - VOID: Unknown/uncertain
+    - MEMORY: Retrieved from context
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        state_dim: int = 32,
+        constraint_threshold: float = 0.85,
+        device: torch.device = None,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        self.constraint_threshold = constraint_threshold
+
+        # Witness projector: hidden → state
+        self.witness_projector = nn.Linear(hidden_dim, state_dim)
+
+        # Vritti classifier: hidden → 5 epistemic states
+        self.vritti_classifier = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, 5),
+            nn.Softmax(dim=-1),
+        )
+
+        # Constraint detector
+        self.constraint_detector = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Sigmoid(),
+        )
+
+        # Meta-cognitive confidence
+        self.confidence_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 4),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 4, 1),
+            nn.Sigmoid(),
+        )
+
+        # History
+        self.history = {
+            'vritti_distributions': [],
+            'constraint_scores': [],
+            'confidence_scores': [],
+            'witness_states': [],
+        }
+
+        if device:
+            self.to(device)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        step: int = 0,
+    ) -> Dict[str, float]:
+        """
+        Compute witness diagnostics for hidden states.
+
+        Returns dict with:
+        - vritti_<name>: probability for each epistemic state
+        - constraint_score: bottleneck detection score
+        - witness_confidence: meta-cognitive confidence
+        - witness_activation: overall witness activity
+        """
+        B, N, D = hidden_states.shape
+
+        # Average over sequence for diagnostics
+        hidden_avg = hidden_states.mean(dim=1)  # [B, D]
+
+        # Vritti classification
+        vritti_probs = self.vritti_classifier(hidden_avg)  # [B, 5]
+
+        # Constraint detection
+        constraint_score = self.constraint_detector(hidden_avg)  # [B, 1]
+
+        # Meta-cognitive confidence
+        confidence = self.confidence_head(hidden_avg)  # [B, 1]
+
+        # Witness state projection
+        witness_state = self.witness_projector(hidden_avg)  # [B, 32]
+
+        vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+
+        metrics = {
+            'vritti_fact': vritti_probs[:, 0].mean().item(),
+            'vritti_misconception': vritti_probs[:, 1].mean().item(),
+            'vritti_imagination': vritti_probs[:, 2].mean().item(),
+            'vritti_void': vritti_probs[:, 3].mean().item(),
+            'vritti_memory': vritti_probs[:, 4].mean().item(),
+            'dominant_vritti': vritti_probs.mean(dim=0).argmax().item(),
+            'dominant_vritti_name': vritti_names[vritti_probs.mean(dim=0).argmax().item()],
+            'constraint_score': constraint_score.mean().item(),
+            'constraint_detected': (constraint_score > self.constraint_threshold).float().mean().item(),
+            'witness_confidence': confidence.mean().item(),
+            'witness_activation': witness_state.abs().mean().item(),
+        }
+
+        # Store history
+        self.history['vritti_distributions'].append(
+            vritti_probs.mean(dim=0).detach().cpu().tolist()
+        )
+        self.history['constraint_scores'].append(constraint_score.mean().item())
+        self.history['confidence_scores'].append(confidence.mean().item())
+
+        return metrics
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary statistics over training history."""
+        if not self.history['vritti_distributions']:
+            return {}
+
+        vritti = torch.tensor(self.history['vritti_distributions'])  # [num_obs, 5]
+        constraints = torch.tensor(self.history['constraint_scores'])
+        confidences = torch.tensor(self.history['confidence_scores'])
+
+        return {
+            'mean_vritti': vritti.mean(dim=0).tolist(),
+            'std_vritti': vritti.std(dim=0).tolist(),
+            'mean_constraint': constraints.mean().item(),
+            'std_constraint': constraints.std().item(),
+            'mean_confidence': confidences.mean().item(),
+            'std_confidence': confidences.std().item(),
+            'high_constraint_ratio': (constraints > self.constraint_threshold).float().mean().item(),
+        }
+
+    def print_report(self, step: int):
+        """Print formatted witness diagnostics report."""
+        summary = self.get_summary()
+        if not summary:
+            return
+
+        vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+
+        print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  WITNESS (SAKSHI) OBSERVER DIAGNOSTICS @ Step {step:<6}            ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Vritti (Epistemic State)      Mean Prob   Std      Status        ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        means = summary['mean_vritti']
+        stds = summary['std_vritti']
+
+        for i, (name, mean, std) in enumerate(zip(vritti_names, means, stds)):
+            bar = "█" * int(mean * 20)
+            dominant = "★" if mean == max(means) else " "
+            print(f"      ║  {name:18}        {mean:5.3f}    {std:5.3f}    {bar:<12} {dominant}║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Constraint Detection:                                            ║")
+        print(f"      ║    Mean Score: {summary['mean_constraint']:.3f}  (threshold: {self.constraint_threshold})      ║")
+        print(f"      ║    Detection Rate: {summary['high_constraint_ratio']*100:.1f}%                              ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Meta-Cognitive Confidence: {summary['mean_confidence']:.3f} ± {summary['std_confidence']:.3f}      ║")
+        print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
 
 
 # =============================================================================
@@ -4118,6 +4784,60 @@ def train_real_language(
     else:
         srk_influence = None
 
+    # ==========================================================================
+    # V10.3.4: KOSHA/WITNESS CONSCIOUSNESS DIAGNOSTICS
+    # ==========================================================================
+    kosha_diagnostics = None
+    witness_diagnostics = None
+
+    if getattr(args, 'enable_kosha', False):
+        kosha_diagnostics = KoshaDiagnostics(
+            hidden_dim=config.d_model,
+            num_layers=config.num_layers,
+            state_dim=SOVEREIGN_STATE_DIM,
+            device=torch.device(config.device),
+        )
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.4: KOSHA CONSCIOUSNESS DIAGNOSTICS ENABLED                 ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  The 5-Layer Kosha Model (Pancha Kosha):                          ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    0. MATERIAL   (Annamaya)     - Token/syntax grounding          ║")
+        print(f"  ║    1. VITAL      (Pranamaya)    - Energy/gradient flow            ║")
+        print(f"  ║    2. MENTAL     (Manomaya)     - Semantic binding                ║")
+        print(f"  ║    3. INTELLECTUAL (Vijnanamaya) - Abstract reasoning             ║")
+        print(f"  ║    4. BLISSFUL   (Anandamaya)   - Coherence/integration           ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Target Kosha: {args.kosha_target:<12}                              ║")
+        print(f"  ║  Dampen Material: {args.kosha_dampen_material:.2f}  |  Boost Target: {args.kosha_boost_target:.2f}       ║")
+        print(f"  ║  Gyroscopic Loss: base={args.kosha_gyro_base_gain:.2f}, max={args.kosha_gyro_max_gain:.2f}            ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
+    if getattr(args, 'enable_witness', False):
+        witness_diagnostics = WitnessDiagnostics(
+            hidden_dim=config.d_model,
+            state_dim=SOVEREIGN_STATE_DIM,
+            constraint_threshold=args.witness_constraint_threshold,
+            device=torch.device(config.device),
+        )
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.4: WITNESS (SAKSHI) OBSERVER DIAGNOSTICS ENABLED           ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  The Witness observes thought patterns without attachment:        ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    Vritti (Epistemic States):                                     ║")
+        print(f"  ║      - FACT: Verified truth                                       ║")
+        print(f"  ║      - MISCONCEPTION: Believed but wrong                          ║")
+        print(f"  ║      - IMAGINATION: Creative/hypothetical                         ║")
+        print(f"  ║      - VOID: Unknown/uncertain                                    ║")
+        print(f"  ║      - MEMORY: Retrieved from context                             ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Constraint Threshold: {args.witness_constraint_threshold:.2f}                               ║")
+        print(f"  ║  Tracks: Domain arbitration, bottleneck detection, meta-cognition ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
@@ -4331,6 +5051,38 @@ def train_real_language(
                             # Print detailed breakdown every 5 evaluations
                             if len(srk_influence.influence_history) % 5 == 0:
                                 srk_influence.print_detailed_layer_report(influence_metrics)
+
+                # V10.3.4: Kosha Consciousness Diagnostics
+                if kosha_diagnostics is not None:
+                    # Forward pass with layer capture
+                    if not layer_hidden_states:
+                        _ = model(x_sample, probe_layers=True)
+                        layer_hidden_states = model.layer_outputs
+
+                    # Analyze each layer's kosha state
+                    for i, hidden in enumerate(layer_hidden_states):
+                        kosha_metrics = kosha_diagnostics(hidden, layer_idx=i, step=step)
+
+                    # Print summary report
+                    kosha_diagnostics.print_report(step)
+
+                # V10.3.4: Witness Observer Diagnostics
+                if witness_diagnostics is not None:
+                    # Forward pass with layer capture
+                    if not layer_hidden_states:
+                        _ = model(x_sample, probe_layers=True)
+                        layer_hidden_states = model.layer_outputs
+
+                    # Use final layer for witness analysis (L9 equivalent)
+                    if layer_hidden_states:
+                        witness_layer_idx = min(2, len(layer_hidden_states) - 1)  # Use late layer
+                        witness_metrics = witness_diagnostics(
+                            layer_hidden_states[witness_layer_idx],
+                            step=step,
+                        )
+
+                    # Print summary report
+                    witness_diagnostics.print_report(step)
 
             print()
             model.train()
@@ -4660,6 +5412,75 @@ def train_real_language(
                 print(f"\n  OVERALL: More layers CONSTRUCTIVE - SRK is helping phase learning!")
             else:
                 print(f"\n  OVERALL: Mixed influence - consider fine-tuning layer positions.")
+
+    # ==========================================================================
+    # V10.3.4: KOSHA/WITNESS FINAL ANALYSIS
+    # ==========================================================================
+    if kosha_diagnostics is not None:
+        print("\n" + "=" * 70)
+        print("KOSHA CONSCIOUSNESS ANALYSIS (V10.3.4)")
+        print("=" * 70)
+        kosha_diagnostics.print_report(step)
+
+        summary = kosha_diagnostics.get_summary()
+        if summary:
+            kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+            vedic_names = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+            means = summary['mean_activations']
+            trends = summary['trends']
+
+            # Find dominant and fastest-growing kosha
+            dominant_idx = means.index(max(means))
+            fastest_idx = trends.index(max(trends))
+
+            print(f"\n  KOSHA CONCLUSIONS:")
+            print(f"  " + "-" * 60)
+            print(f"    Dominant Kosha: {kosha_names[dominant_idx]} ({vedic_names[dominant_idx]})")
+            print(f"    Fastest Growing: {kosha_names[fastest_idx]} ({vedic_names[fastest_idx]})")
+            print(f"    Gyroscopic Loss: {summary['mean_gyro_loss']:.4f}")
+            print(f"    Transitions: {summary['num_transitions']} state changes")
+
+            # Interpretation
+            if dominant_idx == 3:  # INTELLECTUAL
+                print(f"\n    ✓ Model is operating at INTELLECTUAL (Vijnanamaya) level")
+                print(f"      → Good for abstract reasoning and pattern recognition")
+            elif dominant_idx == 4:  # BLISSFUL
+                print(f"\n    ✓ Model reached BLISSFUL (Anandamaya) level")
+                print(f"      → Excellent coherence and integration")
+            elif dominant_idx <= 1:  # MATERIAL or VITAL
+                print(f"\n    ⚠️ Model is stuck at lower consciousness layers")
+                print(f"      → May need more training or kosha steering")
+
+    if witness_diagnostics is not None:
+        print("\n" + "=" * 70)
+        print("WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.4)")
+        print("=" * 70)
+        witness_diagnostics.print_report(step)
+
+        summary = witness_diagnostics.get_summary()
+        if summary:
+            vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+            means = summary['mean_vritti']
+
+            # Find dominant vritti
+            dominant_idx = means.index(max(means))
+
+            print(f"\n  WITNESS CONCLUSIONS:")
+            print(f"  " + "-" * 60)
+            print(f"    Dominant Vritti: {vritti_names[dominant_idx]}")
+            print(f"    Constraint Detection Rate: {summary['high_constraint_ratio']*100:.1f}%")
+            print(f"    Meta-Cognitive Confidence: {summary['mean_confidence']:.3f}")
+
+            # Interpretation
+            if dominant_idx == 0:  # FACT
+                print(f"\n    ✓ Model primarily in FACTUAL epistemic state")
+                print(f"      → High reliability for factual reasoning")
+            elif dominant_idx == 2:  # IMAGINATION
+                print(f"\n    Creative/imaginative state dominant")
+                print(f"      → Good for generative tasks, verify facts carefully")
+            elif dominant_idx == 3:  # VOID
+                print(f"\n    ⚠️ High uncertainty (VOID) detected")
+                print(f"      → Model may need more training or clearer inputs")
 
     return model, best_val_ppl
 
@@ -5428,6 +6249,27 @@ Examples:
                         help="Local ratio per layer for binding cache (default: 0.4)")
     parser.add_argument("--binding-cache-quad-ratio", type=str, default="0.3,0.3,0.3,0.3",
                         help="Quad ratio per layer for binding cache (default: 0.3)")
+
+    # ==========================================================================
+    # V10.3.4: KOSHA/WITNESS CONSCIOUSNESS SYSTEM
+    # ==========================================================================
+    parser.add_argument("--enable-kosha", action="store_true",
+                        help="Enable Kosha (5-layer consciousness) diagnostics")
+    parser.add_argument("--enable-witness", action="store_true",
+                        help="Enable Witness (Sakshi observer) diagnostics")
+    parser.add_argument("--kosha-target", type=str, default="INTELLECTUAL",
+                        choices=["MATERIAL", "VITAL", "MENTAL", "INTELLECTUAL", "BLISSFUL"],
+                        help="Target kosha for steering (default: INTELLECTUAL)")
+    parser.add_argument("--kosha-dampen-material", type=float, default=0.5,
+                        help="Dampen material kosha during reasoning (default: 0.5)")
+    parser.add_argument("--kosha-boost-target", type=float, default=0.4,
+                        help="Boost target kosha strength (default: 0.4)")
+    parser.add_argument("--kosha-gyro-base-gain", type=float, default=0.15,
+                        help="Base gain for kosha homeostatic loss (default: 0.15)")
+    parser.add_argument("--kosha-gyro-max-gain", type=float, default=3.0,
+                        help="Max gain for kosha homeostatic loss (default: 3.0)")
+    parser.add_argument("--witness-constraint-threshold", type=float, default=0.85,
+                        help="Threshold for constraint/bottleneck detection (default: 0.85)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
