@@ -793,9 +793,12 @@ class KoshaDiagnostics(nn.Module):
         from collections import Counter
         dominant_counts = Counter(self.history['dominant_kosha'])
 
+        # Std requires at least 2 samples
+        std_activations = acts.std(dim=0).tolist() if len(acts) >= 2 else [0.0] * 5
+
         return {
             'mean_activations': acts.mean(dim=0).tolist(),
-            'std_activations': acts.std(dim=0).tolist(),
+            'std_activations': std_activations,
             'trends': trends.tolist(),
             'dominant_counts': dict(dominant_counts),
             'num_transitions': len(self.history['transitions']),
@@ -981,13 +984,16 @@ class WitnessDiagnostics(nn.Module):
         constraints = torch.tensor(self.history['constraint_scores'])
         confidences = torch.tensor(self.history['confidence_scores'])
 
+        # Std requires at least 2 samples
+        has_enough_samples = len(vritti) >= 2
+
         return {
             'mean_vritti': vritti.mean(dim=0).tolist(),
-            'std_vritti': vritti.std(dim=0).tolist(),
+            'std_vritti': vritti.std(dim=0).tolist() if has_enough_samples else [0.0] * 5,
             'mean_constraint': constraints.mean().item(),
-            'std_constraint': constraints.std().item(),
+            'std_constraint': constraints.std().item() if has_enough_samples else 0.0,
             'mean_confidence': confidences.mean().item(),
-            'std_confidence': confidences.std().item(),
+            'std_confidence': confidences.std().item() if has_enough_samples else 0.0,
             'high_constraint_ratio': (constraints > self.constraint_threshold).float().mean().item(),
         }
 
