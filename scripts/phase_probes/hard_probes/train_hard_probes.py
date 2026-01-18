@@ -4488,9 +4488,13 @@ class BindingCacheLMBlock(nn.Module):
         local_ratio: float = 0.4,
         phase_ratio: float = 0.3,
         quad_ratio: float = 0.3,
+        proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
+        confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
     ):
         super().__init__()
         self.embed_dim = embed_dim
+        self.proposal_mode = proposal_mode
+        self.confidence_threshold = confidence_threshold
 
         # Store ratios for weighted combination
         self.local_ratio = local_ratio
@@ -4521,6 +4525,7 @@ class BindingCacheLMBlock(nn.Module):
             dropout=dropout,
             top_k=top_k,
             use_cache=use_cache,
+            proposal_mode=proposal_mode,
         )
 
         # Feed-forward
@@ -4533,8 +4538,19 @@ class BindingCacheLMBlock(nn.Module):
             nn.Dropout(dropout),
         )
 
+        # V10.4: Instrumentation for proposal mode
+        self._last_confidence_mean = 0.0
+        self._last_skip_rate = 0.0
+
     def get_phase_health(self) -> dict:
         return self.phase_state.get_health_metrics()
+
+    def get_proposal_metrics(self) -> dict:
+        """V10.4: Return proposal mode instrumentation."""
+        return {
+            "confidence_mean": self._last_confidence_mean,
+            "skip_rate": self._last_skip_rate,
+        }
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -4542,7 +4558,12 @@ class BindingCacheLMBlock(nn.Module):
 
         1. Local attention for syntax
         2. Phase accumulates memory
-        3. Quad queries memory
+        3. Quad queries memory (or proposes in proposal_mode)
+
+        V10.4 Proposal Mode:
+        - Quad returns proposals (no softmax mixing)
+        - Phase integrates proposals with gating
+        - Conditional skip: if phase confident, skip quad
 
         Output = x + (local_ratio * local + phase_ratio * memory + quad_ratio * quad_out) + ff
         """
@@ -4552,8 +4573,25 @@ class BindingCacheLMBlock(nn.Module):
         # Step 2: Phase accumulates memory state
         memory_state = self.phase_state(x)
 
-        # Step 3: Quad queries memory state
-        quad_out = self.quad_query(x, memory_state)
+        if self.proposal_mode:
+            # V10.4: Proposal Mode - quad proposes, phase integrates
+            # Check confidence for conditional skip
+            confidence = self.phase_state.compute_confidence(memory_state)
+
+            with torch.no_grad():
+                self._last_confidence_mean = confidence.mean().item()
+                self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
+
+            # Get proposals from quad (no softmax mixing)
+            proposals, proposal_scores = self.quad_query.get_proposals(x, memory_state)
+
+            # Phase integrates proposals
+            quad_out = self.phase_state.integrate_proposals(
+                x, memory_state, proposals, proposal_scores
+            )
+        else:
+            # Original mode: Quad queries memory state with softmax attention
+            quad_out = self.quad_query(x, memory_state)
 
         # Weighted combination of three paths (with ratios for per-layer tuning)
         # Note: memory_state is passed to quad, but we also add phase contribution directly
@@ -4605,12 +4643,15 @@ class BindingCacheLMTransformer(nn.Module):
         phase_ratios: List[float] = None,
         local_ratios: List[float] = None,
         quad_ratios: List[float] = None,
+        proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
+        confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
     ):
         super().__init__()
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_layers = num_layers
+        self.proposal_mode = proposal_mode
 
         # Default ratios if not specified
         if phase_ratios is None:
@@ -4644,6 +4685,8 @@ class BindingCacheLMTransformer(nn.Module):
                 local_ratio=local_ratios[i],
                 phase_ratio=phase_ratios[i],
                 quad_ratio=quad_ratios[i],
+                proposal_mode=proposal_mode,
+                confidence_threshold=confidence_threshold,
             )
             for i in range(num_layers)
         ])
@@ -4689,6 +4732,35 @@ class BindingCacheLMTransformer(nn.Module):
             "r_k_std": sum(metrics["r_k_std"]) / len(metrics["r_k_std"]) if metrics["r_k_std"] else 0.0,
             "r_k_min": min(metrics["r_k_min"]) if metrics["r_k_min"] else 0.0,
             "r_k_max": max(metrics["r_k_max"]) if metrics["r_k_max"] else 0.0,
+        }
+
+    def get_proposal_metrics(self) -> dict:
+        """
+        V10.4: Aggregate proposal mode metrics from all layers.
+
+        Returns:
+            dict with confidence_mean, skip_rate, and per-layer metrics
+        """
+        if not self.proposal_mode:
+            return {
+                "confidence_mean": 0.0,
+                "skip_rate": 0.0,
+                "per_layer_confidence": [],
+                "per_layer_skip_rate": [],
+            }
+
+        confidence_means = []
+        skip_rates = []
+        for layer in self.layers:
+            metrics = layer.get_proposal_metrics()
+            confidence_means.append(metrics["confidence_mean"])
+            skip_rates.append(metrics["skip_rate"])
+
+        return {
+            "confidence_mean": sum(confidence_means) / len(confidence_means) if confidence_means else 0.0,
+            "skip_rate": sum(skip_rates) / len(skip_rates) if skip_rates else 0.0,
+            "per_layer_confidence": confidence_means,
+            "per_layer_skip_rate": skip_rates,
         }
 
     def update_curriculum(self, new_curriculum: List[float]):
@@ -4962,6 +5034,12 @@ def train_real_language(
         print(f"║    3. QUAD PATH   - O(n*k) Top-K Cache Query                         ║")
         print(f"║       Top-K: {args.binding_cache_top_k}")
         print(f"║       Quadratic attention over cached memories                       ║")
+        if args.proposal_mode:
+            print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+            print(f"║  V10.4 PROPOSAL MODE ENABLED                                          ║")
+            print(f"║    Quad returns K proposals (no softmax mixing)                       ║")
+            print(f"║    Phase integrates proposals with gating                             ║")
+            print(f"║    Confidence threshold: {args.confidence_threshold:.2f}                                      ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
         print(f"║  Per-Layer Ratios:                                                    ║")
         for i in range(config.num_layers):
@@ -4982,6 +5060,8 @@ def train_real_language(
             phase_ratios=bc_phase_ratio,
             local_ratios=bc_local_ratio,
             quad_ratios=bc_quad_ratio,
+            proposal_mode=args.proposal_mode,
+            confidence_threshold=args.confidence_threshold,
         ).to(config.device)
 
     elif use_protected_phase:
@@ -6610,6 +6690,16 @@ Examples:
                              "0.0 = pure content matching (intent ignored), "
                              "0.1 = mild intent influence (recommended), "
                              "1.0 = strong intent influence.")
+
+    # V10.4: Proposal Mode (Quad-as-Proposer, Phase-as-Integrator)
+    parser.add_argument("--proposal-mode", action="store_true",
+                        help="Enable proposal mode: Quad returns K proposals (no softmax mixing), "
+                             "Phase integrates proposals with gating. This reverses the power hierarchy - "
+                             "Phase decides meaning, Quad only proposes. Potential 30-50%% compute savings "
+                             "when phase is confident enough to skip quad.")
+    parser.add_argument("--confidence-threshold", type=float, default=0.7,
+                        help="Threshold for phase confidence to skip quad (default: 0.7). "
+                             "Higher = less skipping, lower = more aggressive skipping.")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
