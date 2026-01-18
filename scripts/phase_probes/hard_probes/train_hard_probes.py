@@ -3533,13 +3533,48 @@ class WikiTextDataset(Dataset):
             text_field = "text"
             ds_label = "WikiText-103"
         elif dataset_name_lower == "bookcorpus":
-            # BookCorpus only has train split
+            # BookCorpus was removed from HuggingFace due to licensing
+            # Try alternatives in order: bookcorpusopen, pg19
             if split != "train":
                 print(f"  [BookCorpus] Warning: Only 'train' split available, using train for {split}")
                 split = "train"
-            ds = load_dataset("bookcorpus", split=split)
-            text_field = "text"
-            ds_label = "BookCorpus"
+
+            ds = None
+            tried = []
+
+            # Try bookcorpusopen first (community-maintained)
+            try:
+                ds = load_dataset("bookcorpusopen", split=split, trust_remote_code=True)
+                ds_label = "BookCorpusOpen"
+                text_field = "text"
+            except Exception as e1:
+                tried.append(f"bookcorpusopen: {e1}")
+
+            # Try pg19 (Project Gutenberg) as fallback
+            if ds is None:
+                try:
+                    ds = load_dataset("pg19", split=split, trust_remote_code=True)
+                    ds_label = "PG19 (Project Gutenberg)"
+                    text_field = "text"
+                except Exception as e2:
+                    tried.append(f"pg19: {e2}")
+
+            # Try plain text dataset as last resort
+            if ds is None:
+                try:
+                    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+                    ds_label = "WikiText-103 (fallback for BookCorpus)"
+                    text_field = "text"
+                    print(f"  [BookCorpus] Warning: BookCorpus unavailable, using WikiText-103 as fallback")
+                except Exception as e3:
+                    tried.append(f"wikitext-103: {e3}")
+
+            if ds is None:
+                raise RuntimeError(
+                    f"BookCorpus is no longer available on HuggingFace.\n"
+                    f"Tried alternatives:\n" + "\n".join(f"  - {t}" for t in tried) + "\n"
+                    f"Suggestion: Use --dataset wikitext103 or --dataset wikisection instead."
+                )
         elif dataset_name_lower == "wikisection":
             # WikiSection has train/validation/test splits
             # Map to the actual split names in the dataset
