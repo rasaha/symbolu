@@ -9309,6 +9309,14 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix - enabled by default)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    # Separates content similarity from intent alignment to prevent intent from dominating:
+    #   s_content = cos(φ_q - φ_k)           # What matches (preserved)
+    #   s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+    #   score = s_content * (1 + α * s_align) # Combined
+    dual_channel_mode: bool = False  # Enable dual-channel attention
+    alignment_authority: float = 0.1  # α: weight for alignment term (0=pure content, higher=more intent influence)
+
     # Phase Rotation Test (validates phase encodes relational structure)
     phase_rotation: bool = False  # Run phase rotation test after training
     phase_rotation_angles: str = "0,45,90,135,180,270"  # Angles to test (degrees)
@@ -9992,6 +10000,10 @@ class UnifiedTrainingConfig:
     jepa_enable_karma_injection: bool = False  # Enable karma injection from SRK
     jepa_karma_gate_bias: float = 0.5        # Initial gate bias (0=internal, 1=external)
 
+    # V10.3.7: Vritti Entropy Regularization (prevents single-vritti collapse)
+    vritti_entropy_reg: bool = False       # Enable entropy regularization for vritti
+    vritti_entropy_lambda: float = 0.1     # Weight for entropy regularization
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -10557,6 +10569,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             protected_phase=use_protected_phase,  # V10.2.1: Protected Phase for chunking
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
@@ -10567,6 +10581,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
         if config.zero_mean_cosine:
             print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
+        if config.dual_channel_mode:
+            print(f"  Dual-Channel Mode: ENABLED (α={config.alignment_authority})")  # V10.3.8
         # V10.2.1: Log chunking settings
         if config.enable_chunking:
             print(f"  Chunking: ENABLED (chunk_size={config.chunk_size})")
@@ -10642,6 +10658,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10658,6 +10676,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
         if config.zero_mean_cosine:
             print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
+        if config.dual_channel_mode:
+            print(f"    Dual-Channel Mode: ENABLED (α={config.alignment_authority})")  # V10.3.8
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     elif config.model_type == "binding_cache":
@@ -15513,6 +15533,25 @@ def train(config: UnifiedTrainingConfig):
                                     metrics['mental_vikalpa_corr'] = alignment_diag.get('mental_vikalpa_corr', 0.0)
                                     metrics['vital_nidra_corr'] = alignment_diag.get('vital_nidra_corr', 0.0)
 
+                                # V10.3.7: Vritti entropy regularization to prevent collapse
+                                if config.vritti_entropy_reg and vritti_states_for_res is not None:
+                                    # vritti_states_for_res shape: [B, seq, 5] or [B, 1, 5]
+                                    # Apply softmax if not already normalized
+                                    vritti_probs = F.softmax(vritti_states_for_res, dim=-1)
+                                    eps = 1e-8
+                                    # Compute entropy: H = -Σ p*log(p)
+                                    vritti_entropy = -(vritti_probs * torch.log(vritti_probs + eps)).sum(dim=-1)
+                                    # Average over batch and sequence
+                                    mean_entropy = vritti_entropy.mean()
+                                    # We want to MAXIMIZE entropy, so subtract from loss (or add negative)
+                                    entropy_loss = -config.vritti_entropy_lambda * mean_entropy
+                                    loss = loss + entropy_loss
+                                    # Log metrics
+                                    max_entropy = math.log(5)  # log(5) ≈ 1.609
+                                    metrics['vritti_entropy'] = mean_entropy.item()
+                                    metrics['vritti_entropy_norm'] = mean_entropy.item() / max_entropy
+                                    metrics['vritti_entropy_loss'] = entropy_loss.item()
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [KOSHA GYROSCOPE] Error: {e}")
@@ -18164,6 +18203,19 @@ def main():
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    parser.add_argument("--dual_channel_mode", action="store_true",
+                       help="Enable dual-channel attention: separates content similarity from intent alignment. "
+                            "s_content = cos(φ_q - φ_k) (what matches), "
+                            "s_align = cos(θ_JEPA - θ_SRK) (intent agreement), "
+                            "score = s_content * (1 + α * s_align). "
+                            "Prevents intent from dominating content selectivity.")
+    parser.add_argument("--alignment_authority", type=float, default=0.1,
+                       help="α: Weight for alignment term in dual-channel mode (default: 0.1). "
+                            "0.0 = pure content matching (intent ignored), "
+                            "0.1 = mild intent influence (recommended), "
+                            "1.0 = strong intent influence.")
+
     # Phase Rotation Test (validates phase encodes relational structure)
     parser.add_argument("--phase_rotation", action="store_true",
                        help="Run phase rotation test after training to verify phase encodes relations. "
@@ -19042,6 +19094,12 @@ def main():
     parser.add_argument("--jepa_karma_gate_bias", type=float, default=0.5,
                        help="Initial gate bias for karma blending (0=internal, 1=external)")
 
+    # V10.3.7: Vritti Entropy Regularization
+    parser.add_argument("--vritti_entropy_reg", action="store_true",
+                       help="Enable entropy regularization to prevent vritti collapse")
+    parser.add_argument("--vritti_entropy_lambda", type=float, default=0.1,
+                       help="Weight for vritti entropy regularization (higher = more balanced)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -19119,6 +19177,9 @@ def main():
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
         bounded_phase=args.bounded_phase,  # V9.9.11: Phase collapse fix 1
         zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+        # V10.3.8: Dual-Channel Attention
+        dual_channel_mode=args.dual_channel_mode,
+        alignment_authority=args.alignment_authority,
         # Phase Rotation Test
         phase_rotation=args.phase_rotation,
         phase_rotation_angles=args.phase_rotation_angles,
@@ -19561,6 +19622,9 @@ def main():
         # JEPA-SRK Integration
         jepa_enable_karma_injection=args.jepa_enable_karma_injection,
         jepa_karma_gate_bias=args.jepa_karma_gate_bias,
+        # V10.3.7: Vritti Entropy Regularization
+        vritti_entropy_reg=args.vritti_entropy_reg,
+        vritti_entropy_lambda=args.vritti_entropy_lambda,
         # V10.2.1: Chunking for long sequences
         enable_chunking=args.enable_chunking,
         chunk_size=args.chunk_size,

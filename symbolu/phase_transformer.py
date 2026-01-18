@@ -1296,6 +1296,9 @@ class PhaseAttentionLayer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+        dual_channel_mode: bool = False,  # Separate content and alignment scores
+        alignment_authority: float = 0.1,  # α: weight for alignment term
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -1306,6 +1309,15 @@ class PhaseAttentionLayer(nn.Module):
         # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
         self.bounded_phase = bounded_phase  # π*sin() bounds φ to S¹ manifold
         self.zero_mean_cosine = zero_mean_cosine  # Center cosine to force selectivity
+
+        # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+        # Instead of collapsing intent into a single cosine, keep content and alignment separate:
+        #   s_content = cos(φ_q - φ_k)           # What matches (content similarity)
+        #   s_align = cos(θ_JEPA - θ_SRK)        # Are we aligned (intent agreement)
+        #   score = s_content * (1 + α * s_align) # Modulated combination
+        # This prevents intent from dominating and losing content selectivity.
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         # V9.6.12: Cosine mode for interaction kernel
         assert cosine_mode in ("standard", "shifted", "complex"), \
@@ -1453,6 +1465,8 @@ class PhaseAttentionLayer(nn.Module):
         causal_mask: bool = True,
         phase_context: Optional[Dict[str, torch.Tensor]] = None,
         intent_phase: Optional[torch.Tensor] = None,
+        intent_phase_query: Optional[torch.Tensor] = None,  # V10.3.8: θ_JEPA (Sensor)
+        intent_phase_key: Optional[torch.Tensor] = None,    # V10.3.8: θ_SRK (Master)
         prev_state: Optional[torch.Tensor] = None,
         prev_norm_state: Optional[torch.Tensor] = None,
         return_state: bool = False,
@@ -1465,6 +1479,13 @@ class PhaseAttentionLayer(nn.Module):
         to maintain temporal continuity. This is critical for Phase to work
         as a true temporal memory, not just per-chunk memory.
 
+        V10.3.8: Dual-Channel Attention Mode
+        When dual_channel_mode=True, content and alignment are computed separately:
+            s_content = cos(φ_q - φ_k)           # What matches
+            s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement
+            score = s_content * (1 + α * s_align) # Combined
+        This prevents intent from dominating content selectivity during training.
+
         Args:
             x: [B, N, D] input tensor
             causal_mask: Apply causal masking (always True for complex cumsum)
@@ -1472,6 +1493,11 @@ class PhaseAttentionLayer(nn.Module):
             intent_phase: Optional [B, H] or [B, H, D_h] or [B, T, H, D_h] phase rotation
                          from Ontological State Delta. Rotates query phasors to change
                          how tokens relate based on intent/understanding.
+                         (Legacy - use intent_phase_query for dual-channel mode)
+            intent_phase_query: V10.3.8 - θ_JEPA from Sensor (JEPA prediction).
+                               Affects Query side: "What am I looking for?"
+            intent_phase_key: V10.3.8 - θ_SRK from Master (SRK understanding).
+                             Affects Key side: "What do I understand?"
             prev_state: Optional [B, 1, H, D_h] complex tensor - accumulated KV state
                        from previous chunk. If provided, this is prepended to cumsum.
                        CRITICAL: Do NOT detach this - gradients must flow through time!
@@ -1537,22 +1563,50 @@ class PhaseAttentionLayer(nn.Module):
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
         # =====================================================================
-        # If intent_phase is provided, rotate query phases by the intent signal.
-        # This changes HOW tokens relate to each other based on understanding.
-        # φ_q' = φ_q + θ_intent (from Ontological State Delta)
-        if intent_phase is not None:
-            # Handle different intent_phase shapes:
-            # [B, H] → broadcast to [B, 1, H, 1] for all positions and dims
-            # [B, H, D_h] → broadcast to [B, 1, H, D_h] for all positions
-            # [B, T, H, D_h] → use directly (per-position intent)
-            if intent_phase.dim() == 2:
-                # [B, H] → [B, 1, H, 1]
-                intent_phase = intent_phase.unsqueeze(1).unsqueeze(-1)
-            elif intent_phase.dim() == 3:
-                # [B, H, D_h] → [B, 1, H, D_h]
-                intent_phase = intent_phase.unsqueeze(1)
-            # [B, T, H, D_h] or broadcasted shape
-            phi_q = phi_q + intent_phase
+        # V10.3.8: Dual-Channel Mode vs Legacy Mode
+        #
+        # LEGACY MODE (dual_channel_mode=False):
+        #   φ_q' = φ_q + θ_intent  (collapsed into single cosine)
+        #   score = cos(φ_q + θ_intent - φ_k)
+        #   Risk: Intent can dominate, losing content selectivity
+        #
+        # DUAL-CHANNEL MODE (dual_channel_mode=True):
+        #   Keep φ_q and φ_k pure for content matching
+        #   s_content = cos(φ_q - φ_k)           # What matches
+        #   s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement
+        #   score = s_content * (1 + α * s_align) # Modulated
+        #   Benefit: Content cannot be overwritten by intent
+
+        # Helper function to normalize intent_phase shape
+        def _normalize_intent_shape(ip: torch.Tensor) -> torch.Tensor:
+            if ip.dim() == 2:
+                return ip.unsqueeze(1).unsqueeze(-1)  # [B, H] → [B, 1, H, 1]
+            elif ip.dim() == 3:
+                return ip.unsqueeze(1)  # [B, H, D_h] → [B, 1, H, D_h]
+            return ip  # [B, T, H, D_h] → use directly
+
+        # Store intent phases for dual-channel computation
+        theta_jepa = None  # θ_JEPA (Sensor/Query side)
+        theta_srk = None   # θ_SRK (Master/Key side)
+
+        if self.dual_channel_mode:
+            # V10.3.8: Dual-channel mode - keep phases pure, store intent separately
+            # Prefer explicit intent_phase_query/key over legacy intent_phase
+            if intent_phase_query is not None:
+                theta_jepa = _normalize_intent_shape(intent_phase_query)
+            elif intent_phase is not None:
+                # Backward compatibility: treat intent_phase as query-side
+                theta_jepa = _normalize_intent_shape(intent_phase)
+
+            if intent_phase_key is not None:
+                theta_srk = _normalize_intent_shape(intent_phase_key)
+            # Note: phi_q and phi_k remain PURE content phases
+        else:
+            # Legacy mode: collapse intent into query phase
+            effective_intent = intent_phase_query if intent_phase_query is not None else intent_phase
+            if effective_intent is not None:
+                effective_intent = _normalize_intent_shape(effective_intent)
+                phi_q = phi_q + effective_intent
 
         # =====================================================================
         # 2. Project Values (content)
@@ -1774,6 +1828,26 @@ class PhaseAttentionLayer(nn.Module):
             # Project complex → real via learned linear layer: [B, N, 2*D] → [B, N, D]
             sync_output = self.complex_to_real(complex_concat)
 
+            # V10.3.8: Dual-Channel Alignment Modulation for complex mode
+            if self.dual_channel_mode and (theta_jepa is not None or theta_srk is not None):
+                if theta_jepa is not None and theta_srk is not None:
+                    theta_diff = theta_jepa - theta_srk
+                elif theta_jepa is not None:
+                    theta_diff = theta_jepa
+                else:
+                    theta_diff = theta_srk
+                s_align = torch.cos(theta_diff)
+                # For complex mode, sync_output is [B, N, D], need to broadcast s_align
+                # s_align is [B, 1, H, 1] or similar, reshape to [B, 1, D] for broadcast
+                s_align_flat = s_align.mean(dim=-1).view(s_align.shape[0], s_align.shape[1], -1)
+                # Broadcast to [B, N, D]
+                if s_align_flat.shape[1] == 1:
+                    s_align_flat = s_align_flat.expand(-1, N, -1)
+                if s_align_flat.shape[2] != D:
+                    s_align_flat = s_align_flat.mean(dim=-1, keepdim=True).expand(-1, -1, D)
+                alignment_modulator = 1.0 + self.alignment_authority * s_align_flat
+                sync_output = sync_output * alignment_modulator
+
             # Early return for complex mode (dtype already handled)
             output = self.out_proj(sync_output)
             output = self.dropout(output)
@@ -1790,6 +1864,39 @@ class PhaseAttentionLayer(nn.Module):
             if phase_context is not None:
                 return result, None
             return result
+
+        # =====================================================================
+        # 5.5. V10.3.8: Dual-Channel Alignment Modulation
+        # =====================================================================
+        # If dual_channel_mode is enabled and we have intent phases,
+        # modulate the content score by the alignment term:
+        #   sync_output = sync_output * (1 + α * s_align)
+        # where s_align = cos(θ_JEPA - θ_SRK)
+        #
+        # This keeps content selectivity while allowing intent to boost/suppress.
+        if self.dual_channel_mode and (theta_jepa is not None or theta_srk is not None):
+            # Use zeros for missing intent phases
+            if theta_jepa is not None and theta_srk is not None:
+                # Both provided - full alignment computation
+                # Broadcast to match sync_output shape [B, N, H, D_h]
+                theta_diff = theta_jepa - theta_srk
+            elif theta_jepa is not None:
+                # Only JEPA - alignment is just cos(θ_JEPA)
+                theta_diff = theta_jepa
+            else:
+                # Only SRK - alignment is cos(-θ_SRK) = cos(θ_SRK)
+                theta_diff = theta_srk
+
+            # s_align = cos(θ_JEPA - θ_SRK), range [-1, +1]
+            s_align = torch.cos(theta_diff)  # [B, 1, H, 1] or [B, N, H, D_h]
+
+            # Modulate: score = s_content * (1 + α * s_align)
+            # α is alignment_authority, controls how much intent affects attention
+            # α=0: pure content matching (intent ignored)
+            # α=0.1: mild intent influence (recommended default)
+            # α=1.0: strong intent influence (can dominate)
+            alignment_modulator = 1.0 + self.alignment_authority * s_align
+            sync_output = sync_output * alignment_modulator
 
         # Cast back to original dtype if we converted (for standard/shifted modes)
         if orig_dtype == torch.bfloat16:
@@ -1959,6 +2066,20 @@ class BindingCachePhaseState(nn.Module):
     - memory_state = cumsum(k_phasor * v_complex) [O(n) STATE]
     - When protected, Phase shows -50% ablation drop (ESSENTIAL)
     - When mixed with Quad, Phase shows ~0% drop (DECORATIVE)
+
+    V10.3.8: Dual-Channel Architecture Role
+    ----------------------------------------
+    In the Master/Sensor duality:
+    - This class handles the BACKWARD Key phasor (-iφ_k)
+    - SRK (Master) influences Key storage via intent_phase: φ_k' = φ_k + θ_SRK
+    - "What do I understand?" → How bindings are stored
+
+    The Query side (JEPA/Sensor) is handled by BindingCacheQuadQuery:
+    - "What am I looking for?" → How bindings are retrieved
+
+    This natural separation already implements the dual-channel concept for
+    Protected Phase architecture. The PhaseAttentionLayer.dual_channel_mode
+    provides the same separation for standard phase attention.
     """
 
     def __init__(
@@ -4205,6 +4326,8 @@ class HybridAttentionLayer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
+        alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2: Protected Phase pattern (default=True)
     ):
         super().__init__()
@@ -4248,6 +4371,8 @@ class HybridAttentionLayer(nn.Module):
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -4497,6 +4622,8 @@ class HybridTransformerBlock(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
+        alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
     ):
         super().__init__()
@@ -4520,6 +4647,8 @@ class HybridTransformerBlock(nn.Module):
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -4967,6 +5096,8 @@ class HybridPhaseTransformer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
+        alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
     ):
         super().__init__()
@@ -4974,6 +5105,10 @@ class HybridPhaseTransformer(nn.Module):
         # V9.9.11: Store phase collapse fix flags
         self.bounded_phase = bounded_phase
         self.zero_mean_cosine = zero_mean_cosine
+
+        # V10.3.8: Dual-channel attention parameters
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         # V10.2.1: Protected Phase pattern - Local cross-attends to Phase memory
         self.protected_phase = protected_phase
@@ -5027,6 +5162,8 @@ class HybridPhaseTransformer(nn.Module):
                     learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
                     bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
                     zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+                    dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
+                    alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
                     protected_phase=protected_phase,  # V10.2.1: Protected Phase for chunking
                 ))
 
@@ -5641,6 +5778,8 @@ class OntologicalHybridTransformer(nn.Module):
         learned_decay: bool = False,  # V9.9.7: Per-head learned decay
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
+        alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
     ):
         super().__init__()
 
@@ -5665,6 +5804,8 @@ class OntologicalHybridTransformer(nn.Module):
             learned_decay=learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]

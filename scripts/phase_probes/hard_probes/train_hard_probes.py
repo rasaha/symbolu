@@ -90,6 +90,75 @@ from torch.utils.data import Dataset, DataLoader
 
 
 # =============================================================================
+# SRK (SOVEREIGN REASONING KERNEL) IMPORTS
+# =============================================================================
+# V10.3.0: Enable SRK to monitor how phase learning progresses at different layers
+# SRK provides auxiliary components at:
+#   - L4: DNA Bridge (Foundational Ontology)
+#   - L7: CSR Alignment Phase Extraction Hook
+#   - L9: Witness Arbitrator (Consciousness/Attention)
+#   - L11: Synthesis Gate (Output Integration)
+
+try:
+    from symbolu.sovereign import (
+        SRKConfig,
+        SovereignReasoningKernel,
+        OntologicalBridge,
+        WitnessArbitrator,
+        SynthesisGate,
+        PhaseExtractionHook,
+        SOVEREIGN_STATE_DIM,
+        BHAVA_NAMES,
+        KOSHA_NAMES,
+        VRITTI_NAMES,
+        GUNA_NAMES,
+    )
+    from symbolu.sovereign.sovereign_loss import (
+        SovereignLossConfig as SRKLossConfig,
+        SovereignLoss as SRKLoss,
+        SovereignAnnealer,
+    )
+    SRK_AVAILABLE = True
+except ImportError as e:
+    SRK_AVAILABLE = False
+    SOVEREIGN_STATE_DIM = 32  # Fallback: 12 Bhava + 5 Kosha + 5 Vritti + 6 Guna + 4 Reserved
+    print(f"Note: SRK modules not available for import: {e}")
+    print("      SRK phase learning will use local implementations.")
+
+
+# =============================================================================
+# KOSHA SYSTEM IMPORTS (V10.3.4)
+# =============================================================================
+# The 5-layer Kosha model (from Vedantic philosophy):
+#   - Annamaya (Physical/Material): Token/syntax grounding
+#   - Pranamaya (Vital/Energy): Gradient/attention flow
+#   - Manomaya (Mental): Semantic binding
+#   - Vijnanamaya (Intellectual/Wisdom): Abstract reasoning
+#   - Anandamaya (Blissful): Coherence/integration
+
+try:
+    from symbolu.losses.kosha_gyroscope import (
+        KoshaGyroscopicLoss,
+        KoshaPhaseCorrector,
+        KoshaPhaseCorrectorConfig,
+    )
+    from symbolu.sovereign.reasoning_kernel import KoshaShiftController
+    KOSHA_AVAILABLE = True
+except ImportError as e:
+    KOSHA_AVAILABLE = False
+    print(f"Note: Kosha modules not available for import: {e}")
+    print("      Kosha system will use local implementations.")
+
+# Kosha names and indices in 32D Sovereign State
+KOSHA_NAMES = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+KOSHA_VEDIC_NAMES = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+KOSHA_INDICES = {
+    'MATERIAL': 12, 'VITAL': 13, 'MENTAL': 14, 'INTELLECTUAL': 15, 'BLISSFUL': 16
+}
+KOSHA_SLICE = slice(12, 17)  # Indices [12:17] in 32D state
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -128,8 +197,1463 @@ class Config:
     # Phase collapse fix
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin()
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    # Separates content similarity from intent alignment:
+    #   s_content = cos(φ_q - φ_k)           # What matches (preserved)
+    #   s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+    #   score = s_content * (1 + α * s_align) # Combined
+    dual_channel_mode: bool = False  # Enable dual-channel attention
+    alignment_authority: float = 0.1  # α: weight for alignment term
+
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+# =============================================================================
+# SRK PHASE LEARNING CONFIGURATION
+# =============================================================================
+# V10.3.0: SRK (Sovereign Reasoning Kernel) monitors how phase learns at layers
+#
+# Layer Components:
+#   L4:  DNA Bridge - Foundational ontology grounding (12D Bhava projection)
+#   L7:  CSR Alignment - Phase Extraction Hook for coherence
+#   L9:  Witness Arbitrator - Consciousness/attention arbitration
+#   L11: Synthesis Gate - Output integration and quality filtering
+
+@dataclass
+class SRKPhaseLearningConfig:
+    """Configuration for SRK phase learning monitoring."""
+    # Enable SRK phase learning monitoring
+    enable_srk: bool = False
+
+    # Layer attachment points (must match model's num_layers)
+    dna_bridge_layer: int = 4       # L4: DNA Bridge
+    csr_alignment_layer: int = 7    # L7: CSR Alignment / Phase Extraction
+    witness_layer: int = 9          # L9: Witness Arbitrator
+    synthesis_layer: int = 11       # L11: Synthesis Gate
+
+    # Component toggles
+    enable_dna_bridge: bool = True      # Enable DNA Bridge at L4
+    enable_phase_hook: bool = True      # Enable Phase Extraction at L7
+    enable_witness: bool = True         # Enable Witness Arbitrator at L9
+    enable_synthesis: bool = True       # Enable Synthesis Gate at L11
+
+    # Phase learning metrics
+    track_phase_coherence: bool = True  # Track phase coherence over training
+    track_bhava_diversity: bool = True  # Track 12D ontological diversity
+    track_layer_contributions: bool = True  # Track per-layer PPL contribution
+
+    # Loss weights for SRK components (optional auxiliary losses)
+    lambda_ontology: float = 0.1        # Ontological alignment loss weight
+    lambda_coherence: float = 0.05      # Phase coherence loss weight
+
+    # State dimension (32D Sovereign State)
+    state_dim: int = SOVEREIGN_STATE_DIM
+
+    def validate_for_model(self, num_layers: int):
+        """Validate layer indices against model's actual layer count."""
+        max_layer = num_layers - 1
+        warnings = []
+
+        if self.dna_bridge_layer > max_layer:
+            warnings.append(f"DNA Bridge layer {self.dna_bridge_layer} > max layer {max_layer}, adjusting to {min(3, max_layer)}")
+            self.dna_bridge_layer = min(3, max_layer)
+
+        if self.csr_alignment_layer > max_layer:
+            warnings.append(f"CSR layer {self.csr_alignment_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.csr_alignment_layer = max_layer
+
+        if self.witness_layer > max_layer:
+            warnings.append(f"Witness layer {self.witness_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.witness_layer = max_layer
+
+        if self.synthesis_layer > max_layer:
+            warnings.append(f"Synthesis layer {self.synthesis_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.synthesis_layer = max_layer
+
+        return warnings
+
+
+# =============================================================================
+# LOCAL SRK COMPONENT IMPLEMENTATIONS (Fallback when imports fail)
+# =============================================================================
+
+if not SRK_AVAILABLE:
+    # Local implementation of OntologicalBridge for Layer 4
+    class OntologicalBridge(nn.Module):
+        """
+        L4: DNA Bridge - Projects hidden states to 12D ontological space.
+
+        Creates a foundational ontological "signature" early in processing,
+        grounding the model's internal representation in the 12 Aspects.
+        """
+        def __init__(self, hidden_dim: int, onto_dim: int = 12):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.onto_dim = onto_dim
+            self.onto_proj = nn.Linear(hidden_dim, onto_dim, bias=False)
+            self.onto_norm = nn.LayerNorm(onto_dim)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Project hidden states to 12D ontological space."""
+            onto_repr = self.onto_proj(hidden_states)  # [B, N, 12]
+            onto_repr = self.onto_norm(onto_repr)
+
+            with torch.no_grad():
+                aspect_means = onto_repr.mean(dim=[0, 1])
+                diversity = aspect_means.std().item()
+                metrics = {
+                    'onto_diversity': diversity,
+                    'onto_mean_activation': aspect_means.abs().mean().item(),
+                }
+            return onto_repr, metrics
+
+    # Local implementation of PhaseExtractionHook for Layer 7
+    class PhaseExtractionHook(nn.Module):
+        """
+        L7: CSR Alignment - Extracts phase information from attention.
+
+        Non-invasive hook that captures rotational phase from Q-K interaction
+        for phase coherence analysis.
+        """
+        def __init__(self, hidden_dim: int, num_heads: int = 8):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.num_heads = num_heads
+            self.phase_proj = nn.Linear(hidden_dim, num_heads)
+            self._last_phases = None
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Extract phase representation from hidden states."""
+            phases = self.phase_proj(hidden_states)  # [B, N, num_heads]
+            # Normalize to [-π, π] using sin
+            phases = math.pi * torch.sin(phases)
+            self._last_phases = phases.detach()
+
+            with torch.no_grad():
+                # Compute phase coherence (mean resultant length)
+                z = torch.exp(1j * phases.float())
+                R_k = torch.abs(z.mean(dim=1)).mean().item()
+                metrics = {
+                    'phase_coherence': R_k,
+                    'phase_std': phases.std().item(),
+                }
+            return phases, metrics
+
+    # Local implementation of WitnessArbitrator for Layer 9
+    class WitnessArbitrator(nn.Module):
+        """
+        L9: Witness Arbitrator - Cross-domain attention arbitration.
+
+        Performs domain arbitration based on consciousness/attention patterns.
+        Does NOT look at words, only CONSTRAINTS.
+        """
+        def __init__(self, hidden_dim: int, state_dim: int = 32):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.state_dim = state_dim
+            self.witness_proj = nn.Linear(hidden_dim, state_dim, bias=False)
+            self.witness_norm = nn.LayerNorm(state_dim)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Perform witness arbitration on hidden states."""
+            witnessed = self.witness_proj(hidden_states)  # [B, N, state_dim]
+            witnessed = self.witness_norm(witnessed)
+
+            with torch.no_grad():
+                # Compute arbitration metrics
+                state_mean = witnessed.mean(dim=[0, 1])
+                metrics = {
+                    'witness_activation': state_mean.abs().mean().item(),
+                    'witness_variance': witnessed.var().item(),
+                }
+            return witnessed, metrics
+
+    # Local implementation of SynthesisGate for Layer 11
+    class SynthesisGate(nn.Module):
+        """
+        L11: Synthesis Gate - Final output integration and quality filter.
+
+        Detects entropy collapse (stuttering) and filters low-quality outputs.
+        """
+        def __init__(self, hidden_dim: int):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.gate_proj = nn.Linear(hidden_dim, hidden_dim)
+            self.quality_proj = nn.Linear(hidden_dim, 1)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Apply synthesis gate to hidden states."""
+            gate = torch.sigmoid(self.gate_proj(hidden_states))
+            quality = torch.sigmoid(self.quality_proj(hidden_states))
+            gated = hidden_states * gate
+
+            with torch.no_grad():
+                metrics = {
+                    'synthesis_gate_mean': gate.mean().item(),
+                    'synthesis_quality': quality.mean().item(),
+                }
+            return gated, metrics
+
+
+# =============================================================================
+# LOCAL KOSHA SYSTEM IMPLEMENTATIONS (V10.3.4)
+# =============================================================================
+# Full Kosha (5-sheath) consciousness model with diagnostics
+
+if not KOSHA_AVAILABLE:
+    class KoshaShiftController(nn.Module):
+        """
+        Kosha steering controller - shifts state toward target consciousness layer.
+
+        The 5 Koshas (consciousness sheaths):
+        - MATERIAL (Annamaya): Physical grounding, syntax, data layer
+        - VITAL (Pranamaya): Energy flow, momentum, activation patterns
+        - MENTAL (Manomaya): Semantic meaning, pattern recognition
+        - INTELLECTUAL (Vijnanamaya): Deep reasoning, wisdom patterns
+        - BLISSFUL (Anandamaya): Unity, coherence, creative synthesis
+        """
+
+        def __init__(
+            self,
+            state_dim: int = 32,
+            target_kosha: str = 'INTELLECTUAL',
+            dampen_material: float = 0.5,
+            boost_target: float = 0.4,
+        ):
+            super().__init__()
+            self.state_dim = state_dim
+            self.target_kosha = target_kosha
+            self.dampen_material = dampen_material
+            self.boost_target = boost_target
+
+            # Kosha indices in 32D state [12:17]
+            self.kosha_indices = {
+                'MATERIAL': 12, 'VITAL': 13, 'MENTAL': 14,
+                'INTELLECTUAL': 15, 'BLISSFUL': 16
+            }
+
+            # Learnable steering weights
+            self.kosha_steering = nn.Parameter(torch.zeros(5))
+
+        def get_kosha_activations(self, state: torch.Tensor) -> torch.Tensor:
+            """Extract kosha activations from 32D state. Returns [B, 5]."""
+            return state[:, 12:17]
+
+        def get_dominant_kosha(self, state: torch.Tensor) -> Tuple[str, int]:
+            """Return name and index of dominant kosha."""
+            kosha_acts = self.get_kosha_activations(state)
+            dominant_idx = kosha_acts.mean(dim=0).argmax().item()
+            names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+            return names[dominant_idx], dominant_idx
+
+        def escalate_to_intellect(self, state: torch.Tensor) -> torch.Tensor:
+            """Shift state toward intellectual kosha for reasoning."""
+            state = state.clone()
+            # Dampen material layer
+            state[:, 12] = state[:, 12] * (1 - self.dampen_material)
+            # Boost intellectual layer
+            state[:, 15] = state[:, 15] + self.boost_target
+            return state
+
+        def forward(
+            self,
+            state: torch.Tensor,
+            target: str = None,
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Apply kosha steering to state.
+
+            Args:
+                state: [B, 32] Sovereign state
+                target: Target kosha name (default: self.target_kosha)
+
+            Returns:
+                steered_state: [B, 32]
+                metrics: dict with kosha diagnostics
+            """
+            target = target or self.target_kosha
+
+            # Get current kosha activations
+            kosha_acts = self.get_kosha_activations(state)
+
+            with torch.no_grad():
+                dominant_name, dominant_idx = self.get_dominant_kosha(state)
+                metrics = {
+                    'dominant_kosha': dominant_idx,
+                    'kosha_material': kosha_acts[:, 0].mean().item(),
+                    'kosha_vital': kosha_acts[:, 1].mean().item(),
+                    'kosha_mental': kosha_acts[:, 2].mean().item(),
+                    'kosha_intellectual': kosha_acts[:, 3].mean().item(),
+                    'kosha_blissful': kosha_acts[:, 4].mean().item(),
+                }
+
+            # Apply steering based on target
+            if target == 'INTELLECTUAL':
+                steered_state = self.escalate_to_intellect(state)
+            else:
+                steered_state = state
+
+            return steered_state, metrics
+
+    class KoshaGyroscopicLoss(nn.Module):
+        """
+        Homeostatic self-regulation for Kosha balance.
+
+        Implements harmonic pentad constraints to keep koshas in healthy ranges:
+        - Floor/ceiling for each kosha prevents collapse/dominance
+        - Three-stage logic: Bliss damper → Physical gate → Reality rip
+        - Dynamic gain scheduling based on PPL
+        """
+
+        def __init__(
+            self,
+            # v2.3.0: Floor/Ceiling for each Kosha (harmonic pentad)
+            floor_material: float = 0.382,
+            ceiling_material: float = 0.618,
+            floor_vital: float = 0.236,
+            ceiling_vital: float = 0.786,
+            floor_mental: float = 0.236,
+            ceiling_mental: float = 0.382,
+            floor_intellectual: float = 0.250,
+            ceiling_intellectual: float = 0.618,
+            floor_bliss: float = 0.236,
+            ceiling_bliss: float = 0.618,
+            # Dynamic gain scheduling
+            base_gain: float = 0.15,
+            max_gain: float = 3.0,
+            ppl_ceiling: float = 100.0,
+            target_ppl: float = 30.0,
+        ):
+            super().__init__()
+
+            # Store floor/ceiling constraints
+            self.floors = torch.tensor([
+                floor_material, floor_vital, floor_mental,
+                floor_intellectual, floor_bliss
+            ])
+            self.ceilings = torch.tensor([
+                ceiling_material, ceiling_vital, ceiling_mental,
+                ceiling_intellectual, ceiling_bliss
+            ])
+
+            # Gain scheduling
+            self.base_gain = base_gain
+            self.max_gain = max_gain
+            self.ppl_ceiling = ppl_ceiling
+            self.target_ppl = target_ppl
+
+            # Current gain (updated by set_ppl)
+            self.current_gain = base_gain
+
+        def set_ppl(self, ppl: float):
+            """Update gain based on current PPL."""
+            # Linear interpolation from base_gain (high PPL) to max_gain (target PPL)
+            if ppl >= self.ppl_ceiling:
+                self.current_gain = self.base_gain
+            elif ppl <= self.target_ppl:
+                self.current_gain = self.max_gain
+            else:
+                t = (self.ppl_ceiling - ppl) / (self.ppl_ceiling - self.target_ppl)
+                self.current_gain = self.base_gain + t * (self.max_gain - self.base_gain)
+
+        def forward(
+            self,
+            kosha_activations: torch.Tensor,  # [B, 5]
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Compute gyroscopic loss to maintain kosha homeostasis.
+
+            Returns:
+                loss: scalar
+                metrics: dict with violation counts
+            """
+            device = kosha_activations.device
+            floors = self.floors.to(device)
+            ceilings = self.ceilings.to(device)
+
+            # Floor violations (kosha too low)
+            floor_violations = F.relu(floors - kosha_activations)
+            floor_loss = floor_violations.sum(dim=-1).mean()
+
+            # Ceiling violations (kosha too high)
+            ceiling_violations = F.relu(kosha_activations - ceilings)
+            ceiling_loss = ceiling_violations.sum(dim=-1).mean()
+
+            # Total loss with gain
+            total_loss = self.current_gain * (floor_loss + ceiling_loss)
+
+            with torch.no_grad():
+                metrics = {
+                    'kosha_floor_violations': (floor_violations > 0).sum().item(),
+                    'kosha_ceiling_violations': (ceiling_violations > 0).sum().item(),
+                    'kosha_gyro_loss': total_loss.item(),
+                    'kosha_gyro_gain': self.current_gain,
+                }
+
+            return total_loss, metrics
+
+    class KoshaPhaseCorrector(nn.Module):
+        """
+        Inference-time phase correction for Kosha stability.
+
+        Applies direct phase rotation when a kosha becomes overactive,
+        forcing re-grounding in the appropriate consciousness layer.
+        """
+
+        def __init__(
+            self,
+            overactive_threshold: float = 0.75,
+            correction_strength: float = 0.3,
+            max_correction_per_step: float = 0.2,
+        ):
+            super().__init__()
+            self.overactive_threshold = overactive_threshold
+            self.correction_strength = correction_strength
+            self.max_correction_per_step = max_correction_per_step
+
+        def forward(
+            self,
+            kosha_activations: torch.Tensor,  # [B, 5]
+        ) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """
+            Apply phase correction for overactive koshas.
+
+            Returns:
+                corrected: [B, 5] corrected activations
+                metrics: dict with correction stats
+            """
+            # Detect overactive koshas
+            overactive = kosha_activations > self.overactive_threshold
+
+            # Apply correction (scale down overactive)
+            correction = torch.where(
+                overactive,
+                kosha_activations * (1 - self.correction_strength),
+                kosha_activations
+            )
+
+            # Clamp correction magnitude
+            delta = (correction - kosha_activations).clamp(
+                -self.max_correction_per_step,
+                self.max_correction_per_step
+            )
+            corrected = kosha_activations + delta
+
+            with torch.no_grad():
+                metrics = {
+                    'kosha_corrections': overactive.sum().item(),
+                    'kosha_correction_magnitude': delta.abs().mean().item(),
+                }
+
+            return corrected, metrics
+
+
+# =============================================================================
+# KOSHA DIAGNOSTICS (V10.3.4)
+# =============================================================================
+
+class KoshaDiagnostics(nn.Module):
+    """
+    Full diagnostic tracking for the 5-layer Kosha consciousness model.
+
+    Tracks:
+    - Per-kosha activation levels over training
+    - Kosha transitions (shifts between consciousness layers)
+    - Homeostatic health (floor/ceiling violations)
+    - Dominant kosha per layer
+
+    Maps transformer layers to koshas:
+    - L0-L2:  MATERIAL (Annamaya) - syntax, tokens
+    - L3-L4:  VITAL (Pranamaya) - energy flow
+    - L5-L6:  MENTAL (Manomaya) - semantics
+    - L7-L8:  INTELLECTUAL (Vijnanamaya) - reasoning
+    - L9+:    BLISSFUL (Anandamaya) - integration
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        num_layers: int,
+        state_dim: int = 32,
+        device: torch.device = None,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.state_dim = state_dim
+
+        # Kosha projector: hidden → 5D kosha space
+        self.kosha_projector = nn.Linear(hidden_dim, 5)
+
+        # Kosha shift controller
+        self.kosha_controller = KoshaShiftController(state_dim=state_dim)
+
+        # Gyroscopic loss for homeostasis
+        self.gyroscope = KoshaGyroscopicLoss()
+
+        # Phase corrector
+        self.corrector = KoshaPhaseCorrector()
+
+        # History for trend analysis
+        self.history = {
+            'kosha_activations': [],  # List of [5] tensors
+            'dominant_kosha': [],     # List of kosha names
+            'gyro_loss': [],
+            'transitions': [],        # (from_kosha, to_kosha, step)
+        }
+
+        self._last_dominant = None
+
+        if device:
+            self.to(device)
+
+    def layer_to_expected_kosha(self, layer_idx: int) -> str:
+        """Map layer index to expected dominant kosha."""
+        if layer_idx <= 2:
+            return 'MATERIAL'
+        elif layer_idx <= 4:
+            return 'VITAL'
+        elif layer_idx <= 6:
+            return 'MENTAL'
+        elif layer_idx <= 8:
+            return 'INTELLECTUAL'
+        else:
+            return 'BLISSFUL'
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        layer_idx: int,
+        step: int = 0,
+    ) -> Dict[str, float]:
+        """
+        Compute kosha diagnostics for a layer's hidden states.
+
+        Returns dict with:
+        - kosha_<name>: activation level for each kosha
+        - dominant_kosha: index of dominant kosha
+        - kosha_alignment: whether dominant matches expected for layer
+        - gyro_loss: homeostatic loss value
+        """
+        # Project to kosha space
+        kosha_acts = torch.sigmoid(self.kosha_projector(hidden_states))  # [B, N, 5]
+        kosha_acts = kosha_acts.mean(dim=1)  # [B, 5] - average over sequence
+
+        # Get dominant kosha
+        dominant_idx = kosha_acts.mean(dim=0).argmax().item()
+        kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+        dominant_name = kosha_names[dominant_idx]
+
+        # Check alignment with expected
+        expected = self.layer_to_expected_kosha(layer_idx)
+        aligned = (dominant_name == expected)
+
+        # Compute gyroscopic loss
+        gyro_loss, gyro_metrics = self.gyroscope(kosha_acts)
+
+        # Track transitions
+        if self._last_dominant is not None and dominant_name != self._last_dominant:
+            self.history['transitions'].append((self._last_dominant, dominant_name, step))
+        self._last_dominant = dominant_name
+
+        # Build metrics
+        metrics = {
+            'kosha_material': kosha_acts[:, 0].mean().item(),
+            'kosha_vital': kosha_acts[:, 1].mean().item(),
+            'kosha_mental': kosha_acts[:, 2].mean().item(),
+            'kosha_intellectual': kosha_acts[:, 3].mean().item(),
+            'kosha_blissful': kosha_acts[:, 4].mean().item(),
+            'dominant_kosha': dominant_idx,
+            'dominant_kosha_name': dominant_name,
+            'expected_kosha': expected,
+            'kosha_alignment': 1.0 if aligned else 0.0,
+            'gyro_loss': gyro_loss.item(),
+            **gyro_metrics,
+        }
+
+        # Store history
+        self.history['kosha_activations'].append(
+            kosha_acts.mean(dim=0).detach().cpu().tolist()
+        )
+        self.history['dominant_kosha'].append(dominant_name)
+        self.history['gyro_loss'].append(gyro_loss.item())
+
+        return metrics
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary statistics over training history."""
+        if not self.history['kosha_activations']:
+            return {}
+
+        # Convert to arrays
+        acts = torch.tensor(self.history['kosha_activations'])  # [num_obs, 5]
+
+        # Compute trends
+        if len(acts) >= 2:
+            early = acts[:len(acts)//2].mean(dim=0)
+            late = acts[len(acts)//2:].mean(dim=0)
+            trends = late - early
+        else:
+            trends = torch.zeros(5)
+
+        # Count dominant kosha occurrences
+        from collections import Counter
+        dominant_counts = Counter(self.history['dominant_kosha'])
+
+        # Std requires at least 2 samples
+        std_activations = acts.std(dim=0).tolist() if len(acts) >= 2 else [0.0] * 5
+
+        return {
+            'mean_activations': acts.mean(dim=0).tolist(),
+            'std_activations': std_activations,
+            'trends': trends.tolist(),
+            'dominant_counts': dict(dominant_counts),
+            'num_transitions': len(self.history['transitions']),
+            'transitions': self.history['transitions'][-10:],  # Last 10
+            'mean_gyro_loss': sum(self.history['gyro_loss']) / max(1, len(self.history['gyro_loss'])),
+        }
+
+    def print_report(self, step: int):
+        """Print formatted kosha diagnostics report."""
+        summary = self.get_summary()
+        if not summary:
+            return
+
+        kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+        vedic_names = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+
+        print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  KOSHA CONSCIOUSNESS DIAGNOSTICS @ Step {step:<6}                 ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Layer    Kosha (Sheath)      Activation   Trend    Status       ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        means = summary['mean_activations']
+        trends = summary['trends']
+
+        for i, (name, vedic, mean, trend) in enumerate(zip(kosha_names, vedic_names, means, trends)):
+            trend_symbol = "↑" if trend > 0.01 else ("↓" if trend < -0.01 else "→")
+            health = "HEALTHY" if 0.2 < mean < 0.8 else ("LOW" if mean < 0.2 else "HIGH")
+            health_symbol = "✓" if health == "HEALTHY" else "⚠️"
+            print(f"      ║  {i:2}    {name:12} ({vedic:11})  {mean:5.3f}    {trend:+.3f}{trend_symbol}  {health} {health_symbol}  ║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        # Dominant kosha statistics
+        counts = summary.get('dominant_counts', {})
+        total = sum(counts.values()) or 1
+        print(f"      ║  Dominant Kosha Distribution:                                     ║")
+        for name in kosha_names:
+            count = counts.get(name, 0)
+            pct = 100 * count / total
+            bar = "█" * int(pct / 5)
+            print(f"      ║    {name:12}: {pct:5.1f}% {bar:<20}                  ║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Transitions: {summary['num_transitions']}  |  Gyro Loss: {summary['mean_gyro_loss']:.4f}                  ║")
+        print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
+
+
+# =============================================================================
+# WITNESS DIAGNOSTICS (V10.3.4)
+# =============================================================================
+
+class WitnessDiagnostics(nn.Module):
+    """
+    Full diagnostic tracking for the Witness (Sakshi) observer system.
+
+    The Witness observes thought patterns without attachment, detecting:
+    - Domain arbitration (cross-domain reasoning quality)
+    - Constraint identification (bottleneck detection)
+    - Vritti status (epistemic reliability)
+    - Meta-cognitive monitoring
+
+    Vritti indices in 32D state [17:22]:
+    - FACT: Verified truth
+    - MISCONCEPTION: Believed but wrong
+    - IMAGINATION: Creative/hypothetical
+    - VOID: Unknown/uncertain
+    - MEMORY: Retrieved from context
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        state_dim: int = 32,
+        constraint_threshold: float = 0.85,
+        device: torch.device = None,
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        self.constraint_threshold = constraint_threshold
+
+        # Witness projector: hidden → state
+        self.witness_projector = nn.Linear(hidden_dim, state_dim)
+
+        # Vritti classifier: hidden → 5 epistemic states
+        self.vritti_classifier = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, 5),
+            nn.Softmax(dim=-1),
+        )
+
+        # Constraint detector
+        self.constraint_detector = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Sigmoid(),
+        )
+
+        # Meta-cognitive confidence
+        self.confidence_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 4),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 4, 1),
+            nn.Sigmoid(),
+        )
+
+        # History
+        self.history = {
+            'vritti_distributions': [],
+            'constraint_scores': [],
+            'confidence_scores': [],
+            'witness_states': [],
+        }
+
+        if device:
+            self.to(device)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,  # [B, N, D]
+        step: int = 0,
+    ) -> Dict[str, float]:
+        """
+        Compute witness diagnostics for hidden states.
+
+        Returns dict with:
+        - vritti_<name>: probability for each epistemic state
+        - constraint_score: bottleneck detection score
+        - witness_confidence: meta-cognitive confidence
+        - witness_activation: overall witness activity
+        """
+        B, N, D = hidden_states.shape
+
+        # Average over sequence for diagnostics
+        hidden_avg = hidden_states.mean(dim=1)  # [B, D]
+
+        # Vritti classification
+        vritti_probs = self.vritti_classifier(hidden_avg)  # [B, 5]
+
+        # V10.3.7: Compute vritti entropy for regularization
+        # Higher entropy = more balanced distribution across epistemic states
+        eps = 1e-8
+        vritti_entropy = -(vritti_probs * torch.log(vritti_probs + eps)).sum(dim=-1)  # [B]
+        # Max entropy for 5 classes = log(5) ≈ 1.609
+        max_entropy = torch.log(torch.tensor(5.0, device=vritti_probs.device))
+        normalized_entropy = vritti_entropy / max_entropy  # [B], range [0, 1]
+
+        # Store for loss computation (with gradient)
+        self._last_vritti_probs = vritti_probs
+        self._last_vritti_entropy = vritti_entropy
+
+        # Constraint detection
+        constraint_score = self.constraint_detector(hidden_avg)  # [B, 1]
+
+        # Meta-cognitive confidence
+        confidence = self.confidence_head(hidden_avg)  # [B, 1]
+
+        # Witness state projection
+        witness_state = self.witness_projector(hidden_avg)  # [B, 32]
+
+        vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+
+        metrics = {
+            'vritti_fact': vritti_probs[:, 0].mean().item(),
+            'vritti_misconception': vritti_probs[:, 1].mean().item(),
+            'vritti_imagination': vritti_probs[:, 2].mean().item(),
+            'vritti_void': vritti_probs[:, 3].mean().item(),
+            'vritti_memory': vritti_probs[:, 4].mean().item(),
+            'dominant_vritti': vritti_probs.mean(dim=0).argmax().item(),
+            'dominant_vritti_name': vritti_names[vritti_probs.mean(dim=0).argmax().item()],
+            'constraint_score': constraint_score.mean().item(),
+            'constraint_detected': (constraint_score > self.constraint_threshold).float().mean().item(),
+            'witness_confidence': confidence.mean().item(),
+            'witness_activation': witness_state.abs().mean().item(),
+            # V10.3.7: Entropy metrics
+            'vritti_entropy': vritti_entropy.mean().item(),
+            'vritti_entropy_normalized': normalized_entropy.mean().item(),
+        }
+
+        # Store history
+        self.history['vritti_distributions'].append(
+            vritti_probs.mean(dim=0).detach().cpu().tolist()
+        )
+        self.history['constraint_scores'].append(constraint_score.mean().item())
+        self.history['confidence_scores'].append(confidence.mean().item())
+
+        return metrics
+
+    def get_entropy_loss(self, lambda_entropy: float = 0.1) -> torch.Tensor:
+        """
+        V10.3.7: Compute entropy regularization loss to prevent vritti collapse.
+
+        Returns negative entropy (to be added to loss, encouraging higher entropy).
+        Higher entropy = more balanced distribution across 5 vritti states.
+
+        Args:
+            lambda_entropy: Weight for entropy regularization (default: 0.1)
+
+        Returns:
+            Entropy loss tensor (negative entropy scaled by lambda)
+        """
+        if not hasattr(self, '_last_vritti_entropy') or self._last_vritti_entropy is None:
+            return torch.tensor(0.0)
+
+        # We want to MAXIMIZE entropy, so we return NEGATIVE entropy
+        # Adding this to loss will encourage higher entropy (more balanced distribution)
+        entropy_loss = -lambda_entropy * self._last_vritti_entropy.mean()
+        return entropy_loss
+
+    def get_summary(self) -> Dict[str, any]:
+        """Get summary statistics over training history."""
+        if not self.history['vritti_distributions']:
+            return {}
+
+        vritti = torch.tensor(self.history['vritti_distributions'])  # [num_obs, 5]
+        constraints = torch.tensor(self.history['constraint_scores'])
+        confidences = torch.tensor(self.history['confidence_scores'])
+
+        # Std requires at least 2 samples
+        has_enough_samples = len(vritti) >= 2
+
+        return {
+            'mean_vritti': vritti.mean(dim=0).tolist(),
+            'std_vritti': vritti.std(dim=0).tolist() if has_enough_samples else [0.0] * 5,
+            'mean_constraint': constraints.mean().item(),
+            'std_constraint': constraints.std().item() if has_enough_samples else 0.0,
+            'mean_confidence': confidences.mean().item(),
+            'std_confidence': confidences.std().item() if has_enough_samples else 0.0,
+            'high_constraint_ratio': (constraints > self.constraint_threshold).float().mean().item(),
+        }
+
+    def print_report(self, step: int):
+        """Print formatted witness diagnostics report."""
+        summary = self.get_summary()
+        if not summary:
+            return
+
+        vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+
+        print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  WITNESS (SAKSHI) OBSERVER DIAGNOSTICS @ Step {step:<6}            ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Vritti (Epistemic State)      Mean Prob   Std      Status        ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+        means = summary['mean_vritti']
+        stds = summary['std_vritti']
+
+        for i, (name, mean, std) in enumerate(zip(vritti_names, means, stds)):
+            bar = "█" * int(mean * 20)
+            dominant = "★" if mean == max(means) else " "
+            print(f"      ║  {name:18}        {mean:5.3f}    {std:5.3f}    {bar:<12} {dominant}║")
+
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Constraint Detection:                                            ║")
+        print(f"      ║    Mean Score: {summary['mean_constraint']:.3f}  (threshold: {self.constraint_threshold})      ║")
+        print(f"      ║    Detection Rate: {summary['high_constraint_ratio']*100:.1f}%                              ║")
+        print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Meta-Cognitive Confidence: {summary['mean_confidence']:.3f} ± {summary['std_confidence']:.3f}      ║")
+        print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
+
+
+# =============================================================================
+# SRK PHASE LEARNING MONITOR
+# =============================================================================
+
+class SRKPhaseLearningMonitor(nn.Module):
+    """
+    Monitors how phase learning progresses at different layers.
+
+    Attaches SRK components at specified layers and tracks:
+    - Phase coherence (R_k metric)
+    - Ontological diversity (12D Bhava representation)
+    - Layer-wise contributions to final output
+    - Consciousness/attention patterns
+
+    Usage:
+        monitor = SRKPhaseLearningMonitor(config, hidden_dim, num_heads, device)
+        metrics = monitor.observe(layer_hidden_states)  # List of [B, N, D] per layer
+    """
+
+    def __init__(
+        self,
+        config: SRKPhaseLearningConfig,
+        hidden_dim: int,
+        num_heads: int,
+        device: torch.device,
+    ):
+        super().__init__()
+        self.config = config
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+
+        # Create components
+        if config.enable_dna_bridge:
+            self.dna_bridge = OntologicalBridge(hidden_dim).to(device)
+        else:
+            self.dna_bridge = None
+
+        if config.enable_phase_hook:
+            self.phase_hook = PhaseExtractionHook(hidden_dim, num_heads).to(device)
+        else:
+            self.phase_hook = None
+
+        if config.enable_witness:
+            self.witness = WitnessArbitrator(hidden_dim, config.state_dim).to(device)
+        else:
+            self.witness = None
+
+        if config.enable_synthesis:
+            self.synthesis = SynthesisGate(hidden_dim).to(device)
+        else:
+            self.synthesis = None
+
+        # Training history
+        self.metrics_history = []
+
+    def observe(
+        self,
+        layer_hidden_states: List[torch.Tensor],  # List of [B, N, D] per layer
+    ) -> Dict[str, float]:
+        """
+        Observe phase learning at each SRK-monitored layer.
+
+        Args:
+            layer_hidden_states: Hidden states from each layer [B, N, D]
+
+        Returns:
+            Dictionary of metrics from all SRK components
+        """
+        metrics = {}
+        num_layers = len(layer_hidden_states)
+
+        # L4: DNA Bridge (if layer exists)
+        if self.dna_bridge is not None and self.config.dna_bridge_layer < num_layers:
+            h = layer_hidden_states[self.config.dna_bridge_layer]
+            _, dna_metrics = self.dna_bridge(h)
+            metrics.update({f'L{self.config.dna_bridge_layer}_dna_{k}': v for k, v in dna_metrics.items()})
+
+        # L7: Phase Hook (if layer exists)
+        if self.phase_hook is not None and self.config.csr_alignment_layer < num_layers:
+            h = layer_hidden_states[self.config.csr_alignment_layer]
+            _, phase_metrics = self.phase_hook(h)
+            metrics.update({f'L{self.config.csr_alignment_layer}_csr_{k}': v for k, v in phase_metrics.items()})
+
+        # L9: Witness Arbitrator (if layer exists)
+        if self.witness is not None and self.config.witness_layer < num_layers:
+            h = layer_hidden_states[self.config.witness_layer]
+            _, witness_metrics = self.witness(h)
+            metrics.update({f'L{self.config.witness_layer}_witness_{k}': v for k, v in witness_metrics.items()})
+
+        # L11: Synthesis Gate (if layer exists)
+        if self.synthesis is not None and self.config.synthesis_layer < num_layers:
+            h = layer_hidden_states[self.config.synthesis_layer]
+            _, synthesis_metrics = self.synthesis(h)
+            metrics.update({f'L{self.config.synthesis_layer}_synth_{k}': v for k, v in synthesis_metrics.items()})
+
+        # Track history for trend analysis
+        self.metrics_history.append(metrics.copy())
+
+        return metrics
+
+    def get_phase_learning_summary(self) -> Dict[str, any]:
+        """
+        Generate a summary of phase learning progress.
+
+        Returns trends and statistics across training.
+        """
+        if not self.metrics_history:
+            return {}
+
+        summary = {
+            'num_observations': len(self.metrics_history),
+        }
+
+        # Compute trends for key metrics
+        for key in self.metrics_history[-1].keys():
+            values = [m.get(key, 0) for m in self.metrics_history]
+            if values:
+                summary[f'{key}_initial'] = values[0]
+                summary[f'{key}_final'] = values[-1]
+                summary[f'{key}_trend'] = values[-1] - values[0]  # Positive = increased
+
+        return summary
+
+    def print_phase_learning_report(self):
+        """Print a formatted report of phase learning progress."""
+        summary = self.get_phase_learning_summary()
+        if not summary:
+            print("  No SRK observations recorded yet.")
+            return
+
+        print("\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print("  ║  SRK PHASE LEARNING REPORT (V10.3.0)                             ║")
+        print("  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Observations: {summary['num_observations']:>6}                                         ║")
+        print("  ╠══════════════════════════════════════════════════════════════════╣")
+
+        # Component reports
+        if self.config.enable_dna_bridge:
+            key_base = f'L{self.config.dna_bridge_layer}_dna_'
+            div_trend = summary.get(f'{key_base}onto_diversity_trend', 0)
+            print(f"  ║  L{self.config.dna_bridge_layer}: DNA Bridge (Ontology)                                    ║")
+            print(f"  ║    Diversity trend: {div_trend:+.4f} ({'↑' if div_trend > 0 else '↓'})                            ║")
+
+        if self.config.enable_phase_hook:
+            key_base = f'L{self.config.csr_alignment_layer}_csr_'
+            coh_trend = summary.get(f'{key_base}phase_coherence_trend', 0)
+            print(f"  ║  L{self.config.csr_alignment_layer}: CSR Alignment (Phase Hook)                              ║")
+            print(f"  ║    Coherence trend: {coh_trend:+.4f} ({'↑' if coh_trend > 0 else '↓'})                             ║")
+
+        if self.config.enable_witness:
+            key_base = f'L{self.config.witness_layer}_witness_'
+            act_trend = summary.get(f'{key_base}witness_activation_trend', 0)
+            print(f"  ║  L{self.config.witness_layer}: Witness Arbitrator (Consciousness)                        ║")
+            print(f"  ║    Activation trend: {act_trend:+.4f} ({'↑' if act_trend > 0 else '↓'})                            ║")
+
+        if self.config.enable_synthesis:
+            key_base = f'L{self.config.synthesis_layer}_synth_'
+            gate_trend = summary.get(f'{key_base}synthesis_gate_mean_trend', 0)
+            print(f"  ║  L{self.config.synthesis_layer}: Synthesis Gate (Integration)                             ║")
+            print(f"  ║    Gate mean trend: {gate_trend:+.4f} ({'↑' if gate_trend > 0 else '↓'})                             ║")
+
+        print("  ╚══════════════════════════════════════════════════════════════════╝")
+
+
+# =============================================================================
+# V10.3.1: LAYER INFLUENCE DIAGNOSTICS
+# =============================================================================
+# Analyzes whether each SRK component layer influences phase learning
+# CONSTRUCTIVELY (helps) or DESTRUCTIVELY (hurts)
+#
+# Influence Classification:
+#   CONSTRUCTIVE (+): Component helps phase learning
+#   NEUTRAL (○):      Component has minimal effect
+#   DESTRUCTIVE (-):  Component hurts phase learning
+
+class InfluenceType(Enum):
+    """Classification of layer influence on phase learning."""
+    CONSTRUCTIVE = "CONSTRUCTIVE"
+    NEUTRAL = "NEUTRAL"
+    DESTRUCTIVE = "DESTRUCTIVE"
+
+
+@dataclass
+class LayerInfluenceMetrics:
+    """Metrics for a single layer's influence on phase learning."""
+    layer_idx: int
+    component_name: str
+    influence_type: InfluenceType
+    influence_score: float  # -1.0 (destructive) to +1.0 (constructive)
+
+    # Detailed metrics
+    phase_preservation: float  # How much phase signal is preserved (0-1)
+    phase_amplification: float  # Phase signal amplification factor
+    gradient_flow: float  # Gradient magnitude through this layer
+    entropy_delta: float  # Change in representation entropy
+
+    # Diagnostic flags
+    causes_collapse: bool  # True if layer causes phase collapse
+    causes_diffusion: bool  # True if layer diffuses phase signal
+    is_bottleneck: bool  # True if layer blocks gradient flow
+
+    def get_influence_symbol(self) -> str:
+        """Get symbol for influence type."""
+        if self.influence_type == InfluenceType.CONSTRUCTIVE:
+            return "+"
+        elif self.influence_type == InfluenceType.DESTRUCTIVE:
+            return "-"
+        else:
+            return "○"
+
+    def get_influence_bar(self, width: int = 20) -> str:
+        """Get visual bar representation of influence score."""
+        # Score ranges from -1 to +1, map to 0 to width
+        normalized = (self.influence_score + 1) / 2  # 0 to 1
+        filled = int(normalized * width)
+        center = width // 2
+
+        bar = ""
+        for i in range(width):
+            if i == center:
+                bar += "│"
+            elif i < center and i >= filled:
+                bar += "◀" if filled < center else "─"
+            elif i > center and i <= filled:
+                bar += "▶" if filled > center else "─"
+            elif i < filled and i < center:
+                bar += "█"
+            elif i > filled and i > center:
+                bar += "░"
+            else:
+                bar += "░" if i < center else "░"
+
+        return bar
+
+
+class LayerInfluenceDiagnostics:
+    """
+    Diagnoses whether each SRK layer influences phase learning constructively
+    or destructively.
+
+    Constructive Influence (helps phase learning):
+    - Increases phase coherence (R_k metric)
+    - Maintains ontological diversity
+    - Preserves phase signal through layer
+    - Allows healthy gradient flow
+
+    Destructive Influence (hurts phase learning):
+    - Causes phase collapse (uniform phases)
+    - Reduces ontological diversity
+    - Diffuses or erases phase signal
+    - Blocks gradient flow (vanishing gradients)
+
+    Usage:
+        diagnostics = LayerInfluenceDiagnostics(config)
+        influence = diagnostics.analyze(
+            layer_hidden_states,
+            prev_metrics,
+            curr_metrics
+        )
+    """
+
+    def __init__(self, config: SRKPhaseLearningConfig):
+        self.config = config
+
+        # Thresholds for influence classification
+        self.constructive_threshold = 0.2   # Score > 0.2 = constructive
+        self.destructive_threshold = -0.2   # Score < -0.2 = destructive
+
+        # Phase health thresholds
+        self.collapse_threshold = 0.1       # R_k < 0.1 = collapsed
+        self.diffusion_threshold = 0.95     # R_k > 0.95 = diffused (too uniform)
+        self.gradient_threshold = 1e-6      # Gradient < this = blocked
+
+        # History for trend analysis
+        self.influence_history: List[Dict[int, LayerInfluenceMetrics]] = []
+
+    def compute_phase_metrics(
+        self,
+        hidden_states: torch.Tensor,
+        num_heads: int = 8,
+    ) -> Dict[str, float]:
+        """
+        Compute phase-related metrics from hidden states.
+
+        Returns metrics useful for influence analysis.
+        """
+        with torch.no_grad():
+            B, N, D = hidden_states.shape
+
+            # Compute pseudo-phase from hidden states
+            # Using the first few dimensions as "phase-like" signal
+            phase_dims = min(D, num_heads * 4)
+            phase_signal = hidden_states[..., :phase_dims]
+
+            # Phase coherence approximation (mean resultant length)
+            # Treat normalized hidden states as unit vectors
+            normalized = F.normalize(phase_signal, dim=-1)
+            mean_vector = normalized.mean(dim=1)  # [B, phase_dims]
+            coherence = torch.norm(mean_vector, dim=-1).mean().item()
+
+            # Phase variance (spread of phase signal)
+            phase_var = phase_signal.var(dim=-1).mean().item()
+
+            # Entropy of hidden state distribution
+            # Use softmax to get "probability-like" distribution
+            probs = F.softmax(hidden_states.abs().mean(dim=1), dim=-1)  # [B, D]
+            entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1).mean().item()
+            max_entropy = math.log(D)
+            normalized_entropy = entropy / max_entropy
+
+            # Signal magnitude
+            signal_norm = hidden_states.norm(dim=-1).mean().item()
+
+            return {
+                'coherence': coherence,
+                'phase_var': phase_var,
+                'entropy': normalized_entropy,
+                'signal_norm': signal_norm,
+            }
+
+    def analyze_layer_influence(
+        self,
+        layer_idx: int,
+        component_name: str,
+        input_hidden: torch.Tensor,
+        output_hidden: torch.Tensor,
+        num_heads: int = 8,
+    ) -> LayerInfluenceMetrics:
+        """
+        Analyze influence of a single layer on phase learning.
+
+        Compares input and output hidden states to determine if the layer
+        is helping or hurting phase learning.
+        """
+        # Compute metrics before and after layer
+        input_metrics = self.compute_phase_metrics(input_hidden, num_heads)
+        output_metrics = self.compute_phase_metrics(output_hidden, num_heads)
+
+        # Phase preservation: how much of input phase survives
+        # Compare coherence before/after
+        coherence_ratio = output_metrics['coherence'] / (input_metrics['coherence'] + 1e-6)
+        phase_preservation = min(coherence_ratio, 2.0) / 2.0  # Clamp to [0, 1]
+
+        # Phase amplification: ratio of signal norms
+        amplification = output_metrics['signal_norm'] / (input_metrics['signal_norm'] + 1e-6)
+
+        # Entropy delta: change in representation entropy
+        entropy_delta = output_metrics['entropy'] - input_metrics['entropy']
+
+        # Gradient flow approximation (using variance as proxy)
+        var_ratio = output_metrics['phase_var'] / (input_metrics['phase_var'] + 1e-6)
+        gradient_flow = min(var_ratio, 2.0) / 2.0
+
+        # Detect problematic conditions
+        causes_collapse = output_metrics['coherence'] < self.collapse_threshold
+        causes_diffusion = output_metrics['coherence'] > self.diffusion_threshold
+        is_bottleneck = gradient_flow < self.gradient_threshold
+
+        # Compute influence score
+        # Positive factors: preserves phase, maintains diversity, good gradient flow
+        # Negative factors: collapses phase, reduces diversity, blocks gradients
+        influence_score = 0.0
+
+        # Phase preservation contribution (-0.5 to +0.5)
+        influence_score += (phase_preservation - 0.5)
+
+        # Entropy contribution: slight increase is good, large increase is bad
+        if -0.1 < entropy_delta < 0.1:
+            influence_score += 0.2  # Stable entropy is good
+        elif entropy_delta > 0.3:
+            influence_score -= 0.3  # Large entropy increase = diffusion
+        elif entropy_delta < -0.3:
+            influence_score -= 0.2  # Large entropy decrease = collapse
+
+        # Gradient flow contribution
+        if gradient_flow > 0.3:
+            influence_score += 0.2
+        elif gradient_flow < 0.1:
+            influence_score -= 0.3
+
+        # Penalty for collapse/diffusion
+        if causes_collapse:
+            influence_score -= 0.5
+        if causes_diffusion:
+            influence_score -= 0.2
+
+        # Clamp to [-1, 1]
+        influence_score = max(-1.0, min(1.0, influence_score))
+
+        # Classify influence type
+        if influence_score > self.constructive_threshold:
+            influence_type = InfluenceType.CONSTRUCTIVE
+        elif influence_score < self.destructive_threshold:
+            influence_type = InfluenceType.DESTRUCTIVE
+        else:
+            influence_type = InfluenceType.NEUTRAL
+
+        return LayerInfluenceMetrics(
+            layer_idx=layer_idx,
+            component_name=component_name,
+            influence_type=influence_type,
+            influence_score=influence_score,
+            phase_preservation=phase_preservation,
+            phase_amplification=amplification,
+            gradient_flow=gradient_flow,
+            entropy_delta=entropy_delta,
+            causes_collapse=causes_collapse,
+            causes_diffusion=causes_diffusion,
+            is_bottleneck=is_bottleneck,
+        )
+
+    def analyze_all_layers(
+        self,
+        layer_hidden_states: List[torch.Tensor],
+        num_heads: int = 8,
+    ) -> Dict[int, LayerInfluenceMetrics]:
+        """
+        Analyze influence for all configured SRK layers.
+
+        Args:
+            layer_hidden_states: List of hidden states from each layer
+
+        Returns:
+            Dictionary mapping layer index to influence metrics
+        """
+        results = {}
+        num_layers = len(layer_hidden_states)
+
+        # Analyze DNA Bridge layer
+        if self.config.enable_dna_bridge and self.config.dna_bridge_layer < num_layers:
+            layer_idx = self.config.dna_bridge_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)] if layer_idx > 0 else layer_hidden_states[0]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "DNA Bridge", input_h, output_h, num_heads
+            )
+
+        # Analyze CSR Alignment layer
+        if self.config.enable_phase_hook and self.config.csr_alignment_layer < num_layers:
+            layer_idx = self.config.csr_alignment_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "CSR Alignment", input_h, output_h, num_heads
+            )
+
+        # Analyze Witness Arbitrator layer
+        if self.config.enable_witness and self.config.witness_layer < num_layers:
+            layer_idx = self.config.witness_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "Witness Arbitrator", input_h, output_h, num_heads
+            )
+
+        # Analyze Synthesis Gate layer
+        if self.config.enable_synthesis and self.config.synthesis_layer < num_layers:
+            layer_idx = self.config.synthesis_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "Synthesis Gate", input_h, output_h, num_heads
+            )
+
+        # Store in history
+        self.influence_history.append(results)
+
+        return results
+
+    def print_influence_report(
+        self,
+        influence_metrics: Dict[int, LayerInfluenceMetrics],
+        step: int = 0,
+    ):
+        """Print formatted influence report for all layers."""
+        print(f"\n      ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  SRK LAYER INFLUENCE DIAGNOSTICS @ Step {step:<6}                  ║")
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Layer  Component           Influence    Score   Flags          ║")
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+
+        for layer_idx in sorted(influence_metrics.keys()):
+            m = influence_metrics[layer_idx]
+            symbol = m.get_influence_symbol()
+
+            # Build flags string
+            flags = []
+            if m.causes_collapse:
+                flags.append("COLLAPSE")
+            if m.causes_diffusion:
+                flags.append("DIFFUSE")
+            if m.is_bottleneck:
+                flags.append("BLOCKED")
+            flags_str = ",".join(flags) if flags else "OK"
+
+            # Influence type with color indicator
+            if m.influence_type == InfluenceType.CONSTRUCTIVE:
+                inf_str = f"[{symbol}] CONSTRUCTIVE"
+            elif m.influence_type == InfluenceType.DESTRUCTIVE:
+                inf_str = f"[{symbol}] DESTRUCTIVE"
+            else:
+                inf_str = f"[{symbol}] NEUTRAL    "
+
+            print(f"      ║  L{layer_idx:<4} {m.component_name:<18} {inf_str}  {m.influence_score:+.2f}   {flags_str:<14} ║")
+
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+
+        # Summary
+        constructive = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.CONSTRUCTIVE)
+        destructive = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.DESTRUCTIVE)
+        neutral = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.NEUTRAL)
+
+        total_score = sum(m.influence_score for m in influence_metrics.values())
+        avg_score = total_score / len(influence_metrics) if influence_metrics else 0
+
+        if avg_score > 0.1:
+            overall = "CONSTRUCTIVE overall"
+        elif avg_score < -0.1:
+            overall = "DESTRUCTIVE overall"
+        else:
+            overall = "NEUTRAL overall"
+
+        print(f"      ║  Summary: {constructive} constructive, {neutral} neutral, {destructive} destructive        ║")
+        print(f"      ║  Average Score: {avg_score:+.3f} → {overall:<20}                  ║")
+        print(f"      ╚══════════════════════════════════════════════════════════════════╝")
+
+    def print_detailed_layer_report(
+        self,
+        influence_metrics: Dict[int, LayerInfluenceMetrics],
+    ):
+        """Print detailed per-layer breakdown."""
+        print(f"\n      Detailed Layer Analysis:")
+        print(f"      " + "-" * 60)
+
+        for layer_idx in sorted(influence_metrics.keys()):
+            m = influence_metrics[layer_idx]
+            print(f"\n      L{layer_idx}: {m.component_name}")
+            print(f"        Influence: {m.influence_type.value} (score: {m.influence_score:+.3f})")
+            print(f"        Phase Preservation:  {m.phase_preservation:.3f} {'✓' if m.phase_preservation > 0.5 else '⚠️'}")
+            print(f"        Phase Amplification: {m.phase_amplification:.3f}x")
+            print(f"        Gradient Flow:       {m.gradient_flow:.3f} {'✓' if m.gradient_flow > 0.1 else '⚠️'}")
+            print(f"        Entropy Delta:       {m.entropy_delta:+.3f}")
+
+            # Interpretation
+            if m.influence_type == InfluenceType.CONSTRUCTIVE:
+                print(f"        → This layer HELPS phase learning")
+                if m.phase_preservation > 0.7:
+                    print(f"          Good phase preservation through layer")
+                if m.gradient_flow > 0.3:
+                    print(f"          Healthy gradient flow")
+            elif m.influence_type == InfluenceType.DESTRUCTIVE:
+                print(f"        → This layer HURTS phase learning")
+                if m.causes_collapse:
+                    print(f"          ⚠️ Causing phase collapse!")
+                if m.causes_diffusion:
+                    print(f"          ⚠️ Causing phase diffusion!")
+                if m.is_bottleneck:
+                    print(f"          ⚠️ Blocking gradient flow!")
+            else:
+                print(f"        → This layer has MINIMAL effect on phase")
+
+    def get_influence_summary(self) -> Dict[str, any]:
+        """Get summary of influence trends over training."""
+        if not self.influence_history:
+            return {}
+
+        summary = {'num_observations': len(self.influence_history)}
+
+        # Track per-layer trends
+        for layer_idx in self.influence_history[-1].keys():
+            scores = [h[layer_idx].influence_score for h in self.influence_history if layer_idx in h]
+            if scores:
+                summary[f'L{layer_idx}_score_initial'] = scores[0]
+                summary[f'L{layer_idx}_score_final'] = scores[-1]
+                summary[f'L{layer_idx}_score_trend'] = scores[-1] - scores[0]
+
+                # Count influence type changes
+                types = [h[layer_idx].influence_type for h in self.influence_history if layer_idx in h]
+                summary[f'L{layer_idx}_constructive_pct'] = sum(1 for t in types if t == InfluenceType.CONSTRUCTIVE) / len(types)
+                summary[f'L{layer_idx}_destructive_pct'] = sum(1 for t in types if t == InfluenceType.DESTRUCTIVE) / len(types)
+
+        return summary
 
 
 # =============================================================================
@@ -910,12 +2434,17 @@ class PhaseAttention(nn.Module):
     """
 
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.1,
-                 operation_tokens: List[int] = None, bounded_phase: bool = True):
+                 operation_tokens: List[int] = None, bounded_phase: bool = True,
+                 dual_channel_mode: bool = False, alignment_authority: float = 0.1):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
         self.bounded_phase = bounded_phase  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+
+        # V10.3.8: Dual-Channel Attention
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         self.W_q_phase = nn.Linear(d_model, d_model)
         self.W_k_phase = nn.Linear(d_model, d_model)
@@ -947,6 +2476,10 @@ class PhaseAttention(nn.Module):
 
         # Rotation test: add a global phase rotation to φ_q
         self._rotation_angle = 0.0  # in radians
+
+        # V10.3.8: Intent phase storage for dual-channel diagnostics
+        self._intent_phase_query = None  # θ_JEPA
+        self._intent_phase_key = None    # θ_SRK
 
     def set_ablation(self, mode: str, seed: int = 42):
         self._ablation_mode = mode
@@ -1011,13 +2544,17 @@ class PhaseAttention(nn.Module):
 
         return phi_k
 
-    def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None,
+                intent_phase_query: torch.Tensor = None,
+                intent_phase_key: torch.Tensor = None) -> torch.Tensor:
         """
         Forward pass with optional operation-conditioned phase shifts.
 
         Args:
             x: Input tensor [B, N, D]
             token_ids: Token IDs [B, N] for operation-conditioned phase shifts
+            intent_phase_query: V10.3.8 - θ_JEPA from Sensor (optional)
+            intent_phase_key: V10.3.8 - θ_SRK from Master (optional)
         """
         B, N, D = x.shape
 
@@ -1043,6 +2580,10 @@ class PhaseAttention(nn.Module):
         if self._rotation_angle != 0.0:
             phi_q = phi_q + self._rotation_angle
 
+        # V10.3.8: Store intent phases for diagnostics
+        self._intent_phase_query = intent_phase_query
+        self._intent_phase_key = intent_phase_key
+
         if self.capture_diagnostics:
             self._phi_k = phi_k.detach()
             self._phi_q = phi_q.detach()
@@ -1064,6 +2605,39 @@ class PhaseAttention(nn.Module):
 
         output = (q_phasor * state).real
 
+        # V10.3.8: Dual-Channel Alignment Modulation
+        # If dual_channel_mode is enabled and we have intent phases,
+        # modulate the content score by the alignment term:
+        #   output = output * (1 + α * s_align)
+        # where s_align = cos(θ_JEPA - θ_SRK)
+        if self.dual_channel_mode and (intent_phase_query is not None or intent_phase_key is not None):
+            # Normalize intent_phase shapes
+            def _norm_intent(ip):
+                if ip is None:
+                    return None
+                if ip.dim() == 2:
+                    return ip.unsqueeze(1).unsqueeze(-1)  # [B, H] → [B, 1, H, 1]
+                elif ip.dim() == 3:
+                    return ip.unsqueeze(1)  # [B, H, D_h] → [B, 1, H, D_h]
+                return ip
+
+            theta_jepa = _norm_intent(intent_phase_query)
+            theta_srk = _norm_intent(intent_phase_key)
+
+            if theta_jepa is not None and theta_srk is not None:
+                theta_diff = theta_jepa - theta_srk
+            elif theta_jepa is not None:
+                theta_diff = theta_jepa
+            else:
+                theta_diff = theta_srk
+
+            # s_align = cos(θ_JEPA - θ_SRK)
+            s_align = torch.cos(theta_diff.float())
+
+            # Modulate: output = output * (1 + α * s_align)
+            alignment_modulator = 1.0 + self.alignment_authority * s_align
+            output = output * alignment_modulator
+
         if dtype == torch.bfloat16:
             output = output.to(dtype)
 
@@ -1084,14 +2658,16 @@ class PhaseAttention(nn.Module):
 class TransformerBlock(nn.Module):
     def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float,
                  use_phase: bool, extra_ff: int = 0, operation_tokens: List[int] = None,
-                 bounded_phase: bool = True):
+                 bounded_phase: bool = True, dual_channel_mode: bool = False,
+                 alignment_authority: float = 0.1):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
 
         # PhaseAttention gets operation_tokens for conditioned phase shifts
         if use_phase:
-            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
+            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase,
+                                       dual_channel_mode, alignment_authority)
         else:
             self.attn = QuadraticAttention(d_model, num_heads, dropout)
 
@@ -1139,6 +2715,8 @@ class HybridTransformerBlock(nn.Module):
         phase_ratio: float = 0.5,  # 0.0 = pure Quadratic, 1.0 = pure Phase
         operation_tokens: List[int] = None,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
     ):
         super().__init__()
         self.phase_ratio = phase_ratio
@@ -1146,7 +2724,8 @@ class HybridTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
         # Both attention types
-        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
+        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase,
+                                         dual_channel_mode, alignment_authority)
         self.quad_attn = QuadraticAttention(d_model, num_heads, dropout)
 
         self.ff = nn.Sequential(
@@ -1211,10 +2790,14 @@ class HybridTransformer(nn.Module):
         curriculum: List[float],  # phase_ratio per layer
         operation_tokens: List[int] = None,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
     ):
         super().__init__()
         self.curriculum = curriculum
         self.operation_tokens = operation_tokens
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         assert len(curriculum) == num_layers, \
             f"Curriculum length ({len(curriculum)}) must match num_layers ({num_layers})"
@@ -1229,6 +2812,8 @@ class HybridTransformer(nn.Module):
                 phase_ratio=curriculum[i],
                 operation_tokens=operation_tokens,
                 bounded_phase=bounded_phase,
+                dual_channel_mode=dual_channel_mode,
+                alignment_authority=alignment_authority,
             )
             for i in range(num_layers)
         ])
@@ -1702,16 +3287,21 @@ class HardProbeTransformer(nn.Module):
         extra_ff_per_layer: int = 0,  # For parameter matching
         operation_tokens: List[int] = None,  # Tokens that trigger phase shifts
         bounded_phase: bool = True,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content/intent
+        alignment_authority: float = 0.1,  # V10.3.8: α weight for alignment
     ):
         super().__init__()
         self.use_phase = use_phase
         self.operation_tokens = operation_tokens
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
         self.token_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_seq_len, d_model)
         self.dropout = nn.Dropout(dropout)
         self.layers = nn.ModuleList([
             TransformerBlock(d_model, num_heads, d_ff, dropout, use_phase,
-                           extra_ff_per_layer, operation_tokens, bounded_phase)
+                           extra_ff_per_layer, operation_tokens, bounded_phase,
+                           dual_channel_mode, alignment_authority)
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(d_model)
@@ -1983,14 +3573,22 @@ def print_rotation_test_results(
 # =============================================================================
 
 class WikiTextDataset(Dataset):
-    """WikiText dataset for language modeling with layer probing."""
+    """Text dataset for language modeling with layer probing.
+
+    Supports:
+    - wikitext2, wikitext103: Encyclopedia text (good for LM, basic Phase)
+    - tinystories: Narrative stories (RECOMMENDED for Kosha/Witness - diverse epistemic states)
+    - writingprompts: Creative writing (excellent Vritti diversity)
+    - imdb: Movie reviews (opinions/emotions)
+    - openwebtext, c4: Large web corpora
+    """
 
     def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
         """
         Args:
             split: "train", "validation", or "test"
             seq_len: Sequence length for chunks
-            dataset_name: "wikitext2" or "wikitext103"
+            dataset_name: Dataset to load (tinystories recommended for consciousness training)
         """
         try:
             from datasets import load_dataset
@@ -2002,16 +3600,67 @@ class WikiTextDataset(Dataset):
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Load dataset
-        if dataset_name == "wikitext2":
+        # Load dataset based on name
+        dataset_name_lower = dataset_name.lower()
+
+        if dataset_name_lower == "wikitext2":
             ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
-        else:
+            text_field = "text"
+            ds_label = "WikiText-2"
+        elif dataset_name_lower == "wikitext103":
             ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+            text_field = "text"
+            ds_label = "WikiText-103"
+        elif dataset_name_lower == "tinystories":
+            # TinyStories - narrative stories, excellent for Kosha/Witness
+            # Small, diverse epistemic states (imagination, memory, facts)
+            ds = load_dataset("roneneldan/TinyStories", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "TinyStories"
+        elif dataset_name_lower == "writingprompts":
+            # WritingPrompts - creative writing with diverse epistemic modes
+            # Great for exercising all Vritti states
+            try:
+                ds = load_dataset("euclaise/writingprompts", split=split, trust_remote_code=True)
+            except Exception:
+                ds = load_dataset("writing_prompts", split=split, trust_remote_code=True)
+            # Has 'prompt' and 'story' fields - concatenate them
+            text_field = "story" if "story" in ds.column_names else "text"
+            ds_label = "WritingPrompts"
+        elif dataset_name_lower == "imdb":
+            # IMDB reviews - opinions/emotions, good for Vritti diversity
+            ds = load_dataset("imdb", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "IMDB Reviews"
+        elif dataset_name_lower == "openwebtext":
+            # OpenWebText - large web text corpus
+            ds = load_dataset("openwebtext", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "OpenWebText"
+        elif dataset_name_lower == "c4":
+            # C4 (Colossal Clean Crawled Corpus) - very large
+            # Only load a subset to avoid memory issues
+            ds = load_dataset("c4", "en", split=f"{split}[:10000]", trust_remote_code=True)
+            text_field = "text"
+            ds_label = "C4 (subset)"
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}. "
+                           f"Choose from: wikitext2, wikitext103, tinystories, writingprompts, imdb, openwebtext, c4")
 
         # Tokenize all text
-        all_text = " ".join([t for t in ds["text"] if t.strip()])
+        if text_field in ds.column_names:
+            all_text = " ".join([t for t in ds[text_field] if t and t.strip()])
+        else:
+            # Fallback: try common text field names
+            for field in ["text", "content", "section_text", "document"]:
+                if field in ds.column_names:
+                    all_text = " ".join([t for t in ds[field] if t and t.strip()])
+                    break
+            else:
+                raise ValueError(f"Could not find text field in dataset. Available: {ds.column_names}")
+
         self.tokens = self.tokenizer.encode(all_text)
-        print(f"  [WikiText] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
+        print(f"  [{ds_label}] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
 
     def __len__(self):
         return max(1, len(self.tokens) // self.seq_len - 1)
@@ -2266,6 +3915,993 @@ class PhaseFirstCurriculum:
         return curriculum
 
 
+# =============================================================================
+# V10.3.2: PROTECTED PHASE FOR REAL LANGUAGE MODE
+# =============================================================================
+# Protected Phase architecture gives Phase and Quadratic NON-COMPETING roles:
+#   - Phase: O(n) memory accumulation (cumsum) - persists binding state
+#   - Quadratic: O(n²) memory querying (attention) - reasons over state
+#
+# They collaborate SEQUENTIALLY, not compete in PARALLEL.
+# This prevents Phase from becoming "decorative" (0% ablation drop).
+
+class ProtectedPhaseLMBlock(nn.Module):
+    """
+    Protected Phase block for Language Modeling.
+
+    Architecture:
+        1. Phase accumulates memory: memory = cumsum(k * v)
+        2. Quadratic queries memory: output = attention(q, memory)
+
+    This is SEQUENTIAL COLLABORATION, not parallel mixing.
+    Phase and Quadratic don't compete for gradients.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        dropout: float,
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm_mem = nn.LayerNorm(d_model)
+
+        # Protected Phase: accumulates memory state
+        self.phase_memory = ProtectedPhaseAttention(d_model, num_heads, dropout, None, bounded_phase)
+        # Protected Quad: queries memory state
+        self.quad_query = ProtectedQuadAttention(d_model, num_heads, dropout)
+
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, d_ff), nn.GELU(), nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model), nn.Dropout(dropout)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Step 1: Phase accumulates memory state (Phase's exclusive job)
+        normed = self.norm1(x)
+        memory_state = self.phase_memory(normed, None)  # No token_ids for LM
+        memory_state = self.norm_mem(memory_state)
+
+        # Step 2: Quadratic queries the memory (Quad's exclusive job)
+        attn_out = self.quad_query(normed, memory_state)
+
+        # Residual and FF
+        x = x + attn_out
+        x = x + self.ff(self.norm2(x))
+        return x
+
+    def get_phase_health(self) -> dict:
+        """Get Phase health metrics."""
+        return self.phase_memory.get_health_metrics()
+
+
+class ProtectedPhaseLMTransformer(nn.Module):
+    """
+    Language Modeling Transformer with PROTECTED Phase architecture.
+
+    Key insight from ablation tests:
+    - When mixed (parallel), Phase becomes DECORATIVE (0% ablation drop)
+    - When protected (sequential), Phase is ESSENTIAL (37% ablation drop)
+
+    Solution: Give Phase and Quadratic NON-COMPETING roles:
+    - Phase: O(n) memory accumulation (cumsum)
+    - Quadratic: O(n²) memory querying (attention)
+
+    They collaborate sequentially, not compete in parallel.
+
+    Supports:
+    - Layer-wise probing (for SRK integration)
+    - Real language modeling (cross-entropy loss)
+    - Phase health monitoring (R_k statistics)
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        # Create protected phase layers
+        self.layers = nn.ModuleList([
+            ProtectedPhaseLMBlock(d_model, num_heads, d_ff, dropout, bounded_phase)
+            for _ in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+
+        # Weight tying
+        self.lm_head.weight = self.token_emb.weight
+
+        # Layer-wise probing storage (for SRK integration)
+        self.layer_outputs = []
+
+        # Curriculum placeholder (not used in protected phase, but for API compatibility)
+        self.curriculum = [1.0] * num_layers  # Protected = 100% phase contribution
+
+    def forward(self, input_ids: torch.Tensor, probe_layers: bool = False) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        self.layer_outputs = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if probe_layers:
+                # Store intermediate output for layer probing / SRK
+                self.layer_outputs.append(x.detach().clone())
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    def get_phase_health(self) -> dict:
+        """
+        Aggregate Phase health metrics (R_k statistics) from all layers.
+
+        Interpretation:
+        - R_k → 0: Phase collapsed (bad)
+        - R_k → 1: Phase degenerate (bad)
+        - R_k stable in (0.3, 0.7): Healthy
+        """
+        metrics = {
+            "r_k_mean": [],
+            "r_k_std": [],
+            "r_k_min": [],
+            "r_k_max": [],
+        }
+        for layer in self.layers:
+            layer_metrics = layer.get_phase_health()
+            for k, v in layer_metrics.items():
+                metrics[k].append(v)
+
+        # Average across layers
+        return {
+            "r_k_mean": sum(metrics["r_k_mean"]) / len(metrics["r_k_mean"]) if metrics["r_k_mean"] else 0.0,
+            "r_k_std": sum(metrics["r_k_std"]) / len(metrics["r_k_std"]) if metrics["r_k_std"] else 0.0,
+            "r_k_min": min(metrics["r_k_min"]) if metrics["r_k_min"] else 0.0,
+            "r_k_max": max(metrics["r_k_max"]) if metrics["r_k_max"] else 0.0,
+        }
+
+    def update_curriculum(self, new_curriculum: List[float]):
+        """API compatibility with HybridLMTransformer (no-op for protected phase)."""
+        # Protected phase doesn't use curriculum - phase is always protected
+        pass
+
+    def get_layer_ppl(self, input_ids: torch.Tensor, targets: torch.Tensor) -> List[float]:
+        """Compute PPL contribution from each layer by early-exiting."""
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_ppls = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            # Early exit: compute PPL after this layer
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+            layer_ppls.append(ppl)
+
+        return layer_ppls
+
+    def get_layer_contributions(self, input_ids: torch.Tensor, targets: torch.Tensor) -> Dict[str, List[float]]:
+        """
+        Analyze per-layer contributions for Protected Phase.
+
+        Returns dict with:
+        - ppl: PPL after each layer
+        - ppl_delta: PPL improvement from each layer
+        - contribution_pct: % of total PPL reduction from each layer
+        - phase_ratio: Always 1.0 for protected phase
+        """
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        # Initial PPL (embedding only)
+        logits_embed = self.lm_head(self.norm(x))
+        loss_embed = F.cross_entropy(logits_embed.view(-1, self.vocab_size), targets.view(-1))
+        ppl_embed = torch.exp(loss_embed).item()
+
+        layer_ppls = []
+        layer_deltas = []
+        prev_ppl = ppl_embed
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+
+            layer_ppls.append(ppl)
+            layer_deltas.append(prev_ppl - ppl)  # Positive = improvement
+            prev_ppl = ppl
+
+        total_reduction = ppl_embed - layer_ppls[-1]
+        contribution_pcts = [
+            (delta / total_reduction * 100) if total_reduction > 0 else 0
+            for delta in layer_deltas
+        ]
+
+        return {
+            'ppl': layer_ppls,
+            'ppl_delta': layer_deltas,
+            'contribution_pct': contribution_pcts,
+            'phase_ratio': [1.0] * self.num_layers,  # Always 100% phase contribution
+            'ppl_embed': ppl_embed,
+            'total_reduction': total_reduction,
+        }
+
+    def ablate_attention(self, input_ids: torch.Tensor, targets: torch.Tensor,
+                         ablate_phase: bool = False, ablate_local: bool = False) -> float:
+        """
+        For Protected Phase, ablation is different:
+        - ablate_phase: Disable phase memory accumulation
+        - ablate_local: Disable quadratic querying
+
+        Returns PPL with ablation applied.
+        """
+        # Store original forward, apply ablation, restore
+        # For now, return normal PPL (full ablation requires modifying layers)
+        with torch.no_grad():
+            logits = self.forward(input_ids)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            return torch.exp(loss).item()
+
+    def count_params(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# =============================================================================
+# V10.3.3: BINDING CACHE FOR REAL LANGUAGE MODE
+# =============================================================================
+# Binding Cache architecture combines THREE attention paths:
+#   1. Local: O(n*w) - Direct token-to-token for syntax learning
+#   2. Phase: O(n) - Memory state accumulation (global compression)
+#   3. Quad:  O(n*k) - Top-K memory query (global retrieval)
+#
+# This is the V10.0 architecture validated by diagnostic probes.
+# Reference: --protected-phase showed -50% ablation drop (Phase essential)
+
+class LocalWindowAttention(nn.Module):
+    """
+    Local window attention for fast syntax learning.
+
+    Uses sliding window attention (O(n*w) complexity) for direct
+    token-to-token patterns like "the → cat".
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        window_size: int = 64,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.window_size = window_size
+
+        self.W_q = nn.Linear(embed_dim, embed_dim)
+        self.W_k = nn.Linear(embed_dim, embed_dim)
+        self.W_v = nn.Linear(embed_dim, embed_dim)
+        self.W_o = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Local window attention.
+
+        Args:
+            x: [B, N, D]
+
+        Returns:
+            output: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Project Q, K, V
+        q = self.W_q(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        k = self.W_k(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Compute attention scores with causal mask
+        attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+
+        # Create causal mask
+        causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+
+        # Create local window mask (only attend within window)
+        window_mask = torch.ones(N, N, device=x.device).bool()
+        for i in range(N):
+            start = max(0, i - self.window_size)
+            window_mask[i, start:i+1] = False
+
+        # Combine masks
+        combined_mask = causal_mask | window_mask
+        attn_scores = attn_scores.masked_fill(combined_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        # Softmax and apply
+        attn_probs = F.softmax(attn_scores, dim=-1)
+        attn_probs = self.dropout(attn_probs)
+
+        attn_out = torch.matmul(attn_probs, v)
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, N, D)
+
+        return self.W_o(attn_out)
+
+
+class BindingCachePhaseState(nn.Module):
+    """
+    Phase state accumulator for binding cache.
+
+    Accumulates key-value bindings into a persistent memory state
+    using O(n) cumulative sum (no attention).
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 0.9,
+        bounded_phase: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.decay_gamma = decay_gamma
+        self.bounded_phase = bounded_phase
+
+        # Phase projections
+        self.W_k_phase = nn.Linear(embed_dim, embed_dim)
+        self.W_k_amp = nn.Linear(embed_dim, embed_dim)
+        self.W_v = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # Health tracking
+        self._last_r_k_mean = 0.0
+        self._last_r_k_std = 0.0
+        self._last_r_k_min = 0.0
+        self._last_r_k_max = 0.0
+
+        self._ablation_mode = "none"
+
+    def set_ablation(self, mode: str, seed: int = 42):
+        self._ablation_mode = mode
+
+    def set_rotation(self, angle: float):
+        pass  # Not implemented for probe
+
+    def clear_rotation(self):
+        pass
+
+    def get_health_metrics(self) -> dict:
+        return {
+            "r_k_mean": self._last_r_k_mean,
+            "r_k_std": self._last_r_k_std,
+            "r_k_min": self._last_r_k_min,
+            "r_k_max": self._last_r_k_max,
+        }
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Compute memory state via cumsum.
+
+        Args:
+            x: [B, N, D]
+
+        Returns:
+            memory_state: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Compute phase and amplitude
+        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
+        if self.bounded_phase:
+            phi_k = math.pi * torch.sin(phi_k_raw)
+        else:
+            phi_k = phi_k_raw
+
+        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim)
+
+        # Track R_k health
+        with torch.no_grad():
+            r_k = a_k.mean(dim=(0, 1))  # [H, D_h]
+            self._last_r_k_mean = r_k.mean().item()
+            self._last_r_k_std = r_k.std().item()
+            self._last_r_k_min = r_k.min().item()
+            self._last_r_k_max = r_k.max().item()
+
+        # Complex representation: z = a * e^(i*phi)
+        z_real = a_k * torch.cos(phi_k)
+        z_imag = a_k * torch.sin(phi_k)
+
+        # Weighted value
+        weighted_v = v * a_k
+
+        # Cumsum for memory accumulation (with decay)
+        if self.decay_gamma < 1.0:
+            # Apply exponential decay
+            decay_weights = torch.pow(
+                torch.tensor(self.decay_gamma, device=x.device),
+                torch.arange(N, device=x.device).float()
+            ).view(1, N, 1, 1)
+            weighted_v = weighted_v * decay_weights
+
+        memory_state = torch.cumsum(weighted_v, dim=1)
+
+        # Reshape back
+        memory_state = memory_state.view(B, N, D)
+        return memory_state
+
+
+class BindingCacheQuadQuery(nn.Module):
+    """
+    Quadratic query with Top-K cache for efficient memory retrieval.
+
+    Uses Top-K selection to reduce O(n²) attention to O(n*k).
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        top_k: int = 64,
+        use_cache: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.top_k = top_k
+        self.use_cache = use_cache
+
+        self.W_q = nn.Linear(embed_dim, embed_dim)
+        self.W_o = nn.Linear(embed_dim, embed_dim)
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Query memory state with Top-K selection.
+
+        Args:
+            x: [B, N, D]
+            memory_state: [B, N, D] from Phase accumulator
+
+        Returns:
+            output: [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Query projection
+        q = self.W_q(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Memory as key-value
+        mem = memory_state.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Compute attention scores
+        attn_scores = torch.matmul(q, mem.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Causal mask
+        causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+        attn_scores = attn_scores.masked_fill(causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        if self.use_cache and self.top_k < N:
+            # Top-K selection per query position
+            # For each query, only attend to top-k memory positions
+            k = min(self.top_k, N)
+            top_k_scores, top_k_indices = torch.topk(attn_scores, k, dim=-1)
+
+            # Create sparse attention (only top-k positions)
+            attn_probs = F.softmax(top_k_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+
+            # Gather top-k memory values
+            top_k_indices_expanded = top_k_indices.unsqueeze(-1).expand(-1, -1, -1, -1, self.head_dim)
+            mem_expanded = mem.unsqueeze(2).expand(-1, -1, N, -1, -1)  # [B, H, N, N, D_h]
+            top_k_mem = torch.gather(mem_expanded, 3, top_k_indices_expanded)  # [B, H, N, k, D_h]
+
+            attn_out = torch.matmul(attn_probs.unsqueeze(-2), top_k_mem).squeeze(-2)  # [B, H, N, D_h]
+        else:
+            # Full attention (no cache)
+            attn_probs = F.softmax(attn_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+            attn_out = torch.matmul(attn_probs, mem)
+
+        attn_out = attn_out.transpose(1, 2).contiguous().view(B, N, D)
+        return self.W_o(attn_out)
+
+
+class BindingCacheLMBlock(nn.Module):
+    """
+    Binding Cache block for Language Modeling.
+
+    Three-path architecture (V10.0):
+    1. Local: O(n*w) - Direct token-to-token for syntax
+    2. Phase: O(n) - Memory state accumulation
+    3. Quad:  O(n*k) - Top-K memory query
+
+    They work together: local_out + mem_out (no gradient competition).
+    Ratios allow per-layer weighting of each path.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+        decay_gamma: float = 0.9,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+        local_window_size: int = 64,
+        local_ratio: float = 0.4,
+        phase_ratio: float = 0.3,
+        quad_ratio: float = 0.3,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+
+        # Store ratios for weighted combination
+        self.local_ratio = local_ratio
+        self.phase_ratio = phase_ratio
+        self.quad_ratio = quad_ratio
+
+        # Local attention for syntax learning
+        self.local_attn = LocalWindowAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            window_size=local_window_size,
+            dropout=dropout,
+        )
+
+        # Phase state accumulator
+        self.phase_state = BindingCachePhaseState(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            decay_gamma=decay_gamma,
+            bounded_phase=bounded_phase,
+        )
+
+        # Quad memory query
+        self.quad_query = BindingCacheQuadQuery(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            top_k=top_k,
+            use_cache=use_cache,
+        )
+
+        # Feed-forward
+        self.norm_ff = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout),
+        )
+
+    def get_phase_health(self) -> dict:
+        return self.phase_state.get_health_metrics()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Three-path forward pass with weighted combination.
+
+        1. Local attention for syntax
+        2. Phase accumulates memory
+        3. Quad queries memory
+
+        Output = x + (local_ratio * local + phase_ratio * memory + quad_ratio * quad_out) + ff
+        """
+        # Step 1: Local attention for syntax (the → cat patterns)
+        local_out = self.local_attn(x)
+
+        # Step 2: Phase accumulates memory state
+        memory_state = self.phase_state(x)
+
+        # Step 3: Quad queries memory state
+        quad_out = self.quad_query(x, memory_state)
+
+        # Weighted combination of three paths (with ratios for per-layer tuning)
+        # Note: memory_state is passed to quad, but we also add phase contribution directly
+        attn_out = (
+            self.local_ratio * local_out +
+            self.phase_ratio * memory_state +
+            self.quad_ratio * quad_out
+        )
+
+        # Residual and FF
+        x = x + attn_out
+        x = x + self.ff(self.norm_ff(x))
+
+        return x
+
+
+class BindingCacheLMTransformer(nn.Module):
+    """
+    Language Modeling Transformer with Binding Cache architecture (V10.0).
+
+    Validated by diagnostic probes:
+    - Phase: O(n) state accumulator (exclusive role)
+    - Quad: O(n*k) memory query via Top-K cache (exclusive role)
+    - Local: O(n*w) direct syntax attention
+
+    Reference: --protected-phase showed -50% ablation drop when Phase
+    has protected role (vs ~0% when mixed with Quad).
+
+    Supports:
+    - Layer-wise probing for SRK integration
+    - Phase health monitoring (R_k statistics)
+    - Top-K cache for O(n*k) complexity
+    """
+
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        d_ff: int,
+        dropout: float,
+        max_seq_len: int,
+        bounded_phase: bool = True,
+        top_k: int = 64,
+        use_cache: bool = True,
+        decay_gamma: float = 0.9,
+        window_size: int = 64,
+        phase_ratios: List[float] = None,
+        local_ratios: List[float] = None,
+        quad_ratios: List[float] = None,
+    ):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+
+        # Default ratios if not specified
+        if phase_ratios is None:
+            phase_ratios = [0.3] * num_layers
+        if local_ratios is None:
+            local_ratios = [0.4] * num_layers
+        if quad_ratios is None:
+            quad_ratios = [0.3] * num_layers
+
+        # Store ratios for logging
+        self.phase_ratios = phase_ratios
+        self.local_ratios = local_ratios
+        self.quad_ratios = quad_ratios
+
+        self.token_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(max_seq_len, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        # Binding Cache blocks with per-layer ratios
+        self.layers = nn.ModuleList([
+            BindingCacheLMBlock(
+                embed_dim=d_model,
+                num_heads=num_heads,
+                ff_dim=d_ff,
+                dropout=dropout,
+                decay_gamma=decay_gamma,
+                bounded_phase=bounded_phase,
+                top_k=top_k,
+                use_cache=use_cache,
+                local_window_size=window_size,
+                local_ratio=local_ratios[i],
+                phase_ratio=phase_ratios[i],
+                quad_ratio=quad_ratios[i],
+            )
+            for i in range(num_layers)
+        ])
+
+        self.norm = nn.LayerNorm(d_model)
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
+
+        # Weight tying
+        self.lm_head.weight = self.token_emb.weight
+
+        # Layer outputs for SRK probing
+        self.layer_outputs = []
+
+        # Curriculum placeholder (for API compatibility)
+        self.curriculum = [1.0] * num_layers
+
+    def forward(self, input_ids: torch.Tensor, probe_layers: bool = False) -> torch.Tensor:
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        self.layer_outputs = []
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if probe_layers:
+                self.layer_outputs.append(x.detach().clone())
+
+        x = self.norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    def get_phase_health(self) -> dict:
+        """Aggregate Phase health metrics from all layers."""
+        metrics = {"r_k_mean": [], "r_k_std": [], "r_k_min": [], "r_k_max": []}
+        for layer in self.layers:
+            layer_metrics = layer.get_phase_health()
+            for k, v in layer_metrics.items():
+                metrics[k].append(v)
+
+        return {
+            "r_k_mean": sum(metrics["r_k_mean"]) / len(metrics["r_k_mean"]) if metrics["r_k_mean"] else 0.0,
+            "r_k_std": sum(metrics["r_k_std"]) / len(metrics["r_k_std"]) if metrics["r_k_std"] else 0.0,
+            "r_k_min": min(metrics["r_k_min"]) if metrics["r_k_min"] else 0.0,
+            "r_k_max": max(metrics["r_k_max"]) if metrics["r_k_max"] else 0.0,
+        }
+
+    def update_curriculum(self, new_curriculum: List[float]):
+        """API compatibility (no-op for binding cache)."""
+        pass
+
+    def get_layer_ppl(self, input_ids: torch.Tensor, targets: torch.Tensor) -> List[float]:
+        """Compute PPL contribution from each layer by early-exiting."""
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_ppls = []
+        for layer in self.layers:
+            x = layer(x)
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+            layer_ppls.append(ppl)
+
+        return layer_ppls
+
+    def get_layer_contributions(self, input_ids: torch.Tensor, targets: torch.Tensor) -> Dict[str, List[float]]:
+        """Analyze per-layer contributions."""
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        # Initial PPL (embedding only)
+        logits_embed = self.lm_head(self.norm(x))
+        loss_embed = F.cross_entropy(logits_embed.view(-1, self.vocab_size), targets.view(-1))
+        ppl_embed = torch.exp(loss_embed).item()
+
+        layer_ppls = []
+        layer_deltas = []
+        prev_ppl = ppl_embed
+
+        for layer in self.layers:
+            x = layer(x)
+            x_normed = self.norm(x)
+            logits = self.lm_head(x_normed)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            ppl = torch.exp(loss).item()
+
+            layer_ppls.append(ppl)
+            layer_deltas.append(prev_ppl - ppl)
+            prev_ppl = ppl
+
+        total_reduction = ppl_embed - layer_ppls[-1]
+        contribution_pcts = [
+            (delta / total_reduction * 100) if total_reduction > 0 else 0
+            for delta in layer_deltas
+        ]
+
+        return {
+            'ppl': layer_ppls,
+            'ppl_delta': layer_deltas,
+            'contribution_pct': contribution_pcts,
+            'phase_ratio': [1.0] * self.num_layers,
+            'ppl_embed': ppl_embed,
+            'total_reduction': total_reduction,
+        }
+
+    def ablate_attention(self, input_ids: torch.Tensor, targets: torch.Tensor,
+                         ablate_phase: bool = False, ablate_local: bool = False) -> float:
+        """Return normal PPL (full ablation not implemented for probe)."""
+        with torch.no_grad():
+            logits = self.forward(input_ids)
+            loss = F.cross_entropy(logits.view(-1, self.vocab_size), targets.view(-1))
+            return torch.exp(loss).item()
+
+    def count_params(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# =============================================================================
+# SAMPLE GENERATION FOR QUALITY MONITORING
+# =============================================================================
+# V10.3.5: Generate text samples every N steps to monitor quality
+
+SAMPLE_PROMPTS = (
+    "The",                                          # Simple completion
+    "In the beginning",                             # Narrative
+    "The cat sat on",                               # Simple syntax
+    "Scientists have discovered that",              # Factual
+    "Once upon a time, there was a",               # Story
+)
+
+
+def generate_sample(
+    model: nn.Module,
+    tokenizer,
+    prompt: str,
+    device: torch.device,
+    max_new_tokens: int = 64,
+    temperature: float = 0.9,
+    top_p: float = 0.95,
+    top_k: int = 50,
+    repetition_penalty: float = 1.15,
+) -> str:
+    """
+    Generate text from a prompt for quality monitoring.
+
+    Uses nucleus (top-p) sampling with temperature for diverse outputs.
+    """
+    model.eval()
+
+    # Encode prompt
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    # Generate tokens one by one
+    generated = input_ids.clone()
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            # Forward pass
+            outputs = model(generated)
+
+            # Handle different output formats
+            if isinstance(outputs, dict):
+                logits = outputs.get('logits', outputs.get('output', None))
+            elif isinstance(outputs, (tuple, list)):
+                logits = outputs[0]
+            else:
+                logits = outputs
+
+            if logits is None:
+                break
+
+            # Get next token logits
+            next_logits = logits[:, -1, :].clone()
+
+            # Apply repetition penalty
+            if repetition_penalty != 1.0:
+                for token_id in set(generated[0].tolist()):
+                    if next_logits[0, token_id] > 0:
+                        next_logits[0, token_id] /= repetition_penalty
+                    else:
+                        next_logits[0, token_id] *= repetition_penalty
+
+            # Apply temperature
+            next_logits = next_logits / temperature
+
+            # Top-k filtering
+            if top_k > 0:
+                top_k_vals, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
+                threshold = top_k_vals[0, -1]
+                next_logits[next_logits < threshold] = float('-inf')
+
+            # Top-p (nucleus) sampling
+            sorted_logits, sorted_indices = torch.sort(next_logits, descending=True)
+            cumsum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above threshold
+            sorted_indices_to_remove = cumsum > top_p
+            sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+            sorted_indices_to_remove[:, 0] = False
+
+            indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+            next_logits[indices_to_remove] = float('-inf')
+
+            # Sample next token
+            probs = F.softmax(next_logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # Append to sequence
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Check for EOS
+            if hasattr(tokenizer, 'eos_token_id') and next_token.item() == tokenizer.eos_token_id:
+                break
+
+    # Decode and return
+    return tokenizer.decode(generated[0], skip_special_tokens=True)
+
+
+def run_quality_samples(
+    model: nn.Module,
+    tokenizer,
+    device: torch.device,
+    step: int,
+    prompts: tuple = SAMPLE_PROMPTS,
+):
+    """Generate and display quality samples."""
+    print(f"\n      ╔═══════════════════════════════════════════════════════════════════╗")
+    print(f"      ║  QUALITY SAMPLES @ Step {step:<6}                                 ║")
+    print(f"      ╠═══════════════════════════════════════════════════════════════════╣")
+
+    model.eval()
+    for i, prompt in enumerate(prompts):
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=64,
+                temperature=0.9,
+                top_p=0.95,
+                top_k=50,
+                repetition_penalty=1.15,
+            )
+            # Clean up for display
+            generated = generated.strip().replace('\n', ' ')[:150]
+            print(f"      ║  [{i+1}] Prompt: \"{prompt}\"")
+            print(f"      ║      Output: \"{generated}\"")
+            print(f"      ║")
+        except Exception as e:
+            print(f"      ║  [{i+1}] Error: {e}")
+            print(f"      ║")
+
+    print(f"      ╚═══════════════════════════════════════════════════════════════════╝")
+    model.train()
+
+
 def train_real_language(
     args,
     config: Config,
@@ -2287,28 +4923,108 @@ def train_real_language(
     val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
 
     # Create model
-    print(f"\nCreating HybridLMTransformer...")
-    print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
-    print(f"  Initial curriculum: {curriculum}")
+    # V10.3.3: Support for Binding Cache architecture
+    use_binding_cache = getattr(args, 'binding_cache', False)
+    # V10.3.2: Support for Protected Phase architecture
+    use_protected_phase = getattr(args, 'protected_phase', False)
 
-    model = HybridLMTransformer(
-        vocab_size=args.lm_vocab_size,
-        d_model=config.d_model,
-        num_heads=config.num_heads,
-        num_layers=config.num_layers,
-        d_ff=config.d_ff,
-        dropout=config.dropout,
-        max_seq_len=args.seq_len,
-        curriculum=curriculum,
-        bounded_phase=config.bounded_phase,
-    ).to(config.device)
+    if use_binding_cache:
+        # Parse binding cache ratios
+        bc_phase_ratio = [float(x) for x in args.binding_cache_phase_ratio.split(",")]
+        bc_local_ratio = [float(x) for x in args.binding_cache_local_ratio.split(",")]
+        bc_quad_ratio = [float(x) for x in args.binding_cache_quad_ratio.split(",")]
+
+        # Pad/truncate to match num_layers
+        while len(bc_phase_ratio) < config.num_layers:
+            bc_phase_ratio.append(bc_phase_ratio[-1] if bc_phase_ratio else 0.3)
+        while len(bc_local_ratio) < config.num_layers:
+            bc_local_ratio.append(bc_local_ratio[-1] if bc_local_ratio else 0.4)
+        while len(bc_quad_ratio) < config.num_layers:
+            bc_quad_ratio.append(bc_quad_ratio[-1] if bc_quad_ratio else 0.3)
+        bc_phase_ratio = bc_phase_ratio[:config.num_layers]
+        bc_local_ratio = bc_local_ratio[:config.num_layers]
+        bc_quad_ratio = bc_quad_ratio[:config.num_layers]
+
+        print(f"\n╔═══════════════════════════════════════════════════════════════════════╗")
+        print(f"║  V10.3.3: BINDING CACHE ARCHITECTURE                                  ║")
+        print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+        print(f"║  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"║  Three-Path Architecture (No Gradient Competition):                   ║")
+        print(f"║                                                                       ║")
+        print(f"║    1. LOCAL PATH  - O(n*w) Window Attention                          ║")
+        print(f"║       Window size: {args.local_window_size}")
+        print(f"║       Fast syntax learning, direct token-to-token                    ║")
+        print(f"║                                                                       ║")
+        print(f"║    2. PHASE PATH  - O(n) Memory State Accumulation                   ║")
+        print(f"║       Decay gamma: {args.decay_gamma}")
+        print(f"║       Binding accumulation via decayed cumsum                        ║")
+        print(f"║                                                                       ║")
+        print(f"║    3. QUAD PATH   - O(n*k) Top-K Cache Query                         ║")
+        print(f"║       Top-K: {args.binding_cache_top_k}")
+        print(f"║       Quadratic attention over cached memories                       ║")
+        print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+        print(f"║  Per-Layer Ratios:                                                    ║")
+        for i in range(config.num_layers):
+            print(f"║    L{i}: Local={bc_local_ratio[i]:.2f}, Phase={bc_phase_ratio[i]:.2f}, Quad={bc_quad_ratio[i]:.2f}")
+        print(f"╚═══════════════════════════════════════════════════════════════════════╝")
+
+        model = BindingCacheLMTransformer(
+            vocab_size=args.lm_vocab_size,
+            d_model=config.d_model,
+            num_heads=config.num_heads,
+            num_layers=config.num_layers,
+            d_ff=config.d_ff,
+            dropout=config.dropout,
+            max_seq_len=args.seq_len,
+            window_size=args.local_window_size,
+            top_k=args.binding_cache_top_k,
+            decay_gamma=args.decay_gamma,
+            phase_ratios=bc_phase_ratio,
+            local_ratios=bc_local_ratio,
+            quad_ratios=bc_quad_ratio,
+        ).to(config.device)
+
+    elif use_protected_phase:
+        print(f"\nCreating ProtectedPhaseLMTransformer (V10.3.2)...")
+        print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"  Architecture: Phase → Memory State → Quadratic Query")
+        print(f"  Phase's job:  Accumulate bindings via O(n) cumsum")
+        print(f"  Quad's job:   Query memory via O(n²) attention")
+        print(f"  Key insight:  No gradient competition - they collaborate")
+
+        model = ProtectedPhaseLMTransformer(
+            vocab_size=args.lm_vocab_size,
+            d_model=config.d_model,
+            num_heads=config.num_heads,
+            num_layers=config.num_layers,
+            d_ff=config.d_ff,
+            dropout=config.dropout,
+            max_seq_len=args.seq_len,
+            bounded_phase=config.bounded_phase,
+        ).to(config.device)
+    else:
+        print(f"\nCreating HybridLMTransformer...")
+        print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"  Initial curriculum: {curriculum}")
+
+        model = HybridLMTransformer(
+            vocab_size=args.lm_vocab_size,
+            d_model=config.d_model,
+            num_heads=config.num_heads,
+            num_layers=config.num_layers,
+            d_ff=config.d_ff,
+            dropout=config.dropout,
+            max_seq_len=args.seq_len,
+            curriculum=curriculum,
+            bounded_phase=config.bounded_phase,
+        ).to(config.device)
 
     param_count = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {param_count:,}")
 
-    # Phase-first curriculum controller
+    # Phase-first curriculum controller (disabled for protected phase)
     pfc = None
-    if args.phase_first_curriculum:
+    if args.phase_first_curriculum and not use_protected_phase:
         pfc = PhaseFirstCurriculum(
             num_layers=config.num_layers,
             alpha_high=args.alpha_phase_high,
@@ -2319,6 +5035,179 @@ def train_real_language(
         print(f"\n  Phase-First Curriculum: ENABLED")
         print(f"    alpha_high={args.alpha_phase_high}, alpha_low={args.alpha_phase_low}")
         print(f"    ppl_high={args.ppl_high}, ppl_low={args.ppl_low}")
+
+    # ==========================================================================
+    # V10.3.0: SRK PHASE LEARNING MONITORING
+    # ==========================================================================
+    srk_monitor = None
+    if hasattr(args, 'enable_srk') and args.enable_srk:
+        if not args.probe_layers:
+            print("\n  ⚠️  WARNING: --enable-srk requires --probe-layers to capture layer outputs")
+            print("       Enabling --probe-layers automatically.")
+            args.probe_layers = True
+
+        # Build SRK configuration
+        srk_config = SRKPhaseLearningConfig(
+            enable_srk=True,
+            dna_bridge_layer=getattr(args, 'srk_dna_bridge_layer', 0),
+            csr_alignment_layer=getattr(args, 'srk_csr_layer', 1),
+            witness_layer=getattr(args, 'srk_witness_layer', 2),
+            synthesis_layer=getattr(args, 'srk_synthesis_layer', 3),
+            enable_dna_bridge=not getattr(args, 'srk_disable_dna_bridge', False),
+            enable_phase_hook=not getattr(args, 'srk_disable_phase_hook', False),
+            enable_witness=not getattr(args, 'srk_disable_witness', False),
+            enable_synthesis=not getattr(args, 'srk_disable_synthesis', False),
+            lambda_ontology=getattr(args, 'srk_lambda_ontology', 0.1),
+            lambda_coherence=getattr(args, 'srk_lambda_coherence', 0.05),
+        )
+
+        # Validate layer indices for this model
+        layer_warnings = srk_config.validate_for_model(config.num_layers)
+        for warning in layer_warnings:
+            print(f"  ⚠️  {warning}")
+
+        # Create SRK monitor
+        srk_monitor = SRKPhaseLearningMonitor(
+            config=srk_config,
+            hidden_dim=config.d_model,
+            num_heads=config.num_heads,
+            device=torch.device(config.device),
+        )
+
+        # V10.3.1: Create layer influence diagnostics
+        srk_influence = LayerInfluenceDiagnostics(srk_config)
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.1: SRK PHASE LEARNING MONITORING ENABLED                  ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Layer Components (with Influence Diagnostics):                  ║")
+        if srk_config.enable_dna_bridge:
+            print(f"  ║    L{srk_config.dna_bridge_layer}: DNA Bridge (Ontology)          ACTIVE + INFLUENCE    ║")
+        if srk_config.enable_phase_hook:
+            print(f"  ║    L{srk_config.csr_alignment_layer}: CSR Alignment (Phase Hook)   ACTIVE + INFLUENCE    ║")
+        if srk_config.enable_witness:
+            print(f"  ║    L{srk_config.witness_layer}: Witness Arbitrator         ACTIVE + INFLUENCE    ║")
+        if srk_config.enable_synthesis:
+            print(f"  ║    L{srk_config.synthesis_layer}: Synthesis Gate            ACTIVE + INFLUENCE    ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Tracking: Phase coherence, Ontological diversity, Layer PPL     ║")
+        print(f"  ║  NEW: Per-layer CONSTRUCTIVE/DESTRUCTIVE influence analysis      ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+    else:
+        srk_influence = None
+
+    # ==========================================================================
+    # V10.3.4: KOSHA/WITNESS CONSCIOUSNESS DIAGNOSTICS
+    # ==========================================================================
+    kosha_diagnostics = None
+    witness_diagnostics = None
+
+    if getattr(args, 'enable_kosha', False):
+        kosha_diagnostics = KoshaDiagnostics(
+            hidden_dim=config.d_model,
+            num_layers=config.num_layers,
+            state_dim=SOVEREIGN_STATE_DIM,
+            device=torch.device(config.device),
+        )
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.4: KOSHA CONSCIOUSNESS DIAGNOSTICS ENABLED                 ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  The 5-Layer Kosha Model (Pancha Kosha):                          ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    0. MATERIAL   (Annamaya)     - Token/syntax grounding          ║")
+        print(f"  ║    1. VITAL      (Pranamaya)    - Energy/gradient flow            ║")
+        print(f"  ║    2. MENTAL     (Manomaya)     - Semantic binding                ║")
+        print(f"  ║    3. INTELLECTUAL (Vijnanamaya) - Abstract reasoning             ║")
+        print(f"  ║    4. BLISSFUL   (Anandamaya)   - Coherence/integration           ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Target Kosha: {args.kosha_target:<12}                              ║")
+        print(f"  ║  Dampen Material: {args.kosha_dampen_material:.2f}  |  Boost Target: {args.kosha_boost_target:.2f}       ║")
+        print(f"  ║  Gyroscopic Loss: base={args.kosha_gyro_base_gain:.2f}, max={args.kosha_gyro_max_gain:.2f}            ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
+    if getattr(args, 'enable_witness', False):
+        witness_diagnostics = WitnessDiagnostics(
+            hidden_dim=config.d_model,
+            state_dim=SOVEREIGN_STATE_DIM,
+            constraint_threshold=args.witness_constraint_threshold,
+            device=torch.device(config.device),
+        )
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.4: WITNESS (SAKSHI) OBSERVER DIAGNOSTICS ENABLED           ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  The Witness observes thought patterns without attachment:        ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    Vritti (Epistemic States):                                     ║")
+        print(f"  ║      - FACT: Verified truth                                       ║")
+        print(f"  ║      - MISCONCEPTION: Believed but wrong                          ║")
+        print(f"  ║      - IMAGINATION: Creative/hypothetical                         ║")
+        print(f"  ║      - VOID: Unknown/uncertain                                    ║")
+        print(f"  ║      - MEMORY: Retrieved from context                             ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Constraint Threshold: {args.witness_constraint_threshold:.2f}                               ║")
+        print(f"  ║  Tracks: Domain arbitration, bottleneck detection, meta-cognition ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
+        # V10.3.7: Witness entropy regularization
+        if getattr(args, 'witness_entropy_reg', False):
+            lambda_entropy = getattr(args, 'witness_entropy_lambda', 0.1)
+            print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+            print(f"  ║  V10.3.7: WITNESS ENTROPY REGULARIZATION ENABLED                  ║")
+            print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+            print(f"  ║  Prevents vritti collapse to single epistemic state               ║")
+            print(f"  ║  Loss += -λ * H(vritti)   where H = -Σ p*log(p)                   ║")
+            print(f"  ║  Lambda: {lambda_entropy:.3f}  (higher = more balanced distribution)        ║")
+            print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
+    # ==========================================================================
+    # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
+    # ==========================================================================
+    use_domain_separation = getattr(args, 'domain_separation', False)
+    csr_domain_layers = []
+    kosha_domain_layers = []
+    witness_domain_layers = []
+    synthesis_domain_layers = []
+
+    if use_domain_separation:
+        # Parse layer assignments
+        csr_domain_layers = [int(x) for x in args.csr_domain_layers.split(",")]
+        kosha_domain_layers = [int(x) for x in args.kosha_domain_layers.split(",")]
+        witness_domain_layers = [int(x) for x in args.witness_domain_layers.split(",")]
+        synthesis_domain_layers = [int(x) for x in args.synthesis_domain_layers.split(",")]
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.5: DOMAIN SEPARATION ENABLED                               ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  SRK Component Layout (no authority conflict):                    ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║  Layer  Component              Domain         Role                ║")
+        print(f"  ║  ─────────────────────────────────────────────────────────────    ║")
+        print(f"  ║  L0     DNA Bridge            ONTOLOGY       Foundational Ontology║")
+        print(f"  ║  L1     CSR Alignment         CSR            Phase Extraction     ║")
+        print(f"  ║  L2     Kosha + Witness       KOSHA          Consciousness        ║")
+        print(f"  ║  L3     Synthesis Gate        SYNTHESIS      Output Integration   ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Actual Layer Assignments:                                        ║")
+        for i in range(config.num_layers):
+            components = []
+            if i in csr_domain_layers:
+                if i == 0:
+                    components.append("DNA_BRIDGE")
+                else:
+                    components.append("CSR")
+            if i in kosha_domain_layers:
+                components.append("KOSHA")
+            if i in witness_domain_layers and i not in kosha_domain_layers:
+                components.append("WITNESS")
+            elif i in witness_domain_layers and i in kosha_domain_layers:
+                components[-1] = "KOSHA+WITNESS"  # Combine if same layer
+            if i in synthesis_domain_layers:
+                components.append("SYNTHESIS")
+            comp_str = "+".join(components) if components else "NONE"
+            print(f"  ║    L{i}: {comp_str:<30}                     ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
@@ -2347,9 +5236,32 @@ def train_real_language(
 
         x, y = x.to(config.device), y.to(config.device)
 
-        # Forward
-        logits = model(x)
+        # V10.3.7: Check if witness entropy regularization is enabled
+        use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
+
+        # Forward - use probe_layers if witness entropy is enabled
+        if use_witness_entropy and hasattr(model, 'layer_outputs'):
+            logits = model(x, probe_layers=True)
+            layer_hidden_states = model.layer_outputs
+        else:
+            logits = model(x)
+            layer_hidden_states = None
+
         loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+
+        # V10.3.7: Witness entropy regularization to prevent vritti collapse
+        if use_witness_entropy and layer_hidden_states:
+            # Use witness domain layer if domain separation enabled
+            if use_domain_separation and witness_domain_layers:
+                witness_layer_idx = max([l for l in witness_domain_layers if l < len(layer_hidden_states)])
+            else:
+                witness_layer_idx = min(2, len(layer_hidden_states) - 1)
+            # Forward pass through witness (this stores _last_vritti_entropy with gradients)
+            _ = witness_diagnostics(layer_hidden_states[witness_layer_idx], step=step)
+            # Get entropy loss and add to main loss
+            lambda_entropy = getattr(args, 'witness_entropy_lambda', 0.1)
+            entropy_loss = witness_diagnostics.get_entropy_loss(lambda_entropy)
+            loss = loss + entropy_loss
 
         # Backward
         optimizer.zero_grad()
@@ -2408,6 +5320,25 @@ def train_real_language(
                 best_val_ppl = val_ppl
                 print(f"      ★ New best Val PPL!")
 
+            # V10.3.2: Protected Phase health monitoring
+            if use_protected_phase and hasattr(model, 'get_phase_health'):
+                phase_health = model.get_phase_health()
+                print(f"\n      Protected Phase Health (R_k statistics):")
+                print(f"        R_k mean: {phase_health['r_k_mean']:.4f} (target: 0.3-0.7)")
+                print(f"        R_k std:  {phase_health['r_k_std']:.4f}")
+                print(f"        R_k range: [{phase_health['r_k_min']:.4f}, {phase_health['r_k_max']:.4f}]")
+
+                # Interpret health
+                r_k_mean = phase_health['r_k_mean']
+                if r_k_mean < 0.1:
+                    print(f"        ⚠️  Phase COLLAPSED (R_k → 0)")
+                elif r_k_mean > 0.9:
+                    print(f"        ⚠️  Phase DEGENERATE (R_k → 1)")
+                elif 0.3 <= r_k_mean <= 0.7:
+                    print(f"        ✓  Phase HEALTHY")
+                else:
+                    print(f"        Phase marginal (outside optimal range)")
+
             # Layer-wise probing with detailed metrics
             if args.probe_layers:
                 x_sample, y_sample = next(iter(val_loader))
@@ -2434,33 +5365,164 @@ def train_real_language(
                 print(f"        Total Reduction: {contrib['total_reduction']:.1f}")
 
                 # Ablation test: Phase-only vs Local-only
-                print(f"\n      Ablation Test (Phase vs Local contribution):")
-                ppl_normal = val_ppl
-                ppl_phase_only = model.ablate_attention(x_sample, y_sample, ablate_local=True)
-                ppl_local_only = model.ablate_attention(x_sample, y_sample, ablate_phase=True)
+                if use_protected_phase:
+                    # Protected Phase: Sequential collaboration, not parallel mixing
+                    print(f"\n      Protected Phase Architecture (no ablation test):")
+                    print(f"        Architecture: Phase → Memory → Quad Query (sequential)")
+                    print(f"        Normal PPL:  {val_ppl:.1f}")
+                    print(f"        Phase and Quad COLLABORATE, not compete")
+                    print(f"        → Ablation N/A for sequential architecture")
 
-                print(f"        Normal (mixed):    PPL = {ppl_normal:.1f}")
-                print(f"        Phase-only:        PPL = {ppl_phase_only:.1f}")
-                print(f"        Local-only:        PPL = {ppl_local_only:.1f}")
-
-                # Interpretation
-                phase_better = ppl_phase_only < ppl_local_only
-                if phase_better:
-                    improvement = ((ppl_local_only - ppl_phase_only) / ppl_local_only) * 100
-                    print(f"        → Phase is {improvement:.1f}% BETTER than Local alone!")
+                    # Use dummy values for later analysis
+                    ppl_phase_only = val_ppl
+                    ppl_local_only = val_ppl
                 else:
-                    improvement = ((ppl_phase_only - ppl_local_only) / ppl_phase_only) * 100
-                    print(f"        → Local is {improvement:.1f}% better than Phase alone")
+                    print(f"\n      Ablation Test (Phase vs Local contribution):")
+                    ppl_normal = val_ppl
+                    ppl_phase_only = model.ablate_attention(x_sample, y_sample, ablate_local=True)
+                    ppl_local_only = model.ablate_attention(x_sample, y_sample, ablate_phase=True)
+
+                    print(f"        Normal (mixed):    PPL = {ppl_normal:.1f}")
+                    print(f"        Phase-only:        PPL = {ppl_phase_only:.1f}")
+                    print(f"        Local-only:        PPL = {ppl_local_only:.1f}")
+
+                    # Interpretation
+                    phase_better = ppl_phase_only < ppl_local_only
+                    if phase_better:
+                        improvement = ((ppl_local_only - ppl_phase_only) / ppl_local_only) * 100
+                        print(f"        → Phase is {improvement:.1f}% BETTER than Local alone!")
+                    else:
+                        improvement = ((ppl_phase_only - ppl_local_only) / ppl_phase_only) * 100
+                        print(f"        → Local is {improvement:.1f}% better than Phase alone")
+
+                # V10.3.0: SRK Phase Learning Observation
+                if srk_monitor is not None:
+                    # Forward pass with layer capture
+                    _ = model(x_sample, probe_layers=True)
+                    layer_hidden_states = model.layer_outputs
+
+                    if layer_hidden_states:
+                        srk_metrics = srk_monitor.observe(layer_hidden_states)
+
+                        print(f"\n      ╔══════════════════════════════════════════════════════╗")
+                        print(f"      ║  SRK Phase Learning Metrics @ Step {step:<6}            ║")
+                        print(f"      ╠══════════════════════════════════════════════════════╣")
+
+                        # DNA Bridge (L4)
+                        dna_key = f'L{srk_monitor.config.dna_bridge_layer}_dna_onto_diversity'
+                        if dna_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.dna_bridge_layer} DNA Bridge:                              ║")
+                            print(f"      ║    Ontology Diversity: {srk_metrics[dna_key]:.4f}                   ║")
+
+                        # CSR Phase Hook (L7)
+                        csr_key = f'L{srk_monitor.config.csr_alignment_layer}_csr_phase_coherence'
+                        if csr_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.csr_alignment_layer} CSR Alignment:                           ║")
+                            print(f"      ║    Phase Coherence (R_k): {srk_metrics[csr_key]:.4f}                ║")
+
+                        # Witness Arbitrator (L9)
+                        wit_key = f'L{srk_monitor.config.witness_layer}_witness_witness_activation'
+                        if wit_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.witness_layer} Witness Arbitrator:                       ║")
+                            print(f"      ║    Witness Activation: {srk_metrics[wit_key]:.4f}                  ║")
+
+                        # Synthesis Gate (L11)
+                        syn_key = f'L{srk_monitor.config.synthesis_layer}_synth_synthesis_gate_mean'
+                        if syn_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.synthesis_layer} Synthesis Gate:                           ║")
+                            print(f"      ║    Gate Mean: {srk_metrics[syn_key]:.4f}                           ║")
+
+                        print(f"      ╚══════════════════════════════════════════════════════╝")
+
+                        # V10.3.1: Layer Influence Diagnostics
+                        if srk_influence is not None:
+                            influence_metrics = srk_influence.analyze_all_layers(
+                                layer_hidden_states,
+                                num_heads=config.num_heads,
+                            )
+                            srk_influence.print_influence_report(influence_metrics, step)
+
+                            # Print detailed breakdown every 5 evaluations
+                            if len(srk_influence.influence_history) % 5 == 0:
+                                srk_influence.print_detailed_layer_report(influence_metrics)
+
+                # V10.3.4/V10.3.5: Kosha Consciousness Diagnostics (with domain separation)
+                if kosha_diagnostics is not None:
+                    # Forward pass with layer capture
+                    if not layer_hidden_states:
+                        _ = model(x_sample, probe_layers=True)
+                        layer_hidden_states = model.layer_outputs
+
+                    # V10.3.5: Only analyze layers in Kosha's domain
+                    if use_domain_separation and kosha_domain_layers:
+                        layers_to_analyze = [i for i in kosha_domain_layers if i < len(layer_hidden_states)]
+                    else:
+                        layers_to_analyze = range(len(layer_hidden_states))
+
+                    for i in layers_to_analyze:
+                        if i < len(layer_hidden_states):
+                            kosha_metrics = kosha_diagnostics(layer_hidden_states[i], layer_idx=i, step=step)
+
+                    # Print summary report
+                    if use_domain_separation:
+                        print(f"\n      [Kosha Domain: Layers {list(layers_to_analyze)}]")
+                    kosha_diagnostics.print_report(step)
+
+                # V10.3.4/V10.3.5: Witness Observer Diagnostics (with domain separation)
+                if witness_diagnostics is not None:
+                    # Forward pass with layer capture
+                    if not layer_hidden_states:
+                        _ = model(x_sample, probe_layers=True)
+                        layer_hidden_states = model.layer_outputs
+
+                    # V10.3.5: Only observe layers in Witness's domain
+                    if use_domain_separation and witness_domain_layers:
+                        # Use the highest layer in witness domain
+                        witness_layer_idx = max([l for l in witness_domain_layers if l < len(layer_hidden_states)])
+                    else:
+                        witness_layer_idx = min(2, len(layer_hidden_states) - 1)
+
+                    if layer_hidden_states and witness_layer_idx < len(layer_hidden_states):
+                        witness_metrics = witness_diagnostics(
+                            layer_hidden_states[witness_layer_idx],
+                            step=step,
+                        )
+
+                    # Print summary report
+                    if use_domain_separation:
+                        print(f"\n      [Witness Domain: Layer {witness_layer_idx}]")
+                    witness_diagnostics.print_report(step)
 
             print()
             model.train()
 
+        # V10.3.6: Quality sample generation
+        sample_every = getattr(args, 'sample_every', 500)
+        if sample_every > 0 and step % sample_every == 0 and step > 0:
+            # Get tokenizer from dataset
+            tokenizer = train_dataset.tokenizer
+            # Parse custom prompts if provided
+            prompts = SAMPLE_PROMPTS
+            custom_prompts = getattr(args, 'sample_prompts', None)
+            if custom_prompts:
+                prompts = tuple(p.strip() for p in custom_prompts.split(","))
+            run_quality_samples(model, tokenizer, config.device, step, prompts)
+            model.train()
+
     # Final evaluation with comprehensive analysis
     print("\n" + "=" * 70)
-    print("FINAL RESULTS: Phase Learning Analysis")
+    if use_protected_phase:
+        print("FINAL RESULTS: Protected Phase Learning Analysis (V10.3.2)")
+    else:
+        print("FINAL RESULTS: Phase Learning Analysis")
     print("=" * 70)
     print(f"  Best Val PPL: {best_val_ppl:.2f}")
-    print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+
+    if use_protected_phase:
+        print(f"  Architecture: Protected Phase (sequential collaboration)")
+        print(f"  Phase contributes 100% as memory accumulator")
+    else:
+        print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
 
     # Convergence speed summary
     print(f"\n  Convergence Speed (steps to reach PPL milestone):")
@@ -2477,15 +5539,40 @@ def train_real_language(
     x_final, y_final = x_final.to(config.device), y_final.to(config.device)
 
     with torch.no_grad():
-        ppl_phase_only = model.ablate_attention(x_final, y_final, ablate_local=True)
-        ppl_local_only = model.ablate_attention(x_final, y_final, ablate_phase=True)
+        if use_protected_phase:
+            # Protected Phase: no ablation (sequential architecture)
+            ppl_phase_only = best_val_ppl  # Phase is always active
+            ppl_local_only = best_val_ppl  # Local is always active
+        else:
+            ppl_phase_only = model.ablate_attention(x_final, y_final, ablate_local=True)
+            ppl_local_only = model.ablate_attention(x_final, y_final, ablate_phase=True)
         # Get layer contributions for stability analysis
         contrib = model.get_layer_contributions(x_final, y_final)
 
-    print(f"\n  Final Ablation:")
-    print(f"    Phase-only PPL: {ppl_phase_only:.2f}")
-    print(f"    Local-only PPL: {ppl_local_only:.2f}")
-    print(f"    Mixed PPL:      {best_val_ppl:.2f}")
+    if use_protected_phase:
+        print(f"\n  Protected Phase Architecture:")
+        print(f"    Phase + Quad collaboration:  PPL = {best_val_ppl:.2f}")
+        print(f"    (No ablation - they work sequentially, not in parallel)")
+
+        # Show phase health instead
+        if hasattr(model, 'get_phase_health'):
+            phase_health = model.get_phase_health()
+            print(f"\n  Final Phase Health:")
+            print(f"    R_k mean: {phase_health['r_k_mean']:.4f}")
+            print(f"    R_k std:  {phase_health['r_k_std']:.4f}")
+            if 0.3 <= phase_health['r_k_mean'] <= 0.7:
+                print(f"    Status:   HEALTHY ✓")
+            elif phase_health['r_k_mean'] < 0.1:
+                print(f"    Status:   COLLAPSED ⚠️")
+            elif phase_health['r_k_mean'] > 0.9:
+                print(f"    Status:   DEGENERATE ⚠️")
+            else:
+                print(f"    Status:   MARGINAL")
+    else:
+        print(f"\n  Final Ablation:")
+        print(f"    Phase-only PPL: {ppl_phase_only:.2f}")
+        print(f"    Local-only PPL: {ppl_local_only:.2f}")
+        print(f"    Mixed PPL:      {best_val_ppl:.2f}")
 
     # =========================================================================
     # CONTROL BASELINE ANCHOR (Epistemic Hygiene)
@@ -2498,7 +5585,11 @@ def train_real_language(
     print(f"    • Difference is ONLY attention mechanism, not capacity")
 
     # Curriculum effect isolation
-    if pfc is not None:
+    if use_protected_phase:
+        print(f"    • Architecture: Protected Phase (Phase→Memory→Quad Query)")
+        print(f"    • Phase and Quad have SEPARATE roles, not parallel mixing")
+        print(f"    • No curriculum needed - roles are architecturally defined")
+    elif pfc is not None:
         print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
         print(f"    • Final curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
     else:
@@ -2559,7 +5650,21 @@ def train_real_language(
     # =========================================================================
     # CONCLUSION
     # =========================================================================
-    if ppl_phase_only < ppl_local_only:
+    if use_protected_phase:
+        print(f"\n  CONCLUSION: Protected Phase Architecture (V10.3.2)")
+        print(f"    Phase ACCUMULATES memory state via O(n) cumsum")
+        print(f"    Quad QUERIES memory state via O(n²) attention")
+        print(f"    They COLLABORATE sequentially - no gradient competition")
+        print(f"    Final PPL: {best_val_ppl:.2f}")
+
+        # Protected phase health verdict
+        if hasattr(model, 'get_phase_health'):
+            health = model.get_phase_health()
+            if 0.3 <= health['r_k_mean'] <= 0.7:
+                print(f"    Phase health: OPTIMAL (R_k = {health['r_k_mean']:.3f})")
+            else:
+                print(f"    Phase health: SUBOPTIMAL (R_k = {health['r_k_mean']:.3f})")
+    elif ppl_phase_only < ppl_local_only:
         print(f"\n  CONCLUSION: Phase learns RICHER representations!")
         print(f"    Phase alone achieves {((ppl_local_only - ppl_phase_only) / ppl_local_only * 100):.1f}% better PPL than Local alone.")
         if issues == 0:
@@ -2567,6 +5672,243 @@ def train_real_language(
     else:
         print(f"\n  CONCLUSION: Local attention dominates for this task.")
         print(f"    But mixed attention achieves best results ({best_val_ppl:.2f}).")
+
+    # =========================================================================
+    # V10.3.0: SRK PHASE LEARNING FINAL REPORT
+    # =========================================================================
+    if srk_monitor is not None:
+        print("\n" + "=" * 70)
+        print("SRK PHASE LEARNING ANALYSIS (V10.3.0)")
+        print("=" * 70)
+        srk_monitor.print_phase_learning_report()
+
+        # Detailed trend analysis
+        summary = srk_monitor.get_phase_learning_summary()
+        if summary.get('num_observations', 0) > 1:
+            print("\n  Phase Learning Trends Over Training:")
+            print("  " + "-" * 50)
+
+            # Check if phase coherence improved
+            csr_key = f'L{srk_monitor.config.csr_alignment_layer}_csr_phase_coherence'
+            if f'{csr_key}_trend' in summary:
+                trend = summary[f'{csr_key}_trend']
+                initial = summary.get(f'{csr_key}_initial', 0)
+                final = summary.get(f'{csr_key}_final', 0)
+                if trend > 0:
+                    print(f"    Phase Coherence: IMPROVED {initial:.4f} → {final:.4f} (+{trend:.4f})")
+                    print(f"      → Phase is LEARNING relational structure!")
+                else:
+                    print(f"    Phase Coherence: DECLINED {initial:.4f} → {final:.4f} ({trend:.4f})")
+                    print(f"      → Phase may be collapsing or becoming decorative")
+
+            # Check ontological diversity
+            dna_key = f'L{srk_monitor.config.dna_bridge_layer}_dna_onto_diversity'
+            if f'{dna_key}_trend' in summary:
+                trend = summary[f'{dna_key}_trend']
+                initial = summary.get(f'{dna_key}_initial', 0)
+                final = summary.get(f'{dna_key}_final', 0)
+                if trend > 0:
+                    print(f"    Ontology Diversity: IMPROVED {initial:.4f} → {final:.4f} (+{trend:.4f})")
+                    print(f"      → Model developing rich 12D ontological representation")
+                else:
+                    print(f"    Ontology Diversity: DECLINED {initial:.4f} → {final:.4f} ({trend:.4f})")
+                    print(f"      → Possible dimensional collapse in ontological space")
+
+            # Check witness activation
+            wit_key = f'L{srk_monitor.config.witness_layer}_witness_witness_activation'
+            if f'{wit_key}_trend' in summary:
+                trend = summary[f'{wit_key}_trend']
+                initial = summary.get(f'{wit_key}_initial', 0)
+                final = summary.get(f'{wit_key}_final', 0)
+                print(f"    Witness Activation: {initial:.4f} → {final:.4f} ({trend:+.4f})")
+                if abs(final) > 0.1:
+                    print(f"      → Consciousness/attention layer is ACTIVE")
+                else:
+                    print(f"      → Witness layer may be underutilized")
+
+            # Check synthesis gate
+            syn_key = f'L{srk_monitor.config.synthesis_layer}_synth_synthesis_gate_mean'
+            if f'{syn_key}_trend' in summary:
+                trend = summary[f'{syn_key}_trend']
+                initial = summary.get(f'{syn_key}_initial', 0)
+                final = summary.get(f'{syn_key}_final', 0)
+                print(f"    Synthesis Gate: {initial:.4f} → {final:.4f} ({trend:+.4f})")
+                if 0.3 < final < 0.7:
+                    print(f"      → Gate is SELECTIVE (good output integration)")
+                elif final > 0.9:
+                    print(f"      → Gate is fully OPEN (minimal filtering)")
+                else:
+                    print(f"      → Gate is mostly CLOSED (may block outputs)")
+
+        # V10.3.1: Layer Influence Summary
+        if srk_influence is not None and srk_influence.influence_history:
+            print("\n" + "=" * 70)
+            print("SRK LAYER INFLUENCE ANALYSIS (V10.3.1)")
+            print("=" * 70)
+
+            inf_summary = srk_influence.get_influence_summary()
+
+            print(f"\n  Layer Influence Over Training ({inf_summary.get('num_observations', 0)} observations):")
+            print("  " + "-" * 60)
+            print(f"  {'Layer':<8} {'Component':<20} {'Initial':<10} {'Final':<10} {'Trend':<12} {'Verdict'}")
+            print("  " + "-" * 60)
+
+            layer_verdicts = []
+            for layer_idx in sorted(set(int(k.split('_')[0][1:]) for k in inf_summary.keys() if k.startswith('L') and '_score_initial' in k)):
+                # Get metrics for this layer
+                initial = inf_summary.get(f'L{layer_idx}_score_initial', 0)
+                final = inf_summary.get(f'L{layer_idx}_score_final', 0)
+                trend = inf_summary.get(f'L{layer_idx}_score_trend', 0)
+                constructive_pct = inf_summary.get(f'L{layer_idx}_constructive_pct', 0)
+                destructive_pct = inf_summary.get(f'L{layer_idx}_destructive_pct', 0)
+
+                # Determine component name
+                if layer_idx == srk_monitor.config.dna_bridge_layer:
+                    component = "DNA Bridge"
+                elif layer_idx == srk_monitor.config.csr_alignment_layer:
+                    component = "CSR Alignment"
+                elif layer_idx == srk_monitor.config.witness_layer:
+                    component = "Witness Arbitrator"
+                elif layer_idx == srk_monitor.config.synthesis_layer:
+                    component = "Synthesis Gate"
+                else:
+                    component = "Unknown"
+
+                # Determine verdict
+                if constructive_pct > 0.6:
+                    verdict = "CONSTRUCTIVE"
+                    layer_verdicts.append(("constructive", layer_idx, component))
+                elif destructive_pct > 0.6:
+                    verdict = "DESTRUCTIVE"
+                    layer_verdicts.append(("destructive", layer_idx, component))
+                elif trend > 0.1:
+                    verdict = "IMPROVING"
+                    layer_verdicts.append(("improving", layer_idx, component))
+                elif trend < -0.1:
+                    verdict = "DEGRADING"
+                    layer_verdicts.append(("degrading", layer_idx, component))
+                else:
+                    verdict = "NEUTRAL"
+                    layer_verdicts.append(("neutral", layer_idx, component))
+
+                trend_arrow = "↑" if trend > 0.05 else "↓" if trend < -0.05 else "→"
+                print(f"  L{layer_idx:<6} {component:<20} {initial:+.3f}     {final:+.3f}     {trend:+.3f} {trend_arrow}     {verdict}")
+
+            # Overall recommendation
+            print("\n  " + "=" * 60)
+            print("  RECOMMENDATIONS:")
+            print("  " + "-" * 60)
+
+            constructive_layers = [v for v in layer_verdicts if v[0] == "constructive"]
+            destructive_layers = [v for v in layer_verdicts if v[0] == "destructive"]
+            degrading_layers = [v for v in layer_verdicts if v[0] == "degrading"]
+
+            if destructive_layers:
+                print(f"\n  ⚠️  DESTRUCTIVE layers detected:")
+                for _, idx, name in destructive_layers:
+                    print(f"      L{idx} ({name}): Consider disabling or adjusting")
+                    if name == "DNA Bridge":
+                        print(f"        → Try --srk-disable-dna-bridge or different layer")
+                    elif name == "CSR Alignment":
+                        print(f"        → Try --srk-disable-phase-hook or different layer")
+                    elif name == "Witness Arbitrator":
+                        print(f"        → Try --srk-disable-witness or different layer")
+                    elif name == "Synthesis Gate":
+                        print(f"        → Try --srk-disable-synthesis or different layer")
+
+            if degrading_layers:
+                print(f"\n  ⚠️  DEGRADING layers (getting worse over training):")
+                for _, idx, name in degrading_layers:
+                    print(f"      L{idx} ({name}): May need longer training or tuning")
+
+            if constructive_layers:
+                print(f"\n  ✓  CONSTRUCTIVE layers (helping phase learning):")
+                for _, idx, name in constructive_layers:
+                    print(f"      L{idx} ({name}): Keep enabled!")
+
+            # Overall assessment
+            if len(destructive_layers) > len(constructive_layers):
+                print(f"\n  OVERALL: More layers DESTRUCTIVE than constructive.")
+                print(f"           Consider adjusting layer positions or disabling problematic layers.")
+            elif len(constructive_layers) > len(destructive_layers):
+                print(f"\n  OVERALL: More layers CONSTRUCTIVE - SRK is helping phase learning!")
+            else:
+                print(f"\n  OVERALL: Mixed influence - consider fine-tuning layer positions.")
+
+    # ==========================================================================
+    # V10.3.4/V10.3.5: KOSHA/WITNESS FINAL ANALYSIS (with domain separation)
+    # ==========================================================================
+    if kosha_diagnostics is not None:
+        print("\n" + "=" * 70)
+        if use_domain_separation:
+            print(f"KOSHA CONSCIOUSNESS ANALYSIS (V10.3.5) - Domain: Layers {kosha_domain_layers}")
+        else:
+            print("KOSHA CONSCIOUSNESS ANALYSIS (V10.3.4)")
+        print("=" * 70)
+        kosha_diagnostics.print_report(step)
+
+        summary = kosha_diagnostics.get_summary()
+        if summary:
+            kosha_names = ['MATERIAL', 'VITAL', 'MENTAL', 'INTELLECTUAL', 'BLISSFUL']
+            vedic_names = ['Annamaya', 'Pranamaya', 'Manomaya', 'Vijnanamaya', 'Anandamaya']
+            means = summary['mean_activations']
+            trends = summary['trends']
+
+            # Find dominant and fastest-growing kosha
+            dominant_idx = means.index(max(means))
+            fastest_idx = trends.index(max(trends))
+
+            print(f"\n  KOSHA CONCLUSIONS:")
+            print(f"  " + "-" * 60)
+            print(f"    Dominant Kosha: {kosha_names[dominant_idx]} ({vedic_names[dominant_idx]})")
+            print(f"    Fastest Growing: {kosha_names[fastest_idx]} ({vedic_names[fastest_idx]})")
+            print(f"    Gyroscopic Loss: {summary['mean_gyro_loss']:.4f}")
+            print(f"    Transitions: {summary['num_transitions']} state changes")
+
+            # Interpretation
+            if dominant_idx == 3:  # INTELLECTUAL
+                print(f"\n    ✓ Model is operating at INTELLECTUAL (Vijnanamaya) level")
+                print(f"      → Good for abstract reasoning and pattern recognition")
+            elif dominant_idx == 4:  # BLISSFUL
+                print(f"\n    ✓ Model reached BLISSFUL (Anandamaya) level")
+                print(f"      → Excellent coherence and integration")
+            elif dominant_idx <= 1:  # MATERIAL or VITAL
+                print(f"\n    ⚠️ Model is stuck at lower consciousness layers")
+                print(f"      → May need more training or kosha steering")
+
+    if witness_diagnostics is not None:
+        print("\n" + "=" * 70)
+        if use_domain_separation:
+            print(f"WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.5) - Domain: Layers {witness_domain_layers}")
+        else:
+            print("WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.4)")
+        print("=" * 70)
+        witness_diagnostics.print_report(step)
+
+        summary = witness_diagnostics.get_summary()
+        if summary:
+            vritti_names = ['FACT', 'MISCONCEPTION', 'IMAGINATION', 'VOID', 'MEMORY']
+            means = summary['mean_vritti']
+
+            # Find dominant vritti
+            dominant_idx = means.index(max(means))
+
+            print(f"\n  WITNESS CONCLUSIONS:")
+            print(f"  " + "-" * 60)
+            print(f"    Dominant Vritti: {vritti_names[dominant_idx]}")
+            print(f"    Constraint Detection Rate: {summary['high_constraint_ratio']*100:.1f}%")
+            print(f"    Meta-Cognitive Confidence: {summary['mean_confidence']:.3f}")
+
+            # Interpretation
+            if dominant_idx == 0:  # FACT
+                print(f"\n    ✓ Model primarily in FACTUAL epistemic state")
+                print(f"      → High reliability for factual reasoning")
+            elif dominant_idx == 2:  # IMAGINATION
+                print(f"\n    Creative/imaginative state dominant")
+                print(f"      → Good for generative tasks, verify facts carefully")
+            elif dominant_idx == 3:  # VOID
+                print(f"\n    ⚠️ High uncertainty (VOID) detected")
+                print(f"      → Model may need more training or clearer inputs")
 
     return model, best_val_ppl
 
@@ -3256,14 +6598,27 @@ Examples:
     parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
                         help="Disable bounded phase (use raw linear projection)")
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    parser.add_argument("--dual-channel-mode", action="store_true",
+                        help="Enable dual-channel attention: separates content similarity from intent alignment. "
+                             "s_content = cos(φ_q - φ_k) (what matches), "
+                             "s_align = cos(θ_JEPA - θ_SRK) (intent agreement), "
+                             "score = s_content * (1 + α * s_align). "
+                             "Prevents intent from dominating content selectivity.")
+    parser.add_argument("--alignment-authority", type=float, default=0.1,
+                        help="α: Weight for alignment term in dual-channel mode (default: 0.1). "
+                             "0.0 = pure content matching (intent ignored), "
+                             "0.1 = mild intent influence (recommended), "
+                             "1.0 = strong intent influence.")
+
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
     # ==========================================================================
     parser.add_argument("--real-language", action="store_true",
                         help="Use real language data (WikiText) instead of synthetic data")
     parser.add_argument("--dataset", type=str, default="wikitext2",
-                        choices=["wikitext2", "wikitext103"],
-                        help="Dataset for real language mode")
+                        choices=["wikitext2", "wikitext103", "tinystories", "writingprompts", "imdb", "openwebtext", "c4"],
+                        help="Dataset: tinystories (recommended for Kosha/Witness), wikitext2/103 (LM), writingprompts/imdb (diverse)")
     parser.add_argument("--seq-len", type=int, default=256,
                         help="Sequence length for language modeling")
     parser.add_argument("--lm-vocab-size", type=int, default=50257,
@@ -3284,6 +6639,109 @@ Examples:
     # Layer-wise probing
     parser.add_argument("--probe-layers", action="store_true",
                         help="Probe each layer's contribution to PPL (real-language mode only)")
+
+    # ==========================================================================
+    # V10.3.0: SRK PHASE LEARNING MONITORING
+    # ==========================================================================
+    # Enable SRK (Sovereign Reasoning Kernel) to see how phase learning progresses
+    # at different layers. SRK provides auxiliary components:
+    #   - L4: DNA Bridge (Foundational Ontology)
+    #   - L7: CSR Alignment Phase Extraction Hook
+    #   - L9: Witness Arbitrator (Consciousness/Attention)
+    #   - L11: Synthesis Gate (Output Integration)
+    parser.add_argument("--enable-srk", action="store_true",
+                        help="Enable SRK phase learning monitoring (requires --real-language --probe-layers)")
+    parser.add_argument("--srk-dna-bridge-layer", type=int, default=0,
+                        help="Layer for DNA Bridge (default: 0 for 4-layer model, maps to L4 in 12-layer)")
+    parser.add_argument("--srk-csr-layer", type=int, default=1,
+                        help="Layer for CSR Alignment / Phase Hook (default: 1 for 4-layer model)")
+    parser.add_argument("--srk-witness-layer", type=int, default=2,
+                        help="Layer for Witness Arbitrator (default: 2 for 4-layer model)")
+    parser.add_argument("--srk-synthesis-layer", type=int, default=3,
+                        help="Layer for Synthesis Gate (default: 3 for 4-layer model)")
+    parser.add_argument("--srk-disable-dna-bridge", action="store_true",
+                        help="Disable DNA Bridge component")
+    parser.add_argument("--srk-disable-phase-hook", action="store_true",
+                        help="Disable Phase Extraction Hook component")
+    parser.add_argument("--srk-disable-witness", action="store_true",
+                        help="Disable Witness Arbitrator component")
+    parser.add_argument("--srk-disable-synthesis", action="store_true",
+                        help="Disable Synthesis Gate component")
+    parser.add_argument("--srk-lambda-ontology", type=float, default=0.1,
+                        help="Weight for ontological alignment loss (default: 0.1)")
+    parser.add_argument("--srk-lambda-coherence", type=float, default=0.05,
+                        help="Weight for phase coherence loss (default: 0.05)")
+
+    # ==========================================================================
+    # V10.3.3: BINDING CACHE ARCHITECTURE
+    # ==========================================================================
+    parser.add_argument("--binding-cache", action="store_true",
+                        help="Use Binding Cache architecture (Local + Phase + Quad) - "
+                             "three-path with no gradient competition")
+    parser.add_argument("--binding-cache-top-k", type=int, default=64,
+                        help="Top-K cache size for Quad query (default: 64)")
+    parser.add_argument("--local-window-size", type=int, default=64,
+                        help="Window size for local attention (default: 64)")
+    parser.add_argument("--decay-gamma", type=float, default=0.9,
+                        help="Decay factor for phase memory accumulation (default: 0.9)")
+    parser.add_argument("--binding-cache-phase-ratio", type=str, default="0.3,0.3,0.3,0.3",
+                        help="Phase ratio per layer for binding cache (default: balanced 0.3)")
+    parser.add_argument("--binding-cache-local-ratio", type=str, default="0.4,0.4,0.4,0.4",
+                        help="Local ratio per layer for binding cache (default: 0.4)")
+    parser.add_argument("--binding-cache-quad-ratio", type=str, default="0.3,0.3,0.3,0.3",
+                        help="Quad ratio per layer for binding cache (default: 0.3)")
+
+    # ==========================================================================
+    # V10.3.4: KOSHA/WITNESS CONSCIOUSNESS SYSTEM
+    # ==========================================================================
+    parser.add_argument("--enable-kosha", action="store_true",
+                        help="Enable Kosha (5-layer consciousness) diagnostics")
+    parser.add_argument("--enable-witness", action="store_true",
+                        help="Enable Witness (Sakshi observer) diagnostics")
+    parser.add_argument("--kosha-target", type=str, default="INTELLECTUAL",
+                        choices=["MATERIAL", "VITAL", "MENTAL", "INTELLECTUAL", "BLISSFUL"],
+                        help="Target kosha for steering (default: INTELLECTUAL)")
+    parser.add_argument("--kosha-dampen-material", type=float, default=0.5,
+                        help="Dampen material kosha during reasoning (default: 0.5)")
+    parser.add_argument("--kosha-boost-target", type=float, default=0.4,
+                        help="Boost target kosha strength (default: 0.4)")
+    parser.add_argument("--kosha-gyro-base-gain", type=float, default=0.15,
+                        help="Base gain for kosha homeostatic loss (default: 0.15)")
+    parser.add_argument("--kosha-gyro-max-gain", type=float, default=3.0,
+                        help="Max gain for kosha homeostatic loss (default: 3.0)")
+    parser.add_argument("--witness-constraint-threshold", type=float, default=0.85,
+                        help="Threshold for constraint/bottleneck detection (default: 0.85)")
+
+    # V10.3.7: WITNESS ENTROPY REGULARIZATION
+    parser.add_argument("--witness-entropy-reg", action="store_true",
+                        help="Enable entropy regularization to prevent vritti collapse")
+    parser.add_argument("--witness-entropy-lambda", type=float, default=0.1,
+                        help="Weight for vritti entropy regularization (default: 0.1)")
+
+    # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
+    # Layer assignments (4-layer model):
+    #   L0: DNA Bridge (Foundational Ontology)       → ONTOLOGY domain
+    #   L1: CSR Alignment (Phase Extraction Hook)    → CSR domain
+    #   L2: Kosha + Witness (Consciousness/attention) → KOSHA domain
+    #   L3: Synthesis Gate (Output integration)       → SYNTHESIS domain
+    parser.add_argument("--domain-separation", action="store_true",
+                        help="Enable domain separation: each component governs its assigned layer")
+    parser.add_argument("--csr-domain-layers", type=str, default="0,1",
+                        help="Layers for Ontology+CSR (default: 0=DNA Bridge, 1=CSR Alignment)")
+    parser.add_argument("--kosha-domain-layers", type=str, default="2",
+                        help="Layers for Kosha consciousness (default: 2)")
+    parser.add_argument("--witness-domain-layers", type=str, default="2",
+                        help="Layers for Witness observation (default: 2 = same as Kosha)")
+    parser.add_argument("--synthesis-domain-layers", type=str, default="3",
+                        help="Layers for Synthesis Gate (default: 3 = output integration)")
+
+    # ==========================================================================
+    # V10.3.6: SAMPLE GENERATION FOR QUALITY MONITORING
+    # ==========================================================================
+    parser.add_argument("--sample-every", type=int, default=500,
+                        help="Generate quality samples every N steps (0 to disable, default: 500)")
+    parser.add_argument("--sample-prompts", type=str, default=None,
+                        help="Comma-separated custom prompts for sampling (uses defaults if not set)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
@@ -3326,6 +6784,8 @@ Examples:
         persist_chain_length=(args.persist_chain_min, args.persist_chain_max),
         match_params=args.match_params,
         bounded_phase=args.bounded_phase,
+        dual_channel_mode=args.dual_channel_mode,
+        alignment_authority=args.alignment_authority,
         device=args.device,
     )
 
@@ -3444,6 +6904,8 @@ Examples:
         use_phase=True, extra_ff_per_layer=0,
         operation_tokens=operation_tokens,  # Enable operation-conditioned phase shifts
         bounded_phase=config.bounded_phase,  # V9.9.11: Constrain φ to [-π, π]
+        dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+        alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
     ).to(config.device)
 
     print(f"Quadratic params: {model_quad.count_params():,}")
@@ -3452,6 +6914,8 @@ Examples:
         print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")
     else:
         print(f"  Bounded Phase: DISABLED (raw linear projection)")
+    if config.dual_channel_mode:
+        print(f"  Dual-Channel Mode: ENABLED (α={config.alignment_authority})")
     if config.match_params:
         diff = abs(model_phase.count_params() - model_quad.count_params())
         print(f"  Param difference: {diff:,} ({diff / model_phase.count_params() * 100:.1f}%)")
@@ -3475,6 +6939,8 @@ Examples:
             curriculum=inverted_curriculum,
             operation_tokens=operation_tokens,
             bounded_phase=config.bounded_phase,
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
         ).to(config.device)
         print(f"  Hybrid params: {model_hybrid.count_params():,}")
 
@@ -3494,6 +6960,8 @@ Examples:
             curriculum=standard_curriculum,
             operation_tokens=operation_tokens,
             bounded_phase=config.bounded_phase,
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
         ).to(config.device)
         print(f"  Standard Hybrid params: {model_hybrid_std.count_params():,}")
 
