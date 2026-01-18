@@ -159,7 +159,88 @@ if self.protected_phase:
 4. **Aligns with predictive coding / active inference** - More biologically plausible
 5. **JEPA integration point is natural** - JEPA affects proposals, SRK/Kosha affects gating
 
-### 4.2 Weaknesses / Concerns
+### 4.2 Cost Savings Analysis (The Compelling Case for Plan B)
+
+This is where the proposal has significant merit that deserves deeper consideration.
+
+#### Current Symbolu Cost Per Layer (Always Runs All Three Paths)
+
+| Component | Operation | Complexity | Notes |
+|-----------|-----------|------------|-------|
+| Phase | cumsum(kv_complex) | O(n·d) | Always runs |
+| Quad | QK^T scores | O(n·n·d/h) or O(n·k·d/h) with TopK | Always runs |
+| Quad | softmax over k | O(n·k) | Always runs |
+| Quad | weighted sum V | O(n·k·d/h) | Always runs |
+| Local | windowed attention | O(n·w·d/h) | Always runs |
+| **Total** | | **O(n·(k+w)·d/h)** | **Fixed cost** |
+
+#### Proposed Cost Per Layer (Conditional Computation)
+
+| Component | Operation | Complexity | Notes |
+|-----------|-----------|------------|-------|
+| Phase state check | confidence(S_t) | O(d) | Cheap gate |
+| **If confident:** | | | |
+| └─ Phase only | S_{t+1} = γS_t | O(n·m) | Skip quad entirely |
+| **If uncertain:** | | | |
+| └─ Quad retrieval | TopK(scores) | O(n·k) | No softmax over values |
+| └─ Phase gating | sigmoid(logits) | O(n·K) | K proposals, not k keys |
+| └─ Phase integrate | Σw·ΔS | O(n·K·m) | m = state dim |
+
+#### Key Savings
+
+1. **Conditional Quad Invocation**
+   ```
+   if phase_confidence(S_t) > threshold:
+       S_{t+1} = γ * S_t  # O(n·m) - skip quad entirely
+   else:
+       # Full retrieval + integration
+   ```
+   - Early layers: High uncertainty → full computation
+   - Later layers: State accumulated → often skip quad
+   - **Potential 30-50% compute reduction** in later layers
+
+2. **No Softmax Over Values**
+   - Current: `softmax(scores) @ V` requires O(n·k·d/h) for weighted sum
+   - Proposed: Just return `V[topk_indices]` - pure gather, no multiply-accumulate
+   - **Saves ~k multiplications per query position**
+
+3. **State Compression Reduces Downstream Work**
+   - S_t is dimension m (can be << embed_dim d)
+   - Once meaning is in S_t, don't need to re-derive from tokens
+   - **Amortized cost over sequence length**
+
+4. **Adaptive K Based on Uncertainty**
+   ```
+   K_effective = base_K * (1 - phase_confidence)
+   ```
+   - High confidence → K=8 (few proposals needed)
+   - Low confidence → K=64 (explore more)
+   - **Dynamic compute allocation**
+
+#### Quantitative Estimate
+
+For a 12-layer model with n=2048, k=64, w=256, d=768:
+
+| Scenario | Current (GFLOPs) | Proposed (GFLOPs) | Savings |
+|----------|------------------|-------------------|---------|
+| All layers uncertain | ~X | ~X | 0% |
+| 50% layers confident | ~X | ~0.6X | ~40% |
+| 75% layers confident | ~X | ~0.4X | ~60% |
+
+*Note: Exact numbers depend on state dimension m and gating overhead*
+
+#### Why This Wasn't Weighted Heavily Initially
+
+My initial evaluation focused on the **semantic** benefits (quad vs phase dominance) rather than **computational** benefits. But the cost savings are real and could be substantial:
+
+1. **Inference speedup** - Confident layers skip quad entirely
+2. **Training efficiency** - Fewer FLOPs per step
+3. **Scaling properties** - Cost grows with uncertainty, not sequence length
+4. **Memory bandwidth** - Fewer value reads when skipping quad
+
+This makes Plan B more attractive for production deployment even if the semantic benefits are uncertain.
+
+### 4.3 Weaknesses / Concerns
 
 1. **Major architectural departure**
    - Not a refactor but a redesign
@@ -253,22 +334,46 @@ def integrate_proposals(self, x, proposals, prev_state):
 
 ## 6. Recommendation
 
-### 6.1 Do NOT Implement Now
+### 6.1 Revised Assessment: Plan B Has Stronger Case Than Initially Evaluated
 
-The proposal is theoretically interesting but:
-1. Symbolu's Protected Phase already solves the core problem
-2. Would require extensive revalidation
-3. Unclear if semantic benefits justify PPL regression
-4. Better to exhaust current architecture's potential first
+The proposal is not just theoretically interesting - **the cost savings make it practically compelling**:
 
-### 6.2 Consider If These Conditions Are Met
+| Factor | Initial Weight | Revised Weight | Notes |
+|--------|---------------|----------------|-------|
+| Semantic benefits | High | Medium | Protected Phase already works |
+| Cost savings | Low | **High** | 30-60% potential reduction |
+| Implementation risk | High | Medium | Can be done incrementally |
+| Production value | Unknown | **High** | Inference speedup matters |
 
-1. **Protected Phase hits a ceiling** - If experiments show phase can't learn beyond current capacity
-2. **Sample quality plateaus** - If PPL improves but samples remain incoherent
-3. **Clear benchmark needed** - If we have a semantic coherence metric to optimize
-4. **Research budget available** - For 2-4 weeks of experimentation
+### 6.2 Two-Phase Approach (Recommended)
 
-### 6.3 Incremental Steps Instead
+**Phase 1: Validate Cost Savings (Low Risk)**
+1. Add phase confidence metric to current architecture
+2. Measure how often phase "could" skip quad (without actually skipping)
+3. Instrument: `confident_layers / total_layers` across training
+4. If >30% layers show high confidence → proceed to Phase 2
+
+**Phase 2: Incremental Implementation**
+1. Start with **inference-only** conditional quad skip
+2. Don't change training - just skip quad during eval when confident
+3. Measure: speedup vs quality degradation
+4. If quality holds → consider training with conditional computation
+
+### 6.3 Conditions That Would Make This Urgent
+
+1. **Inference cost becomes bottleneck** - Production deployment at scale
+2. **Long-context scaling needed** - n=8K+ where O(nk) per layer hurts
+3. **Edge deployment** - Mobile/embedded where FLOPs matter
+4. **Sample quality already good** - Can afford to trade PPL for speed
+
+### 6.4 What NOT to Do
+
+1. Don't implement full architectural reversal immediately
+2. Don't remove softmax from quad without measuring confidence first
+3. Don't change gradient flow without Protected Phase validation
+4. Don't optimize for cost before semantic coherence is achieved
+
+### 6.5 Incremental Steps (If Proceeding)
 
 If we want to move toward this direction without full commitment:
 
