@@ -90,6 +90,43 @@ from torch.utils.data import Dataset, DataLoader
 
 
 # =============================================================================
+# SRK (SOVEREIGN REASONING KERNEL) IMPORTS
+# =============================================================================
+# V10.3.0: Enable SRK to monitor how phase learning progresses at different layers
+# SRK provides auxiliary components at:
+#   - L4: DNA Bridge (Foundational Ontology)
+#   - L7: CSR Alignment Phase Extraction Hook
+#   - L9: Witness Arbitrator (Consciousness/Attention)
+#   - L11: Synthesis Gate (Output Integration)
+
+try:
+    from symbolu.sovereign import (
+        SRKConfig,
+        SovereignReasoningKernel,
+        OntologicalBridge,
+        WitnessArbitrator,
+        SynthesisGate,
+        PhaseExtractionHook,
+        SOVEREIGN_STATE_DIM,
+        BHAVA_NAMES,
+        KOSHA_NAMES,
+        VRITTI_NAMES,
+        GUNA_NAMES,
+    )
+    from symbolu.sovereign.sovereign_loss import (
+        SovereignLossConfig as SRKLossConfig,
+        SovereignLoss as SRKLoss,
+        SovereignAnnealer,
+    )
+    SRK_AVAILABLE = True
+except ImportError as e:
+    SRK_AVAILABLE = False
+    SOVEREIGN_STATE_DIM = 32  # Fallback: 12 Bhava + 5 Kosha + 5 Vritti + 6 Guna + 4 Reserved
+    print(f"Note: SRK modules not available for import: {e}")
+    print("      SRK phase learning will use local implementations.")
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -130,6 +167,357 @@ class Config:
 
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+# =============================================================================
+# SRK PHASE LEARNING CONFIGURATION
+# =============================================================================
+# V10.3.0: SRK (Sovereign Reasoning Kernel) monitors how phase learns at layers
+#
+# Layer Components:
+#   L4:  DNA Bridge - Foundational ontology grounding (12D Bhava projection)
+#   L7:  CSR Alignment - Phase Extraction Hook for coherence
+#   L9:  Witness Arbitrator - Consciousness/attention arbitration
+#   L11: Synthesis Gate - Output integration and quality filtering
+
+@dataclass
+class SRKPhaseLearningConfig:
+    """Configuration for SRK phase learning monitoring."""
+    # Enable SRK phase learning monitoring
+    enable_srk: bool = False
+
+    # Layer attachment points (must match model's num_layers)
+    dna_bridge_layer: int = 4       # L4: DNA Bridge
+    csr_alignment_layer: int = 7    # L7: CSR Alignment / Phase Extraction
+    witness_layer: int = 9          # L9: Witness Arbitrator
+    synthesis_layer: int = 11       # L11: Synthesis Gate
+
+    # Component toggles
+    enable_dna_bridge: bool = True      # Enable DNA Bridge at L4
+    enable_phase_hook: bool = True      # Enable Phase Extraction at L7
+    enable_witness: bool = True         # Enable Witness Arbitrator at L9
+    enable_synthesis: bool = True       # Enable Synthesis Gate at L11
+
+    # Phase learning metrics
+    track_phase_coherence: bool = True  # Track phase coherence over training
+    track_bhava_diversity: bool = True  # Track 12D ontological diversity
+    track_layer_contributions: bool = True  # Track per-layer PPL contribution
+
+    # Loss weights for SRK components (optional auxiliary losses)
+    lambda_ontology: float = 0.1        # Ontological alignment loss weight
+    lambda_coherence: float = 0.05      # Phase coherence loss weight
+
+    # State dimension (32D Sovereign State)
+    state_dim: int = SOVEREIGN_STATE_DIM
+
+    def validate_for_model(self, num_layers: int):
+        """Validate layer indices against model's actual layer count."""
+        max_layer = num_layers - 1
+        warnings = []
+
+        if self.dna_bridge_layer > max_layer:
+            warnings.append(f"DNA Bridge layer {self.dna_bridge_layer} > max layer {max_layer}, adjusting to {min(3, max_layer)}")
+            self.dna_bridge_layer = min(3, max_layer)
+
+        if self.csr_alignment_layer > max_layer:
+            warnings.append(f"CSR layer {self.csr_alignment_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.csr_alignment_layer = max_layer
+
+        if self.witness_layer > max_layer:
+            warnings.append(f"Witness layer {self.witness_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.witness_layer = max_layer
+
+        if self.synthesis_layer > max_layer:
+            warnings.append(f"Synthesis layer {self.synthesis_layer} > max layer {max_layer}, using layer {max_layer}")
+            self.synthesis_layer = max_layer
+
+        return warnings
+
+
+# =============================================================================
+# LOCAL SRK COMPONENT IMPLEMENTATIONS (Fallback when imports fail)
+# =============================================================================
+
+if not SRK_AVAILABLE:
+    # Local implementation of OntologicalBridge for Layer 4
+    class OntologicalBridge(nn.Module):
+        """
+        L4: DNA Bridge - Projects hidden states to 12D ontological space.
+
+        Creates a foundational ontological "signature" early in processing,
+        grounding the model's internal representation in the 12 Aspects.
+        """
+        def __init__(self, hidden_dim: int, onto_dim: int = 12):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.onto_dim = onto_dim
+            self.onto_proj = nn.Linear(hidden_dim, onto_dim, bias=False)
+            self.onto_norm = nn.LayerNorm(onto_dim)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Project hidden states to 12D ontological space."""
+            onto_repr = self.onto_proj(hidden_states)  # [B, N, 12]
+            onto_repr = self.onto_norm(onto_repr)
+
+            with torch.no_grad():
+                aspect_means = onto_repr.mean(dim=[0, 1])
+                diversity = aspect_means.std().item()
+                metrics = {
+                    'onto_diversity': diversity,
+                    'onto_mean_activation': aspect_means.abs().mean().item(),
+                }
+            return onto_repr, metrics
+
+    # Local implementation of PhaseExtractionHook for Layer 7
+    class PhaseExtractionHook(nn.Module):
+        """
+        L7: CSR Alignment - Extracts phase information from attention.
+
+        Non-invasive hook that captures rotational phase from Q-K interaction
+        for phase coherence analysis.
+        """
+        def __init__(self, hidden_dim: int, num_heads: int = 8):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.num_heads = num_heads
+            self.phase_proj = nn.Linear(hidden_dim, num_heads)
+            self._last_phases = None
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Extract phase representation from hidden states."""
+            phases = self.phase_proj(hidden_states)  # [B, N, num_heads]
+            # Normalize to [-π, π] using sin
+            phases = math.pi * torch.sin(phases)
+            self._last_phases = phases.detach()
+
+            with torch.no_grad():
+                # Compute phase coherence (mean resultant length)
+                z = torch.exp(1j * phases.float())
+                R_k = torch.abs(z.mean(dim=1)).mean().item()
+                metrics = {
+                    'phase_coherence': R_k,
+                    'phase_std': phases.std().item(),
+                }
+            return phases, metrics
+
+    # Local implementation of WitnessArbitrator for Layer 9
+    class WitnessArbitrator(nn.Module):
+        """
+        L9: Witness Arbitrator - Cross-domain attention arbitration.
+
+        Performs domain arbitration based on consciousness/attention patterns.
+        Does NOT look at words, only CONSTRAINTS.
+        """
+        def __init__(self, hidden_dim: int, state_dim: int = 32):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.state_dim = state_dim
+            self.witness_proj = nn.Linear(hidden_dim, state_dim, bias=False)
+            self.witness_norm = nn.LayerNorm(state_dim)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Perform witness arbitration on hidden states."""
+            witnessed = self.witness_proj(hidden_states)  # [B, N, state_dim]
+            witnessed = self.witness_norm(witnessed)
+
+            with torch.no_grad():
+                # Compute arbitration metrics
+                state_mean = witnessed.mean(dim=[0, 1])
+                metrics = {
+                    'witness_activation': state_mean.abs().mean().item(),
+                    'witness_variance': witnessed.var().item(),
+                }
+            return witnessed, metrics
+
+    # Local implementation of SynthesisGate for Layer 11
+    class SynthesisGate(nn.Module):
+        """
+        L11: Synthesis Gate - Final output integration and quality filter.
+
+        Detects entropy collapse (stuttering) and filters low-quality outputs.
+        """
+        def __init__(self, hidden_dim: int):
+            super().__init__()
+            self.hidden_dim = hidden_dim
+            self.gate_proj = nn.Linear(hidden_dim, hidden_dim)
+            self.quality_proj = nn.Linear(hidden_dim, 1)
+
+        def forward(self, hidden_states: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+            """Apply synthesis gate to hidden states."""
+            gate = torch.sigmoid(self.gate_proj(hidden_states))
+            quality = torch.sigmoid(self.quality_proj(hidden_states))
+            gated = hidden_states * gate
+
+            with torch.no_grad():
+                metrics = {
+                    'synthesis_gate_mean': gate.mean().item(),
+                    'synthesis_quality': quality.mean().item(),
+                }
+            return gated, metrics
+
+
+# =============================================================================
+# SRK PHASE LEARNING MONITOR
+# =============================================================================
+
+class SRKPhaseLearningMonitor(nn.Module):
+    """
+    Monitors how phase learning progresses at different layers.
+
+    Attaches SRK components at specified layers and tracks:
+    - Phase coherence (R_k metric)
+    - Ontological diversity (12D Bhava representation)
+    - Layer-wise contributions to final output
+    - Consciousness/attention patterns
+
+    Usage:
+        monitor = SRKPhaseLearningMonitor(config, hidden_dim, num_heads, device)
+        metrics = monitor.observe(layer_hidden_states)  # List of [B, N, D] per layer
+    """
+
+    def __init__(
+        self,
+        config: SRKPhaseLearningConfig,
+        hidden_dim: int,
+        num_heads: int,
+        device: torch.device,
+    ):
+        super().__init__()
+        self.config = config
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+
+        # Create components
+        if config.enable_dna_bridge:
+            self.dna_bridge = OntologicalBridge(hidden_dim).to(device)
+        else:
+            self.dna_bridge = None
+
+        if config.enable_phase_hook:
+            self.phase_hook = PhaseExtractionHook(hidden_dim, num_heads).to(device)
+        else:
+            self.phase_hook = None
+
+        if config.enable_witness:
+            self.witness = WitnessArbitrator(hidden_dim, config.state_dim).to(device)
+        else:
+            self.witness = None
+
+        if config.enable_synthesis:
+            self.synthesis = SynthesisGate(hidden_dim).to(device)
+        else:
+            self.synthesis = None
+
+        # Training history
+        self.metrics_history = []
+
+    def observe(
+        self,
+        layer_hidden_states: List[torch.Tensor],  # List of [B, N, D] per layer
+    ) -> Dict[str, float]:
+        """
+        Observe phase learning at each SRK-monitored layer.
+
+        Args:
+            layer_hidden_states: Hidden states from each layer [B, N, D]
+
+        Returns:
+            Dictionary of metrics from all SRK components
+        """
+        metrics = {}
+        num_layers = len(layer_hidden_states)
+
+        # L4: DNA Bridge (if layer exists)
+        if self.dna_bridge is not None and self.config.dna_bridge_layer < num_layers:
+            h = layer_hidden_states[self.config.dna_bridge_layer]
+            _, dna_metrics = self.dna_bridge(h)
+            metrics.update({f'L{self.config.dna_bridge_layer}_dna_{k}': v for k, v in dna_metrics.items()})
+
+        # L7: Phase Hook (if layer exists)
+        if self.phase_hook is not None and self.config.csr_alignment_layer < num_layers:
+            h = layer_hidden_states[self.config.csr_alignment_layer]
+            _, phase_metrics = self.phase_hook(h)
+            metrics.update({f'L{self.config.csr_alignment_layer}_csr_{k}': v for k, v in phase_metrics.items()})
+
+        # L9: Witness Arbitrator (if layer exists)
+        if self.witness is not None and self.config.witness_layer < num_layers:
+            h = layer_hidden_states[self.config.witness_layer]
+            _, witness_metrics = self.witness(h)
+            metrics.update({f'L{self.config.witness_layer}_witness_{k}': v for k, v in witness_metrics.items()})
+
+        # L11: Synthesis Gate (if layer exists)
+        if self.synthesis is not None and self.config.synthesis_layer < num_layers:
+            h = layer_hidden_states[self.config.synthesis_layer]
+            _, synthesis_metrics = self.synthesis(h)
+            metrics.update({f'L{self.config.synthesis_layer}_synth_{k}': v for k, v in synthesis_metrics.items()})
+
+        # Track history for trend analysis
+        self.metrics_history.append(metrics.copy())
+
+        return metrics
+
+    def get_phase_learning_summary(self) -> Dict[str, any]:
+        """
+        Generate a summary of phase learning progress.
+
+        Returns trends and statistics across training.
+        """
+        if not self.metrics_history:
+            return {}
+
+        summary = {
+            'num_observations': len(self.metrics_history),
+        }
+
+        # Compute trends for key metrics
+        for key in self.metrics_history[-1].keys():
+            values = [m.get(key, 0) for m in self.metrics_history]
+            if values:
+                summary[f'{key}_initial'] = values[0]
+                summary[f'{key}_final'] = values[-1]
+                summary[f'{key}_trend'] = values[-1] - values[0]  # Positive = increased
+
+        return summary
+
+    def print_phase_learning_report(self):
+        """Print a formatted report of phase learning progress."""
+        summary = self.get_phase_learning_summary()
+        if not summary:
+            print("  No SRK observations recorded yet.")
+            return
+
+        print("\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print("  ║  SRK PHASE LEARNING REPORT (V10.3.0)                             ║")
+        print("  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Observations: {summary['num_observations']:>6}                                         ║")
+        print("  ╠══════════════════════════════════════════════════════════════════╣")
+
+        # Component reports
+        if self.config.enable_dna_bridge:
+            key_base = f'L{self.config.dna_bridge_layer}_dna_'
+            div_trend = summary.get(f'{key_base}onto_diversity_trend', 0)
+            print(f"  ║  L{self.config.dna_bridge_layer}: DNA Bridge (Ontology)                                    ║")
+            print(f"  ║    Diversity trend: {div_trend:+.4f} ({'↑' if div_trend > 0 else '↓'})                            ║")
+
+        if self.config.enable_phase_hook:
+            key_base = f'L{self.config.csr_alignment_layer}_csr_'
+            coh_trend = summary.get(f'{key_base}phase_coherence_trend', 0)
+            print(f"  ║  L{self.config.csr_alignment_layer}: CSR Alignment (Phase Hook)                              ║")
+            print(f"  ║    Coherence trend: {coh_trend:+.4f} ({'↑' if coh_trend > 0 else '↓'})                             ║")
+
+        if self.config.enable_witness:
+            key_base = f'L{self.config.witness_layer}_witness_'
+            act_trend = summary.get(f'{key_base}witness_activation_trend', 0)
+            print(f"  ║  L{self.config.witness_layer}: Witness Arbitrator (Consciousness)                        ║")
+            print(f"  ║    Activation trend: {act_trend:+.4f} ({'↑' if act_trend > 0 else '↓'})                            ║")
+
+        if self.config.enable_synthesis:
+            key_base = f'L{self.config.synthesis_layer}_synth_'
+            gate_trend = summary.get(f'{key_base}synthesis_gate_mean_trend', 0)
+            print(f"  ║  L{self.config.synthesis_layer}: Synthesis Gate (Integration)                             ║")
+            print(f"  ║    Gate mean trend: {gate_trend:+.4f} ({'↑' if gate_trend > 0 else '↓'})                             ║")
+
+        print("  ╚══════════════════════════════════════════════════════════════════╝")
 
 
 # =============================================================================
@@ -2320,6 +2708,60 @@ def train_real_language(
         print(f"    alpha_high={args.alpha_phase_high}, alpha_low={args.alpha_phase_low}")
         print(f"    ppl_high={args.ppl_high}, ppl_low={args.ppl_low}")
 
+    # ==========================================================================
+    # V10.3.0: SRK PHASE LEARNING MONITORING
+    # ==========================================================================
+    srk_monitor = None
+    if hasattr(args, 'enable_srk') and args.enable_srk:
+        if not args.probe_layers:
+            print("\n  ⚠️  WARNING: --enable-srk requires --probe-layers to capture layer outputs")
+            print("       Enabling --probe-layers automatically.")
+            args.probe_layers = True
+
+        # Build SRK configuration
+        srk_config = SRKPhaseLearningConfig(
+            enable_srk=True,
+            dna_bridge_layer=getattr(args, 'srk_dna_bridge_layer', 0),
+            csr_alignment_layer=getattr(args, 'srk_csr_layer', 1),
+            witness_layer=getattr(args, 'srk_witness_layer', 2),
+            synthesis_layer=getattr(args, 'srk_synthesis_layer', 3),
+            enable_dna_bridge=not getattr(args, 'srk_disable_dna_bridge', False),
+            enable_phase_hook=not getattr(args, 'srk_disable_phase_hook', False),
+            enable_witness=not getattr(args, 'srk_disable_witness', False),
+            enable_synthesis=not getattr(args, 'srk_disable_synthesis', False),
+            lambda_ontology=getattr(args, 'srk_lambda_ontology', 0.1),
+            lambda_coherence=getattr(args, 'srk_lambda_coherence', 0.05),
+        )
+
+        # Validate layer indices for this model
+        layer_warnings = srk_config.validate_for_model(config.num_layers)
+        for warning in layer_warnings:
+            print(f"  ⚠️  {warning}")
+
+        # Create SRK monitor
+        srk_monitor = SRKPhaseLearningMonitor(
+            config=srk_config,
+            hidden_dim=config.d_model,
+            num_heads=config.num_heads,
+            device=torch.device(config.device),
+        )
+
+        print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.0: SRK PHASE LEARNING MONITORING ENABLED                  ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Layer Components:                                               ║")
+        if srk_config.enable_dna_bridge:
+            print(f"  ║    L{srk_config.dna_bridge_layer}: DNA Bridge (Ontology)          ACTIVE                ║")
+        if srk_config.enable_phase_hook:
+            print(f"  ║    L{srk_config.csr_alignment_layer}: CSR Alignment (Phase Hook)   ACTIVE                ║")
+        if srk_config.enable_witness:
+            print(f"  ║    L{srk_config.witness_layer}: Witness Arbitrator         ACTIVE                ║")
+        if srk_config.enable_synthesis:
+            print(f"  ║    L{srk_config.synthesis_layer}: Synthesis Gate            ACTIVE                ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Tracking: Phase coherence, Ontological diversity, Layer PPL     ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
@@ -2452,6 +2894,45 @@ def train_real_language(
                     improvement = ((ppl_phase_only - ppl_local_only) / ppl_phase_only) * 100
                     print(f"        → Local is {improvement:.1f}% better than Phase alone")
 
+                # V10.3.0: SRK Phase Learning Observation
+                if srk_monitor is not None:
+                    # Forward pass with layer capture
+                    _ = model(x_sample, probe_layers=True)
+                    layer_hidden_states = model.layer_outputs
+
+                    if layer_hidden_states:
+                        srk_metrics = srk_monitor.observe(layer_hidden_states)
+
+                        print(f"\n      ╔══════════════════════════════════════════════════════╗")
+                        print(f"      ║  SRK Phase Learning Metrics @ Step {step:<6}            ║")
+                        print(f"      ╠══════════════════════════════════════════════════════╣")
+
+                        # DNA Bridge (L4)
+                        dna_key = f'L{srk_monitor.config.dna_bridge_layer}_dna_onto_diversity'
+                        if dna_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.dna_bridge_layer} DNA Bridge:                              ║")
+                            print(f"      ║    Ontology Diversity: {srk_metrics[dna_key]:.4f}                   ║")
+
+                        # CSR Phase Hook (L7)
+                        csr_key = f'L{srk_monitor.config.csr_alignment_layer}_csr_phase_coherence'
+                        if csr_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.csr_alignment_layer} CSR Alignment:                           ║")
+                            print(f"      ║    Phase Coherence (R_k): {srk_metrics[csr_key]:.4f}                ║")
+
+                        # Witness Arbitrator (L9)
+                        wit_key = f'L{srk_monitor.config.witness_layer}_witness_witness_activation'
+                        if wit_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.witness_layer} Witness Arbitrator:                       ║")
+                            print(f"      ║    Witness Activation: {srk_metrics[wit_key]:.4f}                  ║")
+
+                        # Synthesis Gate (L11)
+                        syn_key = f'L{srk_monitor.config.synthesis_layer}_synth_synthesis_gate_mean'
+                        if syn_key in srk_metrics:
+                            print(f"      ║  L{srk_monitor.config.synthesis_layer} Synthesis Gate:                           ║")
+                            print(f"      ║    Gate Mean: {srk_metrics[syn_key]:.4f}                           ║")
+
+                        print(f"      ╚══════════════════════════════════════════════════════╝")
+
             print()
             model.train()
 
@@ -2567,6 +3048,73 @@ def train_real_language(
     else:
         print(f"\n  CONCLUSION: Local attention dominates for this task.")
         print(f"    But mixed attention achieves best results ({best_val_ppl:.2f}).")
+
+    # =========================================================================
+    # V10.3.0: SRK PHASE LEARNING FINAL REPORT
+    # =========================================================================
+    if srk_monitor is not None:
+        print("\n" + "=" * 70)
+        print("SRK PHASE LEARNING ANALYSIS (V10.3.0)")
+        print("=" * 70)
+        srk_monitor.print_phase_learning_report()
+
+        # Detailed trend analysis
+        summary = srk_monitor.get_phase_learning_summary()
+        if summary.get('num_observations', 0) > 1:
+            print("\n  Phase Learning Trends Over Training:")
+            print("  " + "-" * 50)
+
+            # Check if phase coherence improved
+            csr_key = f'L{srk_monitor.config.csr_alignment_layer}_csr_phase_coherence'
+            if f'{csr_key}_trend' in summary:
+                trend = summary[f'{csr_key}_trend']
+                initial = summary.get(f'{csr_key}_initial', 0)
+                final = summary.get(f'{csr_key}_final', 0)
+                if trend > 0:
+                    print(f"    Phase Coherence: IMPROVED {initial:.4f} → {final:.4f} (+{trend:.4f})")
+                    print(f"      → Phase is LEARNING relational structure!")
+                else:
+                    print(f"    Phase Coherence: DECLINED {initial:.4f} → {final:.4f} ({trend:.4f})")
+                    print(f"      → Phase may be collapsing or becoming decorative")
+
+            # Check ontological diversity
+            dna_key = f'L{srk_monitor.config.dna_bridge_layer}_dna_onto_diversity'
+            if f'{dna_key}_trend' in summary:
+                trend = summary[f'{dna_key}_trend']
+                initial = summary.get(f'{dna_key}_initial', 0)
+                final = summary.get(f'{dna_key}_final', 0)
+                if trend > 0:
+                    print(f"    Ontology Diversity: IMPROVED {initial:.4f} → {final:.4f} (+{trend:.4f})")
+                    print(f"      → Model developing rich 12D ontological representation")
+                else:
+                    print(f"    Ontology Diversity: DECLINED {initial:.4f} → {final:.4f} ({trend:.4f})")
+                    print(f"      → Possible dimensional collapse in ontological space")
+
+            # Check witness activation
+            wit_key = f'L{srk_monitor.config.witness_layer}_witness_witness_activation'
+            if f'{wit_key}_trend' in summary:
+                trend = summary[f'{wit_key}_trend']
+                initial = summary.get(f'{wit_key}_initial', 0)
+                final = summary.get(f'{wit_key}_final', 0)
+                print(f"    Witness Activation: {initial:.4f} → {final:.4f} ({trend:+.4f})")
+                if abs(final) > 0.1:
+                    print(f"      → Consciousness/attention layer is ACTIVE")
+                else:
+                    print(f"      → Witness layer may be underutilized")
+
+            # Check synthesis gate
+            syn_key = f'L{srk_monitor.config.synthesis_layer}_synth_synthesis_gate_mean'
+            if f'{syn_key}_trend' in summary:
+                trend = summary[f'{syn_key}_trend']
+                initial = summary.get(f'{syn_key}_initial', 0)
+                final = summary.get(f'{syn_key}_final', 0)
+                print(f"    Synthesis Gate: {initial:.4f} → {final:.4f} ({trend:+.4f})")
+                if 0.3 < final < 0.7:
+                    print(f"      → Gate is SELECTIVE (good output integration)")
+                elif final > 0.9:
+                    print(f"      → Gate is fully OPEN (minimal filtering)")
+                else:
+                    print(f"      → Gate is mostly CLOSED (may block outputs)")
 
     return model, best_val_ppl
 
@@ -3284,6 +3832,38 @@ Examples:
     # Layer-wise probing
     parser.add_argument("--probe-layers", action="store_true",
                         help="Probe each layer's contribution to PPL (real-language mode only)")
+
+    # ==========================================================================
+    # V10.3.0: SRK PHASE LEARNING MONITORING
+    # ==========================================================================
+    # Enable SRK (Sovereign Reasoning Kernel) to see how phase learning progresses
+    # at different layers. SRK provides auxiliary components:
+    #   - L4: DNA Bridge (Foundational Ontology)
+    #   - L7: CSR Alignment Phase Extraction Hook
+    #   - L9: Witness Arbitrator (Consciousness/Attention)
+    #   - L11: Synthesis Gate (Output Integration)
+    parser.add_argument("--enable-srk", action="store_true",
+                        help="Enable SRK phase learning monitoring (requires --real-language --probe-layers)")
+    parser.add_argument("--srk-dna-bridge-layer", type=int, default=0,
+                        help="Layer for DNA Bridge (default: 0 for 4-layer model, maps to L4 in 12-layer)")
+    parser.add_argument("--srk-csr-layer", type=int, default=1,
+                        help="Layer for CSR Alignment / Phase Hook (default: 1 for 4-layer model)")
+    parser.add_argument("--srk-witness-layer", type=int, default=2,
+                        help="Layer for Witness Arbitrator (default: 2 for 4-layer model)")
+    parser.add_argument("--srk-synthesis-layer", type=int, default=3,
+                        help="Layer for Synthesis Gate (default: 3 for 4-layer model)")
+    parser.add_argument("--srk-disable-dna-bridge", action="store_true",
+                        help="Disable DNA Bridge component")
+    parser.add_argument("--srk-disable-phase-hook", action="store_true",
+                        help="Disable Phase Extraction Hook component")
+    parser.add_argument("--srk-disable-witness", action="store_true",
+                        help="Disable Witness Arbitrator component")
+    parser.add_argument("--srk-disable-synthesis", action="store_true",
+                        help="Disable Synthesis Gate component")
+    parser.add_argument("--srk-lambda-ontology", type=float, default=0.1,
+                        help="Weight for ontological alignment loss (default: 0.1)")
+    parser.add_argument("--srk-lambda-coherence", type=float, default=0.05,
+                        help="Weight for phase coherence loss (default: 0.05)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
