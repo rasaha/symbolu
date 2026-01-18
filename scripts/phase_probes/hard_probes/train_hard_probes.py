@@ -2597,13 +2597,28 @@ def run_chunking_tests_v10(args, config):
     # Try to import the actual HybridPhaseTransformer from symbolu
     try:
         import sys
-        sys.path.insert(0, '/home/user/symbolu')
+        import os
+        # Try multiple paths to find symbolu module
+        possible_paths = [
+            os.getcwd(),  # Current working directory (e.g., /workspace/symbolu)
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),  # Project root from script
+            '/home/user/symbolu',
+            '/workspace/symbolu',
+        ]
+        for path in possible_paths:
+            symbolu_path = os.path.join(path, 'symbolu')
+            if path not in sys.path and os.path.exists(symbolu_path):
+                sys.path.insert(0, path)
+                print(f"  Added {path} to PYTHONPATH")
+                break
+
         from symbolu.phase_transformer import HybridPhaseTransformer
         USE_REAL_MODEL = True
         print("✓ Using real HybridPhaseTransformer from symbolu/phase_transformer.py")
     except ImportError as e:
         print(f"⚠ Could not import HybridPhaseTransformer: {e}")
-        print("  Using local test model instead")
+        print("  Hint: Run from project root: cd /workspace/symbolu && python scripts/...")
+        print("  Or set PYTHONPATH: export PYTHONPATH=/workspace/symbolu:$PYTHONPATH")
         USE_REAL_MODEL = False
 
     device = args.device
