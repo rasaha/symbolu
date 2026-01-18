@@ -3501,7 +3501,7 @@ def print_rotation_test_results(
 class WikiTextDataset(Dataset):
     """Text dataset for language modeling with layer probing.
 
-    Supports: wikitext2, wikitext103, bookcorpus, wikisection
+    Supports: wikitext2, wikitext103, openwebtext, c4
     """
 
     def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
@@ -3509,7 +3509,7 @@ class WikiTextDataset(Dataset):
         Args:
             split: "train", "validation", or "test"
             seq_len: Sequence length for chunks
-            dataset_name: "wikitext2", "wikitext103", "bookcorpus", or "wikisection"
+            dataset_name: "wikitext2", "wikitext103", "openwebtext", or "c4"
         """
         try:
             from datasets import load_dataset
@@ -3532,65 +3532,20 @@ class WikiTextDataset(Dataset):
             ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
             text_field = "text"
             ds_label = "WikiText-103"
-        elif dataset_name_lower == "bookcorpus":
-            # BookCorpus was removed from HuggingFace due to licensing
-            # Try alternatives in order: bookcorpusopen, pg19
-            if split != "train":
-                print(f"  [BookCorpus] Warning: Only 'train' split available, using train for {split}")
-                split = "train"
-
-            ds = None
-            tried = []
-
-            # Try bookcorpusopen first (community-maintained)
-            try:
-                ds = load_dataset("bookcorpusopen", split=split, trust_remote_code=True)
-                ds_label = "BookCorpusOpen"
-                text_field = "text"
-            except Exception as e1:
-                tried.append(f"bookcorpusopen: {e1}")
-
-            # Try pg19 (Project Gutenberg) as fallback
-            if ds is None:
-                try:
-                    ds = load_dataset("pg19", split=split, trust_remote_code=True)
-                    ds_label = "PG19 (Project Gutenberg)"
-                    text_field = "text"
-                except Exception as e2:
-                    tried.append(f"pg19: {e2}")
-
-            # Try plain text dataset as last resort
-            if ds is None:
-                try:
-                    ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
-                    ds_label = "WikiText-103 (fallback for BookCorpus)"
-                    text_field = "text"
-                    print(f"  [BookCorpus] Warning: BookCorpus unavailable, using WikiText-103 as fallback")
-                except Exception as e3:
-                    tried.append(f"wikitext-103: {e3}")
-
-            if ds is None:
-                raise RuntimeError(
-                    f"BookCorpus is no longer available on HuggingFace.\n"
-                    f"Tried alternatives:\n" + "\n".join(f"  - {t}" for t in tried) + "\n"
-                    f"Suggestion: Use --dataset wikitext103 or --dataset wikisection instead."
-                )
-        elif dataset_name_lower == "wikisection":
-            # WikiSection has train/validation/test splits
-            # Map to the actual split names in the dataset
-            split_map = {"train": "train", "validation": "validation", "test": "test"}
-            actual_split = split_map.get(split, split)
-            try:
-                ds = load_dataset("wiki_section", "en_city", split=actual_split)
-            except Exception:
-                # Fallback to plain wikisection if en_city doesn't work
-                ds = load_dataset("wiki_section", split=actual_split)
-            # WikiSection has 'document_title' and 'section_text' fields
-            text_field = "section_text" if "section_text" in ds.column_names else "text"
-            ds_label = "WikiSection"
+        elif dataset_name_lower == "openwebtext":
+            # OpenWebText - large web text corpus
+            ds = load_dataset("openwebtext", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "OpenWebText"
+        elif dataset_name_lower == "c4":
+            # C4 (Colossal Clean Crawled Corpus) - very large
+            # Only load a subset to avoid memory issues
+            ds = load_dataset("c4", "en", split=f"{split}[:10000]", trust_remote_code=True)
+            text_field = "text"
+            ds_label = "C4 (subset)"
         else:
             raise ValueError(f"Unknown dataset: {dataset_name}. "
-                           f"Choose from: wikitext2, wikitext103, bookcorpus, wikisection")
+                           f"Choose from: wikitext2, wikitext103, openwebtext, c4")
 
         # Tokenize all text
         if text_field in ds.column_names:
@@ -6549,8 +6504,8 @@ Examples:
     parser.add_argument("--real-language", action="store_true",
                         help="Use real language data (WikiText) instead of synthetic data")
     parser.add_argument("--dataset", type=str, default="wikitext2",
-                        choices=["wikitext2", "wikitext103", "bookcorpus", "wikisection"],
-                        help="Dataset for real language mode (bookcorpus: train only, wikisection: structured wiki)")
+                        choices=["wikitext2", "wikitext103", "openwebtext", "c4"],
+                        help="Dataset for real language mode (wikitext2: small/fast, wikitext103: larger, openwebtext/c4: web text)")
     parser.add_argument("--seq-len", type=int, default=256,
                         help="Sequence length for language modeling")
     parser.add_argument("--lm-vocab-size", type=int, default=50257,
