@@ -197,6 +197,14 @@ class Config:
     # Phase collapse fix
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin()
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    # Separates content similarity from intent alignment:
+    #   s_content = cos(φ_q - φ_k)           # What matches (preserved)
+    #   s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+    #   score = s_content * (1 + α * s_align) # Combined
+    dual_channel_mode: bool = False  # Enable dual-channel attention
+    alignment_authority: float = 0.1  # α: weight for alignment term
+
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -2426,12 +2434,17 @@ class PhaseAttention(nn.Module):
     """
 
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.1,
-                 operation_tokens: List[int] = None, bounded_phase: bool = True):
+                 operation_tokens: List[int] = None, bounded_phase: bool = True,
+                 dual_channel_mode: bool = False, alignment_authority: float = 0.1):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
         self.bounded_phase = bounded_phase  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+
+        # V10.3.8: Dual-Channel Attention
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         self.W_q_phase = nn.Linear(d_model, d_model)
         self.W_k_phase = nn.Linear(d_model, d_model)
@@ -2463,6 +2476,10 @@ class PhaseAttention(nn.Module):
 
         # Rotation test: add a global phase rotation to φ_q
         self._rotation_angle = 0.0  # in radians
+
+        # V10.3.8: Intent phase storage for dual-channel diagnostics
+        self._intent_phase_query = None  # θ_JEPA
+        self._intent_phase_key = None    # θ_SRK
 
     def set_ablation(self, mode: str, seed: int = 42):
         self._ablation_mode = mode
@@ -2527,13 +2544,17 @@ class PhaseAttention(nn.Module):
 
         return phi_k
 
-    def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, token_ids: torch.Tensor = None,
+                intent_phase_query: torch.Tensor = None,
+                intent_phase_key: torch.Tensor = None) -> torch.Tensor:
         """
         Forward pass with optional operation-conditioned phase shifts.
 
         Args:
             x: Input tensor [B, N, D]
             token_ids: Token IDs [B, N] for operation-conditioned phase shifts
+            intent_phase_query: V10.3.8 - θ_JEPA from Sensor (optional)
+            intent_phase_key: V10.3.8 - θ_SRK from Master (optional)
         """
         B, N, D = x.shape
 
@@ -2559,6 +2580,10 @@ class PhaseAttention(nn.Module):
         if self._rotation_angle != 0.0:
             phi_q = phi_q + self._rotation_angle
 
+        # V10.3.8: Store intent phases for diagnostics
+        self._intent_phase_query = intent_phase_query
+        self._intent_phase_key = intent_phase_key
+
         if self.capture_diagnostics:
             self._phi_k = phi_k.detach()
             self._phi_q = phi_q.detach()
@@ -2580,6 +2605,39 @@ class PhaseAttention(nn.Module):
 
         output = (q_phasor * state).real
 
+        # V10.3.8: Dual-Channel Alignment Modulation
+        # If dual_channel_mode is enabled and we have intent phases,
+        # modulate the content score by the alignment term:
+        #   output = output * (1 + α * s_align)
+        # where s_align = cos(θ_JEPA - θ_SRK)
+        if self.dual_channel_mode and (intent_phase_query is not None or intent_phase_key is not None):
+            # Normalize intent_phase shapes
+            def _norm_intent(ip):
+                if ip is None:
+                    return None
+                if ip.dim() == 2:
+                    return ip.unsqueeze(1).unsqueeze(-1)  # [B, H] → [B, 1, H, 1]
+                elif ip.dim() == 3:
+                    return ip.unsqueeze(1)  # [B, H, D_h] → [B, 1, H, D_h]
+                return ip
+
+            theta_jepa = _norm_intent(intent_phase_query)
+            theta_srk = _norm_intent(intent_phase_key)
+
+            if theta_jepa is not None and theta_srk is not None:
+                theta_diff = theta_jepa - theta_srk
+            elif theta_jepa is not None:
+                theta_diff = theta_jepa
+            else:
+                theta_diff = theta_srk
+
+            # s_align = cos(θ_JEPA - θ_SRK)
+            s_align = torch.cos(theta_diff.float())
+
+            # Modulate: output = output * (1 + α * s_align)
+            alignment_modulator = 1.0 + self.alignment_authority * s_align
+            output = output * alignment_modulator
+
         if dtype == torch.bfloat16:
             output = output.to(dtype)
 
@@ -2600,14 +2658,16 @@ class PhaseAttention(nn.Module):
 class TransformerBlock(nn.Module):
     def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float,
                  use_phase: bool, extra_ff: int = 0, operation_tokens: List[int] = None,
-                 bounded_phase: bool = True):
+                 bounded_phase: bool = True, dual_channel_mode: bool = False,
+                 alignment_authority: float = 0.1):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
 
         # PhaseAttention gets operation_tokens for conditioned phase shifts
         if use_phase:
-            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
+            self.attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase,
+                                       dual_channel_mode, alignment_authority)
         else:
             self.attn = QuadraticAttention(d_model, num_heads, dropout)
 
@@ -2655,6 +2715,8 @@ class HybridTransformerBlock(nn.Module):
         phase_ratio: float = 0.5,  # 0.0 = pure Quadratic, 1.0 = pure Phase
         operation_tokens: List[int] = None,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
     ):
         super().__init__()
         self.phase_ratio = phase_ratio
@@ -2662,7 +2724,8 @@ class HybridTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
         # Both attention types
-        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase)
+        self.phase_attn = PhaseAttention(d_model, num_heads, dropout, operation_tokens, bounded_phase,
+                                         dual_channel_mode, alignment_authority)
         self.quad_attn = QuadraticAttention(d_model, num_heads, dropout)
 
         self.ff = nn.Sequential(
@@ -2727,10 +2790,14 @@ class HybridTransformer(nn.Module):
         curriculum: List[float],  # phase_ratio per layer
         operation_tokens: List[int] = None,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
     ):
         super().__init__()
         self.curriculum = curriculum
         self.operation_tokens = operation_tokens
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         assert len(curriculum) == num_layers, \
             f"Curriculum length ({len(curriculum)}) must match num_layers ({num_layers})"
@@ -2745,6 +2812,8 @@ class HybridTransformer(nn.Module):
                 phase_ratio=curriculum[i],
                 operation_tokens=operation_tokens,
                 bounded_phase=bounded_phase,
+                dual_channel_mode=dual_channel_mode,
+                alignment_authority=alignment_authority,
             )
             for i in range(num_layers)
         ])
@@ -3218,16 +3287,21 @@ class HardProbeTransformer(nn.Module):
         extra_ff_per_layer: int = 0,  # For parameter matching
         operation_tokens: List[int] = None,  # Tokens that trigger phase shifts
         bounded_phase: bool = True,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
+        dual_channel_mode: bool = False,  # V10.3.8: Separate content/intent
+        alignment_authority: float = 0.1,  # V10.3.8: α weight for alignment
     ):
         super().__init__()
         self.use_phase = use_phase
         self.operation_tokens = operation_tokens
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
         self.token_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_seq_len, d_model)
         self.dropout = nn.Dropout(dropout)
         self.layers = nn.ModuleList([
             TransformerBlock(d_model, num_heads, d_ff, dropout, use_phase,
-                           extra_ff_per_layer, operation_tokens, bounded_phase)
+                           extra_ff_per_layer, operation_tokens, bounded_phase,
+                           dual_channel_mode, alignment_authority)
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(d_model)
@@ -6524,6 +6598,19 @@ Examples:
     parser.add_argument("--no-bounded-phase", dest="bounded_phase", action="store_false",
                         help="Disable bounded phase (use raw linear projection)")
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    parser.add_argument("--dual-channel-mode", action="store_true",
+                        help="Enable dual-channel attention: separates content similarity from intent alignment. "
+                             "s_content = cos(φ_q - φ_k) (what matches), "
+                             "s_align = cos(θ_JEPA - θ_SRK) (intent agreement), "
+                             "score = s_content * (1 + α * s_align). "
+                             "Prevents intent from dominating content selectivity.")
+    parser.add_argument("--alignment-authority", type=float, default=0.1,
+                        help="α: Weight for alignment term in dual-channel mode (default: 0.1). "
+                             "0.0 = pure content matching (intent ignored), "
+                             "0.1 = mild intent influence (recommended), "
+                             "1.0 = strong intent influence.")
+
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
     # ==========================================================================
@@ -6697,6 +6784,8 @@ Examples:
         persist_chain_length=(args.persist_chain_min, args.persist_chain_max),
         match_params=args.match_params,
         bounded_phase=args.bounded_phase,
+        dual_channel_mode=args.dual_channel_mode,
+        alignment_authority=args.alignment_authority,
         device=args.device,
     )
 
@@ -6815,6 +6904,8 @@ Examples:
         use_phase=True, extra_ff_per_layer=0,
         operation_tokens=operation_tokens,  # Enable operation-conditioned phase shifts
         bounded_phase=config.bounded_phase,  # V9.9.11: Constrain φ to [-π, π]
+        dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+        alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
     ).to(config.device)
 
     print(f"Quadratic params: {model_quad.count_params():,}")
@@ -6823,6 +6914,8 @@ Examples:
         print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")
     else:
         print(f"  Bounded Phase: DISABLED (raw linear projection)")
+    if config.dual_channel_mode:
+        print(f"  Dual-Channel Mode: ENABLED (α={config.alignment_authority})")
     if config.match_params:
         diff = abs(model_phase.count_params() - model_quad.count_params())
         print(f"  Param difference: {diff:,} ({diff / model_phase.count_params() * 100:.1f}%)")
@@ -6846,6 +6939,8 @@ Examples:
             curriculum=inverted_curriculum,
             operation_tokens=operation_tokens,
             bounded_phase=config.bounded_phase,
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
         ).to(config.device)
         print(f"  Hybrid params: {model_hybrid.count_params():,}")
 
@@ -6865,6 +6960,8 @@ Examples:
             curriculum=standard_curriculum,
             operation_tokens=operation_tokens,
             bounded_phase=config.bounded_phase,
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
         ).to(config.device)
         print(f"  Standard Hybrid params: {model_hybrid_std.count_params():,}")
 
