@@ -2626,34 +2626,100 @@ def run_chunking_tests_v10(args, config):
     seq_len = args.chunk_test_seq_len
 
     results = {}
+    model = None  # Will be created if USE_REAL_MODEL
 
     # =========================================================================
-    # TEST 1: Cross-Attention Ablation
+    # TRAINING PHASE: Train model before testing
     # =========================================================================
-    print("\n" + "-" * 70)
-    print("[TEST 1] CROSS-ATTENTION ABLATION")
-    print("-" * 70)
-    print("Question: Does Local NEED Phase memory for long-range info?")
-    print("Method: Compare Local with/without phase_memory parameter")
-    print()
-
     if USE_REAL_MODEL:
+        print("\n" + "-" * 70)
+        print("[TRAINING] Training model for V10.2.1 architecture tests")
+        print("-" * 70)
+
         # Create model with protected_phase=True
+        vocab_size = 1000
         model = HybridPhaseTransformer(
-            vocab_size=1000,
+            vocab_size=vocab_size,
             embed_dim=config.d_model,
             num_layers=config.num_layers,
             num_heads=config.num_heads,
             ff_dim=config.d_ff,
             max_seq_len=seq_len,
-            dropout=0.0,  # No dropout for deterministic test
+            dropout=0.1,
             local_layers=2,
             window_size=32,
             protected_phase=True,
         ).to(device)
 
-        # Create test input
+        print(f"  Model: {sum(p.numel() for p in model.parameters()):,} parameters")
+        print(f"  Protected Phase: ENABLED")
+        print(f"  Training for 500 steps on next-token prediction...")
+
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+        model.train()
+
+        # Training loop - simple next-token prediction
+        train_steps = 500
+        batch_size = 8
+        log_every = 100
+
+        for step in range(train_steps):
+            # Generate random sequences (simple language modeling setup)
+            # Use patterns that require cross-chunk memory:
+            # Token at position i often predicts token at position i+chunk_size
+            input_ids = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+
+            # Add some structure: repeat patterns across chunk boundaries
+            for b in range(batch_size):
+                # Copy some tokens from first chunk to second chunk positions
+                for offset in range(0, seq_len - chunk_size, chunk_size):
+                    # 30% chance to create cross-chunk dependency
+                    if random.random() < 0.3:
+                        src_pos = random.randint(0, chunk_size - 1)
+                        tgt_pos = offset + chunk_size + src_pos
+                        if tgt_pos < seq_len:
+                            input_ids[b, tgt_pos] = input_ids[b, src_pos]
+
+            # Forward pass
+            result = model(input_ids)
+            logits = result['logits']
+
+            # Next-token prediction loss
+            # Predict token[i+1] from token[i]
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = input_ids[:, 1:].contiguous()
+            loss = F.cross_entropy(
+                shift_logits.view(-1, vocab_size),
+                shift_labels.view(-1)
+            )
+
+            # Backward
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+
+            if (step + 1) % log_every == 0:
+                print(f"    Step {step+1}/{train_steps}: Loss = {loss.item():.4f}")
+
+        print(f"  Training complete. Final loss: {loss.item():.4f}")
+        model.eval()
+
+    # =========================================================================
+    # TEST 1: Cross-Attention Ablation
+    # =========================================================================
+    print("\n" + "-" * 70)
+    print("[TEST 1] CROSS-ATTENTION ABLATION (after training)")
+    print("-" * 70)
+    print("Question: Does Local NEED Phase memory for long-range info?")
+    print("Method: Compare Local with/without phase_memory parameter")
+    print()
+
+    if USE_REAL_MODEL and model is not None:
+        # Create test input with cross-chunk patterns
         test_input = torch.randint(0, 1000, (1, seq_len), device=device)
+        # Add cross-chunk dependency
+        test_input[0, chunk_size + 10] = test_input[0, 10]  # Copy token across chunk
 
         # Forward with normal protected phase (Local queries Phase memory)
         model.eval()
@@ -2707,7 +2773,7 @@ def run_chunking_tests_v10(args, config):
     print(f"  Sequence length: {seq_len}, Chunk size: {chunk_size}")
     print()
 
-    if USE_REAL_MODEL:
+    if USE_REAL_MODEL and model is not None:
         # Use the model's built-in diagnostic
         try:
             diag = model.diagnose_chunk_continuity(
@@ -2724,16 +2790,16 @@ def run_chunking_tests_v10(args, config):
         results['chunk_continuity'] = 'SKIPPED'
 
     # =========================================================================
-    # TEST 3: Cross-Chunk Dependencies
+    # TEST 3: Cross-Chunk Dependencies (after training)
     # =========================================================================
     print("\n" + "-" * 70)
-    print("[TEST 3] CROSS-CHUNK DEPENDENCIES")
+    print("[TEST 3] CROSS-CHUNK DEPENDENCIES (after training)")
     print("-" * 70)
     print("Question: Can Phase capture dependencies that span chunk boundaries?")
     print("Method: Create sequence where answer depends on token in previous chunk")
     print()
 
-    if USE_REAL_MODEL:
+    if USE_REAL_MODEL and model is not None:
         # Create a simple test: put an "anchor" token early, reference it late
         # If Phase works, changing the anchor should change the output at reference
 
@@ -2813,7 +2879,7 @@ def run_chunking_tests_v10(args, config):
     print("Method: Check gradient paths with backward pass")
     print()
 
-    if USE_REAL_MODEL:
+    if USE_REAL_MODEL and model is not None:
         model.train()
 
         # Create input and do forward pass
