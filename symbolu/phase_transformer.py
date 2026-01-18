@@ -3701,17 +3701,19 @@ class LocalAttention(nn.Module):
 
         if phase_memory is not None:
             # V10.2.1: Cross-attention mode - K/V from Phase memory
-            # phase_memory is [B, N, H, D_h] complex
+            # phase_memory is [B, M, H, D_h] complex where M may differ from N
+            # V10.2.2: M can be N+1 when prev_phase_state is concatenated
             # Take real part for K/V (imaginary encodes phase relationships)
             if phase_memory.is_complex():
-                memory_real = phase_memory.real  # [B, N, H, D_h]
+                memory_real = phase_memory.real  # [B, M, H, D_h]
             else:
                 memory_real = phase_memory
 
-            # Reshape to [B, N, D] for projection
+            # V10.2.2: Use memory's sequence length, not input's
+            M = memory_real.shape[1]  # Memory sequence length (may differ from N)
             H = memory_real.shape[2]
             D_h = memory_real.shape[3]
-            memory_flat = memory_real.view(B, N, H * D_h)
+            memory_flat = memory_real.view(B, M, H * D_h)
 
             # Project to K/V (may need to handle dimension mismatch)
             # If embed_dim != H * D_h, we need a separate projection
@@ -3720,15 +3722,15 @@ class LocalAttention(nn.Module):
                 # For now, use linear interpolation or truncation
                 if memory_flat.shape[-1] < D:
                     # Pad with zeros
-                    padding = torch.zeros(B, N, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
+                    padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
                     memory_flat = torch.cat([memory_flat, padding], dim=-1)
                 else:
                     # Truncate
                     memory_flat = memory_flat[:, :, :D]
 
-            # K, V from Phase memory
-            K = self.k_proj(memory_flat).view(B, N, self.n_kv_heads, self.head_dim).transpose(1, 2)
-            V = self.v_proj(memory_flat).view(B, N, self.n_kv_heads, self.head_dim).transpose(1, 2)
+            # K, V from Phase memory (length M, may differ from Q length N)
+            K = self.k_proj(memory_flat).view(B, M, self.n_kv_heads, self.head_dim).transpose(1, 2)
+            V = self.v_proj(memory_flat).view(B, M, self.n_kv_heads, self.head_dim).transpose(1, 2)
         else:
             # Standard self-attention: K, V from input x
             # K, V: (B, N, n_kv_heads, head_dim) -> (B, n_kv_heads, N, head_dim)
