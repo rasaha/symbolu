@@ -9335,6 +9335,14 @@ class UnifiedTrainingConfig:
     alpha_phase_end: float = 0.4
     alpha_decay_steps: int = 10000
 
+    # V10.2.1: Chunking for long sequences (hybrid models)
+    enable_chunking: bool = False  # Enable chunked training for long sequences
+    chunk_size: int = 512  # Size of each chunk when chunking enabled
+    protected_phase: bool = True  # V10.2.1: Protected Phase (Local cross-attends to Phase)
+    no_protected_phase: bool = False  # Disable protected phase (legacy parallel mode)
+    run_chunk_diagnostic: bool = False  # Run chunk continuity diagnostic at start
+    chunk_diagnostic_seq_len: int = 2048  # Sequence length for chunk diagnostic
+
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
     # ==========================================================================
@@ -19553,6 +19561,13 @@ def main():
         # JEPA-SRK Integration
         jepa_enable_karma_injection=args.jepa_enable_karma_injection,
         jepa_karma_gate_bias=args.jepa_karma_gate_bias,
+        # V10.2.1: Chunking for long sequences
+        enable_chunking=args.enable_chunking,
+        chunk_size=args.chunk_size,
+        protected_phase=args.protected_phase,
+        no_protected_phase=args.no_protected_phase,
+        run_chunk_diagnostic=args.run_chunk_diagnostic,
+        chunk_diagnostic_seq_len=args.chunk_diagnostic_seq_len,
     )
 
     # ==========================================================================
