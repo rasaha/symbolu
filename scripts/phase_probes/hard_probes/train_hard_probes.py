@@ -4839,44 +4839,51 @@ def train_real_language(
         print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
     # ==========================================================================
-    # V10.3.5: DOMAIN SEPARATION - CSR vs Kosha authority boundaries
+    # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
     # ==========================================================================
     use_domain_separation = getattr(args, 'domain_separation', False)
     csr_domain_layers = []
     kosha_domain_layers = []
     witness_domain_layers = []
+    synthesis_domain_layers = []
 
     if use_domain_separation:
         # Parse layer assignments
         csr_domain_layers = [int(x) for x in args.csr_domain_layers.split(",")]
         kosha_domain_layers = [int(x) for x in args.kosha_domain_layers.split(",")]
         witness_domain_layers = [int(x) for x in args.witness_domain_layers.split(",")]
+        synthesis_domain_layers = [int(x) for x in args.synthesis_domain_layers.split(",")]
 
         print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
         print(f"  ║  V10.3.5: DOMAIN SEPARATION ENABLED                               ║")
         print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
-        print(f"  ║  CSR and Kosha govern DIFFERENT layers (no authority conflict):   ║")
+        print(f"  ║  SRK Component Layout (no authority conflict):                    ║")
         print(f"  ║                                                                    ║")
-        print(f"  ║    CSR Domain (Phase/Syntax):    Layers {csr_domain_layers}                  ║")
-        print(f"  ║      → Phase coherence, CSR alignment, syntax patterns            ║")
-        print(f"  ║                                                                    ║")
-        print(f"  ║    Kosha Domain (Semantics):     Layers {kosha_domain_layers}                  ║")
-        print(f"  ║      → Consciousness progression, meaning emergence               ║")
-        print(f"  ║                                                                    ║")
-        print(f"  ║    Witness Domain (Observation): Layers {witness_domain_layers}                  ║")
-        print(f"  ║      → Epistemic state tracking, meta-cognition                   ║")
+        print(f"  ║  Layer  Component              Domain         Role                ║")
+        print(f"  ║  ─────────────────────────────────────────────────────────────    ║")
+        print(f"  ║  L0     DNA Bridge            CSR/SRK        Foundational Ontology║")
+        print(f"  ║  L1     CSR Alignment         CSR/SRK        Phase Extraction     ║")
+        print(f"  ║  L2     Kosha + Witness       KOSHA          Consciousness        ║")
+        print(f"  ║  L3     Synthesis Gate        SYNTHESIS      Output Integration   ║")
         print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
-        print(f"  ║  Layer Assignments:                                               ║")
+        print(f"  ║  Actual Layer Assignments:                                        ║")
         for i in range(config.num_layers):
-            governors = []
+            components = []
             if i in csr_domain_layers:
-                governors.append("CSR")
+                if i == 0:
+                    components.append("DNA_BRIDGE")
+                else:
+                    components.append("CSR")
             if i in kosha_domain_layers:
-                governors.append("KOSHA")
-            if i in witness_domain_layers:
-                governors.append("WITNESS")
-            gov_str = "+".join(governors) if governors else "NONE"
-            print(f"  ║    L{i}: {gov_str:<20}                                   ║")
+                components.append("KOSHA")
+            if i in witness_domain_layers and i not in kosha_domain_layers:
+                components.append("WITNESS")
+            elif i in witness_domain_layers and i in kosha_domain_layers:
+                components[-1] = "KOSHA+WITNESS"  # Combine if same layer
+            if i in synthesis_domain_layers:
+                components.append("SYNTHESIS")
+            comp_str = "+".join(components) if components else "NONE"
+            print(f"  ║    L{i}: {comp_str:<30}                     ║")
         print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
     # Optimizer
@@ -6333,15 +6340,22 @@ Examples:
     parser.add_argument("--witness-constraint-threshold", type=float, default=0.85,
                         help="Threshold for constraint/bottleneck detection (default: 0.85)")
 
-    # V10.3.5: DOMAIN SEPARATION - CSR vs Kosha authority boundaries
+    # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
+    # Layer assignments (4-layer model):
+    #   L0: DNA Bridge (Foundational Ontology)       → CSR/SRK domain
+    #   L1: CSR Alignment (Phase Extraction Hook)    → CSR/SRK domain
+    #   L2: Kosha + Witness (Consciousness/attention) → Kosha domain
+    #   L3: Synthesis Gate (Output integration)       → Synthesis domain
     parser.add_argument("--domain-separation", action="store_true",
-                        help="Enable domain separation: CSR governs early layers, Kosha governs late layers")
+                        help="Enable domain separation: each component governs its assigned layer")
     parser.add_argument("--csr-domain-layers", type=str, default="0,1",
-                        help="Layers where CSR has authority (default: 0,1 for syntax/phase)")
-    parser.add_argument("--kosha-domain-layers", type=str, default="2,3",
-                        help="Layers where Kosha has authority (default: 2,3 for semantics/meaning)")
-    parser.add_argument("--witness-domain-layers", type=str, default="2,3",
-                        help="Layers where Witness observes (default: 2,3 - same as Kosha)")
+                        help="Layers for CSR/SRK (default: 0,1 = DNA Bridge + CSR Alignment)")
+    parser.add_argument("--kosha-domain-layers", type=str, default="2",
+                        help="Layers for Kosha consciousness (default: 2)")
+    parser.add_argument("--witness-domain-layers", type=str, default="2",
+                        help="Layers for Witness observation (default: 2 = same as Kosha)")
+    parser.add_argument("--synthesis-domain-layers", type=str, default="3",
+                        help="Layers for Synthesis Gate (default: 3 = output integration)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
