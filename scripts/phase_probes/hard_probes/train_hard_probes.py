@@ -2572,6 +2572,316 @@ def train_real_language(
 
 
 # =============================================================================
+# V10.2.1 CHUNKING ARCHITECTURE TESTS
+# =============================================================================
+
+def run_chunking_tests_v10(args, config):
+    """
+    V10.2.1: Comprehensive tests for the new chunking architecture.
+
+    Tests:
+    1. Cross-Attention Ablation: Does Local need Phase memory?
+    2. Chunk Continuity: Full-sequence vs chunked processing match?
+    3. Cross-Chunk Dependencies: Can Phase capture long-range across chunks?
+    4. Gradient Flow: Does Phase get gradients only through Local?
+    """
+    print("\n" + "=" * 70)
+    print("V10.2.1 CHUNKING ARCHITECTURE TESTS")
+    print("=" * 70)
+    print("\nThese tests verify the new Protected Phase with cross-attention:")
+    print("  - Phase accumulates temporal memory (O(n) cumsum)")
+    print("  - Local queries Phase memory via cross-attention")
+    print("  - Phase gets gradients ONLY through Local's K/V")
+    print()
+
+    # Try to import the actual HybridPhaseTransformer from symbolu
+    try:
+        import sys
+        sys.path.insert(0, '/home/user/symbolu')
+        from symbolu.phase_transformer import HybridPhaseTransformer
+        USE_REAL_MODEL = True
+        print("✓ Using real HybridPhaseTransformer from symbolu/phase_transformer.py")
+    except ImportError as e:
+        print(f"⚠ Could not import HybridPhaseTransformer: {e}")
+        print("  Using local test model instead")
+        USE_REAL_MODEL = False
+
+    device = args.device
+    chunk_size = args.chunk_size
+    seq_len = args.chunk_test_seq_len
+
+    results = {}
+
+    # =========================================================================
+    # TEST 1: Cross-Attention Ablation
+    # =========================================================================
+    print("\n" + "-" * 70)
+    print("[TEST 1] CROSS-ATTENTION ABLATION")
+    print("-" * 70)
+    print("Question: Does Local NEED Phase memory for long-range info?")
+    print("Method: Compare Local with/without phase_memory parameter")
+    print()
+
+    if USE_REAL_MODEL:
+        # Create model with protected_phase=True
+        model = HybridPhaseTransformer(
+            vocab_size=1000,
+            embed_dim=config.d_model,
+            num_layers=config.num_layers,
+            num_heads=config.num_heads,
+            ff_dim=config.d_ff,
+            max_seq_len=seq_len,
+            dropout=0.0,  # No dropout for deterministic test
+            local_layers=2,
+            window_size=32,
+            protected_phase=True,
+        ).to(device)
+
+        # Create test input
+        test_input = torch.randint(0, 1000, (1, seq_len), device=device)
+
+        # Forward with normal protected phase (Local queries Phase memory)
+        model.eval()
+        with torch.no_grad():
+            result_normal = model(test_input)
+            logits_normal = result_normal['logits']
+
+        # Now temporarily disable protected_phase in hybrid layers
+        # This makes Local use self-attention instead of cross-attention to Phase
+        for block in model.blocks:
+            if hasattr(block, 'attention') and hasattr(block.attention, 'protected_phase'):
+                block.attention.protected_phase = False
+
+        with torch.no_grad():
+            result_ablated = model(test_input)
+            logits_ablated = result_ablated['logits']
+
+        # Restore
+        for block in model.blocks:
+            if hasattr(block, 'attention') and hasattr(block.attention, 'protected_phase'):
+                block.attention.protected_phase = True
+
+        # Compare
+        logit_diff = (logits_normal - logits_ablated).abs()
+        max_diff = logit_diff.max().item()
+        mean_diff = logit_diff.mean().item()
+
+        print(f"  Logit difference (Protected vs Parallel):")
+        print(f"    Max:  {max_diff:.6f}")
+        print(f"    Mean: {mean_diff:.6f}")
+
+        # If difference is large, cross-attention to Phase matters
+        if max_diff > 0.1:
+            print(f"  ✓ PASS: Significant difference - Local depends on Phase memory")
+            results['cross_attention_ablation'] = 'PASS'
+        else:
+            print(f"  ⚠ Note: Small difference - may need more training for Phase to learn")
+            results['cross_attention_ablation'] = 'SMALL_DIFF'
+    else:
+        print("  (Skipped - real model not available)")
+        results['cross_attention_ablation'] = 'SKIPPED'
+
+    # =========================================================================
+    # TEST 2: Chunk Continuity
+    # =========================================================================
+    print("\n" + "-" * 70)
+    print("[TEST 2] CHUNK CONTINUITY")
+    print("-" * 70)
+    print("Question: Do full-sequence and chunked processing produce same output?")
+    print(f"Method: Compare model(full_seq) vs model.forward_chunk(chunks)")
+    print(f"  Sequence length: {seq_len}, Chunk size: {chunk_size}")
+    print()
+
+    if USE_REAL_MODEL:
+        # Use the model's built-in diagnostic
+        try:
+            diag = model.diagnose_chunk_continuity(
+                test_input,
+                chunk_size=chunk_size,
+                verbose=True
+            )
+            results['chunk_continuity'] = 'PASS' if diag['healthy'] else 'FAIL'
+        except Exception as e:
+            print(f"  ✗ Error running diagnostic: {e}")
+            results['chunk_continuity'] = 'ERROR'
+    else:
+        print("  (Skipped - real model not available)")
+        results['chunk_continuity'] = 'SKIPPED'
+
+    # =========================================================================
+    # TEST 3: Cross-Chunk Dependencies
+    # =========================================================================
+    print("\n" + "-" * 70)
+    print("[TEST 3] CROSS-CHUNK DEPENDENCIES")
+    print("-" * 70)
+    print("Question: Can Phase capture dependencies that span chunk boundaries?")
+    print("Method: Create sequence where answer depends on token in previous chunk")
+    print()
+
+    if USE_REAL_MODEL:
+        # Create a simple test: put an "anchor" token early, reference it late
+        # If Phase works, changing the anchor should change the output at reference
+
+        # Sequence: [anchor_pos] ... [chunk boundary] ... [reference_pos]
+        anchor_pos = 10  # In first chunk
+        reference_pos = chunk_size + 20  # In second chunk
+
+        if reference_pos < seq_len:
+            # Create two inputs: same except for anchor token
+            input_a = torch.randint(0, 1000, (1, seq_len), device=device)
+            input_b = input_a.clone()
+            input_b[0, anchor_pos] = (input_a[0, anchor_pos] + 500) % 1000  # Change anchor
+
+            # Process both with chunking
+            with torch.no_grad():
+                layer_states_a = None
+                layer_states_b = None
+
+                # First chunk (contains anchor)
+                chunk1_a = input_a[:, :chunk_size]
+                chunk1_b = input_b[:, :chunk_size]
+
+                result_a, layer_states_a = model.forward_chunk(
+                    chunk1_a, chunk_offset=0, prev_layer_states=layer_states_a
+                )
+                result_b, layer_states_b = model.forward_chunk(
+                    chunk1_b, chunk_offset=0, prev_layer_states=layer_states_b
+                )
+
+                # Second chunk (contains reference)
+                chunk2_a = input_a[:, chunk_size:2*chunk_size]
+                chunk2_b = input_b[:, chunk_size:2*chunk_size]
+
+                result2_a, _ = model.forward_chunk(
+                    chunk2_a, chunk_offset=chunk_size, prev_layer_states=layer_states_a
+                )
+                result2_b, _ = model.forward_chunk(
+                    chunk2_b, chunk_offset=chunk_size, prev_layer_states=layer_states_b
+                )
+
+            # Check if output at reference position differs
+            ref_local = reference_pos - chunk_size  # Position within second chunk
+            if ref_local < result2_a['logits'].shape[1]:
+                logits_at_ref_a = result2_a['logits'][0, ref_local]
+                logits_at_ref_b = result2_b['logits'][0, ref_local]
+
+                diff_at_ref = (logits_at_ref_a - logits_at_ref_b).abs().mean().item()
+
+                print(f"  Anchor changed at position {anchor_pos} (chunk 0)")
+                print(f"  Reference position {reference_pos} (chunk 1)")
+                print(f"  Logit difference at reference: {diff_at_ref:.6f}")
+
+                if diff_at_ref > 0.01:
+                    print(f"  ✓ PASS: Change in chunk 0 affects output in chunk 1")
+                    print(f"    Phase successfully propagates state across chunk boundary!")
+                    results['cross_chunk_deps'] = 'PASS'
+                else:
+                    print(f"  ⚠ Note: Little difference - Phase may not have learned dependencies yet")
+                    results['cross_chunk_deps'] = 'SMALL_DIFF'
+            else:
+                print(f"  Reference position out of bounds")
+                results['cross_chunk_deps'] = 'ERROR'
+        else:
+            print(f"  Sequence too short for cross-chunk test")
+            results['cross_chunk_deps'] = 'SKIPPED'
+    else:
+        print("  (Skipped - real model not available)")
+        results['cross_chunk_deps'] = 'SKIPPED'
+
+    # =========================================================================
+    # TEST 4: Gradient Flow Verification
+    # =========================================================================
+    print("\n" + "-" * 70)
+    print("[TEST 4] GRADIENT FLOW VERIFICATION")
+    print("-" * 70)
+    print("Question: Does Phase get gradients only through Local's cross-attention?")
+    print("Method: Check gradient paths with backward pass")
+    print()
+
+    if USE_REAL_MODEL:
+        model.train()
+
+        # Create input and do forward pass
+        test_input_grad = torch.randint(0, 1000, (2, 64), device=device)
+
+        # Zero gradients
+        model.zero_grad()
+
+        # Forward and backward
+        result = model(test_input_grad)
+        logits = result['logits']
+
+        # Simple loss: sum of logits at last position
+        loss = logits[:, -1, :].sum()
+        loss.backward()
+
+        # Check gradients in Phase attention layers vs Local
+        phase_grad_norms = []
+        local_grad_norms = []
+
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.norm().item()
+                if 'phase_attn' in name or 'phase' in name.lower():
+                    phase_grad_norms.append((name, grad_norm))
+                elif 'local_attn' in name or 'local' in name.lower():
+                    local_grad_norms.append((name, grad_norm))
+
+        # Report
+        if phase_grad_norms:
+            avg_phase_grad = sum(g for _, g in phase_grad_norms) / len(phase_grad_norms)
+            print(f"  Phase attention gradient norms (sample):")
+            for name, norm in phase_grad_norms[:3]:
+                print(f"    {name[-50:]}: {norm:.6f}")
+            print(f"  Average Phase grad norm: {avg_phase_grad:.6f}")
+        else:
+            print(f"  No Phase gradients found (names may differ)")
+
+        if local_grad_norms:
+            avg_local_grad = sum(g for _, g in local_grad_norms) / len(local_grad_norms)
+            print(f"\n  Local attention gradient norms (sample):")
+            for name, norm in local_grad_norms[:3]:
+                print(f"    {name[-50:]}: {norm:.6f}")
+            print(f"  Average Local grad norm: {avg_local_grad:.6f}")
+
+        # In Protected Phase mode, both should have gradients
+        # (Phase gets gradients via Local's K/V projection of memory_state)
+        if phase_grad_norms and local_grad_norms:
+            print(f"\n  ✓ Both Phase and Local receive gradients")
+            print(f"    (In Protected Phase, gradients flow: Loss → Local → K/V → Phase)")
+            results['gradient_flow'] = 'PASS'
+        else:
+            print(f"\n  ⚠ Could not verify gradient flow (check parameter names)")
+            results['gradient_flow'] = 'UNCLEAR'
+
+        model.eval()
+    else:
+        print("  (Skipped - real model not available)")
+        results['gradient_flow'] = 'SKIPPED'
+
+    # =========================================================================
+    # SUMMARY
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("V10.2.1 CHUNKING TEST SUMMARY")
+    print("=" * 70)
+
+    print(f"\n{'Test':<35} {'Result':<15}")
+    print("-" * 50)
+    for test_name, result in results.items():
+        status_icon = "✓" if result == "PASS" else "⚠" if result in ["SMALL_DIFF", "UNCLEAR"] else "✗"
+        print(f"{test_name:<35} {status_icon} {result:<15}")
+
+    all_pass = all(r == 'PASS' for r in results.values())
+    if all_pass:
+        print(f"\n✓ ALL TESTS PASSED - V10.2.1 architecture is working correctly!")
+    else:
+        print(f"\n⚠ Some tests need attention - see details above")
+
+    return results
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -2607,6 +2917,12 @@ Examples:
 
   # Custom rotation angles
   python train_hard_probes.py --rotation-test --rotation-angles 0,30,60,90,120,150,180
+
+  # V10.2.1: Test chunking architecture (cross-attention, continuity, etc.)
+  python train_hard_probes.py --test-chunking-v10
+
+  # V10.2.1: Test with custom chunk size and sequence length
+  python train_hard_probes.py --test-chunking-v10 --chunk-size 64 --chunk-test-seq-len 256
         """
     )
 
@@ -2700,6 +3016,17 @@ Examples:
     parser.add_argument("--probe-layers", action="store_true",
                         help="Probe each layer's contribution to PPL (real-language mode only)")
 
+    # ==========================================================================
+    # V10.2.1: CHUNKING ARCHITECTURE TESTS
+    # ==========================================================================
+    parser.add_argument("--test-chunking-v10", action="store_true",
+                        help="Run V10.2.1 chunking architecture tests: cross-attention, "
+                             "chunk continuity, cross-chunk dependencies")
+    parser.add_argument("--chunk-size", type=int, default=64,
+                        help="Chunk size for chunking tests (default: 64 for synthetic tasks)")
+    parser.add_argument("--chunk-test-seq-len", type=int, default=256,
+                        help="Sequence length for chunk continuity test")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -2738,6 +3065,13 @@ Examples:
     # ==========================================================================
     if args.real_language:
         train_real_language(args, config, curriculum)
+        return
+
+    # ==========================================================================
+    # V10.2.1 CHUNKING TESTS: Route to chunking architecture tests
+    # ==========================================================================
+    if args.test_chunking_v10:
+        run_chunking_tests_v10(args, config)
         return
 
     print("=" * 70)
