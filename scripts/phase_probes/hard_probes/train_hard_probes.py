@@ -2629,15 +2629,30 @@ def run_chunking_tests_v10(args, config):
     model = None  # Will be created if USE_REAL_MODEL
 
     # =========================================================================
-    # TRAINING PHASE: Train model before testing
+    # TRAINING PHASE: Train model on CROSS-CHUNK COPY TASK
+    # =========================================================================
+    # The key insight: random next-token prediction doesn't require cross-chunk
+    # memory. We need a task where the model MUST remember info from chunk 0
+    # to predict correctly in chunk 1+.
+    #
+    # CROSS-CHUNK COPY TASK:
+    # - Place "anchor" tokens (special markers 0-9) at fixed positions in chunk 0
+    # - Place "query" token (marker 10) at positions in later chunks
+    # - Target: predict the anchor token that appeared at same relative position
+    # - This REQUIRES cross-chunk memory - local attention can't see chunk 0!
     # =========================================================================
     if USE_REAL_MODEL:
         print("\n" + "-" * 70)
-        print("[TRAINING] Training model for V10.2.1 architecture tests")
+        print("[TRAINING] Cross-Chunk Copy Task for V10.2.1 tests")
         print("-" * 70)
 
-        # Create model with protected_phase=True
-        vocab_size = 1000
+        # Smaller vocab makes the copy task learnable
+        vocab_size = 100
+        # Special tokens: 0-9 are "anchor" tokens, 10 is "query" token
+        NUM_ANCHORS = 10
+        QUERY_TOKEN = 10
+        FILLER_START = 11  # 11-99 are filler tokens
+
         model = HybridPhaseTransformer(
             vocab_size=vocab_size,
             embed_dim=config.d_model,
@@ -2653,57 +2668,145 @@ def run_chunking_tests_v10(args, config):
 
         print(f"  Model: {sum(p.numel() for p in model.parameters()):,} parameters")
         print(f"  Protected Phase: ENABLED")
-        print(f"  Training for 500 steps on next-token prediction...")
+        print(f"  Task: Cross-Chunk Copy (anchor in chunk 0 → predict in chunk 1+)")
+        print(f"  Vocab: {vocab_size} (anchors 0-9, query 10, fillers 11-99)")
 
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.01)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=2000)
         model.train()
 
-        # Training loop - simple next-token prediction
-        train_steps = 500
-        batch_size = 8
-        log_every = 100
+        # Training parameters
+        train_steps = 2000
+        batch_size = 16
+        log_every = 200
+
+        # Fixed anchor positions in first chunk (deterministic for learning)
+        anchor_positions = [5, 15, 25, 35, 45]  # 5 anchors in chunk 0
+        num_anchors_used = len(anchor_positions)
+
+        print(f"  Training for {train_steps} steps...")
+        print(f"  Anchor positions (chunk 0): {anchor_positions}")
+
+        running_loss = 0.0
+        running_acc = 0.0
 
         for step in range(train_steps):
-            # Generate random sequences (simple language modeling setup)
-            # Use patterns that require cross-chunk memory:
-            # Token at position i often predicts token at position i+chunk_size
-            input_ids = torch.randint(0, vocab_size, (batch_size, seq_len), device=device)
+            # Generate sequences with cross-chunk copy structure
+            # Fill with random filler tokens
+            input_ids = torch.randint(FILLER_START, vocab_size, (batch_size, seq_len), device=device)
 
-            # Add some structure: repeat patterns across chunk boundaries
+            # Create targets (same shape, will mask most positions)
+            targets = torch.full((batch_size, seq_len), -100, device=device)  # -100 = ignore
+
             for b in range(batch_size):
-                # Copy some tokens from first chunk to second chunk positions
-                for offset in range(0, seq_len - chunk_size, chunk_size):
-                    # 30% chance to create cross-chunk dependency
-                    if random.random() < 0.3:
-                        src_pos = random.randint(0, chunk_size - 1)
-                        tgt_pos = offset + chunk_size + src_pos
-                        if tgt_pos < seq_len:
-                            input_ids[b, tgt_pos] = input_ids[b, src_pos]
+                # Place anchors in chunk 0 at fixed positions
+                # Each anchor position gets a random anchor token (0-9)
+                anchor_values = torch.randint(0, NUM_ANCHORS, (num_anchors_used,))
+
+                for i, pos in enumerate(anchor_positions):
+                    if pos < chunk_size:
+                        input_ids[b, pos] = anchor_values[i]
+
+                # Place queries in later chunks that must predict the anchor
+                # Query at position P in chunk K should predict anchor at position P % chunk_size
+                for chunk_idx in range(1, seq_len // chunk_size):
+                    chunk_start = chunk_idx * chunk_size
+                    # Pick 2-3 positions per chunk to query
+                    num_queries = random.randint(2, 3)
+                    for _ in range(num_queries):
+                        # Pick which anchor to query
+                        anchor_idx = random.randint(0, num_anchors_used - 1)
+                        anchor_pos = anchor_positions[anchor_idx]
+
+                        # Query position: same relative position in this chunk
+                        query_pos = chunk_start + anchor_pos
+                        if query_pos < seq_len - 1:
+                            # Put query token at query_pos
+                            input_ids[b, query_pos] = QUERY_TOKEN
+                            # Target at query_pos+1 should be the anchor value
+                            targets[b, query_pos] = anchor_values[anchor_idx]
 
             # Forward pass
             result = model(input_ids)
             logits = result['logits']
 
-            # Next-token prediction loss
-            # Predict token[i+1] from token[i]
+            # Compute loss only on query positions (where target != -100)
+            # Shift for next-token prediction
             shift_logits = logits[:, :-1, :].contiguous()
-            shift_labels = input_ids[:, 1:].contiguous()
+            shift_targets = targets[:, 1:].contiguous()
+
+            # Cross-entropy ignores -100 labels
             loss = F.cross_entropy(
                 shift_logits.view(-1, vocab_size),
-                shift_labels.view(-1)
+                shift_targets.view(-1),
+                ignore_index=-100
             )
+
+            # Compute accuracy on query positions
+            valid_mask = shift_targets != -100
+            if valid_mask.sum() > 0:
+                preds = shift_logits.argmax(dim=-1)
+                correct = (preds == shift_targets) & valid_mask
+                acc = correct.sum().float() / valid_mask.sum().float()
+                running_acc += acc.item()
+            else:
+                acc = torch.tensor(0.0)
+
+            running_loss += loss.item()
 
             # Backward
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            scheduler.step()
 
             if (step + 1) % log_every == 0:
-                print(f"    Step {step+1}/{train_steps}: Loss = {loss.item():.4f}")
+                avg_loss = running_loss / log_every
+                avg_acc = running_acc / log_every
+                lr = scheduler.get_last_lr()[0]
+                print(f"    Step {step+1}/{train_steps}: Loss={avg_loss:.4f}, Acc={avg_acc:.1%}, LR={lr:.2e}")
+                running_loss = 0.0
+                running_acc = 0.0
 
-        print(f"  Training complete. Final loss: {loss.item():.4f}")
+        # Final evaluation
         model.eval()
+        eval_correct = 0
+        eval_total = 0
+        with torch.no_grad():
+            for _ in range(10):  # 10 eval batches
+                input_ids = torch.randint(FILLER_START, vocab_size, (batch_size, seq_len), device=device)
+                targets = torch.full((batch_size, seq_len), -100, device=device)
+
+                for b in range(batch_size):
+                    anchor_values = torch.randint(0, NUM_ANCHORS, (num_anchors_used,))
+                    for i, pos in enumerate(anchor_positions):
+                        if pos < chunk_size:
+                            input_ids[b, pos] = anchor_values[i]
+
+                    for chunk_idx in range(1, seq_len // chunk_size):
+                        chunk_start = chunk_idx * chunk_size
+                        for anchor_idx in range(num_anchors_used):
+                            anchor_pos = anchor_positions[anchor_idx]
+                            query_pos = chunk_start + anchor_pos
+                            if query_pos < seq_len - 1:
+                                input_ids[b, query_pos] = QUERY_TOKEN
+                                targets[b, query_pos] = anchor_values[anchor_idx]
+
+                result = model(input_ids)
+                logits = result['logits']
+                shift_logits = logits[:, :-1, :]
+                shift_targets = targets[:, 1:]
+                valid_mask = shift_targets != -100
+                preds = shift_logits.argmax(dim=-1)
+                eval_correct += ((preds == shift_targets) & valid_mask).sum().item()
+                eval_total += valid_mask.sum().item()
+
+        final_acc = eval_correct / eval_total if eval_total > 0 else 0
+        print(f"  Training complete. Final cross-chunk copy accuracy: {final_acc:.1%}")
+
+        # Store vocab_size for tests
+        model._test_vocab_size = vocab_size
 
     # =========================================================================
     # TEST 1: Cross-Attention Ablation
@@ -2716,10 +2819,15 @@ def run_chunking_tests_v10(args, config):
     print()
 
     if USE_REAL_MODEL and model is not None:
-        # Create test input with cross-chunk patterns
-        test_input = torch.randint(0, 1000, (1, seq_len), device=device)
-        # Add cross-chunk dependency
-        test_input[0, chunk_size + 10] = test_input[0, 10]  # Copy token across chunk
+        # Get vocab size from model
+        test_vocab_size = getattr(model, '_test_vocab_size', 100)
+
+        # Create test input with cross-chunk copy task structure
+        test_input = torch.randint(11, test_vocab_size, (1, seq_len), device=device)
+        # Place anchor at position 5 in chunk 0, query at position 5 in chunk 1
+        anchor_value = random.randint(0, 9)  # Anchor token
+        test_input[0, 5] = anchor_value
+        test_input[0, chunk_size + 5] = 10  # Query token
 
         # Forward with normal protected phase (Local queries Phase memory)
         model.eval()
@@ -2800,18 +2908,25 @@ def run_chunking_tests_v10(args, config):
     print()
 
     if USE_REAL_MODEL and model is not None:
-        # Create a simple test: put an "anchor" token early, reference it late
-        # If Phase works, changing the anchor should change the output at reference
+        # Test using the cross-chunk copy task structure
+        # If Phase works, changing the anchor should change the prediction at query
+        test_vocab_size = getattr(model, '_test_vocab_size', 100)
 
-        # Sequence: [anchor_pos] ... [chunk boundary] ... [reference_pos]
-        anchor_pos = 10  # In first chunk
-        reference_pos = chunk_size + 20  # In second chunk
+        # Anchor at position 5 in chunk 0, query at position 5 in chunk 1
+        anchor_pos = 5
+        query_pos = chunk_size + 5  # Same relative position in chunk 1
 
-        if reference_pos < seq_len:
-            # Create two inputs: same except for anchor token
-            input_a = torch.randint(0, 1000, (1, seq_len), device=device)
+        if query_pos < seq_len:
+            # Create two inputs: same except for anchor token value
+            input_a = torch.randint(11, test_vocab_size, (1, seq_len), device=device)
             input_b = input_a.clone()
-            input_b[0, anchor_pos] = (input_a[0, anchor_pos] + 500) % 1000  # Change anchor
+
+            # Set different anchor values (both valid anchor tokens 0-9)
+            input_a[0, anchor_pos] = 3  # Anchor A = 3
+            input_b[0, anchor_pos] = 7  # Anchor B = 7
+            # Both have query token at same position
+            input_a[0, query_pos] = 10  # Query token
+            input_b[0, query_pos] = 10
 
             # Process both with chunking
             with torch.no_grad():
@@ -2840,27 +2955,39 @@ def run_chunking_tests_v10(args, config):
                     chunk2_b, chunk_offset=chunk_size, prev_layer_states=layer_states_b
                 )
 
-            # Check if output at reference position differs
-            ref_local = reference_pos - chunk_size  # Position within second chunk
-            if ref_local < result2_a['logits'].shape[1]:
-                logits_at_ref_a = result2_a['logits'][0, ref_local]
-                logits_at_ref_b = result2_b['logits'][0, ref_local]
+            # Check if output at query position differs and predicts correctly
+            query_local = anchor_pos  # Same relative position in chunk 1
+            if query_local < result2_a['logits'].shape[1]:
+                logits_at_query_a = result2_a['logits'][0, query_local]
+                logits_at_query_b = result2_b['logits'][0, query_local]
 
-                diff_at_ref = (logits_at_ref_a - logits_at_ref_b).abs().mean().item()
+                # Check predictions
+                pred_a = logits_at_query_a.argmax().item()
+                pred_b = logits_at_query_b.argmax().item()
 
-                print(f"  Anchor changed at position {anchor_pos} (chunk 0)")
-                print(f"  Reference position {reference_pos} (chunk 1)")
-                print(f"  Logit difference at reference: {diff_at_ref:.6f}")
+                # Logit difference
+                diff_at_query = (logits_at_query_a - logits_at_query_b).abs().mean().item()
 
-                if diff_at_ref > 0.01:
-                    print(f"  ✓ PASS: Change in chunk 0 affects output in chunk 1")
-                    print(f"    Phase successfully propagates state across chunk boundary!")
+                print(f"  Input A: anchor=3 at pos {anchor_pos}, query at pos {query_pos}")
+                print(f"  Input B: anchor=7 at pos {anchor_pos}, query at pos {query_pos}")
+                print(f"  Prediction A (should be 3): {pred_a}")
+                print(f"  Prediction B (should be 7): {pred_b}")
+                print(f"  Logit difference: {diff_at_query:.6f}")
+
+                # Pass if predictions differ AND match anchors
+                correct_a = pred_a == 3
+                correct_b = pred_b == 7
+                if correct_a and correct_b:
+                    print(f"  ✓ PASS: Both predictions correct! Cross-chunk memory works!")
                     results['cross_chunk_deps'] = 'PASS'
+                elif diff_at_query > 0.1:
+                    print(f"  ⚠ Partial: Different predictions but not perfect copy")
+                    results['cross_chunk_deps'] = 'PARTIAL'
                 else:
-                    print(f"  ⚠ Note: Little difference - Phase may not have learned dependencies yet")
+                    print(f"  ⚠ Note: Predictions don't reflect anchor difference")
                     results['cross_chunk_deps'] = 'SMALL_DIFF'
             else:
-                print(f"  Reference position out of bounds")
+                print(f"  Query position out of bounds")
                 results['cross_chunk_deps'] = 'ERROR'
         else:
             print(f"  Sequence too short for cross-chunk test")
@@ -2883,7 +3010,8 @@ def run_chunking_tests_v10(args, config):
         model.train()
 
         # Create input and do forward pass
-        test_input_grad = torch.randint(0, 1000, (2, 64), device=device)
+        test_vocab_size = getattr(model, '_test_vocab_size', 100)
+        test_input_grad = torch.randint(0, test_vocab_size, (2, 64), device=device)
 
         # Zero gradients
         model.zero_grad()
