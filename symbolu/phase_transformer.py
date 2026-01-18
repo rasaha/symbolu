@@ -3499,37 +3499,57 @@ class LocalAttention(nn.Module):
 
     def _forward_flash(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
                        causal: bool) -> torch.Tensor:
-        """FlashAttention with sliding window - O(n×w) kernel-level."""
+        """FlashAttention with sliding window - O(n×w) kernel-level.
+
+        V10.2.2: Supports cross-attention where K/V length M may differ from Q length N.
+        """
         # flash_attn expects (B, N, H, head_dim)
         Q = Q.transpose(1, 2)  # (B, N, H, head_dim)
-        K = K.transpose(1, 2)
+        K = K.transpose(1, 2)  # (B, M, H, head_dim) - M may differ from N
         V = V.transpose(1, 2)
 
+        # V10.2.2: Check if this is cross-attention (different sequence lengths)
+        N = Q.shape[1]
+        M = K.shape[1]
+        is_cross_attn = (M != N)
+
         # FlashAttention with window_size parameter
+        # For cross-attention, disable window restriction (allow full attention to memory)
         output = flash_attn_func(
             Q, K, V,
             dropout_p=self.dropout_p if self.training else 0.0,
-            causal=causal,
-            window_size=(self.window_size, 0),  # (left, right) - causal means right=0
+            causal=causal if not is_cross_attn else False,  # No causal for cross-attn
+            window_size=(self.window_size, 0) if not is_cross_attn else (-1, -1),  # Full attn for cross
         )
         return output.transpose(1, 2)  # back to (B, H, N, head_dim)
 
     def _forward_sdpa(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
                       B: int, N: int, causal: bool) -> torch.Tensor:
-        """PyTorch 2.0 SDPA - creates block-sparse mask for O(n×w)."""
+        """PyTorch 2.0 SDPA - creates block-sparse mask for O(n×w).
+
+        V10.2.2: Supports cross-attention where K/V length M may differ from Q length N.
+        """
         w = self.window_size
+        M = K.shape[2]  # K/V sequence length (may differ from N in cross-attention)
 
         # Create sliding window + causal mask
         # This is still O(n²) in mask creation but SDPA is optimized
         # For true O(n×w), use flash backend
         if causal:
-            # Create band matrix mask: each position attends to [i-w+1, i]
-            row_idx = torch.arange(N, device=Q.device).unsqueeze(1)
-            col_idx = torch.arange(N, device=Q.device).unsqueeze(0)
-            # Valid if: col <= row (causal) AND col >= row - w + 1 (window)
-            mask = (col_idx <= row_idx) & (col_idx >= row_idx - w + 1)
-            attn_mask = torch.zeros(N, N, device=Q.device, dtype=Q.dtype)
-            attn_mask.masked_fill_(~mask, float('-inf'))
+            if M == N:
+                # Self-attention: standard sliding window + causal mask
+                row_idx = torch.arange(N, device=Q.device).unsqueeze(1)
+                col_idx = torch.arange(N, device=Q.device).unsqueeze(0)
+                # Valid if: col <= row (causal) AND col >= row - w + 1 (window)
+                mask = (col_idx <= row_idx) & (col_idx >= row_idx - w + 1)
+                attn_mask = torch.zeros(N, N, device=Q.device, dtype=Q.dtype)
+                attn_mask.masked_fill_(~mask, float('-inf'))
+            else:
+                # V10.2.2: Cross-attention where K/V have length M (e.g., N+1 with prev_state)
+                # All Q positions can attend to all K/V positions (no causal restriction
+                # since K/V is memory from previous chunks + current Phase state)
+                # Just apply window constraint relative to current positions
+                attn_mask = None  # Allow full attention to memory
         else:
             attn_mask = None
 
@@ -3546,8 +3566,20 @@ class LocalAttention(nn.Module):
         """Unfold-based sliding window - TRUE O(n×w), no N×N tensors.
 
         Uses chunked processing to reduce peak memory usage for long sequences.
+        V10.2.2: Supports cross-attention where K/V length M may differ from Q length N.
         """
         w = self.window_size
+        M = K.shape[2]  # K/V sequence length
+
+        # V10.2.2: Cross-attention case where K/V have different length than Q
+        # Fall back to simple full attention (M is typically just N+1, so this is cheap)
+        if M != N:
+            # Full attention: Q @ K^T, then softmax, then @ V
+            attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B, H, N, M]
+            attn = F.softmax(attn, dim=-1)
+            attn = self.dropout(attn)
+            output = torch.matmul(attn, V)  # [B, H, N, head_dim]
+            return output
 
         # For large batch × sequence, process in chunks to avoid OOM
         # K_windows memory ≈ B × H × chunk × w × head_dim × 2 bytes
