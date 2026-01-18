@@ -3501,7 +3501,12 @@ def print_rotation_test_results(
 class WikiTextDataset(Dataset):
     """Text dataset for language modeling with layer probing.
 
-    Supports: wikitext2, wikitext103, openwebtext, c4
+    Supports:
+    - wikitext2, wikitext103: Encyclopedia text (good for LM, basic Phase)
+    - tinystories: Narrative stories (RECOMMENDED for Kosha/Witness - diverse epistemic states)
+    - writingprompts: Creative writing (excellent Vritti diversity)
+    - imdb: Movie reviews (opinions/emotions)
+    - openwebtext, c4: Large web corpora
     """
 
     def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
@@ -3509,7 +3514,7 @@ class WikiTextDataset(Dataset):
         Args:
             split: "train", "validation", or "test"
             seq_len: Sequence length for chunks
-            dataset_name: "wikitext2", "wikitext103", "openwebtext", or "c4"
+            dataset_name: Dataset to load (tinystories recommended for consciousness training)
         """
         try:
             from datasets import load_dataset
@@ -3532,6 +3537,27 @@ class WikiTextDataset(Dataset):
             ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
             text_field = "text"
             ds_label = "WikiText-103"
+        elif dataset_name_lower == "tinystories":
+            # TinyStories - narrative stories, excellent for Kosha/Witness
+            # Small, diverse epistemic states (imagination, memory, facts)
+            ds = load_dataset("roneneldan/TinyStories", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "TinyStories"
+        elif dataset_name_lower == "writingprompts":
+            # WritingPrompts - creative writing with diverse epistemic modes
+            # Great for exercising all Vritti states
+            try:
+                ds = load_dataset("euclaise/writingprompts", split=split, trust_remote_code=True)
+            except Exception:
+                ds = load_dataset("writing_prompts", split=split, trust_remote_code=True)
+            # Has 'prompt' and 'story' fields - concatenate them
+            text_field = "story" if "story" in ds.column_names else "text"
+            ds_label = "WritingPrompts"
+        elif dataset_name_lower == "imdb":
+            # IMDB reviews - opinions/emotions, good for Vritti diversity
+            ds = load_dataset("imdb", split=split, trust_remote_code=True)
+            text_field = "text"
+            ds_label = "IMDB Reviews"
         elif dataset_name_lower == "openwebtext":
             # OpenWebText - large web text corpus
             ds = load_dataset("openwebtext", split=split, trust_remote_code=True)
@@ -3545,7 +3571,7 @@ class WikiTextDataset(Dataset):
             ds_label = "C4 (subset)"
         else:
             raise ValueError(f"Unknown dataset: {dataset_name}. "
-                           f"Choose from: wikitext2, wikitext103, openwebtext, c4")
+                           f"Choose from: wikitext2, wikitext103, tinystories, writingprompts, imdb, openwebtext, c4")
 
         # Tokenize all text
         if text_field in ds.column_names:
@@ -6504,8 +6530,8 @@ Examples:
     parser.add_argument("--real-language", action="store_true",
                         help="Use real language data (WikiText) instead of synthetic data")
     parser.add_argument("--dataset", type=str, default="wikitext2",
-                        choices=["wikitext2", "wikitext103", "openwebtext", "c4"],
-                        help="Dataset for real language mode (wikitext2: small/fast, wikitext103: larger, openwebtext/c4: web text)")
+                        choices=["wikitext2", "wikitext103", "tinystories", "writingprompts", "imdb", "openwebtext", "c4"],
+                        help="Dataset: tinystories (recommended for Kosha/Witness), wikitext2/103 (LM), writingprompts/imdb (diverse)")
     parser.add_argument("--seq-len", type=int, default=256,
                         help="Sequence length for language modeling")
     parser.add_argument("--lm-vocab-size", type=int, default=50257,
