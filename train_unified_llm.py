@@ -12647,6 +12647,62 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     )
 
 
+def forward_chunked(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    chunk_size: int,
+    return_decorr_loss: bool = False,
+) -> Dict[str, torch.Tensor]:
+    """
+    V10.2.2: Chunked forward pass for training long sequences.
+
+    Processes input in chunks, maintaining Phase state across chunks:
+    - Phase attention persists state (temporal memory)
+    - Local attention resets per chunk (spatial reasoning)
+    - Gradients flow through entire sequence
+
+    Args:
+        model: HybridPhaseTransformer model
+        input_ids: [B, N] token indices (full sequence)
+        chunk_size: Size of each chunk
+        return_decorr_loss: Whether to compute decorrelation loss
+
+    Returns:
+        Dict with 'logits' and optionally 'decorr_loss'
+    """
+    B, N = input_ids.shape
+    device = input_ids.device
+
+    # Process in chunks, accumulating logits
+    all_logits = []
+    layer_states = None  # Persists across chunks
+
+    for chunk_start in range(0, N, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, N)
+        chunk_ids = input_ids[:, chunk_start:chunk_end]
+
+        # Forward chunk with state management
+        result, layer_states = model.forward_chunk(
+            chunk_ids,
+            chunk_offset=chunk_start,
+            prev_layer_states=layer_states,
+        )
+
+        all_logits.append(result['logits'])
+
+    # Concatenate all chunk logits
+    logits = torch.cat(all_logits, dim=1)  # [B, N, V]
+
+    outputs = {'logits': logits}
+
+    # Decorrelation loss not supported in chunked mode yet
+    # (would need to accumulate across chunks)
+    if return_decorr_loss:
+        outputs['decorr_loss'] = torch.tensor(0.0, device=device)
+
+    return outputs
+
+
 def compute_phase_loss(
     logits: torch.Tensor,
     targets: torch.Tensor,
@@ -14408,7 +14464,27 @@ def train(config: UnifiedTrainingConfig):
                     config.decorr_loss_weight > 0 and
                     config.model_type in ('hybrid', 'ontological_hybrid')
                 )
-                outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
+
+                # V10.2.2: Chunked training for long sequences
+                # When enable_chunking is True, process sequence in chunks
+                # Phase state persists across chunks, Local resets per chunk
+                use_chunking = (
+                    hasattr(config, 'enable_chunking') and
+                    config.enable_chunking and
+                    config.model_type == 'hybrid' and
+                    x.shape[1] > config.chunk_size  # Only chunk if sequence > chunk_size
+                )
+
+                if use_chunking:
+                    # Chunked forward: splits sequence, maintains Phase state
+                    outputs = forward_chunked(
+                        model, x,
+                        chunk_size=config.chunk_size,
+                        return_decorr_loss=enable_decorr,
+                    )
+                else:
+                    # Standard forward: process full sequence at once
+                    outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
 
                 if isinstance(outputs, dict):
                     logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
@@ -17378,7 +17454,19 @@ def evaluate(
                     metrics = {'coherence': outputs['coherence'].mean().item()}
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
-                    output = model(x)
+                    # V10.2.2: Support chunked evaluation
+                    use_chunking = (
+                        hasattr(config, 'enable_chunking') and
+                        config.enable_chunking and
+                        config.model_type == 'hybrid' and
+                        x.shape[1] > config.chunk_size
+                    )
+
+                    if use_chunking:
+                        output = forward_chunked(model, x, chunk_size=config.chunk_size)
+                    else:
+                        output = model(x)
+
                     if isinstance(output, dict):
                         logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
                     else:
