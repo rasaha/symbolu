@@ -4308,6 +4308,17 @@ class HybridAttentionLayer(nn.Module):
             # V10.2.1: Protected Phase with cross-attention
             # Local's Q attends to Phase's memory_state (K/V)
             # This enforces: "Quadratic queries ONLY Phase memory for long-range info"
+
+            # V10.2.2 FIX: Include previous chunk's final state in cross-attention
+            # Without this, Local can only see current chunk's Phase memory.
+            # The prev_phase_state contains aggregated info from all previous chunks.
+            if prev_phase_state is not None and phase_memory is not None:
+                # Concatenate: [prev_final_state, current_chunk_memory]
+                # prev_phase_state: [B, 1, H, D_h] (aggregated from previous chunks)
+                # phase_memory: [B, N, H, D_h] (current chunk positions)
+                # Result: [B, N+1, H, D_h] - Local can attend to both
+                phase_memory = torch.cat([prev_phase_state, phase_memory], dim=1)
+
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
             # V10.2.1 GRADIENT ROUTING (Requirement 7):
