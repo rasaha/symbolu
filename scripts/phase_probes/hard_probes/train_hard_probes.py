@@ -521,6 +521,426 @@ class SRKPhaseLearningMonitor(nn.Module):
 
 
 # =============================================================================
+# V10.3.1: LAYER INFLUENCE DIAGNOSTICS
+# =============================================================================
+# Analyzes whether each SRK component layer influences phase learning
+# CONSTRUCTIVELY (helps) or DESTRUCTIVELY (hurts)
+#
+# Influence Classification:
+#   CONSTRUCTIVE (+): Component helps phase learning
+#   NEUTRAL (○):      Component has minimal effect
+#   DESTRUCTIVE (-):  Component hurts phase learning
+
+class InfluenceType(Enum):
+    """Classification of layer influence on phase learning."""
+    CONSTRUCTIVE = "CONSTRUCTIVE"
+    NEUTRAL = "NEUTRAL"
+    DESTRUCTIVE = "DESTRUCTIVE"
+
+
+@dataclass
+class LayerInfluenceMetrics:
+    """Metrics for a single layer's influence on phase learning."""
+    layer_idx: int
+    component_name: str
+    influence_type: InfluenceType
+    influence_score: float  # -1.0 (destructive) to +1.0 (constructive)
+
+    # Detailed metrics
+    phase_preservation: float  # How much phase signal is preserved (0-1)
+    phase_amplification: float  # Phase signal amplification factor
+    gradient_flow: float  # Gradient magnitude through this layer
+    entropy_delta: float  # Change in representation entropy
+
+    # Diagnostic flags
+    causes_collapse: bool  # True if layer causes phase collapse
+    causes_diffusion: bool  # True if layer diffuses phase signal
+    is_bottleneck: bool  # True if layer blocks gradient flow
+
+    def get_influence_symbol(self) -> str:
+        """Get symbol for influence type."""
+        if self.influence_type == InfluenceType.CONSTRUCTIVE:
+            return "+"
+        elif self.influence_type == InfluenceType.DESTRUCTIVE:
+            return "-"
+        else:
+            return "○"
+
+    def get_influence_bar(self, width: int = 20) -> str:
+        """Get visual bar representation of influence score."""
+        # Score ranges from -1 to +1, map to 0 to width
+        normalized = (self.influence_score + 1) / 2  # 0 to 1
+        filled = int(normalized * width)
+        center = width // 2
+
+        bar = ""
+        for i in range(width):
+            if i == center:
+                bar += "│"
+            elif i < center and i >= filled:
+                bar += "◀" if filled < center else "─"
+            elif i > center and i <= filled:
+                bar += "▶" if filled > center else "─"
+            elif i < filled and i < center:
+                bar += "█"
+            elif i > filled and i > center:
+                bar += "░"
+            else:
+                bar += "░" if i < center else "░"
+
+        return bar
+
+
+class LayerInfluenceDiagnostics:
+    """
+    Diagnoses whether each SRK layer influences phase learning constructively
+    or destructively.
+
+    Constructive Influence (helps phase learning):
+    - Increases phase coherence (R_k metric)
+    - Maintains ontological diversity
+    - Preserves phase signal through layer
+    - Allows healthy gradient flow
+
+    Destructive Influence (hurts phase learning):
+    - Causes phase collapse (uniform phases)
+    - Reduces ontological diversity
+    - Diffuses or erases phase signal
+    - Blocks gradient flow (vanishing gradients)
+
+    Usage:
+        diagnostics = LayerInfluenceDiagnostics(config)
+        influence = diagnostics.analyze(
+            layer_hidden_states,
+            prev_metrics,
+            curr_metrics
+        )
+    """
+
+    def __init__(self, config: SRKPhaseLearningConfig):
+        self.config = config
+
+        # Thresholds for influence classification
+        self.constructive_threshold = 0.2   # Score > 0.2 = constructive
+        self.destructive_threshold = -0.2   # Score < -0.2 = destructive
+
+        # Phase health thresholds
+        self.collapse_threshold = 0.1       # R_k < 0.1 = collapsed
+        self.diffusion_threshold = 0.95     # R_k > 0.95 = diffused (too uniform)
+        self.gradient_threshold = 1e-6      # Gradient < this = blocked
+
+        # History for trend analysis
+        self.influence_history: List[Dict[int, LayerInfluenceMetrics]] = []
+
+    def compute_phase_metrics(
+        self,
+        hidden_states: torch.Tensor,
+        num_heads: int = 8,
+    ) -> Dict[str, float]:
+        """
+        Compute phase-related metrics from hidden states.
+
+        Returns metrics useful for influence analysis.
+        """
+        with torch.no_grad():
+            B, N, D = hidden_states.shape
+
+            # Compute pseudo-phase from hidden states
+            # Using the first few dimensions as "phase-like" signal
+            phase_dims = min(D, num_heads * 4)
+            phase_signal = hidden_states[..., :phase_dims]
+
+            # Phase coherence approximation (mean resultant length)
+            # Treat normalized hidden states as unit vectors
+            normalized = F.normalize(phase_signal, dim=-1)
+            mean_vector = normalized.mean(dim=1)  # [B, phase_dims]
+            coherence = torch.norm(mean_vector, dim=-1).mean().item()
+
+            # Phase variance (spread of phase signal)
+            phase_var = phase_signal.var(dim=-1).mean().item()
+
+            # Entropy of hidden state distribution
+            # Use softmax to get "probability-like" distribution
+            probs = F.softmax(hidden_states.abs().mean(dim=1), dim=-1)  # [B, D]
+            entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1).mean().item()
+            max_entropy = math.log(D)
+            normalized_entropy = entropy / max_entropy
+
+            # Signal magnitude
+            signal_norm = hidden_states.norm(dim=-1).mean().item()
+
+            return {
+                'coherence': coherence,
+                'phase_var': phase_var,
+                'entropy': normalized_entropy,
+                'signal_norm': signal_norm,
+            }
+
+    def analyze_layer_influence(
+        self,
+        layer_idx: int,
+        component_name: str,
+        input_hidden: torch.Tensor,
+        output_hidden: torch.Tensor,
+        num_heads: int = 8,
+    ) -> LayerInfluenceMetrics:
+        """
+        Analyze influence of a single layer on phase learning.
+
+        Compares input and output hidden states to determine if the layer
+        is helping or hurting phase learning.
+        """
+        # Compute metrics before and after layer
+        input_metrics = self.compute_phase_metrics(input_hidden, num_heads)
+        output_metrics = self.compute_phase_metrics(output_hidden, num_heads)
+
+        # Phase preservation: how much of input phase survives
+        # Compare coherence before/after
+        coherence_ratio = output_metrics['coherence'] / (input_metrics['coherence'] + 1e-6)
+        phase_preservation = min(coherence_ratio, 2.0) / 2.0  # Clamp to [0, 1]
+
+        # Phase amplification: ratio of signal norms
+        amplification = output_metrics['signal_norm'] / (input_metrics['signal_norm'] + 1e-6)
+
+        # Entropy delta: change in representation entropy
+        entropy_delta = output_metrics['entropy'] - input_metrics['entropy']
+
+        # Gradient flow approximation (using variance as proxy)
+        var_ratio = output_metrics['phase_var'] / (input_metrics['phase_var'] + 1e-6)
+        gradient_flow = min(var_ratio, 2.0) / 2.0
+
+        # Detect problematic conditions
+        causes_collapse = output_metrics['coherence'] < self.collapse_threshold
+        causes_diffusion = output_metrics['coherence'] > self.diffusion_threshold
+        is_bottleneck = gradient_flow < self.gradient_threshold
+
+        # Compute influence score
+        # Positive factors: preserves phase, maintains diversity, good gradient flow
+        # Negative factors: collapses phase, reduces diversity, blocks gradients
+        influence_score = 0.0
+
+        # Phase preservation contribution (-0.5 to +0.5)
+        influence_score += (phase_preservation - 0.5)
+
+        # Entropy contribution: slight increase is good, large increase is bad
+        if -0.1 < entropy_delta < 0.1:
+            influence_score += 0.2  # Stable entropy is good
+        elif entropy_delta > 0.3:
+            influence_score -= 0.3  # Large entropy increase = diffusion
+        elif entropy_delta < -0.3:
+            influence_score -= 0.2  # Large entropy decrease = collapse
+
+        # Gradient flow contribution
+        if gradient_flow > 0.3:
+            influence_score += 0.2
+        elif gradient_flow < 0.1:
+            influence_score -= 0.3
+
+        # Penalty for collapse/diffusion
+        if causes_collapse:
+            influence_score -= 0.5
+        if causes_diffusion:
+            influence_score -= 0.2
+
+        # Clamp to [-1, 1]
+        influence_score = max(-1.0, min(1.0, influence_score))
+
+        # Classify influence type
+        if influence_score > self.constructive_threshold:
+            influence_type = InfluenceType.CONSTRUCTIVE
+        elif influence_score < self.destructive_threshold:
+            influence_type = InfluenceType.DESTRUCTIVE
+        else:
+            influence_type = InfluenceType.NEUTRAL
+
+        return LayerInfluenceMetrics(
+            layer_idx=layer_idx,
+            component_name=component_name,
+            influence_type=influence_type,
+            influence_score=influence_score,
+            phase_preservation=phase_preservation,
+            phase_amplification=amplification,
+            gradient_flow=gradient_flow,
+            entropy_delta=entropy_delta,
+            causes_collapse=causes_collapse,
+            causes_diffusion=causes_diffusion,
+            is_bottleneck=is_bottleneck,
+        )
+
+    def analyze_all_layers(
+        self,
+        layer_hidden_states: List[torch.Tensor],
+        num_heads: int = 8,
+    ) -> Dict[int, LayerInfluenceMetrics]:
+        """
+        Analyze influence for all configured SRK layers.
+
+        Args:
+            layer_hidden_states: List of hidden states from each layer
+
+        Returns:
+            Dictionary mapping layer index to influence metrics
+        """
+        results = {}
+        num_layers = len(layer_hidden_states)
+
+        # Analyze DNA Bridge layer
+        if self.config.enable_dna_bridge and self.config.dna_bridge_layer < num_layers:
+            layer_idx = self.config.dna_bridge_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)] if layer_idx > 0 else layer_hidden_states[0]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "DNA Bridge", input_h, output_h, num_heads
+            )
+
+        # Analyze CSR Alignment layer
+        if self.config.enable_phase_hook and self.config.csr_alignment_layer < num_layers:
+            layer_idx = self.config.csr_alignment_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "CSR Alignment", input_h, output_h, num_heads
+            )
+
+        # Analyze Witness Arbitrator layer
+        if self.config.enable_witness and self.config.witness_layer < num_layers:
+            layer_idx = self.config.witness_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "Witness Arbitrator", input_h, output_h, num_heads
+            )
+
+        # Analyze Synthesis Gate layer
+        if self.config.enable_synthesis and self.config.synthesis_layer < num_layers:
+            layer_idx = self.config.synthesis_layer
+            input_h = layer_hidden_states[max(0, layer_idx - 1)]
+            output_h = layer_hidden_states[layer_idx]
+            results[layer_idx] = self.analyze_layer_influence(
+                layer_idx, "Synthesis Gate", input_h, output_h, num_heads
+            )
+
+        # Store in history
+        self.influence_history.append(results)
+
+        return results
+
+    def print_influence_report(
+        self,
+        influence_metrics: Dict[int, LayerInfluenceMetrics],
+        step: int = 0,
+    ):
+        """Print formatted influence report for all layers."""
+        print(f"\n      ╔══════════════════════════════════════════════════════════════════╗")
+        print(f"      ║  SRK LAYER INFLUENCE DIAGNOSTICS @ Step {step:<6}                  ║")
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+        print(f"      ║  Layer  Component           Influence    Score   Flags          ║")
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+
+        for layer_idx in sorted(influence_metrics.keys()):
+            m = influence_metrics[layer_idx]
+            symbol = m.get_influence_symbol()
+
+            # Build flags string
+            flags = []
+            if m.causes_collapse:
+                flags.append("COLLAPSE")
+            if m.causes_diffusion:
+                flags.append("DIFFUSE")
+            if m.is_bottleneck:
+                flags.append("BLOCKED")
+            flags_str = ",".join(flags) if flags else "OK"
+
+            # Influence type with color indicator
+            if m.influence_type == InfluenceType.CONSTRUCTIVE:
+                inf_str = f"[{symbol}] CONSTRUCTIVE"
+            elif m.influence_type == InfluenceType.DESTRUCTIVE:
+                inf_str = f"[{symbol}] DESTRUCTIVE"
+            else:
+                inf_str = f"[{symbol}] NEUTRAL    "
+
+            print(f"      ║  L{layer_idx:<4} {m.component_name:<18} {inf_str}  {m.influence_score:+.2f}   {flags_str:<14} ║")
+
+        print(f"      ╠══════════════════════════════════════════════════════════════════╣")
+
+        # Summary
+        constructive = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.CONSTRUCTIVE)
+        destructive = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.DESTRUCTIVE)
+        neutral = sum(1 for m in influence_metrics.values() if m.influence_type == InfluenceType.NEUTRAL)
+
+        total_score = sum(m.influence_score for m in influence_metrics.values())
+        avg_score = total_score / len(influence_metrics) if influence_metrics else 0
+
+        if avg_score > 0.1:
+            overall = "CONSTRUCTIVE overall"
+        elif avg_score < -0.1:
+            overall = "DESTRUCTIVE overall"
+        else:
+            overall = "NEUTRAL overall"
+
+        print(f"      ║  Summary: {constructive} constructive, {neutral} neutral, {destructive} destructive        ║")
+        print(f"      ║  Average Score: {avg_score:+.3f} → {overall:<20}                  ║")
+        print(f"      ╚══════════════════════════════════════════════════════════════════╝")
+
+    def print_detailed_layer_report(
+        self,
+        influence_metrics: Dict[int, LayerInfluenceMetrics],
+    ):
+        """Print detailed per-layer breakdown."""
+        print(f"\n      Detailed Layer Analysis:")
+        print(f"      " + "-" * 60)
+
+        for layer_idx in sorted(influence_metrics.keys()):
+            m = influence_metrics[layer_idx]
+            print(f"\n      L{layer_idx}: {m.component_name}")
+            print(f"        Influence: {m.influence_type.value} (score: {m.influence_score:+.3f})")
+            print(f"        Phase Preservation:  {m.phase_preservation:.3f} {'✓' if m.phase_preservation > 0.5 else '⚠️'}")
+            print(f"        Phase Amplification: {m.phase_amplification:.3f}x")
+            print(f"        Gradient Flow:       {m.gradient_flow:.3f} {'✓' if m.gradient_flow > 0.1 else '⚠️'}")
+            print(f"        Entropy Delta:       {m.entropy_delta:+.3f}")
+
+            # Interpretation
+            if m.influence_type == InfluenceType.CONSTRUCTIVE:
+                print(f"        → This layer HELPS phase learning")
+                if m.phase_preservation > 0.7:
+                    print(f"          Good phase preservation through layer")
+                if m.gradient_flow > 0.3:
+                    print(f"          Healthy gradient flow")
+            elif m.influence_type == InfluenceType.DESTRUCTIVE:
+                print(f"        → This layer HURTS phase learning")
+                if m.causes_collapse:
+                    print(f"          ⚠️ Causing phase collapse!")
+                if m.causes_diffusion:
+                    print(f"          ⚠️ Causing phase diffusion!")
+                if m.is_bottleneck:
+                    print(f"          ⚠️ Blocking gradient flow!")
+            else:
+                print(f"        → This layer has MINIMAL effect on phase")
+
+    def get_influence_summary(self) -> Dict[str, any]:
+        """Get summary of influence trends over training."""
+        if not self.influence_history:
+            return {}
+
+        summary = {'num_observations': len(self.influence_history)}
+
+        # Track per-layer trends
+        for layer_idx in self.influence_history[-1].keys():
+            scores = [h[layer_idx].influence_score for h in self.influence_history if layer_idx in h]
+            if scores:
+                summary[f'L{layer_idx}_score_initial'] = scores[0]
+                summary[f'L{layer_idx}_score_final'] = scores[-1]
+                summary[f'L{layer_idx}_score_trend'] = scores[-1] - scores[0]
+
+                # Count influence type changes
+                types = [h[layer_idx].influence_type for h in self.influence_history if layer_idx in h]
+                summary[f'L{layer_idx}_constructive_pct'] = sum(1 for t in types if t == InfluenceType.CONSTRUCTIVE) / len(types)
+                summary[f'L{layer_idx}_destructive_pct'] = sum(1 for t in types if t == InfluenceType.DESTRUCTIVE) / len(types)
+
+        return summary
+
+
+# =============================================================================
 # VOCABULARY (48 tokens)
 # =============================================================================
 
@@ -2746,21 +3166,27 @@ def train_real_language(
             device=torch.device(config.device),
         )
 
+        # V10.3.1: Create layer influence diagnostics
+        srk_influence = LayerInfluenceDiagnostics(srk_config)
+
         print(f"\n  ╔══════════════════════════════════════════════════════════════════╗")
-        print(f"  ║  V10.3.0: SRK PHASE LEARNING MONITORING ENABLED                  ║")
+        print(f"  ║  V10.3.1: SRK PHASE LEARNING MONITORING ENABLED                  ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
-        print(f"  ║  Layer Components:                                               ║")
+        print(f"  ║  Layer Components (with Influence Diagnostics):                  ║")
         if srk_config.enable_dna_bridge:
-            print(f"  ║    L{srk_config.dna_bridge_layer}: DNA Bridge (Ontology)          ACTIVE                ║")
+            print(f"  ║    L{srk_config.dna_bridge_layer}: DNA Bridge (Ontology)          ACTIVE + INFLUENCE    ║")
         if srk_config.enable_phase_hook:
-            print(f"  ║    L{srk_config.csr_alignment_layer}: CSR Alignment (Phase Hook)   ACTIVE                ║")
+            print(f"  ║    L{srk_config.csr_alignment_layer}: CSR Alignment (Phase Hook)   ACTIVE + INFLUENCE    ║")
         if srk_config.enable_witness:
-            print(f"  ║    L{srk_config.witness_layer}: Witness Arbitrator         ACTIVE                ║")
+            print(f"  ║    L{srk_config.witness_layer}: Witness Arbitrator         ACTIVE + INFLUENCE    ║")
         if srk_config.enable_synthesis:
-            print(f"  ║    L{srk_config.synthesis_layer}: Synthesis Gate            ACTIVE                ║")
+            print(f"  ║    L{srk_config.synthesis_layer}: Synthesis Gate            ACTIVE + INFLUENCE    ║")
         print(f"  ╠══════════════════════════════════════════════════════════════════╣")
         print(f"  ║  Tracking: Phase coherence, Ontological diversity, Layer PPL     ║")
+        print(f"  ║  NEW: Per-layer CONSTRUCTIVE/DESTRUCTIVE influence analysis      ║")
         print(f"  ╚══════════════════════════════════════════════════════════════════╝")
+    else:
+        srk_influence = None
 
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
@@ -2932,6 +3358,18 @@ def train_real_language(
                             print(f"      ║    Gate Mean: {srk_metrics[syn_key]:.4f}                           ║")
 
                         print(f"      ╚══════════════════════════════════════════════════════╝")
+
+                        # V10.3.1: Layer Influence Diagnostics
+                        if srk_influence is not None:
+                            influence_metrics = srk_influence.analyze_all_layers(
+                                layer_hidden_states,
+                                num_heads=config.num_heads,
+                            )
+                            srk_influence.print_influence_report(influence_metrics, step)
+
+                            # Print detailed breakdown every 5 evaluations
+                            if len(srk_influence.influence_history) % 5 == 0:
+                                srk_influence.print_detailed_layer_report(influence_metrics)
 
             print()
             model.train()
@@ -3115,6 +3553,101 @@ def train_real_language(
                     print(f"      → Gate is fully OPEN (minimal filtering)")
                 else:
                     print(f"      → Gate is mostly CLOSED (may block outputs)")
+
+        # V10.3.1: Layer Influence Summary
+        if srk_influence is not None and srk_influence.influence_history:
+            print("\n" + "=" * 70)
+            print("SRK LAYER INFLUENCE ANALYSIS (V10.3.1)")
+            print("=" * 70)
+
+            inf_summary = srk_influence.get_influence_summary()
+
+            print(f"\n  Layer Influence Over Training ({inf_summary.get('num_observations', 0)} observations):")
+            print("  " + "-" * 60)
+            print(f"  {'Layer':<8} {'Component':<20} {'Initial':<10} {'Final':<10} {'Trend':<12} {'Verdict'}")
+            print("  " + "-" * 60)
+
+            layer_verdicts = []
+            for layer_idx in sorted(set(int(k.split('_')[0][1:]) for k in inf_summary.keys() if k.startswith('L') and '_score_initial' in k)):
+                # Get metrics for this layer
+                initial = inf_summary.get(f'L{layer_idx}_score_initial', 0)
+                final = inf_summary.get(f'L{layer_idx}_score_final', 0)
+                trend = inf_summary.get(f'L{layer_idx}_score_trend', 0)
+                constructive_pct = inf_summary.get(f'L{layer_idx}_constructive_pct', 0)
+                destructive_pct = inf_summary.get(f'L{layer_idx}_destructive_pct', 0)
+
+                # Determine component name
+                if layer_idx == srk_monitor.config.dna_bridge_layer:
+                    component = "DNA Bridge"
+                elif layer_idx == srk_monitor.config.csr_alignment_layer:
+                    component = "CSR Alignment"
+                elif layer_idx == srk_monitor.config.witness_layer:
+                    component = "Witness Arbitrator"
+                elif layer_idx == srk_monitor.config.synthesis_layer:
+                    component = "Synthesis Gate"
+                else:
+                    component = "Unknown"
+
+                # Determine verdict
+                if constructive_pct > 0.6:
+                    verdict = "CONSTRUCTIVE"
+                    layer_verdicts.append(("constructive", layer_idx, component))
+                elif destructive_pct > 0.6:
+                    verdict = "DESTRUCTIVE"
+                    layer_verdicts.append(("destructive", layer_idx, component))
+                elif trend > 0.1:
+                    verdict = "IMPROVING"
+                    layer_verdicts.append(("improving", layer_idx, component))
+                elif trend < -0.1:
+                    verdict = "DEGRADING"
+                    layer_verdicts.append(("degrading", layer_idx, component))
+                else:
+                    verdict = "NEUTRAL"
+                    layer_verdicts.append(("neutral", layer_idx, component))
+
+                trend_arrow = "↑" if trend > 0.05 else "↓" if trend < -0.05 else "→"
+                print(f"  L{layer_idx:<6} {component:<20} {initial:+.3f}     {final:+.3f}     {trend:+.3f} {trend_arrow}     {verdict}")
+
+            # Overall recommendation
+            print("\n  " + "=" * 60)
+            print("  RECOMMENDATIONS:")
+            print("  " + "-" * 60)
+
+            constructive_layers = [v for v in layer_verdicts if v[0] == "constructive"]
+            destructive_layers = [v for v in layer_verdicts if v[0] == "destructive"]
+            degrading_layers = [v for v in layer_verdicts if v[0] == "degrading"]
+
+            if destructive_layers:
+                print(f"\n  ⚠️  DESTRUCTIVE layers detected:")
+                for _, idx, name in destructive_layers:
+                    print(f"      L{idx} ({name}): Consider disabling or adjusting")
+                    if name == "DNA Bridge":
+                        print(f"        → Try --srk-disable-dna-bridge or different layer")
+                    elif name == "CSR Alignment":
+                        print(f"        → Try --srk-disable-phase-hook or different layer")
+                    elif name == "Witness Arbitrator":
+                        print(f"        → Try --srk-disable-witness or different layer")
+                    elif name == "Synthesis Gate":
+                        print(f"        → Try --srk-disable-synthesis or different layer")
+
+            if degrading_layers:
+                print(f"\n  ⚠️  DEGRADING layers (getting worse over training):")
+                for _, idx, name in degrading_layers:
+                    print(f"      L{idx} ({name}): May need longer training or tuning")
+
+            if constructive_layers:
+                print(f"\n  ✓  CONSTRUCTIVE layers (helping phase learning):")
+                for _, idx, name in constructive_layers:
+                    print(f"      L{idx} ({name}): Keep enabled!")
+
+            # Overall assessment
+            if len(destructive_layers) > len(constructive_layers):
+                print(f"\n  OVERALL: More layers DESTRUCTIVE than constructive.")
+                print(f"           Consider adjusting layer positions or disabling problematic layers.")
+            elif len(constructive_layers) > len(destructive_layers):
+                print(f"\n  OVERALL: More layers CONSTRUCTIVE - SRK is helping phase learning!")
+            else:
+                print(f"\n  OVERALL: Mixed influence - consider fine-tuning layer positions.")
 
     return model, best_val_ppl
 
