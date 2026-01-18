@@ -3499,14 +3499,17 @@ def print_rotation_test_results(
 # =============================================================================
 
 class WikiTextDataset(Dataset):
-    """WikiText dataset for language modeling with layer probing."""
+    """Text dataset for language modeling with layer probing.
+
+    Supports: wikitext2, wikitext103, bookcorpus, wikisection
+    """
 
     def __init__(self, split: str = "train", seq_len: int = 256, dataset_name: str = "wikitext2"):
         """
         Args:
             split: "train", "validation", or "test"
             seq_len: Sequence length for chunks
-            dataset_name: "wikitext2" or "wikitext103"
+            dataset_name: "wikitext2", "wikitext103", "bookcorpus", or "wikisection"
         """
         try:
             from datasets import load_dataset
@@ -3518,16 +3521,56 @@ class WikiTextDataset(Dataset):
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Load dataset
-        if dataset_name == "wikitext2":
+        # Load dataset based on name
+        dataset_name_lower = dataset_name.lower()
+
+        if dataset_name_lower == "wikitext2":
             ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
-        else:
+            text_field = "text"
+            ds_label = "WikiText-2"
+        elif dataset_name_lower == "wikitext103":
             ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+            text_field = "text"
+            ds_label = "WikiText-103"
+        elif dataset_name_lower == "bookcorpus":
+            # BookCorpus only has train split
+            if split != "train":
+                print(f"  [BookCorpus] Warning: Only 'train' split available, using train for {split}")
+                split = "train"
+            ds = load_dataset("bookcorpus", split=split)
+            text_field = "text"
+            ds_label = "BookCorpus"
+        elif dataset_name_lower == "wikisection":
+            # WikiSection has train/validation/test splits
+            # Map to the actual split names in the dataset
+            split_map = {"train": "train", "validation": "validation", "test": "test"}
+            actual_split = split_map.get(split, split)
+            try:
+                ds = load_dataset("wiki_section", "en_city", split=actual_split)
+            except Exception:
+                # Fallback to plain wikisection if en_city doesn't work
+                ds = load_dataset("wiki_section", split=actual_split)
+            # WikiSection has 'document_title' and 'section_text' fields
+            text_field = "section_text" if "section_text" in ds.column_names else "text"
+            ds_label = "WikiSection"
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}. "
+                           f"Choose from: wikitext2, wikitext103, bookcorpus, wikisection")
 
         # Tokenize all text
-        all_text = " ".join([t for t in ds["text"] if t.strip()])
+        if text_field in ds.column_names:
+            all_text = " ".join([t for t in ds[text_field] if t and t.strip()])
+        else:
+            # Fallback: try common text field names
+            for field in ["text", "content", "section_text", "document"]:
+                if field in ds.column_names:
+                    all_text = " ".join([t for t in ds[field] if t and t.strip()])
+                    break
+            else:
+                raise ValueError(f"Could not find text field in dataset. Available: {ds.column_names}")
+
         self.tokens = self.tokenizer.encode(all_text)
-        print(f"  [WikiText] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
+        print(f"  [{ds_label}] {split}: {len(self.tokens):,} tokens → {len(self.tokens) // seq_len:,} chunks")
 
     def __len__(self):
         return max(1, len(self.tokens) // self.seq_len - 1)
@@ -6471,8 +6514,8 @@ Examples:
     parser.add_argument("--real-language", action="store_true",
                         help="Use real language data (WikiText) instead of synthetic data")
     parser.add_argument("--dataset", type=str, default="wikitext2",
-                        choices=["wikitext2", "wikitext103"],
-                        help="Dataset for real language mode")
+                        choices=["wikitext2", "wikitext103", "bookcorpus", "wikisection"],
+                        help="Dataset for real language mode (bookcorpus: train only, wikisection: structured wiki)")
     parser.add_argument("--seq-len", type=int, default=256,
                         help="Sequence length for language modeling")
     parser.add_argument("--lm-vocab-size", type=int, default=50257,
