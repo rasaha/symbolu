@@ -9309,6 +9309,14 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix - enabled by default)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    # Separates content similarity from intent alignment to prevent intent from dominating:
+    #   s_content = cos(φ_q - φ_k)           # What matches (preserved)
+    #   s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+    #   score = s_content * (1 + α * s_align) # Combined
+    dual_channel_mode: bool = False  # Enable dual-channel attention
+    alignment_authority: float = 0.1  # α: weight for alignment term (0=pure content, higher=more intent influence)
+
     # Phase Rotation Test (validates phase encodes relational structure)
     phase_rotation: bool = False  # Run phase rotation test after training
     phase_rotation_angles: str = "0,45,90,135,180,270"  # Angles to test (degrees)
@@ -10561,6 +10569,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             protected_phase=use_protected_phase,  # V10.2.1: Protected Phase for chunking
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
@@ -10571,6 +10581,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
         if config.zero_mean_cosine:
             print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
+        if config.dual_channel_mode:
+            print(f"  Dual-Channel Mode: ENABLED (α={config.alignment_authority})")  # V10.3.8
         # V10.2.1: Log chunking settings
         if config.enable_chunking:
             print(f"  Chunking: ENABLED (chunk_size={config.chunk_size})")
@@ -10646,6 +10658,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             learned_decay=config.learned_decay,  # V9.9.7: Per-head learned decay
             bounded_phase=config.bounded_phase,  # V9.9.11: Phase collapse fix 1
             zero_mean_cosine=config.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+            dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
+            alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
@@ -10662,6 +10676,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    Bounded Phase: ENABLED (π*sin() bounds φ to [-π, π])")  # V9.9.11
         if config.zero_mean_cosine:
             print(f"    Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
+        if config.dual_channel_mode:
+            print(f"    Dual-Channel Mode: ENABLED (α={config.alignment_authority})")  # V10.3.8
         print(f"    Initial State: O12_ABS (Absolute) + Material (Physicality) - Grounded Awareness")
 
     elif config.model_type == "binding_cache":
@@ -18187,6 +18203,19 @@ def main():
                        help="Center cosine per head to force selectivity. "
                             "Without this, cosine is always positive-biased and collapse is inevitable.")
 
+    # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
+    parser.add_argument("--dual_channel_mode", action="store_true",
+                       help="Enable dual-channel attention: separates content similarity from intent alignment. "
+                            "s_content = cos(φ_q - φ_k) (what matches), "
+                            "s_align = cos(θ_JEPA - θ_SRK) (intent agreement), "
+                            "score = s_content * (1 + α * s_align). "
+                            "Prevents intent from dominating content selectivity.")
+    parser.add_argument("--alignment_authority", type=float, default=0.1,
+                       help="α: Weight for alignment term in dual-channel mode (default: 0.1). "
+                            "0.0 = pure content matching (intent ignored), "
+                            "0.1 = mild intent influence (recommended), "
+                            "1.0 = strong intent influence.")
+
     # Phase Rotation Test (validates phase encodes relational structure)
     parser.add_argument("--phase_rotation", action="store_true",
                        help="Run phase rotation test after training to verify phase encodes relations. "
@@ -19148,6 +19177,9 @@ def main():
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
         bounded_phase=args.bounded_phase,  # V9.9.11: Phase collapse fix 1
         zero_mean_cosine=args.zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
+        # V10.3.8: Dual-Channel Attention
+        dual_channel_mode=args.dual_channel_mode,
+        alignment_authority=args.alignment_authority,
         # Phase Rotation Test
         phase_rotation=args.phase_rotation,
         phase_rotation_angles=args.phase_rotation_angles,
