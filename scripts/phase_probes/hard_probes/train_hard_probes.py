@@ -941,6 +941,18 @@ class WitnessDiagnostics(nn.Module):
         # Vritti classification
         vritti_probs = self.vritti_classifier(hidden_avg)  # [B, 5]
 
+        # V10.3.7: Compute vritti entropy for regularization
+        # Higher entropy = more balanced distribution across epistemic states
+        eps = 1e-8
+        vritti_entropy = -(vritti_probs * torch.log(vritti_probs + eps)).sum(dim=-1)  # [B]
+        # Max entropy for 5 classes = log(5) ≈ 1.609
+        max_entropy = torch.log(torch.tensor(5.0, device=vritti_probs.device))
+        normalized_entropy = vritti_entropy / max_entropy  # [B], range [0, 1]
+
+        # Store for loss computation (with gradient)
+        self._last_vritti_probs = vritti_probs
+        self._last_vritti_entropy = vritti_entropy
+
         # Constraint detection
         constraint_score = self.constraint_detector(hidden_avg)  # [B, 1]
 
@@ -964,6 +976,9 @@ class WitnessDiagnostics(nn.Module):
             'constraint_detected': (constraint_score > self.constraint_threshold).float().mean().item(),
             'witness_confidence': confidence.mean().item(),
             'witness_activation': witness_state.abs().mean().item(),
+            # V10.3.7: Entropy metrics
+            'vritti_entropy': vritti_entropy.mean().item(),
+            'vritti_entropy_normalized': normalized_entropy.mean().item(),
         }
 
         # Store history
@@ -974,6 +989,27 @@ class WitnessDiagnostics(nn.Module):
         self.history['confidence_scores'].append(confidence.mean().item())
 
         return metrics
+
+    def get_entropy_loss(self, lambda_entropy: float = 0.1) -> torch.Tensor:
+        """
+        V10.3.7: Compute entropy regularization loss to prevent vritti collapse.
+
+        Returns negative entropy (to be added to loss, encouraging higher entropy).
+        Higher entropy = more balanced distribution across 5 vritti states.
+
+        Args:
+            lambda_entropy: Weight for entropy regularization (default: 0.1)
+
+        Returns:
+            Entropy loss tensor (negative entropy scaled by lambda)
+        """
+        if not hasattr(self, '_last_vritti_entropy') or self._last_vritti_entropy is None:
+            return torch.tensor(0.0)
+
+        # We want to MAXIMIZE entropy, so we return NEGATIVE entropy
+        # Adding this to loss will encourage higher entropy (more balanced distribution)
+        entropy_loss = -lambda_entropy * self._last_vritti_entropy.mean()
+        return entropy_loss
 
     def get_summary(self) -> Dict[str, any]:
         """Get summary statistics over training history."""
@@ -4981,6 +5017,17 @@ def train_real_language(
         print(f"  ║  Tracks: Domain arbitration, bottleneck detection, meta-cognition ║")
         print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
+        # V10.3.7: Witness entropy regularization
+        if getattr(args, 'witness_entropy_reg', False):
+            lambda_entropy = getattr(args, 'witness_entropy_lambda', 0.1)
+            print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+            print(f"  ║  V10.3.7: WITNESS ENTROPY REGULARIZATION ENABLED                  ║")
+            print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+            print(f"  ║  Prevents vritti collapse to single epistemic state               ║")
+            print(f"  ║  Loss += -λ * H(vritti)   where H = -Σ p*log(p)                   ║")
+            print(f"  ║  Lambda: {lambda_entropy:.3f}  (higher = more balanced distribution)        ║")
+            print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
     # ==========================================================================
     # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
     # ==========================================================================
@@ -5056,9 +5103,32 @@ def train_real_language(
 
         x, y = x.to(config.device), y.to(config.device)
 
-        # Forward
-        logits = model(x)
+        # V10.3.7: Check if witness entropy regularization is enabled
+        use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
+
+        # Forward - use probe_layers if witness entropy is enabled
+        if use_witness_entropy and hasattr(model, 'layer_outputs'):
+            logits = model(x, probe_layers=True)
+            layer_hidden_states = model.layer_outputs
+        else:
+            logits = model(x)
+            layer_hidden_states = None
+
         loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+
+        # V10.3.7: Witness entropy regularization to prevent vritti collapse
+        if use_witness_entropy and layer_hidden_states:
+            # Use witness domain layer if domain separation enabled
+            if use_domain_separation and witness_domain_layers:
+                witness_layer_idx = max([l for l in witness_domain_layers if l < len(layer_hidden_states)])
+            else:
+                witness_layer_idx = min(2, len(layer_hidden_states) - 1)
+            # Forward pass through witness (this stores _last_vritti_entropy with gradients)
+            _ = witness_diagnostics(layer_hidden_states[witness_layer_idx], step=step)
+            # Get entropy loss and add to main loss
+            lambda_entropy = getattr(args, 'witness_entropy_lambda', 0.1)
+            entropy_loss = witness_diagnostics.get_entropy_loss(lambda_entropy)
+            loss = loss + entropy_loss
 
         # Backward
         optimizer.zero_grad()
@@ -6495,6 +6565,12 @@ Examples:
                         help="Max gain for kosha homeostatic loss (default: 3.0)")
     parser.add_argument("--witness-constraint-threshold", type=float, default=0.85,
                         help="Threshold for constraint/bottleneck detection (default: 0.85)")
+
+    # V10.3.7: WITNESS ENTROPY REGULARIZATION
+    parser.add_argument("--witness-entropy-reg", action="store_true",
+                        help="Enable entropy regularization to prevent vritti collapse")
+    parser.add_argument("--witness-entropy-lambda", type=float, default=0.1,
+                        help="Weight for vritti entropy regularization (default: 0.1)")
 
     # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
     # Layer assignments (4-layer model):

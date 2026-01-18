@@ -9992,6 +9992,10 @@ class UnifiedTrainingConfig:
     jepa_enable_karma_injection: bool = False  # Enable karma injection from SRK
     jepa_karma_gate_bias: float = 0.5        # Initial gate bias (0=internal, 1=external)
 
+    # V10.3.7: Vritti Entropy Regularization (prevents single-vritti collapse)
+    vritti_entropy_reg: bool = False       # Enable entropy regularization for vritti
+    vritti_entropy_lambda: float = 0.1     # Weight for entropy regularization
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -15513,6 +15517,25 @@ def train(config: UnifiedTrainingConfig):
                                     metrics['mental_vikalpa_corr'] = alignment_diag.get('mental_vikalpa_corr', 0.0)
                                     metrics['vital_nidra_corr'] = alignment_diag.get('vital_nidra_corr', 0.0)
 
+                                # V10.3.7: Vritti entropy regularization to prevent collapse
+                                if config.vritti_entropy_reg and vritti_states_for_res is not None:
+                                    # vritti_states_for_res shape: [B, seq, 5] or [B, 1, 5]
+                                    # Apply softmax if not already normalized
+                                    vritti_probs = F.softmax(vritti_states_for_res, dim=-1)
+                                    eps = 1e-8
+                                    # Compute entropy: H = -Σ p*log(p)
+                                    vritti_entropy = -(vritti_probs * torch.log(vritti_probs + eps)).sum(dim=-1)
+                                    # Average over batch and sequence
+                                    mean_entropy = vritti_entropy.mean()
+                                    # We want to MAXIMIZE entropy, so subtract from loss (or add negative)
+                                    entropy_loss = -config.vritti_entropy_lambda * mean_entropy
+                                    loss = loss + entropy_loss
+                                    # Log metrics
+                                    max_entropy = math.log(5)  # log(5) ≈ 1.609
+                                    metrics['vritti_entropy'] = mean_entropy.item()
+                                    metrics['vritti_entropy_norm'] = mean_entropy.item() / max_entropy
+                                    metrics['vritti_entropy_loss'] = entropy_loss.item()
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [KOSHA GYROSCOPE] Error: {e}")
@@ -19042,6 +19065,12 @@ def main():
     parser.add_argument("--jepa_karma_gate_bias", type=float, default=0.5,
                        help="Initial gate bias for karma blending (0=internal, 1=external)")
 
+    # V10.3.7: Vritti Entropy Regularization
+    parser.add_argument("--vritti_entropy_reg", action="store_true",
+                       help="Enable entropy regularization to prevent vritti collapse")
+    parser.add_argument("--vritti_entropy_lambda", type=float, default=0.1,
+                       help="Weight for vritti entropy regularization (higher = more balanced)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -19561,6 +19590,9 @@ def main():
         # JEPA-SRK Integration
         jepa_enable_karma_injection=args.jepa_enable_karma_injection,
         jepa_karma_gate_bias=args.jepa_karma_gate_bias,
+        # V10.3.7: Vritti Entropy Regularization
+        vritti_entropy_reg=args.vritti_entropy_reg,
+        vritti_entropy_lambda=args.vritti_entropy_lambda,
         # V10.2.1: Chunking for long sequences
         enable_chunking=args.enable_chunking,
         chunk_size=args.chunk_size,
