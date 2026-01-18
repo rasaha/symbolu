@@ -4838,6 +4838,47 @@ def train_real_language(
         print(f"  ║  Tracks: Domain arbitration, bottleneck detection, meta-cognition ║")
         print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
+    # ==========================================================================
+    # V10.3.5: DOMAIN SEPARATION - CSR vs Kosha authority boundaries
+    # ==========================================================================
+    use_domain_separation = getattr(args, 'domain_separation', False)
+    csr_domain_layers = []
+    kosha_domain_layers = []
+    witness_domain_layers = []
+
+    if use_domain_separation:
+        # Parse layer assignments
+        csr_domain_layers = [int(x) for x in args.csr_domain_layers.split(",")]
+        kosha_domain_layers = [int(x) for x in args.kosha_domain_layers.split(",")]
+        witness_domain_layers = [int(x) for x in args.witness_domain_layers.split(",")]
+
+        print(f"\n  ╔═══════════════════════════════════════════════════════════════════╗")
+        print(f"  ║  V10.3.5: DOMAIN SEPARATION ENABLED                               ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  CSR and Kosha govern DIFFERENT layers (no authority conflict):   ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    CSR Domain (Phase/Syntax):    Layers {csr_domain_layers}                  ║")
+        print(f"  ║      → Phase coherence, CSR alignment, syntax patterns            ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    Kosha Domain (Semantics):     Layers {kosha_domain_layers}                  ║")
+        print(f"  ║      → Consciousness progression, meaning emergence               ║")
+        print(f"  ║                                                                    ║")
+        print(f"  ║    Witness Domain (Observation): Layers {witness_domain_layers}                  ║")
+        print(f"  ║      → Epistemic state tracking, meta-cognition                   ║")
+        print(f"  ╠═══════════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Layer Assignments:                                               ║")
+        for i in range(config.num_layers):
+            governors = []
+            if i in csr_domain_layers:
+                governors.append("CSR")
+            if i in kosha_domain_layers:
+                governors.append("KOSHA")
+            if i in witness_domain_layers:
+                governors.append("WITNESS")
+            gov_str = "+".join(governors) if governors else "NONE"
+            print(f"  ║    L{i}: {gov_str:<20}                                   ║")
+        print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
+
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
@@ -5052,36 +5093,51 @@ def train_real_language(
                             if len(srk_influence.influence_history) % 5 == 0:
                                 srk_influence.print_detailed_layer_report(influence_metrics)
 
-                # V10.3.4: Kosha Consciousness Diagnostics
+                # V10.3.4/V10.3.5: Kosha Consciousness Diagnostics (with domain separation)
                 if kosha_diagnostics is not None:
                     # Forward pass with layer capture
                     if not layer_hidden_states:
                         _ = model(x_sample, probe_layers=True)
                         layer_hidden_states = model.layer_outputs
 
-                    # Analyze each layer's kosha state
-                    for i, hidden in enumerate(layer_hidden_states):
-                        kosha_metrics = kosha_diagnostics(hidden, layer_idx=i, step=step)
+                    # V10.3.5: Only analyze layers in Kosha's domain
+                    if use_domain_separation and kosha_domain_layers:
+                        layers_to_analyze = [i for i in kosha_domain_layers if i < len(layer_hidden_states)]
+                    else:
+                        layers_to_analyze = range(len(layer_hidden_states))
+
+                    for i in layers_to_analyze:
+                        if i < len(layer_hidden_states):
+                            kosha_metrics = kosha_diagnostics(layer_hidden_states[i], layer_idx=i, step=step)
 
                     # Print summary report
+                    if use_domain_separation:
+                        print(f"\n      [Kosha Domain: Layers {list(layers_to_analyze)}]")
                     kosha_diagnostics.print_report(step)
 
-                # V10.3.4: Witness Observer Diagnostics
+                # V10.3.4/V10.3.5: Witness Observer Diagnostics (with domain separation)
                 if witness_diagnostics is not None:
                     # Forward pass with layer capture
                     if not layer_hidden_states:
                         _ = model(x_sample, probe_layers=True)
                         layer_hidden_states = model.layer_outputs
 
-                    # Use final layer for witness analysis (L9 equivalent)
-                    if layer_hidden_states:
-                        witness_layer_idx = min(2, len(layer_hidden_states) - 1)  # Use late layer
+                    # V10.3.5: Only observe layers in Witness's domain
+                    if use_domain_separation and witness_domain_layers:
+                        # Use the highest layer in witness domain
+                        witness_layer_idx = max([l for l in witness_domain_layers if l < len(layer_hidden_states)])
+                    else:
+                        witness_layer_idx = min(2, len(layer_hidden_states) - 1)
+
+                    if layer_hidden_states and witness_layer_idx < len(layer_hidden_states):
                         witness_metrics = witness_diagnostics(
                             layer_hidden_states[witness_layer_idx],
                             step=step,
                         )
 
                     # Print summary report
+                    if use_domain_separation:
+                        print(f"\n      [Witness Domain: Layer {witness_layer_idx}]")
                     witness_diagnostics.print_report(step)
 
             print()
@@ -5414,11 +5470,14 @@ def train_real_language(
                 print(f"\n  OVERALL: Mixed influence - consider fine-tuning layer positions.")
 
     # ==========================================================================
-    # V10.3.4: KOSHA/WITNESS FINAL ANALYSIS
+    # V10.3.4/V10.3.5: KOSHA/WITNESS FINAL ANALYSIS (with domain separation)
     # ==========================================================================
     if kosha_diagnostics is not None:
         print("\n" + "=" * 70)
-        print("KOSHA CONSCIOUSNESS ANALYSIS (V10.3.4)")
+        if use_domain_separation:
+            print(f"KOSHA CONSCIOUSNESS ANALYSIS (V10.3.5) - Domain: Layers {kosha_domain_layers}")
+        else:
+            print("KOSHA CONSCIOUSNESS ANALYSIS (V10.3.4)")
         print("=" * 70)
         kosha_diagnostics.print_report(step)
 
@@ -5453,7 +5512,10 @@ def train_real_language(
 
     if witness_diagnostics is not None:
         print("\n" + "=" * 70)
-        print("WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.4)")
+        if use_domain_separation:
+            print(f"WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.5) - Domain: Layers {witness_domain_layers}")
+        else:
+            print("WITNESS (SAKSHI) OBSERVER ANALYSIS (V10.3.4)")
         print("=" * 70)
         witness_diagnostics.print_report(step)
 
@@ -6270,6 +6332,16 @@ Examples:
                         help="Max gain for kosha homeostatic loss (default: 3.0)")
     parser.add_argument("--witness-constraint-threshold", type=float, default=0.85,
                         help="Threshold for constraint/bottleneck detection (default: 0.85)")
+
+    # V10.3.5: DOMAIN SEPARATION - CSR vs Kosha authority boundaries
+    parser.add_argument("--domain-separation", action="store_true",
+                        help="Enable domain separation: CSR governs early layers, Kosha governs late layers")
+    parser.add_argument("--csr-domain-layers", type=str, default="0,1",
+                        help="Layers where CSR has authority (default: 0,1 for syntax/phase)")
+    parser.add_argument("--kosha-domain-layers", type=str, default="2,3",
+                        help="Layers where Kosha has authority (default: 2,3 for semantics/meaning)")
+    parser.add_argument("--witness-domain-layers", type=str, default="2,3",
+                        help="Layers where Witness observes (default: 2,3 - same as Kosha)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING ARCHITECTURE TESTS
