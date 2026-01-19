@@ -4451,6 +4451,13 @@ class BindingCacheQuadQuery(nn.Module):
     Quadratic query with Top-K cache for efficient memory retrieval.
 
     Uses Top-K selection to reduce O(n²) attention to O(n*k).
+
+    V10.5.4: Soft routing warmup support
+    - soft_routing=True: Use full softmax attention (differentiable everywhere)
+    - soft_routing=False: Use hard top-K selection (sparse but non-differentiable)
+
+    Warmup schedule: Start with soft_routing=True, switch to False after warmup_steps.
+    This allows gradients to flow to quad during early training.
     """
 
     def __init__(
@@ -4476,6 +4483,13 @@ class BindingCacheQuadQuery(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
         self.scale = 1.0 / math.sqrt(self.head_dim)
+
+        # V10.5.4: Soft routing warmup
+        self.soft_routing = True  # Start with soft routing (full softmax)
+
+    def set_soft_routing(self, enabled: bool):
+        """V10.5.4: Enable/disable soft routing for warmup schedule."""
+        self.soft_routing = enabled
 
     def get_proposals(
         self,
@@ -4536,7 +4550,11 @@ class BindingCacheQuadQuery(nn.Module):
         memory_state: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Query memory state with Top-K selection.
+        Query memory state with Top-K selection or soft routing.
+
+        V10.5.4: Soft routing warmup
+        - soft_routing=True: Full softmax attention (differentiable, O(n²))
+        - soft_routing=False: Hard top-K selection (sparse, O(n*k))
 
         Args:
             x: [B, N, D]
@@ -4561,9 +4579,14 @@ class BindingCacheQuadQuery(nn.Module):
         causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
         attn_scores = attn_scores.masked_fill(causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
-        if self.use_cache and self.top_k < N:
-            # Top-K selection per query position
-            # For each query, only attend to top-k memory positions
+        # V10.5.4: Soft routing warmup - use full softmax during warmup
+        if self.soft_routing:
+            # Full attention (differentiable everywhere, allows gradients to flow)
+            attn_probs = F.softmax(attn_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+            attn_out = torch.matmul(attn_probs, mem)
+        elif self.use_cache and self.top_k < N:
+            # Hard Top-K selection (sparse, non-differentiable for non-selected)
             k = min(self.top_k, N)
             top_k_scores, top_k_indices = torch.topk(attn_scores, k, dim=-1)
 
@@ -4578,7 +4601,7 @@ class BindingCacheQuadQuery(nn.Module):
 
             attn_out = torch.matmul(attn_probs.unsqueeze(-2), top_k_mem).squeeze(-2)  # [B, H, N, D_h]
         else:
-            # Full attention (no cache)
+            # Full attention (no cache configured)
             attn_probs = F.softmax(attn_scores, dim=-1)
             attn_probs = self.dropout(attn_probs)
             attn_out = torch.matmul(attn_probs, mem)
@@ -4591,13 +4614,24 @@ class BindingCacheLMBlock(nn.Module):
     """
     Binding Cache block for Language Modeling.
 
-    Three-path architecture (V10.0):
-    1. Local: O(n*w) - Direct token-to-token for syntax
-    2. Phase: O(n) - Memory state accumulation
-    3. Quad:  O(n*k) - Top-K memory query
+    V10.5.3 Independent Paths Architecture (Option A):
+    1. Local: O(n*w) - Syntax attention (independent path)
+    2. Phase: O(n) - Pure memory bank (K/V for quad only)
+    3. Quad:  O(n*k) - Memory retriever (queries phase using raw x)
 
-    They work together: local_out + mem_out (no gradient competition).
-    Ratios allow per-layer weighting of each path.
+    Key design: Local and Quad are INDEPENDENT paths, both operating on raw x.
+    Phase is a pure memory bank - it only provides K/V for quad, no direct output.
+
+    Information flow:
+        local_out = local_attn(x)           # Syntax (independent)
+        memory_state = phase_state(x)       # Memory bank
+        quad_out = quad_query(x, memory_state)  # Retrieval (independent)
+        output = local_ratio * local_out + quad_ratio * quad_out
+
+    Evolution:
+    - V10.0: Phase leaked to output, quad redundant (0.1% gradients)
+    - V10.5.2: Cross-attention (Q=local_out), still 0.1% gradients
+    - V10.5.3: Independent paths (Q=x), testing clean architecture
     """
 
     def __init__(
@@ -4680,35 +4714,40 @@ class BindingCacheLMBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Three-path forward pass with weighted combination.
+        Independent paths architecture (V10.5.3 - Option A).
 
-        1. Local attention for syntax
-        2. Phase accumulates memory
-        3. Quad queries memory (or proposes in proposal_mode)
+        V10.5.3 Change: Clean independent paths design
+        - Local: syntax attention (independent path)
+        - Phase: pure memory bank (provides K/V for quad)
+        - Quad: memory retriever (queries phase using raw x, independent path)
 
-        V10.4 Proposal Mode:
-        - Quad returns proposals (no softmax mixing)
-        - Phase integrates proposals with gating
-        - Conditional skip: if phase confident, skip quad
+        Key insight from V10.5.2: Cross-attention (Q=local_out) didn't help quad.
+        Window=8 diagnostic confirmed quad's 0.1% gradients is NOT due to local masking.
+        Option A tests if independent paths help quad optimization.
 
-        Output = x + (local_ratio * local + phase_ratio * memory + quad_ratio * quad_out) + ff
+        Information flow:
+        1. Local: local_out = local_attn(x)     [O(n*w)] - syntax, independent
+        2. Phase: memory = phase_state(x)       [O(n)]   - memory bank
+        3. Quad:  quad_out = quad_query(x, memory) [O(n*k)] - retrieves from phase
+
+        Output = x + (local_ratio * local_out + quad_ratio * quad_out) + ff
+        Note: Local and Quad are INDEPENDENT paths operating on raw input x
         """
-        # Step 1: Local attention for syntax (the → cat patterns)
+        # Step 1: Local attention for syntax (independent path)
         local_out = self.local_attn(x)
 
-        # Step 2: Phase accumulates memory state
+        # Step 2: Phase accumulates memory state (pure memory bank for quad)
         memory_state = self.phase_state(x)
 
         if self.proposal_mode:
             # V10.4: Proposal Mode - quad proposes, phase integrates
-            # Check confidence for conditional skip
             confidence = self.phase_state.compute_confidence(memory_state)
 
             with torch.no_grad():
                 self._last_confidence_mean = confidence.mean().item()
                 self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
 
-            # Get proposals from quad (no softmax mixing)
+            # V10.5.3: Get proposals using x as query source (independent from local)
             proposals, proposal_scores = self.quad_query.get_proposals(x, memory_state)
 
             # Phase integrates proposals
@@ -4716,14 +4755,13 @@ class BindingCacheLMBlock(nn.Module):
                 x, memory_state, proposals, proposal_scores
             )
         else:
-            # Original mode: Quad queries memory state with softmax attention
+            # V10.5.3: Quad queries memory using raw x (independent from local)
             quad_out = self.quad_query(x, memory_state)
 
-        # Weighted combination of three paths (with ratios for per-layer tuning)
-        # Note: memory_state is passed to quad, but we also add phase contribution directly
+        # V10.5.3: Independent paths combination
+        # Local and Quad operate independently on x, no serial dependency
         attn_out = (
             self.local_ratio * local_out +
-            self.phase_ratio * memory_state +
             self.quad_ratio * quad_out
         )
 
@@ -4962,6 +5000,211 @@ class BindingCacheLMTransformer(nn.Module):
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    # =========================================================================
+    # V10.5.4: Soft Routing Warmup Control
+    # =========================================================================
+    def set_soft_routing(self, enabled: bool):
+        """
+        V10.5.4: Enable/disable soft routing for all quad query layers.
+
+        Soft routing uses full softmax attention (differentiable everywhere)
+        instead of hard top-K selection (non-differentiable for non-selected).
+
+        Args:
+            enabled: True = soft routing (warmup), False = hard top-K (normal)
+        """
+        for layer in self.layers:
+            if hasattr(layer, 'quad_query') and hasattr(layer.quad_query, 'set_soft_routing'):
+                layer.quad_query.set_soft_routing(enabled)
+
+    # =========================================================================
+    # V10.5: FIX 3 - True Gradient Norm Diagnostic (not curriculum-based)
+    # =========================================================================
+    def get_component_grad_norms(self) -> Dict[str, List[float]]:
+        """
+        Measure actual gradient norms for each attention component per layer.
+
+        Returns dict with per-layer gradient norms for:
+        - local: LocalWindowAttention gradients
+        - phase: BindingCachePhaseState gradients
+        - quad:  BindingCacheQuadQuery gradients
+        - ff:    Feed-forward gradients
+
+        This replaces the broken curriculum-based "gradient dominance" diagnostic
+        which falsely reported 100% phase-heavy for Protected Phase architecture.
+        """
+        grad_norms = {
+            'local': [],
+            'phase': [],
+            'quad': [],
+            'ff': [],
+        }
+
+        for layer in self.layers:
+            # Local attention gradient norm
+            local_norm = 0.0
+            for p in layer.local_attn.parameters():
+                if p.grad is not None:
+                    local_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['local'].append(local_norm ** 0.5)
+
+            # Phase state gradient norm
+            phase_norm = 0.0
+            for p in layer.phase_state.parameters():
+                if p.grad is not None:
+                    phase_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['phase'].append(phase_norm ** 0.5)
+
+            # Quad query gradient norm
+            quad_norm = 0.0
+            for p in layer.quad_query.parameters():
+                if p.grad is not None:
+                    quad_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['quad'].append(quad_norm ** 0.5)
+
+            # Feed-forward gradient norm
+            ff_norm = 0.0
+            for p in layer.ff.parameters():
+                if p.grad is not None:
+                    ff_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['ff'].append(ff_norm ** 0.5)
+
+        return grad_norms
+
+    def get_gradient_dominance_report(self) -> Dict[str, any]:
+        """
+        Analyze which components receive gradients and detect dominance issues.
+
+        A healthy model should have gradients flowing to all components at all layers.
+        Gradient dominance (one component >> others) indicates learning imbalance.
+
+        Returns:
+            dict with:
+            - component_totals: Total gradient norm per component
+            - component_pcts: Percentage contribution per component
+            - per_layer_dominant: Which component dominates each layer
+            - dominance_detected: True if one component > 70% of total
+            - layer_gradient_decay: Ratio of L_last / L_0 gradients (healthy > 0.1)
+        """
+        grad_norms = self.get_component_grad_norms()
+
+        # Sum across layers for each component
+        totals = {k: sum(v) for k, v in grad_norms.items()}
+        grand_total = sum(totals.values()) + 1e-10  # Avoid division by zero
+
+        # Percentage contribution per component
+        pcts = {k: (v / grand_total * 100) for k, v in totals.items()}
+
+        # Per-layer dominant component
+        per_layer_dominant = []
+        for i in range(self.num_layers):
+            layer_norms = {k: grad_norms[k][i] for k in grad_norms.keys()}
+            dominant = max(layer_norms, key=layer_norms.get)
+            per_layer_dominant.append(dominant)
+
+        # Check for dominance (any component > 70%)
+        max_pct = max(pcts.values())
+        dominance_detected = max_pct > 70
+
+        # Layer gradient decay: how much gradient reaches later layers
+        # Healthy models should have layer_gradient_decay > 0.1
+        total_per_layer = [sum(grad_norms[k][i] for k in grad_norms.keys())
+                          for i in range(self.num_layers)]
+        if total_per_layer[0] > 1e-10:
+            layer_gradient_decay = total_per_layer[-1] / total_per_layer[0]
+        else:
+            layer_gradient_decay = 0.0
+
+        return {
+            'component_totals': totals,
+            'component_pcts': pcts,
+            'per_layer_dominant': per_layer_dominant,
+            'dominance_detected': dominance_detected,
+            'layer_gradient_decay': layer_gradient_decay,
+            'per_layer_totals': total_per_layer,
+        }
+
+    # =========================================================================
+    # V10.5: FIX 1 - Deep Supervision for Depth Utilization
+    # =========================================================================
+    def init_deep_supervision(self, lambda_decay: float = 1.0):
+        """
+        Initialize auxiliary classification heads for deep supervision.
+
+        Deep supervision forces later layers to learn useful representations
+        by adding auxiliary losses at intermediate layers. This prevents
+        L0 overfitting where only the first layer contributes to PPL reduction.
+
+        Args:
+            lambda_decay: Controls how much later layers are weighted.
+                          Loss_i = lambda_decay * (i / num_layers) * CE(proj_i(h_i), targets)
+                          Higher values encourage later layers more strongly.
+        """
+        self.deep_supervision_enabled = True
+        self.deep_supervision_lambda = lambda_decay
+
+        # Auxiliary projection heads - one per layer (except last)
+        # These project intermediate representations to logits
+        # We use weight-tied heads (share with lm_head) to reduce params
+        self.aux_norms = nn.ModuleList([
+            nn.LayerNorm(self.d_model) for _ in range(self.num_layers - 1)
+        ])
+
+        # Move to same device as model
+        device = next(self.parameters()).device
+        self.aux_norms = self.aux_norms.to(device)
+
+    def forward_with_deep_supervision(
+        self,
+        input_ids: torch.Tensor,
+        targets: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, List[float]]:
+        """
+        Forward pass with deep supervision losses at intermediate layers.
+
+        Args:
+            input_ids: [B, N] input token IDs
+            targets: [B, N] target token IDs for loss computation
+
+        Returns:
+            logits: [B, N, V] final layer logits
+            deep_loss: Scalar tensor with weighted sum of auxiliary losses
+            layer_losses: List of per-layer auxiliary losses (for monitoring)
+        """
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_losses = []
+        deep_loss = torch.tensor(0.0, device=input_ids.device)
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+
+            # Compute auxiliary loss for all layers except the last
+            if hasattr(self, 'deep_supervision_enabled') and self.deep_supervision_enabled:
+                if i < self.num_layers - 1:
+                    # Layer weight: increases with depth to emphasize later layers
+                    # λ * (i+1) / num_layers ensures L0 gets minimal weight, Ln-1 gets max
+                    layer_weight = self.deep_supervision_lambda * (i + 1) / self.num_layers
+
+                    # Project to logits using shared lm_head
+                    x_normed = self.aux_norms[i](x)
+                    aux_logits = self.lm_head(x_normed)
+                    aux_loss = F.cross_entropy(
+                        aux_logits.view(-1, self.vocab_size),
+                        targets.view(-1)
+                    )
+
+                    layer_losses.append(aux_loss.item())
+                    deep_loss = deep_loss + layer_weight * aux_loss
+
+        # Final layer
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        return logits, deep_loss, layer_losses
+
 
 # =============================================================================
 # SAMPLE GENERATION FOR QUALITY MONITORING
@@ -5143,6 +5386,23 @@ def train_real_language(
         bc_local_ratio = bc_local_ratio[:config.num_layers]
         bc_quad_ratio = bc_quad_ratio[:config.num_layers]
 
+        # V10.5.5: Force Quad at L0 experiment
+        force_quad_l0 = getattr(args, 'force_quad_l0', False)
+        if force_quad_l0:
+            print(f"\n  ★ FORCE QUAD L0 EXPERIMENT (V10.5.5)")
+            print(f"    Overriding ratios to test if quad CAN work:")
+            # L0: Quad-only (no local)
+            bc_local_ratio[0] = 0.0
+            bc_quad_ratio[0] = 0.7
+            bc_phase_ratio[0] = 0.3
+            print(f"    L0: local=0.0, quad=0.7, phase=0.3 (QUAD MUST DO ALL WORK)")
+            # L1+: Local-only (no quad)
+            for i in range(1, config.num_layers):
+                bc_local_ratio[i] = 0.7
+                bc_quad_ratio[i] = 0.0
+                bc_phase_ratio[i] = 0.3
+                print(f"    L{i}: local=0.7, quad=0.0, phase=0.3 (local only)")
+
         print(f"\n╔═══════════════════════════════════════════════════════════════════════╗")
         print(f"║  V10.3.3: BINDING CACHE ARCHITECTURE                                  ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
@@ -5227,6 +5487,39 @@ def train_real_language(
 
     param_count = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {param_count:,}")
+
+    # V10.5: Deep Supervision initialization (Fix 1 for L0 overfitting)
+    use_deep_supervision = getattr(args, 'deep_supervision', False)
+    if use_deep_supervision and hasattr(model, 'init_deep_supervision'):
+        deep_lambda = getattr(args, 'deep_supervision_lambda', 0.5)
+        model.init_deep_supervision(lambda_decay=deep_lambda)
+        print(f"\n  Deep Supervision: ENABLED (V10.5)")
+        print(f"    Lambda (layer weight): {deep_lambda}")
+        print(f"    Purpose: Force later layers to learn useful representations")
+        print(f"    Formula: loss += λ * (i+1)/L * CE(aux_proj(h_i), targets)")
+    elif use_deep_supervision:
+        print(f"\n  Deep Supervision: REQUESTED but model lacks init_deep_supervision()")
+        print(f"    Only supported for BindingCacheLMTransformer currently")
+        use_deep_supervision = False
+
+    # V10.5.4: Soft Routing Warmup initialization
+    soft_routing_warmup = getattr(args, 'soft_routing_warmup', 0)
+    soft_routing_always = getattr(args, 'soft_routing_always', False)
+    if soft_routing_always or soft_routing_warmup > 0:
+        if hasattr(model, 'set_soft_routing'):
+            model.set_soft_routing(True)  # Start with soft routing
+            print(f"\n  Soft Routing Warmup: ENABLED (V10.5.4)")
+            if soft_routing_always:
+                print(f"    Mode: ALWAYS (never switch to hard top-K)")
+                print(f"    Complexity: O(n²) full attention")
+            else:
+                print(f"    Warmup steps: {soft_routing_warmup}")
+                print(f"    After warmup: switch to hard top-K O(n*k)")
+            print(f"    Purpose: Allow gradients to flow to quad (was 0.1% with hard top-K)")
+        else:
+            print(f"\n  Soft Routing Warmup: REQUESTED but model lacks set_soft_routing()")
+            soft_routing_warmup = 0
+            soft_routing_always = False
 
     # Phase-first curriculum controller (disabled for protected phase)
     pfc = None
@@ -5423,6 +5716,8 @@ def train_real_language(
     model.train()
     step = 0
     total_loss = 0.0
+    total_main_loss = 0.0  # V10.5.1: Track main loss separately for comparable PPL
+    total_deep_loss = 0.0  # V10.5.1: Track deep supervision loss separately
     log_interval = 100
 
     train_iter = iter(train_loader)
@@ -5445,15 +5740,27 @@ def train_real_language(
         # V10.3.7: Check if witness entropy regularization is enabled
         use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
 
+        # V10.5: Deep Supervision forward path
+        deep_loss_value = 0.0
+        main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
+        if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
+            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y)
+            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = main_loss.item()  # Track main loss for reporting
+            loss = main_loss + deep_loss  # Combined loss for backprop
+            deep_loss_value = deep_loss.item()
+            layer_hidden_states = None  # Not needed when using deep supervision
         # Forward - use probe_layers if witness entropy is enabled
-        if use_witness_entropy and hasattr(model, 'layer_outputs'):
+        elif use_witness_entropy and hasattr(model, 'layer_outputs'):
             logits = model(x, probe_layers=True)
             layer_hidden_states = model.layer_outputs
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = loss.item()
         else:
             logits = model(x)
             layer_hidden_states = None
-
-        loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = loss.item()
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -5476,15 +5783,28 @@ def train_real_language(
         optimizer.step()
 
         total_loss += loss.item()
+        total_main_loss += main_loss_value  # V10.5.1: Track main loss separately
+        total_deep_loss += deep_loss_value  # V10.5.1: Track deep loss separately
         step += 1
+
+        # V10.5.4: Soft routing warmup schedule
+        if soft_routing_warmup > 0 and not soft_routing_always and step == soft_routing_warmup:
+            if hasattr(model, 'set_soft_routing'):
+                model.set_soft_routing(False)  # Switch to hard top-K
+                print(f"\n  ★ SOFT ROUTING WARMUP COMPLETE at step {step}")
+                print(f"    Switching to hard top-K selection for quad")
 
         # Logging
         if step % log_interval == 0:
             avg_loss = total_loss / log_interval
-            ppl = math.exp(avg_loss)
+            avg_main_loss = total_main_loss / log_interval  # V10.5.1: Main loss for PPL
+            avg_deep_loss = total_deep_loss / log_interval  # V10.5.1: Deep loss avg
+            ppl = math.exp(avg_main_loss)  # V10.5.1: PPL from main loss only (comparable)
             total_loss = 0.0
+            total_main_loss = 0.0
+            total_deep_loss = 0.0
 
-            # Track PPL history
+            # Track PPL history (using main-loss PPL for comparability)
             ppl_history.append((step, ppl))
 
             # Check milestones (convergence speed tracking)
@@ -5499,6 +5819,9 @@ def train_real_language(
                 model.update_curriculum(new_curriculum)
                 curr_str = ",".join([f"{c:.2f}" for c in new_curriculum])
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Curriculum: [{curr_str}]")
+            elif use_deep_supervision:
+                # V10.5.1: Show main loss, PPL (from main loss), and deep loss separately
+                print(f"  Step {step:5d} | MainLoss: {avg_main_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {avg_deep_loss:.4f}")
             else:
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
 
@@ -5825,13 +6148,37 @@ def train_real_language(
     if phase_layers_checked > 0:
         print(f"      (avg phase weight variance: {avg_phase_var:.6f})")
 
-    # 2. Gradient dominance (one attention type dominates gradients)
-    # We check if phase vs local have similar contribution
-    phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
-    local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
-    gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
-    print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
-    print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+    # 2. Gradient dominance (one attention component dominates gradients)
+    # V10.5 FIX 3: Use actual gradient norms instead of curriculum-based classification
+    # The old curriculum-based diagnostic was broken for Protected Phase (curriculum=[1.0]*L)
+    if hasattr(model, 'get_gradient_dominance_report'):
+        # New: Measure actual gradient norms per component (local/phase/quad/ff)
+        grad_report = model.get_gradient_dominance_report()
+        gradient_dominance = grad_report['dominance_detected']
+        layer_grad_decay = grad_report['layer_gradient_decay']
+
+        print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+        print(f"      Component gradient distribution:")
+        for comp, pct in grad_report['component_pcts'].items():
+            marker = "⚠️" if pct > 70 else ""
+            print(f"        {comp:6s}: {pct:5.1f}% {marker}")
+        print(f"      Layer gradient decay (L{model.num_layers-1}/L0): {layer_grad_decay:.3f}", end="")
+        if layer_grad_decay < 0.1:
+            print(" ⚠️ (vanishing gradients)")
+        elif layer_grad_decay > 10:
+            print(" ⚠️ (exploding gradients)")
+        else:
+            print(" ✓")
+    else:
+        # Fallback for models without the new diagnostic (HybridTransformer, etc.)
+        # This is the OLD curriculum-based diagnostic - known to be broken for Protected Phase
+        phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
+        local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
+        gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
+        print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+        print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+        if all(c == 1.0 for c in model.curriculum):
+            print(f"      ⚠️  WARNING: curriculum=[1.0]*L, this metric is INVALID for Protected Phase")
 
     # 3. Representation saturation (PPL stops improving)
     ppl_improving = len(ppl_history) < 5 or (ppl_history[-1][1] < ppl_history[-5][1] * 0.99)
@@ -5852,6 +6199,23 @@ def train_real_language(
     else:
         confidence = "LOW ⚠️"
     print(f"\n    Overall Confidence: {confidence} ({4-issues}/4 checks passed)")
+
+    # V10.5: Deep Supervision Status
+    if use_deep_supervision:
+        print(f"\n  Deep Supervision (V10.5 Fix 1):")
+        print(f"    Status: ENABLED")
+        deep_lambda = getattr(args, 'deep_supervision_lambda', 0.5)
+        print(f"    Lambda: {deep_lambda}")
+        if early_overfit:
+            print(f"    Effect: L0 still dominates ({contrib['contribution_pct'][0]:.1f}%) - consider increasing lambda")
+        else:
+            print(f"    Effect: Depth utilization improved ✓")
+            # Show per-layer contribution distribution
+            print(f"    Layer contributions: ", end="")
+            for i, pct in enumerate(contrib['contribution_pct']):
+                marker = "★" if pct > 100 / model.num_layers * 1.5 else ""
+                print(f"L{i}:{pct:.0f}% ", end="")
+            print()
 
     # =========================================================================
     # CONCLUSION
@@ -6826,6 +7190,33 @@ Examples:
     parser.add_argument("--confidence-threshold", type=float, default=0.7,
                         help="Threshold for phase confidence to skip quad (default: 0.7). "
                              "Higher = less skipping, lower = more aggressive skipping.")
+
+    # V10.5: Deep Supervision (Fix 1 for L0 overfitting)
+    parser.add_argument("--deep-supervision", action="store_true",
+                        help="Enable deep supervision: add auxiliary losses at intermediate layers "
+                             "to force later layers to learn useful representations. Prevents L0 overfitting "
+                             "where only the first layer contributes to PPL reduction.")
+    parser.add_argument("--deep-supervision-lambda", type=float, default=0.5,
+                        help="Weight for deep supervision losses (default: 0.5). "
+                             "Loss_i = lambda * (i+1)/num_layers * CE(h_i, targets). "
+                             "Higher values encourage later layers more strongly.")
+
+    # V10.5.4: Soft Routing Warmup (Fix for quad gradient starvation)
+    parser.add_argument("--soft-routing-warmup", type=int, default=0,
+                        help="Number of steps to use soft routing (full softmax) for quad. "
+                             "After warmup, switches to hard top-K selection. "
+                             "0 = no warmup (hard top-K from start). "
+                             "Recommended: 500-1000 steps to allow gradients to flow to quad.")
+    parser.add_argument("--soft-routing-always", action="store_true",
+                        help="Always use soft routing (full softmax) for quad, never switch to hard top-K. "
+                             "This is O(n²) but ensures gradients always flow to quad.")
+
+    # V10.5.5: Force Quad at L0 experiment
+    parser.add_argument("--force-quad-l0", action="store_true",
+                        help="Force quad-only at L0, local-only at L1+. "
+                             "Tests if quad CAN work when it's the only attention mechanism. "
+                             "L0: local=0, quad=0.7, phase=0.3 (quad must do all the work) "
+                             "L1+: local=0.7, quad=0, phase=0.3 (local takes over)")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
