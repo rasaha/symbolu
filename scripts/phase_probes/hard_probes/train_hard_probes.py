@@ -159,6 +159,195 @@ KOSHA_SLICE = slice(12, 17)  # Indices [12:17] in 32D state
 
 
 # =============================================================================
+# NO-WRITE CONTRACTS (V10.6.2)
+# =============================================================================
+# From ChatGPT Gap Analysis (Appendix D.5):
+#
+# The Contract in One Sentence:
+#   "intent_phase (and any control) must be low-dimensional, broadcastable,
+#    and not token-position dependent."
+#
+# What We Want to PREVENT:
+#   - Token-wise content being injected into Phase control
+#   - Control signals that have sequence length dimension
+#   - Control signals that have d_model as last dimension
+#
+# What We Want to ALLOW:
+#   - Scalars or per-head/per-layer control: [layers, heads], [batch, heads], [heads]
+#   - Broadcastable scalars
+#   - Shapes like [B, H, 1, 1] that broadcast correctly
+#
+# This is the "highest value gap fix" per ChatGPT analysis.
+
+# Global flag to enable/disable contract enforcement (for performance)
+_ENFORCE_NO_WRITE_CONTRACTS = True
+
+
+def set_no_write_contract_enforcement(enabled: bool):
+    """Enable or disable no-write contract enforcement globally."""
+    global _ENFORCE_NO_WRITE_CONTRACTS
+    _ENFORCE_NO_WRITE_CONTRACTS = enabled
+
+
+def assert_control_shape(
+    tensor: "torch.Tensor",
+    name: str,
+    d_model: int = None,
+    seq_len: int = None,
+    strict: bool = True,
+) -> bool:
+    """
+    Enforce no-write contract: control signals must not be token-wise embeddings.
+
+    V10.6.2: Prevents control signals from injecting content into Phase.
+
+    Args:
+        tensor: The control signal tensor to validate
+        name: Human-readable name for error messages
+        d_model: Model dimension (if known) - tensor must not have this as last dim
+        seq_len: Sequence length (if known) - tensor must not have this dimension
+        strict: If True, raises AssertionError; if False, returns bool and warns
+
+    Returns:
+        True if valid, False if invalid (only when strict=False)
+
+    Raises:
+        AssertionError: If tensor violates no-write contract and strict=True
+
+    Contract Rules:
+        1. Must be low-dimensional (dim <= 4)
+        2. Must NOT have d_model as last dimension (would be embeddings)
+        3. Must NOT have sequence length dimension (would be token-wise)
+        4. Should be broadcastable to [B, H, 1, 1]-like shapes
+
+    Examples:
+        Valid:   [B, H]          - per-head control
+        Valid:   [B, H, 1]       - broadcastable per-head
+        Valid:   [H]             - shared per-head
+        Valid:   []              - scalar
+        Invalid: [B, N, D]       - token-wise embeddings (N=seq_len, D=d_model)
+        Invalid: [B, H, N, D]    - full attention tensor
+    """
+    global _ENFORCE_NO_WRITE_CONTRACTS
+
+    if not _ENFORCE_NO_WRITE_CONTRACTS:
+        return True
+
+    if tensor is None:
+        return True
+
+    violations = []
+
+    # Rule 1: Must be low-dimensional
+    if tensor.dim() > 4:
+        violations.append(
+            f"dim={tensor.dim()} > 4 (must be low-dimensional)"
+        )
+
+    # Rule 2: Must NOT have d_model as last dimension
+    if d_model is not None and tensor.dim() >= 1:
+        if tensor.shape[-1] == d_model:
+            violations.append(
+                f"last dim={tensor.shape[-1]} equals d_model={d_model} "
+                f"(would be embeddings, not control)"
+            )
+
+    # Rule 3: Must NOT have sequence length dimension
+    if seq_len is not None and seq_len > 1:
+        for i, dim_size in enumerate(tensor.shape):
+            if dim_size == seq_len:
+                violations.append(
+                    f"dimension {i} has size={dim_size} equals seq_len={seq_len} "
+                    f"(would be token-position dependent)"
+                )
+
+    # Rule 4: Check for suspicious large dimensions that might be token-wise
+    # Heuristic: any dimension > 64 that's not batch is suspicious
+    if tensor.dim() >= 2:
+        for i, dim_size in enumerate(tensor.shape[1:], start=1):  # Skip batch dim
+            if dim_size > 512:  # Likely d_model or seq_len
+                violations.append(
+                    f"dimension {i} has suspicious size={dim_size} > 512 "
+                    f"(may be token-wise or embedding dimension)"
+                )
+
+    if violations:
+        msg = (
+            f"\n{'='*70}\n"
+            f"NO-WRITE CONTRACT VIOLATION (V10.6.2)\n"
+            f"{'='*70}\n"
+            f"Control signal '{name}' violates Phase control contract:\n"
+            f"  Shape: {list(tensor.shape)}\n"
+            f"  Violations:\n"
+        )
+        for v in violations:
+            msg += f"    - {v}\n"
+        msg += (
+            f"\nContract: Control signals must be low-dimensional and broadcastable,\n"
+            f"          NOT token-wise embeddings that could inject content.\n"
+            f"\nValid shapes: [B, H], [B, H, 1], [H], [] (scalar)\n"
+            f"Invalid shapes: [B, N, D], [B, H, N, D] (token-wise)\n"
+            f"{'='*70}"
+        )
+
+        if strict:
+            raise AssertionError(msg)
+        else:
+            import warnings
+            warnings.warn(msg, UserWarning)
+            return False
+
+    return True
+
+
+def validate_intent_phase_shapes(
+    theta_jepa: "torch.Tensor" = None,
+    theta_srk: "torch.Tensor" = None,
+    d_model: int = None,
+    seq_len: int = None,
+    context: str = "unknown",
+):
+    """
+    Validate that intent phase signals comply with no-write contracts.
+
+    V10.6.2: Specialized validator for JEPA/SRK intent phases.
+
+    Note: In the current implementation, intent phases ARE [B, N, D] tensors
+    because they need to be computed per-position for alignment scoring.
+    This is a known architectural decision - the key protection is that
+    they only affect SCALAR modulation (s_align), not direct content injection.
+
+    This function documents the contract and can be extended later if we
+    want to enforce stricter constraints (e.g., per-head rather than per-token).
+
+    Args:
+        theta_jepa: JEPA intent phase tensor (query intent)
+        theta_srk: SRK intent phase tensor (memory intent)
+        d_model: Model dimension
+        seq_len: Sequence length
+        context: Description of where this is called from
+
+    Current Architecture Note:
+        Intent phases are [B, N, D] but they are:
+        1. Used ONLY to compute scalar alignment: s_align = cos(θ_JEPA - θ_SRK).mean(dim=-1)
+        2. The s_align is then [B, N] - still per-position but scalar per position
+        3. This modulates via: output * (1 + α * s_align) where α << 1
+        4. The modulation is MULTIPLICATIVE on existing content, not additive injection
+
+        This is fundamentally different from "control decides content" because:
+        - Content comes from Phase memory / Quad proposals
+        - Intent only SCALES the integration, doesn't WRITE content
+    """
+    # For now, we document the contract rather than enforce strict shape
+    # because the current architecture intentionally uses per-position phases
+    # The protection is in HOW they're used (scalar modulation), not their shape
+
+    # Future: Could enforce that final s_align is scalar per position
+    # For now: Just document the architectural invariant
+    pass
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -2638,6 +2827,18 @@ class PhaseAttention(nn.Module):
             # s_align = cos(θ_JEPA - θ_SRK)
             s_align = torch.cos(theta_diff.float())
 
+            # V10.6.2: No-Write Contract validation
+            # s_align should be broadcastable control, not full embedding tensor
+            # Note: In PhaseAttention, s_align may be [B, 1, H, D_h] which is
+            # per-head control (valid) as long as it's not [B, N, D] token-wise embeddings
+            assert_control_shape(
+                s_align,
+                name="s_align (PhaseAttention alignment)",
+                d_model=self.d_model,
+                seq_len=N,  # Must not have full sequence dimension
+                strict=True,
+            )
+
             # Modulate: output = output * (1 + α * s_align)
             alignment_modulator = 1.0 + self.alignment_authority * s_align
             output = output * alignment_modulator
@@ -4691,6 +4892,17 @@ class BindingCachePhaseState(nn.Module):
 
         # Cosine over the last dimension
         s_align = torch.cos(theta_diff).mean(dim=-1)  # Average over D
+
+        # V10.6.2: No-Write Contract validation
+        # s_align must be scalar per position [B, N] or [B, N, K], NOT [B, N, D]
+        # This ensures alignment only SCALES integration, doesn't INJECT content
+        assert_control_shape(
+            s_align,
+            name="s_align (alignment score)",
+            d_model=self.embed_dim,
+            seq_len=None,  # seq_len dimension is OK for s_align
+            strict=True,
+        )
 
         return s_align
 
@@ -8102,6 +8314,15 @@ Examples:
                         help="Maximum value for alignment modulator clamp (default: 1.2). "
                              "Prevents alignment agreement from over-amplifying proposals. "
                              "Higher values allow more amplification.")
+    # V10.6.2: No-Write Contracts (ChatGPT gap analysis D.5)
+    parser.add_argument("--enforce-no-write-contracts", action="store_true", default=True,
+                        help="Enable no-write contract assertions (default: True). "
+                             "Validates that control signals (intent phases, alignment scores) "
+                             "are low-dimensional and broadcastable, not token-wise embeddings. "
+                             "This prevents control from injecting content into Phase.")
+    parser.add_argument("--no-enforce-no-write-contracts", dest="enforce_no_write_contracts",
+                        action="store_false",
+                        help="Disable no-write contract assertions for performance.")
 
     # V10.4: Proposal Mode (Quad-as-Proposer, Phase-as-Integrator)
     parser.add_argument("--proposal-mode", action="store_true",
@@ -8327,6 +8548,13 @@ Examples:
                         default="cuda" if torch.cuda.is_available() else "cpu")
 
     args = parser.parse_args()
+
+    # V10.6.2: Configure no-write contract enforcement
+    set_no_write_contract_enforcement(args.enforce_no_write_contracts)
+    if args.enforce_no_write_contracts:
+        print("V10.6.2: No-write contract enforcement ENABLED")
+    else:
+        print("V10.6.2: No-write contract enforcement DISABLED (for performance)")
 
     # Parse curriculum
     curriculum = [float(x) for x in args.curriculum.split(",")]
