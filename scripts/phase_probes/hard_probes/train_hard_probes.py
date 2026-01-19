@@ -6307,9 +6307,9 @@ def train_real_language(
             print()
             model.train()
 
-        # V10.3.6: Quality sample generation
+        # V10.3.6: Quality sample generation (skip for associative recall - no tokenizer)
         sample_every = getattr(args, 'sample_every', 500)
-        if sample_every > 0 and step % sample_every == 0 and step > 0:
+        if sample_every > 0 and step % sample_every == 0 and step > 0 and not use_associative_recall:
             # Get tokenizer from dataset
             tokenizer = train_dataset.tokenizer
             # Parse custom prompts if provided
