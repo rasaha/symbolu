@@ -5386,6 +5386,23 @@ def train_real_language(
         bc_local_ratio = bc_local_ratio[:config.num_layers]
         bc_quad_ratio = bc_quad_ratio[:config.num_layers]
 
+        # V10.5.5: Force Quad at L0 experiment
+        force_quad_l0 = getattr(args, 'force_quad_l0', False)
+        if force_quad_l0:
+            print(f"\n  ★ FORCE QUAD L0 EXPERIMENT (V10.5.5)")
+            print(f"    Overriding ratios to test if quad CAN work:")
+            # L0: Quad-only (no local)
+            bc_local_ratio[0] = 0.0
+            bc_quad_ratio[0] = 0.7
+            bc_phase_ratio[0] = 0.3
+            print(f"    L0: local=0.0, quad=0.7, phase=0.3 (QUAD MUST DO ALL WORK)")
+            # L1+: Local-only (no quad)
+            for i in range(1, config.num_layers):
+                bc_local_ratio[i] = 0.7
+                bc_quad_ratio[i] = 0.0
+                bc_phase_ratio[i] = 0.3
+                print(f"    L{i}: local=0.7, quad=0.0, phase=0.3 (local only)")
+
         print(f"\n╔═══════════════════════════════════════════════════════════════════════╗")
         print(f"║  V10.3.3: BINDING CACHE ARCHITECTURE                                  ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
@@ -7193,6 +7210,13 @@ Examples:
     parser.add_argument("--soft-routing-always", action="store_true",
                         help="Always use soft routing (full softmax) for quad, never switch to hard top-K. "
                              "This is O(n²) but ensures gradients always flow to quad.")
+
+    # V10.5.5: Force Quad at L0 experiment
+    parser.add_argument("--force-quad-l0", action="store_true",
+                        help="Force quad-only at L0, local-only at L1+. "
+                             "Tests if quad CAN work when it's the only attention mechanism. "
+                             "L0: local=0, quad=0.7, phase=0.3 (quad must do all the work) "
+                             "L1+: local=0.7, quad=0, phase=0.3 (local takes over)")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
