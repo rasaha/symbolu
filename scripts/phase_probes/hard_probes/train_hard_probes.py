@@ -4532,6 +4532,12 @@ class BindingCachePhaseState(nn.Module):
 
     Accumulates key-value bindings into a persistent memory state
     using O(n) cumulative sum (no attention).
+
+    V10.6: Extended with dual-channel mode support for proposal architecture.
+    Separates content similarity from intent alignment:
+      s_content = cos(φ_q - φ_k)           # What matches (preserved)
+      s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+      score = s_content * (1 + α * s_align) # Combined
     """
 
     def __init__(
@@ -4541,6 +4547,8 @@ class BindingCachePhaseState(nn.Module):
         dropout: float = 0.1,
         decay_gamma: float = 0.9,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,  # V10.6: Enable dual-channel attention
+        alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -4549,10 +4557,21 @@ class BindingCachePhaseState(nn.Module):
         self.decay_gamma = decay_gamma
         self.bounded_phase = bounded_phase
 
+        # V10.6: Dual-channel mode support
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
+
         # Phase projections
         self.W_k_phase = nn.Linear(embed_dim, embed_dim)
         self.W_k_amp = nn.Linear(embed_dim, embed_dim)
         self.W_v = nn.Linear(embed_dim, embed_dim)
+
+        # V10.6: Intent phase projections for dual-channel mode
+        # θ_JEPA = query intent (what we're looking for)
+        # θ_SRK = key intent (what memory offers)
+        if dual_channel_mode:
+            self.W_intent_q = nn.Linear(embed_dim, embed_dim)  # θ_JEPA projection
+            self.W_intent_k = nn.Linear(embed_dim, embed_dim)  # θ_SRK projection
 
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
@@ -4562,6 +4581,10 @@ class BindingCachePhaseState(nn.Module):
         self._last_r_k_std = 0.0
         self._last_r_k_min = 0.0
         self._last_r_k_max = 0.0
+
+        # V10.6: Dual-channel diagnostics
+        self._last_s_align_mean = 0.0
+        self._last_s_align_std = 0.0
 
         self._ablation_mode = "none"
 
@@ -4575,12 +4598,17 @@ class BindingCachePhaseState(nn.Module):
         pass
 
     def get_health_metrics(self) -> dict:
-        return {
+        metrics = {
             "r_k_mean": self._last_r_k_mean,
             "r_k_std": self._last_r_k_std,
             "r_k_min": self._last_r_k_min,
             "r_k_max": self._last_r_k_max,
         }
+        # V10.6: Include dual-channel diagnostics
+        if self.dual_channel_mode:
+            metrics["s_align_mean"] = self._last_s_align_mean
+            metrics["s_align_std"] = self._last_s_align_std
+        return metrics
 
     def compute_confidence(self, memory_state: torch.Tensor) -> torch.Tensor:
         """
@@ -4609,6 +4637,53 @@ class BindingCachePhaseState(nn.Module):
 
         return confidence
 
+    def compute_intent_phases(self, x: torch.Tensor, memory_state: torch.Tensor) -> tuple:
+        """
+        V10.6: Compute intent phases for dual-channel mode.
+
+        Args:
+            x: Input tensor [B, N, D] - current query context
+            memory_state: [B, N, D] - accumulated memory
+
+        Returns:
+            theta_jepa: [B, N, D] - query intent phase (what we're looking for)
+            theta_srk: [B, N, D] - key intent phase (what memory offers)
+        """
+        if not self.dual_channel_mode:
+            return None, None
+
+        x_norm = self.norm(x)
+        # θ_JEPA: Intent derived from current query context
+        theta_jepa = self.W_intent_q(x_norm)
+        # θ_SRK: Intent derived from accumulated memory state
+        theta_srk = self.W_intent_k(memory_state)
+
+        return theta_jepa, theta_srk
+
+    def compute_alignment_score(self, theta_jepa: torch.Tensor, theta_srk: torch.Tensor) -> torch.Tensor:
+        """
+        V10.6: Compute intent alignment score.
+
+        s_align = cos(θ_JEPA - θ_SRK)
+
+        Args:
+            theta_jepa: [B, N, D] or [B, N, K, D] - query intent
+            theta_srk: [B, N, D] or [B, N, K, D] - key intent
+
+        Returns:
+            s_align: [B, N] or [B, N, K] - alignment scores in [-1, 1]
+        """
+        if theta_jepa is None or theta_srk is None:
+            return None
+
+        # Intent difference
+        theta_diff = theta_jepa - theta_srk
+
+        # Cosine over the last dimension
+        s_align = torch.cos(theta_diff).mean(dim=-1)  # Average over D
+
+        return s_align
+
     def integrate_proposals(
         self,
         x: torch.Tensor,
@@ -4619,9 +4694,14 @@ class BindingCachePhaseState(nn.Module):
     ) -> torch.Tensor:
         """
         V10.4: Integrate quad proposals into phase state.
+        V10.6: Extended with dual-channel alignment modulation.
 
         This implements the "phase-as-integrator" pattern where phase
         decides which proposals survive and integrates them into state.
+
+        Dual-channel mode (V10.6):
+            s_align = cos(θ_JEPA - θ_SRK)
+            weighted_proposals = weighted_proposals * (1 + α * s_align)
 
         Args:
             x: Input tensor [B, N, D]
@@ -4646,6 +4726,22 @@ class BindingCachePhaseState(nn.Module):
         # Weighted sum of proposals
         # [B, N, K, 1] * [B, N, K, D] -> [B, N, K, D] -> sum -> [B, N, D]
         weighted_proposals = (gate_weights.unsqueeze(-1) * proposals).sum(dim=2)  # [B, N, D]
+
+        # V10.6: Dual-channel alignment modulation
+        if self.dual_channel_mode:
+            theta_jepa, theta_srk = self.compute_intent_phases(x, memory_state)
+            s_align = self.compute_alignment_score(theta_jepa, theta_srk)
+
+            if s_align is not None:
+                # Track diagnostics
+                with torch.no_grad():
+                    self._last_s_align_mean = s_align.mean().item()
+                    self._last_s_align_std = s_align.std().item()
+
+                # Modulate: weighted_proposals = weighted_proposals * (1 + α * s_align)
+                # s_align: [B, N], weighted_proposals: [B, N, D]
+                alignment_modulator = 1.0 + self.alignment_authority * s_align.unsqueeze(-1)
+                weighted_proposals = weighted_proposals * alignment_modulator
 
         # State update: decay old state + integrate new proposals
         # S_{t+1} = gamma * S_t + (1 - gamma) * weighted_proposals
@@ -5128,6 +5224,7 @@ class BindingCacheLMBlock(nn.Module):
     - V10.0: Phase leaked to output, quad redundant (0.1% gradients)
     - V10.5.2: Cross-attention (Q=local_out), still 0.1% gradients
     - V10.5.3: Independent paths (Q=x), testing clean architecture
+    - V10.6: Added dual-channel mode support (JEPA/SRK intent alignment)
     """
 
     def __init__(
@@ -5146,11 +5243,17 @@ class BindingCacheLMBlock(nn.Module):
         quad_ratio: float = 0.3,
         proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
+        dual_channel_mode: bool = False,  # V10.6: Enable JEPA/SRK intent alignment
+        alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.proposal_mode = proposal_mode
         self.confidence_threshold = confidence_threshold
+
+        # V10.6: Dual-channel mode
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         # Store ratios for weighted combination
         self.local_ratio = local_ratio
@@ -5172,6 +5275,8 @@ class BindingCacheLMBlock(nn.Module):
             dropout=dropout,
             decay_gamma=decay_gamma,
             bounded_phase=bounded_phase,
+            dual_channel_mode=dual_channel_mode,  # V10.6
+            alignment_authority=alignment_authority,  # V10.6
         )
 
         # Quad memory query
@@ -5309,6 +5414,9 @@ class BindingCacheLMTransformer(nn.Module):
         binding_slots: int = 0,  # 0 = disabled, >0 = number of slots
         binding_slot_eq_token: int = None,  # Token ID for '=' (triggers write)
         binding_slot_query_token: int = None,  # V10.5.7b: Token ID for '?' (forces slot read)
+        # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -5316,6 +5424,10 @@ class BindingCacheLMTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.proposal_mode = proposal_mode
+
+        # V10.6: Dual-channel mode
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
 
         # V10.5.7: Binding slot configuration
         self.binding_slots_enabled = binding_slots > 0
@@ -5374,6 +5486,8 @@ class BindingCacheLMTransformer(nn.Module):
                 quad_ratio=quad_ratios[i],
                 proposal_mode=proposal_mode,
                 confidence_threshold=confidence_threshold,
+                dual_channel_mode=dual_channel_mode,  # V10.6
+                alignment_authority=alignment_authority,  # V10.6
             )
             for i in range(num_layers)
         ])
@@ -6078,6 +6192,13 @@ def train_real_language(
             print(f"║    Quad returns K proposals (no softmax mixing)                       ║")
             print(f"║    Phase integrates proposals with gating                             ║")
             print(f"║    Confidence threshold: {args.confidence_threshold:.2f}                                      ║")
+        if config.dual_channel_mode:
+            print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+            print(f"║  V10.6 DUAL-CHANNEL MODE ENABLED                                      ║")
+            print(f"║    JEPA/SRK intent alignment for proposal integration                 ║")
+            print(f"║    s_align = cos(θ_JEPA - θ_SRK)                                      ║")
+            print(f"║    output = output * (1 + α * s_align)                                ║")
+            print(f"║    Alignment authority (α): {config.alignment_authority:.2f}                                    ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
         print(f"║  Per-Layer Ratios:                                                    ║")
         for i in range(config.num_layers):
@@ -6109,6 +6230,9 @@ def train_real_language(
             binding_slots=binding_slots,
             binding_slot_eq_token=binding_slot_eq_token,
             binding_slot_query_token=binding_slot_query_token,  # V10.5.7b
+            # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
         ).to(config.device)
 
     elif use_protected_phase:
