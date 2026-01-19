@@ -158,6 +158,141 @@ RESERVED_SLICE = slice(28, 32)
 SOVEREIGN_STATE_NAMES = BHAVA_NAMES + KOSHA_NAMES + VRITTI_NAMES + GUNA_NAMES + RESERVED_NAMES
 
 
+# =============================================================================
+# V10.6.2 (D.5): NO-WRITE CONTRACT ENFORCEMENT
+# =============================================================================
+
+class ControlShapeViolation(Exception):
+    """Raised when a control signal violates the no-write contract."""
+    pass
+
+
+def assert_control_shape(
+    tensor: torch.Tensor,
+    name: str,
+    d_model: int,
+    seq_len: Optional[int] = None,
+    strict: bool = True,
+) -> bool:
+    """
+    V10.6.2 (D.5): Enforce no-write contract for control signals.
+
+    Control signals (intent_phase, binding_salience, etc.) must be:
+    - Low-dimensional (not token-wise embeddings)
+    - Broadcastable to control shapes
+    - NOT contain d_model or seq_len dimensions that would allow content injection
+
+    The Contract in One Sentence:
+    > intent_phase (and any control) must be low-dimensional, broadcastable,
+    > and not token-position dependent.
+
+    Valid control shapes:
+    - [B, H] - batch × heads (most common for intent_phase)
+    - [B, H, D_h] - batch × heads × head_dim (per-head rotation)
+    - [B, N] - batch × seq for per-position gating (binding_salience)
+    - [H] or [D_h] - broadcast scalars
+    - [1] - single scalar
+
+    Invalid shapes (content injection risk):
+    - [B, N, D] - full embedding (could encode arbitrary content)
+    - [B, N, H, D_h] - per-position per-head full embeddings
+
+    Args:
+        tensor: Control signal tensor to validate
+        name: Name for error messages (e.g., "intent_phase", "binding_salience")
+        d_model: Model embedding dimension (must NOT appear in control)
+        seq_len: Optional sequence length to check against
+        strict: If True, raise exception on violation; if False, return bool
+
+    Returns:
+        True if valid, False if invalid (only when strict=False)
+
+    Raises:
+        ControlShapeViolation: If strict=True and shape violates contract
+
+    Example:
+        >>> # Valid: intent_phase [B, H]
+        >>> assert_control_shape(intent_phase, "intent_phase", d_model=768)
+        True
+
+        >>> # Invalid: token-wise embedding [B, N, D]
+        >>> assert_control_shape(bad_control, "bad_control", d_model=768)
+        ControlShapeViolation: bad_control must not have d_model dimension
+    """
+    violations = []
+
+    # Check 1: Must be low-dimensional (≤4 dims)
+    if tensor.dim() > 4:
+        violations.append(f"{name} has {tensor.dim()} dims (max 4 allowed)")
+
+    # Check 2: Must NOT have d_model as last dimension (would allow content injection)
+    if tensor.dim() >= 1 and tensor.shape[-1] == d_model:
+        violations.append(f"{name} must not have d_model ({d_model}) as last dimension")
+
+    # Check 3: Must NOT have seq_len dimension if provided
+    # This prevents token-position dependent control (except for binding_salience which is intentionally per-position)
+    if seq_len is not None and name != "binding_salience":
+        for i, dim in enumerate(tensor.shape):
+            if dim == seq_len and i > 0:  # Batch dim at 0 is OK
+                violations.append(f"{name} must not have seq_len ({seq_len}) dimension at index {i}")
+
+    # Check 4: For full token-wise embedding shape [B, N, D], reject
+    if tensor.dim() == 3:
+        B, N, D = tensor.shape
+        if D == d_model and (seq_len is None or N == seq_len):
+            violations.append(
+                f"{name} has shape [B, N, D]={list(tensor.shape)} which could encode token-wise content. "
+                f"Control signals must be low-dimensional (e.g., [B, H] for phase rotation)."
+            )
+
+    # Report violations
+    if violations:
+        error_msg = f"No-write contract violation for '{name}':\n" + "\n".join(f"  - {v}" for v in violations)
+        if strict:
+            raise ControlShapeViolation(error_msg)
+        return False
+
+    return True
+
+
+def validate_control_signals(
+    d_model: int,
+    seq_len: Optional[int] = None,
+    strict: bool = True,
+    **controls: torch.Tensor,
+) -> Dict[str, bool]:
+    """
+    V10.6.2 (D.5): Validate multiple control signals at once.
+
+    Args:
+        d_model: Model embedding dimension
+        seq_len: Optional sequence length
+        strict: If True, raise on first violation
+        **controls: Named control tensors to validate
+
+    Returns:
+        Dict mapping control name to validity (True/False)
+
+    Example:
+        >>> validate_control_signals(
+        ...     d_model=768,
+        ...     seq_len=512,
+        ...     intent_phase=intent_phase,
+        ...     binding_salience=binding_salience,
+        ... )
+        {'intent_phase': True, 'binding_salience': True}
+    """
+    results = {}
+    for name, tensor in controls.items():
+        if tensor is not None:
+            results[name] = assert_control_shape(
+                tensor, name, d_model, seq_len, strict=strict
+            )
+        else:
+            results[name] = True  # None is always valid
+    return results
+
+
 def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
     """
     Extract human-readable summary from 32D Sovereign State.
@@ -2803,6 +2938,7 @@ class BindingCacheBlock(nn.Module):
         x: torch.Tensor,
         intent_phase: Optional[torch.Tensor] = None,
         binding_salience: Optional[torch.Tensor] = None,
+        enable_slots_read: bool = True,
     ) -> torch.Tensor:
         """
         Forward pass with LOCAL + GLOBAL attention paths (V10.1).
@@ -2817,6 +2953,12 @@ class BindingCacheBlock(nn.Module):
         - Phase integrates proposals with gating
         - Conditional skip: if phase confident, skip quad
 
+        V10.6.2: enable_slots_read Control (D.2 Recommendation)
+        - Separates READ path gating from WRITE path
+        - Write path (phase accumulation) remains deterministic via EQ_TOKEN pattern
+        - Read path (quad retrieval) can be gated by Onto/CSR controls
+        - When enable_slots_read=False, quad retrieval is skipped, only local attention runs
+
         Combined: local_out + mem_out (no gradient competition)
 
         Args:
@@ -2824,6 +2966,9 @@ class BindingCacheBlock(nn.Module):
             intent_phase: Optional [B, H] or [B, H, D_h] phase rotation from Ontological State Delta.
             binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
                              Biases Top-K selection in Quad WITHOUT modifying attention math.
+            enable_slots_read: V10.6.2 (D.2) - If False, skip quad retrieval entirely.
+                              Allows Onto/CSR to gate retrieval without affecting storage.
+                              Default True for backward compatibility.
 
         Returns:
             output: [B, N, D]
@@ -2834,9 +2979,17 @@ class BindingCacheBlock(nn.Module):
 
         # Step 2: Phase accumulates memory state (with optional intent rotation)
         # Phase is PURE - no auxiliary systems act here
+        # NOTE: Phase WRITE is always active (deterministic via EQ_TOKEN pattern)
+        # enable_slots_read only gates the READ path (quad retrieval)
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
-        if self.proposal_mode:
+        # V10.6.2: Check if slot reading is enabled (D.2 recommendation)
+        # This separates read path gating from write path
+        if not enable_slots_read:
+            # Skip quad retrieval entirely - only use local attention
+            # Phase still accumulates (write path), but retrieval is gated
+            attn_out = local_out
+        elif self.proposal_mode:
             # V10.4: Proposal Mode - quad proposes, phase integrates
             # Check confidence for conditional skip
             confidence = self.phase_state.compute_confidence(memory_state)
@@ -2854,12 +3007,13 @@ class BindingCacheBlock(nn.Module):
             mem_out = self.phase_state.integrate_proposals(
                 x, memory_state, proposals, proposal_scores
             )
+            # Combine: local (syntax) + memory (semantics) - no competition
+            attn_out = local_out + mem_out
         else:
             # Original mode: Quad queries memory state with softmax attention
             mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
-
-        # Combine: local (syntax) + memory (semantics) - no competition
-        attn_out = local_out + mem_out
+            # Combine: local (syntax) + memory (semantics) - no competition
+            attn_out = local_out + mem_out
 
         # Residual connection
         x = x + attn_out
@@ -3041,6 +3195,7 @@ class BindingCacheTransformer(nn.Module):
         input_ids: torch.Tensor,
         intent_phase: Optional[torch.Tensor] = None,
         binding_salience: Optional[torch.Tensor] = None,
+        enable_slots_read: bool = True,
     ) -> torch.Tensor:
         """
         Forward pass returning hidden states BEFORE LM head.
@@ -3053,6 +3208,8 @@ class BindingCacheTransformer(nn.Module):
             intent_phase: Optional phase rotation from Ontological State Delta
             binding_salience: Optional [B, N] - per-position salience from
                              OntologicalBindingAnnotator for Top-K selection bias
+            enable_slots_read: V10.6.2 (D.2) - If False, skip quad retrieval.
+                              Allows Onto/CSR to gate retrieval without affecting storage.
 
         Returns:
             hidden: [B, N, embed_dim] - normalized hidden states before LM head
@@ -3065,7 +3222,8 @@ class BindingCacheTransformer(nn.Module):
 
         # Transformer blocks (with optional intent_phase and binding_salience)
         for block in self.blocks:
-            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience,
+                      enable_slots_read=enable_slots_read)
 
         # Return normalized hidden states
         return self.norm(x)
@@ -3076,6 +3234,7 @@ class BindingCacheTransformer(nn.Module):
         labels: Optional[torch.Tensor] = None,
         intent_phase: Optional[torch.Tensor] = None,
         binding_salience: Optional[torch.Tensor] = None,
+        enable_slots_read: bool = True,
         return_hidden: bool = False,
         return_last_hidden: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], Dict[str, torch.Tensor]]:
@@ -3089,6 +3248,9 @@ class BindingCacheTransformer(nn.Module):
             binding_salience: Optional [B, N] - per-position salience from OntologicalBindingAnnotator.
                              Biases Top-K selection in Quad WITHOUT modifying attention math.
                              This is where CSR/Kosha/SRK act - as binding selectors, not attention modifiers.
+            enable_slots_read: V10.6.2 (D.2) - If False, skip quad retrieval entirely.
+                              Allows Onto/CSR to gate retrieval without affecting storage.
+                              Write path (phase accumulation) remains active.
             return_hidden: Return dict with hidden states
             return_last_hidden: Return dict with last hidden state
 
@@ -3106,7 +3268,8 @@ class BindingCacheTransformer(nn.Module):
         # Core attention is PURE - binding_salience only affects Top-K selection
         hidden_states = [] if return_hidden else None
         for block in self.blocks:
-            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
+            x = block(x, intent_phase=intent_phase, binding_salience=binding_salience,
+                      enable_slots_read=enable_slots_read)
             if return_hidden:
                 hidden_states.append(x)
 

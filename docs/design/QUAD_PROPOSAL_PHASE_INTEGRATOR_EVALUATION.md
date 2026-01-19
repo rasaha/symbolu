@@ -546,6 +546,8 @@ This preserves current flow and adds explicit control semantics.
 
 **Answer: Only partially.** Pattern detection (EQ_TOKEN) is a *ground-truth trigger*; Onto is an *inference trigger*.
 
+**Status: ✅ IMPLEMENTED (V10.6.2)**
+
 #### Correct Architecture
 
 | Path | Gating Strategy | Rationale |
@@ -558,6 +560,18 @@ This preserves current flow and adds explicit control semantics.
 - **Do add** `enable_slots_read` (or `slots_read_weight`) to make retrieval activation explicit and debuggable
 
 This is the best of both worlds: **deterministic writes + controlled reads**.
+
+#### V10.6.2 Implementation
+
+The `enable_slots_read` parameter has been added to:
+- `BindingCacheBlock.forward()` - Core block implementation
+- `BindingCacheTransformer.forward()` - Transformer wrapper
+- `BindingCacheTransformer.forward_hidden()` - Hidden state extraction
+
+When `enable_slots_read=False`:
+- Phase write path continues (accumulates memory state)
+- Quad read path is skipped (only local attention runs)
+- Allows Onto/CSR to gate retrieval without affecting storage
 
 ---
 
@@ -643,6 +657,8 @@ Scalars or per-head/per-layer control:
 
 > `intent_phase` (and any control) must be **low-dimensional, broadcastable, and not token-position dependent**.
 
+**Status: ✅ IMPLEMENTED (V10.6.2)**
+
 #### Specific Checks
 
 | Check | Pass Condition |
@@ -653,18 +669,27 @@ Scalars or per-head/per-layer control:
 
 This is the single best way to make the **"Phase integrates influence, not structure"** principle enforceable.
 
+#### V10.6.2 Implementation
+
+Shape assertion utilities added to `phase_transformer.py`:
+- `assert_control_shape()` - Validates individual control signals
+- `validate_control_signals()` - Validates multiple controls at once
+- `ControlShapeViolation` - Exception for strict mode violations
+
 ---
 
 ### D.6 Test Priority Matrix
 
+**Status: ✅ IMPLEMENTED (V10.6.2)**
+
 Claude's test list is solid. Prioritize like this:
 
-#### HIGH Priority (Do These Now)
+#### HIGH Priority (Do These Now) - ✅ DONE
 
-| Test | Purpose |
-|------|---------|
-| **Leak detector test** | Assert control signals cannot be token-wise embeddings |
-| **AR regression** | Enable/disable Onto & CSR controls and verify AR accuracy does not collapse |
+| Test | Purpose | Status |
+|------|---------|--------|
+| **Leak detector test** | Assert control signals cannot be token-wise embeddings | ✅ `test_hard_probes_d6_control_plane.py` Group A |
+| **AR regression** | Enable/disable Onto & CSR controls and verify AR accuracy does not collapse | ✅ `test_hard_probes_d6_control_plane.py` Group B |
 
 #### MEDIUM Priority
 
@@ -678,6 +703,12 @@ Claude's test list is solid. Prioritize like this:
 |------|---------|
 | OntoControl struct tests | Only after you formalize OntoControl |
 
+#### Additional D.2 Tests - ✅ DONE
+
+| Test | Purpose | Status |
+|------|---------|--------|
+| **enable_slots_read tests** | Verify read path gating works correctly | ✅ `test_hard_probes_d6_control_plane.py` Group C |
+
 ---
 
 ### D.7 Current PoC Status Assessment
@@ -689,47 +720,56 @@ Claude's test list is solid. Prioritize like this:
 | ✅ | Quad proposals + Phase integrator works |
 | ✅ | Identity is isolated (BindingSlotCache) and retrieval is correct (96%+) |
 | ✅ | CSR/Kosha influence Phase through scalar control, not content injection |
-| ⚠️ | Control-plane API is implicit, not formalized (OntoControl/route flags) |
-| ⚠️ | No-write contracts are not enforced yet (but should be) |
+| ✅ | Control-plane API explicit via `enable_slots_read` (V10.6.2 - D.2) |
+| ✅ | No-write contracts enforced via `assert_control_shape()` (V10.6.2 - D.5) |
+| ✅ | HIGH priority tests implemented (V10.6.2 - D.6) |
 
-**Assessment:** This is a **strong PoC**. The remaining work is "make it unbreakable."
+**Assessment:** This is a **strong PoC** with **enforced invariants**. The remaining work is expanding test coverage.
 
 ---
 
 ### D.8 Direct Answers Summary
 
-| Question | Answer |
-|----------|--------|
-| Do we need OntoControl? | Not yet; a minimal control struct later is enough |
-| Should Onto gate slots? | Gate slot *reads*; keep slot *writes* deterministic via EQ_TOKEN |
-| Should CSR modulate γ? | Only if diagnostics demand it; otherwise keep CSR at synthesis/output |
-| What's the top priority? | **Enforce no-write contracts + add regression tests** |
+| Question | Answer | Status |
+|----------|--------|--------|
+| Do we need OntoControl? | Not yet; a minimal control struct later is enough | Deferred |
+| Should Onto gate slots? | Gate slot *reads*; keep slot *writes* deterministic via EQ_TOKEN | ✅ V10.6.2 |
+| Should CSR modulate γ? | Only if diagnostics demand it; otherwise keep CSR at synthesis/output | Deferred |
+| What's the top priority? | **Enforce no-write contracts + add regression tests** | ✅ V10.6.2 |
 
 ---
 
 ### D.9 Implementation Recommendations
 
-#### Immediate Actions (Gap Closure)
+#### Immediate Actions (Gap Closure) - ✅ COMPLETED V10.6.2
 
-1. **Add shape assertions for control signals**
+1. **Add shape assertions for control signals** ✅
    ```python
-   def assert_control_shape(tensor, name):
+   # Implemented in phase_transformer.py
+   def assert_control_shape(tensor, name, d_model, seq_len=None, strict=True):
        """Enforce no-write contract: control must not be token-wise."""
-       assert tensor.dim() <= 3, f"{name} must be low-dimensional"
-       if tensor.dim() >= 2:
-           assert tensor.shape[-1] != d_model, f"{name} must not have d_model dim"
-       # Must not have sequence length dimension
-       assert all(d != seq_len for d in tensor.shape), f"{name} must not be token-position dependent"
+       # Checks: dim <= 4, no d_model last dim, no seq_len dim, no [B,N,D] shape
+       ...
+
+   def validate_control_signals(d_model, seq_len=None, strict=True, **controls):
+       """Validate multiple control signals at once."""
+       ...
    ```
 
-2. **Add `enable_slots_read` control flag**
+2. **Add `enable_slots_read` control flag** ✅
+   - Added to `BindingCacheBlock.forward()`
+   - Added to `BindingCacheTransformer.forward()` and `forward_hidden()`
    - Separate from write path (which stays deterministic)
    - Allows Onto/CSR to gate retrieval without affecting storage
 
-3. **Add min-gain clamp as safety invariant**
-   ```python
-   phase_gain = torch.clamp(phase_gain, min=g_min, max=g_max)
-   ```
+3. **Add min-gain clamp as safety invariant** ✅
+   - Already present in alignment clamp (V10.6.1)
+
+4. **Add D.6 HIGH priority tests** ✅
+   - `tests/test_hard_probes_d6_control_plane.py`
+   - Group A: Leak detector tests (10 tests)
+   - Group B: AR regression tests (7 tests)
+   - Group C: enable_slots_read tests (6 tests)
 
 #### Deferred Actions
 
