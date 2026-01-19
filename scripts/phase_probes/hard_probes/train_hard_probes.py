@@ -4433,6 +4433,59 @@ class BindingCacheQuadQuery(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.scale = 1.0 / math.sqrt(self.head_dim)
 
+    def get_proposals(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        V10.4: Get TopK proposals WITHOUT softmax mixing.
+
+        Instead of returning attention-weighted output, returns raw proposals
+        for Phase to integrate. This implements the "quad-as-proposer" pattern.
+
+        Args:
+            x: Input tensor [B, N, D] - source for queries
+            memory_state: [B, N, D] - from BindingCachePhaseState
+
+        Returns:
+            proposals: [B, N, K, D] - K proposal values per position
+            scores: [B, N, K] - retrieval scores (before softmax) for each proposal
+        """
+        B, N, D = x.shape
+        K = min(self.top_k, N)
+
+        x_norm = self.norm(x)
+
+        # Query projection
+        q = self.W_q(x_norm).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Memory as key-value
+        mem = memory_state.view(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # [B, H, N, D_h]
+
+        # Compute attention scores
+        scores = torch.matmul(q, mem.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Causal mask
+        causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
+        scores = scores.masked_fill(causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+
+        # TopK selection - NO SOFTMAX
+        top_scores, top_indices = scores.topk(K, dim=-1, largest=True)  # [B, H, N, K]
+
+        # Gather corresponding values
+        top_indices_expanded = top_indices.unsqueeze(-1).expand(-1, -1, -1, -1, self.head_dim)
+        mem_expanded = mem.unsqueeze(2).expand(-1, -1, N, -1, -1)  # [B, H, N, N, D_h]
+        top_mem = torch.gather(mem_expanded, 3, top_indices_expanded)  # [B, H, N, K, D_h]
+
+        # Reshape: [B, H, N, K, D_h] -> [B, N, K, H*D_h] = [B, N, K, D]
+        proposals = top_mem.permute(0, 2, 3, 1, 4).reshape(B, N, K, D)
+
+        # Scores: [B, H, N, K] -> [B, N, K] (mean across heads)
+        proposal_scores = top_scores.permute(0, 2, 3, 1).mean(dim=-1)  # [B, N, K]
+
+        return proposals, proposal_scores
+
     def forward(
         self,
         x: torch.Tensor,
