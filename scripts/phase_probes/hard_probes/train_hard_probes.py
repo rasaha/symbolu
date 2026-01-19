@@ -5625,6 +5625,8 @@ def train_real_language(
     model.train()
     step = 0
     total_loss = 0.0
+    total_main_loss = 0.0  # V10.5.1: Track main loss separately for comparable PPL
+    total_deep_loss = 0.0  # V10.5.1: Track deep supervision loss separately
     log_interval = 100
 
     train_iter = iter(train_loader)
@@ -5649,10 +5651,12 @@ def train_real_language(
 
         # V10.5: Deep Supervision forward path
         deep_loss_value = 0.0
+        main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
             logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y)
-            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
-            loss = loss + deep_loss
+            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = main_loss.item()  # Track main loss for reporting
+            loss = main_loss + deep_loss  # Combined loss for backprop
             deep_loss_value = deep_loss.item()
             layer_hidden_states = None  # Not needed when using deep supervision
         # Forward - use probe_layers if witness entropy is enabled
@@ -5660,10 +5664,12 @@ def train_real_language(
             logits = model(x, probe_layers=True)
             layer_hidden_states = model.layer_outputs
             loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = loss.item()
         else:
             logits = model(x)
             layer_hidden_states = None
             loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            main_loss_value = loss.item()
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -5686,15 +5692,21 @@ def train_real_language(
         optimizer.step()
 
         total_loss += loss.item()
+        total_main_loss += main_loss_value  # V10.5.1: Track main loss separately
+        total_deep_loss += deep_loss_value  # V10.5.1: Track deep loss separately
         step += 1
 
         # Logging
         if step % log_interval == 0:
             avg_loss = total_loss / log_interval
-            ppl = math.exp(avg_loss)
+            avg_main_loss = total_main_loss / log_interval  # V10.5.1: Main loss for PPL
+            avg_deep_loss = total_deep_loss / log_interval  # V10.5.1: Deep loss avg
+            ppl = math.exp(avg_main_loss)  # V10.5.1: PPL from main loss only (comparable)
             total_loss = 0.0
+            total_main_loss = 0.0
+            total_deep_loss = 0.0
 
-            # Track PPL history
+            # Track PPL history (using main-loss PPL for comparability)
             ppl_history.append((step, ppl))
 
             # Check milestones (convergence speed tracking)
@@ -5710,8 +5722,8 @@ def train_real_language(
                 curr_str = ",".join([f"{c:.2f}" for c in new_curriculum])
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Curriculum: [{curr_str}]")
             elif use_deep_supervision:
-                # V10.5: Show deep supervision loss contribution
-                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {deep_loss_value:.4f}")
+                # V10.5.1: Show main loss, PPL (from main loss), and deep loss separately
+                print(f"  Step {step:5d} | MainLoss: {avg_main_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {avg_deep_loss:.4f}")
             else:
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
 
