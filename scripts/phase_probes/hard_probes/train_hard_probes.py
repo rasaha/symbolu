@@ -4451,6 +4451,13 @@ class BindingCacheQuadQuery(nn.Module):
     Quadratic query with Top-K cache for efficient memory retrieval.
 
     Uses Top-K selection to reduce O(n²) attention to O(n*k).
+
+    V10.5.4: Soft routing warmup support
+    - soft_routing=True: Use full softmax attention (differentiable everywhere)
+    - soft_routing=False: Use hard top-K selection (sparse but non-differentiable)
+
+    Warmup schedule: Start with soft_routing=True, switch to False after warmup_steps.
+    This allows gradients to flow to quad during early training.
     """
 
     def __init__(
@@ -4476,6 +4483,13 @@ class BindingCacheQuadQuery(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
         self.scale = 1.0 / math.sqrt(self.head_dim)
+
+        # V10.5.4: Soft routing warmup
+        self.soft_routing = True  # Start with soft routing (full softmax)
+
+    def set_soft_routing(self, enabled: bool):
+        """V10.5.4: Enable/disable soft routing for warmup schedule."""
+        self.soft_routing = enabled
 
     def get_proposals(
         self,
@@ -4536,7 +4550,11 @@ class BindingCacheQuadQuery(nn.Module):
         memory_state: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Query memory state with Top-K selection.
+        Query memory state with Top-K selection or soft routing.
+
+        V10.5.4: Soft routing warmup
+        - soft_routing=True: Full softmax attention (differentiable, O(n²))
+        - soft_routing=False: Hard top-K selection (sparse, O(n*k))
 
         Args:
             x: [B, N, D]
@@ -4561,9 +4579,14 @@ class BindingCacheQuadQuery(nn.Module):
         causal_mask = torch.triu(torch.ones(N, N, device=x.device), diagonal=1).bool()
         attn_scores = attn_scores.masked_fill(causal_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
 
-        if self.use_cache and self.top_k < N:
-            # Top-K selection per query position
-            # For each query, only attend to top-k memory positions
+        # V10.5.4: Soft routing warmup - use full softmax during warmup
+        if self.soft_routing:
+            # Full attention (differentiable everywhere, allows gradients to flow)
+            attn_probs = F.softmax(attn_scores, dim=-1)
+            attn_probs = self.dropout(attn_probs)
+            attn_out = torch.matmul(attn_probs, mem)
+        elif self.use_cache and self.top_k < N:
+            # Hard Top-K selection (sparse, non-differentiable for non-selected)
             k = min(self.top_k, N)
             top_k_scores, top_k_indices = torch.topk(attn_scores, k, dim=-1)
 
@@ -4578,7 +4601,7 @@ class BindingCacheQuadQuery(nn.Module):
 
             attn_out = torch.matmul(attn_probs.unsqueeze(-2), top_k_mem).squeeze(-2)  # [B, H, N, D_h]
         else:
-            # Full attention (no cache)
+            # Full attention (no cache configured)
             attn_probs = F.softmax(attn_scores, dim=-1)
             attn_probs = self.dropout(attn_probs)
             attn_out = torch.matmul(attn_probs, mem)
@@ -4976,6 +4999,23 @@ class BindingCacheLMTransformer(nn.Module):
 
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    # =========================================================================
+    # V10.5.4: Soft Routing Warmup Control
+    # =========================================================================
+    def set_soft_routing(self, enabled: bool):
+        """
+        V10.5.4: Enable/disable soft routing for all quad query layers.
+
+        Soft routing uses full softmax attention (differentiable everywhere)
+        instead of hard top-K selection (non-differentiable for non-selected).
+
+        Args:
+            enabled: True = soft routing (warmup), False = hard top-K (normal)
+        """
+        for layer in self.layers:
+            if hasattr(layer, 'quad_query') and hasattr(layer.quad_query, 'set_soft_routing'):
+                layer.quad_query.set_soft_routing(enabled)
 
     # =========================================================================
     # V10.5: FIX 3 - True Gradient Norm Diagnostic (not curriculum-based)
@@ -5445,6 +5485,25 @@ def train_real_language(
         print(f"    Only supported for BindingCacheLMTransformer currently")
         use_deep_supervision = False
 
+    # V10.5.4: Soft Routing Warmup initialization
+    soft_routing_warmup = getattr(args, 'soft_routing_warmup', 0)
+    soft_routing_always = getattr(args, 'soft_routing_always', False)
+    if soft_routing_always or soft_routing_warmup > 0:
+        if hasattr(model, 'set_soft_routing'):
+            model.set_soft_routing(True)  # Start with soft routing
+            print(f"\n  Soft Routing Warmup: ENABLED (V10.5.4)")
+            if soft_routing_always:
+                print(f"    Mode: ALWAYS (never switch to hard top-K)")
+                print(f"    Complexity: O(n²) full attention")
+            else:
+                print(f"    Warmup steps: {soft_routing_warmup}")
+                print(f"    After warmup: switch to hard top-K O(n*k)")
+            print(f"    Purpose: Allow gradients to flow to quad (was 0.1% with hard top-K)")
+        else:
+            print(f"\n  Soft Routing Warmup: REQUESTED but model lacks set_soft_routing()")
+            soft_routing_warmup = 0
+            soft_routing_always = False
+
     # Phase-first curriculum controller (disabled for protected phase)
     pfc = None
     if args.phase_first_curriculum and not use_protected_phase:
@@ -5710,6 +5769,13 @@ def train_real_language(
         total_main_loss += main_loss_value  # V10.5.1: Track main loss separately
         total_deep_loss += deep_loss_value  # V10.5.1: Track deep loss separately
         step += 1
+
+        # V10.5.4: Soft routing warmup schedule
+        if soft_routing_warmup > 0 and not soft_routing_always and step == soft_routing_warmup:
+            if hasattr(model, 'set_soft_routing'):
+                model.set_soft_routing(False)  # Switch to hard top-K
+                print(f"\n  ★ SOFT ROUTING WARMUP COMPLETE at step {step}")
+                print(f"    Switching to hard top-K selection for quad")
 
         # Logging
         if step % log_interval == 0:
@@ -7117,6 +7183,16 @@ Examples:
                         help="Weight for deep supervision losses (default: 0.5). "
                              "Loss_i = lambda * (i+1)/num_layers * CE(h_i, targets). "
                              "Higher values encourage later layers more strongly.")
+
+    # V10.5.4: Soft Routing Warmup (Fix for quad gradient starvation)
+    parser.add_argument("--soft-routing-warmup", type=int, default=0,
+                        help="Number of steps to use soft routing (full softmax) for quad. "
+                             "After warmup, switches to hard top-K selection. "
+                             "0 = no warmup (hard top-K from start). "
+                             "Recommended: 500-1000 steps to allow gradients to flow to quad.")
+    parser.add_argument("--soft-routing-always", action="store_true",
+                        help="Always use soft routing (full softmax) for quad, never switch to hard top-K. "
+                             "This is O(n²) but ensures gradients always flow to quad.")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
