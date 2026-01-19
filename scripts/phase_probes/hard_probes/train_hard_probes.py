@@ -4389,6 +4389,7 @@ class BindingCacheQuadQuery(nn.Module):
         dropout: float = 0.1,
         top_k: int = 64,
         use_cache: bool = True,
+        proposal_mode: bool = False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -4396,6 +4397,7 @@ class BindingCacheQuadQuery(nn.Module):
         self.head_dim = embed_dim // num_heads
         self.top_k = top_k
         self.use_cache = use_cache
+        self.proposal_mode = proposal_mode
 
         self.W_q = nn.Linear(embed_dim, embed_dim)
         self.W_o = nn.Linear(embed_dim, embed_dim)
