@@ -14,6 +14,9 @@ TEST GROUPS:
 - Group C: Enable Slots Read Tests (5+ tests)
   Purpose: Verify the D.2 enable_slots_read control flag works correctly
 
+- Group D: OntoControl Interface Tests (10 tests) - V10.6.4 D.1
+  Purpose: Verify OntoControl dataclass formalizes control plane correctly
+
 CRITICAL INVARIANTS TESTED:
 - INV-D6-1: intent_phase must be low-dimensional [B, H] or [B, H, D_h], NOT [B, N, D]
 - INV-D6-2: binding_salience must be [B, N] for per-position gating, NOT [B, N, D]
@@ -21,9 +24,10 @@ CRITICAL INVARIANTS TESTED:
 - INV-D6-4: AR accuracy must not collapse when Onto/CSR enabled vs disabled
 - INV-D6-5: enable_slots_read=False must skip quad retrieval without affecting phase writes
 - INV-D6-6: s_align (alignment signal) must be [H] or [], NOT [B, N] (V10.6.3)
+- INV-D6-7: OntoControl wraps binding_salience without changing behavior (V10.6.4)
 
-Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.6, D.10
-Version: V10.6.3
+Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.1, D.6, D.10
+Version: V10.6.4
 """
 
 import pytest
@@ -41,6 +45,8 @@ from symbolu.phase_transformer import (
     validate_control_signals,
     ControlShapeViolation,
     assert_alignment_signal_shape,  # V10.6.3: Stricter alignment signal validation
+    OntoControl,  # V10.6.4 (D.1): Formalized control plane interface
+    onto_control_from_salience,  # V10.6.4 (D.1): Adapter function
 )
 
 
@@ -749,6 +755,166 @@ class TestIntegration:
         assert not torch.isnan(logits).any()
         assert not torch.isinf(logits).any()
         assert logits.abs().max() < 1000, "Logit magnitude too large"
+
+
+# =============================================================================
+# GROUP D: ONTOCONTROL INTERFACE TESTS (V10.6.4 D.1)
+# Purpose: Verify OntoControl dataclass formalizes control plane correctly
+# =============================================================================
+
+class TestGroupD_OntoControlInterface:
+    """
+    Group D: OntoControl Interface Tests
+
+    V10.6.4 (D.1): OntoControl formalizes existing binding_salience as an explicit
+    control-plane object. This is a PURE DATA CONTAINER with NO behavioral changes.
+
+    Tests verify:
+    1. OntoControl wraps binding_salience correctly
+    2. Validation uses existing no-write contract enforcement
+    3. Serialization works for logging/debugging
+    4. Factory methods create valid instances
+    """
+
+    def test_d01_ontocontrol_basic_creation(self, sample_inputs):
+        """OntoControl can be created with binding_salience."""
+        binding_salience = sample_inputs["valid_binding_salience"]
+
+        onto_ctrl = OntoControl(binding_salience=binding_salience)
+
+        assert onto_ctrl.binding_salience is binding_salience
+        assert onto_ctrl.enable_slots_read is True  # default
+        assert onto_ctrl.source == "ontology"  # default
+
+    def test_d02_ontocontrol_from_salience_factory(self, sample_inputs):
+        """OntoControl.from_salience factory creates valid instance."""
+        binding_salience = sample_inputs["valid_binding_salience"]
+
+        onto_ctrl = OntoControl.from_salience(
+            binding_salience,
+            source="annotator",
+            confidence=0.95,
+        )
+
+        assert onto_ctrl.binding_salience is binding_salience
+        assert onto_ctrl.source == "annotator"
+        assert onto_ctrl.confidence == 0.95
+
+    def test_d03_onto_control_from_salience_adapter(self, sample_inputs):
+        """onto_control_from_salience adapter function works."""
+        binding_salience = sample_inputs["valid_binding_salience"]
+
+        onto_ctrl = onto_control_from_salience(binding_salience, source="csr")
+
+        assert onto_ctrl.binding_salience is binding_salience
+        assert onto_ctrl.source == "csr"
+
+    def test_d04_ontocontrol_validate_valid_signals(self, model_config, sample_inputs):
+        """OntoControl.validate() accepts valid control signals."""
+        onto_ctrl = OntoControl(
+            binding_salience=sample_inputs["valid_binding_salience"],
+            intent_phase=sample_inputs["valid_intent_phase_2d"],
+        )
+
+        results = onto_ctrl.validate(
+            d_model=model_config["embed_dim"],
+            strict=False,
+        )
+
+        assert results["binding_salience"] is True
+        assert results["intent_phase"] is True
+
+    def test_d05_ontocontrol_validate_invalid_intent_phase(self, model_config, sample_inputs):
+        """OntoControl.validate() rejects invalid intent_phase."""
+        onto_ctrl = OntoControl(
+            binding_salience=sample_inputs["valid_binding_salience"],
+            intent_phase=sample_inputs["invalid_intent_phase"],  # [B, N, D] INVALID
+        )
+
+        results = onto_ctrl.validate(
+            d_model=model_config["embed_dim"],
+            strict=False,
+        )
+
+        assert results["binding_salience"] is True
+        assert results["intent_phase"] is False, "Invalid intent_phase should be rejected"
+
+    def test_d06_ontocontrol_validate_strict_raises(self, model_config, sample_inputs):
+        """OntoControl.validate() raises in strict mode for invalid signals."""
+        onto_ctrl = OntoControl(
+            intent_phase=sample_inputs["invalid_intent_phase"],  # [B, N, D] INVALID
+        )
+
+        with pytest.raises(ControlShapeViolation):
+            onto_ctrl.validate(
+                d_model=model_config["embed_dim"],
+                strict=True,
+            )
+
+    def test_d07_ontocontrol_to_dict_serialization(self, sample_inputs):
+        """OntoControl.to_dict() serializes correctly for logging."""
+        binding_salience = sample_inputs["valid_binding_salience"]
+        intent_phase = sample_inputs["valid_intent_phase_2d"]
+
+        onto_ctrl = OntoControl(
+            binding_salience=binding_salience,
+            intent_phase=intent_phase,
+            enable_slots_read=False,
+            source="test",
+            confidence=0.85,
+        )
+
+        d = onto_ctrl.to_dict()
+
+        assert d["binding_salience_shape"] == list(binding_salience.shape)
+        assert d["intent_phase_shape"] == list(intent_phase.shape)
+        assert d["enable_slots_read"] is False
+        assert d["source"] == "test"
+        assert d["confidence"] == 0.85
+
+    def test_d08_ontocontrol_to_dict_with_none_values(self):
+        """OntoControl.to_dict() handles None values correctly."""
+        onto_ctrl = OntoControl()  # All tensor fields None
+
+        d = onto_ctrl.to_dict()
+
+        assert d["binding_salience_shape"] is None
+        assert d["intent_phase_shape"] is None
+        assert d["enable_slots_read"] is True
+        assert d["source"] == "ontology"
+
+    def test_d09_ontocontrol_future_flags_no_behavior(self, sample_inputs):
+        """Future flags (enable_quad, enable_csr) exist but have no behavior."""
+        onto_ctrl = OntoControl(
+            binding_salience=sample_inputs["valid_binding_salience"],
+            enable_quad=True,
+            enable_csr=False,
+        )
+
+        # Flags exist and can be set
+        assert onto_ctrl.enable_quad is True
+        assert onto_ctrl.enable_csr is False
+
+        # to_dict includes them
+        d = onto_ctrl.to_dict()
+        assert d["enable_quad"] is True
+        assert d["enable_csr"] is False
+
+    def test_d10_ontocontrol_preserves_no_write_contract(self, model_config, sample_inputs):
+        """OntoControl preserves the no-write contract (D.5) through validation."""
+        # Valid: [B, N] for binding_salience
+        valid_ctrl = OntoControl(
+            binding_salience=sample_inputs["valid_binding_salience"],
+        )
+        valid_results = valid_ctrl.validate(d_model=model_config["embed_dim"], strict=False)
+        assert valid_results["binding_salience"] is True
+
+        # Invalid: [B, N, D] would violate no-write contract
+        invalid_ctrl = OntoControl(
+            binding_salience=sample_inputs["invalid_binding_salience"],  # [B, N, D]
+        )
+        invalid_results = invalid_ctrl.validate(d_model=model_config["embed_dim"], strict=False)
+        assert invalid_results["binding_salience"] is False
 
 
 if __name__ == "__main__":
