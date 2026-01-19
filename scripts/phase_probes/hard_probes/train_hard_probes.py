@@ -3679,6 +3679,203 @@ class WikiTextDataset(Dataset):
         return x, y
 
 
+# =============================================================================
+# V10.5.5: ASSOCIATIVE RECALL TASK (Forces Quad to Work)
+# =============================================================================
+
+class AssociativeRecallDataset(Dataset):
+    """
+    Associative Recall / Key-Value Recall Dataset.
+
+    This task REQUIRES long-range memory retrieval that local attention cannot solve.
+    It forces quad to work by:
+    1. Storing key-value pairs in memory (phase's job)
+    2. Retrieving the correct value given a query key (quad's job)
+    3. Using delays longer than local window (quad MUST retrieve from phase)
+
+    Format:
+        Input:  [K1] [V1] [SEP] [K2] [V2] [SEP] ... [FILLER] ... [QUERY] [Ki]
+        Target: [Vi] at the position after [QUERY] [Ki]
+
+    Example (num_pairs=4, delay=100):
+        "A = cat ; B = dog ; C = bird ; D = fish ; [100 filler tokens] ; ? = A"
+        Target at '?' position: "cat"
+
+    Local attention (window=64) CANNOT solve this when delay > window.
+    Quad MUST retrieve from phase memory.
+    """
+
+    def __init__(
+        self,
+        num_samples: int = 10000,
+        num_pairs: int = 8,
+        delay_min: int = 50,
+        delay_max: int = 150,
+        seq_len: int = 256,
+        vocab_size: int = 1000,
+        seed: int = 42,
+    ):
+        """
+        Args:
+            num_samples: Number of samples to generate
+            num_pairs: Number of key-value pairs per sample
+            delay_min: Minimum filler tokens between pairs and query
+            delay_max: Maximum filler tokens between pairs and query
+            seq_len: Total sequence length (padded/truncated)
+            vocab_size: Size of vocabulary for keys and values
+            seed: Random seed for reproducibility
+        """
+        super().__init__()
+        self.num_samples = num_samples
+        self.num_pairs = num_pairs
+        self.delay_min = delay_min
+        self.delay_max = delay_max
+        self.seq_len = seq_len
+        self.vocab_size = vocab_size
+
+        # Special tokens (reserved at end of vocab)
+        self.PAD_TOKEN = vocab_size - 1
+        self.SEP_TOKEN = vocab_size - 2  # Separator between pairs
+        self.QUERY_TOKEN = vocab_size - 3  # Query marker
+        self.EQ_TOKEN = vocab_size - 4  # Equals sign
+        self.FILLER_START = vocab_size - 100  # Filler tokens (100 reserved)
+
+        # Usable vocab for keys and values (first part of vocab)
+        self.kv_vocab_size = vocab_size - 100
+
+        # Pre-generate all samples for efficiency
+        torch.manual_seed(seed)
+        self.samples = []
+        self._generate_samples()
+
+    def _generate_samples(self):
+        """Pre-generate all samples."""
+        for _ in range(self.num_samples):
+            sample = self._generate_one_sample()
+            self.samples.append(sample)
+
+    def _generate_one_sample(self) -> Tuple[torch.Tensor, torch.Tensor, int]:
+        """
+        Generate one associative recall sample.
+
+        Returns:
+            x: Input sequence [seq_len]
+            y: Target sequence [seq_len] (mostly PAD, value at query position)
+            query_idx: Index of the query key (for analysis)
+        """
+        # Generate random key-value pairs (keys must be unique)
+        keys = torch.randperm(self.kv_vocab_size // 2)[:self.num_pairs]
+        values = torch.randint(0, self.kv_vocab_size // 2, (self.num_pairs,))
+
+        # Build sequence: K1 = V1 ; K2 = V2 ; ... ; [filler] ; ? = Kq
+        tokens = []
+
+        # Add key-value pairs
+        for i in range(self.num_pairs):
+            tokens.append(keys[i].item())
+            tokens.append(self.EQ_TOKEN)
+            tokens.append(values[i].item())
+            if i < self.num_pairs - 1:
+                tokens.append(self.SEP_TOKEN)
+
+        # Add filler tokens (random from filler vocab)
+        delay = torch.randint(self.delay_min, self.delay_max + 1, (1,)).item()
+        for _ in range(delay):
+            filler_token = torch.randint(self.FILLER_START, self.vocab_size - 4, (1,)).item()
+            tokens.append(filler_token)
+
+        # Select random query key
+        query_idx = torch.randint(0, self.num_pairs, (1,)).item()
+        query_key = keys[query_idx].item()
+        query_value = values[query_idx].item()
+
+        # Add query: ? = K
+        tokens.append(self.QUERY_TOKEN)
+        tokens.append(self.EQ_TOKEN)
+        tokens.append(query_key)
+
+        # The target is the value at the position AFTER the query key
+        # For LM, we predict next token, so target[i] = what comes after x[i]
+
+        # Pad or truncate to seq_len
+        if len(tokens) < self.seq_len:
+            tokens = tokens + [self.PAD_TOKEN] * (self.seq_len - len(tokens))
+        else:
+            tokens = tokens[:self.seq_len]
+
+        # Create input and target
+        x = torch.tensor(tokens, dtype=torch.long)
+
+        # Target: mostly ignore (PAD), but at the query_key position, target is query_value
+        y = torch.full((self.seq_len,), self.PAD_TOKEN, dtype=torch.long)
+
+        # Find where query_key appears after QUERY_TOKEN
+        # The answer should come right after
+        for i in range(len(tokens) - 1):
+            if tokens[i] == self.QUERY_TOKEN and i + 2 < len(tokens):
+                # Position i is QUERY, i+1 is EQ, i+2 is query_key
+                # Target at i+2 should be query_value (what comes next)
+                if i + 3 < self.seq_len:
+                    y[i + 2] = query_value  # After seeing key, predict value
+
+        return x, y, query_idx
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        x, y, _ = self.samples[idx]
+        return x, y
+
+    def get_accuracy(self, model: nn.Module, device: torch.device, num_samples: int = 100) -> float:
+        """
+        Compute retrieval accuracy on a subset of samples.
+
+        Args:
+            model: The model to evaluate
+            device: Device to run on
+            num_samples: Number of samples to evaluate
+
+        Returns:
+            accuracy: Fraction of correct retrievals
+        """
+        model.eval()
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for i in range(min(num_samples, len(self.samples))):
+                x, y, query_idx = self.samples[i]
+                x = x.unsqueeze(0).to(device)
+                y = y.to(device)
+
+                logits = model(x)  # [1, seq_len, vocab_size]
+
+                # Find query position (where y is not PAD)
+                query_positions = (y != self.PAD_TOKEN).nonzero(as_tuple=True)[0]
+
+                for pos in query_positions:
+                    pred = logits[0, pos].argmax().item()
+                    target = y[pos].item()
+                    if pred == target:
+                        correct += 1
+                    total += 1
+
+        return correct / max(total, 1)
+
+
+class AssociativeRecallCollator:
+    """Custom collator that ignores PAD tokens in loss computation."""
+
+    def __init__(self, pad_token: int):
+        self.pad_token = pad_token
+
+    def __call__(self, batch):
+        x = torch.stack([item[0] for item in batch])
+        y = torch.stack([item[1] for item in batch])
+        return x, y
+
+
 class HybridLMTransformer(nn.Module):
     """
     Language Modeling Transformer with per-layer Phase/Quadratic mixing.
@@ -5157,7 +5354,8 @@ class BindingCacheLMTransformer(nn.Module):
     def forward_with_deep_supervision(
         self,
         input_ids: torch.Tensor,
-        targets: torch.Tensor
+        targets: torch.Tensor,
+        ignore_index: int = -100  # V10.5.6: For associative recall (ignore PAD tokens)
     ) -> Tuple[torch.Tensor, torch.Tensor, List[float]]:
         """
         Forward pass with deep supervision losses at intermediate layers.
@@ -5165,6 +5363,7 @@ class BindingCacheLMTransformer(nn.Module):
         Args:
             input_ids: [B, N] input token IDs
             targets: [B, N] target token IDs for loss computation
+            ignore_index: Token ID to ignore in loss computation (-100 = none)
 
         Returns:
             logits: [B, N, V] final layer logits
@@ -5193,7 +5392,8 @@ class BindingCacheLMTransformer(nn.Module):
                     aux_logits = self.lm_head(x_normed)
                     aux_loss = F.cross_entropy(
                         aux_logits.view(-1, self.vocab_size),
-                        targets.view(-1)
+                        targets.view(-1),
+                        ignore_index=ignore_index  # V10.5.6: Ignore PAD for AR
                     )
 
                     layer_losses.append(aux_loss.item())
@@ -5351,17 +5551,77 @@ def train_real_language(
     """
     Train with real language data (WikiText) and layer probing.
     """
-    print("\n" + "=" * 70)
-    print("REAL LANGUAGE MODE: WikiText Language Modeling")
-    print("=" * 70)
+    # V10.5.6: Check for Associative Recall mode
+    use_associative_recall = getattr(args, 'associative_recall', False)
+    ar_dataset = None  # For accuracy evaluation
+    ar_pad_token = None  # For custom loss computation
 
-    # Load dataset
-    print(f"\nLoading {args.dataset} dataset...")
-    train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
-    val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+    if use_associative_recall:
+        print("\n" + "=" * 70)
+        print("V10.5.6: ASSOCIATIVE RECALL MODE")
+        print("=" * 70)
+        print("\nThis task REQUIRES long-range memory retrieval:")
+        print("  - Local attention (window=64) CANNOT solve when delay > window")
+        print("  - Quad MUST retrieve from phase memory to succeed")
+        print("  - If quad works → accuracy >> 0%, if broken → accuracy ≈ random")
+        print()
 
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
+        ar_vocab_size = getattr(args, 'ar_vocab_size', 1000)
+        ar_num_pairs = getattr(args, 'ar_num_pairs', 8)
+        ar_delay_min = getattr(args, 'ar_delay_min', 80)
+        ar_delay_max = getattr(args, 'ar_delay_max', 150)
+        ar_train_samples = getattr(args, 'ar_train_samples', 50000)
+        ar_val_samples = getattr(args, 'ar_val_samples', 2000)
+
+        print(f"  Vocabulary size: {ar_vocab_size}")
+        print(f"  Key-value pairs: {ar_num_pairs}")
+        print(f"  Delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
+        print(f"  Local window: {getattr(args, 'local_window_size', 64)}")
+        print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        print(f"  Train samples: {ar_train_samples}")
+        print(f"  Val samples: {ar_val_samples}")
+
+        train_dataset = AssociativeRecallDataset(
+            num_samples=ar_train_samples,
+            num_pairs=ar_num_pairs,
+            delay_min=ar_delay_min,
+            delay_max=ar_delay_max,
+            seq_len=args.seq_len,
+            vocab_size=ar_vocab_size,
+            seed=42,
+        )
+        val_dataset = AssociativeRecallDataset(
+            num_samples=ar_val_samples,
+            num_pairs=ar_num_pairs,
+            delay_min=ar_delay_min,
+            delay_max=ar_delay_max,
+            seq_len=args.seq_len,
+            vocab_size=ar_vocab_size,
+            seed=123,  # Different seed for validation
+        )
+
+        ar_dataset = val_dataset  # For accuracy evaluation
+        ar_pad_token = train_dataset.PAD_TOKEN
+
+        # Custom collator for associative recall
+        collator = AssociativeRecallCollator(ar_pad_token)
+        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=collator)
+        val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=collator)
+
+        # Override vocab size for model creation
+        args.lm_vocab_size = ar_vocab_size
+    else:
+        print("\n" + "=" * 70)
+        print("REAL LANGUAGE MODE: WikiText Language Modeling")
+        print("=" * 70)
+
+        # Load dataset
+        print(f"\nLoading {args.dataset} dataset...")
+        train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
+        val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+
+        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
 
     # Create model
     # V10.3.3: Support for Binding Cache architecture
@@ -5743,9 +6003,13 @@ def train_real_language(
         # V10.5: Deep Supervision forward path
         deep_loss_value = 0.0
         main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
+
+        # V10.5.6: Use ignore_index for associative recall (ignore PAD tokens in loss)
+        ignore_idx = ar_pad_token if use_associative_recall else -100  # -100 is PyTorch default (no ignore)
+
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
-            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y)
-            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y, ignore_index=ignore_idx)
+            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = main_loss.item()  # Track main loss for reporting
             loss = main_loss + deep_loss  # Combined loss for backprop
             deep_loss_value = deep_loss.item()
@@ -5754,12 +6018,12 @@ def train_real_language(
         elif use_witness_entropy and hasattr(model, 'layer_outputs'):
             logits = model(x, probe_layers=True)
             layer_hidden_states = model.layer_outputs
-            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
         else:
             logits = model(x)
             layer_hidden_states = None
-            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
@@ -5835,7 +6099,12 @@ def train_real_language(
                 for x, y in val_loader:
                     x, y = x.to(config.device), y.to(config.device)
                     logits = model(x)
-                    val_loss += F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1)).item()
+                    # V10.5.6: Use ignore_index for associative recall
+                    val_loss += F.cross_entropy(
+                        logits.view(-1, args.lm_vocab_size),
+                        y.view(-1),
+                        ignore_index=ignore_idx
+                    ).item()
                     val_batches += 1
                     if val_batches >= 50:  # Limit eval batches
                         break
@@ -5844,6 +6113,19 @@ def train_real_language(
             val_ppl = math.exp(val_loss)
             print(f"\n  === Validation @ Step {step} ===")
             print(f"      Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+            # V10.5.6: Associative Recall accuracy evaluation
+            if use_associative_recall and ar_dataset is not None:
+                retrieval_acc = ar_dataset.get_accuracy(model, config.device, num_samples=500)
+                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}%")
+                # Random baseline for num_pairs=8 keys would be 12.5%
+                random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
+                if retrieval_acc * 100 > random_baseline * 2:
+                    print(f"        → QUAD IS WORKING! ({retrieval_acc*100:.1f}% >> {random_baseline:.1f}% random)")
+                elif retrieval_acc * 100 > random_baseline * 1.2:
+                    print(f"        → Quad shows some learning ({retrieval_acc*100:.1f}% > {random_baseline:.1f}% random)")
+                else:
+                    print(f"        → Quad NOT working (≈ random {random_baseline:.1f}%)")
 
             if val_ppl < best_val_ppl:
                 best_val_ppl = val_ppl
@@ -6040,12 +6322,33 @@ def train_real_language(
 
     # Final evaluation with comprehensive analysis
     print("\n" + "=" * 70)
-    if use_protected_phase:
+    if use_associative_recall:
+        print("FINAL RESULTS: Associative Recall Task (V10.5.6)")
+    elif use_protected_phase:
         print("FINAL RESULTS: Protected Phase Learning Analysis (V10.3.2)")
     else:
         print("FINAL RESULTS: Phase Learning Analysis")
     print("=" * 70)
     print(f"  Best Val PPL: {best_val_ppl:.2f}")
+
+    # V10.5.6: Final Associative Recall accuracy
+    if use_associative_recall and ar_dataset is not None:
+        final_acc = ar_dataset.get_accuracy(model, config.device, num_samples=1000)
+        random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
+        print(f"\n  ╔══════════════════════════════════════════════════════════════╗")
+        print(f"  ║  ASSOCIATIVE RECALL FINAL ACCURACY                           ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Retrieval Accuracy:   {final_acc*100:6.2f}%                            ║")
+        print(f"  ║  Random Baseline:      {random_baseline:6.2f}%                            ║")
+        if final_acc * 100 > 80:
+            print(f"  ║  Verdict: QUAD WORKS VERY WELL!   ★★★                         ║")
+        elif final_acc * 100 > 50:
+            print(f"  ║  Verdict: QUAD WORKS MODERATELY  ★★                           ║")
+        elif final_acc * 100 > random_baseline * 2:
+            print(f"  ║  Verdict: QUAD SHOWS LEARNING    ★                            ║")
+        else:
+            print(f"  ║  Verdict: QUAD BROKEN (≈ random)  ✗                           ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════╝")
 
     if use_protected_phase:
         print(f"  Architecture: Protected Phase (sequential collaboration)")
@@ -7217,6 +7520,28 @@ Examples:
                              "Tests if quad CAN work when it's the only attention mechanism. "
                              "L0: local=0, quad=0.7, phase=0.3 (quad must do all the work) "
                              "L1+: local=0.7, quad=0, phase=0.3 (local takes over)")
+
+    # ==========================================================================
+    # V10.5.6: ASSOCIATIVE RECALL TASK (Forces Quad to Work)
+    # ==========================================================================
+    parser.add_argument("--associative-recall", action="store_true",
+                        help="Use Associative Recall task instead of WikiText. "
+                             "This task REQUIRES long-range memory retrieval that local "
+                             "attention cannot solve. Format: K1=V1; K2=V2; ... [filler] ?=Ki "
+                             "where the model must retrieve Vi. Delay > local window forces "
+                             "quad to retrieve from phase memory.")
+    parser.add_argument("--ar-num-pairs", type=int, default=8,
+                        help="Number of key-value pairs per sample (default: 8)")
+    parser.add_argument("--ar-delay-min", type=int, default=80,
+                        help="Minimum filler tokens between pairs and query (default: 80, > local window)")
+    parser.add_argument("--ar-delay-max", type=int, default=150,
+                        help="Maximum filler tokens between pairs and query (default: 150)")
+    parser.add_argument("--ar-vocab-size", type=int, default=1000,
+                        help="Vocabulary size for associative recall task (default: 1000)")
+    parser.add_argument("--ar-train-samples", type=int, default=50000,
+                        help="Number of training samples for associative recall (default: 50000)")
+    parser.add_argument("--ar-val-samples", type=int, default=2000,
+                        help="Number of validation samples for associative recall (default: 2000)")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
