@@ -4591,13 +4591,22 @@ class BindingCacheLMBlock(nn.Module):
     """
     Binding Cache block for Language Modeling.
 
-    Three-path architecture (V10.0):
-    1. Local: O(n*w) - Direct token-to-token for syntax
-    2. Phase: O(n) - Memory state accumulation
-    3. Quad:  O(n*k) - Top-K memory query
+    V10.5.2 Cross-Attention Architecture:
+    1. Local: O(n*w) - Syntax attention, ALSO provides queries for quad
+    2. Phase: O(n) - Memory accumulation, provides keys/values for quad
+    3. Quad:  O(n*k) - Cross-attention from local (Q) into phase memory (K/V)
 
-    They work together: local_out + mem_out (no gradient competition).
-    Ratios allow per-layer weighting of each path.
+    Key change from V10.0: Phase no longer contributes directly to output.
+    Quad is the SOLE interface to phase memory, forcing it to learn.
+
+    Information flow:
+        local_out = local_attn(x)           # Syntax + queries
+        memory_state = phase_state(x)       # Semantic memory (K/V)
+        quad_out = quad_query(local_out, memory_state)  # Cross-attention
+        output = local_ratio * local_out + quad_ratio * quad_out
+
+    This fixes the quad gradient starvation problem (was 0.1% gradients)
+    where phase leaked full memory to output, making quad redundant.
     """
 
     def __init__(
@@ -4680,23 +4689,28 @@ class BindingCacheLMBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Three-path forward pass with weighted combination.
+        Three-path forward pass with cross-attention architecture (V10.5.2).
 
-        1. Local attention for syntax
-        2. Phase accumulates memory
-        3. Quad queries memory (or proposes in proposal_mode)
+        V10.5.2 Change: Quad cross-attends from local_out into memory_state
+        - Q = local_out (syntax context)
+        - K/V = memory_state (semantic memory from phase)
+        - Removes direct phase_ratio * memory_state from output (was causing quad redundancy)
 
-        V10.4 Proposal Mode:
-        - Quad returns proposals (no softmax mixing)
-        - Phase integrates proposals with gating
-        - Conditional skip: if phase confident, skip quad
+        This makes quad the SOLE interface to phase memory, forcing it to learn.
 
-        Output = x + (local_ratio * local + phase_ratio * memory + quad_ratio * quad_out) + ff
+        1. Local attention for syntax (provides queries)
+        2. Phase accumulates memory (provides keys/values)
+        3. Quad cross-attends: retrieves from memory using local context
+
+        Output = x + (local_ratio * local + quad_ratio * quad_out) + ff
+        Note: phase contributes ONLY via quad, not directly to output
         """
         # Step 1: Local attention for syntax (the → cat patterns)
+        # This now serves dual purpose: syntax output AND query source for quad
         local_out = self.local_attn(x)
 
-        # Step 2: Phase accumulates memory state
+        # Step 2: Phase accumulates memory state (keys/values for quad)
+        # Phase no longer contributes directly to output - only via quad retrieval
         memory_state = self.phase_state(x)
 
         if self.proposal_mode:
@@ -4708,22 +4722,24 @@ class BindingCacheLMBlock(nn.Module):
                 self._last_confidence_mean = confidence.mean().item()
                 self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
 
-            # Get proposals from quad (no softmax mixing)
-            proposals, proposal_scores = self.quad_query.get_proposals(x, memory_state)
+            # V10.5.2: Get proposals using local_out as query source (cross-attention)
+            proposals, proposal_scores = self.quad_query.get_proposals(local_out, memory_state)
 
             # Phase integrates proposals
             quad_out = self.phase_state.integrate_proposals(
-                x, memory_state, proposals, proposal_scores
+                local_out, memory_state, proposals, proposal_scores
             )
         else:
-            # Original mode: Quad queries memory state with softmax attention
-            quad_out = self.quad_query(x, memory_state)
+            # V10.5.2: Quad cross-attends from local_out (Q) into memory_state (K/V)
+            # This replaces: quad_out = self.quad_query(x, memory_state)
+            quad_out = self.quad_query(local_out, memory_state)
 
-        # Weighted combination of three paths (with ratios for per-layer tuning)
-        # Note: memory_state is passed to quad, but we also add phase contribution directly
+        # V10.5.2: Weighted combination WITHOUT direct phase contribution
+        # Phase contributes ONLY through quad's cross-attention retrieval
+        # This forces quad to be necessary (was getting 0.1% gradients before)
         attn_out = (
             self.local_ratio * local_out +
-            self.phase_ratio * memory_state +
+            # REMOVED: self.phase_ratio * memory_state  (was causing quad redundancy)
             self.quad_ratio * quad_out
         )
 
