@@ -4962,6 +4962,194 @@ class BindingCacheLMTransformer(nn.Module):
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+    # =========================================================================
+    # V10.5: FIX 3 - True Gradient Norm Diagnostic (not curriculum-based)
+    # =========================================================================
+    def get_component_grad_norms(self) -> Dict[str, List[float]]:
+        """
+        Measure actual gradient norms for each attention component per layer.
+
+        Returns dict with per-layer gradient norms for:
+        - local: LocalWindowAttention gradients
+        - phase: BindingCachePhaseState gradients
+        - quad:  BindingCacheQuadQuery gradients
+        - ff:    Feed-forward gradients
+
+        This replaces the broken curriculum-based "gradient dominance" diagnostic
+        which falsely reported 100% phase-heavy for Protected Phase architecture.
+        """
+        grad_norms = {
+            'local': [],
+            'phase': [],
+            'quad': [],
+            'ff': [],
+        }
+
+        for layer in self.layers:
+            # Local attention gradient norm
+            local_norm = 0.0
+            for p in layer.local_attn.parameters():
+                if p.grad is not None:
+                    local_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['local'].append(local_norm ** 0.5)
+
+            # Phase state gradient norm
+            phase_norm = 0.0
+            for p in layer.phase_state.parameters():
+                if p.grad is not None:
+                    phase_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['phase'].append(phase_norm ** 0.5)
+
+            # Quad query gradient norm
+            quad_norm = 0.0
+            for p in layer.quad_query.parameters():
+                if p.grad is not None:
+                    quad_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['quad'].append(quad_norm ** 0.5)
+
+            # Feed-forward gradient norm
+            ff_norm = 0.0
+            for p in layer.ff.parameters():
+                if p.grad is not None:
+                    ff_norm += p.grad.data.norm(2).item() ** 2
+            grad_norms['ff'].append(ff_norm ** 0.5)
+
+        return grad_norms
+
+    def get_gradient_dominance_report(self) -> Dict[str, any]:
+        """
+        Analyze which components receive gradients and detect dominance issues.
+
+        A healthy model should have gradients flowing to all components at all layers.
+        Gradient dominance (one component >> others) indicates learning imbalance.
+
+        Returns:
+            dict with:
+            - component_totals: Total gradient norm per component
+            - component_pcts: Percentage contribution per component
+            - per_layer_dominant: Which component dominates each layer
+            - dominance_detected: True if one component > 70% of total
+            - layer_gradient_decay: Ratio of L_last / L_0 gradients (healthy > 0.1)
+        """
+        grad_norms = self.get_component_grad_norms()
+
+        # Sum across layers for each component
+        totals = {k: sum(v) for k, v in grad_norms.items()}
+        grand_total = sum(totals.values()) + 1e-10  # Avoid division by zero
+
+        # Percentage contribution per component
+        pcts = {k: (v / grand_total * 100) for k, v in totals.items()}
+
+        # Per-layer dominant component
+        per_layer_dominant = []
+        for i in range(self.num_layers):
+            layer_norms = {k: grad_norms[k][i] for k in grad_norms.keys()}
+            dominant = max(layer_norms, key=layer_norms.get)
+            per_layer_dominant.append(dominant)
+
+        # Check for dominance (any component > 70%)
+        max_pct = max(pcts.values())
+        dominance_detected = max_pct > 70
+
+        # Layer gradient decay: how much gradient reaches later layers
+        # Healthy models should have layer_gradient_decay > 0.1
+        total_per_layer = [sum(grad_norms[k][i] for k in grad_norms.keys())
+                          for i in range(self.num_layers)]
+        if total_per_layer[0] > 1e-10:
+            layer_gradient_decay = total_per_layer[-1] / total_per_layer[0]
+        else:
+            layer_gradient_decay = 0.0
+
+        return {
+            'component_totals': totals,
+            'component_pcts': pcts,
+            'per_layer_dominant': per_layer_dominant,
+            'dominance_detected': dominance_detected,
+            'layer_gradient_decay': layer_gradient_decay,
+            'per_layer_totals': total_per_layer,
+        }
+
+    # =========================================================================
+    # V10.5: FIX 1 - Deep Supervision for Depth Utilization
+    # =========================================================================
+    def init_deep_supervision(self, lambda_decay: float = 1.0):
+        """
+        Initialize auxiliary classification heads for deep supervision.
+
+        Deep supervision forces later layers to learn useful representations
+        by adding auxiliary losses at intermediate layers. This prevents
+        L0 overfitting where only the first layer contributes to PPL reduction.
+
+        Args:
+            lambda_decay: Controls how much later layers are weighted.
+                          Loss_i = lambda_decay * (i / num_layers) * CE(proj_i(h_i), targets)
+                          Higher values encourage later layers more strongly.
+        """
+        self.deep_supervision_enabled = True
+        self.deep_supervision_lambda = lambda_decay
+
+        # Auxiliary projection heads - one per layer (except last)
+        # These project intermediate representations to logits
+        # We use weight-tied heads (share with lm_head) to reduce params
+        self.aux_norms = nn.ModuleList([
+            nn.LayerNorm(self.d_model) for _ in range(self.num_layers - 1)
+        ])
+
+        # Move to same device as model
+        device = next(self.parameters()).device
+        self.aux_norms = self.aux_norms.to(device)
+
+    def forward_with_deep_supervision(
+        self,
+        input_ids: torch.Tensor,
+        targets: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, List[float]]:
+        """
+        Forward pass with deep supervision losses at intermediate layers.
+
+        Args:
+            input_ids: [B, N] input token IDs
+            targets: [B, N] target token IDs for loss computation
+
+        Returns:
+            logits: [B, N, V] final layer logits
+            deep_loss: Scalar tensor with weighted sum of auxiliary losses
+            layer_losses: List of per-layer auxiliary losses (for monitoring)
+        """
+        B, N = input_ids.shape
+        pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.dropout(self.token_emb(input_ids) + self.pos_emb(pos))
+
+        layer_losses = []
+        deep_loss = torch.tensor(0.0, device=input_ids.device)
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+
+            # Compute auxiliary loss for all layers except the last
+            if hasattr(self, 'deep_supervision_enabled') and self.deep_supervision_enabled:
+                if i < self.num_layers - 1:
+                    # Layer weight: increases with depth to emphasize later layers
+                    # λ * (i+1) / num_layers ensures L0 gets minimal weight, Ln-1 gets max
+                    layer_weight = self.deep_supervision_lambda * (i + 1) / self.num_layers
+
+                    # Project to logits using shared lm_head
+                    x_normed = self.aux_norms[i](x)
+                    aux_logits = self.lm_head(x_normed)
+                    aux_loss = F.cross_entropy(
+                        aux_logits.view(-1, self.vocab_size),
+                        targets.view(-1)
+                    )
+
+                    layer_losses.append(aux_loss.item())
+                    deep_loss = deep_loss + layer_weight * aux_loss
+
+        # Final layer
+        x = self.norm(x)
+        logits = self.lm_head(x)
+
+        return logits, deep_loss, layer_losses
+
 
 # =============================================================================
 # SAMPLE GENERATION FOR QUALITY MONITORING
@@ -5228,6 +5416,20 @@ def train_real_language(
     param_count = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {param_count:,}")
 
+    # V10.5: Deep Supervision initialization (Fix 1 for L0 overfitting)
+    use_deep_supervision = getattr(args, 'deep_supervision', False)
+    if use_deep_supervision and hasattr(model, 'init_deep_supervision'):
+        deep_lambda = getattr(args, 'deep_supervision_lambda', 0.5)
+        model.init_deep_supervision(lambda_decay=deep_lambda)
+        print(f"\n  Deep Supervision: ENABLED (V10.5)")
+        print(f"    Lambda (layer weight): {deep_lambda}")
+        print(f"    Purpose: Force later layers to learn useful representations")
+        print(f"    Formula: loss += λ * (i+1)/L * CE(aux_proj(h_i), targets)")
+    elif use_deep_supervision:
+        print(f"\n  Deep Supervision: REQUESTED but model lacks init_deep_supervision()")
+        print(f"    Only supported for BindingCacheLMTransformer currently")
+        use_deep_supervision = False
+
     # Phase-first curriculum controller (disabled for protected phase)
     pfc = None
     if args.phase_first_curriculum and not use_protected_phase:
@@ -5445,15 +5647,23 @@ def train_real_language(
         # V10.3.7: Check if witness entropy regularization is enabled
         use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
 
+        # V10.5: Deep Supervision forward path
+        deep_loss_value = 0.0
+        if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
+            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y)
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = loss + deep_loss
+            deep_loss_value = deep_loss.item()
+            layer_hidden_states = None  # Not needed when using deep supervision
         # Forward - use probe_layers if witness entropy is enabled
-        if use_witness_entropy and hasattr(model, 'layer_outputs'):
+        elif use_witness_entropy and hasattr(model, 'layer_outputs'):
             logits = model(x, probe_layers=True)
             layer_hidden_states = model.layer_outputs
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
         else:
             logits = model(x)
             layer_hidden_states = None
-
-        loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -5499,6 +5709,9 @@ def train_real_language(
                 model.update_curriculum(new_curriculum)
                 curr_str = ",".join([f"{c:.2f}" for c in new_curriculum])
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Curriculum: [{curr_str}]")
+            elif use_deep_supervision:
+                # V10.5: Show deep supervision loss contribution
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {deep_loss_value:.4f}")
             else:
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
 
@@ -5825,13 +6038,37 @@ def train_real_language(
     if phase_layers_checked > 0:
         print(f"      (avg phase weight variance: {avg_phase_var:.6f})")
 
-    # 2. Gradient dominance (one attention type dominates gradients)
-    # We check if phase vs local have similar contribution
-    phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
-    local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
-    gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
-    print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
-    print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+    # 2. Gradient dominance (one attention component dominates gradients)
+    # V10.5 FIX 3: Use actual gradient norms instead of curriculum-based classification
+    # The old curriculum-based diagnostic was broken for Protected Phase (curriculum=[1.0]*L)
+    if hasattr(model, 'get_gradient_dominance_report'):
+        # New: Measure actual gradient norms per component (local/phase/quad/ff)
+        grad_report = model.get_gradient_dominance_report()
+        gradient_dominance = grad_report['dominance_detected']
+        layer_grad_decay = grad_report['layer_gradient_decay']
+
+        print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+        print(f"      Component gradient distribution:")
+        for comp, pct in grad_report['component_pcts'].items():
+            marker = "⚠️" if pct > 70 else ""
+            print(f"        {comp:6s}: {pct:5.1f}% {marker}")
+        print(f"      Layer gradient decay (L{model.num_layers-1}/L0): {layer_grad_decay:.3f}", end="")
+        if layer_grad_decay < 0.1:
+            print(" ⚠️ (vanishing gradients)")
+        elif layer_grad_decay > 10:
+            print(" ⚠️ (exploding gradients)")
+        else:
+            print(" ✓")
+    else:
+        # Fallback for models without the new diagnostic (HybridTransformer, etc.)
+        # This is the OLD curriculum-based diagnostic - known to be broken for Protected Phase
+        phase_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] > 0.5)
+        local_contrib = sum(contrib['contribution_pct'][i] for i in range(model.num_layers) if model.curriculum[i] <= 0.5)
+        gradient_dominance = abs(phase_contrib - local_contrib) > 70  # One side > 85%
+        print(f"    • Gradient dominance:          {'YES ⚠️' if gradient_dominance else 'NO ✓'}")
+        print(f"      (phase-heavy layers: {phase_contrib:.1f}%, local-heavy: {local_contrib:.1f}%)")
+        if all(c == 1.0 for c in model.curriculum):
+            print(f"      ⚠️  WARNING: curriculum=[1.0]*L, this metric is INVALID for Protected Phase")
 
     # 3. Representation saturation (PPL stops improving)
     ppl_improving = len(ppl_history) < 5 or (ppl_history[-1][1] < ppl_history[-5][1] * 0.99)
@@ -5852,6 +6089,23 @@ def train_real_language(
     else:
         confidence = "LOW ⚠️"
     print(f"\n    Overall Confidence: {confidence} ({4-issues}/4 checks passed)")
+
+    # V10.5: Deep Supervision Status
+    if use_deep_supervision:
+        print(f"\n  Deep Supervision (V10.5 Fix 1):")
+        print(f"    Status: ENABLED")
+        deep_lambda = getattr(args, 'deep_supervision_lambda', 0.5)
+        print(f"    Lambda: {deep_lambda}")
+        if early_overfit:
+            print(f"    Effect: L0 still dominates ({contrib['contribution_pct'][0]:.1f}%) - consider increasing lambda")
+        else:
+            print(f"    Effect: Depth utilization improved ✓")
+            # Show per-layer contribution distribution
+            print(f"    Layer contributions: ", end="")
+            for i, pct in enumerate(contrib['contribution_pct']):
+                marker = "★" if pct > 100 / model.num_layers * 1.5 else ""
+                print(f"L{i}:{pct:.0f}% ", end="")
+            print()
 
     # =========================================================================
     # CONCLUSION
@@ -6826,6 +7080,16 @@ Examples:
     parser.add_argument("--confidence-threshold", type=float, default=0.7,
                         help="Threshold for phase confidence to skip quad (default: 0.7). "
                              "Higher = less skipping, lower = more aggressive skipping.")
+
+    # V10.5: Deep Supervision (Fix 1 for L0 overfitting)
+    parser.add_argument("--deep-supervision", action="store_true",
+                        help="Enable deep supervision: add auxiliary losses at intermediate layers "
+                             "to force later layers to learn useful representations. Prevents L0 overfitting "
+                             "where only the first layer contributes to PPL reduction.")
+    parser.add_argument("--deep-supervision-lambda", type=float, default=0.5,
+                        help="Weight for deep supervision losses (default: 0.5). "
+                             "Loss_i = lambda * (i+1)/num_layers * CE(h_i, targets). "
+                             "Higher values encourage later layers more strongly.")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
