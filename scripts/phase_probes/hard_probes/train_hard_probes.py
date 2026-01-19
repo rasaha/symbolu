@@ -204,6 +204,10 @@ class Config:
     #   score = s_content * (1 + α * s_align) # Combined
     dual_channel_mode: bool = False  # Enable dual-channel attention
     alignment_authority: float = 0.1  # α: weight for alignment term
+    # V10.6.1: Clamp bounds for alignment modulator (ChatGPT caveat)
+    # Prevents over-constraint collapse from sustained JEPA/SRK misalignment
+    alignment_clamp_min: float = 0.8  # Lower bound for (1 + α * s_align)
+    alignment_clamp_max: float = 1.2  # Upper bound for (1 + α * s_align)
 
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -4549,6 +4553,8 @@ class BindingCachePhaseState(nn.Module):
         bounded_phase: bool = True,
         dual_channel_mode: bool = False,  # V10.6: Enable dual-channel attention
         alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
+        alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound (ChatGPT caveat)
+        alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound (ChatGPT caveat)
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -4560,6 +4566,10 @@ class BindingCachePhaseState(nn.Module):
         # V10.6: Dual-channel mode support
         self.dual_channel_mode = dual_channel_mode
         self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds to prevent over-constraint collapse
+        # ChatGPT recommendation: sustained misalignment can attenuate proposals
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
 
         # Phase projections
         self.W_k_phase = nn.Linear(embed_dim, embed_dim)
@@ -4695,13 +4705,26 @@ class BindingCachePhaseState(nn.Module):
         """
         V10.4: Integrate quad proposals into phase state.
         V10.6: Extended with dual-channel alignment modulation.
+        V10.6.1: Added clamp bounds for stability.
 
         This implements the "phase-as-integrator" pattern where phase
         decides which proposals survive and integrates them into state.
 
         Dual-channel mode (V10.6):
             s_align = cos(θ_JEPA - θ_SRK)
-            weighted_proposals = weighted_proposals * (1 + α * s_align)
+            weighted_proposals = weighted_proposals * clamp(1 + α * s_align, min, max)
+
+        V10.6.1 Stability (ChatGPT Caveat 1):
+            Clamping prevents over-constraint collapse from sustained misalignment.
+
+        FUTURE WORK (ChatGPT Caveat 2):
+            Currently s_align is global (per-step/per-batch), not per-proposal.
+            Conceptually, different proposals may align differently:
+            - θ_JEPA = query direction (what we're looking for)
+            - θ_SRK = memory coherence (what each proposal offers)
+            A future V10.7 could compute s_align_k per proposal k and modulate
+            proposals individually. Not implementing now to avoid destabilizing
+            early training.
 
         Args:
             x: Input tensor [B, N, D]
@@ -4741,6 +4764,16 @@ class BindingCachePhaseState(nn.Module):
                 # Modulate: weighted_proposals = weighted_proposals * (1 + α * s_align)
                 # s_align: [B, N], weighted_proposals: [B, N, D]
                 alignment_modulator = 1.0 + self.alignment_authority * s_align.unsqueeze(-1)
+
+                # V10.6.1: Clamp to prevent over-constraint collapse (ChatGPT caveat)
+                # Sustained JEPA/SRK misalignment can attenuate proposals and reduce
+                # effective learning signal. Clamping ensures safe scaling range.
+                alignment_modulator = torch.clamp(
+                    alignment_modulator,
+                    min=self.alignment_clamp_min,
+                    max=self.alignment_clamp_max
+                )
+
                 weighted_proposals = weighted_proposals * alignment_modulator
 
         # State update: decay old state + integrate new proposals
@@ -5245,6 +5278,8 @@ class BindingCacheLMBlock(nn.Module):
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
         dual_channel_mode: bool = False,  # V10.6: Enable JEPA/SRK intent alignment
         alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
+        alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound
+        alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -5254,6 +5289,9 @@ class BindingCacheLMBlock(nn.Module):
         # V10.6: Dual-channel mode
         self.dual_channel_mode = dual_channel_mode
         self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
 
         # Store ratios for weighted combination
         self.local_ratio = local_ratio
@@ -5277,6 +5315,8 @@ class BindingCacheLMBlock(nn.Module):
             bounded_phase=bounded_phase,
             dual_channel_mode=dual_channel_mode,  # V10.6
             alignment_authority=alignment_authority,  # V10.6
+            alignment_clamp_min=alignment_clamp_min,  # V10.6.1
+            alignment_clamp_max=alignment_clamp_max,  # V10.6.1
         )
 
         # Quad memory query
@@ -5417,6 +5457,9 @@ class BindingCacheLMTransformer(nn.Module):
         # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
         dual_channel_mode: bool = False,
         alignment_authority: float = 0.1,
+        # V10.6.1: Clamp bounds to prevent over-constraint collapse
+        alignment_clamp_min: float = 0.8,
+        alignment_clamp_max: float = 1.2,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -5428,6 +5471,9 @@ class BindingCacheLMTransformer(nn.Module):
         # V10.6: Dual-channel mode
         self.dual_channel_mode = dual_channel_mode
         self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
 
         # V10.5.7: Binding slot configuration
         self.binding_slots_enabled = binding_slots > 0
@@ -5488,6 +5534,8 @@ class BindingCacheLMTransformer(nn.Module):
                 confidence_threshold=confidence_threshold,
                 dual_channel_mode=dual_channel_mode,  # V10.6
                 alignment_authority=alignment_authority,  # V10.6
+                alignment_clamp_min=alignment_clamp_min,  # V10.6.1
+                alignment_clamp_max=alignment_clamp_max,  # V10.6.1
             )
             for i in range(num_layers)
         ])
@@ -6197,8 +6245,9 @@ def train_real_language(
             print(f"║  V10.6 DUAL-CHANNEL MODE ENABLED                                      ║")
             print(f"║    JEPA/SRK intent alignment for proposal integration                 ║")
             print(f"║    s_align = cos(θ_JEPA - θ_SRK)                                      ║")
-            print(f"║    output = output * (1 + α * s_align)                                ║")
+            print(f"║    output = output * clamp(1 + α * s_align, min, max)                 ║")
             print(f"║    Alignment authority (α): {config.alignment_authority:.2f}                                    ║")
+            print(f"║    Clamp bounds: [{config.alignment_clamp_min:.2f}, {config.alignment_clamp_max:.2f}] (V10.6.1 stability fix)             ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
         print(f"║  Per-Layer Ratios:                                                    ║")
         for i in range(config.num_layers):
@@ -6233,6 +6282,9 @@ def train_real_language(
             # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
             dual_channel_mode=config.dual_channel_mode,
             alignment_authority=config.alignment_authority,
+            # V10.6.1: Clamp bounds for alignment modulator
+            alignment_clamp_min=config.alignment_clamp_min,
+            alignment_clamp_max=config.alignment_clamp_max,
         ).to(config.device)
 
     elif use_protected_phase:
@@ -8041,6 +8093,15 @@ Examples:
                              "0.0 = pure content matching (intent ignored), "
                              "0.1 = mild intent influence (recommended), "
                              "1.0 = strong intent influence.")
+    # V10.6.1: Clamp bounds for alignment modulator (ChatGPT caveat)
+    parser.add_argument("--alignment-clamp-min", type=float, default=0.8,
+                        help="Minimum value for alignment modulator clamp (default: 0.8). "
+                             "Prevents sustained JEPA/SRK misalignment from over-attenuating proposals. "
+                             "Lower values allow more attenuation.")
+    parser.add_argument("--alignment-clamp-max", type=float, default=1.2,
+                        help="Maximum value for alignment modulator clamp (default: 1.2). "
+                             "Prevents alignment agreement from over-amplifying proposals. "
+                             "Higher values allow more amplification.")
 
     # V10.4: Proposal Mode (Quad-as-Proposer, Phase-as-Integrator)
     parser.add_argument("--proposal-mode", action="store_true",
@@ -8293,6 +8354,8 @@ Examples:
         bounded_phase=args.bounded_phase,
         dual_channel_mode=args.dual_channel_mode,
         alignment_authority=args.alignment_authority,
+        alignment_clamp_min=args.alignment_clamp_min,
+        alignment_clamp_max=args.alignment_clamp_max,
         device=args.device,
     )
 
