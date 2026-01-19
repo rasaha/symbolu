@@ -4591,22 +4591,24 @@ class BindingCacheLMBlock(nn.Module):
     """
     Binding Cache block for Language Modeling.
 
-    V10.5.2 Cross-Attention Architecture:
-    1. Local: O(n*w) - Syntax attention, ALSO provides queries for quad
-    2. Phase: O(n) - Memory accumulation, provides keys/values for quad
-    3. Quad:  O(n*k) - Cross-attention from local (Q) into phase memory (K/V)
+    V10.5.3 Independent Paths Architecture (Option A):
+    1. Local: O(n*w) - Syntax attention (independent path)
+    2. Phase: O(n) - Pure memory bank (K/V for quad only)
+    3. Quad:  O(n*k) - Memory retriever (queries phase using raw x)
 
-    Key change from V10.0: Phase no longer contributes directly to output.
-    Quad is the SOLE interface to phase memory, forcing it to learn.
+    Key design: Local and Quad are INDEPENDENT paths, both operating on raw x.
+    Phase is a pure memory bank - it only provides K/V for quad, no direct output.
 
     Information flow:
-        local_out = local_attn(x)           # Syntax + queries
-        memory_state = phase_state(x)       # Semantic memory (K/V)
-        quad_out = quad_query(local_out, memory_state)  # Cross-attention
+        local_out = local_attn(x)           # Syntax (independent)
+        memory_state = phase_state(x)       # Memory bank
+        quad_out = quad_query(x, memory_state)  # Retrieval (independent)
         output = local_ratio * local_out + quad_ratio * quad_out
 
-    This fixes the quad gradient starvation problem (was 0.1% gradients)
-    where phase leaked full memory to output, making quad redundant.
+    Evolution:
+    - V10.0: Phase leaked to output, quad redundant (0.1% gradients)
+    - V10.5.2: Cross-attention (Q=local_out), still 0.1% gradients
+    - V10.5.3: Independent paths (Q=x), testing clean architecture
     """
 
     def __init__(
@@ -4689,57 +4691,54 @@ class BindingCacheLMBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Three-path forward pass with cross-attention architecture (V10.5.2).
+        Independent paths architecture (V10.5.3 - Option A).
 
-        V10.5.2 Change: Quad cross-attends from local_out into memory_state
-        - Q = local_out (syntax context)
-        - K/V = memory_state (semantic memory from phase)
-        - Removes direct phase_ratio * memory_state from output (was causing quad redundancy)
+        V10.5.3 Change: Clean independent paths design
+        - Local: syntax attention (independent path)
+        - Phase: pure memory bank (provides K/V for quad)
+        - Quad: memory retriever (queries phase using raw x, independent path)
 
-        This makes quad the SOLE interface to phase memory, forcing it to learn.
+        Key insight from V10.5.2: Cross-attention (Q=local_out) didn't help quad.
+        Window=8 diagnostic confirmed quad's 0.1% gradients is NOT due to local masking.
+        Option A tests if independent paths help quad optimization.
 
-        1. Local attention for syntax (provides queries)
-        2. Phase accumulates memory (provides keys/values)
-        3. Quad cross-attends: retrieves from memory using local context
+        Information flow:
+        1. Local: local_out = local_attn(x)     [O(n*w)] - syntax, independent
+        2. Phase: memory = phase_state(x)       [O(n)]   - memory bank
+        3. Quad:  quad_out = quad_query(x, memory) [O(n*k)] - retrieves from phase
 
-        Output = x + (local_ratio * local + quad_ratio * quad_out) + ff
-        Note: phase contributes ONLY via quad, not directly to output
+        Output = x + (local_ratio * local_out + quad_ratio * quad_out) + ff
+        Note: Local and Quad are INDEPENDENT paths operating on raw input x
         """
-        # Step 1: Local attention for syntax (the → cat patterns)
-        # This now serves dual purpose: syntax output AND query source for quad
+        # Step 1: Local attention for syntax (independent path)
         local_out = self.local_attn(x)
 
-        # Step 2: Phase accumulates memory state (keys/values for quad)
-        # Phase no longer contributes directly to output - only via quad retrieval
+        # Step 2: Phase accumulates memory state (pure memory bank for quad)
         memory_state = self.phase_state(x)
 
         if self.proposal_mode:
             # V10.4: Proposal Mode - quad proposes, phase integrates
-            # Check confidence for conditional skip
             confidence = self.phase_state.compute_confidence(memory_state)
 
             with torch.no_grad():
                 self._last_confidence_mean = confidence.mean().item()
                 self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
 
-            # V10.5.2: Get proposals using local_out as query source (cross-attention)
-            proposals, proposal_scores = self.quad_query.get_proposals(local_out, memory_state)
+            # V10.5.3: Get proposals using x as query source (independent from local)
+            proposals, proposal_scores = self.quad_query.get_proposals(x, memory_state)
 
             # Phase integrates proposals
             quad_out = self.phase_state.integrate_proposals(
-                local_out, memory_state, proposals, proposal_scores
+                x, memory_state, proposals, proposal_scores
             )
         else:
-            # V10.5.2: Quad cross-attends from local_out (Q) into memory_state (K/V)
-            # This replaces: quad_out = self.quad_query(x, memory_state)
-            quad_out = self.quad_query(local_out, memory_state)
+            # V10.5.3: Quad queries memory using raw x (independent from local)
+            quad_out = self.quad_query(x, memory_state)
 
-        # V10.5.2: Weighted combination WITHOUT direct phase contribution
-        # Phase contributes ONLY through quad's cross-attention retrieval
-        # This forces quad to be necessary (was getting 0.1% gradients before)
+        # V10.5.3: Independent paths combination
+        # Local and Quad operate independently on x, no serial dependency
         attn_out = (
             self.local_ratio * local_out +
-            # REMOVED: self.phase_ratio * memory_state  (was causing quad redundancy)
             self.quad_ratio * quad_out
         )
 
