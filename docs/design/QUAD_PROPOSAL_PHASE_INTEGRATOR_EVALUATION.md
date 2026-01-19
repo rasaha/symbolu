@@ -507,3 +507,236 @@ From the proposal:
 ---
 
 *Document prepared for architectural evaluation. Implementation deferred pending validation of current Protected Phase experiments.*
+
+---
+
+## Appendix D: ChatGPT Response to Gap Analysis (2026-01-19)
+
+**Context:** After Claude's evaluation identified several "gaps" in the implementation (interface/contract gaps vs conceptual flaws), ChatGPT provided this detailed response with direct answers and minimal paths to close the gaps.
+
+### D.1 OntoControl Struct: Do You Need It?
+
+**Answer: Not strictly.** The current `binding_salience` scalar is effectively an **OntoControl-lite**.
+
+#### When OntoControl is Worth Adding
+
+Add a formal `OntoControl` only if you want:
+- **(a)** Interpretability
+- **(b)** Consistent control-plane APIs across CSR/Kosha/Onto
+- **(c)** Dynamic routing at scale (larger models / multi-task)
+
+#### Minimal OntoControl That Matches Current Codebase
+
+You don't need full `type_logits` immediately. The minimal struct that closes most gaps is:
+
+| Field | Status | Notes |
+|-------|--------|-------|
+| `binding_salience` | Already exists | Core scalar control |
+| `enable_slots` | Derived | From salience + pattern detection |
+| `enable_quad` | Derived | From query marker / uncertainty |
+| `enable_csr` | Derived | From domain/type |
+| `quad_bias_mask` | Optional | Can be scalar bias rather than mask |
+| `budget_topk` | Optional | Dynamic K allocation |
+
+This preserves current flow and adds explicit control semantics.
+
+---
+
+### D.2 Dynamic Module Routing: Should Onto Gate BindingSlotCache?
+
+**Answer: Only partially.** Pattern detection (EQ_TOKEN) is a *ground-truth trigger*; Onto is an *inference trigger*.
+
+#### Correct Architecture
+
+| Path | Gating Strategy | Rationale |
+|------|-----------------|-----------|
+| **Write path** (binding formation) | Keep **hard trigger** based on EQ_TOKEN | Prevents false positives, keeps mechanism crisp |
+| **Read path** (retrieval) | Allow Onto/CSR to **bias or gate** | Controlled, debuggable retrieval activation |
+
+**Recommendation:**
+- **Don't replace** EQ_TOKEN-based writes with Onto gating
+- **Do add** `enable_slots_read` (or `slots_read_weight`) to make retrieval activation explicit and debuggable
+
+This is the best of both worlds: **deterministic writes + controlled reads**.
+
+---
+
+### D.3 CSR → Phase Coupling: Should CSR Modulate Phase Decay/Gain?
+
+**Answer: Not by default.** Current design—CSR gating at synthesis/output—is safer.
+
+#### Why "Not Implemented" Is Correct
+
+The intentional avoidance of letting CSR "touch the field dynamics" is a **good conservative choice**.
+
+#### When Dynamic γ/α Modulation Becomes Useful
+
+Only if you observe one of these:
+1. Phase health metrics degrade under safety constraints
+2. CSR gating causes "thrash" (oscillatory decisions)
+3. Model needs "rapid forgetting" under detected contamination (prompt injection / adversarial patterns)
+
+#### Minimal Safe CSR→Phase Modulation (If Needed Later)
+
+Do **not** let CSR modulate per-head learned timescales directly. Instead:
+- Keep learned γ as-is
+- Apply a small, clamped **global scalar** on integration strength:
+
+```python
+α_t = clamp(α_base * α_csr, α_min, α_max)
+```
+
+This keeps Phase stable and avoids hard-to-debug dynamics.
+
+**Priority Assessment:** LOW priority, unless diagnostics justify it.
+
+---
+
+### D.4 Failure Modes C and D: What Should You Do?
+
+#### Failure Mode C: "Onto Decides Content"
+
+Claude said "partial" because Onto biases TopK selection. That's fine **as long as it's routing/bias, not templating**.
+
+**Rule to Enforce:**
+> Onto may only affect *which memory/proposals are considered*, not *what tokens are output*.
+
+| If Onto does this... | Status |
+|---------------------|--------|
+| Influences logits directly | ⚠️ **DANGEROUS** |
+| Changes retrieval candidates / attention bias | ✅ **OK** |
+
+#### Failure Mode D: "Over-constraint Collapse"
+
+Treat this as **real risk** once you add more control signals.
+
+**Yes: Implement a min-gain clamp (or equivalent)**
+
+Even if untested, it's cheap and prevents degeneracy:
+
+```python
+phase_gain = clamp(phase_gain, g_min, g_max)
+# Same for any CSR damping multiplier
+```
+
+This is a **low-cost safety invariant**.
+
+---
+
+### D.5 No-Write Contracts: Should You Implement Assertions?
+
+**Answer: Yes.** This is the **highest value "gap fix."**
+
+#### What You Want to Prevent
+
+Anything that looks like **token-wise content** being injected into Phase control.
+
+#### What You Want to Allow
+
+Scalars or per-head/per-layer control:
+- `[layers, heads]`
+- `[batch, heads]`
+- `[heads]`
+- Broadcastable scalars
+
+#### The Contract in One Sentence
+
+> `intent_phase` (and any control) must be **low-dimensional, broadcastable, and not token-position dependent**.
+
+#### Specific Checks
+
+| Check | Pass Condition |
+|-------|----------------|
+| Sequence length dimension | Must NOT have |
+| `d_model` last dim | Must NOT have |
+| Shape compatibility | Must be broadcastable to `[B, H, 1, 1]`-like shapes |
+
+This is the single best way to make the **"Phase integrates influence, not structure"** principle enforceable.
+
+---
+
+### D.6 Test Priority Matrix
+
+Claude's test list is solid. Prioritize like this:
+
+#### HIGH Priority (Do These Now)
+
+| Test | Purpose |
+|------|---------|
+| **Leak detector test** | Assert control signals cannot be token-wise embeddings |
+| **AR regression** | Enable/disable Onto & CSR controls and verify AR accuracy does not collapse |
+
+#### MEDIUM Priority
+
+| Test | Purpose |
+|------|---------|
+| **WikiText2 sanity** | Confirm quad remains mostly dormant; measure quad utilization and gate distributions |
+
+#### OPTIONAL (After Formalization)
+
+| Test | Purpose |
+|------|---------|
+| OntoControl struct tests | Only after you formalize OntoControl |
+
+---
+
+### D.7 Current PoC Status Assessment
+
+#### What Can Be Claimed With Evidence
+
+| Status | Claim |
+|--------|-------|
+| ✅ | Quad proposals + Phase integrator works |
+| ✅ | Identity is isolated (BindingSlotCache) and retrieval is correct (96%+) |
+| ✅ | CSR/Kosha influence Phase through scalar control, not content injection |
+| ⚠️ | Control-plane API is implicit, not formalized (OntoControl/route flags) |
+| ⚠️ | No-write contracts are not enforced yet (but should be) |
+
+**Assessment:** This is a **strong PoC**. The remaining work is "make it unbreakable."
+
+---
+
+### D.8 Direct Answers Summary
+
+| Question | Answer |
+|----------|--------|
+| Do we need OntoControl? | Not yet; a minimal control struct later is enough |
+| Should Onto gate slots? | Gate slot *reads*; keep slot *writes* deterministic via EQ_TOKEN |
+| Should CSR modulate γ? | Only if diagnostics demand it; otherwise keep CSR at synthesis/output |
+| What's the top priority? | **Enforce no-write contracts + add regression tests** |
+
+---
+
+### D.9 Implementation Recommendations
+
+#### Immediate Actions (Gap Closure)
+
+1. **Add shape assertions for control signals**
+   ```python
+   def assert_control_shape(tensor, name):
+       """Enforce no-write contract: control must not be token-wise."""
+       assert tensor.dim() <= 3, f"{name} must be low-dimensional"
+       if tensor.dim() >= 2:
+           assert tensor.shape[-1] != d_model, f"{name} must not have d_model dim"
+       # Must not have sequence length dimension
+       assert all(d != seq_len for d in tensor.shape), f"{name} must not be token-position dependent"
+   ```
+
+2. **Add `enable_slots_read` control flag**
+   - Separate from write path (which stays deterministic)
+   - Allows Onto/CSR to gate retrieval without affecting storage
+
+3. **Add min-gain clamp as safety invariant**
+   ```python
+   phase_gain = torch.clamp(phase_gain, min=g_min, max=g_max)
+   ```
+
+#### Deferred Actions
+
+- Formal OntoControl struct (wait for multi-task/scaling needs)
+- CSR→Phase γ modulation (wait for diagnostic evidence)
+- Full type_logits implementation (not needed for current PoC)
+
+---
+
+*Appendix added 2026-01-19. Source: ChatGPT analysis of Claude evaluation gaps.*
