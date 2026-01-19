@@ -4321,6 +4321,33 @@ class BindingCachePhaseState(nn.Module):
             "r_k_max": self._last_r_k_max,
         }
 
+    def compute_confidence(self, memory_state: torch.Tensor) -> torch.Tensor:
+        """
+        Compute confidence score for proposal mode.
+
+        Higher confidence means phase state has strong, stable bindings.
+        Used in V10.4 proposal mode to decide whether to skip quad attention.
+
+        Args:
+            memory_state: [B, N, D] accumulated memory state
+
+        Returns:
+            confidence: [B, N] confidence scores in [0, 1]
+        """
+        # Confidence based on memory state magnitude (normalized)
+        # Higher magnitude = stronger bindings = higher confidence
+        mem_norm = torch.norm(memory_state, dim=-1)  # [B, N]
+
+        # Normalize to [0, 1] using sigmoid of z-scored values
+        mem_mean = mem_norm.mean(dim=-1, keepdim=True)
+        mem_std = mem_norm.std(dim=-1, keepdim=True) + 1e-6
+        z_scores = (mem_norm - mem_mean) / mem_std
+
+        # Sigmoid to get [0, 1] confidence
+        confidence = torch.sigmoid(z_scores)
+
+        return confidence
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Compute memory state via cumsum.
