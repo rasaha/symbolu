@@ -20,9 +20,10 @@ CRITICAL INVARIANTS TESTED:
 - INV-D6-3: Control signals must be broadcastable to control shapes
 - INV-D6-4: AR accuracy must not collapse when Onto/CSR enabled vs disabled
 - INV-D6-5: enable_slots_read=False must skip quad retrieval without affecting phase writes
+- INV-D6-6: s_align (alignment signal) must be [H] or [], NOT [B, N] (V10.6.3)
 
-Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.6
-Version: V10.6.2
+Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.6, D.10
+Version: V10.6.3
 """
 
 import pytest
@@ -39,6 +40,7 @@ from symbolu.phase_transformer import (
     assert_control_shape,
     validate_control_signals,
     ControlShapeViolation,
+    assert_alignment_signal_shape,  # V10.6.3: Stricter alignment signal validation
 )
 
 
@@ -104,6 +106,11 @@ def sample_inputs(model_config) -> Dict[str, torch.Tensor]:
         "valid_binding_salience": torch.randn(B, N),  # [B, N] - valid
         "invalid_intent_phase": torch.randn(B, N, D),  # [B, N, D] - INVALID
         "invalid_binding_salience": torch.randn(B, N, D),  # [B, N, D] - INVALID
+        # V10.6.3: Alignment signal samples (s_align)
+        "valid_s_align_global": torch.randn(()),  # [] - global scalar (safest)
+        "valid_s_align_per_head": torch.randn(H),  # [H] - per-head (recommended)
+        "valid_s_align_per_batch_head": torch.randn(B, H),  # [B, H] - per-batch per-head
+        "invalid_s_align_token_position": torch.randn(B, N),  # [B, N] - INVALID (token-dependent)
     }
 
 
@@ -260,6 +267,98 @@ class TestGroupA_LeakDetector:
         )
 
         assert result is True, f"Per-head control [H]={H} should be accepted"
+
+    # =========================================================================
+    # V10.6.3: ALIGNMENT SIGNAL TESTS (s_align)
+    # These test the stricter contract: s_align must be [H] or [], NOT [B, N]
+    # =========================================================================
+
+    def test_a11_valid_s_align_global_scalar(self, model_config, sample_inputs):
+        """V10.6.3: Global scalar [] alignment signal should be accepted (safest)."""
+        s_align = sample_inputs["valid_s_align_global"]
+        H = model_config["num_heads"]
+        N = 64  # From sample_inputs
+
+        result = assert_alignment_signal_shape(
+            s_align,
+            name="s_align",
+            num_heads=H,
+            seq_len=N,
+            strict=False,
+        )
+
+        assert result is True, f"Global scalar s_align [] should be accepted"
+
+    def test_a12_valid_s_align_per_head(self, model_config, sample_inputs):
+        """V10.6.3: Per-head [H] alignment signal should be accepted (recommended)."""
+        s_align = sample_inputs["valid_s_align_per_head"]
+        H = model_config["num_heads"]
+        N = 64
+
+        result = assert_alignment_signal_shape(
+            s_align,
+            name="s_align",
+            num_heads=H,
+            seq_len=N,
+            strict=False,
+        )
+
+        assert result is True, f"Per-head s_align [H]={H} should be accepted"
+
+    def test_a13_valid_s_align_per_batch_head(self, model_config, sample_inputs):
+        """V10.6.3: Per-batch per-head [B, H] alignment signal should be accepted."""
+        s_align = sample_inputs["valid_s_align_per_batch_head"]
+        H = model_config["num_heads"]
+        N = 64
+
+        result = assert_alignment_signal_shape(
+            s_align,
+            name="s_align",
+            num_heads=H,
+            seq_len=N,
+            strict=False,
+        )
+
+        assert result is True, f"Per-batch per-head s_align [B, H] should be accepted"
+
+    def test_a14_invalid_s_align_token_position_rejected(self, model_config, sample_inputs):
+        """V10.6.3 (INV-D6-6): s_align [B, N] must be REJECTED (token-position dependent)."""
+        s_align = sample_inputs["invalid_s_align_token_position"]
+        H = model_config["num_heads"]
+        N = 64
+
+        result = assert_alignment_signal_shape(
+            s_align,
+            name="s_align",
+            num_heads=H,
+            seq_len=N,
+            strict=False,
+        )
+
+        assert result is False, (
+            f"ALIGNMENT CONTRACT VIOLATION: s_align with shape [B, N]={list(s_align.shape)} "
+            f"was accepted but should be REJECTED. Token-position dependent alignment "
+            f"allows structure to leak into Phase!"
+        )
+
+    def test_a15_invalid_s_align_raises_strict(self, model_config, sample_inputs):
+        """V10.6.3: s_align [B, N] should raise ControlShapeViolation in strict mode."""
+        s_align = sample_inputs["invalid_s_align_token_position"]
+        H = model_config["num_heads"]
+        N = 64
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            assert_alignment_signal_shape(
+                s_align,
+                name="s_align",
+                num_heads=H,
+                seq_len=N,
+                strict=True,
+            )
+
+        error_msg = str(exc_info.value).lower()
+        assert "s_align" in error_msg or "alignment" in error_msg
+        assert "token" in error_msg or "[b, n]" in error_msg.lower()
 
 
 # =============================================================================

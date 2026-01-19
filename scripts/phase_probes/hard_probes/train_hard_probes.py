@@ -327,23 +327,26 @@ def validate_intent_phase_shapes(
         seq_len: Sequence length
         context: Description of where this is called from
 
-    Current Architecture Note:
-        Intent phases are [B, N, D] but they are:
-        1. Used ONLY to compute scalar alignment: s_align = cos(θ_JEPA - θ_SRK).mean(dim=-1)
-        2. The s_align is then [B, N] - still per-position but scalar per position
+    V10.6.3 Update (ChatGPT feedback):
+        The previous implementation computed s_align as [B, N] (token-position dependent),
+        which VIOLATES the no-write contract. Even a scalar per position allows:
+        - Alignment to suppress/amplify specific tokens
+        - Structure to leak into Phase
+        - Phase to become a soft attention map
+
+        CORRECTED architecture:
+        1. Intent phases are [B, N, D] - computed per-position for scoring
+        2. s_align is REDUCED to [H] or [] (NOT [B, N]):
+           - Option A (safest): s_align = cos(θ_diff).mean() → []
+           - Option B (recommended): s_align = cos(θ_diff).mean(dim=(0,1,3)) → [H]
         3. This modulates via: output * (1 + α * s_align) where α << 1
         4. The modulation is MULTIPLICATIVE on existing content, not additive injection
 
-        This is fundamentally different from "control decides content" because:
-        - Content comes from Phase memory / Quad proposals
-        - Intent only SCALES the integration, doesn't WRITE content
+        The key contract:
+        > Control signals may be scalar or per-head, but must NEVER vary across token positions.
     """
-    # For now, we document the contract rather than enforce strict shape
-    # because the current architecture intentionally uses per-position phases
-    # The protection is in HOW they're used (scalar modulation), not their shape
-
-    # Future: Could enforce that final s_align is scalar per position
-    # For now: Just document the architectural invariant
+    # V10.6.3: We now enforce that final s_align is NOT token-position dependent
+    # The protection is in the REDUCTION of intent phases to [H] or [], not their input shape
     pass
 
 
@@ -397,6 +400,13 @@ class Config:
     # Prevents over-constraint collapse from sustained JEPA/SRK misalignment
     alignment_clamp_min: float = 0.8  # Lower bound for (1 + α * s_align)
     alignment_clamp_max: float = 1.2  # Upper bound for (1 + α * s_align)
+
+    # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+    # s_align must be [H] or [], NOT [B, N] (token-position dependent)
+    alignment_reduction: str = "per_head"  # "per_head" (recommended), "global" (safest), "per_batch_head"
+
+    # V10.6.3: Contract enforcement mode
+    strict_control_contract: bool = True  # If True, raise exceptions; if False, warn and continue
 
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -4756,6 +4766,8 @@ class BindingCachePhaseState(nn.Module):
         alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
         alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound (ChatGPT caveat)
         alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound (ChatGPT caveat)
+        alignment_reduction: str = "per_head",  # V10.6.3: "per_head", "global", "per_batch_head"
+        strict_control_contract: bool = True,  # V10.6.3: Strict vs warn mode
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -4771,6 +4783,10 @@ class BindingCachePhaseState(nn.Module):
         # ChatGPT recommendation: sustained misalignment can attenuate proposals
         self.alignment_clamp_min = alignment_clamp_min
         self.alignment_clamp_max = alignment_clamp_max
+        # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+        # Must be "per_head" or "global", NOT [B, N] (removed)
+        self.alignment_reduction = alignment_reduction
+        self.strict_control_contract = strict_control_contract
 
         # Phase projections
         self.W_k_phase = nn.Linear(embed_dim, embed_dim)
@@ -4871,18 +4887,38 @@ class BindingCachePhaseState(nn.Module):
 
         return theta_jepa, theta_srk
 
-    def compute_alignment_score(self, theta_jepa: torch.Tensor, theta_srk: torch.Tensor) -> torch.Tensor:
+    def compute_alignment_score(
+        self,
+        theta_jepa: torch.Tensor,
+        theta_srk: torch.Tensor,
+        reduction: str = "per_head",
+    ) -> torch.Tensor:
         """
         V10.6: Compute intent alignment score.
+        V10.6.3: Updated to return [H] or [] instead of [B, N] (ChatGPT feedback).
 
         s_align = cos(θ_JEPA - θ_SRK)
+
+        CRITICAL CONTRACT (V10.6.3):
+            Control signals may be scalar or per-head, but must NEVER vary
+            across token positions. [B, N] is NOT allowed because:
+            - Token-wise scalar still leaks structure into Phase
+            - Allows alignment to suppress/amplify specific tokens
+            - Phase turns into a soft attention map
 
         Args:
             theta_jepa: [B, N, D] or [B, N, K, D] - query intent
             theta_srk: [B, N, D] or [B, N, K, D] - key intent
+            reduction: How to reduce the alignment:
+                - "per_head": [H] - per-head control (recommended)
+                - "global": [] - batch-level scalar (safest)
+                - "per_batch_head": [B, H] - per-batch, per-head
 
         Returns:
-            s_align: [B, N] or [B, N, K] - alignment scores in [-1, 1]
+            s_align: Shape depends on reduction mode:
+                - "per_head": [H]
+                - "global": []
+                - "per_batch_head": [B, H]
         """
         if theta_jepa is None or theta_srk is None:
             return None
@@ -4890,18 +4926,43 @@ class BindingCachePhaseState(nn.Module):
         # Intent difference
         theta_diff = theta_jepa - theta_srk
 
-        # Cosine over the last dimension
-        s_align = torch.cos(theta_diff).mean(dim=-1)  # Average over D
+        # Cosine over the last dimension, then reduce appropriately
+        # theta_diff: [B, N, D] → cos: [B, N, D]
+        cos_diff = torch.cos(theta_diff)
 
-        # V10.6.2: No-Write Contract validation
-        # s_align must be scalar per position [B, N] or [B, N, K], NOT [B, N, D]
-        # This ensures alignment only SCALES integration, doesn't INJECT content
-        assert_control_shape(
+        # Reshape to [B, N, H, D_h] for per-head reduction
+        B, N, D = cos_diff.shape
+        H = self.num_heads
+        D_h = D // H
+        cos_diff_heads = cos_diff.view(B, N, H, D_h)
+
+        if reduction == "global":
+            # Option A (ChatGPT): batch-level scalar (safest)
+            # Mean over all dimensions → []
+            s_align = cos_diff_heads.mean()
+        elif reduction == "per_head":
+            # Option B (ChatGPT): per-head control (recommended)
+            # Mean over batch, seq, head_dim → [H]
+            s_align = cos_diff_heads.mean(dim=(0, 1, 3))  # [H]
+        elif reduction == "per_batch_head":
+            # Variant: per-batch per-head
+            # Mean over seq, head_dim → [B, H]
+            s_align = cos_diff_heads.mean(dim=(1, 3))  # [B, H]
+        else:
+            raise ValueError(
+                f"Invalid reduction mode: {reduction}. "
+                f"Must be 'global', 'per_head', or 'per_batch_head'."
+            )
+
+        # V10.6.3: Validate that result is NOT token-position dependent
+        # This enforces the contract: control signals must never vary across tokens
+        from symbolu.phase_transformer import assert_alignment_signal_shape
+        assert_alignment_signal_shape(
             s_align,
             name="s_align (alignment score)",
-            d_model=self.embed_dim,
-            seq_len=None,  # seq_len dimension is OK for s_align
-            strict=True,
+            num_heads=self.num_heads,
+            seq_len=N,
+            strict=self.strict_control_contract,  # V10.6.3: Use configured mode
         )
 
         return s_align
@@ -4963,19 +5024,47 @@ class BindingCachePhaseState(nn.Module):
         weighted_proposals = (gate_weights.unsqueeze(-1) * proposals).sum(dim=2)  # [B, N, D]
 
         # V10.6: Dual-channel alignment modulation
+        # V10.6.3: s_align is now [H] or [] (NOT [B, N])
         if self.dual_channel_mode:
             theta_jepa, theta_srk = self.compute_intent_phases(x, memory_state)
-            s_align = self.compute_alignment_score(theta_jepa, theta_srk)
+            s_align = self.compute_alignment_score(
+                theta_jepa, theta_srk,
+                reduction=self.alignment_reduction,
+            )
 
             if s_align is not None:
                 # Track diagnostics
                 with torch.no_grad():
                     self._last_s_align_mean = s_align.mean().item()
-                    self._last_s_align_std = s_align.std().item()
+                    if s_align.numel() > 1:
+                        self._last_s_align_std = s_align.std().item()
+                    else:
+                        self._last_s_align_std = 0.0
 
-                # Modulate: weighted_proposals = weighted_proposals * (1 + α * s_align)
-                # s_align: [B, N], weighted_proposals: [B, N, D]
-                alignment_modulator = 1.0 + self.alignment_authority * s_align.unsqueeze(-1)
+                # V10.6.3: s_align is now [H] or [] (not [B, N])
+                # Reshape for broadcasting to [B, N, D]
+                # weighted_proposals: [B, N, D] where D = H * D_h
+                if s_align.dim() == 0:
+                    # Global scalar [] - broadcast to everything
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align
+                elif s_align.dim() == 1:
+                    # Per-head [H] - expand to [1, 1, H, 1] then reshape to [1, 1, D]
+                    H = s_align.shape[0]
+                    D_h = self.head_dim
+                    # Replicate each head value D_h times: [H] -> [1, 1, H*D_h]
+                    s_align_expanded = s_align.unsqueeze(0).unsqueeze(0)  # [1, 1, H]
+                    s_align_expanded = s_align_expanded.repeat(1, 1, D_h)  # [1, 1, H*D_h]
+                    # This broadcasts correctly: [1, 1, D] * [B, N, D] -> [B, N, D]
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align_expanded
+                elif s_align.dim() == 2:
+                    # Per-batch per-head [B, H] - expand to [B, 1, H*D_h]
+                    B_s, H = s_align.shape
+                    D_h = self.head_dim
+                    s_align_expanded = s_align.unsqueeze(1)  # [B, 1, H]
+                    s_align_expanded = s_align_expanded.repeat(1, 1, D_h)  # [B, 1, H*D_h]
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align_expanded
+                else:
+                    raise ValueError(f"Unexpected s_align shape: {s_align.shape}")
 
                 # V10.6.1: Clamp to prevent over-constraint collapse (ChatGPT caveat)
                 # Sustained JEPA/SRK misalignment can attenuate proposals and reduce
@@ -5492,6 +5581,8 @@ class BindingCacheLMBlock(nn.Module):
         alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
         alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound
         alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound
+        alignment_reduction: str = "per_head",  # V10.6.3: Alignment reduction mode
+        strict_control_contract: bool = True,  # V10.6.3: Strict vs warn mode
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -5504,6 +5595,9 @@ class BindingCacheLMBlock(nn.Module):
         # V10.6.1: Clamp bounds
         self.alignment_clamp_min = alignment_clamp_min
         self.alignment_clamp_max = alignment_clamp_max
+        # V10.6.3: Alignment reduction and strict mode
+        self.alignment_reduction = alignment_reduction
+        self.strict_control_contract = strict_control_contract
 
         # Store ratios for weighted combination
         self.local_ratio = local_ratio
@@ -8323,6 +8417,24 @@ Examples:
     parser.add_argument("--no-enforce-no-write-contracts", dest="enforce_no_write_contracts",
                         action="store_false",
                         help="Disable no-write contract assertions for performance.")
+    # V10.6.3: Strict vs Warn mode (ChatGPT recommendation)
+    parser.add_argument("--strict-control-contract", action="store_true", default=True,
+                        help="Raise exceptions on contract violations (default: True). "
+                             "In strict mode, violations stop execution immediately. "
+                             "Use --no-strict-control-contract for warn mode (log and continue).")
+    parser.add_argument("--no-strict-control-contract", dest="strict_control_contract",
+                        action="store_false",
+                        help="Use warn mode: log contract violations but continue execution. "
+                             "Useful for experiments that intentionally explore violations.")
+    # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+    parser.add_argument("--alignment-reduction", type=str, default="per_head",
+                        choices=["per_head", "global", "per_batch_head"],
+                        help="How to reduce alignment scores (default: per_head). "
+                             "per_head: [H] - per-head control (recommended). "
+                             "global: [] - batch-level scalar (safest). "
+                             "per_batch_head: [B, H] - per-batch per-head. "
+                             "NOTE: [B, N] is no longer supported as it violates "
+                             "the contract (token-position dependent).")
 
     # V10.4: Proposal Mode (Quad-as-Proposer, Phase-as-Integrator)
     parser.add_argument("--proposal-mode", action="store_true",
@@ -8584,6 +8696,8 @@ Examples:
         alignment_authority=args.alignment_authority,
         alignment_clamp_min=args.alignment_clamp_min,
         alignment_clamp_max=args.alignment_clamp_max,
+        alignment_reduction=args.alignment_reduction,  # V10.6.3
+        strict_control_contract=args.strict_control_contract,  # V10.6.3
         device=args.device,
     )
 

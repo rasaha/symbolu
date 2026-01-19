@@ -186,16 +186,27 @@ def assert_control_shape(
     > intent_phase (and any control) must be low-dimensional, broadcastable,
     > and not token-position dependent.
 
+    V10.6.3 Clarification (ChatGPT feedback):
+    > Control signals may be scalar or per-head, but must never vary across
+    > token positions (except binding_salience which is explicitly per-position gating).
+
     Valid control shapes:
     - [B, H] - batch × heads (most common for intent_phase)
     - [B, H, D_h] - batch × heads × head_dim (per-head rotation)
-    - [B, N] - batch × seq for per-position gating (binding_salience)
     - [H] or [D_h] - broadcast scalars
-    - [1] - single scalar
+    - [1] or [] - single scalar (safest for alignment control)
+
+    SPECIAL CASE - binding_salience only:
+    - [B, N] - batch × seq for per-position gating
+      NOTE: This is ONLY valid for binding_salience because it's a gating control
+      that explicitly needs per-position weighting. It is NOT valid for alignment
+      signals (s_align) which must be reduced to [H] or [] to prevent Phase from
+      becoming a token-conditioned workspace.
 
     Invalid shapes (content injection risk):
     - [B, N, D] - full embedding (could encode arbitrary content)
     - [B, N, H, D_h] - per-position per-head full embeddings
+    - [B, N] for alignment signals - token-position dependent (leaks structure into Phase)
 
     Args:
         tensor: Control signal tensor to validate
@@ -291,6 +302,99 @@ def validate_control_signals(
         else:
             results[name] = True  # None is always valid
     return results
+
+
+def assert_alignment_signal_shape(
+    tensor: torch.Tensor,
+    name: str,
+    num_heads: int,
+    seq_len: Optional[int] = None,
+    strict: bool = True,
+) -> bool:
+    """
+    V10.6.3 (ChatGPT feedback): Validate alignment signals are NOT token-position dependent.
+
+    Alignment signals (s_align) must be reduced to [H], [], or [B, H] shapes.
+    They must NEVER be [B, N] which allows alignment to sculpt Phase per token.
+
+    The Key Distinction:
+    > Control signals may be scalar or per-head, but must never vary across token positions.
+
+    Why [B, N] is dangerous for alignment (even though it looks harmless):
+    - Token-wise scalar still allows structure to leak into Phase
+    - Allows alignment to suppress/amplify *specific tokens*
+    - Phase turns into a soft attention map
+    - This reintroduces the failures that come from intent sneaking into Phase
+
+    Valid alignment shapes:
+    - [] - global scalar (safest)
+    - [H] - per-head control (recommended)
+    - [B, H] - batch × per-head control
+
+    Invalid alignment shapes:
+    - [B, N] - token-position dependent (scalar ≠ safe if it varies per token)
+    - [B, N, D] - full embedding
+
+    Args:
+        tensor: Alignment signal tensor to validate
+        name: Name for error messages
+        num_heads: Number of attention heads
+        seq_len: Sequence length (to detect [B, N] shapes)
+        strict: If True, raise exception; if False, return bool and warn
+
+    Returns:
+        True if valid, False if invalid (only when strict=False)
+
+    Raises:
+        ControlShapeViolation: If strict=True and shape violates contract
+    """
+    if tensor is None:
+        return True
+
+    violations = []
+
+    # Check 1: Reject any [B, N] shape for alignment
+    if tensor.dim() == 2:
+        B, N = tensor.shape
+        # If second dim matches seq_len or is not num_heads, it's likely [B, N]
+        if seq_len is not None and N == seq_len:
+            violations.append(
+                f"{name} has shape [B, N]={list(tensor.shape)} which is token-position dependent. "
+                f"Alignment signals must be [H], [], or [B, H], NOT [B, N]."
+            )
+        elif N != num_heads and N != 1:
+            # Heuristic: if N doesn't match num_heads, it's probably seq_len
+            violations.append(
+                f"{name} has shape {list(tensor.shape)} where dim 1 ({N}) doesn't match "
+                f"num_heads ({num_heads}). If this is [B, N], it violates the contract."
+            )
+
+    # Check 2: Reject [B, N, *] shapes (anything with token dimension)
+    if tensor.dim() >= 3 and seq_len is not None:
+        for i, dim_size in enumerate(tensor.shape):
+            if dim_size == seq_len and i > 0:  # Skip batch dim
+                violations.append(
+                    f"{name} has seq_len dimension at index {i}. "
+                    f"Alignment signals must not vary across token positions."
+                )
+
+    # Report violations
+    if violations:
+        error_msg = (
+            f"Alignment signal contract violation for '{name}' (V10.6.3):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+            + "\n\nCORRECT: Reduce alignment to [H] or [] before applying:\n"
+            "  Option A (safest):    s_align = cos(theta_diff).mean()           # []\n"
+            "  Option B (per-head):  s_align = cos(theta_diff).mean(dim=(0, 2)) # [H]"
+        )
+        if strict:
+            raise ControlShapeViolation(error_msg)
+        else:
+            import warnings
+            warnings.warn(error_msg, UserWarning)
+            return False
+
+    return True
 
 
 def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:

@@ -657,15 +657,29 @@ Scalars or per-head/per-layer control:
 
 > `intent_phase` (and any control) must be **low-dimensional, broadcastable, and not token-position dependent**.
 
-**Status: ✅ IMPLEMENTED (V10.6.2)**
+**Status: ✅ IMPLEMENTED (V10.6.2, UPDATED V10.6.3)**
+
+#### V10.6.3 Clarification
+
+> Control signals may be **scalar or per-head**, but must **never vary across token positions**.
+
+This means `[B, N]` (token-position scalar) is **INVALID for alignment signals** because:
+- Token-wise scalar still leaks structural information into Phase
+- Allows alignment to suppress/amplify specific tokens
+- Phase turns into a soft attention map
+
+**Exception:** `[B, N]` is **ONLY valid for `binding_salience`** which explicitly needs per-position gating.
+
+See **D.10** for full correction details and shape validation table.
 
 #### Specific Checks
 
 | Check | Pass Condition |
 |-------|----------------|
-| Sequence length dimension | Must NOT have |
+| Sequence length dimension | Must NOT have (except binding_salience) |
 | `d_model` last dim | Must NOT have |
 | Shape compatibility | Must be broadcastable to `[B, H, 1, 1]`-like shapes |
+| Alignment signals | Must be `[H]`, `[]`, or `[B, H]` - NOT `[B, N]` |
 
 This is the single best way to make the **"Phase integrates influence, not structure"** principle enforceable.
 
@@ -675,6 +689,7 @@ Shape assertion utilities added to `phase_transformer.py`:
 - `assert_control_shape()` - Validates individual control signals
 - `validate_control_signals()` - Validates multiple controls at once
 - `ControlShapeViolation` - Exception for strict mode violations
+- `assert_alignment_signal_shape()` - Validates alignment signals are NOT `[B, N]` (V10.6.3)
 
 ---
 
@@ -776,6 +791,87 @@ Claude's test list is solid. Prioritize like this:
 - Formal OntoControl struct (wait for multi-task/scaling needs)
 - CSR→Phase γ modulation (wait for diagnostic evidence)
 - Full type_logits implementation (not needed for current PoC)
+
+---
+
+### D.10 V10.6.3: Alignment Signal Shape Correction (ChatGPT Feedback)
+
+**Date:** 2026-01-19
+
+#### The Problem
+
+The V10.6.2 implementation had a subtle contract violation in the example code:
+
+```python
+# PREVIOUS (INCORRECT):
+s_align = cos(θ_JEPA - θ_SRK).mean(dim=-1)  # [B, N] - scalar per position
+phase_output = phase_output * (1 + α * s_align)
+```
+
+**Why `[B, N]` violates the contract:**
+
+Even though `[B, N]` looks like "just a scalar per position," it is **token-position dependent**:
+- ❌ Token-wise scalar still leaks structural information into Phase
+- ❌ Allows alignment to suppress/amplify *specific tokens*
+- ❌ Phase turns into a soft attention map
+- ❌ This reintroduces the failures from intent sneaking into Phase
+
+#### The Correction
+
+**The updated contract rule:**
+> Control signals may be scalar or per-head, but must **never vary across token positions**.
+
+**Correct implementation options:**
+
+| Option | Code | Shape | Description |
+|--------|------|-------|-------------|
+| A (safest) | `s_align = cos(θ_diff).mean()` | `[]` | Batch-level scalar |
+| B (recommended) | `s_align = cos(θ_diff).mean(dim=(0, 1, 3))` | `[H]` | Per-head control |
+| C | `s_align = cos(θ_diff).mean(dim=(1, 3))` | `[B, H]` | Per-batch per-head |
+
+#### Updated Shape Validation Table
+
+| Shape | Valid? | Reason |
+|-------|--------|--------|
+| `[]` | ✅ | Global scalar (safest) |
+| `[H]` | ✅ | Per-head control (recommended for alignment) |
+| `[B, H]` | ✅ | Per-batch per-head |
+| `[B, H, D_h]` | ✅ | Per-head rotation (for intent_phase) |
+| `[B, N]` | ⚠️ | **ONLY valid for `binding_salience`** (explicitly per-position gating) |
+| `[B, N]` | ❌ | **INVALID for `s_align`** (token-position dependent = leaks structure) |
+| `[B, N, D]` | ❌ | Full embedding (content injection) |
+| `[B, N, H, D_h]` | ❌ | Per-position per-head embeddings |
+
+#### Implementation Changes (V10.6.3)
+
+1. **`phase_transformer.py`**:
+   - Added `assert_alignment_signal_shape()` for stricter validation
+   - Updated contract docstrings to clarify `[B, N]` restrictions
+   - Added V10.6.3 clarification note
+
+2. **`train_hard_probes.py`**:
+   - Updated `compute_alignment_score()` to return `[H]` or `[]` (not `[B, N]`)
+   - Added `--alignment-reduction` flag: `per_head` (default), `global`, `per_batch_head`
+   - Added `--strict-control-contract` / `--no-strict-control-contract` flags
+   - Updated `integrate_proposals()` to handle new s_align shapes
+
+3. **Config additions**:
+   - `alignment_reduction: str = "per_head"`
+   - `strict_control_contract: bool = True`
+
+#### Status
+
+| Item | Status |
+|------|--------|
+| Contract documentation updated | ✅ V10.6.3 |
+| `compute_alignment_score()` fixed | ✅ V10.6.3 |
+| `assert_alignment_signal_shape()` added | ✅ V10.6.3 |
+| Strict vs warn mode flag | ✅ V10.6.3 |
+| Shape table updated | ✅ V10.6.3 |
+
+---
+
+*V10.6.3 update 2026-01-19. Source: ChatGPT feedback on alignment signal shape contract violation.*
 
 ---
 
