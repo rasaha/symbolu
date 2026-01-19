@@ -3703,6 +3703,11 @@ class AssociativeRecallDataset(Dataset):
 
     Local attention (window=64) CANNOT solve this when delay > window.
     Quad MUST retrieve from phase memory.
+
+    V10.5.8: Dynamic delay curriculum support
+    - dynamic_delay=True: Generate samples on-the-fly with current delay range
+    - set_delay_range(): Update delay range during training
+    - apply_curriculum(): Helper for progressive difficulty
     """
 
     def __init__(
@@ -3714,6 +3719,7 @@ class AssociativeRecallDataset(Dataset):
         seq_len: int = 256,
         vocab_size: int = 1000,
         seed: int = 42,
+        dynamic_delay: bool = False,  # V10.5.8: Generate on-the-fly for curriculum
     ):
         """
         Args:
@@ -3724,6 +3730,7 @@ class AssociativeRecallDataset(Dataset):
             seq_len: Total sequence length (padded/truncated)
             vocab_size: Size of vocabulary for keys and values
             seed: Random seed for reproducibility
+            dynamic_delay: If True, generate samples on-the-fly (enables curriculum)
         """
         super().__init__()
         self.num_samples = num_samples
@@ -3732,6 +3739,8 @@ class AssociativeRecallDataset(Dataset):
         self.delay_max = delay_max
         self.seq_len = seq_len
         self.vocab_size = vocab_size
+        self.dynamic_delay = dynamic_delay
+        self.seed = seed
 
         # Special tokens (reserved at end of vocab)
         self.PAD_TOKEN = vocab_size - 1
@@ -3743,10 +3752,58 @@ class AssociativeRecallDataset(Dataset):
         # Usable vocab for keys and values (first part of vocab)
         self.kv_vocab_size = vocab_size - 100
 
-        # Pre-generate all samples for efficiency
-        torch.manual_seed(seed)
-        self.samples = []
-        self._generate_samples()
+        # V10.5.8: Curriculum tracking
+        self._curriculum_step = 0
+        self._initial_delay_min = delay_min
+        self._initial_delay_max = delay_max
+
+        if dynamic_delay:
+            # On-the-fly generation - just set random state
+            self.rng = torch.Generator()
+            self.rng.manual_seed(seed)
+            self.samples = None  # Generated lazily
+        else:
+            # Pre-generate all samples for efficiency
+            torch.manual_seed(seed)
+            self.samples = []
+            self._generate_samples()
+
+    def set_delay_range(self, delay_min: int, delay_max: int):
+        """
+        V10.5.8: Update delay range for curriculum learning.
+
+        Call this during training to progressively increase difficulty.
+        Only works if dynamic_delay=True.
+
+        Args:
+            delay_min: New minimum delay
+            delay_max: New maximum delay
+        """
+        self.delay_min = delay_min
+        self.delay_max = delay_max
+
+    def apply_curriculum(self, progress: float, target_delay_min: int, target_delay_max: int):
+        """
+        V10.5.8: Apply curriculum based on training progress.
+
+        Linearly interpolates delay range from initial to target based on progress.
+
+        Args:
+            progress: Training progress [0, 1] (e.g., step / total_steps)
+            target_delay_min: Target minimum delay at progress=1.0
+            target_delay_max: Target maximum delay at progress=1.0
+
+        Returns:
+            Tuple of (current_delay_min, current_delay_max)
+        """
+        progress = min(1.0, max(0.0, progress))  # Clamp to [0, 1]
+
+        # Linear interpolation
+        new_delay_min = int(self._initial_delay_min + progress * (target_delay_min - self._initial_delay_min))
+        new_delay_max = int(self._initial_delay_max + progress * (target_delay_max - self._initial_delay_max))
+
+        self.set_delay_range(new_delay_min, new_delay_max)
+        return (new_delay_min, new_delay_max)
 
     def _generate_samples(self):
         """Pre-generate all samples."""
@@ -3824,8 +3881,15 @@ class AssociativeRecallDataset(Dataset):
         return self.num_samples
 
     def __getitem__(self, idx):
-        x, y, _ = self.samples[idx]
-        return x, y
+        # V10.5.8: Support dynamic generation for curriculum learning
+        if self.dynamic_delay or self.samples is None:
+            # Generate on-the-fly with current delay range
+            x, y, _ = self._generate_one_sample()
+            return x, y
+        else:
+            # Use pre-generated samples
+            x, y, _ = self.samples[idx]
+            return x, y
 
     def get_accuracy(self, model: nn.Module, device: torch.device, num_samples: int = 100) -> float:
         """
@@ -5878,11 +5942,24 @@ def train_real_language(
 
         print(f"  Vocabulary size: {ar_vocab_size}")
         print(f"  Key-value pairs: {ar_num_pairs}")
-        print(f"  Delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
+        print(f"  Initial delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
         print(f"  Local window: {getattr(args, 'local_window_size', 64)}")
         print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
         print(f"  Train samples: {ar_train_samples}")
         print(f"  Val samples: {ar_val_samples}")
+
+        # V10.5.8: Dynamic delay curriculum
+        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', False)
+        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 120)
+        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 200)
+        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.3)
+
+        if ar_dynamic_delay:
+            print(f"\n  ★ DYNAMIC DELAY CURRICULUM ENABLED (V10.5.8)")
+            print(f"    Initial: delay=[{ar_delay_min}, {ar_delay_max}]")
+            print(f"    Target:  delay=[{ar_target_delay_min}, {ar_target_delay_max}]")
+            print(f"    Warmup:  {ar_curriculum_warmup*100:.0f}% of training at initial delay")
+            print(f"    Formula: delay(t) = base + (t - warmup) * (target - base) / (1 - warmup)")
 
         train_dataset = AssociativeRecallDataset(
             num_samples=ar_train_samples,
@@ -5892,6 +5969,7 @@ def train_real_language(
             seq_len=args.seq_len,
             vocab_size=ar_vocab_size,
             seed=42,
+            dynamic_delay=ar_dynamic_delay,  # V10.5.8
         )
         val_dataset = AssociativeRecallDataset(
             num_samples=ar_val_samples,
@@ -5901,6 +5979,7 @@ def train_real_language(
             seq_len=args.seq_len,
             vocab_size=ar_vocab_size,
             seed=123,  # Different seed for validation
+            dynamic_delay=False,  # Validation uses fixed delays for fair comparison
         )
 
         ar_dataset = val_dataset  # For accuracy evaluation
@@ -6311,6 +6390,20 @@ def train_real_language(
     ppl_history = []  # Track PPL over time
 
     while step < config.num_steps:
+        # V10.5.8: Dynamic delay curriculum update
+        if use_associative_recall and ar_dynamic_delay and hasattr(train_dataset, 'set_delay_range'):
+            # Progress with warmup: stay at initial delay during warmup, then ramp
+            progress = step / config.num_steps
+            if progress < ar_curriculum_warmup:
+                # During warmup - use initial delays
+                pass
+            else:
+                # After warmup - linear ramp to target
+                ramp_progress = (progress - ar_curriculum_warmup) / (1.0 - ar_curriculum_warmup)
+                new_delay_min = int(ar_delay_min + ramp_progress * (ar_target_delay_min - ar_delay_min))
+                new_delay_max = int(ar_delay_max + ramp_progress * (ar_target_delay_max - ar_delay_max))
+                train_dataset.set_delay_range(new_delay_min, new_delay_max)
+
         try:
             x, y = next(train_iter)
         except StopIteration:
@@ -6408,6 +6501,11 @@ def train_real_language(
             elif use_deep_supervision:
                 # V10.5.1: Show main loss, PPL (from main loss), and deep loss separately
                 print(f"  Step {step:5d} | MainLoss: {avg_main_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {avg_deep_loss:.4f}")
+            elif use_associative_recall and ar_dynamic_delay:
+                # V10.5.8: Show delay curriculum progress
+                curr_delay_min = train_dataset.delay_min
+                curr_delay_max = train_dataset.delay_max
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Delay: [{curr_delay_min}, {curr_delay_max}]")
             else:
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
 
@@ -7878,6 +7976,17 @@ Examples:
                         help="Number of training samples for associative recall (default: 50000)")
     parser.add_argument("--ar-val-samples", type=int, default=2000,
                         help="Number of validation samples for associative recall (default: 2000)")
+
+    # V10.5.8: Dynamic delay curriculum
+    parser.add_argument("--ar-dynamic-delay", action="store_true",
+                        help="Enable dynamic delay curriculum. Starts with --ar-delay-min/max and "
+                             "progressively increases to --ar-target-delay-min/max over training.")
+    parser.add_argument("--ar-target-delay-min", type=int, default=120,
+                        help="Target minimum delay at end of training (default: 120)")
+    parser.add_argument("--ar-target-delay-max", type=int, default=200,
+                        help="Target maximum delay at end of training (default: 200)")
+    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.3,
+                        help="Fraction of training to stay at initial delay before ramping (default: 0.3)")
 
     # V10.5.7: Binding Slot Cache (explicit key-value memory)
     parser.add_argument("--binding-slots", type=int, default=0,
