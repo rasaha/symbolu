@@ -507,3 +507,372 @@ From the proposal:
 ---
 
 *Document prepared for architectural evaluation. Implementation deferred pending validation of current Protected Phase experiments.*
+
+---
+
+## Appendix D: ChatGPT Response to Gap Analysis (2026-01-19)
+
+**Context:** After Claude's evaluation identified several "gaps" in the implementation (interface/contract gaps vs conceptual flaws), ChatGPT provided this detailed response with direct answers and minimal paths to close the gaps.
+
+### D.1 OntoControl Struct: Do You Need It?
+
+**Answer: Not strictly.** The current `binding_salience` scalar is effectively an **OntoControl-lite**.
+
+#### When OntoControl is Worth Adding
+
+Add a formal `OntoControl` only if you want:
+- **(a)** Interpretability
+- **(b)** Consistent control-plane APIs across CSR/Kosha/Onto
+- **(c)** Dynamic routing at scale (larger models / multi-task)
+
+#### Minimal OntoControl That Matches Current Codebase
+
+You don't need full `type_logits` immediately. The minimal struct that closes most gaps is:
+
+| Field | Status | Notes |
+|-------|--------|-------|
+| `binding_salience` | Already exists | Core scalar control |
+| `enable_slots` | Derived | From salience + pattern detection |
+| `enable_quad` | Derived | From query marker / uncertainty |
+| `enable_csr` | Derived | From domain/type |
+| `quad_bias_mask` | Optional | Can be scalar bias rather than mask |
+| `budget_topk` | Optional | Dynamic K allocation |
+
+This preserves current flow and adds explicit control semantics.
+
+---
+
+### D.2 Dynamic Module Routing: Should Onto Gate BindingSlotCache?
+
+**Answer: Only partially.** Pattern detection (EQ_TOKEN) is a *ground-truth trigger*; Onto is an *inference trigger*.
+
+**Status: ✅ IMPLEMENTED (V10.6.2)**
+
+#### Correct Architecture
+
+| Path | Gating Strategy | Rationale |
+|------|-----------------|-----------|
+| **Write path** (binding formation) | Keep **hard trigger** based on EQ_TOKEN | Prevents false positives, keeps mechanism crisp |
+| **Read path** (retrieval) | Allow Onto/CSR to **bias or gate** | Controlled, debuggable retrieval activation |
+
+**Recommendation:**
+- **Don't replace** EQ_TOKEN-based writes with Onto gating
+- **Do add** `enable_slots_read` (or `slots_read_weight`) to make retrieval activation explicit and debuggable
+
+This is the best of both worlds: **deterministic writes + controlled reads**.
+
+#### V10.6.2 Implementation
+
+The `enable_slots_read` parameter has been added to:
+- `BindingCacheBlock.forward()` - Core block implementation
+- `BindingCacheTransformer.forward()` - Transformer wrapper
+- `BindingCacheTransformer.forward_hidden()` - Hidden state extraction
+
+When `enable_slots_read=False`:
+- Phase write path continues (accumulates memory state)
+- Quad read path is skipped (only local attention runs)
+- Allows Onto/CSR to gate retrieval without affecting storage
+
+---
+
+### D.3 CSR → Phase Coupling: Should CSR Modulate Phase Decay/Gain?
+
+**Answer: Not by default.** Current design—CSR gating at synthesis/output—is safer.
+
+#### Why "Not Implemented" Is Correct
+
+The intentional avoidance of letting CSR "touch the field dynamics" is a **good conservative choice**.
+
+#### When Dynamic γ/α Modulation Becomes Useful
+
+Only if you observe one of these:
+1. Phase health metrics degrade under safety constraints
+2. CSR gating causes "thrash" (oscillatory decisions)
+3. Model needs "rapid forgetting" under detected contamination (prompt injection / adversarial patterns)
+
+#### Minimal Safe CSR→Phase Modulation (If Needed Later)
+
+Do **not** let CSR modulate per-head learned timescales directly. Instead:
+- Keep learned γ as-is
+- Apply a small, clamped **global scalar** on integration strength:
+
+```python
+α_t = clamp(α_base * α_csr, α_min, α_max)
+```
+
+This keeps Phase stable and avoids hard-to-debug dynamics.
+
+**Priority Assessment:** LOW priority, unless diagnostics justify it.
+
+---
+
+### D.4 Failure Modes C and D: What Should You Do?
+
+#### Failure Mode C: "Onto Decides Content"
+
+Claude said "partial" because Onto biases TopK selection. That's fine **as long as it's routing/bias, not templating**.
+
+**Rule to Enforce:**
+> Onto may only affect *which memory/proposals are considered*, not *what tokens are output*.
+
+| If Onto does this... | Status |
+|---------------------|--------|
+| Influences logits directly | ⚠️ **DANGEROUS** |
+| Changes retrieval candidates / attention bias | ✅ **OK** |
+
+#### Failure Mode D: "Over-constraint Collapse"
+
+Treat this as **real risk** once you add more control signals.
+
+**Yes: Implement a min-gain clamp (or equivalent)**
+
+Even if untested, it's cheap and prevents degeneracy:
+
+```python
+phase_gain = clamp(phase_gain, g_min, g_max)
+# Same for any CSR damping multiplier
+```
+
+This is a **low-cost safety invariant**.
+
+---
+
+### D.5 No-Write Contracts: Should You Implement Assertions?
+
+**Answer: Yes.** This is the **highest value "gap fix."**
+
+#### What You Want to Prevent
+
+Anything that looks like **token-wise content** being injected into Phase control.
+
+#### What You Want to Allow
+
+Scalars or per-head/per-layer control:
+- `[layers, heads]`
+- `[batch, heads]`
+- `[heads]`
+- Broadcastable scalars
+
+#### The Contract in One Sentence
+
+> `intent_phase` (and any control) must be **low-dimensional, broadcastable, and not token-position dependent**.
+
+**Status: ✅ IMPLEMENTED (V10.6.2, UPDATED V10.6.3)**
+
+#### V10.6.3 Clarification
+
+> Control signals may be **scalar or per-head**, but must **never vary across token positions**.
+
+This means `[B, N]` (token-position scalar) is **INVALID for alignment signals** because:
+- Token-wise scalar still leaks structural information into Phase
+- Allows alignment to suppress/amplify specific tokens
+- Phase turns into a soft attention map
+
+**Exception:** `[B, N]` is **ONLY valid for `binding_salience`** which explicitly needs per-position gating.
+
+See **D.10** for full correction details and shape validation table.
+
+#### Specific Checks
+
+| Check | Pass Condition |
+|-------|----------------|
+| Sequence length dimension | Must NOT have (except binding_salience) |
+| `d_model` last dim | Must NOT have |
+| Shape compatibility | Must be broadcastable to `[B, H, 1, 1]`-like shapes |
+| Alignment signals | Must be `[H]`, `[]`, or `[B, H]` - NOT `[B, N]` |
+
+This is the single best way to make the **"Phase integrates influence, not structure"** principle enforceable.
+
+#### V10.6.2 Implementation
+
+Shape assertion utilities added to `phase_transformer.py`:
+- `assert_control_shape()` - Validates individual control signals
+- `validate_control_signals()` - Validates multiple controls at once
+- `ControlShapeViolation` - Exception for strict mode violations
+- `assert_alignment_signal_shape()` - Validates alignment signals are NOT `[B, N]` (V10.6.3)
+
+---
+
+### D.6 Test Priority Matrix
+
+**Status: ✅ IMPLEMENTED (V10.6.2)**
+
+Claude's test list is solid. Prioritize like this:
+
+#### HIGH Priority (Do These Now) - ✅ DONE
+
+| Test | Purpose | Status |
+|------|---------|--------|
+| **Leak detector test** | Assert control signals cannot be token-wise embeddings | ✅ `test_hard_probes_d6_control_plane.py` Group A |
+| **AR regression** | Enable/disable Onto & CSR controls and verify AR accuracy does not collapse | ✅ `test_hard_probes_d6_control_plane.py` Group B |
+
+#### MEDIUM Priority
+
+| Test | Purpose |
+|------|---------|
+| **WikiText2 sanity** | Confirm quad remains mostly dormant; measure quad utilization and gate distributions |
+
+#### OPTIONAL (After Formalization)
+
+| Test | Purpose |
+|------|---------|
+| OntoControl struct tests | Only after you formalize OntoControl |
+
+#### Additional D.2 Tests - ✅ DONE
+
+| Test | Purpose | Status |
+|------|---------|--------|
+| **enable_slots_read tests** | Verify read path gating works correctly | ✅ `test_hard_probes_d6_control_plane.py` Group C |
+
+---
+
+### D.7 Current PoC Status Assessment
+
+#### What Can Be Claimed With Evidence
+
+| Status | Claim |
+|--------|-------|
+| ✅ | Quad proposals + Phase integrator works |
+| ✅ | Identity is isolated (BindingSlotCache) and retrieval is correct (96%+) |
+| ✅ | CSR/Kosha influence Phase through scalar control, not content injection |
+| ✅ | Control-plane API explicit via `enable_slots_read` (V10.6.2 - D.2) |
+| ✅ | No-write contracts enforced via `assert_control_shape()` (V10.6.2 - D.5) |
+| ✅ | HIGH priority tests implemented (V10.6.2 - D.6) |
+
+**Assessment:** This is a **strong PoC** with **enforced invariants**. The remaining work is expanding test coverage.
+
+---
+
+### D.8 Direct Answers Summary
+
+| Question | Answer | Status |
+|----------|--------|--------|
+| Do we need OntoControl? | Not yet; a minimal control struct later is enough | Deferred |
+| Should Onto gate slots? | Gate slot *reads*; keep slot *writes* deterministic via EQ_TOKEN | ✅ V10.6.2 |
+| Should CSR modulate γ? | Only if diagnostics demand it; otherwise keep CSR at synthesis/output | Deferred |
+| What's the top priority? | **Enforce no-write contracts + add regression tests** | ✅ V10.6.2 |
+
+---
+
+### D.9 Implementation Recommendations
+
+#### Immediate Actions (Gap Closure) - ✅ COMPLETED V10.6.2
+
+1. **Add shape assertions for control signals** ✅
+   ```python
+   # Implemented in phase_transformer.py
+   def assert_control_shape(tensor, name, d_model, seq_len=None, strict=True):
+       """Enforce no-write contract: control must not be token-wise."""
+       # Checks: dim <= 4, no d_model last dim, no seq_len dim, no [B,N,D] shape
+       ...
+
+   def validate_control_signals(d_model, seq_len=None, strict=True, **controls):
+       """Validate multiple control signals at once."""
+       ...
+   ```
+
+2. **Add `enable_slots_read` control flag** ✅
+   - Added to `BindingCacheBlock.forward()`
+   - Added to `BindingCacheTransformer.forward()` and `forward_hidden()`
+   - Separate from write path (which stays deterministic)
+   - Allows Onto/CSR to gate retrieval without affecting storage
+
+3. **Add min-gain clamp as safety invariant** ✅
+   - Already present in alignment clamp (V10.6.1)
+
+4. **Add D.6 HIGH priority tests** ✅
+   - `tests/test_hard_probes_d6_control_plane.py`
+   - Group A: Leak detector tests (10 tests)
+   - Group B: AR regression tests (7 tests)
+   - Group C: enable_slots_read tests (6 tests)
+
+#### Deferred Actions
+
+- Formal OntoControl struct (wait for multi-task/scaling needs)
+- CSR→Phase γ modulation (wait for diagnostic evidence)
+- Full type_logits implementation (not needed for current PoC)
+
+---
+
+### D.10 V10.6.3: Alignment Signal Shape Correction (ChatGPT Feedback)
+
+**Date:** 2026-01-19
+
+#### The Problem
+
+The V10.6.2 implementation had a subtle contract violation in the example code:
+
+```python
+# PREVIOUS (INCORRECT):
+s_align = cos(θ_JEPA - θ_SRK).mean(dim=-1)  # [B, N] - scalar per position
+phase_output = phase_output * (1 + α * s_align)
+```
+
+**Why `[B, N]` violates the contract:**
+
+Even though `[B, N]` looks like "just a scalar per position," it is **token-position dependent**:
+- ❌ Token-wise scalar still leaks structural information into Phase
+- ❌ Allows alignment to suppress/amplify *specific tokens*
+- ❌ Phase turns into a soft attention map
+- ❌ This reintroduces the failures from intent sneaking into Phase
+
+#### The Correction
+
+**The updated contract rule:**
+> Control signals may be scalar or per-head, but must **never vary across token positions**.
+
+**Correct implementation options:**
+
+| Option | Code | Shape | Description |
+|--------|------|-------|-------------|
+| A (safest) | `s_align = cos(θ_diff).mean()` | `[]` | Batch-level scalar |
+| B (recommended) | `s_align = cos(θ_diff).mean(dim=(0, 1, 3))` | `[H]` | Per-head control |
+| C | `s_align = cos(θ_diff).mean(dim=(1, 3))` | `[B, H]` | Per-batch per-head |
+
+#### Updated Shape Validation Table
+
+| Shape | Valid? | Reason |
+|-------|--------|--------|
+| `[]` | ✅ | Global scalar (safest) |
+| `[H]` | ✅ | Per-head control (recommended for alignment) |
+| `[B, H]` | ✅ | Per-batch per-head |
+| `[B, H, D_h]` | ✅ | Per-head rotation (for intent_phase) |
+| `[B, N]` | ⚠️ | **ONLY valid for `binding_salience`** (explicitly per-position gating) |
+| `[B, N]` | ❌ | **INVALID for `s_align`** (token-position dependent = leaks structure) |
+| `[B, N, D]` | ❌ | Full embedding (content injection) |
+| `[B, N, H, D_h]` | ❌ | Per-position per-head embeddings |
+
+#### Implementation Changes (V10.6.3)
+
+1. **`phase_transformer.py`**:
+   - Added `assert_alignment_signal_shape()` for stricter validation
+   - Updated contract docstrings to clarify `[B, N]` restrictions
+   - Added V10.6.3 clarification note
+
+2. **`train_hard_probes.py`**:
+   - Updated `compute_alignment_score()` to return `[H]` or `[]` (not `[B, N]`)
+   - Added `--alignment-reduction` flag: `per_head` (default), `global`, `per_batch_head`
+   - Added `--strict-control-contract` / `--no-strict-control-contract` flags
+   - Updated `integrate_proposals()` to handle new s_align shapes
+
+3. **Config additions**:
+   - `alignment_reduction: str = "per_head"`
+   - `strict_control_contract: bool = True`
+
+#### Status
+
+| Item | Status |
+|------|--------|
+| Contract documentation updated | ✅ V10.6.3 |
+| `compute_alignment_score()` fixed | ✅ V10.6.3 |
+| `assert_alignment_signal_shape()` added | ✅ V10.6.3 |
+| Strict vs warn mode flag | ✅ V10.6.3 |
+| Shape table updated | ✅ V10.6.3 |
+
+---
+
+*V10.6.3 update 2026-01-19. Source: ChatGPT feedback on alignment signal shape contract violation.*
+
+---
+
+*Appendix added 2026-01-19. Source: ChatGPT analysis of Claude evaluation gaps.*

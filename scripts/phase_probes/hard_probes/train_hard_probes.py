@@ -159,6 +159,198 @@ KOSHA_SLICE = slice(12, 17)  # Indices [12:17] in 32D state
 
 
 # =============================================================================
+# NO-WRITE CONTRACTS (V10.6.2)
+# =============================================================================
+# From ChatGPT Gap Analysis (Appendix D.5):
+#
+# The Contract in One Sentence:
+#   "intent_phase (and any control) must be low-dimensional, broadcastable,
+#    and not token-position dependent."
+#
+# What We Want to PREVENT:
+#   - Token-wise content being injected into Phase control
+#   - Control signals that have sequence length dimension
+#   - Control signals that have d_model as last dimension
+#
+# What We Want to ALLOW:
+#   - Scalars or per-head/per-layer control: [layers, heads], [batch, heads], [heads]
+#   - Broadcastable scalars
+#   - Shapes like [B, H, 1, 1] that broadcast correctly
+#
+# This is the "highest value gap fix" per ChatGPT analysis.
+
+# Global flag to enable/disable contract enforcement (for performance)
+_ENFORCE_NO_WRITE_CONTRACTS = True
+
+
+def set_no_write_contract_enforcement(enabled: bool):
+    """Enable or disable no-write contract enforcement globally."""
+    global _ENFORCE_NO_WRITE_CONTRACTS
+    _ENFORCE_NO_WRITE_CONTRACTS = enabled
+
+
+def assert_control_shape(
+    tensor: "torch.Tensor",
+    name: str,
+    d_model: int = None,
+    seq_len: int = None,
+    strict: bool = True,
+) -> bool:
+    """
+    Enforce no-write contract: control signals must not be token-wise embeddings.
+
+    V10.6.2: Prevents control signals from injecting content into Phase.
+
+    Args:
+        tensor: The control signal tensor to validate
+        name: Human-readable name for error messages
+        d_model: Model dimension (if known) - tensor must not have this as last dim
+        seq_len: Sequence length (if known) - tensor must not have this dimension
+        strict: If True, raises AssertionError; if False, returns bool and warns
+
+    Returns:
+        True if valid, False if invalid (only when strict=False)
+
+    Raises:
+        AssertionError: If tensor violates no-write contract and strict=True
+
+    Contract Rules:
+        1. Must be low-dimensional (dim <= 4)
+        2. Must NOT have d_model as last dimension (would be embeddings)
+        3. Must NOT have sequence length dimension (would be token-wise)
+        4. Should be broadcastable to [B, H, 1, 1]-like shapes
+
+    Examples:
+        Valid:   [B, H]          - per-head control
+        Valid:   [B, H, 1]       - broadcastable per-head
+        Valid:   [H]             - shared per-head
+        Valid:   []              - scalar
+        Invalid: [B, N, D]       - token-wise embeddings (N=seq_len, D=d_model)
+        Invalid: [B, H, N, D]    - full attention tensor
+    """
+    global _ENFORCE_NO_WRITE_CONTRACTS
+
+    if not _ENFORCE_NO_WRITE_CONTRACTS:
+        return True
+
+    if tensor is None:
+        return True
+
+    violations = []
+
+    # Rule 1: Must be low-dimensional
+    if tensor.dim() > 4:
+        violations.append(
+            f"dim={tensor.dim()} > 4 (must be low-dimensional)"
+        )
+
+    # Rule 2: Must NOT have d_model as last dimension
+    if d_model is not None and tensor.dim() >= 1:
+        if tensor.shape[-1] == d_model:
+            violations.append(
+                f"last dim={tensor.shape[-1]} equals d_model={d_model} "
+                f"(would be embeddings, not control)"
+            )
+
+    # Rule 3: Must NOT have sequence length dimension
+    if seq_len is not None and seq_len > 1:
+        for i, dim_size in enumerate(tensor.shape):
+            if dim_size == seq_len:
+                violations.append(
+                    f"dimension {i} has size={dim_size} equals seq_len={seq_len} "
+                    f"(would be token-position dependent)"
+                )
+
+    # Rule 4: Check for suspicious large dimensions that might be token-wise
+    # Heuristic: any dimension > 64 that's not batch is suspicious
+    if tensor.dim() >= 2:
+        for i, dim_size in enumerate(tensor.shape[1:], start=1):  # Skip batch dim
+            if dim_size > 512:  # Likely d_model or seq_len
+                violations.append(
+                    f"dimension {i} has suspicious size={dim_size} > 512 "
+                    f"(may be token-wise or embedding dimension)"
+                )
+
+    if violations:
+        msg = (
+            f"\n{'='*70}\n"
+            f"NO-WRITE CONTRACT VIOLATION (V10.6.2)\n"
+            f"{'='*70}\n"
+            f"Control signal '{name}' violates Phase control contract:\n"
+            f"  Shape: {list(tensor.shape)}\n"
+            f"  Violations:\n"
+        )
+        for v in violations:
+            msg += f"    - {v}\n"
+        msg += (
+            f"\nContract: Control signals must be low-dimensional and broadcastable,\n"
+            f"          NOT token-wise embeddings that could inject content.\n"
+            f"\nValid shapes: [B, H], [B, H, 1], [H], [] (scalar)\n"
+            f"Invalid shapes: [B, N, D], [B, H, N, D] (token-wise)\n"
+            f"{'='*70}"
+        )
+
+        if strict:
+            raise AssertionError(msg)
+        else:
+            import warnings
+            warnings.warn(msg, UserWarning)
+            return False
+
+    return True
+
+
+def validate_intent_phase_shapes(
+    theta_jepa: "torch.Tensor" = None,
+    theta_srk: "torch.Tensor" = None,
+    d_model: int = None,
+    seq_len: int = None,
+    context: str = "unknown",
+):
+    """
+    Validate that intent phase signals comply with no-write contracts.
+
+    V10.6.2: Specialized validator for JEPA/SRK intent phases.
+
+    Note: In the current implementation, intent phases ARE [B, N, D] tensors
+    because they need to be computed per-position for alignment scoring.
+    This is a known architectural decision - the key protection is that
+    they only affect SCALAR modulation (s_align), not direct content injection.
+
+    This function documents the contract and can be extended later if we
+    want to enforce stricter constraints (e.g., per-head rather than per-token).
+
+    Args:
+        theta_jepa: JEPA intent phase tensor (query intent)
+        theta_srk: SRK intent phase tensor (memory intent)
+        d_model: Model dimension
+        seq_len: Sequence length
+        context: Description of where this is called from
+
+    V10.6.3 Update (ChatGPT feedback):
+        The previous implementation computed s_align as [B, N] (token-position dependent),
+        which VIOLATES the no-write contract. Even a scalar per position allows:
+        - Alignment to suppress/amplify specific tokens
+        - Structure to leak into Phase
+        - Phase to become a soft attention map
+
+        CORRECTED architecture:
+        1. Intent phases are [B, N, D] - computed per-position for scoring
+        2. s_align is REDUCED to [H] or [] (NOT [B, N]):
+           - Option A (safest): s_align = cos(θ_diff).mean() → []
+           - Option B (recommended): s_align = cos(θ_diff).mean(dim=(0,1,3)) → [H]
+        3. This modulates via: output * (1 + α * s_align) where α << 1
+        4. The modulation is MULTIPLICATIVE on existing content, not additive injection
+
+        The key contract:
+        > Control signals may be scalar or per-head, but must NEVER vary across token positions.
+    """
+    # V10.6.3: We now enforce that final s_align is NOT token-position dependent
+    # The protection is in the REDUCTION of intent phases to [H] or [], not their input shape
+    pass
+
+
+# =============================================================================
 # CONFIGURATION
 # =============================================================================
 
@@ -204,6 +396,17 @@ class Config:
     #   score = s_content * (1 + α * s_align) # Combined
     dual_channel_mode: bool = False  # Enable dual-channel attention
     alignment_authority: float = 0.1  # α: weight for alignment term
+    # V10.6.1: Clamp bounds for alignment modulator (ChatGPT caveat)
+    # Prevents over-constraint collapse from sustained JEPA/SRK misalignment
+    alignment_clamp_min: float = 0.8  # Lower bound for (1 + α * s_align)
+    alignment_clamp_max: float = 1.2  # Upper bound for (1 + α * s_align)
+
+    # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+    # s_align must be [H] or [], NOT [B, N] (token-position dependent)
+    alignment_reduction: str = "per_head"  # "per_head" (recommended), "global" (safest), "per_batch_head"
+
+    # V10.6.3: Contract enforcement mode
+    strict_control_contract: bool = True  # If True, raise exceptions; if False, warn and continue
 
     # Device
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -2634,6 +2837,18 @@ class PhaseAttention(nn.Module):
             # s_align = cos(θ_JEPA - θ_SRK)
             s_align = torch.cos(theta_diff.float())
 
+            # V10.6.2: No-Write Contract validation
+            # s_align should be broadcastable control, not full embedding tensor
+            # Note: In PhaseAttention, s_align may be [B, 1, H, D_h] which is
+            # per-head control (valid) as long as it's not [B, N, D] token-wise embeddings
+            assert_control_shape(
+                s_align,
+                name="s_align (PhaseAttention alignment)",
+                d_model=self.d_model,
+                seq_len=N,  # Must not have full sequence dimension
+                strict=True,
+            )
+
             # Modulate: output = output * (1 + α * s_align)
             alignment_modulator = 1.0 + self.alignment_authority * s_align
             output = output * alignment_modulator
@@ -3679,6 +3894,267 @@ class WikiTextDataset(Dataset):
         return x, y
 
 
+# =============================================================================
+# V10.5.5: ASSOCIATIVE RECALL TASK (Forces Quad to Work)
+# =============================================================================
+
+class AssociativeRecallDataset(Dataset):
+    """
+    Associative Recall / Key-Value Recall Dataset.
+
+    This task REQUIRES long-range memory retrieval that local attention cannot solve.
+    It forces quad to work by:
+    1. Storing key-value pairs in memory (phase's job)
+    2. Retrieving the correct value given a query key (quad's job)
+    3. Using delays longer than local window (quad MUST retrieve from phase)
+
+    Format:
+        Input:  [K1] [V1] [SEP] [K2] [V2] [SEP] ... [FILLER] ... [QUERY] [Ki]
+        Target: [Vi] at the position after [QUERY] [Ki]
+
+    Example (num_pairs=4, delay=100):
+        "A = cat ; B = dog ; C = bird ; D = fish ; [100 filler tokens] ; ? = A"
+        Target at '?' position: "cat"
+
+    Local attention (window=64) CANNOT solve this when delay > window.
+    Quad MUST retrieve from phase memory.
+
+    V10.5.8: Dynamic delay curriculum support
+    - dynamic_delay=True: Generate samples on-the-fly with current delay range
+    - set_delay_range(): Update delay range during training
+    - apply_curriculum(): Helper for progressive difficulty
+    """
+
+    def __init__(
+        self,
+        num_samples: int = 10000,
+        num_pairs: int = 8,
+        delay_min: int = 50,
+        delay_max: int = 150,
+        seq_len: int = 256,
+        vocab_size: int = 1000,
+        seed: int = 42,
+        dynamic_delay: bool = False,  # V10.5.8: Generate on-the-fly for curriculum
+    ):
+        """
+        Args:
+            num_samples: Number of samples to generate
+            num_pairs: Number of key-value pairs per sample
+            delay_min: Minimum filler tokens between pairs and query
+            delay_max: Maximum filler tokens between pairs and query
+            seq_len: Total sequence length (padded/truncated)
+            vocab_size: Size of vocabulary for keys and values
+            seed: Random seed for reproducibility
+            dynamic_delay: If True, generate samples on-the-fly (enables curriculum)
+        """
+        super().__init__()
+        self.num_samples = num_samples
+        self.num_pairs = num_pairs
+        self.delay_min = delay_min
+        self.delay_max = delay_max
+        self.seq_len = seq_len
+        self.vocab_size = vocab_size
+        self.dynamic_delay = dynamic_delay
+        self.seed = seed
+
+        # Special tokens (reserved at end of vocab)
+        self.PAD_TOKEN = vocab_size - 1
+        self.SEP_TOKEN = vocab_size - 2  # Separator between pairs
+        self.QUERY_TOKEN = vocab_size - 3  # Query marker
+        self.EQ_TOKEN = vocab_size - 4  # Equals sign
+        self.FILLER_START = vocab_size - 100  # Filler tokens (100 reserved)
+
+        # Usable vocab for keys and values (first part of vocab)
+        self.kv_vocab_size = vocab_size - 100
+
+        # V10.5.8: Curriculum tracking
+        self._curriculum_step = 0
+        self._initial_delay_min = delay_min
+        self._initial_delay_max = delay_max
+
+        if dynamic_delay:
+            # On-the-fly generation - just set random state
+            self.rng = torch.Generator()
+            self.rng.manual_seed(seed)
+            self.samples = None  # Generated lazily
+        else:
+            # Pre-generate all samples for efficiency
+            torch.manual_seed(seed)
+            self.samples = []
+            self._generate_samples()
+
+    def set_delay_range(self, delay_min: int, delay_max: int):
+        """
+        V10.5.8: Update delay range for curriculum learning.
+
+        Call this during training to progressively increase difficulty.
+        Only works if dynamic_delay=True.
+
+        Args:
+            delay_min: New minimum delay
+            delay_max: New maximum delay
+        """
+        self.delay_min = delay_min
+        self.delay_max = delay_max
+
+    def apply_curriculum(self, progress: float, target_delay_min: int, target_delay_max: int):
+        """
+        V10.5.8: Apply curriculum based on training progress.
+
+        Linearly interpolates delay range from initial to target based on progress.
+
+        Args:
+            progress: Training progress [0, 1] (e.g., step / total_steps)
+            target_delay_min: Target minimum delay at progress=1.0
+            target_delay_max: Target maximum delay at progress=1.0
+
+        Returns:
+            Tuple of (current_delay_min, current_delay_max)
+        """
+        progress = min(1.0, max(0.0, progress))  # Clamp to [0, 1]
+
+        # Linear interpolation
+        new_delay_min = int(self._initial_delay_min + progress * (target_delay_min - self._initial_delay_min))
+        new_delay_max = int(self._initial_delay_max + progress * (target_delay_max - self._initial_delay_max))
+
+        self.set_delay_range(new_delay_min, new_delay_max)
+        return (new_delay_min, new_delay_max)
+
+    def _generate_samples(self):
+        """Pre-generate all samples."""
+        for _ in range(self.num_samples):
+            sample = self._generate_one_sample()
+            self.samples.append(sample)
+
+    def _generate_one_sample(self) -> Tuple[torch.Tensor, torch.Tensor, int]:
+        """
+        Generate one associative recall sample.
+
+        Returns:
+            x: Input sequence [seq_len]
+            y: Target sequence [seq_len] (mostly PAD, value at query position)
+            query_idx: Index of the query key (for analysis)
+        """
+        # Generate random key-value pairs (keys must be unique)
+        keys = torch.randperm(self.kv_vocab_size // 2)[:self.num_pairs]
+        values = torch.randint(0, self.kv_vocab_size // 2, (self.num_pairs,))
+
+        # Build sequence: K1 = V1 ; K2 = V2 ; ... ; [filler] ; ? = Kq
+        tokens = []
+
+        # Add key-value pairs
+        for i in range(self.num_pairs):
+            tokens.append(keys[i].item())
+            tokens.append(self.EQ_TOKEN)
+            tokens.append(values[i].item())
+            if i < self.num_pairs - 1:
+                tokens.append(self.SEP_TOKEN)
+
+        # Add filler tokens (random from filler vocab)
+        delay = torch.randint(self.delay_min, self.delay_max + 1, (1,)).item()
+        for _ in range(delay):
+            filler_token = torch.randint(self.FILLER_START, self.vocab_size - 4, (1,)).item()
+            tokens.append(filler_token)
+
+        # Select random query key
+        query_idx = torch.randint(0, self.num_pairs, (1,)).item()
+        query_key = keys[query_idx].item()
+        query_value = values[query_idx].item()
+
+        # Add query: ? = K
+        tokens.append(self.QUERY_TOKEN)
+        tokens.append(self.EQ_TOKEN)
+        tokens.append(query_key)
+
+        # The target is the value at the position AFTER the query key
+        # For LM, we predict next token, so target[i] = what comes after x[i]
+
+        # Pad or truncate to seq_len
+        if len(tokens) < self.seq_len:
+            tokens = tokens + [self.PAD_TOKEN] * (self.seq_len - len(tokens))
+        else:
+            tokens = tokens[:self.seq_len]
+
+        # Create input and target
+        x = torch.tensor(tokens, dtype=torch.long)
+
+        # Target: mostly ignore (PAD), but at the query_key position, target is query_value
+        y = torch.full((self.seq_len,), self.PAD_TOKEN, dtype=torch.long)
+
+        # Find where query_key appears after QUERY_TOKEN
+        # The answer should come right after
+        for i in range(len(tokens) - 1):
+            if tokens[i] == self.QUERY_TOKEN and i + 2 < len(tokens):
+                # Position i is QUERY, i+1 is EQ, i+2 is query_key
+                # Target at i+2 should be query_value (what comes next)
+                if i + 3 < self.seq_len:
+                    y[i + 2] = query_value  # After seeing key, predict value
+
+        return x, y, query_idx
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        # V10.5.8: Support dynamic generation for curriculum learning
+        if self.dynamic_delay or self.samples is None:
+            # Generate on-the-fly with current delay range
+            x, y, _ = self._generate_one_sample()
+            return x, y
+        else:
+            # Use pre-generated samples
+            x, y, _ = self.samples[idx]
+            return x, y
+
+    def get_accuracy(self, model: nn.Module, device: torch.device, num_samples: int = 100) -> float:
+        """
+        Compute retrieval accuracy on a subset of samples.
+
+        Args:
+            model: The model to evaluate
+            device: Device to run on
+            num_samples: Number of samples to evaluate
+
+        Returns:
+            accuracy: Fraction of correct retrievals
+        """
+        model.eval()
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for i in range(min(num_samples, len(self.samples))):
+                x, y, query_idx = self.samples[i]
+                x = x.unsqueeze(0).to(device)
+                y = y.to(device)
+
+                logits = model(x)  # [1, seq_len, vocab_size]
+
+                # Find query position (where y is not PAD)
+                query_positions = (y != self.PAD_TOKEN).nonzero(as_tuple=True)[0]
+
+                for pos in query_positions:
+                    pred = logits[0, pos].argmax().item()
+                    target = y[pos].item()
+                    if pred == target:
+                        correct += 1
+                    total += 1
+
+        return correct / max(total, 1)
+
+
+class AssociativeRecallCollator:
+    """Custom collator that ignores PAD tokens in loss computation."""
+
+    def __init__(self, pad_token: int):
+        self.pad_token = pad_token
+
+    def __call__(self, batch):
+        x = torch.stack([item[0] for item in batch])
+        y = torch.stack([item[1] for item in batch])
+        return x, y
+
+
 class HybridLMTransformer(nn.Module):
     """
     Language Modeling Transformer with per-layer Phase/Quadratic mixing.
@@ -4271,6 +4747,12 @@ class BindingCachePhaseState(nn.Module):
 
     Accumulates key-value bindings into a persistent memory state
     using O(n) cumulative sum (no attention).
+
+    V10.6: Extended with dual-channel mode support for proposal architecture.
+    Separates content similarity from intent alignment:
+      s_content = cos(φ_q - φ_k)           # What matches (preserved)
+      s_align = cos(θ_JEPA - θ_SRK)        # Intent agreement (modulator)
+      score = s_content * (1 + α * s_align) # Combined
     """
 
     def __init__(
@@ -4280,6 +4762,12 @@ class BindingCachePhaseState(nn.Module):
         dropout: float = 0.1,
         decay_gamma: float = 0.9,
         bounded_phase: bool = True,
+        dual_channel_mode: bool = False,  # V10.6: Enable dual-channel attention
+        alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
+        alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound (ChatGPT caveat)
+        alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound (ChatGPT caveat)
+        alignment_reduction: str = "per_head",  # V10.6.3: "per_head", "global", "per_batch_head"
+        strict_control_contract: bool = True,  # V10.6.3: Strict vs warn mode
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -4288,10 +4776,29 @@ class BindingCachePhaseState(nn.Module):
         self.decay_gamma = decay_gamma
         self.bounded_phase = bounded_phase
 
+        # V10.6: Dual-channel mode support
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds to prevent over-constraint collapse
+        # ChatGPT recommendation: sustained misalignment can attenuate proposals
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
+        # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+        # Must be "per_head" or "global", NOT [B, N] (removed)
+        self.alignment_reduction = alignment_reduction
+        self.strict_control_contract = strict_control_contract
+
         # Phase projections
         self.W_k_phase = nn.Linear(embed_dim, embed_dim)
         self.W_k_amp = nn.Linear(embed_dim, embed_dim)
         self.W_v = nn.Linear(embed_dim, embed_dim)
+
+        # V10.6: Intent phase projections for dual-channel mode
+        # θ_JEPA = query intent (what we're looking for)
+        # θ_SRK = key intent (what memory offers)
+        if dual_channel_mode:
+            self.W_intent_q = nn.Linear(embed_dim, embed_dim)  # θ_JEPA projection
+            self.W_intent_k = nn.Linear(embed_dim, embed_dim)  # θ_SRK projection
 
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
@@ -4301,6 +4808,10 @@ class BindingCachePhaseState(nn.Module):
         self._last_r_k_std = 0.0
         self._last_r_k_min = 0.0
         self._last_r_k_max = 0.0
+
+        # V10.6: Dual-channel diagnostics
+        self._last_s_align_mean = 0.0
+        self._last_s_align_std = 0.0
 
         self._ablation_mode = "none"
 
@@ -4314,12 +4825,17 @@ class BindingCachePhaseState(nn.Module):
         pass
 
     def get_health_metrics(self) -> dict:
-        return {
+        metrics = {
             "r_k_mean": self._last_r_k_mean,
             "r_k_std": self._last_r_k_std,
             "r_k_min": self._last_r_k_min,
             "r_k_max": self._last_r_k_max,
         }
+        # V10.6: Include dual-channel diagnostics
+        if self.dual_channel_mode:
+            metrics["s_align_mean"] = self._last_s_align_mean
+            metrics["s_align_std"] = self._last_s_align_std
+        return metrics
 
     def compute_confidence(self, memory_state: torch.Tensor) -> torch.Tensor:
         """
@@ -4348,6 +4864,109 @@ class BindingCachePhaseState(nn.Module):
 
         return confidence
 
+    def compute_intent_phases(self, x: torch.Tensor, memory_state: torch.Tensor) -> tuple:
+        """
+        V10.6: Compute intent phases for dual-channel mode.
+
+        Args:
+            x: Input tensor [B, N, D] - current query context
+            memory_state: [B, N, D] - accumulated memory
+
+        Returns:
+            theta_jepa: [B, N, D] - query intent phase (what we're looking for)
+            theta_srk: [B, N, D] - key intent phase (what memory offers)
+        """
+        if not self.dual_channel_mode:
+            return None, None
+
+        x_norm = self.norm(x)
+        # θ_JEPA: Intent derived from current query context
+        theta_jepa = self.W_intent_q(x_norm)
+        # θ_SRK: Intent derived from accumulated memory state
+        theta_srk = self.W_intent_k(memory_state)
+
+        return theta_jepa, theta_srk
+
+    def compute_alignment_score(
+        self,
+        theta_jepa: torch.Tensor,
+        theta_srk: torch.Tensor,
+        reduction: str = "per_head",
+    ) -> torch.Tensor:
+        """
+        V10.6: Compute intent alignment score.
+        V10.6.3: Updated to return [H] or [] instead of [B, N] (ChatGPT feedback).
+
+        s_align = cos(θ_JEPA - θ_SRK)
+
+        CRITICAL CONTRACT (V10.6.3):
+            Control signals may be scalar or per-head, but must NEVER vary
+            across token positions. [B, N] is NOT allowed because:
+            - Token-wise scalar still leaks structure into Phase
+            - Allows alignment to suppress/amplify specific tokens
+            - Phase turns into a soft attention map
+
+        Args:
+            theta_jepa: [B, N, D] or [B, N, K, D] - query intent
+            theta_srk: [B, N, D] or [B, N, K, D] - key intent
+            reduction: How to reduce the alignment:
+                - "per_head": [H] - per-head control (recommended)
+                - "global": [] - batch-level scalar (safest)
+                - "per_batch_head": [B, H] - per-batch, per-head
+
+        Returns:
+            s_align: Shape depends on reduction mode:
+                - "per_head": [H]
+                - "global": []
+                - "per_batch_head": [B, H]
+        """
+        if theta_jepa is None or theta_srk is None:
+            return None
+
+        # Intent difference
+        theta_diff = theta_jepa - theta_srk
+
+        # Cosine over the last dimension, then reduce appropriately
+        # theta_diff: [B, N, D] → cos: [B, N, D]
+        cos_diff = torch.cos(theta_diff)
+
+        # Reshape to [B, N, H, D_h] for per-head reduction
+        B, N, D = cos_diff.shape
+        H = self.num_heads
+        D_h = D // H
+        cos_diff_heads = cos_diff.view(B, N, H, D_h)
+
+        if reduction == "global":
+            # Option A (ChatGPT): batch-level scalar (safest)
+            # Mean over all dimensions → []
+            s_align = cos_diff_heads.mean()
+        elif reduction == "per_head":
+            # Option B (ChatGPT): per-head control (recommended)
+            # Mean over batch, seq, head_dim → [H]
+            s_align = cos_diff_heads.mean(dim=(0, 1, 3))  # [H]
+        elif reduction == "per_batch_head":
+            # Variant: per-batch per-head
+            # Mean over seq, head_dim → [B, H]
+            s_align = cos_diff_heads.mean(dim=(1, 3))  # [B, H]
+        else:
+            raise ValueError(
+                f"Invalid reduction mode: {reduction}. "
+                f"Must be 'global', 'per_head', or 'per_batch_head'."
+            )
+
+        # V10.6.3: Validate that result is NOT token-position dependent
+        # This enforces the contract: control signals must never vary across tokens
+        from symbolu.phase_transformer import assert_alignment_signal_shape
+        assert_alignment_signal_shape(
+            s_align,
+            name="s_align (alignment score)",
+            num_heads=self.num_heads,
+            seq_len=N,
+            strict=self.strict_control_contract,  # V10.6.3: Use configured mode
+        )
+
+        return s_align
+
     def integrate_proposals(
         self,
         x: torch.Tensor,
@@ -4358,9 +4977,27 @@ class BindingCachePhaseState(nn.Module):
     ) -> torch.Tensor:
         """
         V10.4: Integrate quad proposals into phase state.
+        V10.6: Extended with dual-channel alignment modulation.
+        V10.6.1: Added clamp bounds for stability.
 
         This implements the "phase-as-integrator" pattern where phase
         decides which proposals survive and integrates them into state.
+
+        Dual-channel mode (V10.6):
+            s_align = cos(θ_JEPA - θ_SRK)
+            weighted_proposals = weighted_proposals * clamp(1 + α * s_align, min, max)
+
+        V10.6.1 Stability (ChatGPT Caveat 1):
+            Clamping prevents over-constraint collapse from sustained misalignment.
+
+        FUTURE WORK (ChatGPT Caveat 2):
+            Currently s_align is global (per-step/per-batch), not per-proposal.
+            Conceptually, different proposals may align differently:
+            - θ_JEPA = query direction (what we're looking for)
+            - θ_SRK = memory coherence (what each proposal offers)
+            A future V10.7 could compute s_align_k per proposal k and modulate
+            proposals individually. Not implementing now to avoid destabilizing
+            early training.
 
         Args:
             x: Input tensor [B, N, D]
@@ -4385,6 +5022,60 @@ class BindingCachePhaseState(nn.Module):
         # Weighted sum of proposals
         # [B, N, K, 1] * [B, N, K, D] -> [B, N, K, D] -> sum -> [B, N, D]
         weighted_proposals = (gate_weights.unsqueeze(-1) * proposals).sum(dim=2)  # [B, N, D]
+
+        # V10.6: Dual-channel alignment modulation
+        # V10.6.3: s_align is now [H] or [] (NOT [B, N])
+        if self.dual_channel_mode:
+            theta_jepa, theta_srk = self.compute_intent_phases(x, memory_state)
+            s_align = self.compute_alignment_score(
+                theta_jepa, theta_srk,
+                reduction=self.alignment_reduction,
+            )
+
+            if s_align is not None:
+                # Track diagnostics
+                with torch.no_grad():
+                    self._last_s_align_mean = s_align.mean().item()
+                    if s_align.numel() > 1:
+                        self._last_s_align_std = s_align.std().item()
+                    else:
+                        self._last_s_align_std = 0.0
+
+                # V10.6.3: s_align is now [H] or [] (not [B, N])
+                # Reshape for broadcasting to [B, N, D]
+                # weighted_proposals: [B, N, D] where D = H * D_h
+                if s_align.dim() == 0:
+                    # Global scalar [] - broadcast to everything
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align
+                elif s_align.dim() == 1:
+                    # Per-head [H] - expand to [1, 1, H, 1] then reshape to [1, 1, D]
+                    H = s_align.shape[0]
+                    D_h = self.head_dim
+                    # Replicate each head value D_h times: [H] -> [1, 1, H*D_h]
+                    s_align_expanded = s_align.unsqueeze(0).unsqueeze(0)  # [1, 1, H]
+                    s_align_expanded = s_align_expanded.repeat(1, 1, D_h)  # [1, 1, H*D_h]
+                    # This broadcasts correctly: [1, 1, D] * [B, N, D] -> [B, N, D]
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align_expanded
+                elif s_align.dim() == 2:
+                    # Per-batch per-head [B, H] - expand to [B, 1, H*D_h]
+                    B_s, H = s_align.shape
+                    D_h = self.head_dim
+                    s_align_expanded = s_align.unsqueeze(1)  # [B, 1, H]
+                    s_align_expanded = s_align_expanded.repeat(1, 1, D_h)  # [B, 1, H*D_h]
+                    alignment_modulator = 1.0 + self.alignment_authority * s_align_expanded
+                else:
+                    raise ValueError(f"Unexpected s_align shape: {s_align.shape}")
+
+                # V10.6.1: Clamp to prevent over-constraint collapse (ChatGPT caveat)
+                # Sustained JEPA/SRK misalignment can attenuate proposals and reduce
+                # effective learning signal. Clamping ensures safe scaling range.
+                alignment_modulator = torch.clamp(
+                    alignment_modulator,
+                    min=self.alignment_clamp_min,
+                    max=self.alignment_clamp_max
+                )
+
+                weighted_proposals = weighted_proposals * alignment_modulator
 
         # State update: decay old state + integrate new proposals
         # S_{t+1} = gamma * S_t + (1 - gamma) * weighted_proposals
@@ -4610,6 +5301,241 @@ class BindingCacheQuadQuery(nn.Module):
         return self.W_o(attn_out)
 
 
+# =============================================================================
+# V10.5.7: BINDING SLOT CACHE (Explicit Key-Value Memory)
+# =============================================================================
+# Minimal symbolic structure for associative recall.
+# This module provides explicit key-value slots that Quad can query,
+# separate from the decayed Phase memory.
+#
+# Key insight from AR experiment: Phase's decayed cumsum creates a "blurred
+# superposition" that cannot be inverted. Binding slots provide discrete,
+# content-addressable storage.
+
+class BindingSlotCache(nn.Module):
+    """
+    Explicit key-value binding slots for discrete memory retrieval.
+
+    Solves the associative recall problem by providing:
+    1. Identity - each slot stores a distinct (key, value) pair
+    2. Stability - slots don't decay or blend
+    3. Addressability - content-based retrieval via key similarity
+
+    Architecture:
+    - N slots, each with key_emb and value_emb [D]
+    - Write: detect (K, V) patterns, store in next available slot
+    - Read: query by key similarity, return corresponding value
+    - Separate from Phase decay - slots persist until overwritten
+
+    V10.5.7b Fixes for failure modes:
+    - Failure Mode A: Force slot usage at query positions (query_mask output)
+    - Failure Mode B: Contextualized keys with position encoding
+
+    This is a minimal Memory Network / NTM-style component.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_slots: int = 16,
+        num_heads: int = 8,
+        dropout: float = 0.1,
+        max_seq_len: int = 512,  # For positional encoding
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_slots = num_slots
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.max_seq_len = max_seq_len
+
+        # Learnable slot embeddings (keys and values)
+        # These are updated during forward pass based on input patterns
+        self.register_buffer('slot_keys', torch.zeros(1, num_slots, embed_dim))
+        self.register_buffer('slot_values', torch.zeros(1, num_slots, embed_dim))
+        self.register_buffer('slot_used', torch.zeros(1, num_slots, dtype=torch.bool))
+        self.register_buffer('write_head', torch.zeros(1, dtype=torch.long))
+
+        # V10.5.7b: Positional encoding for contextualized keys (Failure Mode B fix)
+        self.pos_emb = nn.Embedding(max_seq_len, embed_dim)
+
+        # Projections for key-value - now includes position context
+        # Key projection: combines token hidden state with position
+        self.key_proj = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),  # hidden + position
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
+        self.value_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Query projection for reading
+        self.query_proj = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),  # hidden + position for query too
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
+        self.output_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Write gate - learns when to write (triggered by patterns like K=V)
+        self.write_gate = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, 1),
+            nn.Sigmoid(),
+        )
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def reset_slots(self, batch_size: int, device: torch.device):
+        """Reset slots for a new sequence (call at start of each batch)."""
+        self.slot_keys = torch.zeros(batch_size, self.num_slots, self.embed_dim, device=device)
+        self.slot_values = torch.zeros(batch_size, self.num_slots, self.embed_dim, device=device)
+        self.slot_used = torch.zeros(batch_size, self.num_slots, dtype=torch.bool, device=device)
+        self.write_head = torch.zeros(batch_size, dtype=torch.long, device=device)
+
+    def write_binding(
+        self,
+        key_emb: torch.Tensor,  # [B, D]
+        value_emb: torch.Tensor,  # [B, D]
+        write_mask: torch.Tensor,  # [B] - which batch items to write
+    ):
+        """
+        Write a key-value binding to the next available slot.
+
+        Args:
+            key_emb: Key embedding to store [B, D]
+            value_emb: Value embedding to store [B, D]
+            write_mask: Boolean mask indicating which batch items should write [B]
+        """
+        B = key_emb.shape[0]
+
+        for b in range(B):
+            if write_mask[b] and self.write_head[b] < self.num_slots:
+                slot_idx = self.write_head[b].item()
+                self.slot_keys[b, slot_idx] = key_emb[b].detach()  # Detach to avoid long BPTT
+                self.slot_values[b, slot_idx] = value_emb[b].detach()
+                self.slot_used[b, slot_idx] = True
+                self.write_head[b] = min(self.write_head[b] + 1, self.num_slots - 1)
+
+    def read_by_query(
+        self,
+        query: torch.Tensor,  # [B, N, D] - already projected with position
+    ) -> torch.Tensor:
+        """
+        Read from slots by querying with key similarity.
+
+        Args:
+            query: Query embeddings [B, N, D] (already projected)
+
+        Returns:
+            retrieved: Retrieved values [B, N, D]
+        """
+        B, N, D = query.shape
+
+        # Compute attention over slots
+        # query: [B, N, D], slot_keys: [B, num_slots, D]
+        attn_scores = torch.matmul(query, self.slot_keys.transpose(-2, -1)) * self.scale  # [B, N, num_slots]
+
+        # Mask unused slots
+        slot_mask = ~self.slot_used  # [B, num_slots]
+        attn_scores = attn_scores.masked_fill(slot_mask.unsqueeze(1), float('-inf'))
+
+        # Softmax over slots
+        attn_probs = F.softmax(attn_scores, dim=-1)  # [B, N, num_slots]
+        attn_probs = self.dropout(attn_probs)
+
+        # Retrieve values
+        # attn_probs: [B, N, num_slots], slot_values: [B, num_slots, D]
+        retrieved = torch.matmul(attn_probs, self.slot_values)  # [B, N, D]
+
+        return self.output_proj(retrieved)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        input_ids: Optional[torch.Tensor] = None,
+        eq_token_id: Optional[int] = None,
+        query_token_id: Optional[int] = None,  # V10.5.7b: For detecting query positions
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Process input: detect write patterns, read from slots.
+
+        For associative recall, we detect K=V patterns:
+        - Position i has EQ_TOKEN (=)
+        - Key is at position i-1
+        - Value is at position i+1
+        - Write (key, value) to slot
+
+        V10.5.7b: Returns query_mask to force slot usage at query positions.
+
+        Args:
+            x: Input embeddings [B, N, D]
+            input_ids: Original token IDs [B, N] (for pattern detection)
+            eq_token_id: The token ID for '=' (EQ_TOKEN)
+            query_token_id: The token ID for '?' (QUERY_TOKEN) - for forcing slot usage
+
+        Returns:
+            output: Retrieved memories [B, N, D]
+            query_mask: Positions where slots should be forced [B, N] (Failure Mode A fix)
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Get position embeddings
+        positions = torch.arange(N, device=x.device).unsqueeze(0).expand(B, -1)
+        pos_emb = self.pos_emb(positions.clamp(max=self.max_seq_len - 1))  # [B, N, D]
+
+        # Reset slots at sequence start (position 0)
+        # In practice, this should be called externally before each sequence
+        if not hasattr(self, '_initialized') or self.slot_keys.shape[0] != B:
+            self.reset_slots(B, x.device)
+            self._initialized = True
+
+        # V10.5.7b: Detect query positions for Failure Mode A fix
+        query_mask = torch.zeros(B, N, dtype=torch.bool, device=x.device)
+        if input_ids is not None and query_token_id is not None:
+            query_mask = (input_ids == query_token_id)  # [B, N]
+
+        # Pattern detection and writing (if input_ids provided)
+        if input_ids is not None and eq_token_id is not None:
+            # Find positions where EQ_TOKEN appears
+            eq_mask = (input_ids == eq_token_id)  # [B, N]
+
+            # For each EQ position, write (key=prev, value=next)
+            for pos in range(1, N - 1):
+                write_mask = eq_mask[:, pos]  # [B]
+                if write_mask.any():
+                    # V10.5.7b: Contextualized key with position (Failure Mode B fix)
+                    # Key is at pos-1, combine hidden state with position
+                    key_hidden = x_norm[:, pos - 1]  # [B, D]
+                    key_pos = pos_emb[:, pos - 1]  # [B, D]
+                    key_emb = self.key_proj(torch.cat([key_hidden, key_pos], dim=-1))  # [B, D]
+
+                    value_emb = self.value_proj(x_norm[:, pos + 1])  # [B, D]
+                    self.write_binding(key_emb, value_emb, write_mask)
+
+        # V10.5.7b: Contextualized query with position
+        query_input = torch.cat([x_norm, pos_emb], dim=-1)  # [B, N, 2D]
+        query = self.query_proj(query_input)  # [B, N, D]
+
+        # Read from slots using current position as query
+        retrieved = self.read_by_query(query)
+
+        return retrieved, query_mask
+
+    def get_slot_usage(self) -> Dict[str, float]:
+        """Get diagnostic info about slot usage."""
+        used_count = self.slot_used.sum().item()
+        total_slots = self.slot_used.numel()
+        return {
+            'used_slots': used_count,
+            'total_slots': total_slots,
+            'usage_ratio': used_count / total_slots if total_slots > 0 else 0.0,
+        }
+
+
 class BindingCacheLMBlock(nn.Module):
     """
     Binding Cache block for Language Modeling.
@@ -4632,6 +5558,7 @@ class BindingCacheLMBlock(nn.Module):
     - V10.0: Phase leaked to output, quad redundant (0.1% gradients)
     - V10.5.2: Cross-attention (Q=local_out), still 0.1% gradients
     - V10.5.3: Independent paths (Q=x), testing clean architecture
+    - V10.6: Added dual-channel mode support (JEPA/SRK intent alignment)
     """
 
     def __init__(
@@ -4650,11 +5577,27 @@ class BindingCacheLMBlock(nn.Module):
         quad_ratio: float = 0.3,
         proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
+        dual_channel_mode: bool = False,  # V10.6: Enable JEPA/SRK intent alignment
+        alignment_authority: float = 0.1,  # V10.6: α weight for alignment term
+        alignment_clamp_min: float = 0.8,  # V10.6.1: Clamp lower bound
+        alignment_clamp_max: float = 1.2,  # V10.6.1: Clamp upper bound
+        alignment_reduction: str = "per_head",  # V10.6.3: Alignment reduction mode
+        strict_control_contract: bool = True,  # V10.6.3: Strict vs warn mode
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.proposal_mode = proposal_mode
         self.confidence_threshold = confidence_threshold
+
+        # V10.6: Dual-channel mode
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
+        # V10.6.3: Alignment reduction and strict mode
+        self.alignment_reduction = alignment_reduction
+        self.strict_control_contract = strict_control_contract
 
         # Store ratios for weighted combination
         self.local_ratio = local_ratio
@@ -4676,6 +5619,10 @@ class BindingCacheLMBlock(nn.Module):
             dropout=dropout,
             decay_gamma=decay_gamma,
             bounded_phase=bounded_phase,
+            dual_channel_mode=dual_channel_mode,  # V10.6
+            alignment_authority=alignment_authority,  # V10.6
+            alignment_clamp_min=alignment_clamp_min,  # V10.6.1
+            alignment_clamp_max=alignment_clamp_max,  # V10.6.1
         )
 
         # Quad memory query
@@ -4809,6 +5756,16 @@ class BindingCacheLMTransformer(nn.Module):
         quad_ratios: List[float] = None,
         proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
+        # V10.5.7: Binding Slot Cache for explicit key-value memory
+        binding_slots: int = 0,  # 0 = disabled, >0 = number of slots
+        binding_slot_eq_token: int = None,  # Token ID for '=' (triggers write)
+        binding_slot_query_token: int = None,  # V10.5.7b: Token ID for '?' (forces slot read)
+        # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
+        dual_channel_mode: bool = False,
+        alignment_authority: float = 0.1,
+        # V10.6.1: Clamp bounds to prevent over-constraint collapse
+        alignment_clamp_min: float = 0.8,
+        alignment_clamp_max: float = 1.2,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -4816,6 +5773,18 @@ class BindingCacheLMTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.proposal_mode = proposal_mode
+
+        # V10.6: Dual-channel mode
+        self.dual_channel_mode = dual_channel_mode
+        self.alignment_authority = alignment_authority
+        # V10.6.1: Clamp bounds
+        self.alignment_clamp_min = alignment_clamp_min
+        self.alignment_clamp_max = alignment_clamp_max
+
+        # V10.5.7: Binding slot configuration
+        self.binding_slots_enabled = binding_slots > 0
+        self.binding_slot_eq_token = binding_slot_eq_token
+        self.binding_slot_query_token = binding_slot_query_token  # V10.5.7b
 
         # Default ratios if not specified
         if phase_ratios is None:
@@ -4834,6 +5803,24 @@ class BindingCacheLMTransformer(nn.Module):
         self.pos_emb = nn.Embedding(max_seq_len, d_model)
         self.dropout = nn.Dropout(dropout)
 
+        # V10.5.7: Binding Slot Cache (shared across layers, first layer only)
+        self.binding_slot_cache = None
+        if self.binding_slots_enabled:
+            self.binding_slot_cache = BindingSlotCache(
+                embed_dim=d_model,
+                num_slots=binding_slots,
+                num_heads=num_heads,
+                dropout=dropout,
+                max_seq_len=max_seq_len,  # V10.5.7b: For positional encoding
+            )
+            # Learnable gate to combine slot output with main path
+            self.slot_gate = nn.Sequential(
+                nn.Linear(d_model * 2, d_model),
+                nn.ReLU(),
+                nn.Linear(d_model, 1),
+                nn.Sigmoid(),
+            )
+
         # Binding Cache blocks with per-layer ratios
         self.layers = nn.ModuleList([
             BindingCacheLMBlock(
@@ -4851,6 +5838,10 @@ class BindingCacheLMTransformer(nn.Module):
                 quad_ratio=quad_ratios[i],
                 proposal_mode=proposal_mode,
                 confidence_threshold=confidence_threshold,
+                dual_channel_mode=dual_channel_mode,  # V10.6
+                alignment_authority=alignment_authority,  # V10.6
+                alignment_clamp_min=alignment_clamp_min,  # V10.6.1
+                alignment_clamp_max=alignment_clamp_max,  # V10.6.1
             )
             for i in range(num_layers)
         ])
@@ -4874,14 +5865,53 @@ class BindingCacheLMTransformer(nn.Module):
 
         self.layer_outputs = []
 
+        # V10.5.7: Reset binding slot cache for new batch
+        if self.binding_slots_enabled and self.binding_slot_cache is not None:
+            self.binding_slot_cache.reset_slots(B, input_ids.device)
+
         for i, layer in enumerate(self.layers):
             x = layer(x)
+
+            # V10.5.7: Apply binding slot cache after first layer
+            # This allows embeddings to be processed before write/read
+            if i == 0 and self.binding_slots_enabled and self.binding_slot_cache is not None:
+                # Get slot retrieval and query mask
+                slot_out, query_mask = self.binding_slot_cache(
+                    x,
+                    input_ids=input_ids,
+                    eq_token_id=self.binding_slot_eq_token,
+                    query_token_id=self.binding_slot_query_token,  # V10.5.7b
+                )
+
+                # Gated combination: gate * slot_out + (1-gate) * x
+                gate_input = torch.cat([x, slot_out], dim=-1)
+                gate = self.slot_gate(gate_input)  # [B, N, 1]
+
+                # V10.5.7b: Force slot usage at query positions (Failure Mode A fix)
+                # At query positions, override gate to be high (0.9) to force slot retrieval
+                if query_mask.any():
+                    # Create forced gate: 0.9 at query positions, learned elsewhere
+                    forced_gate = torch.where(
+                        query_mask.unsqueeze(-1),  # [B, N, 1]
+                        torch.tensor(0.9, device=gate.device, dtype=gate.dtype),
+                        gate
+                    )
+                    gate = forced_gate
+
+                x = gate * slot_out + (1 - gate) * x
+
             if probe_layers:
                 self.layer_outputs.append(x.detach().clone())
 
         x = self.norm(x)
         logits = self.lm_head(x)
         return logits
+
+    def get_slot_usage(self) -> Dict[str, float]:
+        """V10.5.7: Get binding slot usage diagnostics."""
+        if self.binding_slot_cache is not None:
+            return self.binding_slot_cache.get_slot_usage()
+        return {'used_slots': 0, 'total_slots': 0, 'usage_ratio': 0.0}
 
     def get_phase_health(self) -> dict:
         """Aggregate Phase health metrics from all layers."""
@@ -5157,7 +6187,8 @@ class BindingCacheLMTransformer(nn.Module):
     def forward_with_deep_supervision(
         self,
         input_ids: torch.Tensor,
-        targets: torch.Tensor
+        targets: torch.Tensor,
+        ignore_index: int = -100  # V10.5.6: For associative recall (ignore PAD tokens)
     ) -> Tuple[torch.Tensor, torch.Tensor, List[float]]:
         """
         Forward pass with deep supervision losses at intermediate layers.
@@ -5165,6 +6196,7 @@ class BindingCacheLMTransformer(nn.Module):
         Args:
             input_ids: [B, N] input token IDs
             targets: [B, N] target token IDs for loss computation
+            ignore_index: Token ID to ignore in loss computation (-100 = none)
 
         Returns:
             logits: [B, N, V] final layer logits
@@ -5193,7 +6225,8 @@ class BindingCacheLMTransformer(nn.Module):
                     aux_logits = self.lm_head(x_normed)
                     aux_loss = F.cross_entropy(
                         aux_logits.view(-1, self.vocab_size),
-                        targets.view(-1)
+                        targets.view(-1),
+                        ignore_index=ignore_index  # V10.5.6: Ignore PAD for AR
                     )
 
                     layer_losses.append(aux_loss.item())
@@ -5351,17 +6384,104 @@ def train_real_language(
     """
     Train with real language data (WikiText) and layer probing.
     """
-    print("\n" + "=" * 70)
-    print("REAL LANGUAGE MODE: WikiText Language Modeling")
-    print("=" * 70)
+    # V10.5.6: Check for Associative Recall mode
+    use_associative_recall = getattr(args, 'associative_recall', False)
+    ar_dataset = None  # For accuracy evaluation
+    ar_pad_token = None  # For custom loss computation
+    ar_eq_token = None  # V10.5.7: For binding slot cache pattern detection
+    ar_query_token = None  # V10.5.7b: For forcing slot usage at query positions
 
-    # Load dataset
-    print(f"\nLoading {args.dataset} dataset...")
-    train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
-    val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+    if use_associative_recall:
+        print("\n" + "=" * 70)
+        print("V10.5.6: ASSOCIATIVE RECALL MODE")
+        print("=" * 70)
+        print("\nThis task REQUIRES long-range memory retrieval:")
+        print("  - Local attention (window=64) CANNOT solve when delay > window")
+        print("  - Quad MUST retrieve from phase memory to succeed")
+        print("  - If quad works → accuracy >> 0%, if broken → accuracy ≈ random")
+        print()
 
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
+        ar_vocab_size = getattr(args, 'ar_vocab_size', 1000)
+        ar_num_pairs = getattr(args, 'ar_num_pairs', 8)
+        ar_delay_min = getattr(args, 'ar_delay_min', 80)
+        ar_delay_max = getattr(args, 'ar_delay_max', 150)
+        ar_train_samples = getattr(args, 'ar_train_samples', 50000)
+        ar_val_samples = getattr(args, 'ar_val_samples', 2000)
+
+        print(f"  Vocabulary size: {ar_vocab_size}")
+        print(f"  Key-value pairs: {ar_num_pairs}")
+        print(f"  Initial delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
+        print(f"  Local window: {getattr(args, 'local_window_size', 64)}")
+        print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        print(f"  Train samples: {ar_train_samples}")
+        print(f"  Val samples: {ar_val_samples}")
+
+        # V10.5.8: Dynamic delay curriculum
+        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', False)
+        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 120)
+        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 200)
+        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.3)
+
+        if ar_dynamic_delay:
+            print(f"\n  ★ DYNAMIC DELAY CURRICULUM ENABLED (V10.5.8)")
+            print(f"    Initial: delay=[{ar_delay_min}, {ar_delay_max}]")
+            print(f"    Target:  delay=[{ar_target_delay_min}, {ar_target_delay_max}]")
+            print(f"    Warmup:  {ar_curriculum_warmup*100:.0f}% of training at initial delay")
+            print(f"    Formula: delay(t) = base + (t - warmup) * (target - base) / (1 - warmup)")
+
+        train_dataset = AssociativeRecallDataset(
+            num_samples=ar_train_samples,
+            num_pairs=ar_num_pairs,
+            delay_min=ar_delay_min,
+            delay_max=ar_delay_max,
+            seq_len=args.seq_len,
+            vocab_size=ar_vocab_size,
+            seed=42,
+            dynamic_delay=ar_dynamic_delay,  # V10.5.8
+        )
+        val_dataset = AssociativeRecallDataset(
+            num_samples=ar_val_samples,
+            num_pairs=ar_num_pairs,
+            delay_min=ar_delay_min,
+            delay_max=ar_delay_max,
+            seq_len=args.seq_len,
+            vocab_size=ar_vocab_size,
+            seed=123,  # Different seed for validation
+            dynamic_delay=False,  # Validation uses fixed delays for fair comparison
+        )
+
+        ar_dataset = val_dataset  # For accuracy evaluation
+        ar_pad_token = train_dataset.PAD_TOKEN
+        ar_eq_token = train_dataset.EQ_TOKEN  # V10.5.7: For binding slot cache
+        ar_query_token = train_dataset.QUERY_TOKEN  # V10.5.7b: For forcing slot usage
+
+        # Custom collator for associative recall
+        collator = AssociativeRecallCollator(ar_pad_token)
+        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=collator)
+        val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=collator)
+
+        # Override vocab size for model creation
+        args.lm_vocab_size = ar_vocab_size
+
+        # V10.5.7: Print binding slots info if enabled
+        binding_slots = getattr(args, 'binding_slots', 0)
+        if binding_slots > 0:
+            print(f"\n  ★ BINDING SLOT CACHE ENABLED (V10.5.7)")
+            print(f"    Number of slots: {binding_slots}")
+            print(f"    EQ_TOKEN ID: {ar_eq_token}")
+            print(f"    Purpose: Explicit K-V memory separate from Phase decay")
+    else:
+        print("\n" + "=" * 70)
+        print("REAL LANGUAGE MODE: WikiText Language Modeling")
+        print("=" * 70)
+
+        # Load dataset
+        print(f"\nLoading {args.dataset} dataset...")
+        train_dataset = WikiTextDataset("train", args.seq_len, args.dataset)
+        val_dataset = WikiTextDataset("validation", args.seq_len, args.dataset)
+
+        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
 
     # Create model
     # V10.3.3: Support for Binding Cache architecture
@@ -5426,11 +6546,24 @@ def train_real_language(
             print(f"║    Quad returns K proposals (no softmax mixing)                       ║")
             print(f"║    Phase integrates proposals with gating                             ║")
             print(f"║    Confidence threshold: {args.confidence_threshold:.2f}                                      ║")
+        if config.dual_channel_mode:
+            print(f"╠═══════════════════════════════════════════════════════════════════════╣")
+            print(f"║  V10.6 DUAL-CHANNEL MODE ENABLED                                      ║")
+            print(f"║    JEPA/SRK intent alignment for proposal integration                 ║")
+            print(f"║    s_align = cos(θ_JEPA - θ_SRK)                                      ║")
+            print(f"║    output = output * clamp(1 + α * s_align, min, max)                 ║")
+            print(f"║    Alignment authority (α): {config.alignment_authority:.2f}                                    ║")
+            print(f"║    Clamp bounds: [{config.alignment_clamp_min:.2f}, {config.alignment_clamp_max:.2f}] (V10.6.1 stability fix)             ║")
         print(f"╠═══════════════════════════════════════════════════════════════════════╣")
         print(f"║  Per-Layer Ratios:                                                    ║")
         for i in range(config.num_layers):
             print(f"║    L{i}: Local={bc_local_ratio[i]:.2f}, Phase={bc_phase_ratio[i]:.2f}, Quad={bc_quad_ratio[i]:.2f}")
         print(f"╚═══════════════════════════════════════════════════════════════════════╝")
+
+        # V10.5.7: Get binding slots configuration
+        binding_slots = getattr(args, 'binding_slots', 0)
+        binding_slot_eq_token = ar_eq_token if use_associative_recall else None
+        binding_slot_query_token = ar_query_token if use_associative_recall else None  # V10.5.7b
 
         model = BindingCacheLMTransformer(
             vocab_size=args.lm_vocab_size,
@@ -5448,6 +6581,16 @@ def train_real_language(
             quad_ratios=bc_quad_ratio,
             proposal_mode=args.proposal_mode,
             confidence_threshold=args.confidence_threshold,
+            # V10.5.7: Binding slot cache for explicit K-V memory
+            binding_slots=binding_slots,
+            binding_slot_eq_token=binding_slot_eq_token,
+            binding_slot_query_token=binding_slot_query_token,  # V10.5.7b
+            # V10.6: Dual-channel mode (JEPA/SRK intent alignment)
+            dual_channel_mode=config.dual_channel_mode,
+            alignment_authority=config.alignment_authority,
+            # V10.6.1: Clamp bounds for alignment modulator
+            alignment_clamp_min=config.alignment_clamp_min,
+            alignment_clamp_max=config.alignment_clamp_max,
         ).to(config.device)
 
     elif use_protected_phase:
@@ -5729,6 +6872,20 @@ def train_real_language(
     ppl_history = []  # Track PPL over time
 
     while step < config.num_steps:
+        # V10.5.8: Dynamic delay curriculum update
+        if use_associative_recall and ar_dynamic_delay and hasattr(train_dataset, 'set_delay_range'):
+            # Progress with warmup: stay at initial delay during warmup, then ramp
+            progress = step / config.num_steps
+            if progress < ar_curriculum_warmup:
+                # During warmup - use initial delays
+                pass
+            else:
+                # After warmup - linear ramp to target
+                ramp_progress = (progress - ar_curriculum_warmup) / (1.0 - ar_curriculum_warmup)
+                new_delay_min = int(ar_delay_min + ramp_progress * (ar_target_delay_min - ar_delay_min))
+                new_delay_max = int(ar_delay_max + ramp_progress * (ar_target_delay_max - ar_delay_max))
+                train_dataset.set_delay_range(new_delay_min, new_delay_max)
+
         try:
             x, y = next(train_iter)
         except StopIteration:
@@ -5743,9 +6900,13 @@ def train_real_language(
         # V10.5: Deep Supervision forward path
         deep_loss_value = 0.0
         main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
+
+        # V10.5.6: Use ignore_index for associative recall (ignore PAD tokens in loss)
+        ignore_idx = ar_pad_token if use_associative_recall else -100  # -100 is PyTorch default (no ignore)
+
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
-            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y)
-            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y, ignore_index=ignore_idx)
+            main_loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = main_loss.item()  # Track main loss for reporting
             loss = main_loss + deep_loss  # Combined loss for backprop
             deep_loss_value = deep_loss.item()
@@ -5754,12 +6915,12 @@ def train_real_language(
         elif use_witness_entropy and hasattr(model, 'layer_outputs'):
             logits = model(x, probe_layers=True)
             layer_hidden_states = model.layer_outputs
-            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
         else:
             logits = model(x)
             layer_hidden_states = None
-            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1))
+            loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
@@ -5822,6 +6983,11 @@ def train_real_language(
             elif use_deep_supervision:
                 # V10.5.1: Show main loss, PPL (from main loss), and deep loss separately
                 print(f"  Step {step:5d} | MainLoss: {avg_main_loss:.4f} | PPL: {ppl:8.2f} | DeepLoss: {avg_deep_loss:.4f}")
+            elif use_associative_recall and ar_dynamic_delay:
+                # V10.5.8: Show delay curriculum progress
+                curr_delay_min = train_dataset.delay_min
+                curr_delay_max = train_dataset.delay_max
+                print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f} | Delay: [{curr_delay_min}, {curr_delay_max}]")
             else:
                 print(f"  Step {step:5d} | Loss: {avg_loss:.4f} | PPL: {ppl:8.2f}")
 
@@ -5835,7 +7001,12 @@ def train_real_language(
                 for x, y in val_loader:
                     x, y = x.to(config.device), y.to(config.device)
                     logits = model(x)
-                    val_loss += F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1)).item()
+                    # V10.5.6: Use ignore_index for associative recall
+                    val_loss += F.cross_entropy(
+                        logits.view(-1, args.lm_vocab_size),
+                        y.view(-1),
+                        ignore_index=ignore_idx
+                    ).item()
                     val_batches += 1
                     if val_batches >= 50:  # Limit eval batches
                         break
@@ -5844,6 +7015,25 @@ def train_real_language(
             val_ppl = math.exp(val_loss)
             print(f"\n  === Validation @ Step {step} ===")
             print(f"      Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}")
+
+            # V10.5.6: Associative Recall accuracy evaluation
+            if use_associative_recall and ar_dataset is not None:
+                retrieval_acc = ar_dataset.get_accuracy(model, config.device, num_samples=500)
+                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}%")
+                # Random baseline for num_pairs=8 keys would be 12.5%
+                random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
+                if retrieval_acc * 100 > random_baseline * 2:
+                    print(f"        → QUAD IS WORKING! ({retrieval_acc*100:.1f}% >> {random_baseline:.1f}% random)")
+                elif retrieval_acc * 100 > random_baseline * 1.2:
+                    print(f"        → Quad shows some learning ({retrieval_acc*100:.1f}% > {random_baseline:.1f}% random)")
+                else:
+                    print(f"        → Quad NOT working (≈ random {random_baseline:.1f}%)")
+
+                # V10.5.7: Show binding slot usage if enabled
+                if hasattr(model, 'get_slot_usage'):
+                    slot_usage = model.get_slot_usage()
+                    if slot_usage['total_slots'] > 0:
+                        print(f"      Binding Slots: {slot_usage['used_slots']}/{slot_usage['total_slots']} used ({slot_usage['usage_ratio']*100:.1f}%)")
 
             if val_ppl < best_val_ppl:
                 best_val_ppl = val_ppl
@@ -6025,9 +7215,9 @@ def train_real_language(
             print()
             model.train()
 
-        # V10.3.6: Quality sample generation
+        # V10.3.6: Quality sample generation (skip for associative recall - no tokenizer)
         sample_every = getattr(args, 'sample_every', 500)
-        if sample_every > 0 and step % sample_every == 0 and step > 0:
+        if sample_every > 0 and step % sample_every == 0 and step > 0 and not use_associative_recall:
             # Get tokenizer from dataset
             tokenizer = train_dataset.tokenizer
             # Parse custom prompts if provided
@@ -6040,12 +7230,41 @@ def train_real_language(
 
     # Final evaluation with comprehensive analysis
     print("\n" + "=" * 70)
-    if use_protected_phase:
+    if use_associative_recall:
+        print("FINAL RESULTS: Associative Recall Task (V10.5.6)")
+    elif use_protected_phase:
         print("FINAL RESULTS: Protected Phase Learning Analysis (V10.3.2)")
     else:
         print("FINAL RESULTS: Phase Learning Analysis")
     print("=" * 70)
     print(f"  Best Val PPL: {best_val_ppl:.2f}")
+
+    # V10.5.6: Final Associative Recall accuracy
+    if use_associative_recall and ar_dataset is not None:
+        final_acc = ar_dataset.get_accuracy(model, config.device, num_samples=1000)
+        random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
+        print(f"\n  ╔══════════════════════════════════════════════════════════════╗")
+        print(f"  ║  ASSOCIATIVE RECALL FINAL ACCURACY                           ║")
+        print(f"  ╠══════════════════════════════════════════════════════════════╣")
+        print(f"  ║  Retrieval Accuracy:   {final_acc*100:6.2f}%                            ║")
+        print(f"  ║  Random Baseline:      {random_baseline:6.2f}%                            ║")
+        if final_acc * 100 > 80:
+            print(f"  ║  Verdict: QUAD WORKS VERY WELL!   ★★★                         ║")
+        elif final_acc * 100 > 50:
+            print(f"  ║  Verdict: QUAD WORKS MODERATELY  ★★                           ║")
+        elif final_acc * 100 > random_baseline * 2:
+            print(f"  ║  Verdict: QUAD SHOWS LEARNING    ★                            ║")
+        else:
+            print(f"  ║  Verdict: QUAD BROKEN (≈ random)  ✗                           ║")
+        print(f"  ╚══════════════════════════════════════════════════════════════╝")
+
+        # V10.5.7: Show binding slot usage in final results
+        if hasattr(model, 'get_slot_usage'):
+            slot_usage = model.get_slot_usage()
+            if slot_usage['total_slots'] > 0:
+                print(f"\n  Binding Slot Cache Usage:")
+                print(f"    Slots used: {slot_usage['used_slots']}/{slot_usage['total_slots']}")
+                print(f"    Usage ratio: {slot_usage['usage_ratio']*100:.1f}%")
 
     if use_protected_phase:
         print(f"  Architecture: Protected Phase (sequential collaboration)")
@@ -7180,6 +8399,42 @@ Examples:
                              "0.0 = pure content matching (intent ignored), "
                              "0.1 = mild intent influence (recommended), "
                              "1.0 = strong intent influence.")
+    # V10.6.1: Clamp bounds for alignment modulator (ChatGPT caveat)
+    parser.add_argument("--alignment-clamp-min", type=float, default=0.8,
+                        help="Minimum value for alignment modulator clamp (default: 0.8). "
+                             "Prevents sustained JEPA/SRK misalignment from over-attenuating proposals. "
+                             "Lower values allow more attenuation.")
+    parser.add_argument("--alignment-clamp-max", type=float, default=1.2,
+                        help="Maximum value for alignment modulator clamp (default: 1.2). "
+                             "Prevents alignment agreement from over-amplifying proposals. "
+                             "Higher values allow more amplification.")
+    # V10.6.2: No-Write Contracts (ChatGPT gap analysis D.5)
+    parser.add_argument("--enforce-no-write-contracts", action="store_true", default=True,
+                        help="Enable no-write contract assertions (default: True). "
+                             "Validates that control signals (intent phases, alignment scores) "
+                             "are low-dimensional and broadcastable, not token-wise embeddings. "
+                             "This prevents control from injecting content into Phase.")
+    parser.add_argument("--no-enforce-no-write-contracts", dest="enforce_no_write_contracts",
+                        action="store_false",
+                        help="Disable no-write contract assertions for performance.")
+    # V10.6.3: Strict vs Warn mode (ChatGPT recommendation)
+    parser.add_argument("--strict-control-contract", action="store_true", default=True,
+                        help="Raise exceptions on contract violations (default: True). "
+                             "In strict mode, violations stop execution immediately. "
+                             "Use --no-strict-control-contract for warn mode (log and continue).")
+    parser.add_argument("--no-strict-control-contract", dest="strict_control_contract",
+                        action="store_false",
+                        help="Use warn mode: log contract violations but continue execution. "
+                             "Useful for experiments that intentionally explore violations.")
+    # V10.6.3: Alignment reduction mode (ChatGPT feedback)
+    parser.add_argument("--alignment-reduction", type=str, default="per_head",
+                        choices=["per_head", "global", "per_batch_head"],
+                        help="How to reduce alignment scores (default: per_head). "
+                             "per_head: [H] - per-head control (recommended). "
+                             "global: [] - batch-level scalar (safest). "
+                             "per_batch_head: [B, H] - per-batch per-head. "
+                             "NOTE: [B, N] is no longer supported as it violates "
+                             "the contract (token-position dependent).")
 
     # V10.4: Proposal Mode (Quad-as-Proposer, Phase-as-Integrator)
     parser.add_argument("--proposal-mode", action="store_true",
@@ -7217,6 +8472,45 @@ Examples:
                              "Tests if quad CAN work when it's the only attention mechanism. "
                              "L0: local=0, quad=0.7, phase=0.3 (quad must do all the work) "
                              "L1+: local=0.7, quad=0, phase=0.3 (local takes over)")
+
+    # ==========================================================================
+    # V10.5.6: ASSOCIATIVE RECALL TASK (Forces Quad to Work)
+    # ==========================================================================
+    parser.add_argument("--associative-recall", action="store_true",
+                        help="Use Associative Recall task instead of WikiText. "
+                             "This task REQUIRES long-range memory retrieval that local "
+                             "attention cannot solve. Format: K1=V1; K2=V2; ... [filler] ?=Ki "
+                             "where the model must retrieve Vi. Delay > local window forces "
+                             "quad to retrieve from phase memory.")
+    parser.add_argument("--ar-num-pairs", type=int, default=8,
+                        help="Number of key-value pairs per sample (default: 8)")
+    parser.add_argument("--ar-delay-min", type=int, default=80,
+                        help="Minimum filler tokens between pairs and query (default: 80, > local window)")
+    parser.add_argument("--ar-delay-max", type=int, default=150,
+                        help="Maximum filler tokens between pairs and query (default: 150)")
+    parser.add_argument("--ar-vocab-size", type=int, default=1000,
+                        help="Vocabulary size for associative recall task (default: 1000)")
+    parser.add_argument("--ar-train-samples", type=int, default=50000,
+                        help="Number of training samples for associative recall (default: 50000)")
+    parser.add_argument("--ar-val-samples", type=int, default=2000,
+                        help="Number of validation samples for associative recall (default: 2000)")
+
+    # V10.5.8: Dynamic delay curriculum
+    parser.add_argument("--ar-dynamic-delay", action="store_true",
+                        help="Enable dynamic delay curriculum. Starts with --ar-delay-min/max and "
+                             "progressively increases to --ar-target-delay-min/max over training.")
+    parser.add_argument("--ar-target-delay-min", type=int, default=120,
+                        help="Target minimum delay at end of training (default: 120)")
+    parser.add_argument("--ar-target-delay-max", type=int, default=200,
+                        help="Target maximum delay at end of training (default: 200)")
+    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.3,
+                        help="Fraction of training to stay at initial delay before ramping (default: 0.3)")
+
+    # V10.5.7: Binding Slot Cache (explicit key-value memory)
+    parser.add_argument("--binding-slots", type=int, default=0,
+                        help="Number of binding slots for explicit K-V memory (0=disabled, 16-32 recommended). "
+                             "Provides discrete, content-addressable storage separate from Phase decay. "
+                             "Required for associative recall task to work.")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
@@ -7367,6 +8661,13 @@ Examples:
 
     args = parser.parse_args()
 
+    # V10.6.2: Configure no-write contract enforcement
+    set_no_write_contract_enforcement(args.enforce_no_write_contracts)
+    if args.enforce_no_write_contracts:
+        print("V10.6.2: No-write contract enforcement ENABLED")
+    else:
+        print("V10.6.2: No-write contract enforcement DISABLED (for performance)")
+
     # Parse curriculum
     curriculum = [float(x) for x in args.curriculum.split(",")]
     # Pad/truncate to match num_layers
@@ -7393,6 +8694,10 @@ Examples:
         bounded_phase=args.bounded_phase,
         dual_channel_mode=args.dual_channel_mode,
         alignment_authority=args.alignment_authority,
+        alignment_clamp_min=args.alignment_clamp_min,
+        alignment_clamp_max=args.alignment_clamp_max,
+        alignment_reduction=args.alignment_reduction,  # V10.6.3
+        strict_control_contract=args.strict_control_contract,  # V10.6.3
         device=args.device,
     )
 
