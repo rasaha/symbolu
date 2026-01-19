@@ -4833,6 +4833,10 @@ class BindingSlotCache(nn.Module):
     - Read: query by key similarity, return corresponding value
     - Separate from Phase decay - slots persist until overwritten
 
+    V10.5.7b Fixes for failure modes:
+    - Failure Mode A: Force slot usage at query positions (query_mask output)
+    - Failure Mode B: Contextualized keys with position encoding
+
     This is a minimal Memory Network / NTM-style component.
     """
 
@@ -4842,12 +4846,14 @@ class BindingSlotCache(nn.Module):
         num_slots: int = 16,
         num_heads: int = 8,
         dropout: float = 0.1,
+        max_seq_len: int = 512,  # For positional encoding
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_slots = num_slots
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
+        self.max_seq_len = max_seq_len
 
         # Learnable slot embeddings (keys and values)
         # These are updated during forward pass based on input patterns
@@ -4856,12 +4862,24 @@ class BindingSlotCache(nn.Module):
         self.register_buffer('slot_used', torch.zeros(1, num_slots, dtype=torch.bool))
         self.register_buffer('write_head', torch.zeros(1, dtype=torch.long))
 
-        # Projections for key-value detection
-        self.key_proj = nn.Linear(embed_dim, embed_dim)
+        # V10.5.7b: Positional encoding for contextualized keys (Failure Mode B fix)
+        self.pos_emb = nn.Embedding(max_seq_len, embed_dim)
+
+        # Projections for key-value - now includes position context
+        # Key projection: combines token hidden state with position
+        self.key_proj = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),  # hidden + position
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
         self.value_proj = nn.Linear(embed_dim, embed_dim)
 
         # Query projection for reading
-        self.query_proj = nn.Linear(embed_dim, embed_dim)
+        self.query_proj = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),  # hidden + position for query too
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+        )
         self.output_proj = nn.Linear(embed_dim, embed_dim)
 
         # Write gate - learns when to write (triggered by patterns like K=V)
@@ -4909,25 +4927,22 @@ class BindingSlotCache(nn.Module):
 
     def read_by_query(
         self,
-        query: torch.Tensor,  # [B, N, D]
+        query: torch.Tensor,  # [B, N, D] - already projected with position
     ) -> torch.Tensor:
         """
         Read from slots by querying with key similarity.
 
         Args:
-            query: Query embeddings [B, N, D]
+            query: Query embeddings [B, N, D] (already projected)
 
         Returns:
             retrieved: Retrieved values [B, N, D]
         """
         B, N, D = query.shape
 
-        # Project query
-        q = self.query_proj(query)  # [B, N, D]
-
         # Compute attention over slots
-        # q: [B, N, D], slot_keys: [B, num_slots, D]
-        attn_scores = torch.matmul(q, self.slot_keys.transpose(-2, -1)) * self.scale  # [B, N, num_slots]
+        # query: [B, N, D], slot_keys: [B, num_slots, D]
+        attn_scores = torch.matmul(query, self.slot_keys.transpose(-2, -1)) * self.scale  # [B, N, num_slots]
 
         # Mask unused slots
         slot_mask = ~self.slot_used  # [B, num_slots]
@@ -4948,7 +4963,8 @@ class BindingSlotCache(nn.Module):
         x: torch.Tensor,
         input_ids: Optional[torch.Tensor] = None,
         eq_token_id: Optional[int] = None,
-    ) -> torch.Tensor:
+        query_token_id: Optional[int] = None,  # V10.5.7b: For detecting query positions
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Process input: detect write patterns, read from slots.
 
@@ -4958,22 +4974,35 @@ class BindingSlotCache(nn.Module):
         - Value is at position i+1
         - Write (key, value) to slot
 
+        V10.5.7b: Returns query_mask to force slot usage at query positions.
+
         Args:
             x: Input embeddings [B, N, D]
             input_ids: Original token IDs [B, N] (for pattern detection)
             eq_token_id: The token ID for '=' (EQ_TOKEN)
+            query_token_id: The token ID for '?' (QUERY_TOKEN) - for forcing slot usage
 
         Returns:
-            output: Retrieved memories + residual [B, N, D]
+            output: Retrieved memories [B, N, D]
+            query_mask: Positions where slots should be forced [B, N] (Failure Mode A fix)
         """
         B, N, D = x.shape
         x_norm = self.norm(x)
+
+        # Get position embeddings
+        positions = torch.arange(N, device=x.device).unsqueeze(0).expand(B, -1)
+        pos_emb = self.pos_emb(positions.clamp(max=self.max_seq_len - 1))  # [B, N, D]
 
         # Reset slots at sequence start (position 0)
         # In practice, this should be called externally before each sequence
         if not hasattr(self, '_initialized') or self.slot_keys.shape[0] != B:
             self.reset_slots(B, x.device)
             self._initialized = True
+
+        # V10.5.7b: Detect query positions for Failure Mode A fix
+        query_mask = torch.zeros(B, N, dtype=torch.bool, device=x.device)
+        if input_ids is not None and query_token_id is not None:
+            query_mask = (input_ids == query_token_id)  # [B, N]
 
         # Pattern detection and writing (if input_ids provided)
         if input_ids is not None and eq_token_id is not None:
@@ -4984,15 +5013,23 @@ class BindingSlotCache(nn.Module):
             for pos in range(1, N - 1):
                 write_mask = eq_mask[:, pos]  # [B]
                 if write_mask.any():
-                    # Key is at pos-1, value is at pos+1
-                    key_emb = self.key_proj(x_norm[:, pos - 1])  # [B, D]
+                    # V10.5.7b: Contextualized key with position (Failure Mode B fix)
+                    # Key is at pos-1, combine hidden state with position
+                    key_hidden = x_norm[:, pos - 1]  # [B, D]
+                    key_pos = pos_emb[:, pos - 1]  # [B, D]
+                    key_emb = self.key_proj(torch.cat([key_hidden, key_pos], dim=-1))  # [B, D]
+
                     value_emb = self.value_proj(x_norm[:, pos + 1])  # [B, D]
                     self.write_binding(key_emb, value_emb, write_mask)
 
-        # Read from slots using current position as query
-        retrieved = self.read_by_query(x_norm)
+        # V10.5.7b: Contextualized query with position
+        query_input = torch.cat([x_norm, pos_emb], dim=-1)  # [B, N, 2D]
+        query = self.query_proj(query_input)  # [B, N, D]
 
-        return retrieved
+        # Read from slots using current position as query
+        retrieved = self.read_by_query(query)
+
+        return retrieved, query_mask
 
     def get_slot_usage(self) -> Dict[str, float]:
         """Get diagnostic info about slot usage."""
@@ -5207,6 +5244,7 @@ class BindingCacheLMTransformer(nn.Module):
         # V10.5.7: Binding Slot Cache for explicit key-value memory
         binding_slots: int = 0,  # 0 = disabled, >0 = number of slots
         binding_slot_eq_token: int = None,  # Token ID for '=' (triggers write)
+        binding_slot_query_token: int = None,  # V10.5.7b: Token ID for '?' (forces slot read)
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -5218,6 +5256,7 @@ class BindingCacheLMTransformer(nn.Module):
         # V10.5.7: Binding slot configuration
         self.binding_slots_enabled = binding_slots > 0
         self.binding_slot_eq_token = binding_slot_eq_token
+        self.binding_slot_query_token = binding_slot_query_token  # V10.5.7b
 
         # Default ratios if not specified
         if phase_ratios is None:
@@ -5244,6 +5283,7 @@ class BindingCacheLMTransformer(nn.Module):
                 num_slots=binding_slots,
                 num_heads=num_heads,
                 dropout=dropout,
+                max_seq_len=max_seq_len,  # V10.5.7b: For positional encoding
             )
             # Learnable gate to combine slot output with main path
             self.slot_gate = nn.Sequential(
@@ -5303,15 +5343,29 @@ class BindingCacheLMTransformer(nn.Module):
             # V10.5.7: Apply binding slot cache after first layer
             # This allows embeddings to be processed before write/read
             if i == 0 and self.binding_slots_enabled and self.binding_slot_cache is not None:
-                # Get slot retrieval
-                slot_out = self.binding_slot_cache(
+                # Get slot retrieval and query mask
+                slot_out, query_mask = self.binding_slot_cache(
                     x,
                     input_ids=input_ids,
                     eq_token_id=self.binding_slot_eq_token,
+                    query_token_id=self.binding_slot_query_token,  # V10.5.7b
                 )
+
                 # Gated combination: gate * slot_out + (1-gate) * x
                 gate_input = torch.cat([x, slot_out], dim=-1)
                 gate = self.slot_gate(gate_input)  # [B, N, 1]
+
+                # V10.5.7b: Force slot usage at query positions (Failure Mode A fix)
+                # At query positions, override gate to be high (0.9) to force slot retrieval
+                if query_mask.any():
+                    # Create forced gate: 0.9 at query positions, learned elsewhere
+                    forced_gate = torch.where(
+                        query_mask.unsqueeze(-1),  # [B, N, 1]
+                        torch.tensor(0.9, device=gate.device, dtype=gate.dtype),
+                        gate
+                    )
+                    gate = forced_gate
+
                 x = gate * slot_out + (1 - gate) * x
 
             if probe_layers:
@@ -5803,6 +5857,7 @@ def train_real_language(
     ar_dataset = None  # For accuracy evaluation
     ar_pad_token = None  # For custom loss computation
     ar_eq_token = None  # V10.5.7: For binding slot cache pattern detection
+    ar_query_token = None  # V10.5.7b: For forcing slot usage at query positions
 
     if use_associative_recall:
         print("\n" + "=" * 70)
@@ -5851,6 +5906,7 @@ def train_real_language(
         ar_dataset = val_dataset  # For accuracy evaluation
         ar_pad_token = train_dataset.PAD_TOKEN
         ar_eq_token = train_dataset.EQ_TOKEN  # V10.5.7: For binding slot cache
+        ar_query_token = train_dataset.QUERY_TOKEN  # V10.5.7b: For forcing slot usage
 
         # Custom collator for associative recall
         collator = AssociativeRecallCollator(ar_pad_token)
@@ -5952,6 +6008,7 @@ def train_real_language(
         # V10.5.7: Get binding slots configuration
         binding_slots = getattr(args, 'binding_slots', 0)
         binding_slot_eq_token = ar_eq_token if use_associative_recall else None
+        binding_slot_query_token = ar_query_token if use_associative_recall else None  # V10.5.7b
 
         model = BindingCacheLMTransformer(
             vocab_size=args.lm_vocab_size,
@@ -5972,6 +6029,7 @@ def train_real_language(
             # V10.5.7: Binding slot cache for explicit K-V memory
             binding_slots=binding_slots,
             binding_slot_eq_token=binding_slot_eq_token,
+            binding_slot_query_token=binding_slot_query_token,  # V10.5.7b
         ).to(config.device)
 
     elif use_protected_phase:
