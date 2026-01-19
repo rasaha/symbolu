@@ -4807,6 +4807,204 @@ class BindingCacheQuadQuery(nn.Module):
         return self.W_o(attn_out)
 
 
+# =============================================================================
+# V10.5.7: BINDING SLOT CACHE (Explicit Key-Value Memory)
+# =============================================================================
+# Minimal symbolic structure for associative recall.
+# This module provides explicit key-value slots that Quad can query,
+# separate from the decayed Phase memory.
+#
+# Key insight from AR experiment: Phase's decayed cumsum creates a "blurred
+# superposition" that cannot be inverted. Binding slots provide discrete,
+# content-addressable storage.
+
+class BindingSlotCache(nn.Module):
+    """
+    Explicit key-value binding slots for discrete memory retrieval.
+
+    Solves the associative recall problem by providing:
+    1. Identity - each slot stores a distinct (key, value) pair
+    2. Stability - slots don't decay or blend
+    3. Addressability - content-based retrieval via key similarity
+
+    Architecture:
+    - N slots, each with key_emb and value_emb [D]
+    - Write: detect (K, V) patterns, store in next available slot
+    - Read: query by key similarity, return corresponding value
+    - Separate from Phase decay - slots persist until overwritten
+
+    This is a minimal Memory Network / NTM-style component.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_slots: int = 16,
+        num_heads: int = 8,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_slots = num_slots
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Learnable slot embeddings (keys and values)
+        # These are updated during forward pass based on input patterns
+        self.register_buffer('slot_keys', torch.zeros(1, num_slots, embed_dim))
+        self.register_buffer('slot_values', torch.zeros(1, num_slots, embed_dim))
+        self.register_buffer('slot_used', torch.zeros(1, num_slots, dtype=torch.bool))
+        self.register_buffer('write_head', torch.zeros(1, dtype=torch.long))
+
+        # Projections for key-value detection
+        self.key_proj = nn.Linear(embed_dim, embed_dim)
+        self.value_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Query projection for reading
+        self.query_proj = nn.Linear(embed_dim, embed_dim)
+        self.output_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Write gate - learns when to write (triggered by patterns like K=V)
+        self.write_gate = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, 1),
+            nn.Sigmoid(),
+        )
+
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.scale = 1.0 / math.sqrt(self.head_dim)
+
+    def reset_slots(self, batch_size: int, device: torch.device):
+        """Reset slots for a new sequence (call at start of each batch)."""
+        self.slot_keys = torch.zeros(batch_size, self.num_slots, self.embed_dim, device=device)
+        self.slot_values = torch.zeros(batch_size, self.num_slots, self.embed_dim, device=device)
+        self.slot_used = torch.zeros(batch_size, self.num_slots, dtype=torch.bool, device=device)
+        self.write_head = torch.zeros(batch_size, dtype=torch.long, device=device)
+
+    def write_binding(
+        self,
+        key_emb: torch.Tensor,  # [B, D]
+        value_emb: torch.Tensor,  # [B, D]
+        write_mask: torch.Tensor,  # [B] - which batch items to write
+    ):
+        """
+        Write a key-value binding to the next available slot.
+
+        Args:
+            key_emb: Key embedding to store [B, D]
+            value_emb: Value embedding to store [B, D]
+            write_mask: Boolean mask indicating which batch items should write [B]
+        """
+        B = key_emb.shape[0]
+
+        for b in range(B):
+            if write_mask[b] and self.write_head[b] < self.num_slots:
+                slot_idx = self.write_head[b].item()
+                self.slot_keys[b, slot_idx] = key_emb[b].detach()  # Detach to avoid long BPTT
+                self.slot_values[b, slot_idx] = value_emb[b].detach()
+                self.slot_used[b, slot_idx] = True
+                self.write_head[b] = min(self.write_head[b] + 1, self.num_slots - 1)
+
+    def read_by_query(
+        self,
+        query: torch.Tensor,  # [B, N, D]
+    ) -> torch.Tensor:
+        """
+        Read from slots by querying with key similarity.
+
+        Args:
+            query: Query embeddings [B, N, D]
+
+        Returns:
+            retrieved: Retrieved values [B, N, D]
+        """
+        B, N, D = query.shape
+
+        # Project query
+        q = self.query_proj(query)  # [B, N, D]
+
+        # Compute attention over slots
+        # q: [B, N, D], slot_keys: [B, num_slots, D]
+        attn_scores = torch.matmul(q, self.slot_keys.transpose(-2, -1)) * self.scale  # [B, N, num_slots]
+
+        # Mask unused slots
+        slot_mask = ~self.slot_used  # [B, num_slots]
+        attn_scores = attn_scores.masked_fill(slot_mask.unsqueeze(1), float('-inf'))
+
+        # Softmax over slots
+        attn_probs = F.softmax(attn_scores, dim=-1)  # [B, N, num_slots]
+        attn_probs = self.dropout(attn_probs)
+
+        # Retrieve values
+        # attn_probs: [B, N, num_slots], slot_values: [B, num_slots, D]
+        retrieved = torch.matmul(attn_probs, self.slot_values)  # [B, N, D]
+
+        return self.output_proj(retrieved)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        input_ids: Optional[torch.Tensor] = None,
+        eq_token_id: Optional[int] = None,
+    ) -> torch.Tensor:
+        """
+        Process input: detect write patterns, read from slots.
+
+        For associative recall, we detect K=V patterns:
+        - Position i has EQ_TOKEN (=)
+        - Key is at position i-1
+        - Value is at position i+1
+        - Write (key, value) to slot
+
+        Args:
+            x: Input embeddings [B, N, D]
+            input_ids: Original token IDs [B, N] (for pattern detection)
+            eq_token_id: The token ID for '=' (EQ_TOKEN)
+
+        Returns:
+            output: Retrieved memories + residual [B, N, D]
+        """
+        B, N, D = x.shape
+        x_norm = self.norm(x)
+
+        # Reset slots at sequence start (position 0)
+        # In practice, this should be called externally before each sequence
+        if not hasattr(self, '_initialized') or self.slot_keys.shape[0] != B:
+            self.reset_slots(B, x.device)
+            self._initialized = True
+
+        # Pattern detection and writing (if input_ids provided)
+        if input_ids is not None and eq_token_id is not None:
+            # Find positions where EQ_TOKEN appears
+            eq_mask = (input_ids == eq_token_id)  # [B, N]
+
+            # For each EQ position, write (key=prev, value=next)
+            for pos in range(1, N - 1):
+                write_mask = eq_mask[:, pos]  # [B]
+                if write_mask.any():
+                    # Key is at pos-1, value is at pos+1
+                    key_emb = self.key_proj(x_norm[:, pos - 1])  # [B, D]
+                    value_emb = self.value_proj(x_norm[:, pos + 1])  # [B, D]
+                    self.write_binding(key_emb, value_emb, write_mask)
+
+        # Read from slots using current position as query
+        retrieved = self.read_by_query(x_norm)
+
+        return retrieved
+
+    def get_slot_usage(self) -> Dict[str, float]:
+        """Get diagnostic info about slot usage."""
+        used_count = self.slot_used.sum().item()
+        total_slots = self.slot_used.numel()
+        return {
+            'used_slots': used_count,
+            'total_slots': total_slots,
+            'usage_ratio': used_count / total_slots if total_slots > 0 else 0.0,
+        }
+
+
 class BindingCacheLMBlock(nn.Module):
     """
     Binding Cache block for Language Modeling.
@@ -5006,6 +5204,9 @@ class BindingCacheLMTransformer(nn.Module):
         quad_ratios: List[float] = None,
         proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
+        # V10.5.7: Binding Slot Cache for explicit key-value memory
+        binding_slots: int = 0,  # 0 = disabled, >0 = number of slots
+        binding_slot_eq_token: int = None,  # Token ID for '=' (triggers write)
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -5013,6 +5214,10 @@ class BindingCacheLMTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.proposal_mode = proposal_mode
+
+        # V10.5.7: Binding slot configuration
+        self.binding_slots_enabled = binding_slots > 0
+        self.binding_slot_eq_token = binding_slot_eq_token
 
         # Default ratios if not specified
         if phase_ratios is None:
@@ -5030,6 +5235,23 @@ class BindingCacheLMTransformer(nn.Module):
         self.token_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_seq_len, d_model)
         self.dropout = nn.Dropout(dropout)
+
+        # V10.5.7: Binding Slot Cache (shared across layers, first layer only)
+        self.binding_slot_cache = None
+        if self.binding_slots_enabled:
+            self.binding_slot_cache = BindingSlotCache(
+                embed_dim=d_model,
+                num_slots=binding_slots,
+                num_heads=num_heads,
+                dropout=dropout,
+            )
+            # Learnable gate to combine slot output with main path
+            self.slot_gate = nn.Sequential(
+                nn.Linear(d_model * 2, d_model),
+                nn.ReLU(),
+                nn.Linear(d_model, 1),
+                nn.Sigmoid(),
+            )
 
         # Binding Cache blocks with per-layer ratios
         self.layers = nn.ModuleList([
@@ -5071,14 +5293,39 @@ class BindingCacheLMTransformer(nn.Module):
 
         self.layer_outputs = []
 
+        # V10.5.7: Reset binding slot cache for new batch
+        if self.binding_slots_enabled and self.binding_slot_cache is not None:
+            self.binding_slot_cache.reset_slots(B, input_ids.device)
+
         for i, layer in enumerate(self.layers):
             x = layer(x)
+
+            # V10.5.7: Apply binding slot cache after first layer
+            # This allows embeddings to be processed before write/read
+            if i == 0 and self.binding_slots_enabled and self.binding_slot_cache is not None:
+                # Get slot retrieval
+                slot_out = self.binding_slot_cache(
+                    x,
+                    input_ids=input_ids,
+                    eq_token_id=self.binding_slot_eq_token,
+                )
+                # Gated combination: gate * slot_out + (1-gate) * x
+                gate_input = torch.cat([x, slot_out], dim=-1)
+                gate = self.slot_gate(gate_input)  # [B, N, 1]
+                x = gate * slot_out + (1 - gate) * x
+
             if probe_layers:
                 self.layer_outputs.append(x.detach().clone())
 
         x = self.norm(x)
         logits = self.lm_head(x)
         return logits
+
+    def get_slot_usage(self) -> Dict[str, float]:
+        """V10.5.7: Get binding slot usage diagnostics."""
+        if self.binding_slot_cache is not None:
+            return self.binding_slot_cache.get_slot_usage()
+        return {'used_slots': 0, 'total_slots': 0, 'usage_ratio': 0.0}
 
     def get_phase_health(self) -> dict:
         """Aggregate Phase health metrics from all layers."""
@@ -5555,6 +5802,7 @@ def train_real_language(
     use_associative_recall = getattr(args, 'associative_recall', False)
     ar_dataset = None  # For accuracy evaluation
     ar_pad_token = None  # For custom loss computation
+    ar_eq_token = None  # V10.5.7: For binding slot cache pattern detection
 
     if use_associative_recall:
         print("\n" + "=" * 70)
@@ -5602,6 +5850,7 @@ def train_real_language(
 
         ar_dataset = val_dataset  # For accuracy evaluation
         ar_pad_token = train_dataset.PAD_TOKEN
+        ar_eq_token = train_dataset.EQ_TOKEN  # V10.5.7: For binding slot cache
 
         # Custom collator for associative recall
         collator = AssociativeRecallCollator(ar_pad_token)
@@ -5610,6 +5859,14 @@ def train_real_language(
 
         # Override vocab size for model creation
         args.lm_vocab_size = ar_vocab_size
+
+        # V10.5.7: Print binding slots info if enabled
+        binding_slots = getattr(args, 'binding_slots', 0)
+        if binding_slots > 0:
+            print(f"\n  ★ BINDING SLOT CACHE ENABLED (V10.5.7)")
+            print(f"    Number of slots: {binding_slots}")
+            print(f"    EQ_TOKEN ID: {ar_eq_token}")
+            print(f"    Purpose: Explicit K-V memory separate from Phase decay")
     else:
         print("\n" + "=" * 70)
         print("REAL LANGUAGE MODE: WikiText Language Modeling")
@@ -5692,6 +5949,10 @@ def train_real_language(
             print(f"║    L{i}: Local={bc_local_ratio[i]:.2f}, Phase={bc_phase_ratio[i]:.2f}, Quad={bc_quad_ratio[i]:.2f}")
         print(f"╚═══════════════════════════════════════════════════════════════════════╝")
 
+        # V10.5.7: Get binding slots configuration
+        binding_slots = getattr(args, 'binding_slots', 0)
+        binding_slot_eq_token = ar_eq_token if use_associative_recall else None
+
         model = BindingCacheLMTransformer(
             vocab_size=args.lm_vocab_size,
             d_model=config.d_model,
@@ -5708,6 +5969,9 @@ def train_real_language(
             quad_ratios=bc_quad_ratio,
             proposal_mode=args.proposal_mode,
             confidence_threshold=args.confidence_threshold,
+            # V10.5.7: Binding slot cache for explicit K-V memory
+            binding_slots=binding_slots,
+            binding_slot_eq_token=binding_slot_eq_token,
         ).to(config.device)
 
     elif use_protected_phase:
@@ -6127,6 +6391,12 @@ def train_real_language(
                 else:
                     print(f"        → Quad NOT working (≈ random {random_baseline:.1f}%)")
 
+                # V10.5.7: Show binding slot usage if enabled
+                if hasattr(model, 'get_slot_usage'):
+                    slot_usage = model.get_slot_usage()
+                    if slot_usage['total_slots'] > 0:
+                        print(f"      Binding Slots: {slot_usage['used_slots']}/{slot_usage['total_slots']} used ({slot_usage['usage_ratio']*100:.1f}%)")
+
             if val_ppl < best_val_ppl:
                 best_val_ppl = val_ppl
                 print(f"      ★ New best Val PPL!")
@@ -6349,6 +6619,14 @@ def train_real_language(
         else:
             print(f"  ║  Verdict: QUAD BROKEN (≈ random)  ✗                           ║")
         print(f"  ╚══════════════════════════════════════════════════════════════╝")
+
+        # V10.5.7: Show binding slot usage in final results
+        if hasattr(model, 'get_slot_usage'):
+            slot_usage = model.get_slot_usage()
+            if slot_usage['total_slots'] > 0:
+                print(f"\n  Binding Slot Cache Usage:")
+                print(f"    Slots used: {slot_usage['used_slots']}/{slot_usage['total_slots']}")
+                print(f"    Usage ratio: {slot_usage['usage_ratio']*100:.1f}%")
 
     if use_protected_phase:
         print(f"  Architecture: Protected Phase (sequential collaboration)")
@@ -7542,6 +7820,12 @@ Examples:
                         help="Number of training samples for associative recall (default: 50000)")
     parser.add_argument("--ar-val-samples", type=int, default=2000,
                         help="Number of validation samples for associative recall (default: 2000)")
+
+    # V10.5.7: Binding Slot Cache (explicit key-value memory)
+    parser.add_argument("--binding-slots", type=int, default=0,
+                        help="Number of binding slots for explicit K-V memory (0=disabled, 16-32 recommended). "
+                             "Provides discrete, content-addressable storage separate from Phase decay. "
+                             "Required for associative recall task to work.")
 
     # ==========================================================================
     # REAL LANGUAGE MODE (WikiText/FineWeb)
