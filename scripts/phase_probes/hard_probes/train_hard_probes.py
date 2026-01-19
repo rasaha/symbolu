@@ -4348,6 +4348,50 @@ class BindingCachePhaseState(nn.Module):
 
         return confidence
 
+    def integrate_proposals(
+        self,
+        x: torch.Tensor,
+        memory_state: torch.Tensor,
+        proposals: torch.Tensor,
+        proposal_scores: torch.Tensor,
+        gamma: float = 0.9,
+    ) -> torch.Tensor:
+        """
+        V10.4: Integrate quad proposals into phase state.
+
+        This implements the "phase-as-integrator" pattern where phase
+        decides which proposals survive and integrates them into state.
+
+        Args:
+            x: Input tensor [B, N, D]
+            memory_state: Current phase state [B, N, D]
+            proposals: [B, N, K, D] - K proposals from quad
+            proposal_scores: [B, N, K] - retrieval scores for each proposal
+            gamma: Decay factor for state (0 < gamma < 1)
+
+        Returns:
+            integrated_output: [B, N, D] - integrated state update
+        """
+        B, N, K, D = proposals.shape
+
+        # Phase computes gating weights (NOT quad softmax)
+        # Use sigmoid + normalize for smoother gradients than softmax
+        gate_logits = proposal_scores  # [B, N, K]
+
+        # Sigmoid + normalize (not winner-take-all like softmax)
+        gate_weights_raw = torch.sigmoid(gate_logits)  # [B, N, K]
+        gate_weights = gate_weights_raw / (gate_weights_raw.sum(dim=-1, keepdim=True) + 1e-8)  # [B, N, K]
+
+        # Weighted sum of proposals
+        # [B, N, K, 1] * [B, N, K, D] -> [B, N, K, D] -> sum -> [B, N, D]
+        weighted_proposals = (gate_weights.unsqueeze(-1) * proposals).sum(dim=2)  # [B, N, D]
+
+        # State update: decay old state + integrate new proposals
+        # S_{t+1} = gamma * S_t + (1 - gamma) * weighted_proposals
+        integrated = gamma * memory_state + (1 - gamma) * weighted_proposals
+
+        return integrated
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Compute memory state via cumsum.
