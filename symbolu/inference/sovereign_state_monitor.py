@@ -5,6 +5,15 @@ Sovereign State Monitor
 
 Real-time monitoring and analysis of the 32D Sovereign State during inference.
 
+CRITICAL DESIGN INVARIANT:
+    This monitor is PURELY OBSERVATIONAL. It must NEVER influence generation.
+    - Observational: Reads state tensors (always detached from computation graph)
+    - Diagnostic: Provides metrics and warnings for logging/display
+    - Logged/Surfaced: Results are for human review and debugging only
+    - NEVER fed back into the forward pass
+    - NEVER used to modify logits, sampling, or token selection
+    - NEVER used to abort generation (warnings are informational only)
+
 The 32D Sovereign State structure:
 - [0:12]  - 12 Bhavas (Ontological Aspects of being/becoming)
 - [12:17] - 5 Koshas (Consciousness Sheaths)
@@ -187,12 +196,28 @@ class SovereignStateMonitor:
     """
     Monitor and analyze 32D Sovereign State during inference.
 
+    ╔════════════════════════════════════════════════════════════════════════════╗
+    ║  CRITICAL INVARIANT: This monitor must NEVER influence generation.         ║
+    ║                                                                            ║
+    ║  This component is:                                                        ║
+    ║    ✓ Observational - reads state tensors, never modifies them              ║
+    ║    ✓ Diagnostic - provides metrics and warnings for logging/display        ║
+    ║    ✓ Logged/Surfaced - results are for human review and debugging          ║
+    ║    ✗ NEVER fed back into the forward pass                                  ║
+    ║    ✗ NEVER used to modify logits, sampling, or token selection             ║
+    ║    ✗ NEVER used to abort generation (warnings are informational only)      ║
+    ║                                                                            ║
+    ║  All state analysis uses .detach().cpu() to ensure complete decoupling     ║
+    ║  from the computation graph. If you need to influence generation based     ║
+    ║  on state, use a separate component (e.g., CSRInferenceGuard).             ║
+    ╚════════════════════════════════════════════════════════════════════════════╝
+
     Provides:
     - Real-time state analysis
     - Trajectory tracking
     - Reliability assessment
     - Depth estimation
-    - Warning detection
+    - Warning detection (informational only, does not influence generation)
 
     Example:
         monitor = SovereignStateMonitor()
@@ -201,6 +226,7 @@ class SovereignStateMonitor:
             metrics = monitor.analyze_state(state)
             print(metrics.get_status_line())
 
+            # Warnings are INFORMATIONAL ONLY - do not use to abort/modify generation
             if metrics.error_risk > 0.5:
                 print("Warning: High hallucination risk!")
 
@@ -238,11 +264,16 @@ class SovereignStateMonitor:
         """
         Analyze a 32D Sovereign State tensor.
 
+        NOTE: This method is READ-ONLY and OBSERVATIONAL. The returned metrics
+        must NEVER be used to influence generation (modify logits, abort, etc.).
+        All tensor operations use .detach().cpu() to ensure complete decoupling
+        from the computation graph.
+
         Args:
             state: [B, 32] or [32] Sovereign State tensor
 
         Returns:
-            metrics: Comprehensive state metrics
+            metrics: Comprehensive state metrics (for logging/display only)
         """
         # Ensure 2D
         if state.dim() == 1:
@@ -350,7 +381,14 @@ class SovereignStateMonitor:
         return metrics
 
     def _check_warnings(self, metrics: SovereignStateMetrics) -> None:
-        """Check for warning conditions."""
+        """
+        Check for warning conditions.
+
+        IMPORTANT: These warnings are INFORMATIONAL ONLY for logging/display.
+        They must NEVER be used to abort generation or modify the forward pass.
+        Callers should use these warnings for human review, debugging, or
+        post-generation analysis - never for real-time generation control.
+        """
         warnings_triggered = []
 
         if metrics.error_risk > self.warn_thresholds['error_risk']:
@@ -392,7 +430,13 @@ class SovereignStateMonitor:
         return self._state_history
 
     def get_warnings(self) -> List[Dict[str, Any]]:
-        """Get triggered warnings."""
+        """
+        Get triggered warnings.
+
+        Returns:
+            warnings: List of warning dicts (for logging/display ONLY,
+                     must NEVER be used to influence generation)
+        """
         return self._warnings
 
     def get_reliability_trend(self, window: int = 5) -> str:
