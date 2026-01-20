@@ -13,11 +13,16 @@ This module implements the inference-side equivalents of training components:
 - SovereignInferenceScorer: Quality scoring using Sovereign-1 metrics
 - LayerInferenceConfig: 6:6 / 9:3 layer configuration for inference
 
+V10.0 Phase 5 additions:
+- BindingCacheInferenceEngine: Engine for BindingCacheTransformer
+- OntologicalBindingCacheInferenceEngine: Engine for OntologicalBindingCacheTransformer
+- SovereignStateMonitor: 32D Sovereign State monitoring and analysis
+
 See docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md for detailed gap analysis.
 
 Author: Sovereign-1 Training Initiative
 Date: January 2026
-Version: 1.0.0
+Version: 2.0.0 (Phase 5 - V10.0 Binding Cache Support)
 """
 
 from .evolutionary_inference import EvolutionaryInferenceEngine
@@ -25,29 +30,74 @@ from .csr_inference import CSRInferenceGuard
 from .metacognitive_monitor import InferenceMetacognition
 from .guna_inference import InferenceGunas
 from .sovereign_scorer import SovereignInferenceScorer
-from .layer_config import LayerInferenceConfig
+from .layer_config import LayerInferenceConfig, ArchitectureMode
 from .checkpoint_utils import load_inference_engine, InferenceCheckpointLoader
 from .manager import InferenceManager, InferenceMode, InferenceManagerConfig
 
+# V10.0 Phase 5 - Binding Cache Inference Engines
+from .binding_cache_inference import (
+    BindingCacheInferenceEngine,
+    BindingCacheInferenceConfig,
+    IntentPhaseInferenceModule,
+    BindingSalienceController,
+)
+from .ontological_binding_cache_inference import (
+    OntologicalBindingCacheInferenceEngine,
+    OntologicalBindingCacheInferenceConfig,
+)
+from .sovereign_state_monitor import (
+    SovereignStateMonitor,
+    SovereignStateMetrics,
+    DepthLevel,
+    ReliabilityLevel,
+    SOVEREIGN_STATE_DIM,
+    BHAVA_NAMES,
+    KOSHA_NAMES,
+    VRITTI_NAMES,
+    GUNA_NAMES,
+    get_sovereign_state_summary,
+)
+
 __all__ = [
-    # Core engines
+    # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
     "CSRInferenceGuard",
     "InferenceManager",
     "InferenceMode",
     "InferenceManagerConfig",
 
-    # Monitoring
+    # Monitoring (Legacy)
     "InferenceMetacognition",
     "InferenceGunas",
     "SovereignInferenceScorer",
 
     # Configuration
     "LayerInferenceConfig",
+    "ArchitectureMode",
 
     # Utilities
     "load_inference_engine",
     "InferenceCheckpointLoader",
+
+    # V10.0 Binding Cache Engines (Phase 5)
+    "BindingCacheInferenceEngine",
+    "BindingCacheInferenceConfig",
+    "IntentPhaseInferenceModule",
+    "BindingSalienceController",
+    "OntologicalBindingCacheInferenceEngine",
+    "OntologicalBindingCacheInferenceConfig",
+
+    # V10.0 Sovereign State Monitor (Phase 5)
+    "SovereignStateMonitor",
+    "SovereignStateMetrics",
+    "DepthLevel",
+    "ReliabilityLevel",
+    "SOVEREIGN_STATE_DIM",
+    "BHAVA_NAMES",
+    "KOSHA_NAMES",
+    "VRITTI_NAMES",
+    "GUNA_NAMES",
+    "get_sovereign_state_summary",
 ]
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

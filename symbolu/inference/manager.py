@@ -30,6 +30,12 @@ from .metacognitive_monitor import InferenceMetacognition, MetacognitiveConfig, 
 from .guna_inference import InferenceGunas, GunaConfig
 from .sovereign_scorer import SovereignInferenceScorer, SovereignScorerConfig
 from .layer_config import LayerInferenceConfig, ArchitectureMode
+from .binding_cache_inference import BindingCacheInferenceEngine, BindingCacheInferenceConfig
+from .ontological_binding_cache_inference import (
+    OntologicalBindingCacheInferenceEngine,
+    OntologicalBindingCacheInferenceConfig,
+)
+from .sovereign_state_monitor import SovereignStateMonitor
 
 
 class InferenceMode(Enum):
@@ -60,6 +66,12 @@ class InferenceManagerConfig:
     # Safety
     abort_on_low_coherence: bool = False
     auto_adjust_params: bool = True
+
+    # V10.0 Architecture settings (Phase 5)
+    architecture_mode: Optional[ArchitectureMode] = None  # Auto-detected from model
+    enable_binding_cache_engine: bool = True  # Use specialized engine for V10.0
+    enable_sovereign_state_monitor: bool = True  # Track 32D state
+    track_state_trajectory: bool = True  # Track state evolution
 
 
 class InferenceManager:
@@ -102,6 +114,8 @@ class InferenceManager:
         evolutionary_engine: Optional[EvolutionaryInferenceEngine] = None,
         csr_guard: Optional[CSRInferenceGuard] = None,
         layer_config: Optional[LayerInferenceConfig] = None,
+        binding_cache_engine: Optional[BindingCacheInferenceEngine] = None,
+        ontological_engine: Optional[OntologicalBindingCacheInferenceEngine] = None,
         device: Union[str, torch.device] = 'cpu',
     ):
         """
@@ -114,6 +128,8 @@ class InferenceManager:
             evolutionary_engine: Pre-initialized evolutionary engine
             csr_guard: Pre-initialized CSR guard
             layer_config: Layer configuration
+            binding_cache_engine: Pre-initialized BindingCache engine (V10.0)
+            ontological_engine: Pre-initialized OntologicalBindingCache engine (V10.0)
             device: Target device
         """
         self.config = config or InferenceManagerConfig()
@@ -124,10 +140,21 @@ class InferenceManager:
         # Apply mode presets
         self._apply_mode_preset()
 
+        # Auto-detect architecture mode from model type
+        self._detect_architecture_mode()
+
         # Initialize components based on config
         self.evolutionary_engine = evolutionary_engine
         self.csr_guard = csr_guard
         self.layer_config = layer_config or LayerInferenceConfig()
+
+        # V10.0 Binding Cache engines (Phase 5)
+        self.binding_cache_engine = binding_cache_engine
+        self.ontological_engine = ontological_engine
+        self.state_monitor: Optional[SovereignStateMonitor] = None
+
+        # Initialize V10.0 engines if appropriate architecture
+        self._initialize_v10_engines()
 
         # Create remaining components
         self.metacognition = InferenceMetacognition() if self.config.enable_metacognition else None
@@ -137,6 +164,56 @@ class InferenceManager:
         # Generation state
         self._generation_count: int = 0
         self._total_tokens_generated: int = 0
+
+    def _detect_architecture_mode(self) -> None:
+        """Auto-detect architecture mode from model class name."""
+        if self.config.architecture_mode is not None:
+            return
+
+        model_class_name = self.model.__class__.__name__
+
+        if 'OntologicalBindingCache' in model_class_name:
+            self.config.architecture_mode = ArchitectureMode.ONTOLOGICAL_BINDING_CACHE
+        elif 'BindingCache' in model_class_name:
+            self.config.architecture_mode = ArchitectureMode.BINDING_CACHE
+        elif 'Ontological' in model_class_name or 'Hybrid' in model_class_name:
+            self.config.architecture_mode = ArchitectureMode.SPLIT_6_6
+        else:
+            self.config.architecture_mode = ArchitectureMode.SPLIT_12_0
+
+    def _initialize_v10_engines(self) -> None:
+        """Initialize V10.0 inference engines based on architecture mode."""
+        if not self.config.enable_binding_cache_engine:
+            return
+
+        arch = self.config.architecture_mode
+
+        if arch == ArchitectureMode.ONTOLOGICAL_BINDING_CACHE:
+            if self.ontological_engine is None:
+                self.ontological_engine = OntologicalBindingCacheInferenceEngine(
+                    self.model,
+                    config=OntologicalBindingCacheInferenceConfig(
+                        track_state_trajectory=self.config.track_state_trajectory,
+                    ),
+                )
+                self.ontological_engine.to(self._device)
+
+            # Use the engine's state monitor
+            self.state_monitor = self.ontological_engine.state_monitor
+
+        elif arch == ArchitectureMode.BINDING_CACHE:
+            if self.binding_cache_engine is None:
+                self.binding_cache_engine = BindingCacheInferenceEngine(
+                    self.model,
+                    config=BindingCacheInferenceConfig(),
+                )
+                self.binding_cache_engine.to(self._device)
+
+        # Create state monitor for tracking even without ontological engine
+        if (self.config.enable_sovereign_state_monitor and
+            self.state_monitor is None):
+            self.state_monitor = SovereignStateMonitor()
+            self.state_monitor.to(self._device)
 
     def _apply_mode_preset(self) -> None:
         """Apply mode-specific defaults."""
@@ -243,6 +320,16 @@ class InferenceManager:
 
         if self.csr_guard is not None:
             self.csr_guard.to(device)
+
+        # V10.0 engines (Phase 5)
+        if self.binding_cache_engine is not None:
+            self.binding_cache_engine.to(device)
+
+        if self.ontological_engine is not None:
+            self.ontological_engine.to(device)
+
+        if self.state_monitor is not None:
+            self.state_monitor.to(device)
 
         return self
 
@@ -488,6 +575,138 @@ class InferenceManager:
 
         return result
 
+    @torch.no_grad()
+    def generate_v10(
+        self,
+        prompt: Union[str, torch.Tensor],
+        max_new_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        reset_state: bool = False,
+        track_trajectory: bool = True,
+        on_token_callback: Optional[callable] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Generate using V10.0 Binding Cache architecture (Phase 5).
+
+        Automatically dispatches to the appropriate engine based on architecture:
+        - ONTOLOGICAL_BINDING_CACHE: Uses two-pass generation with 32D state
+        - BINDING_CACHE: Uses proposal mode with Top-K cache
+
+        Args:
+            prompt: Text prompt or input_ids tensor
+            max_new_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            top_p: Nucleus sampling threshold
+            top_k: Top-k sampling
+            reset_state: Reset Sovereign State (for ontological mode)
+            track_trajectory: Track state evolution
+            on_token_callback: Optional callback(token_id, step_meta)
+            **kwargs: Additional generation arguments
+
+        Returns:
+            result: Dict with generation outputs and V10.0 specific metrics
+        """
+        # Apply defaults
+        max_new_tokens = max_new_tokens or self.config.max_new_tokens
+        temperature = temperature or self.config.default_temperature
+        top_p = top_p or self.config.default_top_p
+        top_k = top_k or self.config.default_top_k
+
+        # Encode prompt if string
+        if isinstance(prompt, str):
+            input_ids = self.tokenizer.encode(prompt, return_tensors='pt')
+        else:
+            input_ids = prompt
+
+        input_ids = input_ids.to(self._device)
+
+        arch = self.config.architecture_mode
+
+        # Dispatch to appropriate engine
+        if arch == ArchitectureMode.ONTOLOGICAL_BINDING_CACHE and self.ontological_engine is not None:
+            # Two-pass generation with Sovereign State tracking
+            generated_ids, engine_meta = self.ontological_engine.generate_with_ontology(
+                input_ids,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                reset_state=reset_state,
+                track_trajectory=track_trajectory,
+                on_token_callback=on_token_callback,
+                **kwargs,
+            )
+
+            # Decode output
+            generated_token_ids = generated_ids[0, input_ids.size(1):].tolist()
+            generated_text = self.tokenizer.decode(generated_token_ids, skip_special_tokens=True)
+
+            # Update counters
+            self._generation_count += 1
+            self._total_tokens_generated += engine_meta['tokens_generated']
+
+            return {
+                'text': generated_text,
+                'tokens': generated_token_ids,
+                'full_ids': generated_ids,
+                'meta': engine_meta,
+                'architecture': 'ontological_binding_cache',
+                'state_trajectory': engine_meta.get('state_trajectory'),
+                'final_state': engine_meta.get('final_state'),
+                'final_metrics': engine_meta.get('final_metrics'),
+                'reliability': engine_meta.get('avg_reliability'),
+                'warnings': engine_meta.get('warnings', []),
+            }
+
+        elif arch == ArchitectureMode.BINDING_CACHE and self.binding_cache_engine is not None:
+            # Proposal mode generation with Top-K cache
+            generated_ids, engine_meta = self.binding_cache_engine.generate(
+                input_ids,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                track_metrics=track_trajectory,
+                on_token_callback=on_token_callback,
+                **kwargs,
+            )
+
+            # Decode output
+            generated_token_ids = generated_ids[0, input_ids.size(1):].tolist()
+            generated_text = self.tokenizer.decode(generated_token_ids, skip_special_tokens=True)
+
+            # Update counters
+            self._generation_count += 1
+            self._total_tokens_generated += engine_meta['tokens_generated']
+
+            return {
+                'text': generated_text,
+                'tokens': generated_token_ids,
+                'full_ids': generated_ids,
+                'meta': engine_meta,
+                'architecture': 'binding_cache',
+                'proposal_metrics': engine_meta.get('proposal_metrics'),
+                'avg_confidence': engine_meta.get('avg_confidence'),
+                'avg_skip_rate': engine_meta.get('avg_skip_rate'),
+                'phase_health': engine_meta.get('final_phase_health'),
+                'cache_metrics': engine_meta.get('final_cache_metrics'),
+            }
+
+        else:
+            # Fallback to standard generation
+            return self.generate(
+                prompt,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                on_token_callback=on_token_callback,
+                **kwargs,
+            )
+
     def get_status(self) -> str:
         """
         Get comprehensive status string.
@@ -497,6 +716,7 @@ class InferenceManager:
         """
         lines = [f"InferenceManager [{self.config.mode.value}]"]
         lines.append(f"  Device: {self._device}")
+        lines.append(f"  Architecture: {self.config.architecture_mode.value if self.config.architecture_mode else 'unknown'}")
         lines.append(f"  Generations: {self._generation_count}")
         lines.append(f"  Total tokens: {self._total_tokens_generated}")
         lines.append("")
@@ -516,6 +736,16 @@ class InferenceManager:
 
         if self.scorer is not None:
             lines.append(f"  {self.scorer.get_status_line()}")
+
+        # V10.0 engine statuses (Phase 5)
+        if self.binding_cache_engine is not None:
+            lines.append(f"  {self.binding_cache_engine.get_status_line()}")
+
+        if self.ontological_engine is not None:
+            lines.append(f"  {self.ontological_engine.get_status_line()}")
+
+        if self.state_monitor is not None:
+            lines.append(f"  {self.state_monitor.get_status_line()}")
 
         return "\n".join(lines)
 
@@ -548,6 +778,16 @@ class InferenceManager:
 
         if self.scorer is not None:
             self.scorer.reset()
+
+        # V10.0 engines (Phase 5)
+        if self.binding_cache_engine is not None:
+            self.binding_cache_engine.clear_state()
+
+        if self.ontological_engine is not None:
+            self.ontological_engine.clear_state()
+
+        if self.state_monitor is not None:
+            self.state_monitor.clear()
 
     def save_state(self, path: Union[str, Path]) -> None:
         """
