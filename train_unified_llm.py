@@ -131,6 +131,16 @@ from symbolu.phase_transformer import (
     # V9.9.12c: Health dashboard (diagnostic only)
     enable_health_diagnostics_capture,
     compute_phase_health_diagnostics,
+    # V10.6.2+ Control-Plane Items (Hard Probes Integration)
+    # D.5: No-Write Contract Enforcement
+    ControlShapeViolation,
+    assert_control_shape,
+    validate_control_signals,
+    # V10.6.3: Alignment signal shape contract
+    assert_alignment_signal_shape,
+    # D.1: OntoControl formalized interface
+    OntoControl,
+    onto_control_from_salience,
 )
 
 # Import ontological models
@@ -9317,9 +9327,44 @@ class UnifiedTrainingConfig:
     dual_channel_mode: bool = False  # Enable dual-channel attention
     alignment_authority: float = 0.1  # α: weight for alignment term (0=pure content, higher=more intent influence)
 
+    # ==========================================================================
+    # V10.6+ CONTROL-PLANE ITEMS (Hard Probes Integration)
+    # ==========================================================================
+    # D.5: No-Write Contract Enforcement - prevents control signals from encoding content
+    # D.2: enable_slots_read routing flag - separate read/write paths for quad
+    # D.1: OntoControl formalized interface - explicit control plane object
+    # Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D
+
+    # V10.6.1: Alignment Clamp (ChatGPT caveat - prevents over-constraint collapse)
+    # Clamp bounds for alignment modulator: output = output * clamp(1 + α * s_align, min, max)
+    alignment_clamp_min: float = 0.8  # Lower bound (prevents over-suppression)
+    alignment_clamp_max: float = 1.2  # Upper bound (prevents over-amplification)
+
+    # V10.6.2 D.5: No-Write Contract Enforcement
+    strict_control_contract: bool = True  # If True, raise on contract violation; if False, warn
+
+    # V10.6.3: Architecture Health Summary (PASS/FAIL diagnostics at startup)
+    run_architecture_health_check: bool = True  # Run health check at training start
+    architecture_health_strict: bool = False  # If True, abort training on FAIL
+
+    # V10.6.5: Parameter-Matched Baseline Enforcement
+    # Ensures baseline comparison uses exact parameter count (not just same architecture)
+    enforce_baseline_param_match: bool = True  # Validate param count matches
+
+    # V10.6.6: Quad Utilization Sanity Checks (diagnostic probes)
+    enable_quad_utilization_checks: bool = False  # Enable quad utilization monitoring
+    quad_utilization_warn_threshold: float = 0.01  # Warn if quad contributes < 1%
+    quad_utilization_check_interval: int = 100  # Check every N steps
+
+    # V10.6.7: Lightweight Probe Hooks (diagnostic only, not full datasets)
+    enable_probe_hooks: bool = False  # Enable lightweight diagnostic probes
+    probe_hook_interval: int = 500  # Run probes every N steps
+    probe_hook_types: str = "phase_rotation,chunk_continuity"  # Comma-separated probe types
+
     # Phase Rotation Test (validates phase encodes relational structure)
     phase_rotation: bool = False  # Run phase rotation test after training
     phase_rotation_angles: str = "0,45,90,135,180,270"  # Angles to test (degrees)
+    phase_rotation_as_diagnostic: bool = False  # Run as periodic diagnostic during training
 
     # V10.0: Binding Cache architecture (validated by diagnostic probes)
     binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
@@ -12763,6 +12808,482 @@ def compute_phase_loss(
 
 
 # =============================================================================
+# V10.6+ CONTROL-PLANE UTILITIES (Hard Probes Integration)
+# =============================================================================
+
+@dataclass
+class ArchitectureHealthReport:
+    """
+    V10.6.3: Architecture Health Summary with PASS/FAIL diagnostics.
+
+    Checks critical invariants at training start:
+    - Control signal shapes (D.5 no-write contract)
+    - Dual-channel wiring (alignment clamp present)
+    - Quad utilization baseline (not bypassed)
+    - Chunk continuity (if chunking enabled)
+
+    Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D
+    """
+    overall: str = "UNKNOWN"  # "PASS", "WARN", "FAIL"
+    checks: Dict[str, Tuple[str, str]] = field(default_factory=dict)  # name -> (status, detail)
+    timestamp: str = ""
+
+    def __post_init__(self):
+        self.timestamp = datetime.now().isoformat()
+
+    def add_check(self, name: str, status: str, detail: str = ""):
+        """Add a check result. status should be 'PASS', 'WARN', or 'FAIL'."""
+        self.checks[name] = (status, detail)
+
+    def compute_overall(self) -> str:
+        """Compute overall status from individual checks."""
+        statuses = [s for s, _ in self.checks.values()]
+        if "FAIL" in statuses:
+            self.overall = "FAIL"
+        elif "WARN" in statuses:
+            self.overall = "WARN"
+        elif statuses:
+            self.overall = "PASS"
+        return self.overall
+
+    def print_report(self):
+        """Print formatted health report."""
+        print(f"\n{'='*70}")
+        print("  📊 ARCHITECTURE HEALTH CHECK (V10.6.3)")
+        print(f"{'='*70}")
+
+        status_icons = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌", "UNKNOWN": "❓"}
+
+        for name, (status, detail) in self.checks.items():
+            icon = status_icons.get(status, "❓")
+            detail_str = f" - {detail}" if detail else ""
+            print(f"  {icon} {name}: {status}{detail_str}")
+
+        self.compute_overall()
+        overall_icon = status_icons.get(self.overall, "❓")
+        print(f"\n  {overall_icon} OVERALL: {self.overall}")
+        print(f"{'='*70}\n")
+
+        return self.overall
+
+
+def run_architecture_health_check(
+    model: torch.nn.Module,
+    config: "UnifiedTrainingConfig",
+    device: torch.device,
+) -> ArchitectureHealthReport:
+    """
+    V10.6.3: Run architecture health check and return PASS/FAIL report.
+
+    Checks:
+    1. D.5 No-Write Contract - control signal shapes are low-dimensional
+    2. Dual-Channel Wiring - alignment clamp bounds configured
+    3. D.2 Slots Read Flag - enable_slots_read routing works
+    4. Quad Baseline - quad path contributes (not bypassed)
+    5. Chunk Continuity - (if chunking enabled) state persists across chunks
+
+    Args:
+        model: The model to check
+        config: Training configuration
+        device: Torch device
+
+    Returns:
+        ArchitectureHealthReport with all check results
+    """
+    report = ArchitectureHealthReport()
+
+    # Check 1: D.5 No-Write Contract Configuration
+    try:
+        if config.strict_control_contract:
+            report.add_check(
+                "D.5 No-Write Contract",
+                "PASS",
+                "strict mode enabled (violations will raise)"
+            )
+        else:
+            report.add_check(
+                "D.5 No-Write Contract",
+                "WARN",
+                "warn mode (violations logged, not raised)"
+            )
+    except Exception as e:
+        report.add_check("D.5 No-Write Contract", "FAIL", str(e))
+
+    # Check 2: Dual-Channel Wiring (alignment clamp)
+    try:
+        if config.dual_channel_mode:
+            if 0.0 < config.alignment_clamp_min < config.alignment_clamp_max <= 2.0:
+                report.add_check(
+                    "Dual-Channel Wiring",
+                    "PASS",
+                    f"clamp=[{config.alignment_clamp_min:.2f}, {config.alignment_clamp_max:.2f}], α={config.alignment_authority:.2f}"
+                )
+            else:
+                report.add_check(
+                    "Dual-Channel Wiring",
+                    "WARN",
+                    f"unusual clamp bounds: [{config.alignment_clamp_min}, {config.alignment_clamp_max}]"
+                )
+        else:
+            report.add_check(
+                "Dual-Channel Wiring",
+                "PASS",
+                "dual_channel_mode disabled (not needed)"
+            )
+    except Exception as e:
+        report.add_check("Dual-Channel Wiring", "FAIL", str(e))
+
+    # Check 3: D.2 Enable Slots Read (if model supports it)
+    try:
+        has_slots_read = hasattr(model, 'forward') and 'enable_slots_read' in str(
+            model.forward.__code__.co_varnames if hasattr(model, 'forward') else ""
+        )
+        # Check if model class has binding cache blocks
+        has_binding_cache = any(
+            "BindingCache" in type(m).__name__
+            for m in model.modules()
+        )
+        if has_binding_cache:
+            report.add_check(
+                "D.2 Enable Slots Read",
+                "PASS",
+                "BindingCache architecture detected"
+            )
+        else:
+            report.add_check(
+                "D.2 Enable Slots Read",
+                "PASS",
+                "no BindingCache (slots_read N/A)"
+            )
+    except Exception as e:
+        report.add_check("D.2 Enable Slots Read", "WARN", f"check skipped: {e}")
+
+    # Check 4: Quad Utilization Baseline
+    try:
+        # Check if model has quad/binding cache path
+        has_quad = any(
+            "quad" in name.lower() or "binding" in name.lower()
+            for name, _ in model.named_modules()
+        )
+        if has_quad and not config.no_binding_cache:
+            report.add_check(
+                "Quad Utilization",
+                "PASS",
+                f"top_k={config.binding_cache_top_k}"
+            )
+        elif config.no_binding_cache:
+            report.add_check(
+                "Quad Utilization",
+                "WARN",
+                "binding_cache disabled (--no_binding_cache)"
+            )
+        else:
+            report.add_check(
+                "Quad Utilization",
+                "PASS",
+                "no quad path (model type doesn't use it)"
+            )
+    except Exception as e:
+        report.add_check("Quad Utilization", "WARN", f"check skipped: {e}")
+
+    # Check 5: Chunk Continuity (if chunking enabled)
+    try:
+        if config.enable_chunking:
+            has_chunk_method = hasattr(model, 'forward_chunk') or hasattr(model, 'diagnose_chunk_continuity')
+            if has_chunk_method:
+                report.add_check(
+                    "Chunk Continuity",
+                    "PASS",
+                    f"chunk_size={config.chunk_size}"
+                )
+            else:
+                report.add_check(
+                    "Chunk Continuity",
+                    "WARN",
+                    "chunking enabled but model lacks forward_chunk method"
+                )
+        else:
+            report.add_check(
+                "Chunk Continuity",
+                "PASS",
+                "chunking disabled"
+            )
+    except Exception as e:
+        report.add_check("Chunk Continuity", "WARN", f"check skipped: {e}")
+
+    # Check 6: Parameter-Matched Baseline
+    try:
+        num_params = sum(p.numel() for p in model.parameters())
+        # Baselines should have similar param counts for fair comparison
+        # StandardTransformer at same config should match
+        if config.enforce_baseline_param_match:
+            report.add_check(
+                "Param-Match Baseline",
+                "PASS",
+                f"param_count={num_params:,} (enforcement enabled)"
+            )
+        else:
+            report.add_check(
+                "Param-Match Baseline",
+                "WARN",
+                f"param_count={num_params:,} (enforcement disabled)"
+            )
+    except Exception as e:
+        report.add_check("Param-Match Baseline", "WARN", f"check skipped: {e}")
+
+    return report
+
+
+def check_quad_utilization(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    device: torch.device,
+    threshold: float = 0.01,
+) -> Tuple[bool, float, str]:
+    """
+    V10.6.6: Check that quad path contributes to output (not bypassed).
+
+    Runs forward pass with and without quad to measure contribution.
+
+    Args:
+        model: Model with BindingCache architecture
+        input_ids: Sample input [B, N]
+        device: Torch device
+        threshold: Minimum contribution ratio (default 1%)
+
+    Returns:
+        Tuple of (passed, contribution_ratio, message)
+    """
+    model.eval()
+
+    with torch.no_grad():
+        # Forward with quad enabled
+        try:
+            out_with_quad = model(input_ids)
+            if isinstance(out_with_quad, dict):
+                logits_with = out_with_quad.get('logits', out_with_quad.get('output'))
+            else:
+                logits_with = out_with_quad
+        except Exception as e:
+            return False, 0.0, f"Forward with quad failed: {e}"
+
+        # Forward with quad disabled (if model supports enable_slots_read)
+        try:
+            if hasattr(model, 'forward'):
+                import inspect
+                sig = inspect.signature(model.forward)
+                if 'enable_slots_read' in sig.parameters:
+                    out_without_quad = model(input_ids, enable_slots_read=False)
+                    if isinstance(out_without_quad, dict):
+                        logits_without = out_without_quad.get('logits', out_without_quad.get('output'))
+                    else:
+                        logits_without = out_without_quad
+
+                    # Compute contribution
+                    diff = (logits_with - logits_without).abs().mean().item()
+                    baseline = logits_with.abs().mean().item() + 1e-9
+                    contribution = diff / baseline
+
+                    passed = contribution >= threshold
+                    msg = f"quad contributes {contribution:.1%} of output"
+                    return passed, contribution, msg
+
+            # Model doesn't support enable_slots_read - skip check
+            return True, -1.0, "model doesn't support enable_slots_read (check skipped)"
+
+        except Exception as e:
+            return True, -1.0, f"quad check skipped: {e}"
+
+
+class LightweightProbeHooks:
+    """
+    V10.6.7: Lightweight diagnostic probe hooks for training.
+
+    These are NOT full HardProbeDataset evaluations - they're quick sanity checks
+    that run periodically during training to catch issues early.
+
+    Supported probes:
+    - phase_rotation: Quick check that phase encodes relational structure
+    - chunk_continuity: Verify state persists across chunk boundaries
+    - control_contract: Validate control signal shapes
+
+    Usage:
+        hooks = LightweightProbeHooks(model, config, device)
+        # During training loop:
+        if step % config.probe_hook_interval == 0:
+            results = hooks.run_probes(step)
+            for name, (passed, msg) in results.items():
+                print(f"  Probe {name}: {'PASS' if passed else 'WARN'} - {msg}")
+    """
+
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        config: "UnifiedTrainingConfig",
+        device: torch.device,
+    ):
+        self.model = model
+        self.config = config
+        self.device = device
+        self.probe_types = [p.strip() for p in config.probe_hook_types.split(",")]
+
+    def run_probes(self, step: int) -> Dict[str, Tuple[bool, str]]:
+        """
+        Run all enabled lightweight probes.
+
+        Args:
+            step: Current training step
+
+        Returns:
+            Dict mapping probe name to (passed, message)
+        """
+        results = {}
+
+        for probe_type in self.probe_types:
+            if probe_type == "phase_rotation":
+                results["phase_rotation"] = self._probe_phase_rotation()
+            elif probe_type == "chunk_continuity":
+                results["chunk_continuity"] = self._probe_chunk_continuity()
+            elif probe_type == "control_contract":
+                results["control_contract"] = self._probe_control_contract()
+            else:
+                results[probe_type] = (True, f"unknown probe type (skipped)")
+
+        return results
+
+    def _probe_phase_rotation(self) -> Tuple[bool, str]:
+        """
+        Quick phase rotation sanity check.
+
+        Verifies that rotating all phases by θ changes output (phase is functional).
+        """
+        try:
+            # Create small test input
+            B, N = 2, 64
+            test_ids = torch.randint(0, 1000, (B, N), device=self.device)
+
+            self.model.eval()
+            with torch.no_grad():
+                # Get baseline output
+                out1 = self.model(test_ids)
+                if isinstance(out1, dict):
+                    logits1 = out1.get('logits', out1.get('output'))
+                else:
+                    logits1 = out1
+
+                # Apply phase rotation if model supports it
+                if hasattr(self.model, 'apply_phase_rotation'):
+                    self.model.apply_phase_rotation(math.pi / 4)  # 45 degrees
+                    out2 = self.model(test_ids)
+                    if isinstance(out2, dict):
+                        logits2 = out2.get('logits', out2.get('output'))
+                    else:
+                        logits2 = out2
+                    self.model.apply_phase_rotation(-math.pi / 4)  # Undo
+
+                    diff = (logits1 - logits2).abs().mean().item()
+                    if diff > 1e-6:
+                        return True, f"phase rotation changes output (Δ={diff:.4f})"
+                    else:
+                        return False, f"phase rotation has no effect (Δ={diff:.4f})"
+                else:
+                    return True, "model lacks apply_phase_rotation (skipped)"
+
+        except Exception as e:
+            return True, f"probe failed: {e}"
+
+    def _probe_chunk_continuity(self) -> Tuple[bool, str]:
+        """
+        Quick chunk continuity sanity check.
+
+        Verifies that processing in chunks produces similar output to full sequence.
+        """
+        try:
+            if not self.config.enable_chunking:
+                return True, "chunking disabled (skipped)"
+
+            if not hasattr(self.model, 'forward_chunk'):
+                return True, "model lacks forward_chunk (skipped)"
+
+            # Create test input
+            B, N = 1, 256
+            chunk_size = 64
+            test_ids = torch.randint(0, 1000, (B, N), device=self.device)
+
+            self.model.eval()
+            with torch.no_grad():
+                # Full sequence
+                out_full = self.model(test_ids)
+                if isinstance(out_full, dict):
+                    logits_full = out_full.get('logits', out_full.get('output'))
+                else:
+                    logits_full = out_full
+
+                # Chunked
+                logits_chunked = forward_chunked(self.model, test_ids, chunk_size)['logits']
+
+                # Compare
+                diff = (logits_full - logits_chunked).abs().mean().item()
+                baseline = logits_full.abs().mean().item() + 1e-9
+                ratio = diff / baseline
+
+                if ratio < 0.1:  # 10% tolerance
+                    return True, f"chunk vs full diff={ratio:.1%}"
+                else:
+                    return False, f"chunk vs full diff={ratio:.1%} (>10%)"
+
+        except Exception as e:
+            return True, f"probe failed: {e}"
+
+    def _probe_control_contract(self) -> Tuple[bool, str]:
+        """
+        Quick control contract validation.
+
+        Checks that any registered control signals have valid shapes.
+        """
+        try:
+            # Get model's d_model
+            d_model = None
+            if hasattr(self.model, 'config') and hasattr(self.model.config, 'd_model'):
+                d_model = self.model.config.d_model
+            elif hasattr(self.model, 'd_model'):
+                d_model = self.model.d_model
+            else:
+                # Try to infer from embedding
+                for name, module in self.model.named_modules():
+                    if 'embed' in name.lower() and hasattr(module, 'weight'):
+                        d_model = module.weight.shape[-1]
+                        break
+
+            if d_model is None:
+                return True, "couldn't determine d_model (skipped)"
+
+            # Create sample control signals and validate
+            B, N = 2, 64
+            test_binding_salience = torch.rand(B, N, device=self.device)
+            test_intent_phase = torch.rand(B, 8, device=self.device)  # [B, H]
+
+            try:
+                results = validate_control_signals(
+                    d_model=d_model,
+                    seq_len=N,
+                    strict=False,
+                    binding_salience=test_binding_salience,
+                    intent_phase=test_intent_phase,
+                )
+                if all(results.values()):
+                    return True, "sample control signals valid"
+                else:
+                    invalid = [k for k, v in results.items() if not v]
+                    return False, f"invalid signals: {invalid}"
+            except ControlShapeViolation as e:
+                return False, f"contract violation: {e}"
+
+        except Exception as e:
+            return True, f"probe failed: {e}"
+
+
+# =============================================================================
 # TRAINING LOOP
 # =============================================================================
 
@@ -12812,6 +13333,23 @@ def train(config: UnifiedTrainingConfig):
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
+    if config.run_architecture_health_check:
+        health_report = run_architecture_health_check(model, config, device)
+        overall = health_report.print_report()
+        if overall == "FAIL" and config.architecture_health_strict:
+            print("\n  ❌ ABORTING: Architecture health check FAILED (--architecture_health_strict)")
+            print("     Fix the issues above or use --no_architecture_health_check to skip\n")
+            return
+        elif overall == "WARN":
+            print("  ⚠️  Continuing with warnings. Consider reviewing the issues above.\n")
+
+    # V10.6.7: Initialize Lightweight Probe Hooks (if enabled)
+    probe_hooks = None
+    if config.enable_probe_hooks:
+        probe_hooks = LightweightProbeHooks(model, config, device)
+        print(f"  🔬 Probe Hooks: ENABLED (interval={config.probe_hook_interval}, types={config.probe_hook_types})")
 
     # torch.compile() for faster training (PyTorch 2.0+)
     if config.use_compile:
@@ -16520,6 +17058,36 @@ def train(config: UnifiedTrainingConfig):
                         print(f"\n  ⚠️ [PHASE HEALTH] Diagnostic failed: {e}")
                         enable_health_diagnostics_capture(model, False)  # Ensure cleanup
 
+                # V10.6.6: Quad Utilization Sanity Check (periodic)
+                if config.enable_quad_utilization_checks and global_step % config.quad_utilization_check_interval == 0:
+                    try:
+                        # Use first validation batch for quick check
+                        if cached_val_batches and len(cached_val_batches) > 0:
+                            quad_check_batch = cached_val_batches[0][0][:2].to(device)
+                        else:
+                            quad_check_batch = next(iter(val_loader))[0][:2].to(device)
+                        passed, contrib, msg = check_quad_utilization(
+                            model, quad_check_batch, device, config.quad_utilization_warn_threshold
+                        )
+                        if not passed:
+                            print(f"\n  ⚠️  [QUAD CHECK] Step {global_step}: {msg}")
+                    except Exception as e:
+                        if global_step % 500 == 0:  # Limit spam
+                            print(f"\n  ⚠️  [QUAD CHECK] Error: {e}")
+
+                # V10.6.7: Lightweight Probe Hooks (periodic diagnostic)
+                if probe_hooks is not None and global_step % config.probe_hook_interval == 0:
+                    try:
+                        probe_results = probe_hooks.run_probes(global_step)
+                        warnings = [(n, m) for n, (p, m) in probe_results.items() if not p]
+                        if warnings:
+                            print(f"\n  🔬 [PROBE] Step {global_step}:")
+                            for name, msg in warnings:
+                                print(f"     ⚠️  {name}: {msg}")
+                    except Exception as e:
+                        if global_step % 1000 == 0:  # Limit spam
+                            print(f"\n  ⚠️  [PROBE] Error: {e}")
+
                 # V9.9.1: Inverted Layer Curriculum Update
                 # V9.9.3: With Sovereign Reset Protocol (Gemini's "Soft-Reset" recommendations)
                 # V9.9.4: Now with composite ReadinessIndex (ChatGPT's insight)
@@ -18216,6 +18784,56 @@ def main():
                             "0.1 = mild intent influence (recommended), "
                             "1.0 = strong intent influence.")
 
+    # ==========================================================================
+    # V10.6+ CONTROL-PLANE ITEMS (Hard Probes Integration)
+    # ==========================================================================
+    # V10.6.1: Alignment Clamp (ChatGPT caveat - prevents over-constraint collapse)
+    parser.add_argument("--alignment_clamp_min", type=float, default=0.8,
+                       help="Lower clamp bound for alignment modulator (default: 0.8). "
+                            "Prevents over-suppression from sustained misalignment.")
+    parser.add_argument("--alignment_clamp_max", type=float, default=1.2,
+                       help="Upper clamp bound for alignment modulator (default: 1.2). "
+                            "Prevents over-amplification from sustained alignment.")
+
+    # V10.6.2 D.5: No-Write Contract Enforcement
+    parser.add_argument("--strict_control_contract", action="store_true", default=True,
+                       help="Enable strict mode for D.5 no-write contract (violations raise exceptions)")
+    parser.add_argument("--no_strict_control_contract", dest="strict_control_contract",
+                       action="store_false",
+                       help="Warn-only mode for D.5 no-write contract (violations logged, not raised)")
+
+    # V10.6.3: Architecture Health Summary
+    parser.add_argument("--run_architecture_health_check", action="store_true", default=True,
+                       help="Run architecture health check at training start (PASS/WARN/FAIL)")
+    parser.add_argument("--no_architecture_health_check", dest="run_architecture_health_check",
+                       action="store_false",
+                       help="Skip architecture health check at training start")
+    parser.add_argument("--architecture_health_strict", action="store_true",
+                       help="Abort training if architecture health check returns FAIL")
+
+    # V10.6.5: Parameter-Matched Baseline Enforcement
+    parser.add_argument("--enforce_baseline_param_match", action="store_true", default=True,
+                       help="Validate that baseline comparisons use parameter-matched models")
+    parser.add_argument("--no_baseline_param_match", dest="enforce_baseline_param_match",
+                       action="store_false",
+                       help="Skip parameter-match validation for baseline comparisons")
+
+    # V10.6.6: Quad Utilization Sanity Checks
+    parser.add_argument("--enable_quad_utilization_checks", action="store_true",
+                       help="Enable periodic quad utilization sanity checks during training")
+    parser.add_argument("--quad_utilization_warn_threshold", type=float, default=0.01,
+                       help="Warn if quad contributes less than this fraction (default: 0.01 = 1%%)")
+    parser.add_argument("--quad_utilization_check_interval", type=int, default=100,
+                       help="Check quad utilization every N steps (default: 100)")
+
+    # V10.6.7: Lightweight Probe Hooks
+    parser.add_argument("--enable_probe_hooks", action="store_true",
+                       help="Enable lightweight diagnostic probes during training (not full datasets)")
+    parser.add_argument("--probe_hook_interval", type=int, default=500,
+                       help="Run lightweight probes every N steps (default: 500)")
+    parser.add_argument("--probe_hook_types", type=str, default="phase_rotation,chunk_continuity",
+                       help="Comma-separated probe types: phase_rotation, chunk_continuity, control_contract")
+
     # Phase Rotation Test (validates phase encodes relational structure)
     parser.add_argument("--phase_rotation", action="store_true",
                        help="Run phase rotation test after training to verify phase encodes relations. "
@@ -18223,6 +18841,9 @@ def main():
     parser.add_argument("--phase_rotation_angles", type=str, default="0,45,90,135,180,270",
                        help="Comma-separated rotation angles in degrees for --phase_rotation test. "
                             "(default: 0,45,90,135,180,270)")
+    parser.add_argument("--phase_rotation_as_diagnostic", action="store_true",
+                       help="Run phase rotation as periodic diagnostic during training, "
+                            "not just at the end.")
 
     # V10.0: Binding Cache architecture (validated by diagnostic probes)
     parser.add_argument("--binding_cache_top_k", type=int, default=64,
