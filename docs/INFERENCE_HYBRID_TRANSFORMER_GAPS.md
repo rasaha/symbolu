@@ -1,16 +1,20 @@
 # Inference vs Training Gaps: Hybrid Transformer Logic
 
-**Document Version:** 2.3
+**Document Version:** 3.0
 **Date:** January 2026
-**Status:** ✅ ALL PHASES IMPLEMENTED
-**Related File:** `train_unified_llm.py` (V9.5.2)
+**Status:** ⚠️ NEW GAPS IDENTIFIED (V10.0 Binding Cache Models)
+**Related File:** `train_unified_llm.py` (V10.6.6)
 **Implementation:** `symbolu/inference/` module, `generate_sovereign.py`
 
 ---
 
 ## Executive Summary
 
-This document catalogs the gaps between training-time logic in `train_unified_llm.py` and inference-time behavior. **All priority 1 and 2 gaps have been addressed** with the implementation of the `symbolu.inference` module.
+This document catalogs the gaps between training-time logic in `train_unified_llm.py` and inference-time behavior. **Phases 1-4 are complete** for the original model architectures (HybridPhaseTransformer, OntologicalHybridTransformer).
+
+**V10.0 Update:** Two new validated model architectures require inference support:
+- **`BindingCacheTransformer`** (V10.0): Protected Phase + Top-K Query with proposal_mode
+- **`OntologicalBindingCacheTransformer`** (V10.0): AGI Architecture combining Binding Cache + 32D Sovereign State
 
 ### Implementation Summary
 
@@ -20,6 +24,7 @@ This document catalogs the gaps between training-time logic in `train_unified_ll
 | Phase 2 (Important) | ✅ Complete | `InferenceMetacognition`, `InferenceGunas`, `CSRInferenceGuard`, `SovereignInferenceScorer` |
 | Phase 3 (Orchestration) | ✅ Complete | `InferenceManager` with Fast/Standard/Sovereign modes |
 | Phase 4 (Deployment) | ✅ Complete | `generate_sovereign.py` CLI script, `generate_full_sequence()` method |
+| **Phase 5 (V10.0 Models)** | ❌ **NOT STARTED** | `BindingCacheTransformer`, `OntologicalBindingCacheTransformer` inference support |
 
 ### Quick Start
 
@@ -50,10 +55,13 @@ print(f"Interventions: {metrics['interventions']}")
 1. [Critical Gaps (Priority 1)](#1-critical-gaps-priority-1) - ✅ IMPLEMENTED
 2. [Important Gaps (Priority 2)](#2-important-gaps-priority-2) - ✅ IMPLEMENTED
 3. [Enhancement Gaps (Priority 3)](#3-enhancement-gaps-priority-3) - ✅ IMPLEMENTED
-4. [Implementation Roadmap](#4-implementation-roadmap) - Phases 1-3 ✅ | Phase 4 ⏳
+4. [Implementation Roadmap](#4-implementation-roadmap) - Phases 1-4 ✅ | Phase 5 ❌
 5. [Architecture Considerations](#5-architecture-considerations)
 6. [Usage Guide](#6-usage-guide)
-7. [Phase 4: Deployment Script](#7-phase-4-deployment-script) - ⏳ BLOCKED
+7. [Phase 4: Deployment Script](#7-phase-4-deployment-script) - ✅ COMPLETE
+8. [Phase 5: BindingCacheTransformer Gaps](#8-phase-5-bindingcachetransformer-gaps) - ❌ NOT IMPLEMENTED
+9. [Phase 5: OntologicalBindingCacheTransformer Gaps](#9-phase-5-ontologicalbindingcachetransformer-gaps) - ❌ NOT IMPLEMENTED
+10. [Phase 5: Implementation Roadmap](#10-phase-5-implementation-roadmap)
 
 ---
 
@@ -875,7 +883,7 @@ manager = InferenceManager(
 
 ---
 
-## 7. Phase 4: Deployment Script (✅ IMPLEMENTED)
+## 7. Phase 4: Deployment Script (✅ COMPLETE)
 
 ### 7.1 Implementation Notes
 
@@ -1233,10 +1241,720 @@ python generate_sovereign.py --checkpoint model.pt \
 
 ---
 
+## 8. Phase 5: BindingCacheTransformer Gaps (❌ NOT IMPLEMENTED)
+
+**Model Location:** `symbolu/phase_transformer.py:3375-3724`
+**Training Config:** `--model_type binding_cache`
+
+### 8.1 Architecture Overview
+
+The `BindingCacheTransformer` (V10.0) introduces a fundamentally different attention mechanism validated by diagnostic probes:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BINDING CACHE ARCHITECTURE (O(n) + O(nk) vs O(n²))                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Three-Path Collaboration:                                                  │
+│  ────────────────────────                                                   │
+│  1. Phase: O(n) state accumulator (global compression) - PROTECTED ROLE    │
+│  2. Quad: O(nk) memory query via Top-K cache (global retrieval)            │
+│  3. Local: O(n*w) direct token-to-token attention (syntax learning)        │
+│                                                                             │
+│  V10.4 Proposal Mode Enhancement:                                          │
+│  ─────────────────────────────────                                          │
+│  - Phase computes confidence score from memory state                        │
+│  - If confidence > threshold: SKIP Quad query (efficiency)                 │
+│  - Quad returns proposals (no softmax mixing)                              │
+│  - Phase integrates proposals with gating                                   │
+│                                                                             │
+│  Validated by Diagnostic Probes:                                            │
+│  - Phase ablation drop: -50% to -54% (Phase is ESSENTIAL)                  │
+│  - When Phase mixed with Quad: ~0% drop (DECORATIVE - bad!)                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 Critical Gaps (Priority 1)
+
+#### 8.2.1 Model Type Recognition ❌
+
+**Training Behavior:**
+`train_unified_llm.py` creates `BindingCacheTransformer` when `--model_type binding_cache`:
+
+```python
+# train_unified_llm.py:10738
+model = BindingCacheTransformer(
+    vocab_size=config.vocab_size,
+    embed_dim=preset["embed_dim"],
+    top_k=config.binding_cache_top_k,
+    proposal_mode=False,  # V10.4 optional
+    confidence_threshold=0.7,
+    ...
+)
+```
+
+**Inference Gap:**
+`generate_sovereign.py` and `InferenceManager` do not recognize `binding_cache` model type.
+
+```python
+# generate_sovereign.py:102-113 - MISSING binding_cache
+if model_type == 'ontological_hybrid':
+    ...
+elif model_type == 'hybrid':
+    ...
+# NO binding_cache OR ontological_binding_cache support!
+```
+
+**Required Implementation:**
+```python
+# Proposed addition to generate_sovereign.py
+elif model_type == 'binding_cache':
+    from symbolu.phase_transformer import BindingCacheTransformer
+    ModelClass = BindingCacheTransformer
+elif model_type == 'ontological_binding_cache':
+    from symbolu.phase_transformer import OntologicalBindingCacheTransformer
+    ModelClass = OntologicalBindingCacheTransformer
+```
+
+#### 8.2.2 Proposal Mode Inference ❌
+
+**Training Behavior (`symbolu/phase_transformer.py:3340-3359`):**
+```python
+# V10.4: Proposal Mode - quad proposes, phase integrates
+confidence = self.phase_state.compute_confidence(memory_state)
+
+# Track metrics for monitoring
+self._last_confidence_mean = confidence.mean().item()
+self._last_skip_rate = (confidence > self.confidence_threshold).float().mean().item()
+
+# Get proposals from quad (no softmax mixing)
+proposals, proposal_scores = self.quad_query.get_proposals(x, memory_state)
+
+# Phase integrates proposals
+mem_out = self.phase_state.integrate_proposals(x, memory_state, proposals, proposal_scores)
+```
+
+**Inference Gap:**
+No inference-time access to:
+- `get_proposal_metrics()` - confidence_mean, skip_rate monitoring
+- Adaptive confidence threshold adjustment
+- Proposal mode toggle during generation
+
+**Required Implementation:**
+```python
+class BindingCacheInferenceEngine:
+    """Inference engine for BindingCacheTransformer."""
+
+    def get_proposal_metrics(self) -> Dict[str, float]:
+        """Access proposal mode instrumentation."""
+        return self.model.get_proposal_metrics()
+
+    def set_confidence_threshold(self, threshold: float):
+        """Dynamically adjust confidence threshold during generation."""
+        for block in self.model.blocks:
+            block.confidence_threshold = threshold
+```
+
+#### 8.2.3 Intent Phase Injection ❌
+
+**Training Behavior:**
+The `BindingCacheTransformer` accepts optional `intent_phase` to modulate Phase behavior:
+
+```python
+# phase_transformer.py:3630-3640
+def forward(
+    self,
+    input_ids: torch.Tensor,
+    intent_phase: Optional[torch.Tensor] = None,  # [B, H] or [B, H, D_h]
+    binding_salience: Optional[torch.Tensor] = None,
+    enable_slots_read: bool = True,
+    ...
+)
+```
+
+**Inference Gap:**
+No mechanism to:
+- Compute intent_phase from external state (e.g., conversation history)
+- Inject intent_phase during autoregressive generation
+- Track intent phase evolution across tokens
+
+**Required Implementation:**
+```python
+class IntentPhaseInferenceModule:
+    """Compute and inject intent phase during inference."""
+
+    def compute_intent_from_history(
+        self,
+        conversation_hidden_states: List[torch.Tensor],
+    ) -> torch.Tensor:
+        """Compute intent_phase from conversation history."""
+        # Pooled representation of conversation context
+        context = torch.stack(conversation_hidden_states).mean(dim=0)
+        return self.intent_projector(context)
+```
+
+### 8.3 Important Gaps (Priority 2)
+
+#### 8.3.1 Binding Salience Control ❌
+
+**Training Behavior:**
+`binding_salience` biases Top-K selection without modifying attention math:
+
+```python
+# phase_transformer.py:3693
+x = block(x, intent_phase=intent_phase, binding_salience=binding_salience)
+```
+
+**Inference Gap:**
+No inference-time mechanism to:
+- Compute binding_salience from semantic analysis
+- Inject salience to prioritize certain token positions
+- Use CSR/Kosha/SRK as binding selectors
+
+#### 8.3.2 Enable Slots Read Gating ❌
+
+**Training Behavior (V10.6.2 D.2 Recommendation):**
+```python
+# Separates READ path gating from WRITE path
+# Write path (phase accumulation) remains deterministic
+# Read path (quad retrieval) can be gated
+if not enable_slots_read:
+    attn_out = local_out  # Skip quad retrieval entirely
+```
+
+**Inference Gap:**
+No inference control for:
+- Gating quad retrieval based on confidence
+- Disabling retrieval for certain tokens (e.g., high-entropy positions)
+- Dynamic enable_slots_read during generation
+
+#### 8.3.3 Phase Health Monitoring ❌
+
+**Training Behavior:**
+```python
+# phase_transformer.py:3501-3511
+def get_phase_health(self) -> dict:
+    """Aggregate Phase health metrics from all blocks."""
+    return {
+        "r_k_mean": ...,  # Phase coherence
+        "r_k_per_layer": ...,
+    }
+```
+
+**Inference Gap:**
+No access to Phase health metrics during generation for:
+- Detecting Phase collapse
+- Monitoring memory state saturation
+- Triggering recovery actions
+
+#### 8.3.4 Cache Instrumentation ❌
+
+**Training Behavior:**
+```python
+# phase_transformer.py:3513-3534
+def get_instrumentation(self) -> dict:
+    return {
+        "cache_hit_rate": ...,
+        "mean_alpha": ...,
+        "cache_key_cosine_mean": ...,  # > 0.85 = redundancy
+        "cache_key_cosine_max": ...,   # > 0.95 = collision
+    }
+```
+
+**Inference Gap:**
+No access to cache diagnostics during inference:
+- Cache redundancy detection
+- Slot collision warnings
+- Hit rate monitoring
+
+### 8.4 Enhancement Gaps (Priority 3)
+
+#### 8.4.1 Ablation/Rotation Testing ❌
+
+**Training Methods Available:**
+```python
+model.set_ablation(mode='shuffle', seed=42)  # Test Phase contribution
+model.set_rotation(angle_radians=math.pi/4)  # Test phase encoding
+model.clear_rotation()
+```
+
+**Inference Gap:**
+No inference-time ablation/rotation for:
+- Diagnostic generation runs
+- Understanding model behavior
+- A/B testing phase contribution
+
+#### 8.4.2 Control Contract Enforcement ❌
+
+**Training Behavior (V10.6.6):**
+```python
+# Hard-fail on control signal violations
+model.set_enforce_control_contract(enabled=True)
+# Raises ControlShapeViolation if intent_phase/binding_salience are wrong shape
+```
+
+**Inference Gap:**
+No inference-time contract enforcement for:
+- Validating external control signals
+- Preventing silent failures from bad inputs
+
+---
+
+## 9. Phase 5: OntologicalBindingCacheTransformer Gaps (❌ NOT IMPLEMENTED)
+
+**Model Location:** `symbolu/phase_transformer.py:3740-4075`
+**Training Config:** `--model_type ontological_binding_cache`
+
+### 9.1 Architecture Overview
+
+The `OntologicalBindingCacheTransformer` (V10.0) is the AGI Architecture combining:
+1. **Binding Cache**: Protected Phase + Top-K Query (validated by probes)
+2. **32D Sovereign State**: Ontological reasoning (Bhava, Kosha, Vritti, Guna)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ONTOLOGICAL BINDING CACHE - AGI ARCHITECTURE                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Two-Pass Architecture:                                                     │
+│  ──────────────────────                                                     │
+│  Pass 1: Get hidden states WITHOUT intent phase                             │
+│  │                                                                          │
+│  ▼                                                                          │
+│  Compute State Delta: hidden → SovereignState[32] → ΔS                      │
+│  │                                                                          │
+│  ▼                                                                          │
+│  Convert ΔS → Intent Phase: ΔS[32] → θ[H] or θ[H, D_h]                     │
+│  │                                                                          │
+│  ▼                                                                          │
+│  Compute Binding Salience: OntologicalBindingAnnotator                     │
+│  │                                                                          │
+│  ▼                                                                          │
+│  Pass 2: Full forward WITH intent phase AND binding salience               │
+│                                                                             │
+│  32D Sovereign State Structure:                                             │
+│  ─────────────────────────────                                              │
+│  [0:12]  - 12 Bhavas (Ontological Aspects)                                 │
+│  [12:17] - 5 Koshas (Consciousness Sheaths)                                 │
+│  [17:22] - 5 Vrittis (Mental Modifications)                                 │
+│  [22:28] - 6 Gunas (Energy States)                                          │
+│  [28:32] - 4 Reserved (Toroidal Feedback)                                   │
+│                                                                             │
+│  Theory: System 2 (Ontological) → ΔS → System 1 (Binding Cache)            │
+│          Slow deliberate reasoning → Phase rotation → Fast completion       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 Critical Gaps (Priority 1)
+
+#### 9.2.1 Model Type Recognition ❌
+
+**Same as Section 8.2.1** - `generate_sovereign.py` doesn't recognize `ontological_binding_cache`.
+
+#### 9.2.2 Two-Pass Generation Loop ❌
+
+**Training Behavior (`phase_transformer.py:3988-4028`):**
+```python
+def forward(self, input_ids, ...):
+    # Pass 1: Get hidden WITHOUT intent
+    with torch.no_grad():
+        hidden = self.binding_cache.forward_hidden(input_ids, intent_phase=None)
+
+    # Compute state delta
+    state, delta_S = self.compute_state_delta(hidden, reset_state)
+
+    # Convert to intent phase
+    intent_phase = self.intent_projector(delta_S)
+
+    # Compute binding salience
+    binding_salience = self.binding_annotator(hidden, state, ...)
+
+    # Pass 2: Full forward WITH intent and salience
+    result = self.binding_cache(input_ids, intent_phase=intent_phase, binding_salience=binding_salience)
+```
+
+**Inference Gap:**
+No autoregressive generation loop that:
+- Performs two-pass per token
+- Accumulates state delta across tokens
+- Maintains Sovereign State continuity
+
+**Required Implementation:**
+```python
+class OntologicalBindingCacheInferenceEngine:
+    """Inference engine with two-pass Sovereign generation."""
+
+    @torch.no_grad()
+    def generate_with_ontology(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 100,
+    ) -> Dict[str, Any]:
+        """Autoregressive generation with Sovereign State tracking."""
+
+        for step in range(max_new_tokens):
+            # Two-pass: hidden → delta_S → intent_phase → logits
+            result = self.model(input_ids, reset_state=(step == 0))
+
+            # Track Sovereign State evolution
+            self.state_history.append(result['state'].clone())
+            self.delta_history.append(result['delta_S'].clone())
+
+            # Sample next token
+            next_token = self._sample(result['logits'][:, -1, :])
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+        return {
+            'generated_ids': input_ids,
+            'state_trajectory': torch.stack(self.state_history),
+            'delta_trajectory': torch.stack(self.delta_history),
+        }
+```
+
+#### 9.2.3 32D Sovereign State Tracking ❌
+
+**Training Behavior:**
+```python
+# Compute state delta (System 2 reasoning)
+state, delta_S = self.compute_state_delta(hidden, reset_state)
+
+# State structure:
+# state[0:12]  = Bhava activations (POT, IDN, EXE, STR, COG, AGY, RSN, PRP, WIT, UNI, INT, ABS)
+# state[12:17] = Kosha activations (MATERIAL, VITAL, MENTAL, INTELLECTUAL, BLISSFUL)
+# state[17:22] = Vritti activations (FACT, ERROR, IMAGINATION, VOID, MEMORY)
+# state[22:28] = Guna activations (LUCIDITY, ACTIVITY, STABILITY, VELOCITY, ACCEL, STABLE)
+# state[28:32] = Reserved (Toroidal feedback)
+```
+
+**Inference Gap:**
+No inference-time access to:
+- Bhava activation monitoring (which ontological aspects are active)
+- Kosha depth tracking (surface vs deep understanding)
+- Vritti reliability assessment (FACT vs ERROR vs IMAGINATION)
+- Guna dynamics (clarity vs turbulence vs stability)
+
+**Required Implementation:**
+```python
+@dataclass
+class SovereignStateMetrics:
+    """Inference-time Sovereign State analysis."""
+
+    # Bhava analysis
+    dominant_bhava: str  # Most active ontological aspect
+    bhava_activations: Dict[str, float]
+
+    # Kosha analysis
+    depth_level: str  # MATERIAL/VITAL/MENTAL/INTELLECTUAL/BLISSFUL
+    kosha_profile: Tuple[float, ...]
+
+    # Vritti analysis (reliability)
+    vritti_dominant: str  # FACT/ERROR/IMAGINATION/VOID/MEMORY
+    fact_confidence: float
+    error_risk: float
+
+    # Guna dynamics
+    lucidity: float
+    turbulence: float
+    stability: float
+
+class SovereignStateMonitor:
+    """Monitor 32D Sovereign State during inference."""
+
+    def analyze_state(self, state: torch.Tensor) -> SovereignStateMetrics:
+        """Analyze current Sovereign State."""
+        bhava = state[:, 0:12]
+        kosha = state[:, 12:17]
+        vritti = state[:, 17:22]
+        guna = state[:, 22:28]
+
+        return SovereignStateMetrics(
+            dominant_bhava=BHAVA_NAMES[bhava.argmax().item()],
+            depth_level=KOSHA_NAMES[kosha.argmax().item()],
+            vritti_dominant=VRITTI_NAMES[vritti.argmax().item()],
+            fact_confidence=vritti[:, 0].item(),  # FACT index
+            error_risk=vritti[:, 1].item(),  # ERROR index
+            lucidity=guna[:, 0].item(),
+            turbulence=guna[:, 1].item(),
+            stability=guna[:, 2].item(),
+            ...
+        )
+```
+
+#### 9.2.4 Intent Phase Projection ❌
+
+**Training Behavior:**
+```python
+# IntentPhaseProjector: ΔS[32] → θ[H] or θ[H, D_h]
+self.intent_projector = IntentPhaseProjector(
+    state_dim=32,
+    num_heads=num_heads,
+    head_dim=head_dim,
+    project_per_head_dim=project_per_head_dim,
+)
+
+intent_phase = self.intent_projector(delta_S)
+```
+
+**Inference Gap:**
+No inference-time mechanism to:
+- Access intent phase values during generation
+- Inject external intent (e.g., from user instruction)
+- Visualize intent evolution
+
+### 9.3 Important Gaps (Priority 2)
+
+#### 9.3.1 OntologicalBindingAnnotator ❌
+
+**Training Behavior:**
+```python
+# Computes binding salience from hidden + sovereign state
+# CSR/Kosha/SRK act as SELECTORS (semantics), not attention modifiers
+self.binding_annotator = OntologicalBindingAnnotator(
+    embed_dim=embed_dim,
+    state_dim=32,
+    num_heads=num_heads,
+    use_csr=True,      # CSR phonological grounding
+    use_kosha=True,    # Depth-based selection
+    use_srk=True,      # Sovereignty signals
+)
+
+binding_salience = self.binding_annotator(
+    hidden_states=hidden,
+    sovereign_state=state,
+    kosha_activations=state[:, 12:17],
+    csr_mask=csr_mask,
+)
+```
+
+**Inference Gap:**
+No inference control for:
+- Enabling/disabling individual annotators (CSR/Kosha/SRK)
+- Inspecting binding salience values
+- Overriding salience for specific tokens
+
+#### 9.3.2 External Delta State Injection ❌
+
+**Training Behavior:**
+```python
+# Support for external state delta (e.g., from multi-turn context)
+def forward(self, input_ids, ..., external_delta_S=None):
+    if external_delta_S is not None:
+        delta_S = external_delta_S
+```
+
+**Inference Gap:**
+No mechanism to inject external delta for:
+- Multi-turn conversation context
+- User instruction encoding
+- Cross-document reasoning
+
+#### 9.3.3 CSR Mask Integration ❌
+
+**Training Behavior:**
+```python
+# CSR content word mask for phonological grounding
+binding_salience = self.binding_annotator(
+    ...,
+    csr_mask=csr_mask,  # [B, N] content word positions
+)
+```
+
+**Inference Gap:**
+No inference mechanism to:
+- Compute CSR masks during generation
+- Integrate with CSRInferenceGuard
+- Track phonological grounding quality
+
+### 9.4 Enhancement Gaps (Priority 3)
+
+#### 9.4.1 Built-in Generate Method ❌
+
+**Training Behavior:**
+```python
+# phase_transformer.py:4049-4070
+def generate(self, input_ids, max_new_tokens=50, temperature=1.0, top_k=50):
+    """Generation with Ontological state tracking."""
+    self.prev_state = None
+    for _ in range(max_new_tokens):
+        result = self(input_ids, reset_state=(self.prev_state is None))
+        logits = result['logits'][:, -1, :]
+        ...
+```
+
+**Inference Gap:**
+The built-in generate method lacks:
+- All InferenceManager features (karma, metacognition, gunas)
+- Callback support for token-by-token monitoring
+- Configurable stopping criteria
+
+#### 9.4.2 State Persistence Across Conversations ❌
+
+**Inference Gap:**
+No mechanism to:
+- Save/load Sovereign State between sessions
+- Resume generation with previous state
+- Track state evolution across conversation turns
+
+---
+
+## 10. Phase 5: Implementation Roadmap
+
+### 10.1 Phase 5a: Model Recognition (Critical)
+
+| Task | Priority | Effort | Dependencies |
+|------|----------|--------|--------------|
+| Add `binding_cache` to `generate_sovereign.py` | P0 | Low | None |
+| Add `ontological_binding_cache` to `generate_sovereign.py` | P0 | Low | None |
+| Update `InferenceManager.from_checkpoint()` | P0 | Medium | Model recognition |
+| Update checkpoint utilities for new models | P0 | Low | None |
+
+**Deliverables:**
+- Modified `generate_sovereign.py` with model type detection
+- Modified `symbolu/inference/checkpoint_utils.py`
+- Tests for new model loading
+
+### 10.2 Phase 5b: BindingCacheTransformer Inference
+
+| Task | Priority | Effort | Dependencies |
+|------|----------|--------|--------------|
+| Create `BindingCacheInferenceEngine` | P1 | Medium | 5a |
+| Implement proposal mode metrics access | P1 | Low | Engine |
+| Add intent phase injection support | P1 | Medium | Engine |
+| Add binding salience control | P2 | Medium | Engine |
+| Add enable_slots_read gating | P2 | Low | Engine |
+| Add Phase health monitoring | P2 | Low | Engine |
+| Add cache instrumentation access | P3 | Low | Engine |
+| Add ablation/rotation testing | P3 | Low | Engine |
+
+**Deliverables:**
+- `symbolu/inference/binding_cache_inference.py`
+- Unit tests: `tests/test_binding_cache_inference.py`
+
+### 10.3 Phase 5c: OntologicalBindingCacheTransformer Inference
+
+| Task | Priority | Effort | Dependencies |
+|------|----------|--------|--------------|
+| Create `OntologicalBindingCacheInferenceEngine` | P1 | High | 5b |
+| Implement two-pass generation loop | P1 | High | Engine |
+| Add 32D Sovereign State tracking | P1 | Medium | Engine |
+| Create `SovereignStateMonitor` | P1 | Medium | State tracking |
+| Add intent phase projection access | P2 | Low | Engine |
+| Add OntologicalBindingAnnotator control | P2 | Medium | Engine |
+| Add external delta_S injection | P2 | Medium | Engine |
+| Add CSR mask integration | P2 | Low | Engine |
+| Add state persistence utilities | P3 | Medium | Engine |
+
+**Deliverables:**
+- `symbolu/inference/ontological_binding_cache_inference.py`
+- `symbolu/inference/sovereign_state_monitor.py`
+- Unit tests: `tests/test_ontological_binding_cache_inference.py`
+
+### 10.4 Phase 5d: InferenceManager Integration
+
+| Task | Priority | Effort | Dependencies |
+|------|----------|--------|--------------|
+| Add `ArchitectureMode.BINDING_CACHE` | P1 | Low | 5b |
+| Add `ArchitectureMode.ONTOLOGICAL_BINDING_CACHE` | P1 | Low | 5c |
+| Integrate engines with InferenceManager | P1 | Medium | Engines |
+| Add cognitive status line for new models | P2 | Low | Integration |
+| Update documentation | P3 | Medium | All |
+
+**Deliverables:**
+- Modified `symbolu/inference/manager.py`
+- Modified `symbolu/inference/layer_config.py`
+- Updated documentation
+
+### 10.5 Estimated Complexity
+
+| Phase | Complexity | Key Challenges |
+|-------|------------|----------------|
+| 5a | Low | Model detection, config extraction |
+| 5b | Medium | Proposal mode state management |
+| 5c | High | Two-pass loop, 32D state tracking, binding annotator |
+| 5d | Medium | Engine integration, mode presets |
+
+---
+
+## Appendix C: V10.0 Model Comparison
+
+| Feature | HybridPhaseTransformer | BindingCacheTransformer | OntologicalBindingCacheTransformer |
+|---------|------------------------|-------------------------|-----------------------------------|
+| Attention Complexity | O(n²) + O(n) | O(n) + O(nk) + O(nw) | O(n) + O(nk) + O(nw) |
+| Phase Role | Mixed | Protected (validated) | Protected + Intent modulated |
+| Memory Query | Full attention | Top-K cache | Top-K cache + Salience |
+| Local Attention | No | Yes (syntax) | Yes (syntax) |
+| Ontological State | No | No | 32D Sovereign State |
+| Proposal Mode | No | Optional | No (uses delta_S instead) |
+| Binding Salience | No | Optional | Required (CSR/Kosha/SRK) |
+| Two-Pass | No | No | Yes (hidden → delta → intent) |
+| Inference Support | ✅ Complete | ❌ Not implemented | ❌ Not implemented |
+
+---
+
+## Appendix D: 32D Sovereign State Reference
+
+```python
+# From symbolu/phase_transformer.py
+
+SOVEREIGN_STATE_DIM = 32
+
+# Bhava indices [0:12] - Ontological Aspects
+BHAVA_NAMES = [
+    'POT',  # 0: Potential - latent possibility
+    'IDN',  # 1: Identity - self-recognition
+    'EXE',  # 2: Execution - action/manifestation
+    'STR',  # 3: Structure - form/organization
+    'COG',  # 4: Cognition - knowing/understanding
+    'AGY',  # 5: Agency - will/intention
+    'RSN',  # 6: Reason - logic/analysis
+    'PRP',  # 7: Purpose - meaning/direction
+    'WIT',  # 8: Witness - observation/awareness
+    'UNI',  # 9: Unity - integration/wholeness
+    'INT',  # 10: Intent - focused will
+    'ABS',  # 11: Absolute - transcendent ground
+]
+
+# Sheath indices [12:17] - Depth Mapping
+KOSHA_NAMES = [
+    'MATERIAL',     # 12: Physicality/Syntax
+    'VITAL',        # 13: Flow/Energy
+    'MENTAL',       # 14: Semantics/Meaning
+    'INTELLECTUAL', # 15: Pattern/Wisdom
+    'BLISSFUL',     # 16: Unity/Integration
+]
+
+# State indices [17:22] - Reliability Mapping
+VRITTI_NAMES = [
+    'FACT',        # 17: Verified Truth
+    'ERROR',       # 18: Hallucination
+    'IMAGINATION', # 19: Conceptualization
+    'VOID',        # 20: Null State
+    'MEMORY',      # 21: Recall/Weights
+]
+
+# Qualia/Dynamics indices [22:28] - System Dynamics
+GUNA_NAMES = [
+    'LUCIDITY',  # 22: Clarity/Precision
+    'ACTIVITY',  # 23: Dynamism/Turbulence
+    'STABILITY', # 24: Inertia/Fixedness
+    'VELOCITY',  # 25: Rate of state change
+    'ACCEL',     # 26: Acceleration of change
+    'STABLE',    # 27: Stability measure
+]
+
+# Reserved indices [28:32] - Toroidal Feedback
+RESERVED_NAMES = ['VOID_0', 'VOID_1', 'VOID_2', 'VOID_3']
+```
+
+---
+
 ## Revision History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 3.0 | 2026-01-20 | Claude | **V10.0 Gap Analysis**: Added Phase 5 for BindingCacheTransformer and OntologicalBindingCacheTransformer, new sections 8-10, implementation roadmap |
 | 2.3 | 2026-01-06 | Claude | Phase 4 COMPLETE: `generate_sovereign.py` CLI, `generate_full_sequence()` implemented |
 | 2.2 | 2026-01-05 | Claude | Phase 4 specification added (BLOCKED awaiting training), `generate_full_sequence()` documented |
 | 2.1 | 2026-01-05 | Claude | Priority 3 enhancements complete: LayerInferenceConfig, checkpoint utilities, 3-way coherence |
