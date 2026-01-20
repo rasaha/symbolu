@@ -1693,6 +1693,7 @@ def compute_ghost_metrics(
 |---------|------|---------|
 | 1.0 | 2026-01-20 | Initial specification |
 | 1.1 | 2026-01-20 | Added Appendix E: Hard Probes Gap Analysis |
+| 1.2 | 2026-01-20 | Added Appendix F: Creativity Controller Proposal & Evaluation |
 
 ---
 
@@ -2004,3 +2005,345 @@ def inference_step(
 ### E.7 One-Sentence Assessment
 
 > The gap analysis is careful and mostly correct, aligned with Symbolu philosophy, but mixes *clarifications* with *optional research extensions*. Treating only the true P0 items as blockers enables confident progress.
+
+---
+
+## Appendix F: Creativity Controller Proposal & Evaluation
+
+This appendix documents an external proposal for adding deliberate creativity controls to Phase-Quad, along with a critical evaluation and implementation recommendations.
+
+### F.1 Background: The Creativity Question
+
+A valid concern was raised:
+
+> "Persistence alone ≠ creativity. Left unchecked, a Phase-Quad system could become *too stable*."
+
+The Phase-Quad architecture deliberately removes two traditional sources of variability:
+
+1. **Global softmax remixing** — replaced with sigmoid gating
+2. **Noise-driven re-interpretation** — replaced with deterministic Phase accumulation
+
+This raises the question: **Where does intentional divergence live in Phase-Quad?**
+
+---
+
+### F.2 External Proposal: Creativity Controller
+
+The following proposal was received for adding deliberate creativity controls:
+
+#### F.2.1 Core Philosophy
+
+> "Creativity must be a *mode*, not a side-effect."
+
+The proposal positions:
+- **Phase** = memory / continuity
+- **Quad** = proposal space
+- **Creativity** = governed exploration in Quad, controlled by Phase
+
+#### F.2.2 Proposed Mechanisms
+
+**Mechanism 1: Multi-Track Quad Proposals (Creative Branching)**
+
+Instead of a single Top-K, Quad generates multiple proposal sets:
+
+```
+Sₜ₊₁ = γSₜ + (1−γ)(w₁·P_canonical + w₂·P_adjacent + w₃·P_divergent)
+```
+
+Where:
+- `P_canonical`: Top-K on raw scores (safe, expected)
+- `P_adjacent`: Top-K on slightly noised scores (novel but plausible)
+- `P_divergent`: Top-K on high-temperature scores (imaginative)
+- `w₁, w₂, w₃`: Creativity-controlled weights
+
+**Mechanism 2: Phase Drift Windows (Controlled Imagination Bursts)**
+
+Allow temporary relaxation of phase rigidity:
+
+```
+Normal mode:    γ ≈ 0.9 (stable)
+Creative mode:  γ → 0.6–0.7 for N steps
+Then restore:   γ → 0.9
+```
+
+Rationale: Mirrors "human imagination episodes" where stability temporarily relaxes.
+
+**Mechanism 3: Semantic Mutation (Not Spatial Chaos)**
+
+Creativity should change:
+- Style, metaphor, composition, mood
+
+But NOT:
+- Object identity, spatial topology (unless requested)
+
+Implementation suggestion: Allow phase rotation in "concept subspaces" while locking "spatial channels".
+
+**Mechanism 4: Kosha-Level Creativity Control**
+
+Map creativity to ontological layers:
+
+| Kosha | Effect |
+|-------|--------|
+| Material | Precise, literal |
+| Mental | Combinatorial creativity |
+| Intellectual | Conceptual reframing |
+| Integrative | Symbolic, abstract |
+
+Claim: "Creativity = moving up Kosha, not adding noise."
+
+**Mechanism 5: Proposal Temperature (NOT Diffusion Noise)**
+
+Add temperature to proposal score distribution:
+- Higher temperature → more surprising proposals enter Top-K
+- Preserves structure while increasing novelty
+
+#### F.2.3 Proposed Implementation Steps
+
+**Step 8 — Creativity Controller**
+
+File: `creativity_controller.py`
+
+Implement:
+- `proposal_temperature(t)` schedule: start high → anneal
+- `phase_gamma(t)` schedule: stability default 0.9, creative windows 0.6–0.7
+- Multi-track proposals with `w1, w2, w3` weights
+
+**Step 9 — Creativity Diagnostics**
+
+File: `metrics.py`
+
+Implement:
+- Ghosting metric: `cos_sim(S_t, S_{t+Δ})` averaged
+- Track "stagnant" (>0.99) vs "jitter" (<0.5)
+- Quad utilization metrics
+- Replaceability tests
+
+---
+
+### F.3 Critical Evaluation
+
+#### F.3.1 What's Already Implemented
+
+| Proposed Element | Current Implementation | Location |
+|------------------|----------------------|----------|
+| Proposal Temperature | ✅ `tau` parameter in GateMixer | `gate_mixer.py:789` |
+| Temperature Schedule | ✅ `TemperatureSchedule` class | `training/temperature_schedule.py` |
+| Ghost Metrics | ✅ `compute_ghost_metrics()` | `diagnostics.py:199` |
+| Replaceability Tests | ✅ `ReplaceabilityTester` class | `training/replaceability_tester.py` |
+| Phase Gamma Control | ✅ Learned per-head decay | `phase_integrator.py:370-379` |
+| Quad Utilization | ✅ `QuadUtilizationMetrics` | `diagnostics.py:21` |
+
+**Key insight**: The proposal's "Step 9 — Diagnostics" is already fully implemented. The proposal's "Proposal Temperature" is already implemented as the `tau` parameter with annealing schedule.
+
+#### F.3.2 Evaluation of Proposed Mechanisms
+
+**Mechanism 1: Multi-Track Quad Proposals**
+
+| Aspect | Assessment |
+|--------|------------|
+| Compute Cost | ❌ 3× proposal generation |
+| Complexity | ❌ 3 additional hyperparameters (w₁, w₂, w₃) |
+| Evidence of Need | ❌ None — baseline not yet validated |
+| Implementation Risk | ⚠️ More failure modes to debug |
+| Alignment with Design | ❌ Violates "minimal complexity" principle |
+
+**Verdict**: ❌ PREMATURE — Add only if baseline proves excessively stable
+
+**Mechanism 2: Phase Drift Windows**
+
+| Aspect | Assessment |
+|--------|------------|
+| Current Alternative | ✅ Learned per-head decay already adapts γ |
+| Training Stability | ⚠️ Sudden γ changes could destabilize |
+| Trigger Mechanism | ❌ Unspecified — when to enter "creative mode"? |
+| Reversibility | ⚠️ Hard to control return to stability |
+
+**Verdict**: ⚠️ DEFERRED — Existing learned decay may suffice; needs evidence
+
+**Mechanism 3: Semantic Mutation**
+
+| Aspect | Assessment |
+|--------|------------|
+| Subspace Discovery | ❌ Requires identifying "semantic" vs "spatial" dims |
+| Validation | ❌ No existing work validates this decomposition |
+| Contract Risk | ⚠️ Could violate no-write contract if misimplemented |
+| Dependencies | ❌ Requires interpretability research first |
+
+**Verdict**: ❌ SPECULATIVE — Tier-3 research, not implementation-ready
+
+**Mechanism 4: Kosha-Level Creativity Control**
+
+| Aspect | Assessment |
+|--------|------------|
+| Design Doc Position | ❌ "Ontological mapping is optional, slight overreach" |
+| Vision Applicability | ⚠️ Ontological layers are *interpretive* in vision |
+| Validation | ❌ No evidence Kosha maps to visual creativity |
+| Coupling Risk | ❌ High — ties implementation to unproven theory |
+
+**Verdict**: ❌ NOT RECOMMENDED — Contradicts design philosophy
+
+**Mechanism 5: Proposal Temperature**
+
+| Aspect | Assessment |
+|--------|------------|
+| Implementation | ✅ Already exists as `tau` parameter |
+| Schedule | ✅ Already exists as `TemperatureSchedule` |
+| Extension Needed | None |
+
+**Verdict**: ✅ ALREADY IMPLEMENTED
+
+#### F.3.3 Summary Evaluation Matrix
+
+| Mechanism | Priority | Status | Recommendation |
+|-----------|----------|--------|----------------|
+| Proposal Temperature | — | ✅ Implemented | No action needed |
+| Ghost Metrics | — | ✅ Implemented | No action needed |
+| Replaceability Tests | — | ✅ Implemented | No action needed |
+| Multi-Track Proposals | P2-P3 | ⚠️ Premature | Defer to Tier-2 |
+| Phase Drift Windows | P2-P3 | ⚠️ Premature | Defer to Tier-2 |
+| Semantic Mutation | P3+ | ❌ Speculative | Defer to Tier-3 research |
+| Kosha-Level Control | P3+ | ❌ Speculative | Not recommended |
+
+---
+
+### F.4 The Principled Response
+
+#### F.4.1 Why Not Implement Now
+
+The proposal is **premature optimization** for several reasons:
+
+1. **No evidence of problem**: We haven't proven the baseline is "too stable"
+2. **Complexity budget**: Each mechanism adds parameters, compute, and failure modes
+3. **Design philosophy**: "If any component shows <2% drop when disabled, it's DECORATIVE" — same applies to additions
+4. **Validation order**: Train baseline → Measure → Targeted fix
+
+#### F.4.2 The Correct Development Sequence
+
+```
+1. Train baseline Phase-Quad
+   ↓
+2. Measure creativity/stability metrics
+   ↓
+3. IF stability excessive:
+   - First: Adjust existing tau schedule
+   - Second: Adjust learned decay initialization
+   - Third: Consider multi-track proposals
+   ↓
+4. IF creativity insufficient:
+   - First: Increase tau range (2.0 → 3.0 start)
+   - Second: Add score noise to proposals
+   - Third: Consider drift windows
+```
+
+#### F.4.3 What Would Trigger Implementation
+
+Multi-track proposals should be implemented IF AND ONLY IF:
+
+1. Baseline achieves competitive FID/CLIP scores, AND
+2. User studies show "creativity deficit" vs. baselines, AND
+3. Simple tau/gamma adjustments prove insufficient
+
+Phase drift windows should be implemented IF AND ONLY IF:
+
+1. Ghost metrics show excessive stability (cos_sim > 0.99 sustained), AND
+2. Learned decay converges to uniform high γ across all heads, AND
+3. Visual inspection shows "frozen" generations
+
+---
+
+### F.5 Minimal Future-Ready Interface
+
+If creativity controls become necessary, the following minimal interface preserves option value without premature complexity:
+
+```python
+@dataclass
+class CreativityControl:
+    """
+    Minimal creativity control interface (Tier-2).
+
+    Uses EXISTING mechanisms, just exposes them deliberately.
+    Does NOT add new computational paths.
+    """
+    # Proposal temperature (already in GateMixer)
+    tau: float = 1.0
+
+    # Optional score noise for diverse proposals
+    # 0.0 = deterministic (default), >0 = stochastic
+    score_noise_std: float = 0.0
+
+    # Phase stability multiplier (scales learned gamma)
+    # 1.0 = use learned values, <1.0 = more drift, >1.0 = more stable
+    gamma_scale: float = 1.0
+
+    # Creativity level (convenience interface)
+    # Maps to: tau, score_noise_std, gamma_scale
+    @classmethod
+    def from_level(cls, level: float) -> "CreativityControl":
+        """
+        Create control from creativity level [0, 1].
+
+        0.0 = maximally stable/deterministic
+        0.5 = balanced (default behavior)
+        1.0 = maximally creative/diverse
+        """
+        return cls(
+            tau=1.0 + level,           # [1.0, 2.0]
+            score_noise_std=level * 0.5,  # [0.0, 0.5]
+            gamma_scale=1.0 - level * 0.3,  # [1.0, 0.7]
+        )
+```
+
+**Note**: This interface is documented for future reference but NOT implemented in v1 baseline.
+
+---
+
+### F.6 Response to Philosophical Claims
+
+#### F.6.1 "Phase-Quad is not less creative — it makes creativity deliberate"
+
+**Assessment**: Philosophically appealing but empirically unvalidated.
+
+The claim that "deliberate creativity" is superior to "accidental creativity" requires demonstration. Diffusion models' stochastic creativity, while less controllable, has produced remarkable results. Phase-Quad must prove competitive before claiming superiority.
+
+#### F.6.2 "Creativity = governed exploration"
+
+**Assessment**: Reasonable framing, but implementation-dependent.
+
+"Governed exploration" is a good mental model. However, the specific mechanisms (Kosha mapping, semantic mutation) are speculative. The simpler mechanisms (temperature, learned decay) may suffice.
+
+#### F.6.3 "This is design creativity, not chaos"
+
+**Assessment**: Marketing language, not technical specification.
+
+Terms like "design creativity" vs "chaos" are rhetorical. The technical question is: does Phase-Quad produce diverse, high-quality outputs? This is measurable and should be measured.
+
+---
+
+### F.7 Recommendations
+
+#### F.7.1 For v1 Baseline
+
+1. **Do NOT implement** multi-track proposals, drift windows, or Kosha mapping
+2. **Use existing** tau schedule, learned decay, and diagnostics
+3. **Measure** ghost metrics, gate entropy, and FID/CLIP during training
+4. **Document** any observed creativity limitations for Tier-2 consideration
+
+#### F.7.2 For Tier-2 (If Needed)
+
+1. Implement `CreativityControl` interface (Section F.5)
+2. Add optional score noise to QuadRetriever
+3. Experiment with wider tau ranges
+4. Consider multi-track proposals if simple approaches fail
+
+#### F.7.3 For Tier-3 (Research Extensions)
+
+1. Investigate semantic vs. spatial subspace decomposition
+2. Explore cross-timestep phase persistence for "imagination mode"
+3. Study relationship between Phase dynamics and visual creativity
+4. Do NOT implement Kosha mapping without empirical validation
+
+---
+
+### F.8 One-Sentence Assessment
+
+> The creativity controller proposal contains valid insights about deliberate vs. accidental creativity, but its specific mechanisms are either already implemented (temperature, diagnostics), premature (multi-track, drift windows), or speculative (Kosha, semantic mutation) — the correct approach is to validate the baseline first, then add minimal complexity only where measured deficits exist.
