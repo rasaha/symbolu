@@ -1392,3 +1392,396 @@ python train_unified_llm.py \
   --learning_rate 1e-5 \
   --max_steps 5000
 ```
+
+---
+
+## Architecture Overrides
+
+Override model_size preset with custom architecture dimensions.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--n_layer` | int | `None` | Number of transformer layers (overrides model_size) |
+| `--n_head` | int | `None` | Number of attention heads (overrides model_size) |
+| `--n_embd` | int | `None` | Embedding dimension (overrides model_size) |
+| `--n_kv_heads` | int | `None` | Number of KV heads for GQA (if None, uses n_head) |
+| `--dropout` | float | `0.1` | Dropout rate |
+| `--attention_dropout` | float | `0.1` | Attention dropout rate |
+
+### Notes
+- Architecture overrides take precedence over `--model_size` preset
+- Use `--n_kv_heads` for Grouped Query Attention (GQA) efficiency
+
+---
+
+## Training Basics (Extended)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--warmup_steps` | int | `500` | Max warmup steps (fallback if PPL doesn't drop) |
+| `--warmup_until_ppl` | float | `500.0` | End warmup when PPL < this (0 = disabled, use fixed steps) |
+| `--weight_decay` | float | `0.1` | Weight decay (L2 regularization) |
+| `--max_grad_norm` | float | `1.0` | Maximum gradient norm for clipping |
+| `--batch_size_max` | int | `512` | Max batch size for dynamic scaling (seq len curriculum) |
+| `--use_amp` | flag | `False` | Enable AMP with bf16 (convenience flag, equivalent to --mixed_precision bf16) |
+
+### Notes
+- **warmup_until_ppl**: Allows PPL-gated warmup exit for faster convergence
+- **batch_size_max**: Used with sequence length curriculum for dynamic batch scaling
+
+---
+
+## Chunking for Long Sequences (V10.2.1)
+
+Enables processing sequences longer than max_seq_len by chunking. Phase attention persists state across chunks (temporal memory), Local attention resets per chunk (spatial reasoning).
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_chunking` | flag | `False` | Enable chunked training for long sequences |
+| `--chunk_size` | int | `512` | Size of each chunk (should be <= max_seq_len) |
+| `--protected_phase` | flag | `True` | Use Protected Phase pattern (RECOMMENDED) |
+| `--no_protected_phase` | flag | `False` | Disable Protected Phase (use legacy parallel blending) |
+| `--run_chunk_diagnostic` | flag | `False` | Run chunk continuity diagnostic at start of training |
+| `--chunk_diagnostic_seq_len` | int | `2048` | Sequence length for chunk diagnostic test |
+
+### Notes
+- **Protected Phase**: Local cross-attends to Phase memory instead of parallel blending. Ensures Phase learns useful representations.
+- Smaller chunk_size = less memory, more chunks
+
+---
+
+## Phase-First Curriculum
+
+Unified inverse curriculum: SRK strong→weak, alpha high→low, window small→large.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--phase_first_curriculum` | flag | `False` | Enable phase-first learning |
+| `--enable_ppl_alpha_curriculum` | flag | `False` | Adjust alpha_phase based on PPL |
+| `--alpha_phase_ppl_high` | float | `0.8` | alpha_phase when PPL >= ppl_high_threshold |
+| `--alpha_phase_ppl_low` | float | `0.3` | alpha_phase when PPL <= ppl_low_threshold |
+| `--ppl_high_threshold` | float | `1000.0` | PPL threshold for max phase weight |
+| `--ppl_low_threshold` | float | `100.0` | PPL threshold for min phase weight |
+| `--enable_adaptive_window` | flag | `False` | Adapt window size based on PPL |
+| `--window_size_high_ppl` | int | `128` | Window size when PPL >= ppl_high_threshold |
+| `--window_size_low_ppl` | int | `256` | Window size when PPL <= ppl_low_threshold |
+
+### Notes
+- Phase dominates early training (high PPL), local refines later (low PPL)
+- Adaptive window: small early for fast phase, large later for local context
+
+---
+
+## Decorrelation & Phase Diversity
+
+Forces phase and local attention to learn different features, combats phase collapse.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--decorr_loss_weight` | float | `0.0` | Weight for decorrelation loss (0=disabled, 0.1=recommended) |
+| `--phase_diversity_weight` | float | `0.0` | Weight for phase diversity loss (0=disabled) |
+| `--phase_diversity_ramp_steps` | int | `5000` | Steps to ramp phase diversity weight linearly |
+
+### Adaptive Phase Diversity Controller (V9.9.12)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_adaptive_phase_diversity` | flag | `False` | Use adaptive controller instead of fixed weight |
+| `--phase_diversity_target_R` | float | `0.25` | Target R for adaptive controller (0.25 = healthy diversity) |
+| `--phase_diversity_lambda_init` | float | `0.0001` | Initial λ value after ramp |
+| `--phase_diversity_lambda_max` | float | `0.1` | Maximum λ ceiling |
+| `--phase_diversity_eta` | float | `0.1` | Control gain (how fast λ adapts to R) |
+| `--phase_diversity_ramp_multiplier` | float | `5.0` | ramp_steps = multiplier × warmup_steps |
+| `--phase_diversity_task_scaling` | flag | `True` | Scale λ by task loss (Lagrange approach) |
+| `--no_phase_diversity_task_scaling` | flag | `False` | Disable task-loss scaling |
+| `--phase_diversity_task_alpha` | float | `0.01` | Base coefficient for task-loss scaling mode |
+
+---
+
+## Per-Layer Phase Control
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_per_layer_phase` | flag | `False` | Enable per-layer phase weight control |
+| `--per_layer_phase_weights` | str | `""` | Initial per-layer phase weights (12 comma-separated values) |
+| `--layer_transition_steps` | int | `500` | Steps for soft layer transitions during evolution |
+
+---
+
+## Inverted Curriculum (V9.9.1)
+
+Full inverted curriculum: 3:9→9:3 with sequence length growth.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_inverted_curriculum` | flag | `False` | Enable full inverted curriculum |
+| `--inverted_curriculum_stages` | str | `""` | Custom stages: '3:9@256,5:7@512,6:6@768,9:3@2048' |
+| `--inverted_curriculum_ppl_triggers` | str | `""` | PPL triggers: '300,200,120,75,45,25' |
+| `--inverted_curriculum_stability_threshold` | float | `5.0` | Max PPL slope for 'stable' |
+| `--inverted_curriculum_stability_stages` | str | `"2,3,4"` | Stages requiring PPL stability check |
+
+---
+
+## Phase Attention Advanced
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--learned_decay` | flag | `False` | Enable per-head learned decay (Mamba/S4-style) |
+| `--bounded_phase` | flag | `True` | Constrain phase to [-π, π] via π*sin() |
+| `--no-bounded-phase` | flag | `False` | Disable bounded phase (may cause collapse) |
+| `--zero_mean_cosine` | flag | `False` | Center cosine per head to force selectivity |
+
+### Notes
+- **learned_decay**: Each attention head learns its own decay rate [0.5, 1.0] via gradient descent
+- **bounded_phase**: Prevents raw linear phase projections from drifting unbounded
+
+---
+
+## Dual-Channel Attention (V10.3.8)
+
+Separates content similarity from intent alignment.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--dual_channel_mode` | flag | `False` | Enable dual-channel attention |
+| `--alignment_authority` | float | `0.1` | Weight for alignment term (0.0-1.0) |
+| `--alignment_clamp_min` | float | `0.8` | Lower clamp bound for alignment modulator |
+| `--alignment_clamp_max` | float | `1.2` | Upper clamp bound for alignment modulator |
+
+### Notes
+- Formula: `score = s_content * (1 + α * s_align)`
+- Prevents intent from dominating content selectivity
+
+---
+
+## Control Plane Items (V10.6+)
+
+### Contract Enforcement (D.5)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--strict_control_contract` | flag | `True` | Enable strict mode (violations raise exceptions) |
+| `--no_strict_control_contract` | flag | `False` | Warn-only mode (violations logged, not raised) |
+
+### Architecture Health Check (V10.6.3)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--run_architecture_health_check` | flag | `True` | Run health check at training start |
+| `--no_architecture_health_check` | flag | `False` | Skip architecture health check |
+| `--architecture_health_strict` | flag | `False` | Abort training if health check returns FAIL |
+
+### Baseline Parameter Matching (V10.6.5)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enforce_baseline_param_match` | flag | `True` | Validate parameter-matched baselines |
+| `--no_baseline_param_match` | flag | `False` | Skip parameter-match validation |
+
+### Quad Utilization Checks (V10.6.6)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_quad_utilization_checks` | flag | `False` | Enable periodic quad utilization checks |
+| `--quad_utilization_warn_threshold` | float | `0.01` | Warn if quad contributes less than this (1%) |
+| `--quad_utilization_check_interval` | int | `100` | Check every N steps |
+
+### Lightweight Probe Hooks (V10.6.7)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_probe_hooks` | flag | `False` | Enable lightweight diagnostic probes |
+| `--probe_hook_interval` | int | `500` | Run probes every N steps |
+| `--probe_hook_types` | str | `"phase_rotation,chunk_continuity"` | Comma-separated probe types |
+
+---
+
+## Phase Rotation Test
+
+Validates phase encodes relational structure by rotating φ_k and measuring accuracy/perplexity change.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--phase_rotation` | flag | `False` | Run phase rotation test after training |
+| `--phase_rotation_angles` | str | `"0,45,90,135,180,270"` | Comma-separated rotation angles in degrees |
+| `--phase_rotation_as_diagnostic` | flag | `False` | Run as periodic diagnostic during training |
+
+---
+
+## Binding Cache Architecture (V10.0)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--binding_cache_top_k` | int | `64` | Top-K cache size per head (0=full attention) |
+| `--binding_cache_use_cache` | flag | `True` | Use Top-K cache in binding_cache model |
+| `--no_binding_cache` | flag | `False` | Disable Top-K cache (use full O(n²) attention) |
+
+### Ontological Binding Annotator
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--use_binding_annotator` | flag | `True` | Enable OntologicalBindingAnnotator |
+| `--no_binding_annotator` | flag | `False` | Disable binding annotator |
+| `--use_csr_annotation` | flag | `True` | Enable CSR in binding annotation |
+| `--no_csr_annotation` | flag | `False` | Disable CSR in binding annotation |
+| `--use_kosha_annotation` | flag | `True` | Enable Kosha in binding annotation |
+| `--no_kosha_annotation` | flag | `False` | Disable Kosha in binding annotation |
+| `--use_srk_annotation` | flag | `True` | Enable SRK in binding annotation |
+| `--no_srk_annotation` | flag | `False` | Disable SRK in binding annotation |
+
+---
+
+## Multi-Stage Evolution (V9.9.1)
+
+Automatic multi-stage evolution: 9:3→6:6→5:7→4:8→3:9.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_multi_stage_evolution` | flag | `True` | Enable automatic multi-stage evolution |
+| `--disable_multi_stage_evolution` | flag | `False` | Disable multi-stage evolution |
+| `--evolution_trigger_mode` | str | `"auto"` | Trigger mode: auto, metrics, ppl, step |
+| `--evolution_ppl_triggers` | str | `""` | PPL thresholds (e.g., '100,50,25,15') |
+| `--evolution_step_triggers` | str | `""` | Step numbers (e.g., '10000,30000,50000,70000') |
+| `--custom_evolution_stages` | str | `""` | Custom stages (e.g., '9:3,6:6,4:8,3:9') |
+| `--evolution_patience` | int | `200` | Steps of stable metrics before evolution |
+| `--evolution_coherence_min` | float | `0.82` | Minimum coherence to evolve |
+| `--evolution_entropy_floor` | float | `0.42` | Minimum entropy to evolve |
+| `--evolution_ppl_window` | int | `10` | Steps to average PPL |
+| `--evolution_thaw_alpha` | float | `0.1` | Initial gradient scale for new sensory layers |
+| `--evolution_thaw_steps` | int | `300` | Steps to ramp new sensory gradients |
+
+---
+
+## Kosha Diagnostics Extended
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--lightweight_diagnostics` | flag | `True` | Skip expensive gradient norm computation |
+| `--full_diagnostics` | flag | `False` | Enable full diagnostics with gradient norms |
+| `--kosha_steering_layer` | int | `9` | Layer for phase steering (9=O9_WITNESSES) |
+
+---
+
+## Kosha Gyroscope Extended (V9.8.7)
+
+Three-phase dynamic engagement based on validation PPL.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--gyroscope_engage_ppl` | float | `50.0` | Phase 2: Auto-engage with RELAXED settings |
+| `--gyroscope_active_ppl` | float | `30.0` | Phase 3: Switch to ACTIVE settings |
+| `--gyroscope_relaxed_ceiling_clamp` | float | `0.90` | Relaxed phase ceiling clamp factor |
+| `--gyroscope_relaxed_floor_push` | float | `0.30` | Relaxed phase floor push factor |
+| `--gyroscope_active_ceiling_clamp` | float | `0.65` | Active phase ceiling clamp factor |
+| `--gyroscope_active_floor_push` | float | `0.75` | Active phase floor push factor |
+
+### Three-Phase Kosha Curriculum (V9.8.6)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--kosha_engage_ppl` | float | `100.0` | Kosha fully ON above this PPL |
+| `--kosha_disengage_ppl` | float | `30.0` | Kosha OFF below this PPL |
+| `--kosha_rampdown_steps` | int | `500` | Steps to ramp gain to 0 at graduation |
+
+---
+
+## Ontological Bridge Curriculum (V9.8.6)
+
+Three-phase Onto Bridge activation based on PPL.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--onto_engage_ppl` | float | `150.0` | Onto fully ON above this PPL |
+| `--onto_disengage_ppl` | float | `50.0` | Onto OFF below this PPL |
+| `--onto_rampdown_steps` | int | `500` | Steps to ramp onto loss to 0 |
+
+---
+
+## PIDv2 Controller Extended (V9.8.7)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--pidv2_c_floor` | float | `0.45` | Coherence floor (below this, gate at minimum) |
+| `--pidv2_c_good` | float | `0.65` | Coherence good (above this, gate at full) |
+| `--pidv2_engage_ppl` | float | `100.0` | PID turns ON when Val PPL > this |
+| `--pidv2_disengage_ppl` | float | `30.0` | PID turns OFF when Val PPL < this |
+| `--pidv2_rampdown_steps` | int | `500` | Steps to ramp down PID after disengagement |
+| `--no_pidv2_engagement` | flag | `False` | Disable dynamic PID engagement |
+
+---
+
+## 9:3 Split Extended
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--authority_floor` | float | `1.0` | Alpha floor for authority layers (1.0=full, 0.3=dampen) |
+
+---
+
+## CSR Curriculum (V9.8.6)
+
+Three-phase CSR activation based on PPL.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--csr_engage_ppl` | float | `120.0` | CSR fully ON above this PPL |
+| `--csr_disengage_ppl` | float | `40.0` | CSR OFF below this PPL |
+| `--csr_rampdown_steps` | int | `500` | Steps to ramp down CSR after disengage |
+
+---
+
+## Sovereign Phase Controller (V9.8.8)
+
+Graduated, damped phase interventions for entropy and variance control.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_sovereign_phase_controller` | flag | `False` | Enable SPC system |
+| `--spc_entropy_critical` | float | `0.4` | Critical entropy threshold (red alert) |
+| `--spc_entropy_warning` | float | `0.5` | Warning entropy threshold (yellow alert) |
+| `--spc_entropy_recovered` | float | `0.55` | Recovered entropy threshold (exit boost) |
+| `--spc_variance_critical` | float | `0.0005` | Critical variance threshold (stagnation) |
+| `--spc_variance_warning` | float | `0.001` | Warning variance threshold |
+| `--spc_variance_recovered` | float | `0.002` | Recovered variance threshold |
+| `--spc_min_boost_duration` | int | `100` | Minimum steps in boost mode |
+| `--spc_alpha` | float | `0.2` | EMA smoothing coefficient for rotation damping |
+| `--spc_max_rotation` | float | `0.3` | Maximum rotation per step in radians (~17°) |
+| `--spc_damping` | float | `0.9` | Velocity damping coefficient |
+| `--spc_velocity_threshold` | float | `0.2` | Velocity threshold for applying damping |
+
+---
+
+## Dynamic Window Scheduler (V9.8.9)
+
+PPL-adaptive attention span / receptive field dimension.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_dynamic_window` | flag | `False` | Enable dynamic window sizing |
+| `--dws_schedule` | str | `None` | Custom schedule: 'ppl1:win1,ppl2:win2,...' |
+| `--dws_growth_rate_max` | float | `1.25` | Maximum growth rate per transition (25%) |
+| `--dws_shrink_rate_max` | float | `0.80` | Maximum shrink rate per transition (20%) |
+| `--dws_align_to` | int | `32` | Align windows to multiples (GPU efficiency) |
+| `--dws_smooth_steps` | int | `100` | Interpolate transitions over N steps |
+| `--dws_min_steps_between` | int | `200` | Minimum steps between target changes |
+| `--dws_hysteresis` | float | `0.15` | PPL hysteresis factor (prevents thrashing) |
+| `--dws_vram_threshold` | float | `0.85` | VRAM threshold for emergency shrink |
+
+---
+
+## SRK Extended
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--srk_invert_annealing` | flag | `False` | Invert annealing: start STRONG, ramp DOWN |
+
+---
+
+## Vritti Entropy Regularization (V10.3.7)
+
+Prevents vritti collapse by maintaining entropy.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--vritti_entropy_reg` | flag | `False` | Enable entropy regularization |
+| `--vritti_entropy_lambda` | float | `0.1` | Weight for vritti entropy regularization |
