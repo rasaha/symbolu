@@ -17,6 +17,10 @@ TEST GROUPS:
 - Group D: OntoControl Interface Tests (10 tests) - V10.6.4 D.1
   Purpose: Verify OntoControl dataclass formalizes control plane correctly
 
+- Group E: Forward-Pass Contract Enforcement Tests (10 tests) - V10.6.6
+  Purpose: Verify no-write contract is enforced INSIDE forward(), not just config
+  This addresses the "highest-risk gap" - violations must STOP TRAINING immediately.
+
 CRITICAL INVARIANTS TESTED:
 - INV-D6-1: intent_phase must be low-dimensional [B, H] or [B, H, D_h], NOT [B, N, D]
 - INV-D6-2: binding_salience must be [B, N] for per-position gating, NOT [B, N, D]
@@ -25,9 +29,12 @@ CRITICAL INVARIANTS TESTED:
 - INV-D6-5: enable_slots_read=False must skip quad retrieval without affecting phase writes
 - INV-D6-6: s_align (alignment signal) must be [H] or [], NOT [B, N] (V10.6.3)
 - INV-D6-7: OntoControl wraps binding_salience without changing behavior (V10.6.4)
+- INV-E6-1: Invalid control signals in forward() must raise ControlShapeViolation (V10.6.6)
+- INV-E6-4: enforce_control_contract=True is the default (STRICT) (V10.6.6)
+- INV-E6-5: set_enforce_control_contract() propagates to all child blocks (V10.6.6)
 
 Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.1, D.6, D.10
-Version: V10.6.4
+Version: V10.6.6
 """
 
 import pytest
@@ -915,6 +922,188 @@ class TestGroupD_OntoControlInterface:
         )
         invalid_results = invalid_ctrl.validate(d_model=model_config["embed_dim"], strict=False)
         assert invalid_results["binding_salience"] is False
+
+
+# =============================================================================
+# GROUP E: FORWARD-PASS CONTRACT ENFORCEMENT TESTS (V10.6.6)
+# Purpose: Verify no-write contract is enforced INSIDE forward(), not just config
+# =============================================================================
+
+class TestGroupE_ForwardPassEnforcement:
+    """
+    Group E: Forward-Pass Contract Enforcement Tests (V10.6.6)
+
+    These tests verify that the no-write contract is enforced INSIDE the forward
+    pass, not just during configuration or health checks. This is the "highest-risk
+    gap" identified by ChatGPT review - violations must STOP TRAINING immediately.
+
+    Critical Requirements:
+    - INV-E6-1: Invalid control signals in forward() must raise ControlShapeViolation
+    - INV-E6-2: Enforcement must happen at BindingCacheBlock.forward() entry
+    - INV-E6-3: Enforcement must happen at BindingCacheTransformer.forward() entry
+    - INV-E6-4: enforce_control_contract=True is the default (STRICT)
+    - INV-E6-5: set_enforce_control_contract() propagates to all child blocks
+
+    Reference: ChatGPT feedback on V10.6.5 - "True No-Write Contract Enforcement"
+    """
+
+    def test_e01_block_forward_rejects_invalid_intent_phase(
+        self, binding_cache_block, model_config, sample_inputs
+    ):
+        """BindingCacheBlock.forward() must HARD-FAIL on invalid intent_phase (INV-E6-1)."""
+        x = sample_inputs["x"]
+        invalid_intent_phase = sample_inputs["invalid_intent_phase"]  # [B, N, D]
+
+        # Default enforcement is True
+        assert binding_cache_block.enforce_control_contract is True
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            binding_cache_block(x, intent_phase=invalid_intent_phase)
+
+        assert "intent_phase" in str(exc_info.value)
+
+    def test_e02_block_forward_rejects_invalid_binding_salience(
+        self, binding_cache_block, model_config, sample_inputs
+    ):
+        """BindingCacheBlock.forward() must HARD-FAIL on invalid binding_salience (INV-E6-1)."""
+        x = sample_inputs["x"]
+        invalid_salience = sample_inputs["invalid_binding_salience"]  # [B, N, D]
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            binding_cache_block(x, binding_salience=invalid_salience)
+
+        assert "binding_salience" in str(exc_info.value)
+
+    def test_e03_block_forward_accepts_valid_controls(
+        self, binding_cache_block, model_config, sample_inputs
+    ):
+        """BindingCacheBlock.forward() must accept valid control signals."""
+        x = sample_inputs["x"]
+        valid_intent = sample_inputs["valid_intent_phase_2d"]
+        valid_salience = sample_inputs["valid_binding_salience"]
+
+        # Should NOT raise - valid controls
+        output = binding_cache_block(
+            x,
+            intent_phase=valid_intent,
+            binding_salience=valid_salience,
+        )
+
+        assert output.shape == x.shape
+
+    def test_e04_transformer_forward_rejects_invalid_intent_phase(
+        self, binding_cache_transformer, model_config, sample_inputs
+    ):
+        """BindingCacheTransformer.forward() must HARD-FAIL on invalid intent_phase (INV-E6-3)."""
+        input_ids = sample_inputs["input_ids"]
+        invalid_intent_phase = sample_inputs["invalid_intent_phase"]  # [B, N, D]
+
+        # Default enforcement is True
+        assert binding_cache_transformer.enforce_control_contract is True
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            binding_cache_transformer(input_ids, intent_phase=invalid_intent_phase)
+
+        assert "intent_phase" in str(exc_info.value)
+
+    def test_e05_transformer_forward_rejects_invalid_binding_salience(
+        self, binding_cache_transformer, model_config, sample_inputs
+    ):
+        """BindingCacheTransformer.forward() must HARD-FAIL on invalid binding_salience."""
+        input_ids = sample_inputs["input_ids"]
+        invalid_salience = sample_inputs["invalid_binding_salience"]  # [B, N, D]
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            binding_cache_transformer(input_ids, binding_salience=invalid_salience)
+
+        assert "binding_salience" in str(exc_info.value)
+
+    def test_e06_transformer_forward_accepts_valid_controls(
+        self, binding_cache_transformer, model_config, sample_inputs
+    ):
+        """BindingCacheTransformer.forward() must accept valid control signals."""
+        input_ids = sample_inputs["input_ids"]
+        valid_intent = sample_inputs["valid_intent_phase_2d"]
+        valid_salience = sample_inputs["valid_binding_salience"]
+
+        # Should NOT raise - valid controls
+        output = binding_cache_transformer(
+            input_ids,
+            intent_phase=valid_intent,
+            binding_salience=valid_salience,
+        )
+
+        # Returns logits tensor
+        assert output.dim() == 3  # [B, N, vocab_size]
+
+    def test_e07_enforcement_enabled_by_default(
+        self, binding_cache_block, binding_cache_transformer
+    ):
+        """enforce_control_contract must be True by default (INV-E6-4)."""
+        # Block level
+        assert binding_cache_block.enforce_control_contract is True
+
+        # Transformer level
+        assert binding_cache_transformer.enforce_control_contract is True
+
+        # All child blocks
+        for block in binding_cache_transformer.blocks:
+            assert block.enforce_control_contract is True
+
+    def test_e08_set_enforce_control_contract_propagates(
+        self, binding_cache_transformer, sample_inputs
+    ):
+        """set_enforce_control_contract() must propagate to all child blocks (INV-E6-5)."""
+        # Disable enforcement
+        binding_cache_transformer.set_enforce_control_contract(False)
+
+        # Check transformer
+        assert binding_cache_transformer.enforce_control_contract is False
+
+        # Check all child blocks
+        for block in binding_cache_transformer.blocks:
+            assert block.enforce_control_contract is False
+
+        # Re-enable enforcement
+        binding_cache_transformer.set_enforce_control_contract(True)
+
+        # Verify re-enabled
+        assert binding_cache_transformer.enforce_control_contract is True
+        for block in binding_cache_transformer.blocks:
+            assert block.enforce_control_contract is True
+
+    def test_e09_disabled_enforcement_allows_invalid_controls(
+        self, binding_cache_transformer, sample_inputs
+    ):
+        """When enforcement is disabled, invalid controls should NOT raise (debugging only)."""
+        input_ids = sample_inputs["input_ids"]
+        invalid_intent_phase = sample_inputs["invalid_intent_phase"]
+
+        # Disable enforcement (NOT recommended for production)
+        binding_cache_transformer.set_enforce_control_contract(False)
+
+        try:
+            # Should NOT raise with enforcement disabled
+            output = binding_cache_transformer(input_ids, intent_phase=invalid_intent_phase)
+            # Model runs but produces potentially garbage output
+            assert output.dim() == 3
+        finally:
+            # Always re-enable for safety
+            binding_cache_transformer.set_enforce_control_contract(True)
+
+    def test_e10_forward_hidden_also_enforces_contract(
+        self, binding_cache_transformer, sample_inputs
+    ):
+        """forward_hidden() must also enforce the no-write contract."""
+        input_ids = sample_inputs["input_ids"]
+        invalid_intent_phase = sample_inputs["invalid_intent_phase"]
+
+        with pytest.raises(ControlShapeViolation) as exc_info:
+            binding_cache_transformer.forward_hidden(
+                input_ids, intent_phase=invalid_intent_phase
+            )
+
+        assert "intent_phase" in str(exc_info.value)
 
 
 if __name__ == "__main__":

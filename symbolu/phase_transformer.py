@@ -3164,7 +3164,15 @@ class BindingCacheBlock(nn.Module):
     3. Local attention [O(n*w)] - direct token-to-token for syntax
 
     Combined: local_out + mem_out allows fast syntax + slow semantic learning.
+
+    V10.6.6: Forward-pass contract enforcement
+    - Control signals (intent_phase, binding_salience) are validated at forward() entry
+    - Violations raise ControlShapeViolation immediately (hard-fail)
+    - Set enforce_control_contract=False to disable (NOT recommended for production)
     """
+
+    # V10.6.6: Class-level enforcement toggle (STRICT by default)
+    enforce_control_contract: bool = True
 
     def __init__(
         self,
@@ -3182,6 +3190,8 @@ class BindingCacheBlock(nn.Module):
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
     ):
         super().__init__()
+        self.embed_dim = embed_dim  # V10.6.6: Store for contract enforcement
+        self.num_heads = num_heads  # V10.6.6: Store for contract enforcement
         self.proposal_mode = proposal_mode
         self.confidence_threshold = confidence_threshold
 
@@ -3286,7 +3296,31 @@ class BindingCacheBlock(nn.Module):
 
         Returns:
             output: [B, N, D]
+
+        Raises:
+            ControlShapeViolation: If control signals violate no-write contract (V10.6.6)
         """
+        # V10.6.6: Enforce no-write contract at forward() entry (HARD-FAIL)
+        # This is the authoritative enforcement point - violations stop training immediately
+        if self.enforce_control_contract:
+            B, N, D = x.shape
+            if intent_phase is not None:
+                assert_control_shape(
+                    intent_phase,
+                    name="intent_phase",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
+            if binding_salience is not None:
+                assert_control_shape(
+                    binding_salience,
+                    name="binding_salience",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
+
         # Step 1: LOCAL attention for syntax learning (direct, no compression)
         # This is what makes PPL drop quickly at start of training
         local_out = self.local_attn(x)
@@ -3348,7 +3382,16 @@ class BindingCacheTransformer(nn.Module):
 
     Reference: --protected-phase experiment showed -50% ablation drop
     when Phase has protected role (vs ~0% when mixed with Quad).
+
+    V10.6.6: Forward-pass contract enforcement
+    - Control signals are validated at forward() and forward_hidden() entry
+    - Violations raise ControlShapeViolation immediately (hard-fail)
+    - Propagates enforcement to all BindingCacheBlock children
+    - Set enforce_control_contract=False to disable (NOT recommended for production)
     """
+
+    # V10.6.6: Class-level enforcement toggle (STRICT by default)
+    enforce_control_contract: bool = True
 
     def __init__(
         self,
@@ -3371,6 +3414,7 @@ class BindingCacheTransformer(nn.Module):
         super().__init__()
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
+        self.num_heads = num_heads  # V10.6.6: Store for contract enforcement
         self.num_layers = num_layers
         self.proposal_mode = proposal_mode
 
@@ -3435,6 +3479,24 @@ class BindingCacheTransformer(nn.Module):
         """Clear rotation from all Phase components."""
         for block in self.blocks:
             block.clear_rotation()
+
+    def set_enforce_control_contract(self, enabled: bool):
+        """
+        V10.6.6: Enable/disable forward-pass contract enforcement.
+
+        This sets enforcement on BOTH the transformer and all child blocks.
+        When enabled (default), violations raise ControlShapeViolation immediately.
+
+        IMPORTANT: Disabling enforcement is NOT recommended for production.
+        This should only be used for debugging or specific testing scenarios.
+
+        Args:
+            enabled: If True (default), enforce contracts in forward pass.
+                    If False, skip enforcement (dangerous - allows violations).
+        """
+        self.enforce_control_contract = enabled
+        for block in self.blocks:
+            block.enforce_control_contract = enabled
 
     def get_phase_health(self) -> dict:
         """Aggregate Phase health metrics from all blocks."""
@@ -3527,8 +3589,31 @@ class BindingCacheTransformer(nn.Module):
 
         Returns:
             hidden: [B, N, embed_dim] - normalized hidden states before LM head
+
+        Raises:
+            ControlShapeViolation: If control signals violate no-write contract (V10.6.6)
         """
         B, N = input_ids.shape
+
+        # V10.6.6: Enforce no-write contract at forward() entry (HARD-FAIL)
+        # Transformer-level enforcement before blocks process signals
+        if self.enforce_control_contract:
+            if intent_phase is not None:
+                assert_control_shape(
+                    intent_phase,
+                    name="intent_phase",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
+            if binding_salience is not None:
+                assert_control_shape(
+                    binding_salience,
+                    name="binding_salience",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
 
         # Embeddings
         pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
@@ -3571,8 +3656,31 @@ class BindingCacheTransformer(nn.Module):
         Returns:
             logits: [B, N, vocab_size] or (loss, logits) if labels provided
             Or Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state'
+
+        Raises:
+            ControlShapeViolation: If control signals violate no-write contract (V10.6.6)
         """
         B, N = input_ids.shape
+
+        # V10.6.6: Enforce no-write contract at forward() entry (HARD-FAIL)
+        # This is the TOP-LEVEL enforcement - stops training immediately on violation
+        if self.enforce_control_contract:
+            if intent_phase is not None:
+                assert_control_shape(
+                    intent_phase,
+                    name="intent_phase",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
+            if binding_salience is not None:
+                assert_control_shape(
+                    binding_salience,
+                    name="binding_salience",
+                    d_model=self.embed_dim,
+                    seq_len=N,
+                    strict=True,  # HARD-FAIL: raise ControlShapeViolation
+                )
 
         # Embeddings
         pos = torch.arange(N, device=input_ids.device).unsqueeze(0)
