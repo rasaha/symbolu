@@ -27,6 +27,10 @@ class ArchitectureMode(Enum):
     SPLIT_6_6 = "6:6"  # Balanced: 6 Authority, 6 Sensory
     SPLIT_12_0 = "12:0"  # All Authority (standard transformer)
 
+    # V10.0 Binding Cache Architectures (Phase 5)
+    BINDING_CACHE = "binding_cache"  # Protected Phase + Top-K Query
+    ONTOLOGICAL_BINDING_CACHE = "ontological_binding_cache"  # AGI: Binding Cache + 32D State
+
 
 @dataclass
 class LayerInferenceConfig:
@@ -141,6 +145,20 @@ class LayerInferenceConfig:
             # Slightly sharper for sensory (expression) layers
             return base_temp * 0.9
         return base_temp
+
+    def get_temperature_multiplier(self, layer_idx: int) -> float:
+        """
+        Get temperature multiplier for a layer.
+
+        Args:
+            layer_idx: Layer index
+
+        Returns:
+            multiplier: Temperature multiplier (0.9 for sensory, 1.0 otherwise)
+        """
+        if layer_idx in self._sensory_layers:
+            return 0.9
+        return 1.0
 
     def get_layer_role(self, layer_idx: int) -> str:
         """

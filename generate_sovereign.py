@@ -33,7 +33,11 @@ Usage:
 
 Author: Sovereign-1 Training Initiative
 Date: January 2026
-Version: 1.0.0
+Version: 2.0.0 (Phase 5 - V10.0 Binding Cache Support)
+
+V10.0 Model Support:
+    - binding_cache: BindingCacheTransformer with Top-K query
+    - ontological_binding_cache: OntologicalBindingCacheTransformer with 32D state
 """
 
 import argparse
@@ -54,6 +58,11 @@ from symbolu.inference import (
     InferenceGunas,
     CSRInferenceGuard,
     LayerInferenceConfig,
+    ArchitectureMode,
+    # V10.0 Phase 5 imports
+    BindingCacheInferenceEngine,
+    OntologicalBindingCacheInferenceEngine,
+    SovereignStateMonitor,
 )
 from symbolu.inference.manager import InferenceMode, InferenceManagerConfig
 from symbolu.inference.checkpoint_utils import load_sovereign_config, InferenceCheckpointLoader
@@ -108,6 +117,13 @@ def load_model_from_checkpoint(
     elif model_type == 'phase':
         from symbolu.phase_transformer import PhaseTransformer
         ModelClass = PhaseTransformer
+    # V10.0 Binding Cache Architectures (Phase 5)
+    elif model_type == 'binding_cache':
+        from symbolu.phase_transformer import BindingCacheTransformer
+        ModelClass = BindingCacheTransformer
+    elif model_type == 'ontological_binding_cache':
+        from symbolu.phase_transformer import OntologicalBindingCacheTransformer
+        ModelClass = OntologicalBindingCacheTransformer
     else:
         from symbolu.phase_transformer import HybridPhaseTransformer
         ModelClass = HybridPhaseTransformer
@@ -126,6 +142,18 @@ def load_model_from_checkpoint(
             'max_seq_len': getattr(cfg, 'max_seq_len', 2048),
             'dropout': getattr(cfg, 'dropout', 0.1),
         }
+        # V10.0 Binding Cache specific config (Phase 5)
+        if model_type in ['binding_cache', 'ontological_binding_cache']:
+            model_config['top_k'] = getattr(cfg, 'binding_cache_top_k', 64)
+            model_config['use_cache'] = not getattr(cfg, 'no_binding_cache', False)
+            model_config['decay_gamma'] = getattr(cfg, 'decay_gamma', 1.0)
+            model_config['learned_decay'] = getattr(cfg, 'learned_decay', False)
+        if model_type == 'ontological_binding_cache':
+            model_config['state_dim'] = getattr(cfg, 'state_dim', 32)
+            model_config['use_binding_annotator'] = getattr(cfg, 'use_binding_annotator', True)
+            model_config['use_csr_annotation'] = getattr(cfg, 'use_csr_annotation', True)
+            model_config['use_kosha_annotation'] = getattr(cfg, 'use_kosha_annotation', True)
+            model_config['use_srk_annotation'] = getattr(cfg, 'use_srk_annotation', True)
     else:
         # Default small model config
         model_config = {
@@ -137,6 +165,12 @@ def load_model_from_checkpoint(
             'max_seq_len': 2048,
             'dropout': 0.0,  # No dropout at inference
         }
+        # V10.0 defaults if binding cache model type
+        if model_type in ['binding_cache', 'ontological_binding_cache']:
+            model_config['top_k'] = 64
+            model_config['use_cache'] = True
+        if model_type == 'ontological_binding_cache':
+            model_config['state_dim'] = 32
 
     # Create model
     print(f"  Creating {ModelClass.__name__}...")
@@ -179,19 +213,36 @@ def create_inference_manager(
     }
     inference_mode = mode_map.get(mode.lower(), InferenceMode.SOVEREIGN)
 
+    # Auto-detect architecture mode from model class
+    model_class_name = model.__class__.__name__
+    architecture_mode = None
+    if 'OntologicalBindingCache' in model_class_name:
+        architecture_mode = ArchitectureMode.ONTOLOGICAL_BINDING_CACHE
+        print(f"  Architecture: V10.0 Ontological Binding Cache (AGI)")
+    elif 'BindingCache' in model_class_name:
+        architecture_mode = ArchitectureMode.BINDING_CACHE
+        print(f"  Architecture: V10.0 Binding Cache")
+    else:
+        print(f"  Architecture: Legacy (HybridPhase/Ontological)")
+
     # Create config
-    config = InferenceManagerConfig(mode=inference_mode)
+    config = InferenceManagerConfig(
+        mode=inference_mode,
+        architecture_mode=architecture_mode,
+    )
 
     # Get embed_dim from model
     embed_dim = getattr(model, 'embed_dim', 768)
     lm_head = getattr(model, 'lm_head', None)
 
-    # Create evolutionary engine
-    evolutionary_engine = EvolutionaryInferenceEngine(
-        model=model,
-        bridge_checkpoint_path=checkpoint_path,
-    )
-    evolutionary_engine.to(device)
+    # Create evolutionary engine (for legacy models)
+    evolutionary_engine = None
+    if architecture_mode not in [ArchitectureMode.BINDING_CACHE, ArchitectureMode.ONTOLOGICAL_BINDING_CACHE]:
+        evolutionary_engine = EvolutionaryInferenceEngine(
+            model=model,
+            bridge_checkpoint_path=checkpoint_path,
+        )
+        evolutionary_engine.to(device)
 
     # Create CSR guard (if lm_head available)
     csr_guard = None
@@ -205,6 +256,20 @@ def create_inference_manager(
     # Create layer config
     layer_config = LayerInferenceConfig()
 
+    # Create V10.0 engines if applicable (Phase 5)
+    binding_cache_engine = None
+    ontological_engine = None
+
+    if architecture_mode == ArchitectureMode.ONTOLOGICAL_BINDING_CACHE:
+        ontological_engine = OntologicalBindingCacheInferenceEngine(model)
+        ontological_engine.to(device)
+        print(f"  Initialized OntologicalBindingCacheInferenceEngine")
+
+    elif architecture_mode == ArchitectureMode.BINDING_CACHE:
+        binding_cache_engine = BindingCacheInferenceEngine(model)
+        binding_cache_engine.to(device)
+        print(f"  Initialized BindingCacheInferenceEngine")
+
     # Try to load sovereign config from checkpoint
     try:
         sovereign_config = load_sovereign_config(checkpoint_path)
@@ -212,7 +277,8 @@ def create_inference_manager(
             print(f"  Loaded sovereign config: split={sovereign_config.authority_sensory_split}, "
                   f"alpha={sovereign_config.recommended_alpha}")
             # Apply recommended alpha
-            evolutionary_engine.config.resonance_alpha = sovereign_config.recommended_alpha
+            if evolutionary_engine is not None:
+                evolutionary_engine.config.resonance_alpha = sovereign_config.recommended_alpha
     except Exception as e:
         print(f"  Note: Could not load sovereign config ({e})")
 
@@ -224,6 +290,8 @@ def create_inference_manager(
         evolutionary_engine=evolutionary_engine,
         csr_guard=csr_guard,
         layer_config=layer_config,
+        binding_cache_engine=binding_cache_engine,
+        ontological_engine=ontological_engine,
         device=device,
     )
 
@@ -234,36 +302,96 @@ def format_cognitive_log(output: Dict[str, Any]) -> str:
     """Format cognitive telemetry for display."""
     lines = []
 
-    # Guna state
-    s, r, t = output.get('gunas', (0.33, 0.33, 0.34))
-    dominant = "Sattva" if s >= r and s >= t else "Rajas" if r >= t else "Tamas"
-    lines.append(f"[Cognitive Log] {dominant} dominant | S:{s:.2f} R:{r:.2f} T:{t:.2f}")
+    # Check architecture type for V10.0 specific formatting
+    arch = output.get('architecture', 'legacy')
 
-    # Metacognition
-    rec = output.get('recommendation', 'CONTINUE')
-    lines.append(f"[Metacognition] Recommendation: {rec}")
+    if arch == 'ontological_binding_cache':
+        # V10.0 Ontological Binding Cache output format
+        lines.append(f"[Architecture] V10.0 Ontological Binding Cache (AGI)")
 
-    # Coherence
-    coh = output.get('coherence', 0.0)
-    details = output.get('coherence_details', {})
-    if details.get('3way', False):
-        lines.append(f"[Coherence] 3-Way Flow: {coh:.4f} "
-                     f"(Birth:{details.get('birth_similarity', 0):.2f}, "
-                     f"Flow:{details.get('flow_similarity', 0):.2f}, "
-                     f"Evolution:{details.get('evolution_similarity', 0):.2f})")
+        # 32D Sovereign State metrics
+        final_metrics = output.get('final_metrics')
+        if final_metrics is not None:
+            lines.append(f"[Sovereign State] Bhava:{final_metrics.dominant_bhava} | "
+                        f"Depth:{final_metrics.depth_level.name} | "
+                        f"Vritti:{final_metrics.vritti_dominant.name}")
+            lines.append(f"[Reliability] Fact:{final_metrics.fact_confidence:.2f} | "
+                        f"Error:{final_metrics.error_risk:.2f} | "
+                        f"Score:{final_metrics.reliability_score:.2f}")
+            lines.append(f"[Dynamics] Lucidity:{final_metrics.lucidity:.2f} | "
+                        f"Turbulence:{final_metrics.turbulence:.2f} | "
+                        f"Stability:{final_metrics.stability:.2f}")
+
+        # Reliability trend
+        reliability = output.get('reliability')
+        if reliability is not None:
+            lines.append(f"[Avg Reliability] {reliability:.3f}")
+
+        # Warnings
+        warnings = output.get('warnings', [])
+        if warnings:
+            lines.append(f"[Warnings] {len(warnings)} warning(s) triggered")
+            for w in warnings[:3]:  # Show max 3
+                lines.append(f"  - {w.get('type', 'unknown')}: {w.get('value', 0):.2f}")
+
+    elif arch == 'binding_cache':
+        # V10.0 Binding Cache output format
+        lines.append(f"[Architecture] V10.0 Binding Cache")
+
+        # Proposal mode metrics
+        avg_conf = output.get('avg_confidence', 0)
+        avg_skip = output.get('avg_skip_rate', 0)
+        lines.append(f"[Proposal Mode] Avg Confidence:{avg_conf:.2f} | Skip Rate:{avg_skip:.1%}")
+
+        # Phase health
+        phase_health = output.get('phase_health', {})
+        if phase_health:
+            lines.append(f"[Phase Health] r_k_mean:{phase_health.get('r_k_mean', 0):.3f}")
+
+        # Cache metrics
+        cache_metrics = output.get('cache_metrics', {})
+        if cache_metrics:
+            lines.append(f"[Cache] Hit Rate:{cache_metrics.get('cache_hit_rate', 0):.1%} | "
+                        f"Alpha:{cache_metrics.get('mean_alpha', 0):.2f}")
+
     else:
-        lines.append(f"[Coherence] 2-Way Flow: {coh:.4f}")
+        # Legacy output format
+        # Guna state
+        s, r, t = output.get('gunas', (0.33, 0.33, 0.34))
+        dominant = "Sattva" if s >= r and s >= t else "Rajas" if r >= t else "Tamas"
+        lines.append(f"[Cognitive Log] {dominant} dominant | S:{s:.2f} R:{r:.2f} T:{t:.2f}")
 
-    # Generation stats
-    lines.append(f"[Stats] Tokens:{output.get('tokens_generated', 0)} | "
-                 f"Interventions:{output.get('interventions', 0)} | "
-                 f"Karma:{'stored' if output.get('karma_stored') else 'none'}")
+        # Metacognition
+        rec = output.get('recommendation', 'CONTINUE')
+        lines.append(f"[Metacognition] Recommendation: {rec}")
+
+        # Coherence
+        coh = output.get('coherence', 0.0)
+        details = output.get('coherence_details', {})
+        if details.get('3way', False):
+            lines.append(f"[Coherence] 3-Way Flow: {coh:.4f} "
+                         f"(Birth:{details.get('birth_similarity', 0):.2f}, "
+                         f"Flow:{details.get('flow_similarity', 0):.2f}, "
+                         f"Evolution:{details.get('evolution_similarity', 0):.2f})")
+        else:
+            lines.append(f"[Coherence] 2-Way Flow: {coh:.4f}")
+
+        # Generation stats
+        lines.append(f"[Stats] Tokens:{output.get('tokens_generated', 0)} | "
+                     f"Interventions:{output.get('interventions', 0)} | "
+                     f"Karma:{'stored' if output.get('karma_stored') else 'none'}")
 
     if output.get('aborted'):
         lines.append(f"[ABORT] Reason: {output.get('abort_reason', 'unknown')}")
 
     if output.get('sovereign_score') is not None:
         lines.append(f"[Sovereign] Alignment Score: {output['sovereign_score']:.4f}")
+
+    # Common stats for all architectures
+    meta = output.get('meta', {})
+    tokens = meta.get('tokens_generated', output.get('tokens_generated', 0))
+    if tokens:
+        lines.append(f"[Generation] {tokens} tokens generated")
 
     return "\n".join(lines)
 
@@ -318,17 +446,31 @@ def run_interactive_session(
 
         input_ids = input_ids.to(manager.device)
 
-        # Generate
-        print(f"\n| Mode: {args.mode.upper()} | Scaling: 9:3 Hierarchical |")
+        # Generate - dispatch based on architecture
+        arch = manager.config.architecture_mode
+        if arch in [ArchitectureMode.BINDING_CACHE, ArchitectureMode.ONTOLOGICAL_BINDING_CACHE]:
+            print(f"\n| Mode: {args.mode.upper()} | Architecture: V10.0 {arch.value} |")
+        else:
+            print(f"\n| Mode: {args.mode.upper()} | Scaling: 9:3 Hierarchical |")
         print("-" * 50)
 
-        output = manager.generate_full_sequence(
-            prompt_ids=input_ids,
-            max_tokens=args.max_tokens,
-            base_temp=args.temp,
-            top_p=args.top_p,
-            top_k=args.top_k,
-        )
+        # Use V10.0 generate for binding cache models, else use standard
+        if arch in [ArchitectureMode.BINDING_CACHE, ArchitectureMode.ONTOLOGICAL_BINDING_CACHE]:
+            output = manager.generate_v10(
+                prompt=input_ids,
+                max_new_tokens=args.max_tokens,
+                temperature=args.temp,
+                top_p=args.top_p,
+                top_k=args.top_k,
+            )
+        else:
+            output = manager.generate_full_sequence(
+                prompt_ids=input_ids,
+                max_tokens=args.max_tokens,
+                base_temp=args.temp,
+                top_p=args.top_p,
+                top_k=args.top_k,
+            )
 
         # Display cognitive telemetry
         print(format_cognitive_log(output))
@@ -359,13 +501,24 @@ def run_single_generation(
 
     input_ids = input_ids.to(manager.device)
 
-    output = manager.generate_full_sequence(
-        prompt_ids=input_ids,
-        max_tokens=args.max_tokens,
-        base_temp=args.temp,
-        top_p=args.top_p,
-        top_k=args.top_k,
-    )
+    # Dispatch based on architecture
+    arch = manager.config.architecture_mode
+    if arch in [ArchitectureMode.BINDING_CACHE, ArchitectureMode.ONTOLOGICAL_BINDING_CACHE]:
+        output = manager.generate_v10(
+            prompt=input_ids,
+            max_new_tokens=args.max_tokens,
+            temperature=args.temp,
+            top_p=args.top_p,
+            top_k=args.top_k,
+        )
+    else:
+        output = manager.generate_full_sequence(
+            prompt_ids=input_ids,
+            max_tokens=args.max_tokens,
+            base_temp=args.temp,
+            top_p=args.top_p,
+            top_k=args.top_k,
+        )
 
     response_text = output.get('text', '')
     if not response_text and tokenizer is not None:
