@@ -1692,3 +1692,315 @@ def compute_ghost_metrics(
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-20 | Initial specification |
+| 1.1 | 2026-01-20 | Added Appendix E: Hard Probes Gap Analysis |
+
+---
+
+## Appendix E: Hard Probes Gap Analysis
+
+This appendix documents the gap analysis performed against Phase-Quad invariants and the existing Symbolu codebase. Items are categorized by priority level, distinguishing between **true blockers**, **clarifications**, and **optional research extensions**.
+
+### E.1 Executive Summary
+
+| Category | Count | Action |
+|----------|-------|--------|
+| ✅ True Blockers (P0) | 3 | Must resolve before coding |
+| ⚠️ Important Non-Blockers (P1) | 4 | Document clearly, implement later |
+| 🧪 Optional / Tier-2 (P2-P3) | 3 | Do NOT gate baseline |
+
+**Key Principle**: If all items are treated as P0, the project slows unnecessarily. If none are treated as P0, implementers face ambiguity.
+
+---
+
+### E.2 True Blockers (P0) — Must Resolve Before Coding
+
+#### E.2.1 VAE and Text Encoder Selection
+
+**Status**: ✅ REQUIRED — Cannot define tensor shapes without this
+
+**Problem**: The specification must lock specific encoder choices to define exact tensor dimensions.
+
+**Resolution for v1 Baseline**:
+
+| Component | Selection | Rationale |
+|-----------|-----------|-----------|
+| **VAE** | SDXL VAE (4 channels, 8× compression) | Well-understood latent statistics, compatible with many datasets |
+| **Text Encoder** | CLIP (768-dim) | Matches SD/SDXL ecosystem, simpler LocalMixer integration, avoids T5 memory explosion |
+
+**Deferred to v2**: T5-XXL / dual-encoder configurations
+
+**Action**: Lock these choices in Section 1 of main specification.
+
+---
+
+#### E.2.2 Cross-Timestep Phase Persistence Semantics
+
+**Status**: ✅ CRITICAL — Most important architectural question
+
+**Problem**: Unclear whether Phase state persists across diffusion timesteps.
+
+**Resolution**: Hybrid approach (default for v1)
+
+```
+Correct baseline behavior:
+- Phase state PERSISTS within a single denoising step
+- Phase state RESETS at the start of each diffusion timestep
+- No cross-timestep authority carryover in v1
+```
+
+**Rationale**:
+- Matches diffusion assumptions
+- Prevents semantic drift
+- Keeps training stable
+- Still allows strong spatial coherence
+
+**Action**: Add explicit statement to Section 4.1:
+
+> "Phase state is initialized fresh at each diffusion timestep t. Cross-timestep persistence is deferred to Tier-3 research extensions."
+
+---
+
+#### E.2.3 Chunked/Blockwise Quad Retrieval for Large N
+
+**Status**: ✅ REAL GAP — Memory explosion beyond ~16k tokens
+
+**Problem**: Tensor `[B, N, K, D]` is not scalable for high-resolution images.
+
+**Resolution**: Specify chunked retrieval API
+
+```python
+def forward_chunked(
+    self,
+    x: Tensor,
+    S: Tensor,
+    meta: PatchMeta,
+    chunk_size: int = 1024,
+) -> Tuple[Tensor, Tensor]:
+    """
+    Chunked Quad retrieval for large token counts.
+
+    - Chunk queries (not keys/values)
+    - Keep Phase state global
+    - Quad retrieves per chunk
+    - Integrate chunk-local proposals
+
+    Memory: O(chunk_size × K × D) instead of O(N × K × D)
+    """
+    ...
+```
+
+**Action**: Add chunked API to QuadRetriever2D specification. Implementation can be deferred, but API must exist.
+
+---
+
+### E.3 Important Non-Blockers (P1) — Document Clearly, Implement Later
+
+#### E.3.1 Mixed-Precision Handling
+
+**Status**: ⚠️ VALID AND IMPORTANT
+
+**Problem**: Complex phasors + BF16 = silent corruption if mishandled.
+
+**Resolution**: Explicit precision rules per module:
+
+```python
+# Pattern from existing BindingCachePhaseState
+def forward(self, x: Tensor) -> Tensor:
+    # Critical: Complex phasor math in FP32
+    with torch.autocast(enabled=False):
+        phi_k = ...  # Phase computation
+        k_re = ...   # Real part
+        k_im = ...   # Imaginary part
+
+    # Safe to return to mixed precision after phasor math
+    return result
+```
+
+**Action**: Add Section 4.4 "Mixed Precision Requirements" documenting explicit BF16 → FP32 → BF16 boundaries.
+
+---
+
+#### E.3.2 Inference Pipeline (CFG, Sampling)
+
+**Status**: ⚠️ IMPORTANT BUT NOT A TRAINING BLOCKER
+
+**Problem**: Inference details (classifier-free guidance, sampling strategy) not specified.
+
+**Resolution**: Defer to Section 4.3 "Inference Pipeline" (to be added):
+
+```python
+def inference_step(
+    self,
+    z_t: Tensor,
+    t: int,
+    text_cond: Tensor,
+    uncond: Tensor,
+    cfg_scale: float = 7.5,
+) -> Tensor:
+    """
+    Standard CFG inference.
+
+    Reuses existing diffusion sampler patterns (DDIM, DPM++, etc.)
+    """
+    # Conditional prediction
+    noise_cond = self.model(z_t, t, text_cond)
+
+    # Unconditional prediction
+    noise_uncond = self.model(z_t, t, uncond)
+
+    # CFG
+    noise_pred = noise_uncond + cfg_scale * (noise_cond - noise_uncond)
+
+    return noise_pred
+```
+
+**Action**: Add inference section. Do NOT block Phase-Quad block coding.
+
+---
+
+#### E.3.3 Initialization Strategy
+
+**Status**: ⚠️ NICE-TO-HAVE for reproducibility
+
+**Problem**: Default initialization not documented.
+
+**Resolution**: Document defaults:
+
+| Component | Initialization |
+|-----------|---------------|
+| Phase weights (W_k_phase) | Xavier uniform or U(−π, π) |
+| QKV projections | Standard Xavier uniform |
+| Output projections | Zero-init (optional, for residual paths) |
+| Decay logits | Log-spaced timescales (2 to 2048 tokens) |
+
+**Action**: Add initialization table to Section 3 or Appendix.
+
+---
+
+#### E.3.4 Non-Square Latents (H ≠ W)
+
+**Status**: ⚠️ VALID CONCERN BUT MANAGEABLE
+
+**Problem**: Bi-axial scans with H ≠ W create different sequence lengths.
+
+**Resolution**: No special handling needed. Bi-axial scans do NOT assume H = W:
+
+- Row scan: N_row = W tokens per row
+- Col scan: N_col = H tokens per column
+- Outputs normalized → no directional bias
+- Merge projection is learned
+
+**Action**: Add clarification:
+
+> "Bi-axial scans support non-square grids (H ≠ W). The learned merge projection and output normalization ensure no directional bias from differing scan lengths."
+
+---
+
+### E.4 Optional / Tier-2 Items (P2-P3) — Do NOT Gate Baseline
+
+#### E.4.1 Coherence Loss
+
+**Status**: ❌ NOT REQUIRED FOR BASELINE
+
+**Problem**: Should explicit coherence loss be added?
+
+**Analysis**: Phase-Quad architecture already enforces:
+- Accumulation via EMA
+- Authority via Phase gating
+- Prevents proposal mixing via sigmoid (not softmax)
+
+**Risk of adding early**:
+- Over-regularization
+- Masking architectural flaws
+- False confidence in metrics
+
+**Resolution**: Explicitly deferred to Tier-2.
+
+**Action**: Add note:
+
+> "Coherence loss is explicitly NOT included in v1 baseline. The Phase-Quad architecture should demonstrate coherence through its gating mechanism alone. Auxiliary losses will be considered in Tier-2 if baseline shows insufficient consistency."
+
+---
+
+#### E.4.2 Relationship to 12-Layer Ontological Model
+
+**Status**: ⚠️ OPTIONAL — Not a gap, slight overreach
+
+**Analysis**: Phase-Quad vision architecture does NOT need ontological layer mapping to be valid or testable.
+
+**Important Distinction**:
+- Language side: Ontological layers are *structural*
+- Vision side: Ontological layers are *interpretive*
+
+**Sufficient for vision**:
+- Phase = authority
+- Quad = proposal
+- Local = texture
+- Synthesis = integration
+
+**Resolution**: Do NOT block implementation on ontological mapping.
+
+**Action**: If included, add as optional appendix with:
+- Layer-wise γ and top-K scaling configs
+- No semantic guarantees
+- Clearly labeled "experimental/optional"
+
+---
+
+#### E.4.3 Ablation Modes
+
+**Status**: 🧪 OPTIONAL BUT GOOD PRACTICE
+
+**Problem**: Formal ablation infrastructure for replaceability tests.
+
+**Analysis**:
+- Replaceability tests are important for proving contribution
+- Can be implemented after baseline works
+- Existing patterns in Symbolu codebase
+
+**Resolution**: Mention in appendix, do not block baseline.
+
+**Action**: Keep existing ReplaceabilityTester in Section 5.3 as-is. Implementation is Tier-2.
+
+---
+
+### E.5 Priority Summary Matrix
+
+| Item | Priority | Blocking? | Action |
+|------|----------|-----------|--------|
+| VAE + Text Encoder | P0 | ✅ YES | Lock SDXL VAE + CLIP 768 |
+| Cross-Timestep Phase Reset | P0 | ✅ YES | Reset per timestep (default) |
+| Chunked Quad Retrieval | P0 | ✅ YES | Specify API in QuadRetriever2D |
+| Mixed Precision | P1 | ❌ NO | Document FP32 boundaries |
+| Inference Pipeline | P1 | ❌ NO | Add Section 4.3 |
+| Initialization | P1-P2 | ❌ NO | Document defaults |
+| Non-Square Latents | P1 | ❌ NO | Add clarification |
+| Coherence Loss | P2 | ❌ NO | Explicitly defer |
+| Ontological Mapping | P3 | ❌ NO | Optional appendix only |
+| Ablation Modes | P2 | ❌ NO | Keep existing, defer impl |
+
+---
+
+### E.6 Proceed-Now Checklist
+
+**Before coding, complete these P0 items**:
+
+- [ ] Lock VAE choice: SDXL VAE (4 channels, 8× compression)
+- [ ] Lock text encoder: CLIP (768-dim)
+- [ ] Explicitly define: Phase state resets at each diffusion timestep
+- [ ] Specify chunked Quad retrieval API (forward_chunked signature)
+- [ ] Document mixed-precision rules (FP32 for phasor math)
+
+**Do NOT block on**:
+
+- ❌ Ontological layer mapping
+- ❌ Coherence loss
+- ❌ Advanced ablation infrastructure
+- ❌ T5/dual-encoder support
+- ❌ Cross-timestep persistence experiments
+
+---
+
+### E.7 One-Sentence Assessment
+
+> The gap analysis is careful and mostly correct, aligned with Symbolu philosophy, but mixes *clarifications* with *optional research extensions*. Treating only the true P0 items as blockers enables confident progress.
