@@ -397,6 +397,216 @@ def assert_alignment_signal_shape(
     return True
 
 
+# =============================================================================
+# D.1 ONTOCONTROL: FORMALIZED CONTROL PLANE INTERFACE
+# =============================================================================
+# V10.6.4 (D.1): OntoControl formalizes existing binding_salience as an explicit
+# control-plane object. This is a PURE DATA CONTAINER with NO behavioral changes.
+#
+# Why this exists:
+# - binding_salience already functions as "OntoControl-lite"
+# - This makes the control plane EXPLICIT and INSPECTABLE
+# - Future extensibility without current risk
+# - Better logging and debugging
+#
+# What this is NOT:
+# - NOT new routing logic
+# - NOT ontology embeddings
+# - NOT Phase dynamic changes
+# - NOT any behavioral modification
+#
+# Reference: QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md, Appendix D.1
+# =============================================================================
+
+@dataclass
+class OntoControl:
+    """
+    Ontological Control Signal Container - explicit control plane interface.
+
+    This dataclass wraps binding_salience and related control signals, making
+    the implicit "OntoControl-lite" explicit without changing behavior.
+
+    V10.6.4 (D.1): Formalization only, no behavioral changes.
+
+    Key Principles:
+    1. binding_salience is the PRIMARY control signal (per-position gating)
+    2. Future flags are present but have NO behavior attached yet
+    3. Validation uses existing no-write contract enforcement
+    4. Serialization enables logging/debugging
+
+    Shape Contracts (from V10.6.2 D.5):
+    - binding_salience: [B, N] - per-position gating for Top-K selection
+    - intent_phase: [B, H] or [B, H, D_h] - low-dimensional phase rotation
+
+    Usage:
+        # Create from existing binding_salience
+        onto_ctrl = OntoControl.from_salience(binding_salience)
+
+        # Or create manually
+        onto_ctrl = OntoControl(
+            binding_salience=salience_tensor,
+            enable_slots_read=True,
+        )
+
+        # Validate against no-write contract
+        onto_ctrl.validate(d_model=768)
+
+        # Log for debugging
+        print(onto_ctrl.to_dict())
+
+    Attributes:
+        binding_salience: Per-position gating signal [B, N] for Top-K selection.
+            This is the core control that biases which bindings get retrieved.
+        intent_phase: Optional low-dimensional phase rotation [B, H] or [B, H, D_h].
+            Controls how bindings are stored (Key phasor modulation).
+        enable_slots_read: Flag for D.2 read/write separation (defaults True).
+            When False, quad retrieval is skipped but phase writes continue.
+        enable_quad: Future flag for quad query control (no behavior yet).
+        enable_csr: Future flag for CSR control (no behavior yet).
+        source: Metadata indicating signal origin ("ontology", "csr", "kosha", etc).
+        confidence: Optional confidence score for the control signal.
+    """
+
+    # Primary control signal - already exists and works
+    binding_salience: Optional[torch.Tensor] = None  # [B, N] per-position gating
+
+    # Low-dimensional phase rotation (from existing intent_phase pathway)
+    intent_phase: Optional[torch.Tensor] = None  # [B, H] or [B, H, D_h]
+
+    # D.2: Separate read/write control (already implemented in BindingCacheBlock)
+    enable_slots_read: bool = True
+
+    # Future-ready flags - NO BEHAVIOR ATTACHED
+    # These exist for interface stability, not functionality
+    enable_quad: Optional[bool] = None  # Reserved for future quad gating
+    enable_csr: Optional[bool] = None   # Reserved for future CSR control
+
+    # Metadata for logging/debugging
+    source: str = "ontology"
+    confidence: Optional[float] = None
+
+    def validate(
+        self,
+        d_model: int,
+        seq_len: Optional[int] = None,
+        num_heads: Optional[int] = None,
+        strict: bool = True,
+    ) -> Dict[str, bool]:
+        """
+        Validate all control signals against the no-write contract (V10.6.2 D.5).
+
+        Args:
+            d_model: Model embedding dimension
+            seq_len: Optional sequence length for shape validation
+            num_heads: Optional number of heads for alignment validation
+            strict: If True, raise on violation; if False, return bool dict
+
+        Returns:
+            Dict mapping signal name to validity (True/False)
+
+        Raises:
+            ControlShapeViolation: If strict=True and any signal violates contract
+        """
+        results = {}
+
+        if self.binding_salience is not None:
+            # binding_salience is special: [B, N] is VALID (per-position gating)
+            results["binding_salience"] = assert_control_shape(
+                self.binding_salience,
+                name="binding_salience",
+                d_model=d_model,
+                seq_len=seq_len,
+                strict=strict,
+            )
+
+        if self.intent_phase is not None:
+            # intent_phase must be low-dimensional: [B, H] or [B, H, D_h]
+            results["intent_phase"] = assert_control_shape(
+                self.intent_phase,
+                name="intent_phase",
+                d_model=d_model,
+                seq_len=seq_len,
+                strict=strict,
+            )
+
+        return results
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize for logging/debugging.
+
+        Returns:
+            Dict with shape information and metadata for all fields.
+        """
+        return {
+            "binding_salience_shape": (
+                list(self.binding_salience.shape)
+                if self.binding_salience is not None
+                else None
+            ),
+            "intent_phase_shape": (
+                list(self.intent_phase.shape)
+                if self.intent_phase is not None
+                else None
+            ),
+            "enable_slots_read": self.enable_slots_read,
+            "enable_quad": self.enable_quad,
+            "enable_csr": self.enable_csr,
+            "source": self.source,
+            "confidence": self.confidence,
+        }
+
+    @classmethod
+    def from_salience(
+        cls,
+        binding_salience: torch.Tensor,
+        source: str = "ontology",
+        confidence: Optional[float] = None,
+    ) -> "OntoControl":
+        """
+        Factory: Create OntoControl from existing binding_salience tensor.
+
+        This is the recommended way to wrap existing binding_salience signals
+        in the formalized OntoControl interface.
+
+        Args:
+            binding_salience: [B, N] per-position gating tensor
+            source: Origin of the signal ("ontology", "csr", "kosha", "annotator")
+            confidence: Optional confidence score
+
+        Returns:
+            OntoControl instance wrapping the binding_salience
+        """
+        return cls(
+            binding_salience=binding_salience,
+            source=source,
+            confidence=confidence,
+        )
+
+
+def onto_control_from_salience(
+    binding_salience: torch.Tensor,
+    source: str = "ontology",
+) -> OntoControl:
+    """
+    Adapter: Convert binding_salience to OntoControl.
+
+    This is a convenience function that wraps OntoControl.from_salience().
+
+    Args:
+        binding_salience: [B, N] per-position gating tensor
+        source: Origin of the signal
+
+    Returns:
+        OntoControl instance
+
+    Example:
+        >>> salience = annotator(hidden_states, sovereign_state)
+        >>> onto_ctrl = onto_control_from_salience(salience, source="annotator")
+    """
+    return OntoControl.from_salience(binding_salience, source=source)
+
+
 def get_sovereign_state_summary(state: torch.Tensor) -> Dict[str, Any]:
     """
     Extract human-readable summary from 32D Sovereign State.
