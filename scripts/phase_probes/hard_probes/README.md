@@ -231,6 +231,112 @@ If ablations don't hurt, phase is "decorative" (not causally necessary).
 - Clean test of O(n) state maintenance
 - Previous experiments showed Phase wins on simple BIND tasks
 
+## D.6 Control Plane Test Suite
+
+The `test_hard_probes_d6_control_plane.py` script provides comprehensive validation of the control plane implementation per the D.6 Test Priority Matrix.
+
+### Test Groups
+
+| Group | Name | Tests | Purpose |
+|-------|------|-------|---------|
+| **A** | Leak Detector | 15 tests | Assert control signals cannot be token-wise embeddings (no-write contract) |
+| **B** | AR Regression | 7 tests | Verify AR accuracy doesn't collapse when Onto/CSR controls enabled vs disabled |
+| **C** | Enable Slots Read | 6 tests | Verify the D.2 `enable_slots_read` control flag works correctly |
+| **D** | OntoControl Interface | 10 tests | Verify OntoControl dataclass formalizes control plane correctly (V10.6.4) |
+| **E** | Forward-Pass Enforcement | 10 tests | Verify no-write contract is enforced INSIDE forward(), not just config (V10.6.6) |
+| **Integration** | Full Pipeline | 1 test | End-to-end validation combining multiple D.6 requirements |
+
+### Critical Invariants Tested
+
+- **INV-D6-1**: `intent_phase` must be low-dimensional `[B, H]` or `[B, H, D_h]`, NOT `[B, N, D]`
+- **INV-D6-2**: `binding_salience` must be `[B, N]` for per-position gating, NOT `[B, N, D]`
+- **INV-D6-3**: Control signals must be broadcastable to control shapes
+- **INV-D6-4**: AR accuracy must not collapse when Onto/CSR enabled vs disabled
+- **INV-D6-5**: `enable_slots_read=False` must skip quad retrieval without affecting phase writes
+- **INV-D6-6**: `s_align` (alignment signal) must be `[H]` or `[]`, NOT `[B, N]` (V10.6.3)
+- **INV-D6-7**: OntoControl wraps binding_salience without changing behavior (V10.6.4)
+- **INV-E6-1**: Invalid control signals in forward() must raise `ControlShapeViolation` (V10.6.6)
+- **INV-E6-4**: `enforce_control_contract=True` is the default (STRICT) (V10.6.6)
+- **INV-E6-5**: `set_enforce_control_contract()` propagates to all child blocks (V10.6.6)
+
+### Running the Tests
+
+**Run all D.6 control plane tests:**
+```bash
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v
+```
+
+**Run specific test groups:**
+```bash
+# Group A: Leak detector tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestGroupA"
+
+# Group B: AR regression tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestGroupB"
+
+# Group C: Enable slots read tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestGroupC"
+
+# Group D: OntoControl interface tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestGroupD"
+
+# Group E: Forward-pass enforcement tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestGroupE"
+
+# Integration tests
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py -v -k "TestIntegration"
+```
+
+**Run with coverage:**
+```bash
+pytest scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py --cov=symbolu.phase_transformer -v
+```
+
+**Run as standalone script:**
+```bash
+python scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py
+```
+
+### Test Details by Group
+
+#### Group A: Leak Detector Tests (15 tests)
+Tests the no-write contract (D.5) enforcement:
+- `test_a01-a04`: Valid/invalid `intent_phase` shape validation
+- `test_a05-a06`: Valid/invalid `binding_salience` shape validation
+- `test_a07-a10`: Multi-signal validation and scalar/per-head controls
+- `test_a11-a15`: Alignment signal (`s_align`) shape validation (V10.6.3)
+
+#### Group B: AR Regression Tests (7 tests)
+Tests autoregressive stability with control signals:
+- `test_b01-b04`: Forward pass with various control configurations
+- `test_b05`: Logit magnitude stability check (INV-D6-4)
+- `test_b06`: Gradient flow verification
+- `test_b07`: Output determinism verification
+
+#### Group C: Enable Slots Read Tests (6 tests)
+Tests the D.2 READ/WRITE path separation:
+- `test_c01-c02`: Default and explicit `enable_slots_read` flag
+- `test_c03`: Output difference verification
+- `test_c04-c06`: Combined controls and gradient flow
+
+#### Group D: OntoControl Interface Tests (10 tests)
+Tests the V10.6.4 formalized control plane interface:
+- `test_d01-d03`: Creation and factory methods
+- `test_d04-d06`: Validation with valid/invalid signals
+- `test_d07-d08`: Serialization (`to_dict`)
+- `test_d09-d10`: Future flags and no-write contract preservation
+
+#### Group E: Forward-Pass Enforcement Tests (10 tests)
+Tests V10.6.6 runtime enforcement (highest-risk gap):
+- `test_e01-e03`: Block-level forward rejection/acceptance
+- `test_e04-e06`: Transformer-level forward rejection/acceptance
+- `test_e07`: Default enforcement verification (INV-E6-4)
+- `test_e08`: Propagation to child blocks (INV-E6-5)
+- `test_e09`: Disabled enforcement behavior (debugging only)
+- `test_e10`: `forward_hidden()` enforcement
+
+---
+
 ## Citation
 
 This benchmark was designed to isolate relational reasoning from pattern memorization, following principles from:
