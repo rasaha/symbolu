@@ -32,7 +32,7 @@ class PretrainedVAE(nn.Module):
         self,
         model_id: str = "stabilityai/stable-diffusion-xl-base-1.0",
         subfolder: str = "vae",
-        torch_dtype: torch.dtype = torch.float16,
+        torch_dtype: torch.dtype = torch.float32,  # Use fp32 for stability
         device: Optional[torch.device] = None,
     ):
         super().__init__()
@@ -146,7 +146,7 @@ class PretrainedCLIP(nn.Module):
         self,
         model_id: str = "openai/clip-vit-large-patch14",
         max_length: int = 77,
-        torch_dtype: torch.dtype = torch.float16,
+        torch_dtype: torch.dtype = torch.float32,  # Use fp32 for stability
         device: Optional[torch.device] = None,
     ):
         super().__init__()
@@ -241,7 +241,7 @@ class PretrainedSDXLTextEncoder(nn.Module):
     def __init__(
         self,
         model_id: str = "stabilityai/stable-diffusion-xl-base-1.0",
-        torch_dtype: torch.dtype = torch.float16,
+        torch_dtype: torch.dtype = torch.float32,  # Use fp32 for stability
         device: Optional[torch.device] = None,
     ):
         super().__init__()
