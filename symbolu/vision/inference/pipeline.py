@@ -435,6 +435,9 @@ class PhaseQuadInferencePipeline:
         latent_w = config.width // 8
 
         # Initialize with noise
+        # Scale initial noise to match training scale (VAE encoding scales by ~0.13)
+        # This is critical because training operates on scaled latents
+        init_noise_sigma = getattr(self.vae, 'scaling_factor', 1.0)
         latents = torch.randn(
             batch_size,
             self.config.vae.in_channels,
@@ -442,7 +445,7 @@ class PhaseQuadInferencePipeline:
             latent_w,
             device=self.device,
             generator=generator,
-        )
+        ) * init_noise_sigma
 
         # Get sampler
         sampler = get_sampler(
