@@ -63,6 +63,8 @@ class PretrainedVAE(nn.Module):
                 subfolder=self._subfolder,
                 torch_dtype=self.torch_dtype,
             ).to(self.device)
+            # Force float32 for numerical stability (fp16 can cause NaN)
+            self._vae = self._vae.float()
             self._vae.eval()
             print("VAE loaded successfully.")
 
@@ -114,8 +116,8 @@ class PretrainedVAE(nn.Module):
         # Unscale
         latents = latents / self.scaling_factor
 
-        # Decode
-        images = self._vae.decode(latents.to(self.torch_dtype)).sample
+        # Decode (always use float32 for stability)
+        images = self._vae.decode(latents.float()).sample
 
         # Convert to [0, 1]
         images = (images + 1.0) / 2.0
