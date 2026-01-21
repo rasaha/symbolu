@@ -113,6 +113,11 @@ class DiffusionTrainer:
         Returns:
             latents: [B, 4, H//8, W//8] latents.
         """
+        # Check input validity
+        if torch.isnan(images).any():
+            print(f"WARNING: NaN in input images!")
+            return torch.zeros(images.shape[0], 4, images.shape[2]//8, images.shape[3]//8, device=images.device)
+
         with torch.no_grad():
             if hasattr(self.vae, 'encode'):
                 latents = self.vae.encode(images)
@@ -120,6 +125,11 @@ class DiffusionTrainer:
                 # For mock VAE
                 latents = images[:, :4] if images.shape[1] >= 4 else images
                 latents = F.interpolate(latents, scale_factor=1/8, mode='bilinear')
+
+        # Debug first batch
+        if self.global_step == 0:
+            print(f"  Images: shape={images.shape}, min={images.min():.3f}, max={images.max():.3f}")
+            print(f"  Latents: shape={latents.shape}, min={latents.min():.3f}, max={latents.max():.3f}")
 
         return latents
 
@@ -135,6 +145,12 @@ class DiffusionTrainer:
         """
         with torch.no_grad():
             embeddings = self.text_encoder.encode(captions)
+
+        # Debug first batch
+        if self.global_step == 0:
+            print(f"  Text: shape={embeddings.shape}, min={embeddings.min():.3f}, max={embeddings.max():.3f}")
+            if torch.isnan(embeddings).any():
+                print("  WARNING: NaN in text embeddings!")
 
         return embeddings
 
@@ -159,6 +175,14 @@ class DiffusionTrainer:
         latents = latents.float()
         text_embeddings = text_embeddings.float()
 
+        # Debug: Check for NaN early
+        if torch.isnan(latents).any():
+            print(f"WARNING: NaN in latents! shape={latents.shape}, min={latents.min()}, max={latents.max()}")
+            return torch.tensor(0.0, device=self.device, requires_grad=True)
+        if torch.isnan(text_embeddings).any():
+            print(f"WARNING: NaN in text_embeddings! shape={text_embeddings.shape}")
+            return torch.tensor(0.0, device=self.device, requires_grad=True)
+
         # Sample random timesteps
         timesteps = torch.randint(
             0,
@@ -173,9 +197,9 @@ class DiffusionTrainer:
         # Add noise to latents
         noisy_latents = self.noise_schedule.add_noise(latents, noise, timesteps)
 
-        # Check for NaN in inputs
-        if torch.isnan(noisy_latents).any() or torch.isnan(text_embeddings).any():
-            print("WARNING: NaN detected in inputs!")
+        # Check for NaN after noise addition
+        if torch.isnan(noisy_latents).any():
+            print(f"WARNING: NaN after add_noise! timesteps={timesteps.tolist()}")
             return torch.tensor(0.0, device=self.device, requires_grad=True)
 
         # Predict noise
