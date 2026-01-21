@@ -82,6 +82,8 @@ class PhaseQuadImageGenerator(nn.Module):
             self.text_proj = None
 
         # Main transformer blocks
+        # NOTE: text_dim is embed_dim because text is projected by self.text_proj
+        # before passing to blocks (from text_encoder.embed_dim to embed_dim)
         self.blocks = nn.ModuleList([
             CognadeVisionBlock(
                 embed_dim=config.embed_dim,
@@ -91,7 +93,7 @@ class PhaseQuadImageGenerator(nn.Module):
                 ffn_ratio=config.block.ffn_ratio,
                 dropout=config.block.dropout,
                 use_cross_attn=config.block.local.use_cross_attn,
-                text_dim=config.text_encoder.embed_dim if config.block.local.use_cross_attn else None,
+                text_dim=config.embed_dim if config.block.local.use_cross_attn else None,
             )
             for _ in range(config.num_blocks)
         ])
