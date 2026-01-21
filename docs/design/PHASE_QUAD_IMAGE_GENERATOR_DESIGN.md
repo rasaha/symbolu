@@ -2347,3 +2347,207 @@ Terms like "design creativity" vs "chaos" are rhetorical. The technical question
 ### F.8 One-Sentence Assessment
 
 > The creativity controller proposal contains valid insights about deliberate vs. accidental creativity, but its specific mechanisms are either already implemented (temperature, diagnostics), premature (multi-track, drift windows), or speculative (Kosha, semantic mutation) — the correct approach is to validate the baseline first, then add minimal complexity only where measured deficits exist.
+
+---
+
+## Appendix G: Training Datasets Reference
+
+This appendix documents recommended datasets for training Phase-Quad image generation models at various scales.
+
+### G.1 Dataset Selection Philosophy
+
+**Key Principles:**
+
+1. **Start small, scale up** — Validate pipeline on small datasets before committing GPU resources
+2. **Quality over quantity** — Aesthetic-filtered datasets often outperform raw web scrapes
+3. **Caption quality matters** — Better captions = better text-image alignment
+4. **License awareness** — Some datasets have commercial restrictions
+
+---
+
+### G.2 Large-Scale Datasets (Production Training)
+
+These datasets are suitable for training competitive image generation models from scratch.
+
+| Dataset | Size | Description | Source |
+|---------|------|-------------|--------|
+| **LAION-5B** | 5.8B images | Largest open dataset, used to train Stable Diffusion | `laion/laion2B-en` |
+| **LAION-400M** | 400M images | Smaller subset, more curated | `laion/laion400m` |
+| **LAION-Aesthetics** | 120M images | Filtered for aesthetic quality (score > 6.5) | `laion/laion-high-resolution` |
+| **COYO-700M** | 700M images | Korean-originated, high quality | `kakaobrain/coyo-700m` |
+| **DataComp-1B** | 1.4B images | Curated for CLIP training, high quality | `mlfoundations/datacomp_1b` |
+
+**Recommended for Phase-Quad**: LAION-Aesthetics (quality-filtered, manageable size)
+
+**Training command:**
+```bash
+python -m symbolu.vision.training.train \
+  --hf-dataset "laion/laion-high-resolution" \
+  --model-size base \
+  --epochs 50 \
+  --batch-size 8 \
+  --save-every 10
+```
+
+---
+
+### G.3 Medium-Scale Datasets (Fine-Tuning & Experiments)
+
+These datasets are suitable for fine-tuning pretrained models or experimental training runs.
+
+| Dataset | Size | Description | Source |
+|---------|------|-------------|--------|
+| **CC3M** | 3.3M images | Conceptual Captions, Google-curated | `google-research-datasets/conceptual_captions` |
+| **CC12M** | 12M images | Larger Conceptual Captions | `google-research-datasets/cc12m` |
+| **RedCaps** | 12M images | Reddit image-caption pairs, diverse | `red_caps` |
+| **SBU Captions** | 1M images | Flickr-sourced with captions | `sbu_captions` |
+| **COCO** | 330K images | Object detection + 5 captions per image | `coco_captions` |
+
+**Recommended for Phase-Quad validation**: COCO (diverse, well-captioned, manageable)
+
+**Training command:**
+```bash
+python -m symbolu.vision.training.train \
+  --hf-dataset "HuggingFaceM4/COCO" \
+  --model-size small \
+  --epochs 100 \
+  --batch-size 4 \
+  --save-every 20
+```
+
+---
+
+### G.4 Small-Scale Datasets (Quick Experiments & Debugging)
+
+These datasets are suitable for validating the training pipeline and quick experiments.
+
+| Dataset | Size | Description | Source |
+|---------|------|-------------|--------|
+| **Pokemon BLIP** | 833 images | Pokemon with BLIP captions | `svjack/pokemon-blip-captions-en-zh` |
+| **Flickr30k** | 31K images | High quality, 5 captions each | `nlphuji/flickr30k` |
+| **Oxford Flowers** | 8K images | Flower classification + captions | `nelorth/oxford-flowers` |
+| **CelebA-HQ** | 30K images | High-quality face images | `huggan/CelebA-HQ` |
+| **FFHQ** | 70K images | Face images, high diversity | `nhytrek/FFHQ-1024` |
+
+**Recommended for Phase-Quad debugging**: Pokemon BLIP (tiny, fast iteration)
+
+**Training command:**
+```bash
+python -m symbolu.vision.training.train \
+  --hf-dataset "svjack/pokemon-blip-captions-en-zh" \
+  --model-size tiny \
+  --epochs 50 \
+  --batch-size 8 \
+  --save-every 10
+```
+
+---
+
+### G.5 Specialized Datasets
+
+For domain-specific training or style transfer:
+
+| Dataset | Size | Description | Use Case |
+|---------|------|-------------|----------|
+| **WikiArt** | 80K images | Artwork with style labels | Artistic style |
+| **Danbooru** | 4M+ images | Anime/illustration style | Anime generation |
+| **Unsplash** | 2M images | High-quality photography | Photorealism |
+| **IconClass** | 100K images | Art history iconography | Historical art |
+| **Fashion-MNIST** | 70K images | Fashion items | Product images |
+
+---
+
+### G.6 Dataset Quality Guidelines
+
+#### G.6.1 Caption Quality Indicators
+
+**Good captions:**
+- Descriptive and specific
+- Mention objects, actions, and style
+- Consistent grammar and formatting
+
+**Bad captions:**
+- Single words or very short phrases
+- URL fragments or metadata
+- Non-English mixed with English randomly
+
+#### G.6.2 Image Quality Indicators
+
+**Good images:**
+- Resolution ≥ 256×256 (ideally 512×512+)
+- Clear subject matter
+- No heavy watermarks or text overlays
+
+**Bad images:**
+- Tiny thumbnails
+- Heavy compression artifacts
+- Mostly text/screenshots
+
+#### G.6.3 Filtering Recommendations
+
+For production training, apply these filters:
+
+```python
+# Recommended filters for LAION-style datasets
+min_image_size = 256
+min_caption_length = 10
+max_caption_length = 200
+aesthetic_score_threshold = 5.0  # For aesthetic-filtered subsets
+nsfw_filter = True  # Unless specifically needed
+```
+
+---
+
+### G.7 Training Progression Recommendation
+
+**Recommended order for Phase-Quad development:**
+
+| Stage | Dataset | Model Size | Epochs | Purpose |
+|-------|---------|------------|--------|---------|
+| 1. Debug | Pokemon (833) | tiny | 50 | Validate pipeline |
+| 2. Validate | COCO (330K) | small | 50 | Test real diversity |
+| 3. Scale | LAION-Aesthetics (1M subset) | base | 100 | Production training |
+| 4. Production | LAION-Aesthetics (full) | large | 200+ | Final model |
+
+**Estimated GPU hours (A100):**
+
+| Stage | Dataset | GPU Hours |
+|-------|---------|-----------|
+| Debug | Pokemon | <1 hour |
+| Validate | COCO | ~10 hours |
+| Scale | LAION-1M | ~100 hours |
+| Production | LAION-full | ~1000+ hours |
+
+---
+
+### G.8 Local Dataset Format
+
+For custom/proprietary datasets, use this structure:
+
+```
+data_dir/
+├── images/
+│   ├── image_001.jpg
+│   ├── image_002.png
+│   └── ...
+├── captions/
+│   ├── image_001.txt
+│   ├── image_002.txt
+│   └── ...
+└── metadata.json  # Optional: {"image_001.jpg": "caption text", ...}
+```
+
+**Training command:**
+```bash
+python -m symbolu.vision.training.train \
+  --data-dir /path/to/data \
+  --model-size small \
+  --epochs 100 \
+  --batch-size 4
+```
+
+---
+
+### G.9 One-Sentence Assessment
+
+> Start with Pokemon (833 images) to validate the pipeline works, progress to COCO (330K) for real diversity testing, then scale to LAION-Aesthetics subsets for production-quality training — quality filtering and good captions matter more than raw dataset size.
