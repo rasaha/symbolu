@@ -155,6 +155,10 @@ class DiffusionTrainer:
         """
         batch_size = latents.shape[0]
 
+        # Ensure float32 for model forward pass (avoid fp16 precision issues)
+        latents = latents.float()
+        text_embeddings = text_embeddings.float()
+
         # Sample random timesteps
         timesteps = torch.randint(
             0,
@@ -169,12 +173,22 @@ class DiffusionTrainer:
         # Add noise to latents
         noisy_latents = self.noise_schedule.add_noise(latents, noise, timesteps)
 
+        # Check for NaN in inputs
+        if torch.isnan(noisy_latents).any() or torch.isnan(text_embeddings).any():
+            print("WARNING: NaN detected in inputs!")
+            return torch.tensor(0.0, device=self.device, requires_grad=True)
+
         # Predict noise
         noise_pred = self.model(
             noisy_latents,
             timesteps,
             text_embeddings,
         )
+
+        # Check for NaN in output
+        if torch.isnan(noise_pred).any():
+            print("WARNING: NaN detected in model output!")
+            return torch.tensor(0.0, device=self.device, requires_grad=True)
 
         # MSE loss
         loss = F.mse_loss(noise_pred, noise)
@@ -428,7 +442,7 @@ def train(
     )
     print(f"Dataset: {len(dataset)} samples, {len(dataloader)} batches per epoch")
 
-    # Create trainer
+    # Create trainer (disable AMP for stability during initial training)
     trainer = DiffusionTrainer(
         model=model,
         config=config,
@@ -436,6 +450,7 @@ def train(
         text_encoder=text_encoder,
         device=device,
         output_dir=output_dir,
+        use_amp=False,  # Disable mixed precision for stability
     )
 
     # Create optimizer and scheduler
