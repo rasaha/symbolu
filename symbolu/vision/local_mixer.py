@@ -115,9 +115,10 @@ class LocalMixer(nn.Module):
         # Optional cross-attention to text
         if self.use_cross_attn and text_cond is not None and self.cross_attn is not None:
             x_norm = self.norm2(x_local)
-            # Project text if needed
-            text_proj = self.text_proj(text_cond) if self.text_proj is not None else text_cond
-            x_cross, _ = self.cross_attn(x_norm, text_cond, text_cond)
+            # Project text if needed (identity when text_dim == embed_dim)
+            text_for_attn = self.text_proj(text_cond) if self.text_proj is not None else text_cond
+            # Cross-attention: query from image, key/value from text
+            x_cross, _ = self.cross_attn(x_norm, text_for_attn, text_for_attn)
             x_local = x_local + self.dropout(x_cross)
 
         return x_local

@@ -117,14 +117,25 @@ def demo_basic_generation(args):
         GenerationConfig,
     )
 
-    print("1. Creating Phase-Quad Pipeline (mock mode for demo)")
-    print("   - In production, use PhaseQuadInferencePipeline.from_pretrained()")
-    print()
+    # Create pipeline - use pretrained if checkpoint provided
+    if args.checkpoint:
+        print("1. Creating Phase-Quad Pipeline (with trained checkpoint)")
+        print(f"   - Loading checkpoint: {args.checkpoint}")
+        print()
 
-    # Create mock pipeline
-    pipeline = PhaseQuadInferencePipeline.create_mock(
-        model_size=args.model_size,
-    )
+        pipeline = PhaseQuadInferencePipeline.from_pretrained(
+            checkpoint_path=args.checkpoint,
+            model_size=args.model_size,
+        )
+    else:
+        print("1. Creating Phase-Quad Pipeline (mock mode for demo)")
+        print("   - In production, use --checkpoint to load trained model")
+        print()
+
+        # Create mock pipeline
+        pipeline = PhaseQuadInferencePipeline.create_mock(
+            model_size=args.model_size,
+        )
 
     print(f"   Model: {args.model_size}")
     n_params = sum(p.numel() for p in pipeline.model.parameters())
@@ -388,6 +399,12 @@ Examples:
         "--ablation",
         action="store_true",
         help="Run ablation demo",
+    )
+    parser.add_argument(
+        "--checkpoint", "-c",
+        type=str,
+        default=None,
+        help="Path to trained model checkpoint (uses pretrained VAE/CLIP)",
     )
 
     args = parser.parse_args()

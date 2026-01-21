@@ -79,8 +79,8 @@ class PatchEmbed2D(nn.Module):
         else:
             self.pos_embed = None
 
-        # For unpatchify
-        self.unpatch_proj = nn.Linear(embed_dim, in_channels * patch_size * patch_size)
+        # Store patch dimension for unpatchify
+        self.patch_dim = in_channels * patch_size * patch_size
 
     def forward(self, z: Tensor) -> Tuple[Tensor, PatchMeta]:
         """
@@ -166,20 +166,24 @@ class PatchEmbed2D(nn.Module):
         Reverse patchification.
 
         Args:
-            x: Patch tokens [B, N, D].
+            x: Patch tokens [B, N, C * P * P] (already projected from embed_dim).
             meta: PatchMeta from forward pass.
 
         Returns:
             z: Latent tensor [B, C, H_img, W_img].
         """
-        B, N, D = x.shape
+        B, N, patch_dim = x.shape
         H_p, W_p = meta.H_p, meta.W_p
         P = self.patch_size
         C = meta.in_channels
 
-        # Project back to patch space
-        # [B, N, D] -> [B, N, C * P * P]
-        x = self.unpatch_proj(x)
+        # Validate input shape
+        expected_dim = C * P * P
+        if patch_dim != expected_dim:
+            raise ValueError(
+                f"Input dimension {patch_dim} doesn't match expected {expected_dim} "
+                f"(C={C}, P={P}). Make sure to project from embed_dim before calling unpatchify."
+            )
 
         # Reshape: [B, N, C * P * P] -> [B, H_p, W_p, C, P, P]
         x = x.view(B, H_p, W_p, C, P, P)

@@ -150,9 +150,15 @@ class MockVAE(nn.Module):
         latents = latents / self.scaling_factor
         return self.decoder(latents)
 
-    def encode(self, images: Tensor) -> Any:
-        """Encode images to latents (not implemented for mock)."""
-        raise NotImplementedError("Mock VAE does not support encoding")
+    def encode(self, images: Tensor) -> Tensor:
+        """Encode images to latents (simple downscale for mock)."""
+        B, C, H, W = images.shape
+        # Simple mock encoding: downsample and project to latent channels
+        latents = F.interpolate(images, scale_factor=1/8, mode='bilinear', align_corners=False)
+        # Project 3 channels to latent_channels (4)
+        if latents.shape[1] != self.latent_channels:
+            latents = F.pad(latents, (0, 0, 0, 0, 0, self.latent_channels - latents.shape[1]))
+        return latents * self.scaling_factor
 
 
 class MockTextEncoder(nn.Module):
@@ -280,6 +286,90 @@ class PhaseQuadInferencePipeline:
         # Create mock components
         vae = MockVAE(latent_channels=config.vae.in_channels)
         text_encoder = MockTextEncoder(embed_dim=config.text_encoder.embed_dim)
+
+        return cls(
+            model=model,
+            vae=vae,
+            text_encoder=text_encoder,
+            config=config,
+            device=device,
+        )
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        checkpoint_path: Optional[str] = None,
+        model_size: str = "base",
+        vae_model_id: str = "stabilityai/stable-diffusion-xl-base-1.0",
+        text_encoder_id: str = "openai/clip-vit-large-patch14",
+        device: Optional[torch.device] = None,
+        torch_dtype: torch.dtype = torch.float16,
+    ) -> "PhaseQuadInferencePipeline":
+        """
+        Create pipeline with pretrained VAE and text encoder.
+
+        This creates a pipeline that can generate actual images using
+        pretrained components from HuggingFace.
+
+        Args:
+            checkpoint_path: Path to trained Phase-Quad model checkpoint.
+                            If None, uses random initialization.
+            model_size: "tiny", "small", "base", or "large"
+            vae_model_id: HuggingFace model ID for VAE.
+            text_encoder_id: HuggingFace model ID for text encoder.
+            device: Device to use.
+            torch_dtype: Data type for pretrained models.
+
+        Returns:
+            Pipeline with pretrained VAE and text encoder.
+
+        Example:
+            >>> # With trained checkpoint
+            >>> pipeline = PhaseQuadInferencePipeline.from_pretrained(
+            ...     checkpoint_path="checkpoints/phase_quad_epoch_10.pt"
+            ... )
+            >>> result = pipeline.generate("A sunset over mountains")
+
+            >>> # Without checkpoint (for testing pretrained components)
+            >>> pipeline = PhaseQuadInferencePipeline.from_pretrained()
+        """
+        from symbolu.vision.inference.pretrained import (
+            PretrainedVAE,
+            PretrainedCLIP,
+        )
+
+        device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Get config
+        config_fn = getattr(PhaseQuadVisionConfig, model_size)
+        config = config_fn()
+
+        # Create Phase-Quad model
+        model = PhaseQuadImageGenerator(config)
+
+        # Load checkpoint if provided
+        if checkpoint_path is not None:
+            print(f"Loading Phase-Quad checkpoint from {checkpoint_path}...")
+            checkpoint = torch.load(checkpoint_path, map_location="cpu")
+            if "model_state_dict" in checkpoint:
+                model.load_state_dict(checkpoint["model_state_dict"])
+            else:
+                model.load_state_dict(checkpoint)
+            print("Checkpoint loaded successfully.")
+
+        # Load pretrained VAE
+        vae = PretrainedVAE(
+            model_id=vae_model_id,
+            torch_dtype=torch_dtype,
+            device=device,
+        )
+
+        # Load pretrained text encoder
+        text_encoder = PretrainedCLIP(
+            model_id=text_encoder_id,
+            torch_dtype=torch_dtype,
+            device=device,
+        )
 
         return cls(
             model=model,
