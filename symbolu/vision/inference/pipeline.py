@@ -458,28 +458,41 @@ class PhaseQuadInferencePipeline:
         # Control for Phase-Quad
         control = GeneratorControl(tau=config.tau)
 
+        # Determine if we should use classifier-free guidance
+        use_cfg = config.guidance_scale > 1.0
+
         # Denoising loop
         for i, t in enumerate(timesteps):
-            # Expand latents for classifier-free guidance
-            latent_model_input = torch.cat([latents, latents], dim=0)
+            if use_cfg:
+                # Expand latents for classifier-free guidance
+                latent_model_input = torch.cat([latents, latents], dim=0)
 
-            # Combine embeddings
-            combined_embeddings = torch.cat([uncond_embeddings, text_embeddings], dim=0)
+                # Combine embeddings
+                combined_embeddings = torch.cat([uncond_embeddings, text_embeddings], dim=0)
 
-            # Predict noise
-            t_tensor = torch.tensor([t] * (batch_size * 2), device=self.device)
-            noise_pred = self.model(
-                latent_model_input,
-                t_tensor,
-                combined_embeddings,
-                control=control,
-            )
+                # Predict noise
+                t_tensor = torch.tensor([t] * (batch_size * 2), device=self.device)
+                noise_pred = self.model(
+                    latent_model_input,
+                    t_tensor,
+                    combined_embeddings,
+                    control=control,
+                )
 
-            # Classifier-free guidance
-            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + config.guidance_scale * (
-                noise_pred_text - noise_pred_uncond
-            )
+                # Classifier-free guidance
+                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + config.guidance_scale * (
+                    noise_pred_text - noise_pred_uncond
+                )
+            else:
+                # No CFG - single forward pass
+                t_tensor = torch.tensor([t] * batch_size, device=self.device)
+                noise_pred = self.model(
+                    latents,
+                    t_tensor,
+                    text_embeddings,
+                    control=control,
+                )
 
             # Denoise step
             t_prev = timesteps[i + 1] if i + 1 < len(timesteps) else 0
