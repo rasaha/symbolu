@@ -15,6 +15,13 @@ from symbolu.vision.inference.samplers import (
     DDIMSampler,
     get_sampler,
 )
+from symbolu.vision.inference.pretrained import (
+    PretrainedVAE,
+    PretrainedCLIP,
+    PretrainedSDXLTextEncoder,
+    load_pretrained_vae,
+    load_pretrained_text_encoder,
+)
 
 __all__ = [
     "PhaseQuadInferencePipeline",
@@ -23,4 +30,9 @@ __all__ = [
     "DDPMSampler",
     "DDIMSampler",
     "get_sampler",
+    "PretrainedVAE",
+    "PretrainedCLIP",
+    "PretrainedSDXLTextEncoder",
+    "load_pretrained_vae",
+    "load_pretrained_text_encoder",
 ]
