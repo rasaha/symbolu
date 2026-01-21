@@ -150,9 +150,15 @@ class MockVAE(nn.Module):
         latents = latents / self.scaling_factor
         return self.decoder(latents)
 
-    def encode(self, images: Tensor) -> Any:
-        """Encode images to latents (not implemented for mock)."""
-        raise NotImplementedError("Mock VAE does not support encoding")
+    def encode(self, images: Tensor) -> Tensor:
+        """Encode images to latents (simple downscale for mock)."""
+        B, C, H, W = images.shape
+        # Simple mock encoding: downsample and project to latent channels
+        latents = F.interpolate(images, scale_factor=1/8, mode='bilinear', align_corners=False)
+        # Project 3 channels to latent_channels (4)
+        if latents.shape[1] != self.latent_channels:
+            latents = F.pad(latents, (0, 0, 0, 0, 0, self.latent_channels - latents.shape[1]))
+        return latents * self.scaling_factor
 
 
 class MockTextEncoder(nn.Module):

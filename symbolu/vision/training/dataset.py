@@ -238,6 +238,25 @@ class HuggingFaceDataset(Dataset):
         if max_samples is not None and not streaming:
             self.dataset = self.dataset.select(range(min(max_samples, len(self.dataset))))
 
+        # Auto-detect caption column if specified one doesn't exist
+        if not streaming and len(self.dataset) > 0:
+            sample = self.dataset[0]
+            if caption_column not in sample:
+                # Try common caption column names
+                caption_candidates = ["text", "caption", "en_text", "description", "prompt", "label"]
+                for candidate in caption_candidates:
+                    if candidate in sample:
+                        print(f"Caption column '{caption_column}' not found, using '{candidate}'")
+                        self.caption_column = candidate
+                        break
+                else:
+                    # Use first string-like column
+                    for key, value in sample.items():
+                        if isinstance(value, str) and key != image_column:
+                            print(f"Caption column '{caption_column}' not found, using '{key}'")
+                            self.caption_column = key
+                            break
+
         if not streaming:
             print(f"Loaded {len(self.dataset)} samples")
 
