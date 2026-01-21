@@ -113,17 +113,23 @@ class QuadRetriever2D(nn.Module):
                 torch.zeros(B, N, K, device=x.device, dtype=x.dtype),
             )
 
+        # Get score noise from control
+        score_noise_std = 0.0
+        if control is not None:
+            score_noise_std = control.score_noise_std
+
         # Use chunked retrieval for large N
         if self.chunk_size > 0 and x.shape[1] > self.chunk_size:
-            return self.forward_chunked(x, S, meta, self.chunk_size)
+            return self.forward_chunked(x, S, meta, self.chunk_size, score_noise_std)
 
-        return self._forward_full(x, S, meta)
+        return self._forward_full(x, S, meta, score_noise_std)
 
     def _forward_full(
         self,
         x: Tensor,
         S: Tensor,
         meta: PatchMeta,
+        score_noise_std: float = 0.0,
     ) -> Tuple[Tensor, Tensor]:
         """Full (non-chunked) forward pass."""
         B, N, D = x.shape
@@ -152,6 +158,12 @@ class QuadRetriever2D(nn.Module):
 
         # Compute scores: [B, H, N, N]
         scores = torch.matmul(Q, Keys.transpose(-2, -1)) * self.scale
+
+        # Add score noise for creativity (if enabled)
+        # Higher noise -> more surprising proposals enter TopK
+        if score_noise_std > 0.0 and self.training is False:
+            noise = torch.randn_like(scores) * score_noise_std
+            scores = scores + noise
 
         # TopK selection - NO SOFTMAX
         top_scores, top_indices = scores.topk(K, dim=-1)  # [B, H, N, K]
@@ -195,6 +207,7 @@ class QuadRetriever2D(nn.Module):
         S: Tensor,
         meta: PatchMeta,
         chunk_size: int = 1024,
+        score_noise_std: float = 0.0,
     ) -> Tuple[Tensor, Tensor]:
         """
         Chunked Quad retrieval for large token counts.
@@ -212,6 +225,7 @@ class QuadRetriever2D(nn.Module):
             S: Phase state [B, N, D].
             meta: PatchMeta with coords.
             chunk_size: Number of query positions per chunk.
+            score_noise_std: Noise to add to scores for creativity.
 
         Returns:
             proposals: [B, N, K, D] - K proposals per position.
@@ -262,6 +276,11 @@ class QuadRetriever2D(nn.Module):
             # Compute scores for this chunk
             scores_chunk = torch.matmul(Q_chunk, Keys.transpose(-2, -1)) * self.scale
             # [B, H, chunk_len, N]
+
+            # Add score noise for creativity (if enabled)
+            if score_noise_std > 0.0 and self.training is False:
+                noise = torch.randn_like(scores_chunk) * score_noise_std
+                scores_chunk = scores_chunk + noise
 
             # TopK selection
             top_scores, top_indices = scores_chunk.topk(K, dim=-1)

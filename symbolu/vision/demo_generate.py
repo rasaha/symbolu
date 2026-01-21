@@ -152,6 +152,7 @@ def demo_basic_generation(args):
         sampler=args.sampler,
         seed=args.seed,
         tau=args.tau,
+        creativity=args.creativity,
     )
 
     print("2. Generation Configuration")
@@ -161,6 +162,8 @@ def demo_basic_generation(args):
     print(f"   Guidance: {config.guidance_scale}")
     print(f"   Sampler: {config.sampler}")
     print(f"   Tau (Phase-Quad): {config.tau}")
+    if config.creativity > 0:
+        print(f"   Creativity: {config.creativity:.1f}")
     if args.seed:
         print(f"   Seed: {args.seed}")
     print()
@@ -377,6 +380,12 @@ Examples:
         type=float,
         default=1.0,
         help="Phase-Quad temperature (default: 1.0)",
+    )
+    parser.add_argument(
+        "--creativity",
+        type=float,
+        default=0.0,
+        help="Creativity level [0.0-1.0]. 0=deterministic, 0.5=balanced, 1.0=max creativity (default: 0.0)",
     )
     parser.add_argument(
         "--model-size",
