@@ -430,14 +430,9 @@ class PhaseQuadInferencePipeline:
         text_embeddings = self.text_encoder.encode(prompt)
         uncond_embeddings = self.text_encoder.encode(negative_prompt)
 
-        # Compute latent size
-        latent_h = config.height // (self.config.patch_size * 8)  # VAE downsamples 8x
-        latent_w = config.width // (self.config.patch_size * 8)
-
-        # For mock VAE, use simpler calculation
-        if isinstance(self.vae, MockVAE):
-            latent_h = config.height // 8
-            latent_w = config.width // 8
+        # Compute latent size (VAE downsamples 8x)
+        latent_h = config.height // 8
+        latent_w = config.width // 8
 
         # Initialize with noise
         latents = torch.randn(
