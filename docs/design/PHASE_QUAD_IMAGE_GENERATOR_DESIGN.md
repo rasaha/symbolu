@@ -2979,3 +2979,382 @@ Before replacing the baseline, the new block must demonstrate:
 ### H.8 One-Sentence Assessment
 
 > The baseline Phase-Quad block lacks the conditioning strength needed for diffusion — adding AdaLN-Zero, timestep-dependent Phase scaling, and cross-attention to proposals addresses the three core architectural blockers preventing production-quality images.
+
+---
+
+## Appendix I: Stability Enhancements (BCVF + Phase Coherence)
+
+This appendix documents stability enhancements that improve image quality through refined proposal selection and phase regularization. These techniques shape **selection and stability**, not imagination — they do not inject content, do not break O(N) guarantees, and do not reduce creativity when used correctly.
+
+### I.1 Overview
+
+| Enhancement | Purpose | Layer | Training/Inference |
+|-------------|---------|-------|-------------------|
+| BCVF (Bidirectional Consistency Verification) | Re-weight Quad proposals for stability | Quad Proposal | Both |
+| Phase Coherence Loss | Stabilize Phase memory evolution | Phase Training | Training only |
+| Semantic Entropy Monitoring | Prevent late-step collapse | Diagnostics | Training only |
+
+### I.2 BCVF (Bidirectional Consistency Verification)
+
+#### I.2.1 Motivation
+
+The standard Quad proposal integration uses raw retrieval scores:
+```python
+weighted_proposals = gate * proposals
+```
+
+This ignores:
+1. **Forward consistency (sf)**: Does the proposal fit local evidence?
+2. **Backward consistency (sb)**: Does the proposal align with Phase memory?
+
+BCVF re-weights proposals to suppress unstable textures and reduce flicker.
+
+#### I.2.2 Mathematical Formulation
+
+**Forward Score (sf)** — measures local evidence fit:
+```
+sf = sigmoid(proposal_scores)   # Already computed by Quad
+```
+
+**Backward Score (sb)** — measures Phase memory alignment:
+```
+sb = cosine_similarity(proposals, phase_state)
+```
+
+**BCVF Lagrangian (B1)**:
+```
+L = λf(1 - sf)² + λb(1 - sb)² + λc(sf - sb)²
+```
+
+Where:
+- `λf`: Forward feasibility weight (default 1.0)
+- `λb`: Backward alignment weight (default 1.0)
+- `λc`: Consistency penalty weight (default 0.5)
+
+**Consistency Weight (B2 + B3)**:
+```
+w = exp(-β · L)
+w = w / Σw   # Normalize
+```
+
+Where `β` controls sharpness (default 2.0).
+
+#### I.2.3 Implementation
+
+```python
+class BCVFQuadWeighter(nn.Module):
+    """
+    Bidirectional Consistency Verification for Quad proposals.
+
+    Re-weights proposals based on:
+    - Forward score: How well proposal fits local evidence
+    - Backward score: How well proposal aligns with Phase memory
+    - Consistency: Agreement between forward and backward
+
+    Args:
+        lambda_f: Forward feasibility weight.
+        lambda_b: Backward alignment weight.
+        lambda_c: Consistency penalty weight.
+        beta: Sharpness of weighting (higher = sharper selection).
+    """
+
+    def __init__(
+        self,
+        lambda_f: float = 1.0,
+        lambda_b: float = 1.0,
+        lambda_c: float = 0.5,
+        beta: float = 2.0,
+    ):
+        super().__init__()
+        self.lambda_f = lambda_f
+        self.lambda_b = lambda_b
+        self.lambda_c = lambda_c
+        self.beta = beta
+
+    def forward(
+        self,
+        proposals: Tensor,       # [B, N, K, D]
+        proposal_scores: Tensor, # [B, N, K]
+        phase_state: Tensor,     # [B, N, D]
+    ) -> Tensor:
+        """
+        Compute BCVF-weighted proposals.
+
+        Returns:
+            weighted_proposals: [B, N, D]
+        """
+        # Forward score: local evidence fit
+        sf = torch.sigmoid(proposal_scores)  # [B, N, K]
+
+        # Backward score: Phase alignment
+        sb = F.cosine_similarity(
+            proposals,                      # [B, N, K, D]
+            phase_state.unsqueeze(2),       # [B, N, 1, D]
+            dim=-1
+        )  # [B, N, K]
+
+        # BCVF Lagrangian
+        L = (
+            self.lambda_f * (1 - sf) ** 2 +
+            self.lambda_b * (1 - sb) ** 2 +
+            self.lambda_c * (sf - sb) ** 2
+        )  # [B, N, K]
+
+        # Consistency weights
+        w = torch.exp(-self.beta * L)
+        w = w / (w.sum(dim=-1, keepdim=True) + 1e-8)  # [B, N, K]
+
+        # Weighted combination
+        weighted = torch.sum(w.unsqueeze(-1) * proposals, dim=2)  # [B, N, D]
+
+        return weighted
+```
+
+#### I.2.4 Integration Point
+
+BCVF slots into the proposal integration stage. In `PhaseQuadDiTBlock`:
+
+```python
+# Option A: Replace simple weighted sum
+# Before:
+weighted_proposals = gate * proposals
+# After:
+weighted_proposals = bcvf_weighter(proposals, scores, phase_state)
+
+# Option B: Combine with CrossAttentionToProposals
+# Use BCVF weights as additional attention bias
+```
+
+#### I.2.5 Benefits
+
+| Metric | Expected Improvement |
+|--------|---------------------|
+| Image sharpness | Sharper edges, reduced blur |
+| Temporal stability | Less flicker in video |
+| Consistency | Better global composition |
+
+### I.3 Phase Coherence Loss
+
+#### I.3.1 Motivation
+
+Phase state should:
+- Change **slowly** (temporal smoothness)
+- Not **collapse** (maintain diversity)
+- Not **jitter** (avoid instability)
+
+The Phase Coherence Loss encourages smooth Phase evolution during training without affecting inference creativity.
+
+#### I.3.2 Mathematical Formulation
+
+Let:
+- `S_t` = Phase state at diffusion step t
+- `S_{t+Δ}` = Phase state at step t+Δ
+
+**Cosine similarity target**:
+```
+sim = cosine_similarity(S_t, S_{t+Δ})
+```
+
+**Bounded regularization** (avoid over-locking):
+```
+loss_low = ReLU(target_low - sim)   # Penalize too different
+loss_high = ReLU(sim - target_high) # Penalize too similar
+loss = mean(loss_low + loss_high)
+```
+
+Target range: `[0.8, 0.95]` — enforce smoothness without collapse.
+
+#### I.3.3 Implementation
+
+```python
+class PhaseCoherenceLoss(nn.Module):
+    """
+    Phase coherence regularization for stable Phase evolution.
+
+    Encourages Phase state to change smoothly across diffusion steps:
+    - Too different (sim < low): Phase is jittering
+    - Too similar (sim > high): Phase is collapsing
+
+    Args:
+        target_low: Minimum acceptable similarity (default 0.8).
+        target_high: Maximum acceptable similarity (default 0.95).
+    """
+
+    def __init__(
+        self,
+        target_low: float = 0.8,
+        target_high: float = 0.95,
+    ):
+        super().__init__()
+        self.target_low = target_low
+        self.target_high = target_high
+
+    def forward(
+        self,
+        phase_t: Tensor,       # [B, N, D] Phase state at step t
+        phase_t_delta: Tensor, # [B, N, D] Phase state at step t+Δ
+    ) -> Tensor:
+        """
+        Compute Phase coherence loss.
+
+        Returns:
+            loss: Scalar loss value.
+        """
+        # Cosine similarity between states
+        sim = F.cosine_similarity(phase_t, phase_t_delta, dim=-1)  # [B, N]
+
+        # Bounded penalty
+        loss_low = F.relu(self.target_low - sim)   # Penalize jitter
+        loss_high = F.relu(sim - self.target_high) # Penalize collapse
+
+        return (loss_low + loss_high).mean()
+```
+
+#### I.3.4 Training Integration
+
+```python
+# In training loop
+total_loss = diffusion_loss
+
+# Add Phase coherence with small weight
+if step % coherence_check_interval == 0:
+    phase_coherence = phase_coherence_loss(phase_state_t, phase_state_t_prev)
+    total_loss += lambda_phase * phase_coherence
+
+# Recommended: λ_phase ∈ [0.01, 0.05]
+```
+
+#### I.3.5 What This Loss Does NOT Do
+
+| Action | Status |
+|--------|--------|
+| Enforce meaning | ❌ No |
+| Inject structure | ❌ No |
+| Bias text conditioning | ❌ No |
+| Affect inference | ❌ No |
+| Reduce creativity | ❌ No |
+
+It **only** prevents Phase instability during training.
+
+### I.4 Semantic Entropy Monitoring (SCC-Inspired)
+
+#### I.4.1 Purpose
+
+Track semantic entropy across diffusion steps to:
+- Detect early signs of collapse
+- Identify unstable batches
+- Monitor training health
+
+#### I.4.2 Implementation
+
+```python
+def compute_semantic_entropy(x: Tensor) -> float:
+    """
+    Compute semantic entropy of representation.
+
+    Args:
+        x: Representation tensor [B, N, D]
+
+    Returns:
+        entropy: Scalar entropy value.
+    """
+    # Flatten and normalize
+    x_flat = x.view(-1, x.size(-1))
+    x_norm = F.normalize(x_flat, dim=-1)
+
+    # Compute covariance
+    cov = x_norm.T @ x_norm / x_norm.size(0)
+
+    # Entropy from eigenvalues
+    eigenvalues = torch.linalg.eigvalsh(cov)
+    eigenvalues = eigenvalues.clamp(min=1e-8)
+    probs = eigenvalues / eigenvalues.sum()
+
+    return -(probs * torch.log(probs)).sum().item()
+
+
+class SemanticEntropyMonitor:
+    """
+    Monitor semantic entropy evolution during diffusion.
+
+    Expected behavior:
+    - Early steps (noisy): High entropy
+    - Late steps (clean): Lower entropy
+
+    Alert conditions:
+    - Entropy increases in late steps
+    - Entropy collapses too fast
+    """
+
+    def __init__(self, alert_threshold: float = 0.1):
+        self.history = []
+        self.alert_threshold = alert_threshold
+
+    def update(self, x: Tensor, timestep: int) -> dict:
+        entropy = compute_semantic_entropy(x)
+        self.history.append((timestep, entropy))
+
+        metrics = {"entropy": entropy, "alert": False}
+
+        # Check for entropy increase in late steps
+        if len(self.history) >= 2:
+            prev_t, prev_e = self.history[-2]
+            if timestep < prev_t and entropy > prev_e + self.alert_threshold:
+                metrics["alert"] = True
+                metrics["alert_reason"] = "entropy_increase"
+
+        return metrics
+```
+
+### I.5 Implementation Files
+
+| File | Description |
+|------|-------------|
+| `symbolu/vision/bcvf_weighter.py` | BCVF proposal re-weighting |
+| `symbolu/vision/phase_coherence_loss.py` | Phase stability regularization |
+| `symbolu/vision/semantic_entropy.py` | Entropy monitoring utilities |
+
+### I.6 Configuration
+
+Add to `PhaseQuadVisionConfig`:
+
+```python
+@dataclass
+class BCVFConfig:
+    """BCVF proposal weighting configuration."""
+    enabled: bool = True
+    lambda_f: float = 1.0      # Forward weight
+    lambda_b: float = 1.0      # Backward weight
+    lambda_c: float = 0.5      # Consistency weight
+    beta: float = 2.0          # Sharpness
+
+
+@dataclass
+class PhaseCoherenceConfig:
+    """Phase coherence loss configuration."""
+    enabled: bool = True
+    target_low: float = 0.8    # Min similarity
+    target_high: float = 0.95  # Max similarity
+    loss_weight: float = 0.01  # λ_phase
+```
+
+### I.7 Integration Order
+
+| Step | Component | Complexity | Risk |
+|------|-----------|------------|------|
+| 1 | BCVF weighting | Low | Low |
+| 2 | Phase coherence loss | Low | Low |
+| 3 | Entropy monitoring | Low | None (diagnostic only) |
+
+### I.8 Expected Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Image sharpness | Blurry edges | Sharper details |
+| Phase stability | Jittery | Smooth evolution |
+| Video flicker | Visible | Reduced |
+| Training stability | Occasional spikes | More consistent |
+
+### I.9 One-Sentence Assessment
+
+> BCVF improves "what to choose" by re-weighting proposals for consistency; Phase coherence loss stabilizes "how memory evolves" during training — neither replaces architectural conditioning, they refine it.

@@ -41,6 +41,7 @@ from torch.cuda.amp import autocast, GradScaler
 from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
 from symbolu.vision.config import PhaseQuadVisionConfig
 from symbolu.vision.inference.samplers import NoiseSchedule
+from symbolu.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
 from symbolu.vision.training.dataset import (
     get_dataset,
     create_dataloader,
@@ -83,6 +84,11 @@ class DiffusionTrainer:
         gradient_accumulation_steps: int = 1,
         num_timesteps: int = 250,  # Fewer timesteps for faster early convergence
         phase_warmup_steps: int = 2000,  # Steps before Phase becomes fully active
+        # Phase Coherence Loss (Appendix I)
+        use_phase_coherence: bool = True,
+        phase_coherence_weight: float = 0.01,
+        phase_coherence_target_low: float = 0.8,
+        phase_coherence_target_high: float = 0.95,
     ):
         self.model = model.to(device)
         self.config = config
@@ -101,6 +107,23 @@ class DiffusionTrainer:
         # Noise schedule (fewer timesteps = faster early convergence)
         self.noise_schedule = NoiseSchedule(num_timesteps=num_timesteps).to(device)
         print(f"Using {num_timesteps} timesteps for noise schedule")
+
+        # Phase Coherence Loss (Appendix I) - Training-only regularization
+        self.use_phase_coherence = use_phase_coherence
+        self.phase_coherence_weight = phase_coherence_weight
+        if use_phase_coherence:
+            self.phase_coherence_loss = PhaseCoherenceLoss(
+                target_low=phase_coherence_target_low,
+                target_high=phase_coherence_target_high,
+            )
+            self.entropy_monitor = SemanticEntropyMonitor()
+            print(f"Phase Coherence Loss enabled: λ={phase_coherence_weight}")
+        else:
+            self.phase_coherence_loss = None
+            self.entropy_monitor = None
+
+        # Track previous noise predictions for coherence loss
+        self._prev_noise_pred = None
 
         # Mixed precision scaler
         self.scaler = GradScaler() if self.use_amp else None
@@ -234,8 +257,29 @@ class DiffusionTrainer:
             print("WARNING: NaN detected in model output!")
             return torch.tensor(0.0, device=self.device, requires_grad=True)
 
-        # MSE loss
+        # MSE loss (primary diffusion loss)
         loss = F.mse_loss(noise_pred, noise)
+
+        # Phase Coherence Loss (Appendix I)
+        # Encourages smooth evolution of model outputs across training steps
+        if self.use_phase_coherence and self._prev_noise_pred is not None:
+            # Compute coherence between current and previous predictions
+            # This encourages the model to make consistent predictions
+            coherence_loss, coherence_stats = self.phase_coherence_loss.forward_with_stats(
+                noise_pred.detach().view(batch_size, -1),  # Flatten spatial dims
+                self._prev_noise_pred.view(batch_size, -1),
+            )
+            loss = loss + self.phase_coherence_weight * coherence_loss
+
+            # Monitor semantic entropy (diagnostic only)
+            if self.entropy_monitor is not None and self.global_step % 100 == 0:
+                avg_timestep = timesteps.float().mean().item()
+                entropy_info = self.entropy_monitor.update(noise_pred.detach(), int(avg_timestep))
+                if entropy_info.get("alert"):
+                    print(f"  Entropy alert: {entropy_info.get('alert_reason')}")
+
+        # Store for next iteration (detached to avoid memory buildup)
+        self._prev_noise_pred = noise_pred.detach().clone()
 
         return loss
 
@@ -288,10 +332,16 @@ class DiffusionTrainer:
 
         self.global_step += 1
 
-        return {
+        metrics = {
             "loss": loss.item(),
             "latent_norm": latents.norm().item(),
         }
+
+        # Add Phase coherence metrics if enabled
+        if self.use_phase_coherence and self.phase_coherence_loss is not None:
+            metrics["phase_coherence_weight"] = self.phase_coherence_weight
+
+        return metrics
 
     def train_epoch(
         self,
@@ -501,6 +551,11 @@ def train(
         use_amp=False,  # Disable mixed precision for stability
         num_timesteps=num_timesteps,
         phase_warmup_steps=phase_warmup_steps,
+        # Phase Coherence Loss from config (Appendix I)
+        use_phase_coherence=config.training.phase_coherence.enabled,
+        phase_coherence_weight=config.training.phase_coherence.loss_weight,
+        phase_coherence_target_low=config.training.phase_coherence.target_low,
+        phase_coherence_target_high=config.training.phase_coherence.target_high,
     )
 
     # Create optimizer and scheduler

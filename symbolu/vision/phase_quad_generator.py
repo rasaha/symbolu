@@ -88,7 +88,7 @@ class PhaseQuadImageGenerator(nn.Module):
         self.use_dit_style = config.block.dit_style.enabled
 
         if self.use_dit_style:
-            # Use improved DiT-style blocks (Appendix H improvements)
+            # Use improved DiT-style blocks (Appendix H + I improvements)
             self.blocks = nn.ModuleList([
                 PhaseQuadDiTBlock(
                     embed_dim=config.embed_dim,
@@ -102,6 +102,12 @@ class PhaseQuadImageGenerator(nn.Module):
                     t_max=config.training.diffusion.num_train_timesteps,
                     phase_min_strength=config.block.dit_style.phase_min_strength,
                     phase_max_strength=config.block.dit_style.phase_max_strength,
+                    # BCVF configuration (Appendix I)
+                    use_bcvf=config.block.bcvf.enabled,
+                    bcvf_lambda_f=config.block.bcvf.lambda_f,
+                    bcvf_lambda_b=config.block.bcvf.lambda_b,
+                    bcvf_lambda_c=config.block.bcvf.lambda_c,
+                    bcvf_beta=config.block.bcvf.beta,
                 )
                 for _ in range(config.num_blocks)
             ])

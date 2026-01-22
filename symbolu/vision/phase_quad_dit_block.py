@@ -19,6 +19,7 @@ from torch import Tensor
 
 from symbolu.vision.adaln_zero import AdaLNZero, FinalLayer
 from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
+from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
 from symbolu.vision.controls import (
     BlockControl,
     PhaseControl,
@@ -139,6 +140,12 @@ class PhaseQuadDiTBlock(nn.Module):
         t_max: int = 1000,
         phase_min_strength: float = 0.1,
         phase_max_strength: float = 1.0,
+        # BCVF configuration (Appendix I)
+        use_bcvf: bool = True,
+        bcvf_lambda_f: float = 1.0,
+        bcvf_lambda_b: float = 1.0,
+        bcvf_lambda_c: float = 0.5,
+        bcvf_beta: float = 2.0,
     ):
         super().__init__()
 
@@ -148,6 +155,7 @@ class PhaseQuadDiTBlock(nn.Module):
         self.t_max = t_max
         self.phase_min_strength = phase_min_strength
         self.phase_max_strength = phase_max_strength
+        self.use_bcvf = use_bcvf
 
         # AdaLN-Zero conditioning
         self.adaln = AdaLNZero(embed_dim, embed_dim)
@@ -168,10 +176,25 @@ class PhaseQuadDiTBlock(nn.Module):
         # Quad retriever
         self.quad = QuadRetriever2D(embed_dim, num_heads, topk)
 
-        # Cross-attention to proposals (replaces simple GateMixer)
-        self.cross_attn_proposals = CrossAttentionToProposals(
-            embed_dim, num_heads, dropout, use_score_bias=True
-        )
+        # Proposal integration: BCVF + Cross-attention hybrid or pure cross-attention
+        if use_bcvf:
+            # Hybrid BCVF + Cross-attention (Appendix I)
+            self.proposal_mixer = HybridBCVFCrossAttention(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                bcvf_config={
+                    "lambda_f": bcvf_lambda_f,
+                    "lambda_b": bcvf_lambda_b,
+                    "lambda_c": bcvf_lambda_c,
+                    "beta": bcvf_beta,
+                },
+            )
+        else:
+            # Pure cross-attention (Appendix H)
+            self.proposal_mixer = None
+            self.cross_attn_proposals = CrossAttentionToProposals(
+                embed_dim, num_heads, dropout, use_score_bias=True
+            )
 
         # Layer norms for pre-normalization
         self.norm_local = nn.LayerNorm(embed_dim)
@@ -264,11 +287,18 @@ class PhaseQuadDiTBlock(nn.Module):
         quad_control = QuadControl(enable_quad=enable_quad)
         proposals, scores = self.quad(x, S, meta, quad_control)
 
-        # Cross-attention to proposals (instead of simple weighted sum)
+        # Proposal integration: BCVF hybrid or pure cross-attention
         x_cross_in = self.adaln.modulate(
             self.norm_cross(x), shift_attn, scale_attn
         )
-        x_cross = self.cross_attn_proposals(x_cross_in, proposals, scores)
+
+        if self.use_bcvf and self.proposal_mixer is not None:
+            # Hybrid BCVF + Cross-attention (Appendix I)
+            x_cross = self.proposal_mixer(x_cross_in, proposals, scores, S)
+        else:
+            # Pure cross-attention (Appendix H)
+            x_cross = self.cross_attn_proposals(x_cross_in, proposals, scores)
+
         x = x + gate_attn * x_cross
 
         # FFN with modulation and gating
@@ -293,6 +323,12 @@ class PhaseQuadDiTBlock(nn.Module):
         for k, v in quad_metrics.items():
             diagnostics[f"quad/{k}"] = v
 
+        # BCVF metrics (if enabled)
+        if self.use_bcvf and self.proposal_mixer is not None:
+            bcvf_metrics = self.proposal_mixer.bcvf.get_instrumentation()
+            for k, v in bcvf_metrics.items():
+                diagnostics[k] = v
+
         return diagnostics
 
 
@@ -313,6 +349,11 @@ class PhaseQuadDiTBlockStack(nn.Module):
         use_cross_attn: Include cross-attention to text.
         text_dim: Text embedding dimension.
         t_max: Maximum diffusion timestep.
+        use_bcvf: Enable BCVF proposal weighting.
+        bcvf_lambda_f: BCVF forward weight.
+        bcvf_lambda_b: BCVF backward weight.
+        bcvf_lambda_c: BCVF consistency weight.
+        bcvf_beta: BCVF sharpness.
     """
 
     def __init__(
@@ -327,6 +368,11 @@ class PhaseQuadDiTBlockStack(nn.Module):
         use_cross_attn: bool = True,
         text_dim: Optional[int] = None,
         t_max: int = 1000,
+        use_bcvf: bool = True,
+        bcvf_lambda_f: float = 1.0,
+        bcvf_lambda_b: float = 1.0,
+        bcvf_lambda_c: float = 0.5,
+        bcvf_beta: float = 2.0,
     ):
         super().__init__()
 
@@ -344,6 +390,11 @@ class PhaseQuadDiTBlockStack(nn.Module):
                 use_cross_attn=use_cross_attn,
                 text_dim=text_dim,
                 t_max=t_max,
+                use_bcvf=use_bcvf,
+                bcvf_lambda_f=bcvf_lambda_f,
+                bcvf_lambda_b=bcvf_lambda_b,
+                bcvf_lambda_c=bcvf_lambda_c,
+                bcvf_beta=bcvf_beta,
             )
             for _ in range(num_blocks)
         ])
