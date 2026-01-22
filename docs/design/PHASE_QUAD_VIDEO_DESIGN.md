@@ -438,6 +438,108 @@ config = {
 }
 ```
 
+### 5.4 Training Scripts
+
+Training scripts are implemented in `symbolu/vision/video/train.py`.
+
+#### Quick Start Commands
+
+```bash
+# Quick test with synthetic data (no downloads needed)
+python -m symbolu.vision.video.demo_train --quick
+
+# Progressive training from pretrained image model
+python -m symbolu.vision.video.demo_train --progressive
+
+# Train on local video dataset
+python -m symbolu.vision.video.train \
+    --data-dir /path/to/videos \
+    --model-size small \
+    --num-frames 16 \
+    --epochs 50
+
+# Train on HuggingFace dataset
+python -m symbolu.vision.video.train \
+    --hf-dataset webvid \
+    --model-size small
+
+# Initialize from image model checkpoint
+python -m symbolu.vision.video.train \
+    --synthetic \
+    --init-from-image checkpoints/image_model.pt \
+    --model-size small
+
+# Resume training from checkpoint
+python -m symbolu.vision.video.train \
+    --resume checkpoints_video/epoch_10.pt \
+    --epochs 100
+```
+
+#### Training CLI Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--model-size` | Model size (tiny/small/base) | small |
+| `--num-frames` | Number of video frames | 16 |
+| `--image-size` | Frame resolution | 256 |
+| `--batch-size` | Training batch size | 2 |
+| `--learning-rate` | Learning rate | 1e-5 |
+| `--epochs` | Number of training epochs | 50 |
+| `--gradient-accumulation` | Gradient accumulation steps | 4 |
+| `--init-from-image` | Initialize from image checkpoint | None |
+| `--resume` | Resume from video checkpoint | None |
+| `--data-dir` | Local video data directory | None |
+| `--hf-dataset` | HuggingFace dataset name | None |
+| `--synthetic` | Use synthetic data for testing | False |
+
+#### Dataset Directory Structure
+
+For local datasets, use this directory structure:
+
+```
+data_dir/
+├── videos/
+│   ├── video_001.mp4
+│   ├── video_002.mp4
+│   └── ...
+└── captions/
+    ├── video_001.txt
+    └── video_002.txt
+```
+
+Or with metadata.json:
+
+```
+data_dir/
+├── videos/
+│   └── ...
+└── metadata.json  # {"video_001.mp4": "caption text", ...}
+```
+
+#### Progressive Training Workflow
+
+The recommended training approach:
+
+```python
+# Phase 1: Train image model (if not already done)
+python -m symbolu.vision.demo_train --pokemon
+
+# Phase 2: Initialize video model from image checkpoint
+python -m symbolu.vision.video.train \
+    --init-from-image checkpoints_pokemon/final.pt \
+    --synthetic \
+    --num-frames 8 \
+    --image-size 128 \
+    --epochs 10
+
+# Phase 3: Extend to longer videos
+python -m symbolu.vision.video.train \
+    --resume checkpoints_video/epoch_10.pt \
+    --num-frames 16 \
+    --image-size 256 \
+    --epochs 20
+```
+
 ---
 
 ## 6. Memory Optimization
@@ -581,26 +683,30 @@ result = pipeline.generate_long(
 
 ## 10. Implementation Roadmap
 
-### Phase 1: Core Implementation (Week 1-2)
-- [ ] PhaseIntegrator3D
-- [ ] VideoMeta and 3D patch embedding
-- [ ] Video VAE wrapper (CogVideoX)
-- [ ] Basic video pipeline
+### Phase 1: Core Implementation ✅
+- [x] PhaseIntegrator3D (`symbolu/vision/phase_integrator_3d.py`)
+- [x] VideoMeta and 3D patch embedding (`symbolu/vision/video/generator.py`)
+- [x] Video VAE wrapper - CogVideoX (`symbolu/vision/video/vae.py`)
+- [x] Basic video pipeline (`symbolu/vision/video/pipeline.py`)
 
-### Phase 2: Training Infrastructure (Week 2-3)
-- [ ] Video dataset loaders (WebVid)
-- [ ] Video training script
-- [ ] Checkpoint conversion (image → video)
+### Phase 2: Training Infrastructure ✅
+- [x] Video dataset loaders (`symbolu/vision/video/dataset.py`)
+  - LocalVideoTextDataset (local files)
+  - HuggingFaceVideoDataset (HF hub)
+  - SyntheticVideoDataset (testing)
+- [x] Video training script (`symbolu/vision/video/train.py`)
+- [x] Demo training script (`symbolu/vision/video/demo_train.py`)
+- [x] Checkpoint conversion (image → video) via `--init-from-image`
 
-### Phase 3: Optimization (Week 3-4)
-- [ ] Chunked temporal processing
-- [ ] Memory optimization
-- [ ] Multi-GPU training
+### Phase 3: Optimization (Pending)
+- [ ] Chunked temporal processing for long videos
+- [ ] Memory optimization (gradient checkpointing)
+- [ ] Multi-GPU training (DDP)
 
-### Phase 4: Evaluation & Polish (Week 4+)
+### Phase 4: Evaluation & Polish (Pending)
 - [ ] FVD evaluation
-- [ ] Demo scripts
-- [ ] Documentation
+- [x] Demo scripts
+- [x] Documentation
 
 ---
 
@@ -642,3 +748,4 @@ Phase-Quad 3D solves this by adding the time integrator:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-22 | Initial specification |
+| 1.1 | 2026-01-22 | Added training scripts documentation, updated roadmap with completed items |
