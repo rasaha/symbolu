@@ -275,10 +275,14 @@ class HuggingFaceDataset(Dataset):
 
         image = self.transform(image)
 
-        # Get caption
-        caption = item[self.caption_column]
-        if isinstance(caption, list):
-            caption = random.choice(caption)
+        # Get caption (handle missing or None captions)
+        caption = item.get(self.caption_column, None)
+        if caption is None or caption == "":
+            caption = "an image"  # Default caption for datasets without text
+        elif isinstance(caption, list):
+            caption = random.choice(caption) if caption else "an image"
+        elif not isinstance(caption, str):
+            caption = str(caption) if caption else "an image"
 
         return {
             "image": image,

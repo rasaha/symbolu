@@ -62,11 +62,14 @@ class PhaseControl:
         intent_phase: Phase rotation bias. Rotates the phase angle by a
             broadcastable offset. Shape: [] or [H] or [B, H].
         phase_gain: Scaling factor for phase projection. Shape: [] or [H] or [B, H].
+        gamma_scale: Multiplier for learned decay (gamma). 1.0 = use learned values,
+            <1.0 = more drift (creative), >1.0 = more stable.
         strict_contract: If True (default), validate control shapes and raise
             ContractViolationError on violations.
     """
     intent_phase: Optional[Tensor] = None
     phase_gain: Optional[Tensor] = None
+    gamma_scale: float = 1.0
     strict_contract: bool = True
 
     def validate(self, num_heads: int, batch_size: Optional[int] = None) -> None:
@@ -86,8 +89,11 @@ class QuadControl:
 
     Attributes:
         enable_quad: If False, QuadRetriever returns zeros (for ablation testing).
+        score_noise_std: Standard deviation of noise added to scores for diverse proposals.
+            0.0 = deterministic (default), >0 = stochastic for creativity.
     """
     enable_quad: bool = True
+    score_noise_std: float = 0.0
 
 
 @dataclass
@@ -130,6 +136,7 @@ class BlockControl:
         tau: Temperature for gate sigmoid.
         phase_control: Detailed control for PhaseIntegrator2D.
         gate_control: Detailed control for GateMixer.
+        quad_control: Detailed control for QuadRetriever.
     """
     enable_quad: bool = True
     enable_phase: bool = True
@@ -137,6 +144,7 @@ class BlockControl:
     tau: float = 1.0
     phase_control: Optional[PhaseControl] = None
     gate_control: Optional[GateControl] = None
+    quad_control: Optional[QuadControl] = None
 
     def get_phase_control(self) -> PhaseControl:
         """Get PhaseControl, creating default if None."""
@@ -155,7 +163,12 @@ class BlockControl:
         return GateControl(tau=self.tau)
 
     def get_quad_control(self) -> QuadControl:
-        """Get QuadControl based on enable_quad setting."""
+        """Get QuadControl based on enable_quad setting and quad_control."""
+        if self.quad_control is not None:
+            return QuadControl(
+                enable_quad=self.enable_quad,
+                score_noise_std=self.quad_control.score_noise_std,
+            )
         return QuadControl(enable_quad=self.enable_quad)
 
 
@@ -183,4 +196,100 @@ class GeneratorControl:
             enable_quad=self.enable_quad,
             enable_phase=self.enable_phase,
             tau=self.tau,
+        )
+
+
+@dataclass
+class CreativityControl:
+    """
+    Creativity control interface for Phase-Quad generation.
+
+    This is the Tier-2 interface from Appendix F.5 of the design document.
+    Uses EXISTING mechanisms, just exposes them deliberately.
+    Does NOT add new computational paths.
+
+    Attributes:
+        tau: Proposal temperature for GateMixer. Higher values make gates softer,
+            allowing more diverse proposals. Range: [1.0, 3.0] typical.
+        score_noise_std: Standard deviation of noise added to proposal scores.
+            0.0 = deterministic (default), >0 = stochastic for more variety.
+        gamma_scale: Phase stability multiplier (scales learned gamma).
+            1.0 = use learned values, <1.0 = more drift (creative), >1.0 = more stable.
+
+    Example:
+        >>> # Maximum creativity
+        >>> control = CreativityControl.from_level(1.0)
+        >>> result = pipeline.generate("abstract art", creativity=control)
+
+        >>> # Balanced (default behavior)
+        >>> control = CreativityControl.from_level(0.5)
+
+        >>> # Maximum stability/determinism
+        >>> control = CreativityControl.from_level(0.0)
+    """
+    tau: float = 1.0
+    score_noise_std: float = 0.0
+    gamma_scale: float = 1.0
+
+    @classmethod
+    def from_level(cls, level: float) -> "CreativityControl":
+        """
+        Create control from creativity level [0, 1].
+
+        This is a convenience interface that maps a single creativity
+        parameter to the underlying control values.
+
+        Args:
+            level: Creativity level from 0.0 to 1.0
+                - 0.0 = maximally stable/deterministic
+                - 0.5 = balanced (default behavior)
+                - 1.0 = maximally creative/diverse
+
+        Returns:
+            CreativityControl with appropriate settings.
+
+        Mapping:
+            - tau: 1.0 + level (range [1.0, 2.0])
+            - score_noise_std: level * 0.5 (range [0.0, 0.5])
+            - gamma_scale: 1.0 - level * 0.3 (range [1.0, 0.7])
+        """
+        level = max(0.0, min(1.0, level))  # Clamp to [0, 1]
+        return cls(
+            tau=1.0 + level,              # [1.0, 2.0]
+            score_noise_std=level * 0.5,  # [0.0, 0.5]
+            gamma_scale=1.0 - level * 0.3,  # [1.0, 0.7]
+        )
+
+    def to_generator_control(self) -> GeneratorControl:
+        """
+        Convert to GeneratorControl for use with the model.
+
+        Returns:
+            GeneratorControl with tau set from this CreativityControl.
+        """
+        return GeneratorControl(
+            tau=self.tau,
+            enable_quad=True,
+            enable_phase=True,
+        )
+
+    def to_phase_control(self) -> PhaseControl:
+        """
+        Create PhaseControl with gamma_scale setting.
+
+        Returns:
+            PhaseControl with gamma_scale from this CreativityControl.
+        """
+        return PhaseControl(gamma_scale=self.gamma_scale)
+
+    def to_quad_control(self) -> QuadControl:
+        """
+        Create QuadControl with score_noise_std setting.
+
+        Returns:
+            QuadControl with score_noise_std from this CreativityControl.
+        """
+        return QuadControl(
+            enable_quad=True,
+            score_noise_std=self.score_noise_std,
         )

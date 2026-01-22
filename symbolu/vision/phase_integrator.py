@@ -245,6 +245,16 @@ class PhaseIntegrator1D(nn.Module):
 
         # State accumulation
         gamma = self._get_decay()  # [H] or scalar
+
+        # Apply gamma_scale from control (for creativity)
+        # gamma_scale < 1.0 = more drift (creative), > 1.0 = more stable
+        if control is not None and control.gamma_scale != 1.0:
+            # Scale gamma towards or away from 1.0
+            # If gamma_scale < 1.0, reduce gamma (more drift)
+            # If gamma_scale > 1.0, increase gamma (more stable)
+            gamma = gamma * control.gamma_scale
+            gamma = torch.clamp(gamma, 0.001, 0.9995)  # Keep in valid range
+
         S_re, S_im = parallel_ema_scan_complex(kv_re, kv_im, gamma)
 
         # Convert back to original dtype

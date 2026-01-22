@@ -15,7 +15,13 @@ from torch import Tensor
 
 from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
 from symbolu.vision.config import PhaseQuadVisionConfig
-from symbolu.vision.controls import GeneratorControl
+from symbolu.vision.controls import (
+    GeneratorControl,
+    BlockControl,
+    PhaseControl,
+    QuadControl,
+    CreativityControl,
+)
 from symbolu.vision.inference.samplers import (
     NoiseSchedule,
     DDPMSampler,
@@ -38,6 +44,8 @@ class GenerationConfig:
         eta: Stochasticity for DDIM (0 = deterministic, 1 = stochastic).
         seed: Random seed for reproducibility.
         tau: Temperature for Phase-Quad gating.
+        creativity: Creativity level [0.0, 1.0] for diverse/novel outputs.
+            0.0 = deterministic/stable, 0.5 = balanced, 1.0 = maximum creativity.
     """
     height: int = 512
     width: int = 512
@@ -47,6 +55,7 @@ class GenerationConfig:
     eta: float = 0.0
     seed: Optional[int] = None
     tau: float = 1.0
+    creativity: float = 0.0  # Default: deterministic
 
     @classmethod
     def fast(cls) -> "GenerationConfig":
@@ -458,8 +467,28 @@ class PhaseQuadInferencePipeline:
         # Get timesteps
         timesteps = sampler.get_timesteps(config.num_inference_steps)
 
-        # Control for Phase-Quad
-        control = GeneratorControl(tau=config.tau)
+        # Control for Phase-Quad (with creativity if specified)
+        if config.creativity > 0.0:
+            creativity = CreativityControl.from_level(config.creativity)
+            # Build per-block controls with creativity settings
+            per_block_controls = {}
+            for i in range(self.model.num_blocks):
+                per_block_controls[i] = BlockControl(
+                    enable_quad=True,
+                    enable_phase=True,
+                    tau=creativity.tau,
+                    phase_control=creativity.to_phase_control(),
+                    gate_control=None,  # tau is set at block level
+                    quad_control=creativity.to_quad_control(),
+                )
+            control = GeneratorControl(
+                tau=creativity.tau,
+                enable_quad=True,
+                enable_phase=True,
+                per_block_controls=per_block_controls,
+            )
+        else:
+            control = GeneratorControl(tau=config.tau)
 
         # Determine if we should use classifier-free guidance
         use_cfg = config.guidance_scale > 1.0
