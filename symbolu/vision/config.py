@@ -87,8 +87,16 @@ class LocalMixerConfig:
 
 
 @dataclass
+class DiTStyleConfig:
+    """Configuration for DiT-style improvements (Appendix H)."""
+    enabled: bool = True  # Use PhaseQuadDiTBlock instead of CognadeVisionBlock
+    phase_min_strength: float = 0.1  # Min Phase strength at t=t_max (noisy)
+    phase_max_strength: float = 1.0  # Max Phase strength at t=0 (clean)
+
+
+@dataclass
 class BlockConfig:
-    """Configuration for CognadeVisionBlock."""
+    """Configuration for CognadeVisionBlock or PhaseQuadDiTBlock."""
     embed_dim: int = 768  # Model width D
     num_heads: int = 12  # Number of attention heads H
     ffn_ratio: float = 4.0  # FFN hidden dimension ratio
@@ -97,6 +105,7 @@ class BlockConfig:
     quad: QuadConfig = field(default_factory=QuadConfig)
     gate: GateConfig = field(default_factory=GateConfig)
     local: LocalMixerConfig = field(default_factory=LocalMixerConfig)
+    dit_style: DiTStyleConfig = field(default_factory=DiTStyleConfig)
 
 
 @dataclass

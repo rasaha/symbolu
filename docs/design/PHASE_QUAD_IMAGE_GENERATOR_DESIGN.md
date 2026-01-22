@@ -2551,3 +2551,431 @@ python -m symbolu.vision.training.train \
 ### G.9 One-Sentence Assessment
 
 > Start with Pokemon (833 images) to validate the pipeline works, progress to COCO (330K) for real diversity testing, then scale to LAION-Aesthetics subsets for production-quality training — quality filtering and good captions matter more than raw dataset size.
+
+---
+
+## Appendix H: DiT-Style Architectural Improvements
+
+This appendix documents architectural improvements inspired by DiT (Diffusion Transformers) and addresses core limitations in the baseline Phase-Quad block that prevent production-quality image generation.
+
+### H.1 Problem Analysis
+
+After training the baseline Phase-Quad architecture for 100+ epochs, images remained blurry and lacked fine detail. External analysis identified three **core architectural blockers**:
+
+#### H.1.1 Conditioning is Too Weak
+
+**Problem**: The current timestep conditioning uses simple scale/shift:
+```python
+x = x * (1 + scale) + shift
+```
+
+This is significantly weaker than DiT's AdaLN-Zero, which provides:
+- Pre-attention layer norm modulation (shift + scale)
+- Post-attention gating (learns to "turn off" residual paths early)
+
+**Impact**: Without proper conditioning, the model cannot learn timestep-appropriate behavior — early steps should be coarse/structure-focused, later steps should be fine/detail-focused.
+
+#### H.1.2 Phase Integrates Before Semantics Exist
+
+**Problem**: At high noise levels (early diffusion steps), the input is mostly noise. Phase integration on noise creates meaningless "authority" that interferes with later semantic learning.
+
+**Impact**: Phase state contaminates the semantic signal instead of reinforcing it.
+
+#### H.1.3 Quad Proposals Are Too Weak Early
+
+**Problem**: Simple weighted sum of proposals limits expressiveness:
+```python
+x = sum(gate * proposal for gate, proposal in zip(gates, proposals))
+```
+
+**Impact**: Proposals cannot interact richly with the query position — they're just blended, not transformed.
+
+### H.2 Proposed Solutions
+
+#### H.2.1 AdaLN-Zero Conditioning (DiT-Style)
+
+Replace simple scale/shift with full AdaLN-Zero modulation:
+
+```python
+class AdaLNZero(nn.Module):
+    """
+    Adaptive Layer Normalization with Zero-Init Gate.
+
+    DiT-style conditioning that provides:
+    - Pre-layer norm modulation (shift, scale)
+    - Post-residual gate (starts at 0, learns to enable)
+    """
+
+    def __init__(self, embed_dim: int, cond_dim: int):
+        super().__init__()
+        self.norm = nn.LayerNorm(embed_dim, elementwise_affine=False)
+
+        # 6 outputs: shift_pre, scale_pre, shift_post, scale_post, gate_attn, gate_ffn
+        self.adaLN = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(cond_dim, 6 * embed_dim),
+        )
+
+        # Zero-init the final projection
+        nn.init.zeros_(self.adaLN[-1].weight)
+        nn.init.zeros_(self.adaLN[-1].bias)
+
+    def forward(self, x: Tensor, cond: Tensor):
+        """
+        Args:
+            x: Input [B, N, D]
+            cond: Conditioning [B, D] (timestep + optionally pooled text)
+
+        Returns:
+            x_norm: Normalized and modulated x
+            gate_attn: Gate for attention residual [B, 1, D]
+            gate_ffn: Gate for FFN residual [B, 1, D]
+        """
+        params = self.adaLN(cond)  # [B, 6*D]
+        shift_pre, scale_pre, shift_post, scale_post, gate_attn, gate_ffn = params.chunk(6, dim=-1)
+
+        # Modulated layer norm
+        x_norm = self.norm(x)
+        x_norm = x_norm * (1 + scale_pre.unsqueeze(1)) + shift_pre.unsqueeze(1)
+
+        return x_norm, gate_attn.unsqueeze(1), gate_ffn.unsqueeze(1)
+```
+
+**Usage in block**:
+```python
+# Instead of: x = x + attention(x)
+# Use:
+x_norm, gate_attn, gate_ffn = self.adaln(x, t_emb)
+x = x + gate_attn * attention(x_norm)
+x = x + gate_ffn * ffn(x)
+```
+
+#### H.2.2 Timestep-Dependent Phase Strength
+
+Scale Phase contribution based on diffusion timestep:
+
+```python
+def phase_strength(t: Tensor, t_max: int = 1000) -> Tensor:
+    """
+    Compute Phase integration strength based on timestep.
+
+    Early steps (high t, noisy): Low phase strength
+    Late steps (low t, clean): High phase strength
+
+    Args:
+        t: Timestep tensor [B]
+        t_max: Maximum timestep
+
+    Returns:
+        strength: Phase strength [B, 1] in range [0.1, 1.0]
+    """
+    # Linear schedule: 0.1 at t=t_max, 1.0 at t=0
+    t_normalized = t.float() / t_max  # 0 (clean) to 1 (noisy)
+    strength = 1.0 - 0.9 * t_normalized  # 1.0 (clean) to 0.1 (noisy)
+    return strength.unsqueeze(-1)
+```
+
+**Usage**:
+```python
+S = self.phase2d(x, meta)
+phase_weight = phase_strength(timestep, self.t_max)
+S = S * phase_weight  # Scale phase contribution
+```
+
+#### H.2.3 Cross-Attention to Quad Proposals
+
+Replace simple weighted sum with cross-attention:
+
+```python
+class CrossAttentionToProposals(nn.Module):
+    """
+    Cross-attention from query positions to Quad proposals.
+
+    Instead of simple weighted sum, allow rich interaction
+    between current position and retrieved proposals.
+    """
+
+    def __init__(self, embed_dim: int, num_heads: int):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.scale = self.head_dim ** -0.5
+
+    def forward(
+        self,
+        x: Tensor,           # [B, N, D] query positions
+        proposals: Tensor,   # [B, N, K, D] retrieved proposals
+        scores: Tensor,      # [B, N, K] retrieval scores (used as attention bias)
+    ) -> Tensor:
+        """
+        Args:
+            x: Current representation [B, N, D]
+            proposals: TopK retrieved proposals [B, N, K, D]
+            scores: Retrieval scores for bias [B, N, K]
+
+        Returns:
+            out: Cross-attended output [B, N, D]
+        """
+        B, N, D = x.shape
+        K = proposals.size(2)
+        H = self.num_heads
+        D_h = self.head_dim
+
+        # Project queries from current position
+        q = self.q_proj(x).view(B, N, H, D_h)  # [B, N, H, D_h]
+
+        # Project keys and values from proposals
+        proposals_flat = proposals.view(B * N, K, D)
+        k = self.k_proj(proposals_flat).view(B, N, K, H, D_h)
+        v = self.v_proj(proposals_flat).view(B, N, K, H, D_h)
+
+        # Compute attention: q attends to K proposals
+        # q: [B, N, H, D_h] -> [B, N, H, 1, D_h]
+        # k: [B, N, K, H, D_h] -> [B, N, H, K, D_h]
+        q = q.unsqueeze(3)  # [B, N, H, 1, D_h]
+        k = k.permute(0, 1, 3, 2, 4)  # [B, N, H, K, D_h]
+        v = v.permute(0, 1, 3, 2, 4)  # [B, N, H, K, D_h]
+
+        # Attention scores
+        attn = (q @ k.transpose(-2, -1)) * self.scale  # [B, N, H, 1, K]
+
+        # Add retrieval score bias
+        score_bias = scores.unsqueeze(2).unsqueeze(3)  # [B, N, 1, 1, K]
+        attn = attn + score_bias
+
+        attn = torch.softmax(attn, dim=-1)  # [B, N, H, 1, K]
+
+        # Weighted combination
+        out = attn @ v  # [B, N, H, 1, D_h]
+        out = out.squeeze(3)  # [B, N, H, D_h]
+        out = out.reshape(B, N, D)
+        out = self.out_proj(out)
+
+        return out
+```
+
+### H.3 PhaseQuadDiTBlock Implementation
+
+The complete improved block combining all enhancements:
+
+```python
+class PhaseQuadDiTBlock(nn.Module):
+    """
+    Phase-Quad block with DiT-style improvements.
+
+    Key enhancements over CognadeVisionBlock:
+    1. AdaLN-Zero conditioning (DiT-style)
+    2. Timestep-dependent Phase strength
+    3. Cross-attention to proposals (instead of weighted sum)
+    4. Proper zero-initialization for residual paths
+
+    Architecture:
+        INPUT: x [B, N, D], t_emb [B, D], text_cond
+
+        (A) AdaLN-Zero: Modulate x based on timestep
+
+        (B) LOCAL PATH: Windowed attention with text cross-attn
+
+        (C) PHASE INTEGRATOR: Bi-axial phase accumulation
+            - Scaled by timestep-dependent strength
+
+        (D) QUAD RETRIEVER: TopK proposal retrieval
+
+        (E) CROSS-ATTENTION: x attends to proposals
+            - Replaces simple weighted sum
+
+        (F) FFN: With AdaLN-Zero gating
+
+        OUTPUT: x_out [B, N, D]
+    """
+
+    def __init__(
+        self,
+        embed_dim: int = 768,
+        num_heads: int = 12,
+        topk: int = 64,
+        window_size: int = 8,
+        ffn_ratio: float = 4.0,
+        dropout: float = 0.1,
+        use_cross_attn: bool = True,
+        text_dim: Optional[int] = None,
+        t_max: int = 1000,
+    ):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.t_max = t_max
+
+        # AdaLN-Zero conditioning
+        self.adaln = AdaLNZero(embed_dim, embed_dim)
+
+        # Local mixer (windowed attention + optional text cross-attn)
+        self.local = LocalMixer(
+            embed_dim, window_size, num_heads,
+            use_cross_attn, text_dim, dropout
+        )
+        self.norm_local = nn.LayerNorm(embed_dim)
+
+        # Phase integrator (bi-axial)
+        self.phase2d = PhaseIntegrator2D(embed_dim, num_heads)
+
+        # Quad retriever
+        self.quad = QuadRetriever2D(embed_dim, num_heads, topk)
+
+        # Cross-attention to proposals (replaces GateMixer)
+        self.cross_attn_proposals = CrossAttentionToProposals(embed_dim, num_heads)
+        self.norm_cross = nn.LayerNorm(embed_dim)
+
+        # FFN
+        self.norm_ffn = nn.LayerNorm(embed_dim)
+        ffn_hidden = int(embed_dim * ffn_ratio)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, ffn_hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ffn_hidden, embed_dim),
+            nn.Dropout(dropout),
+        )
+
+        # Zero-init output projections for residual-friendly start
+        nn.init.zeros_(self.local.out_proj.weight)
+        nn.init.zeros_(self.cross_attn_proposals.out_proj.weight)
+        nn.init.zeros_(self.ffn[-2].weight)  # Last linear in FFN
+
+    def forward(
+        self,
+        x: Tensor,
+        meta: PatchMeta,
+        time_embed: Tensor,
+        text_cond: Optional[Tensor] = None,
+        timestep: Optional[Tensor] = None,
+        control: Optional[BlockControl] = None,
+    ) -> Tensor:
+        """
+        Forward pass with DiT-style conditioning.
+
+        Args:
+            x: Input tokens [B, N, D]
+            meta: PatchMeta with spatial info
+            time_embed: Timestep embedding [B, D]
+            text_cond: Optional text embeddings [B, T, D_t]
+            timestep: Raw timestep values [B] for phase strength calculation
+            control: Optional BlockControl
+
+        Returns:
+            x_out: [B, N, D] output tokens
+        """
+        # AdaLN-Zero conditioning
+        x_norm, gate_attn, gate_ffn = self.adaln(x, time_embed)
+
+        # Local path with gating
+        x_local = self.local(self.norm_local(x_norm), meta, text_cond)
+        x = x + gate_attn * x_local
+
+        # Phase path with timestep-dependent strength
+        S = self.phase2d(x, meta)
+
+        if timestep is not None:
+            phase_weight = self._phase_strength(timestep)
+            S = S * phase_weight.unsqueeze(-1)  # Scale phase contribution
+
+        # Quad retrieval
+        proposals, scores = self.quad(x, S, meta)
+
+        # Cross-attention to proposals (instead of simple weighted sum)
+        x_cross = self.cross_attn_proposals(
+            self.norm_cross(x), proposals, scores
+        )
+        x = x + gate_attn * x_cross
+
+        # FFN with gating
+        x = x + gate_ffn * self.ffn(self.norm_ffn(x))
+
+        return x
+
+    def _phase_strength(self, t: Tensor) -> Tensor:
+        """
+        Compute timestep-dependent Phase strength.
+
+        Early steps (high t, noisy): Low strength (0.1)
+        Late steps (low t, clean): High strength (1.0)
+        """
+        t_normalized = t.float() / self.t_max
+        strength = 1.0 - 0.9 * t_normalized
+        return strength.unsqueeze(-1)
+```
+
+### H.4 Migration Strategy
+
+#### H.4.1 Backward Compatibility
+
+The new `PhaseQuadDiTBlock` is provided alongside `CognadeVisionBlock`:
+
+```python
+# Old code (still works)
+from symbolu.vision.cognade_vision_block import CognadeVisionBlock
+
+# New code (recommended)
+from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+```
+
+#### H.4.2 Configuration Flag
+
+Add to `PhaseQuadVisionConfig`:
+
+```python
+@dataclass
+class BlockConfig:
+    # ... existing fields ...
+    use_dit_style: bool = True  # Enable DiT improvements
+```
+
+#### H.4.3 Generator Update
+
+Modify `PhaseQuadImageGenerator` to use the improved block:
+
+```python
+if config.block.use_dit_style:
+    from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+    block_class = PhaseQuadDiTBlock
+else:
+    block_class = CognadeVisionBlock
+```
+
+### H.5 Expected Benefits
+
+| Improvement | Expected Effect |
+|-------------|-----------------|
+| AdaLN-Zero | Better timestep adaptation, cleaner gradients |
+| Phase Strength | Prevents noise contamination in early steps |
+| Cross-Attention | Richer proposal integration, sharper details |
+| Zero-Init | Stable training, better convergence |
+
+### H.6 Validation Criteria
+
+Before replacing the baseline, the new block must demonstrate:
+
+1. **Training stability**: No gradient explosions or NaN losses
+2. **Faster convergence**: Better FID at same epoch count
+3. **Visual quality**: Sharper edges, clearer details
+4. **Ablation value**: Each improvement shows measurable benefit
+
+### H.7 Implementation Files
+
+| File | Description |
+|------|-------------|
+| `symbolu/vision/phase_quad_dit_block.py` | New DiT-style block |
+| `symbolu/vision/adaln_zero.py` | AdaLN-Zero module |
+| `symbolu/vision/cross_attention_proposals.py` | Cross-attention to proposals |
+
+### H.8 One-Sentence Assessment
+
+> The baseline Phase-Quad block lacks the conditioning strength needed for diffusion — adding AdaLN-Zero, timestep-dependent Phase scaling, and cross-attention to proposals addresses the three core architectural blockers preventing production-quality images.

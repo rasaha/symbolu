@@ -24,6 +24,7 @@ from symbolu.vision.controls import (
 )
 from symbolu.vision.patch_embed import PatchEmbed2D, TimestepEmbedding, TextProjection
 from symbolu.vision.cognade_vision_block import CognadeVisionBlock
+from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
 from symbolu.vision.diagnostics import (
     ModelDiagnostics,
     BlockDiagnostics,
@@ -84,19 +85,41 @@ class PhaseQuadImageGenerator(nn.Module):
         # Main transformer blocks
         # NOTE: text_dim is embed_dim because text is projected by self.text_proj
         # before passing to blocks (from text_encoder.embed_dim to embed_dim)
-        self.blocks = nn.ModuleList([
-            CognadeVisionBlock(
-                embed_dim=config.embed_dim,
-                num_heads=config.num_heads,
-                topk=config.topk,
-                window_size=config.block.local.window_size,
-                ffn_ratio=config.block.ffn_ratio,
-                dropout=config.block.dropout,
-                use_cross_attn=config.block.local.use_cross_attn,
-                text_dim=config.embed_dim if config.block.local.use_cross_attn else None,
-            )
-            for _ in range(config.num_blocks)
-        ])
+        self.use_dit_style = config.block.dit_style.enabled
+
+        if self.use_dit_style:
+            # Use improved DiT-style blocks (Appendix H improvements)
+            self.blocks = nn.ModuleList([
+                PhaseQuadDiTBlock(
+                    embed_dim=config.embed_dim,
+                    num_heads=config.num_heads,
+                    topk=config.topk,
+                    window_size=config.block.local.window_size,
+                    ffn_ratio=config.block.ffn_ratio,
+                    dropout=config.block.dropout,
+                    use_cross_attn=config.block.local.use_cross_attn,
+                    text_dim=config.embed_dim if config.block.local.use_cross_attn else None,
+                    t_max=config.training.diffusion.num_train_timesteps,
+                    phase_min_strength=config.block.dit_style.phase_min_strength,
+                    phase_max_strength=config.block.dit_style.phase_max_strength,
+                )
+                for _ in range(config.num_blocks)
+            ])
+        else:
+            # Use baseline blocks (original architecture)
+            self.blocks = nn.ModuleList([
+                CognadeVisionBlock(
+                    embed_dim=config.embed_dim,
+                    num_heads=config.num_heads,
+                    topk=config.topk,
+                    window_size=config.block.local.window_size,
+                    ffn_ratio=config.block.ffn_ratio,
+                    dropout=config.block.dropout,
+                    use_cross_attn=config.block.local.use_cross_attn,
+                    text_dim=config.embed_dim if config.block.local.use_cross_attn else None,
+                )
+                for _ in range(config.num_blocks)
+            ])
 
         # Final layer norm
         self.final_norm = nn.LayerNorm(config.embed_dim)
@@ -164,7 +187,11 @@ class PhaseQuadImageGenerator(nn.Module):
             if control is not None:
                 block_control = control.get_block_control(i)
 
-            x = block(x, meta, t_emb, text_cond, block_control)
+            # DiT-style blocks need the raw timestep for phase strength calculation
+            if self.use_dit_style:
+                x = block(x, meta, t_emb, text_cond, timestep, block_control)
+            else:
+                x = block(x, meta, t_emb, text_cond, block_control)
 
         # Final norm
         x = self.final_norm(x)
@@ -221,7 +248,11 @@ class PhaseQuadImageGenerator(nn.Module):
             if control is not None:
                 block_control = control.get_block_control(i)
 
-            x = block(x, meta, t_emb, text_cond, block_control)
+            # DiT-style blocks need the raw timestep for phase strength calculation
+            if self.use_dit_style:
+                x = block(x, meta, t_emb, text_cond, timestep, block_control)
+            else:
+                x = block(x, meta, t_emb, text_cond, block_control)
 
             # Collect block diagnostics
             block_diag = block.get_diagnostics()
