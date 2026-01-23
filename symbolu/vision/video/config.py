@@ -75,6 +75,22 @@ class LocalMixer3DConfig(LocalMixerConfig):
 
 
 @dataclass
+class BCVFVideoConfig:
+    """
+    BCVF configuration for video (Appendix C).
+
+    Extends image BCVF with temporal consistency scoring.
+    """
+    enabled: bool = True
+    lambda_f: float = 1.0      # Forward feasibility weight
+    lambda_b: float = 1.0      # Backward alignment weight
+    lambda_c: float = 0.5      # Consistency penalty weight
+    lambda_t: float = 0.75     # Temporal consistency weight (NEW)
+    beta: float = 2.0          # Sharpness of weighting
+    detach_prev: bool = True   # Detach prev_state for stability
+
+
+@dataclass
 class VideoBlockConfig:
     """Configuration for Phase-Quad 3D Block."""
     embed_dim: int = 768
@@ -85,6 +101,7 @@ class VideoBlockConfig:
     quad: QuadConfig = field(default_factory=QuadConfig)
     gate: GateConfig = field(default_factory=GateConfig)
     local: LocalMixer3DConfig = field(default_factory=LocalMixer3DConfig)
+    bcvf: BCVFVideoConfig = field(default_factory=BCVFVideoConfig)
 
 
 @dataclass

@@ -749,3 +749,488 @@ Phase-Quad 3D solves this by adding the time integrator:
 |---------|------|---------|
 | 1.0 | 2026-01-22 | Initial specification |
 | 1.1 | 2026-01-22 | Added training scripts documentation, updated roadmap with completed items |
+| 1.2 | 2026-01-22 | Added Appendix C (BCVF Video Temporal Consistency) and Appendix D (Ablation Plan) |
+
+---
+
+## Appendix C: BCVF Video Temporal Consistency
+
+This appendix extends BCVF (Bidirectional Consistency Verification) from image to video, adding temporal consistency scoring to reduce flicker, drift, and stutter.
+
+### C.1 Video-Specific Failure Modes
+
+Without temporal consistency, video generation suffers from:
+
+| Failure Mode | Description | Visual Effect |
+|--------------|-------------|---------------|
+| **Flicker** | Identity/texture changes frame-to-frame | Unstable appearance |
+| **Drift** | Objects slowly morph over time | Character changes face |
+| **Stutter** | Inconsistent motion patterns | Jerky movement |
+
+### C.2 BCVF Extension for Video
+
+#### C.2.1 Tensor Shapes
+
+For video, Quad returns:
+- `proposals`: [B, T, N, K, D] — proposals for each frame and position
+- `proposal_scores`: [B, T, N, K] — raw retrieval scores
+- `phase_state`: [B, T, N, D] — Phase state per frame
+
+#### C.2.2 Scoring Components
+
+BCVF for video computes three scores:
+
+**A) Forward Feasibility (sf)** — Same as image:
+```python
+sf = sigmoid(proposal_scores)   # [B, T, N, K]
+```
+
+**B) Backward Phase Alignment (sb)** — Same as image:
+```python
+sb = cosine_similarity(
+    proposals,                    # [B, T, N, K, D]
+    phase_state.unsqueeze(3),     # [B, T, N, 1, D]
+    dim=-1
+)                                 # [B, T, N, K]
+```
+
+**C) Temporal Consistency (st)** — **NEW for video**:
+```python
+# Proposal should align with previous frame's representation
+# at the same spatial position
+st = cosine_similarity(
+    proposals[:, t],              # [B, N, K, D]
+    prev_state.unsqueeze(2),      # [B, N, 1, D]
+    dim=-1
+)                                 # [B, N, K]
+```
+
+Where `prev_state` is the integrated output from frame t-1.
+
+#### C.2.3 BCVF Video Lagrangian
+
+Extended Lagrangian with temporal term:
+
+```
+L = λf(1-sf)² + λb(1-sb)² + λc(sf-sb)² + λt(1-st)²
+```
+
+Where:
+- `λf`: Forward feasibility weight (default 1.0)
+- `λb`: Backward alignment weight (default 1.0)
+- `λc`: Consistency penalty weight (default 0.5)
+- `λt`: **Temporal consistency weight** (default 0.75)
+
+#### C.2.4 Weight Computation
+
+```python
+w = exp(-β * L)
+w = w / Σw  # Normalize
+```
+
+### C.3 Implementation
+
+```python
+class BCVFVideoQuadWeighter(nn.Module):
+    """
+    BCVF for video with temporal consistency scoring.
+
+    Extends image BCVF to reduce flicker and drift across frames.
+
+    Args:
+        lambda_f: Forward feasibility weight.
+        lambda_b: Backward alignment weight.
+        lambda_c: Consistency penalty weight.
+        lambda_t: Temporal consistency weight (NEW).
+        beta: Sharpness of weighting.
+        detach_prev: Whether to detach prev_state (safer early in training).
+    """
+
+    def __init__(
+        self,
+        lambda_f: float = 1.0,
+        lambda_b: float = 1.0,
+        lambda_c: float = 0.5,
+        lambda_t: float = 0.75,
+        beta: float = 2.0,
+        detach_prev: bool = True,
+    ):
+        super().__init__()
+        self.lambda_f = lambda_f
+        self.lambda_b = lambda_b
+        self.lambda_c = lambda_c
+        self.lambda_t = lambda_t
+        self.beta = beta
+        self.detach_prev = detach_prev
+
+    def forward(
+        self,
+        proposals: Tensor,       # [B, T, N, K, D]
+        proposal_scores: Tensor, # [B, T, N, K]
+        phase_state: Tensor,     # [B, T, N, D]
+        prev_state: Tensor = None,  # [B, N, D] from previous frame (or None for t=0)
+    ) -> Tensor:
+        """
+        Compute BCVF-weighted proposals with temporal consistency.
+
+        Returns:
+            weighted: [B, T, N, D]
+        """
+        B, T, N, K, D = proposals.shape
+
+        # Forward score
+        sf = torch.sigmoid(proposal_scores)  # [B, T, N, K]
+
+        # Backward score (per-frame Phase alignment)
+        sb = F.cosine_similarity(
+            proposals,
+            phase_state.unsqueeze(3),
+            dim=-1
+        )  # [B, T, N, K]
+
+        # Process frame by frame for temporal consistency
+        outputs = []
+        current_prev = prev_state
+
+        for t in range(T):
+            # Temporal consistency score
+            if t == 0 and current_prev is None:
+                st_t = torch.zeros_like(sf[:, t])  # [B, N, K]
+            else:
+                st_t = F.cosine_similarity(
+                    proposals[:, t],           # [B, N, K, D]
+                    current_prev.unsqueeze(2), # [B, N, 1, D]
+                    dim=-1
+                )  # [B, N, K]
+
+            # Map cosine sim from [-1, 1] to [0, 1]
+            sb_t = (sb[:, t] + 1) / 2
+            st_t = (st_t + 1) / 2 if t > 0 or current_prev is not None else st_t
+
+            # BCVF Lagrangian
+            L = (
+                self.lambda_f * (1 - sf[:, t])**2 +
+                self.lambda_b * (1 - sb_t)**2 +
+                self.lambda_c * (sf[:, t] - sb_t)**2 +
+                self.lambda_t * (1 - st_t)**2
+            )  # [B, N, K]
+
+            # Weights
+            w = torch.exp(-self.beta * L)
+            w = w / (w.sum(dim=-1, keepdim=True) + 1e-8)  # [B, N, K]
+
+            # Weighted combination
+            weighted_t = torch.sum(
+                w.unsqueeze(-1) * proposals[:, t],
+                dim=2
+            )  # [B, N, D]
+
+            outputs.append(weighted_t)
+
+            # Update prev_state for next frame
+            if self.detach_prev:
+                current_prev = weighted_t.detach()
+            else:
+                current_prev = weighted_t
+
+        return torch.stack(outputs, dim=1)  # [B, T, N, D]
+```
+
+### C.4 Integration Point
+
+In `PhaseQuadVideoGenerator` or `CognadeVideo3DBlock`:
+
+```python
+# After Quad retrieval
+proposals, scores = self.quad(x, S, meta)
+
+# Apply BCVF video weighting
+weighted_proposals = self.bcvf_video(
+    proposals, scores, S, prev_state=self._prev_frame_state
+)
+
+# Store for next frame
+self._prev_frame_state = weighted_proposals[:, -1].detach()
+```
+
+### C.5 Configuration
+
+```python
+@dataclass
+class BCVFVideoConfig:
+    """BCVF configuration for video."""
+    enabled: bool = True
+    lambda_f: float = 1.0
+    lambda_b: float = 1.0
+    lambda_c: float = 0.5
+    lambda_t: float = 0.75  # Temporal weight
+    beta: float = 2.0
+    detach_prev: bool = True  # Detach for stability
+```
+
+### C.6 Detach Strategy
+
+**When to detach `prev_state`:**
+- **Early training**: Always detach (prevents gradient explosion)
+- **After ~5K steps**: Can enable gradients for stronger temporal signal
+- **If unstable**: Return to detach mode
+
+```python
+# Adaptive detach based on training step
+if self.global_step < 5000:
+    detach_prev = True
+else:
+    detach_prev = False  # Enable full gradient flow
+```
+
+### C.7 Expected Benefits
+
+| Metric | Without λt | With λt=0.75 |
+|--------|-----------|--------------|
+| Flicker | High | Reduced |
+| Object persistence | Poor | Good |
+| Motion smoothness | Jerky | Smooth |
+| Training stability | Baseline | Similar |
+
+---
+
+## Appendix D: BCVF Ablation Plan
+
+This appendix defines a rigorous ablation plan to prove BCVF adds value.
+
+### D.1 Why Ablation is Necessary
+
+Without ablation, improved quality could be caused by:
+- Better training schedule
+- More compute
+- Different guidance
+- Seed variance / luck
+
+The ablation isolates: **"BCVF reweighting improves quality at same budget."**
+
+### D.2 Experimental Matrix
+
+#### D.2.1 Image Experiments (Sanity Check)
+
+Run with fixed seeds and prompts.
+
+| Experiment | BCVF | Configuration |
+|------------|------|---------------|
+| Baseline | Off | Phase-Quad gating only |
+| +BCVF | On | sf + sb, λf=1.0, λb=1.0 |
+| +BCVF + clamp | On | sf + sb + alignment clamp |
+
+**Metrics:**
+- FID (if affordable)
+- CLIP-score / prompt alignment
+- Human preference (side-by-side)
+
+**Pass Condition:**
+- Equal or better prompt fidelity at same steps
+- Fewer artifacts
+- Less mode collapse
+
+#### D.2.2 Video Experiments (Core)
+
+Fix: same dataset, same steps, same LR, same model size.
+
+| Experiment | λt | Config |
+|------------|-----|--------|
+| Baseline | 0.0 | No temporal BCVF |
+| BCVF-temporal | 0.75 | With temporal consistency |
+| BCVF + detach toggle | 0.75 | Test with/without detach |
+
+### D.3 Required Metrics
+
+#### D.3.1 Temporal Consistency / Flicker Score
+
+```python
+def compute_flicker_score(video_frames, feature_extractor):
+    """
+    Compute frame-to-frame feature consistency.
+
+    Lower = more consistent (less flicker).
+    """
+    features = []
+    for frame in video_frames:
+        f = feature_extractor(frame)  # e.g., CLIP image encoder
+        features.append(f)
+
+    similarities = []
+    for i in range(len(features) - 1):
+        sim = F.cosine_similarity(
+            features[i], features[i+1], dim=-1
+        ).mean()
+        similarities.append(sim.item())
+
+    return {
+        "mean_similarity": np.mean(similarities),
+        "std_similarity": np.std(similarities),
+        "min_similarity": np.min(similarities),
+    }
+```
+
+#### D.3.2 Delta Energy Metric (Cheap, No Optical Flow)
+
+```python
+def compute_delta_energy(video_frames):
+    """
+    Compute L2 difference between consecutive frames.
+
+    - Too high = flicker
+    - Too low = frozen video
+    - BCVF should reduce unstructured delta while preserving motion
+    """
+    deltas = []
+    for i in range(len(video_frames) - 1):
+        delta = (video_frames[i+1] - video_frames[i]).pow(2).mean()
+        deltas.append(delta.item())
+
+    return {
+        "mean_delta": np.mean(deltas),
+        "std_delta": np.std(deltas),
+        "max_delta": np.max(deltas),
+    }
+```
+
+#### D.3.3 Prompt Adherence Stability
+
+```python
+def compute_prompt_stability(video_frames, prompt, clip_model):
+    """
+    CLIP text-image score per frame.
+
+    Report mean and std — BCVF should reduce std (less "forgetting").
+    """
+    text_features = clip_model.encode_text(prompt)
+    scores = []
+
+    for frame in video_frames:
+        image_features = clip_model.encode_image(frame)
+        score = F.cosine_similarity(
+            text_features, image_features, dim=-1
+        ).item()
+        scores.append(score)
+
+    return {
+        "mean_score": np.mean(scores),
+        "std_score": np.std(scores),  # BCVF should reduce this
+        "min_score": np.min(scores),
+    }
+```
+
+### D.4 Ablation Sweep
+
+#### D.4.1 Parameter Sweep
+
+| Parameter | Values |
+|-----------|--------|
+| λt | {0.0, 0.25, 0.5, 0.75, 1.0} |
+| β | {1.0, 2.0, 4.0} |
+| detach_prev | {True, False} |
+
+#### D.4.2 Recommended First Sweep
+
+```python
+# Fix beta, sweep lambda_t
+experiments = [
+    {"lambda_t": 0.0, "beta": 2.0, "detach": True},   # Baseline
+    {"lambda_t": 0.5, "beta": 2.0, "detach": True},
+    {"lambda_t": 0.75, "beta": 2.0, "detach": True},  # Expected best
+    {"lambda_t": 0.75, "beta": 2.0, "detach": False}, # Test gradient flow
+]
+```
+
+### D.5 Logging Requirements
+
+Per training step or validation batch:
+
+```python
+def log_bcvf_metrics(sf, sb, st, weights):
+    """Log BCVF diagnostic metrics."""
+    metrics = {
+        # Score means
+        "bcvf/sf_mean": sf.mean().item(),
+        "bcvf/sb_mean": sb.mean().item(),
+        "bcvf/st_mean": st.mean().item(),
+
+        # Score variances
+        "bcvf/sf_std": sf.std().item(),
+        "bcvf/sb_std": sb.std().item(),
+        "bcvf/st_std": st.std().item(),
+
+        # Weight distribution
+        "bcvf/weight_entropy": -(weights * torch.log(weights + 1e-8)).sum(-1).mean().item(),
+        "bcvf/top1_weight": weights.max(dim=-1)[0].mean().item(),
+    }
+    return metrics
+```
+
+**Interpretation:**
+- `weight_entropy` collapses early → reduce β or λt
+- `st_mean` stays low → temporal signal too weak
+- `top1_weight` ≈ 1.0 → BCVF collapsing to hard routing
+
+### D.6 Replaceability Test
+
+After training, run model with BCVF on/off (same seed):
+
+```python
+def replaceability_test(model, dataloader, seeds=[42, 123, 456]):
+    """Test if BCVF is actually being used."""
+    results = []
+
+    for seed in seeds:
+        # Generate with BCVF
+        set_seed(seed)
+        output_bcvf = model.generate(enable_bcvf=True)
+
+        # Generate without BCVF
+        set_seed(seed)
+        output_no_bcvf = model.generate(enable_bcvf=False)
+
+        # Compare
+        diff = (output_bcvf - output_no_bcvf).abs().mean()
+        results.append(diff.item())
+
+    mean_diff = np.mean(results)
+
+    if mean_diff < 0.01:
+        print("WARNING: BCVF has minimal effect — may not be used")
+    else:
+        print(f"BCVF contributes: mean diff = {mean_diff:.4f}")
+
+    return mean_diff
+```
+
+### D.7 Pass/Fail Criteria
+
+| Metric | Baseline | Target (BCVF) | Pass If |
+|--------|----------|---------------|---------|
+| Flicker std | 0.15 | < 0.10 | Reduced by >30% |
+| Delta energy std | High | Lower | More consistent |
+| Prompt adherence std | 0.08 | < 0.05 | Reduced variance |
+| Replaceability | N/A | > 0.01 | BCVF is used |
+
+### D.8 Ablation Script
+
+```bash
+# Run ablation sweep
+python -m symbolu.vision.video.ablation \
+    --sweep lambda_t \
+    --values 0.0 0.5 0.75 \
+    --seeds 42 123 456 \
+    --num-frames 16 \
+    --output-dir ablation_results/
+
+# Compare results
+python -m symbolu.vision.video.ablation --compare ablation_results/
+```
+
+### D.9 Implementation Files
+
+| File | Description |
+|------|-------------|
+| `symbolu/vision/video/bcvf_video.py` | BCVFVideoQuadWeighter |
+| `symbolu/vision/video/ablation.py` | Ablation sweep script |
+| `symbolu/vision/video/metrics.py` | Video quality metrics |

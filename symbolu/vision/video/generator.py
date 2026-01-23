@@ -10,13 +10,14 @@ Architecture:
     3. DECODE: Unpatchify3D → VideoVAE.decode → video
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.video.config import PhaseQuadVideoConfig
+from symbolu.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
+from symbolu.vision.video.bcvf_video import BCVFVideoQuadWeighter
 from symbolu.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
 from symbolu.vision.controls import (
     BlockControl,
@@ -244,6 +245,7 @@ class CognadeVideo3DBlock(nn.Module):
     - PhaseIntegrator3D instead of PhaseIntegrator2D
     - LocalMixer3D instead of LocalMixer
     - VideoMeta instead of PatchMeta
+    - BCVFVideoQuadWeighter for temporal consistency (optional)
     """
 
     def __init__(
@@ -257,12 +259,14 @@ class CognadeVideo3DBlock(nn.Module):
         dropout: float = 0.1,
         use_cross_attn: bool = True,
         text_dim: Optional[int] = None,
+        bcvf_config: Optional[BCVFVideoConfig] = None,
     ):
         super().__init__()
 
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.topk = topk
+        self.use_bcvf = bcvf_config is not None and bcvf_config.enabled
 
         # Components
         self.local_mixer = LocalMixer3D(
@@ -291,6 +295,19 @@ class CognadeVideo3DBlock(nn.Module):
             num_heads=num_heads,
         )
 
+        # BCVF weighter for temporal consistency
+        if self.use_bcvf:
+            self.bcvf_weighter = BCVFVideoQuadWeighter(
+                lambda_f=bcvf_config.lambda_f,
+                lambda_b=bcvf_config.lambda_b,
+                lambda_c=bcvf_config.lambda_c,
+                lambda_t=bcvf_config.lambda_t,
+                beta=bcvf_config.beta,
+                detach_prev=bcvf_config.detach_prev,
+            )
+        else:
+            self.bcvf_weighter = None
+
         # FFN
         self.norm = nn.LayerNorm(embed_dim)
         ffn_hidden = int(embed_dim * ffn_ratio)
@@ -316,7 +333,8 @@ class CognadeVideo3DBlock(nn.Module):
         time_embed: Tensor,
         text_cond: Optional[Tensor] = None,
         control: Optional[BlockControl] = None,
-    ) -> Tensor:
+        prev_state: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         """
         Forward pass through video block.
 
@@ -326,10 +344,16 @@ class CognadeVideo3DBlock(nn.Module):
             time_embed: Timestep embedding [B, D].
             text_cond: Text conditioning [B, L, D].
             control: Optional BlockControl.
+            prev_state: Previous frame's output [B, H_p*W_p, D] for BCVF temporal.
 
         Returns:
             x: Output [B, N, D].
+            new_prev_state: Output from last frame [B, H_p*W_p, D] for next block.
         """
+        B, N, D = x.shape
+        T = meta.T
+        N_spatial = meta.H_p * meta.W_p  # Spatial positions per frame
+
         # Get controls
         phase_control = control.get_phase_control() if control else PhaseControl()
         gate_control = control.get_gate_control() if control else None
@@ -346,21 +370,45 @@ class CognadeVideo3DBlock(nn.Module):
         # Phase integration (3D)
         phase_state = self.phase_integrator(x_local, meta, phase_control)
 
-        # Quad retrieval
+        # Quad retrieval - get both proposals and scores
         score_noise_std = quad_control.score_noise_std if quad_control else 0.0
-        proposals = self.quad_retriever(
+        proposals, proposal_scores = self.quad_retriever(
             x_local, phase_state,
             score_noise_std=score_noise_std,
-        )
+        )  # proposals: [B, N, K, D], scores: [B, N, K]
 
-        # Gate mixing
-        tau = gate_control.tau if gate_control else 1.0
-        x = self.gate_mixer(x_local, proposals, phase_state, tau=tau)
+        # Apply BCVF temporal weighting if enabled
+        new_prev_state = None
+        if self.use_bcvf and self.bcvf_weighter is not None:
+            K = proposals.shape[2]
+
+            # Reshape to [B, T, N_spatial, K, D] for BCVF video
+            proposals_3d = proposals.view(B, T, N_spatial, K, D)
+            scores_3d = proposal_scores.view(B, T, N_spatial, K)
+            phase_state_3d = phase_state.view(B, T, N_spatial, D)
+
+            # Apply BCVF with temporal consistency
+            weighted = self.bcvf_weighter(
+                proposals_3d,
+                scores_3d,
+                phase_state_3d,
+                prev_state,
+            )  # [B, T, N_spatial, D]
+
+            # Reshape back to [B, N, D]
+            x = x_local + weighted.view(B, N, D)
+
+            # Track prev_state for next block (last frame's output)
+            new_prev_state = weighted[:, -1, :, :]  # [B, N_spatial, D]
+        else:
+            # Standard gate mixing (no BCVF)
+            tau = gate_control.tau if gate_control else 1.0
+            x = self.gate_mixer(x_local, proposals, phase_state, tau=tau)
 
         # FFN
         x = x + self.ffn(self.norm(x))
 
-        return x
+        return x, new_prev_state
 
 
 class PhaseQuadVideoGenerator(nn.Module):
@@ -414,9 +462,13 @@ class PhaseQuadVideoGenerator(nn.Module):
                 dropout=config.block.dropout,
                 use_cross_attn=True,
                 text_dim=config.embed_dim,
+                bcvf_config=config.block.bcvf,
             )
             for _ in range(config.num_blocks)
         ])
+
+        # Track BCVF metrics for instrumentation
+        self._bcvf_metrics: Dict[str, float] = {}
 
         # Final layer norm
         self.final_norm = nn.LayerNorm(config.embed_dim)
@@ -479,13 +531,30 @@ class PhaseQuadVideoGenerator(nn.Module):
         if text_cond is not None:
             text_cond = self.text_proj(text_cond)  # [B, L, D]
 
-        # Forward through blocks
+        # Forward through blocks with BCVF prev_state tracking
+        prev_states: List[Optional[Tensor]] = [None] * len(self.blocks)
+
         for i, block in enumerate(self.blocks):
             block_control = None
             if control is not None:
                 block_control = control.get_block_control(i)
 
-            x = block(x, meta, t_emb, text_cond, block_control)
+            x, new_prev_state = block(
+                x, meta, t_emb, text_cond, block_control,
+                prev_state=prev_states[i],
+            )
+
+            # Update prev_state for this block (for next forward pass)
+            # Note: In training, we don't carry state across batches
+            # This is mainly for temporal consistency within a single forward
+
+        # Collect BCVF metrics from blocks
+        self._bcvf_metrics = {}
+        for i, block in enumerate(self.blocks):
+            if block.use_bcvf and block.bcvf_weighter is not None:
+                block_metrics = block.bcvf_weighter.get_instrumentation()
+                for key, value in block_metrics.items():
+                    self._bcvf_metrics[f"block_{i}/{key}"] = value
 
         # Final norm and output
         x = self.final_norm(x)
@@ -502,6 +571,15 @@ class PhaseQuadVideoGenerator(nn.Module):
         if non_embedding:
             n_params -= self.patch_embed.proj.weight.numel()
         return n_params
+
+    def get_bcvf_metrics(self) -> Dict[str, float]:
+        """
+        Get BCVF metrics from all blocks.
+
+        Returns:
+            Dictionary with BCVF metrics from each block.
+        """
+        return self._bcvf_metrics
 
     @classmethod
     def tiny(cls) -> "PhaseQuadVideoGenerator":

@@ -338,9 +338,15 @@ class VideoDiffusionTrainer:
 
         self.global_step += 1
 
+        # Collect BCVF metrics
+        bcvf_metrics = {}
+        if hasattr(self.model, 'get_bcvf_metrics'):
+            bcvf_metrics = self.model.get_bcvf_metrics()
+
         return {
             "loss": loss.item(),
             "latent_norm": latents.norm().item(),
+            **bcvf_metrics,
         }
 
     def train_epoch(
@@ -362,11 +368,20 @@ class VideoDiffusionTrainer:
             num_batches += 1
 
             if batch_idx % 10 == 0:
-                print(
+                # Build log string
+                log_str = (
                     f"  Batch {batch_idx}/{len(dataloader)} | "
                     f"Loss: {metrics['loss']:.4f} | "
                     f"LR: {optimizer.param_groups[0]['lr']:.2e}"
                 )
+                # Add BCVF metrics if available
+                bcvf_sf = metrics.get("block_0/bcvf_video/sf_mean")
+                bcvf_st = metrics.get("block_0/bcvf_video/st_mean")
+                if bcvf_sf is not None:
+                    log_str += f" | sf={bcvf_sf:.3f}"
+                if bcvf_st is not None:
+                    log_str += f" st={bcvf_st:.3f}"
+                print(log_str)
 
         if scheduler is not None:
             scheduler.step()

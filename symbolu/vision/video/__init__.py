@@ -30,12 +30,17 @@ Example:
 
 from symbolu.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
 from symbolu.vision.video.vae import PretrainedVideoVAE, load_video_vae
-from symbolu.vision.video.config import PhaseQuadVideoConfig
+from symbolu.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
 from symbolu.vision.video.generator import PhaseQuadVideoGenerator
 from symbolu.vision.video.pipeline import (
     PhaseQuadVideoPipeline,
     VideoGenerationConfig,
     VideoGenerationResult,
+)
+from symbolu.vision.video.bcvf_video import (
+    BCVFVideoQuadWeighter,
+    AdaptiveBCVFVideoWeighter,
+    compute_video_bcvf_metrics,
 )
 
 __all__ = [
@@ -47,8 +52,13 @@ __all__ = [
     "load_video_vae",
     # Config
     "PhaseQuadVideoConfig",
+    "BCVFVideoConfig",
     # Model
     "PhaseQuadVideoGenerator",
+    # BCVF
+    "BCVFVideoQuadWeighter",
+    "AdaptiveBCVFVideoWeighter",
+    "compute_video_bcvf_metrics",
     # Pipeline
     "PhaseQuadVideoPipeline",
     "VideoGenerationConfig",
