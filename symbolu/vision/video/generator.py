@@ -402,8 +402,7 @@ class CognadeVideo3DBlock(nn.Module):
             new_prev_state = weighted[:, -1, :, :]  # [B, N_spatial, D]
         else:
             # Standard gate mixing (no BCVF)
-            tau = gate_control.tau if gate_control else 1.0
-            x = self.gate_mixer(x_local, proposals, phase_state, tau=tau)
+            x = self.gate_mixer(x_local, proposals, proposal_scores, control=gate_control)
 
         # FFN
         x = x + self.ffn(self.norm(x))

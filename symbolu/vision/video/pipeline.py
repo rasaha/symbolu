@@ -445,6 +445,9 @@ class PhaseQuadVideoPipeline:
 
         # Decode latents to video frames
         frames = self.vae.decode(latents)
+        # Handle both raw tensor and wrapped outputs (e.g., MockDecoded)
+        if hasattr(frames, 'sample'):
+            frames = frames.sample
         frames = torch.clamp(frames, 0, 1)
 
         generation_time = (time.time() - start_time) * 1000
