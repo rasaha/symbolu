@@ -41,6 +41,7 @@ from torch.cuda.amp import autocast, GradScaler
 from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
 from symbolu.vision.config import PhaseQuadVisionConfig
 from symbolu.vision.inference.samplers import NoiseSchedule
+from symbolu.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
 from symbolu.vision.training.dataset import (
     get_dataset,
     create_dataloader,
@@ -81,6 +82,13 @@ class DiffusionTrainer:
         output_dir: str = "checkpoints",
         use_amp: bool = True,
         gradient_accumulation_steps: int = 1,
+        num_timesteps: int = 250,  # Fewer timesteps for faster early convergence
+        phase_warmup_steps: int = 2000,  # Steps before Phase becomes fully active
+        # Phase Coherence Loss (Appendix I)
+        use_phase_coherence: bool = True,
+        phase_coherence_weight: float = 0.01,
+        phase_coherence_target_low: float = 0.8,
+        phase_coherence_target_high: float = 0.95,
     ):
         self.model = model.to(device)
         self.config = config
@@ -93,8 +101,29 @@ class DiffusionTrainer:
         self.use_amp = use_amp and device.type == "cuda"
         self.gradient_accumulation_steps = gradient_accumulation_steps
 
-        # Noise schedule
-        self.noise_schedule = NoiseSchedule(num_timesteps=1000).to(device)
+        # Phase-Quad specific: warm-up steps before full Phase integration
+        self.phase_warmup_steps = phase_warmup_steps
+
+        # Noise schedule (fewer timesteps = faster early convergence)
+        self.noise_schedule = NoiseSchedule(num_timesteps=num_timesteps).to(device)
+        print(f"Using {num_timesteps} timesteps for noise schedule")
+
+        # Phase Coherence Loss (Appendix I) - Training-only regularization
+        self.use_phase_coherence = use_phase_coherence
+        self.phase_coherence_weight = phase_coherence_weight
+        if use_phase_coherence:
+            self.phase_coherence_loss = PhaseCoherenceLoss(
+                target_low=phase_coherence_target_low,
+                target_high=phase_coherence_target_high,
+            )
+            self.entropy_monitor = SemanticEntropyMonitor()
+            print(f"Phase Coherence Loss enabled: λ={phase_coherence_weight}")
+        else:
+            self.phase_coherence_loss = None
+            self.entropy_monitor = None
+
+        # Track previous noise predictions for coherence loss
+        self._prev_noise_pred = None
 
         # Mixed precision scaler
         self.scaler = GradScaler() if self.use_amp else None
@@ -202,11 +231,25 @@ class DiffusionTrainer:
             print(f"WARNING: NaN after add_noise! timesteps={timesteps.tolist()}")
             return torch.tensor(0.0, device=self.device, requires_grad=True)
 
+        # Phase warm-up: reduce Phase influence early in training
+        # High gamma_scale = nearly frozen Phase state (lets Quad learn structure first)
+        control = None
+        if self.global_step < self.phase_warmup_steps:
+            from symbolu.vision.controls import GeneratorControl, BlockControl, PhaseControl
+            # gamma_scale > 1.0 makes Phase more stable (less drift)
+            warmup_gamma = 1.0 + (1.0 - self.global_step / self.phase_warmup_steps)  # 2.0 -> 1.0
+            phase_control = PhaseControl(gamma_scale=warmup_gamma)
+            per_block_controls = {}
+            for i in range(self.model.num_blocks):
+                per_block_controls[i] = BlockControl(phase_control=phase_control)
+            control = GeneratorControl(per_block_controls=per_block_controls)
+
         # Predict noise
         noise_pred = self.model(
             noisy_latents,
             timesteps,
             text_embeddings,
+            control=control,
         )
 
         # Check for NaN in output
@@ -214,8 +257,29 @@ class DiffusionTrainer:
             print("WARNING: NaN detected in model output!")
             return torch.tensor(0.0, device=self.device, requires_grad=True)
 
-        # MSE loss
+        # MSE loss (primary diffusion loss)
         loss = F.mse_loss(noise_pred, noise)
+
+        # Phase Coherence Loss (Appendix I)
+        # Encourages smooth evolution of model outputs across training steps
+        if self.use_phase_coherence and self._prev_noise_pred is not None:
+            # Compute coherence between current and previous predictions
+            # This encourages the model to make consistent predictions
+            coherence_loss, coherence_stats = self.phase_coherence_loss.forward_with_stats(
+                noise_pred.detach().view(batch_size, -1),  # Flatten spatial dims
+                self._prev_noise_pred.view(batch_size, -1),
+            )
+            loss = loss + self.phase_coherence_weight * coherence_loss
+
+            # Monitor semantic entropy (diagnostic only)
+            if self.entropy_monitor is not None and self.global_step % 100 == 0:
+                avg_timestep = timesteps.float().mean().item()
+                entropy_info = self.entropy_monitor.update(noise_pred.detach(), int(avg_timestep))
+                if entropy_info.get("alert"):
+                    print(f"  Entropy alert: {entropy_info.get('alert_reason')}")
+
+        # Store for next iteration (detached to avoid memory buildup)
+        self._prev_noise_pred = noise_pred.detach().clone()
 
         return loss
 
@@ -268,10 +332,16 @@ class DiffusionTrainer:
 
         self.global_step += 1
 
-        return {
+        metrics = {
             "loss": loss.item(),
             "latent_norm": latents.norm().item(),
         }
+
+        # Add Phase coherence metrics if enabled
+        if self.use_phase_coherence and self.phase_coherence_loss is not None:
+            metrics["phase_coherence_weight"] = self.phase_coherence_weight
+
+        return metrics
 
     def train_epoch(
         self,
@@ -377,14 +447,16 @@ def train(
     hf_dataset: Optional[str] = None,
     synthetic: bool = False,
     batch_size: int = 4,
-    learning_rate: float = 1e-4,
+    learning_rate: float = 5e-5,  # Lowered from 1e-4 for stability
     epochs: int = 100,
     save_every: int = 10,
     output_dir: str = "checkpoints",
     resume: Optional[str] = None,
     num_workers: int = 4,
     use_pretrained: bool = True,
-    image_size: int = 512,
+    image_size: int = 256,  # Lowered from 512 - match model capacity
+    num_timesteps: int = 250,  # Fewer timesteps for faster early convergence
+    phase_warmup_steps: int = 2000,  # Steps before Phase becomes active
 ):
     """
     Main training function.
@@ -395,14 +467,16 @@ def train(
         hf_dataset: HuggingFace dataset name.
         synthetic: Use synthetic data for testing.
         batch_size: Training batch size.
-        learning_rate: Learning rate.
+        learning_rate: Learning rate (default 5e-5, lowered for stability).
         epochs: Number of epochs.
         save_every: Save checkpoint every N epochs.
         output_dir: Output directory for checkpoints.
         resume: Path to checkpoint to resume from.
         num_workers: Number of data loading workers.
         use_pretrained: Whether to use pretrained VAE/CLIP.
-        image_size: Training image size.
+        image_size: Training image size (default 256, match model capacity).
+        num_timesteps: Noise schedule timesteps (default 250 for faster convergence).
+        phase_warmup_steps: Steps before Phase becomes fully active (default 2000).
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
@@ -475,6 +549,13 @@ def train(
         device=device,
         output_dir=output_dir,
         use_amp=False,  # Disable mixed precision for stability
+        num_timesteps=num_timesteps,
+        phase_warmup_steps=phase_warmup_steps,
+        # Phase Coherence Loss from config (Appendix I)
+        use_phase_coherence=config.training.phase_coherence.enabled,
+        phase_coherence_weight=config.training.phase_coherence.loss_weight,
+        phase_coherence_target_low=config.training.phase_coherence.target_low,
+        phase_coherence_target_high=config.training.phase_coherence.target_high,
     )
 
     # Create optimizer and scheduler
@@ -497,6 +578,8 @@ def train(
 
     # Training loop
     print(f"\nStarting training for {epochs} epochs...")
+    print(f"Settings: LR={learning_rate}, image_size={image_size}, timesteps={num_timesteps}")
+    print(f"Phase warm-up: {phase_warmup_steps} steps")
     print("=" * 60)
 
     start_time = time.time()
@@ -553,8 +636,8 @@ def main():
     parser.add_argument(
         "--image-size",
         type=int,
-        default=512,
-        help="Training image size",
+        default=256,  # Lowered from 512 to match model capacity
+        help="Training image size (default 256)",
     )
 
     # Training arguments
@@ -567,8 +650,20 @@ def main():
     parser.add_argument(
         "--learning-rate", "--lr",
         type=float,
-        default=1e-4,
-        help="Learning rate",
+        default=5e-5,  # Lowered from 1e-4 for stability
+        help="Learning rate (default 5e-5)",
+    )
+    parser.add_argument(
+        "--num-timesteps",
+        type=int,
+        default=250,  # Fewer timesteps for faster early convergence
+        help="Noise schedule timesteps (default 250)",
+    )
+    parser.add_argument(
+        "--phase-warmup-steps",
+        type=int,
+        default=2000,
+        help="Steps before Phase becomes fully active (default 2000)",
     )
     parser.add_argument(
         "--epochs",
@@ -623,6 +718,8 @@ def main():
         num_workers=args.num_workers,
         use_pretrained=not args.no_pretrained,
         image_size=args.image_size,
+        num_timesteps=args.num_timesteps,
+        phase_warmup_steps=args.phase_warmup_steps,
     )
 
 

@@ -39,6 +39,11 @@ from symbolu.vision.quad_retriever import QuadRetriever2D
 from symbolu.vision.gate_mixer import GateMixer
 from symbolu.vision.local_mixer import LocalMixer
 from symbolu.vision.cognade_vision_block import CognadeVisionBlock
+from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+from symbolu.vision.adaln_zero import AdaLNZero, FinalLayer
+from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
+from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
+from symbolu.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
 from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
 from symbolu.vision.diagnostics import (
     QuadUtilizationMetrics,
@@ -70,6 +75,14 @@ __all__ = [
     "GateMixer",
     "LocalMixer",
     "CognadeVisionBlock",
+    "PhaseQuadDiTBlock",
+    "AdaLNZero",
+    "FinalLayer",
+    "CrossAttentionToProposals",
+    "BCVFQuadWeighter",
+    "HybridBCVFCrossAttention",
+    "PhaseCoherenceLoss",
+    "SemanticEntropyMonitor",
     "PhaseQuadImageGenerator",
     # Diagnostics
     "QuadUtilizationMetrics",

@@ -2551,3 +2551,810 @@ python -m symbolu.vision.training.train \
 ### G.9 One-Sentence Assessment
 
 > Start with Pokemon (833 images) to validate the pipeline works, progress to COCO (330K) for real diversity testing, then scale to LAION-Aesthetics subsets for production-quality training — quality filtering and good captions matter more than raw dataset size.
+
+---
+
+## Appendix H: DiT-Style Architectural Improvements
+
+This appendix documents architectural improvements inspired by DiT (Diffusion Transformers) and addresses core limitations in the baseline Phase-Quad block that prevent production-quality image generation.
+
+### H.1 Problem Analysis
+
+After training the baseline Phase-Quad architecture for 100+ epochs, images remained blurry and lacked fine detail. External analysis identified three **core architectural blockers**:
+
+#### H.1.1 Conditioning is Too Weak
+
+**Problem**: The current timestep conditioning uses simple scale/shift:
+```python
+x = x * (1 + scale) + shift
+```
+
+This is significantly weaker than DiT's AdaLN-Zero, which provides:
+- Pre-attention layer norm modulation (shift + scale)
+- Post-attention gating (learns to "turn off" residual paths early)
+
+**Impact**: Without proper conditioning, the model cannot learn timestep-appropriate behavior — early steps should be coarse/structure-focused, later steps should be fine/detail-focused.
+
+#### H.1.2 Phase Integrates Before Semantics Exist
+
+**Problem**: At high noise levels (early diffusion steps), the input is mostly noise. Phase integration on noise creates meaningless "authority" that interferes with later semantic learning.
+
+**Impact**: Phase state contaminates the semantic signal instead of reinforcing it.
+
+#### H.1.3 Quad Proposals Are Too Weak Early
+
+**Problem**: Simple weighted sum of proposals limits expressiveness:
+```python
+x = sum(gate * proposal for gate, proposal in zip(gates, proposals))
+```
+
+**Impact**: Proposals cannot interact richly with the query position — they're just blended, not transformed.
+
+### H.2 Proposed Solutions
+
+#### H.2.1 AdaLN-Zero Conditioning (DiT-Style)
+
+Replace simple scale/shift with full AdaLN-Zero modulation:
+
+```python
+class AdaLNZero(nn.Module):
+    """
+    Adaptive Layer Normalization with Zero-Init Gate.
+
+    DiT-style conditioning that provides:
+    - Pre-layer norm modulation (shift, scale)
+    - Post-residual gate (starts at 0, learns to enable)
+    """
+
+    def __init__(self, embed_dim: int, cond_dim: int):
+        super().__init__()
+        self.norm = nn.LayerNorm(embed_dim, elementwise_affine=False)
+
+        # 6 outputs: shift_pre, scale_pre, shift_post, scale_post, gate_attn, gate_ffn
+        self.adaLN = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(cond_dim, 6 * embed_dim),
+        )
+
+        # Zero-init the final projection
+        nn.init.zeros_(self.adaLN[-1].weight)
+        nn.init.zeros_(self.adaLN[-1].bias)
+
+    def forward(self, x: Tensor, cond: Tensor):
+        """
+        Args:
+            x: Input [B, N, D]
+            cond: Conditioning [B, D] (timestep + optionally pooled text)
+
+        Returns:
+            x_norm: Normalized and modulated x
+            gate_attn: Gate for attention residual [B, 1, D]
+            gate_ffn: Gate for FFN residual [B, 1, D]
+        """
+        params = self.adaLN(cond)  # [B, 6*D]
+        shift_pre, scale_pre, shift_post, scale_post, gate_attn, gate_ffn = params.chunk(6, dim=-1)
+
+        # Modulated layer norm
+        x_norm = self.norm(x)
+        x_norm = x_norm * (1 + scale_pre.unsqueeze(1)) + shift_pre.unsqueeze(1)
+
+        return x_norm, gate_attn.unsqueeze(1), gate_ffn.unsqueeze(1)
+```
+
+**Usage in block**:
+```python
+# Instead of: x = x + attention(x)
+# Use:
+x_norm, gate_attn, gate_ffn = self.adaln(x, t_emb)
+x = x + gate_attn * attention(x_norm)
+x = x + gate_ffn * ffn(x)
+```
+
+#### H.2.2 Timestep-Dependent Phase Strength
+
+Scale Phase contribution based on diffusion timestep:
+
+```python
+def phase_strength(t: Tensor, t_max: int = 1000) -> Tensor:
+    """
+    Compute Phase integration strength based on timestep.
+
+    Early steps (high t, noisy): Low phase strength
+    Late steps (low t, clean): High phase strength
+
+    Args:
+        t: Timestep tensor [B]
+        t_max: Maximum timestep
+
+    Returns:
+        strength: Phase strength [B, 1] in range [0.1, 1.0]
+    """
+    # Linear schedule: 0.1 at t=t_max, 1.0 at t=0
+    t_normalized = t.float() / t_max  # 0 (clean) to 1 (noisy)
+    strength = 1.0 - 0.9 * t_normalized  # 1.0 (clean) to 0.1 (noisy)
+    return strength.unsqueeze(-1)
+```
+
+**Usage**:
+```python
+S = self.phase2d(x, meta)
+phase_weight = phase_strength(timestep, self.t_max)
+S = S * phase_weight  # Scale phase contribution
+```
+
+#### H.2.3 Cross-Attention to Quad Proposals
+
+Replace simple weighted sum with cross-attention:
+
+```python
+class CrossAttentionToProposals(nn.Module):
+    """
+    Cross-attention from query positions to Quad proposals.
+
+    Instead of simple weighted sum, allow rich interaction
+    between current position and retrieved proposals.
+    """
+
+    def __init__(self, embed_dim: int, num_heads: int):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.scale = self.head_dim ** -0.5
+
+    def forward(
+        self,
+        x: Tensor,           # [B, N, D] query positions
+        proposals: Tensor,   # [B, N, K, D] retrieved proposals
+        scores: Tensor,      # [B, N, K] retrieval scores (used as attention bias)
+    ) -> Tensor:
+        """
+        Args:
+            x: Current representation [B, N, D]
+            proposals: TopK retrieved proposals [B, N, K, D]
+            scores: Retrieval scores for bias [B, N, K]
+
+        Returns:
+            out: Cross-attended output [B, N, D]
+        """
+        B, N, D = x.shape
+        K = proposals.size(2)
+        H = self.num_heads
+        D_h = self.head_dim
+
+        # Project queries from current position
+        q = self.q_proj(x).view(B, N, H, D_h)  # [B, N, H, D_h]
+
+        # Project keys and values from proposals
+        proposals_flat = proposals.view(B * N, K, D)
+        k = self.k_proj(proposals_flat).view(B, N, K, H, D_h)
+        v = self.v_proj(proposals_flat).view(B, N, K, H, D_h)
+
+        # Compute attention: q attends to K proposals
+        # q: [B, N, H, D_h] -> [B, N, H, 1, D_h]
+        # k: [B, N, K, H, D_h] -> [B, N, H, K, D_h]
+        q = q.unsqueeze(3)  # [B, N, H, 1, D_h]
+        k = k.permute(0, 1, 3, 2, 4)  # [B, N, H, K, D_h]
+        v = v.permute(0, 1, 3, 2, 4)  # [B, N, H, K, D_h]
+
+        # Attention scores
+        attn = (q @ k.transpose(-2, -1)) * self.scale  # [B, N, H, 1, K]
+
+        # Add retrieval score bias
+        score_bias = scores.unsqueeze(2).unsqueeze(3)  # [B, N, 1, 1, K]
+        attn = attn + score_bias
+
+        attn = torch.softmax(attn, dim=-1)  # [B, N, H, 1, K]
+
+        # Weighted combination
+        out = attn @ v  # [B, N, H, 1, D_h]
+        out = out.squeeze(3)  # [B, N, H, D_h]
+        out = out.reshape(B, N, D)
+        out = self.out_proj(out)
+
+        return out
+```
+
+### H.3 PhaseQuadDiTBlock Implementation
+
+The complete improved block combining all enhancements:
+
+```python
+class PhaseQuadDiTBlock(nn.Module):
+    """
+    Phase-Quad block with DiT-style improvements.
+
+    Key enhancements over CognadeVisionBlock:
+    1. AdaLN-Zero conditioning (DiT-style)
+    2. Timestep-dependent Phase strength
+    3. Cross-attention to proposals (instead of weighted sum)
+    4. Proper zero-initialization for residual paths
+
+    Architecture:
+        INPUT: x [B, N, D], t_emb [B, D], text_cond
+
+        (A) AdaLN-Zero: Modulate x based on timestep
+
+        (B) LOCAL PATH: Windowed attention with text cross-attn
+
+        (C) PHASE INTEGRATOR: Bi-axial phase accumulation
+            - Scaled by timestep-dependent strength
+
+        (D) QUAD RETRIEVER: TopK proposal retrieval
+
+        (E) CROSS-ATTENTION: x attends to proposals
+            - Replaces simple weighted sum
+
+        (F) FFN: With AdaLN-Zero gating
+
+        OUTPUT: x_out [B, N, D]
+    """
+
+    def __init__(
+        self,
+        embed_dim: int = 768,
+        num_heads: int = 12,
+        topk: int = 64,
+        window_size: int = 8,
+        ffn_ratio: float = 4.0,
+        dropout: float = 0.1,
+        use_cross_attn: bool = True,
+        text_dim: Optional[int] = None,
+        t_max: int = 1000,
+    ):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.t_max = t_max
+
+        # AdaLN-Zero conditioning
+        self.adaln = AdaLNZero(embed_dim, embed_dim)
+
+        # Local mixer (windowed attention + optional text cross-attn)
+        self.local = LocalMixer(
+            embed_dim, window_size, num_heads,
+            use_cross_attn, text_dim, dropout
+        )
+        self.norm_local = nn.LayerNorm(embed_dim)
+
+        # Phase integrator (bi-axial)
+        self.phase2d = PhaseIntegrator2D(embed_dim, num_heads)
+
+        # Quad retriever
+        self.quad = QuadRetriever2D(embed_dim, num_heads, topk)
+
+        # Cross-attention to proposals (replaces GateMixer)
+        self.cross_attn_proposals = CrossAttentionToProposals(embed_dim, num_heads)
+        self.norm_cross = nn.LayerNorm(embed_dim)
+
+        # FFN
+        self.norm_ffn = nn.LayerNorm(embed_dim)
+        ffn_hidden = int(embed_dim * ffn_ratio)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, ffn_hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(ffn_hidden, embed_dim),
+            nn.Dropout(dropout),
+        )
+
+        # Zero-init output projections for residual-friendly start
+        nn.init.zeros_(self.local.out_proj.weight)
+        nn.init.zeros_(self.cross_attn_proposals.out_proj.weight)
+        nn.init.zeros_(self.ffn[-2].weight)  # Last linear in FFN
+
+    def forward(
+        self,
+        x: Tensor,
+        meta: PatchMeta,
+        time_embed: Tensor,
+        text_cond: Optional[Tensor] = None,
+        timestep: Optional[Tensor] = None,
+        control: Optional[BlockControl] = None,
+    ) -> Tensor:
+        """
+        Forward pass with DiT-style conditioning.
+
+        Args:
+            x: Input tokens [B, N, D]
+            meta: PatchMeta with spatial info
+            time_embed: Timestep embedding [B, D]
+            text_cond: Optional text embeddings [B, T, D_t]
+            timestep: Raw timestep values [B] for phase strength calculation
+            control: Optional BlockControl
+
+        Returns:
+            x_out: [B, N, D] output tokens
+        """
+        # AdaLN-Zero conditioning
+        x_norm, gate_attn, gate_ffn = self.adaln(x, time_embed)
+
+        # Local path with gating
+        x_local = self.local(self.norm_local(x_norm), meta, text_cond)
+        x = x + gate_attn * x_local
+
+        # Phase path with timestep-dependent strength
+        S = self.phase2d(x, meta)
+
+        if timestep is not None:
+            phase_weight = self._phase_strength(timestep)
+            S = S * phase_weight.unsqueeze(-1)  # Scale phase contribution
+
+        # Quad retrieval
+        proposals, scores = self.quad(x, S, meta)
+
+        # Cross-attention to proposals (instead of simple weighted sum)
+        x_cross = self.cross_attn_proposals(
+            self.norm_cross(x), proposals, scores
+        )
+        x = x + gate_attn * x_cross
+
+        # FFN with gating
+        x = x + gate_ffn * self.ffn(self.norm_ffn(x))
+
+        return x
+
+    def _phase_strength(self, t: Tensor) -> Tensor:
+        """
+        Compute timestep-dependent Phase strength.
+
+        Early steps (high t, noisy): Low strength (0.1)
+        Late steps (low t, clean): High strength (1.0)
+        """
+        t_normalized = t.float() / self.t_max
+        strength = 1.0 - 0.9 * t_normalized
+        return strength.unsqueeze(-1)
+```
+
+### H.4 Migration Strategy
+
+#### H.4.1 Backward Compatibility
+
+The new `PhaseQuadDiTBlock` is provided alongside `CognadeVisionBlock`:
+
+```python
+# Old code (still works)
+from symbolu.vision.cognade_vision_block import CognadeVisionBlock
+
+# New code (recommended)
+from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+```
+
+#### H.4.2 Configuration Flag
+
+Add to `PhaseQuadVisionConfig`:
+
+```python
+@dataclass
+class BlockConfig:
+    # ... existing fields ...
+    use_dit_style: bool = True  # Enable DiT improvements
+```
+
+#### H.4.3 Generator Update
+
+Modify `PhaseQuadImageGenerator` to use the improved block:
+
+```python
+if config.block.use_dit_style:
+    from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+    block_class = PhaseQuadDiTBlock
+else:
+    block_class = CognadeVisionBlock
+```
+
+### H.5 Expected Benefits
+
+| Improvement | Expected Effect |
+|-------------|-----------------|
+| AdaLN-Zero | Better timestep adaptation, cleaner gradients |
+| Phase Strength | Prevents noise contamination in early steps |
+| Cross-Attention | Richer proposal integration, sharper details |
+| Zero-Init | Stable training, better convergence |
+
+### H.6 Validation Criteria
+
+Before replacing the baseline, the new block must demonstrate:
+
+1. **Training stability**: No gradient explosions or NaN losses
+2. **Faster convergence**: Better FID at same epoch count
+3. **Visual quality**: Sharper edges, clearer details
+4. **Ablation value**: Each improvement shows measurable benefit
+
+### H.7 Implementation Files
+
+| File | Description |
+|------|-------------|
+| `symbolu/vision/phase_quad_dit_block.py` | New DiT-style block |
+| `symbolu/vision/adaln_zero.py` | AdaLN-Zero module |
+| `symbolu/vision/cross_attention_proposals.py` | Cross-attention to proposals |
+
+### H.8 One-Sentence Assessment
+
+> The baseline Phase-Quad block lacks the conditioning strength needed for diffusion — adding AdaLN-Zero, timestep-dependent Phase scaling, and cross-attention to proposals addresses the three core architectural blockers preventing production-quality images.
+
+---
+
+## Appendix I: Stability Enhancements (BCVF + Phase Coherence)
+
+This appendix documents stability enhancements that improve image quality through refined proposal selection and phase regularization. These techniques shape **selection and stability**, not imagination — they do not inject content, do not break O(N) guarantees, and do not reduce creativity when used correctly.
+
+### I.1 Overview
+
+| Enhancement | Purpose | Layer | Training/Inference |
+|-------------|---------|-------|-------------------|
+| BCVF (Bidirectional Consistency Verification) | Re-weight Quad proposals for stability | Quad Proposal | Both |
+| Phase Coherence Loss | Stabilize Phase memory evolution | Phase Training | Training only |
+| Semantic Entropy Monitoring | Prevent late-step collapse | Diagnostics | Training only |
+
+### I.2 BCVF (Bidirectional Consistency Verification)
+
+#### I.2.1 Motivation
+
+The standard Quad proposal integration uses raw retrieval scores:
+```python
+weighted_proposals = gate * proposals
+```
+
+This ignores:
+1. **Forward consistency (sf)**: Does the proposal fit local evidence?
+2. **Backward consistency (sb)**: Does the proposal align with Phase memory?
+
+BCVF re-weights proposals to suppress unstable textures and reduce flicker.
+
+#### I.2.2 Mathematical Formulation
+
+**Forward Score (sf)** — measures local evidence fit:
+```
+sf = sigmoid(proposal_scores)   # Already computed by Quad
+```
+
+**Backward Score (sb)** — measures Phase memory alignment:
+```
+sb = cosine_similarity(proposals, phase_state)
+```
+
+**BCVF Lagrangian (B1)**:
+```
+L = λf(1 - sf)² + λb(1 - sb)² + λc(sf - sb)²
+```
+
+Where:
+- `λf`: Forward feasibility weight (default 1.0)
+- `λb`: Backward alignment weight (default 1.0)
+- `λc`: Consistency penalty weight (default 0.5)
+
+**Consistency Weight (B2 + B3)**:
+```
+w = exp(-β · L)
+w = w / Σw   # Normalize
+```
+
+Where `β` controls sharpness (default 2.0).
+
+#### I.2.3 Implementation
+
+```python
+class BCVFQuadWeighter(nn.Module):
+    """
+    Bidirectional Consistency Verification for Quad proposals.
+
+    Re-weights proposals based on:
+    - Forward score: How well proposal fits local evidence
+    - Backward score: How well proposal aligns with Phase memory
+    - Consistency: Agreement between forward and backward
+
+    Args:
+        lambda_f: Forward feasibility weight.
+        lambda_b: Backward alignment weight.
+        lambda_c: Consistency penalty weight.
+        beta: Sharpness of weighting (higher = sharper selection).
+    """
+
+    def __init__(
+        self,
+        lambda_f: float = 1.0,
+        lambda_b: float = 1.0,
+        lambda_c: float = 0.5,
+        beta: float = 2.0,
+    ):
+        super().__init__()
+        self.lambda_f = lambda_f
+        self.lambda_b = lambda_b
+        self.lambda_c = lambda_c
+        self.beta = beta
+
+    def forward(
+        self,
+        proposals: Tensor,       # [B, N, K, D]
+        proposal_scores: Tensor, # [B, N, K]
+        phase_state: Tensor,     # [B, N, D]
+    ) -> Tensor:
+        """
+        Compute BCVF-weighted proposals.
+
+        Returns:
+            weighted_proposals: [B, N, D]
+        """
+        # Forward score: local evidence fit
+        sf = torch.sigmoid(proposal_scores)  # [B, N, K]
+
+        # Backward score: Phase alignment
+        sb = F.cosine_similarity(
+            proposals,                      # [B, N, K, D]
+            phase_state.unsqueeze(2),       # [B, N, 1, D]
+            dim=-1
+        )  # [B, N, K]
+
+        # BCVF Lagrangian
+        L = (
+            self.lambda_f * (1 - sf) ** 2 +
+            self.lambda_b * (1 - sb) ** 2 +
+            self.lambda_c * (sf - sb) ** 2
+        )  # [B, N, K]
+
+        # Consistency weights
+        w = torch.exp(-self.beta * L)
+        w = w / (w.sum(dim=-1, keepdim=True) + 1e-8)  # [B, N, K]
+
+        # Weighted combination
+        weighted = torch.sum(w.unsqueeze(-1) * proposals, dim=2)  # [B, N, D]
+
+        return weighted
+```
+
+#### I.2.4 Integration Point
+
+BCVF slots into the proposal integration stage. In `PhaseQuadDiTBlock`:
+
+```python
+# Option A: Replace simple weighted sum
+# Before:
+weighted_proposals = gate * proposals
+# After:
+weighted_proposals = bcvf_weighter(proposals, scores, phase_state)
+
+# Option B: Combine with CrossAttentionToProposals
+# Use BCVF weights as additional attention bias
+```
+
+#### I.2.5 Benefits
+
+| Metric | Expected Improvement |
+|--------|---------------------|
+| Image sharpness | Sharper edges, reduced blur |
+| Temporal stability | Less flicker in video |
+| Consistency | Better global composition |
+
+### I.3 Phase Coherence Loss
+
+#### I.3.1 Motivation
+
+Phase state should:
+- Change **slowly** (temporal smoothness)
+- Not **collapse** (maintain diversity)
+- Not **jitter** (avoid instability)
+
+The Phase Coherence Loss encourages smooth Phase evolution during training without affecting inference creativity.
+
+#### I.3.2 Mathematical Formulation
+
+Let:
+- `S_t` = Phase state at diffusion step t
+- `S_{t+Δ}` = Phase state at step t+Δ
+
+**Cosine similarity target**:
+```
+sim = cosine_similarity(S_t, S_{t+Δ})
+```
+
+**Bounded regularization** (avoid over-locking):
+```
+loss_low = ReLU(target_low - sim)   # Penalize too different
+loss_high = ReLU(sim - target_high) # Penalize too similar
+loss = mean(loss_low + loss_high)
+```
+
+Target range: `[0.8, 0.95]` — enforce smoothness without collapse.
+
+#### I.3.3 Implementation
+
+```python
+class PhaseCoherenceLoss(nn.Module):
+    """
+    Phase coherence regularization for stable Phase evolution.
+
+    Encourages Phase state to change smoothly across diffusion steps:
+    - Too different (sim < low): Phase is jittering
+    - Too similar (sim > high): Phase is collapsing
+
+    Args:
+        target_low: Minimum acceptable similarity (default 0.8).
+        target_high: Maximum acceptable similarity (default 0.95).
+    """
+
+    def __init__(
+        self,
+        target_low: float = 0.8,
+        target_high: float = 0.95,
+    ):
+        super().__init__()
+        self.target_low = target_low
+        self.target_high = target_high
+
+    def forward(
+        self,
+        phase_t: Tensor,       # [B, N, D] Phase state at step t
+        phase_t_delta: Tensor, # [B, N, D] Phase state at step t+Δ
+    ) -> Tensor:
+        """
+        Compute Phase coherence loss.
+
+        Returns:
+            loss: Scalar loss value.
+        """
+        # Cosine similarity between states
+        sim = F.cosine_similarity(phase_t, phase_t_delta, dim=-1)  # [B, N]
+
+        # Bounded penalty
+        loss_low = F.relu(self.target_low - sim)   # Penalize jitter
+        loss_high = F.relu(sim - self.target_high) # Penalize collapse
+
+        return (loss_low + loss_high).mean()
+```
+
+#### I.3.4 Training Integration
+
+```python
+# In training loop
+total_loss = diffusion_loss
+
+# Add Phase coherence with small weight
+if step % coherence_check_interval == 0:
+    phase_coherence = phase_coherence_loss(phase_state_t, phase_state_t_prev)
+    total_loss += lambda_phase * phase_coherence
+
+# Recommended: λ_phase ∈ [0.01, 0.05]
+```
+
+#### I.3.5 What This Loss Does NOT Do
+
+| Action | Status |
+|--------|--------|
+| Enforce meaning | ❌ No |
+| Inject structure | ❌ No |
+| Bias text conditioning | ❌ No |
+| Affect inference | ❌ No |
+| Reduce creativity | ❌ No |
+
+It **only** prevents Phase instability during training.
+
+### I.4 Semantic Entropy Monitoring (SCC-Inspired)
+
+#### I.4.1 Purpose
+
+Track semantic entropy across diffusion steps to:
+- Detect early signs of collapse
+- Identify unstable batches
+- Monitor training health
+
+#### I.4.2 Implementation
+
+```python
+def compute_semantic_entropy(x: Tensor) -> float:
+    """
+    Compute semantic entropy of representation.
+
+    Args:
+        x: Representation tensor [B, N, D]
+
+    Returns:
+        entropy: Scalar entropy value.
+    """
+    # Flatten and normalize
+    x_flat = x.view(-1, x.size(-1))
+    x_norm = F.normalize(x_flat, dim=-1)
+
+    # Compute covariance
+    cov = x_norm.T @ x_norm / x_norm.size(0)
+
+    # Entropy from eigenvalues
+    eigenvalues = torch.linalg.eigvalsh(cov)
+    eigenvalues = eigenvalues.clamp(min=1e-8)
+    probs = eigenvalues / eigenvalues.sum()
+
+    return -(probs * torch.log(probs)).sum().item()
+
+
+class SemanticEntropyMonitor:
+    """
+    Monitor semantic entropy evolution during diffusion.
+
+    Expected behavior:
+    - Early steps (noisy): High entropy
+    - Late steps (clean): Lower entropy
+
+    Alert conditions:
+    - Entropy increases in late steps
+    - Entropy collapses too fast
+    """
+
+    def __init__(self, alert_threshold: float = 0.1):
+        self.history = []
+        self.alert_threshold = alert_threshold
+
+    def update(self, x: Tensor, timestep: int) -> dict:
+        entropy = compute_semantic_entropy(x)
+        self.history.append((timestep, entropy))
+
+        metrics = {"entropy": entropy, "alert": False}
+
+        # Check for entropy increase in late steps
+        if len(self.history) >= 2:
+            prev_t, prev_e = self.history[-2]
+            if timestep < prev_t and entropy > prev_e + self.alert_threshold:
+                metrics["alert"] = True
+                metrics["alert_reason"] = "entropy_increase"
+
+        return metrics
+```
+
+### I.5 Implementation Files
+
+| File | Description |
+|------|-------------|
+| `symbolu/vision/bcvf_weighter.py` | BCVF proposal re-weighting |
+| `symbolu/vision/phase_coherence_loss.py` | Phase stability regularization |
+| `symbolu/vision/semantic_entropy.py` | Entropy monitoring utilities |
+
+### I.6 Configuration
+
+Add to `PhaseQuadVisionConfig`:
+
+```python
+@dataclass
+class BCVFConfig:
+    """BCVF proposal weighting configuration."""
+    enabled: bool = True
+    lambda_f: float = 1.0      # Forward weight
+    lambda_b: float = 1.0      # Backward weight
+    lambda_c: float = 0.5      # Consistency weight
+    beta: float = 2.0          # Sharpness
+
+
+@dataclass
+class PhaseCoherenceConfig:
+    """Phase coherence loss configuration."""
+    enabled: bool = True
+    target_low: float = 0.8    # Min similarity
+    target_high: float = 0.95  # Max similarity
+    loss_weight: float = 0.01  # λ_phase
+```
+
+### I.7 Integration Order
+
+| Step | Component | Complexity | Risk |
+|------|-----------|------------|------|
+| 1 | BCVF weighting | Low | Low |
+| 2 | Phase coherence loss | Low | Low |
+| 3 | Entropy monitoring | Low | None (diagnostic only) |
+
+### I.8 Expected Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Image sharpness | Blurry edges | Sharper details |
+| Phase stability | Jittery | Smooth evolution |
+| Video flicker | Visible | Reduced |
+| Training stability | Occasional spikes | More consistent |
+
+### I.9 One-Sentence Assessment
+
+> BCVF improves "what to choose" by re-weighting proposals for consistency; Phase coherence loss stabilizes "how memory evolves" during training — neither replaces architectural conditioning, they refine it.

@@ -87,8 +87,43 @@ class LocalMixerConfig:
 
 
 @dataclass
+class DiTStyleConfig:
+    """Configuration for DiT-style improvements (Appendix H)."""
+    enabled: bool = True  # Use PhaseQuadDiTBlock instead of CognadeVisionBlock
+    phase_min_strength: float = 0.1  # Min Phase strength at t=t_max (noisy)
+    phase_max_strength: float = 1.0  # Max Phase strength at t=0 (clean)
+
+
+@dataclass
+class BCVFConfig:
+    """
+    BCVF (Bidirectional Consistency Verification) configuration (Appendix I).
+
+    Re-weights Quad proposals based on forward/backward consistency.
+    """
+    enabled: bool = True  # Enable BCVF proposal weighting
+    lambda_f: float = 1.0  # Forward feasibility weight
+    lambda_b: float = 1.0  # Backward alignment weight
+    lambda_c: float = 0.5  # Consistency penalty weight
+    beta: float = 2.0  # Sharpness of weighting
+
+
+@dataclass
+class PhaseCoherenceConfig:
+    """
+    Phase coherence loss configuration (Appendix I).
+
+    Training-only regularization for Phase stability.
+    """
+    enabled: bool = True  # Enable Phase coherence loss
+    target_low: float = 0.8  # Min acceptable similarity (penalize jitter)
+    target_high: float = 0.95  # Max acceptable similarity (penalize collapse)
+    loss_weight: float = 0.01  # λ_phase weight in total loss
+
+
+@dataclass
 class BlockConfig:
-    """Configuration for CognadeVisionBlock."""
+    """Configuration for CognadeVisionBlock or PhaseQuadDiTBlock."""
     embed_dim: int = 768  # Model width D
     num_heads: int = 12  # Number of attention heads H
     ffn_ratio: float = 4.0  # FFN hidden dimension ratio
@@ -97,6 +132,8 @@ class BlockConfig:
     quad: QuadConfig = field(default_factory=QuadConfig)
     gate: GateConfig = field(default_factory=GateConfig)
     local: LocalMixerConfig = field(default_factory=LocalMixerConfig)
+    dit_style: DiTStyleConfig = field(default_factory=DiTStyleConfig)
+    bcvf: BCVFConfig = field(default_factory=BCVFConfig)
 
 
 @dataclass
@@ -131,6 +168,7 @@ class TrainingConfig:
     compile_model: bool = False  # torch.compile
     temperature: TemperatureScheduleConfig = field(default_factory=TemperatureScheduleConfig)
     diffusion: DiffusionConfig = field(default_factory=DiffusionConfig)
+    phase_coherence: PhaseCoherenceConfig = field(default_factory=PhaseCoherenceConfig)
 
 
 @dataclass
