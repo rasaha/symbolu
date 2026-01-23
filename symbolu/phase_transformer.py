@@ -3188,6 +3188,7 @@ class BindingCacheBlock(nn.Module):
         local_window_size: int = 256,  # V10.1.1: Max local window (actual = min(this, seq_len//2))
         proposal_mode: bool = False,  # V10.4: Quad proposes, Phase integrates
         confidence_threshold: float = 0.7,  # V10.4: Skip quad if confidence > threshold
+        interference_scorer: Optional[nn.Module] = None,  # V10.5: Optional interference rescoring
     ):
         super().__init__()
         self.embed_dim = embed_dim  # V10.6.6: Store for contract enforcement
@@ -3224,6 +3225,10 @@ class BindingCacheBlock(nn.Module):
             proposal_mode=proposal_mode,
         )
 
+        # V10.5: Optional interference-aware proposal scoring
+        # Applied AFTER proposals, BEFORE phase integration (compositional creativity)
+        self.interference_scorer = interference_scorer
+
         # Feed-forward
         self.norm_ff = nn.LayerNorm(embed_dim)
         self.ff = nn.Sequential(
@@ -3237,6 +3242,7 @@ class BindingCacheBlock(nn.Module):
         # V10.4: Instrumentation for proposal mode
         self._last_confidence_mean = 0.0
         self._last_skip_rate = 0.0
+        self._last_interference_stats = {}  # V10.5: Interference diagnostics
 
     def set_ablation(self, mode: str, seed: int = 42):
         """Set Phase ablation mode."""
@@ -3252,10 +3258,14 @@ class BindingCacheBlock(nn.Module):
 
     def get_proposal_metrics(self) -> dict:
         """V10.4: Return proposal mode instrumentation."""
-        return {
+        metrics = {
             "confidence_mean": self._last_confidence_mean,
             "skip_rate": self._last_skip_rate,
         }
+        # V10.5: Include interference stats if available
+        if hasattr(self, '_last_interference_stats'):
+            metrics.update(self._last_interference_stats)
+        return metrics
 
     def forward(
         self,
@@ -3350,6 +3360,16 @@ class BindingCacheBlock(nn.Module):
             proposals, proposal_scores = self.quad_query.get_proposals(
                 x, memory_state, binding_salience=binding_salience
             )
+
+            # V10.5: Optional interference-aware rescoring (compositional creativity)
+            # Applied AFTER proposals, BEFORE phase integration
+            # Only active if interference_scorer is configured and conditions met
+            if hasattr(self, 'interference_scorer') and self.interference_scorer is not None:
+                proposal_scores, interference_stats = self.interference_scorer(
+                    proposals, proposal_scores
+                )
+                if hasattr(self, '_last_interference_stats'):
+                    self._last_interference_stats = interference_stats
 
             # Phase integrates proposals
             mem_out = self.phase_state.integrate_proposals(

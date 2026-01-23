@@ -9370,6 +9370,15 @@ class UnifiedTrainingConfig:
     binding_cache_top_k: int = 64  # Top-K cache size per head (O(nk) vs O(n²))
     no_binding_cache: bool = False  # Disable cache (use full attention)
 
+    # V10.5: Interference-Aware Proposal Scoring (compositional creativity)
+    # Applied AFTER proposals, BEFORE phase integration. Task-conditional.
+    enable_quad_interference: bool = False  # Master switch (OFF by default)
+    interference_lambda_text: float = 0.02  # Strength (0.01-0.03 for text, lower than vision)
+    interference_min_step: int = 8  # Only apply after N decoding steps
+    interference_entropy_gate: float = 1.2  # Only apply if proposal entropy > threshold
+    interference_auto_classify: bool = True  # Auto-detect compositional tasks
+    interference_modes: str = "compose,reason,write"  # Enabled modes (comma-separated)
+
     # V10.0: Binding Annotation (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
     use_binding_annotator: bool = True  # Enable OntologicalBindingAnnotator
     use_csr_annotation: bool = True  # CSR affects binding salience (phonological grounding)
@@ -18853,6 +18862,24 @@ def main():
                        help="Use Top-K cache in binding_cache model (default: True)")
     parser.add_argument("--no_binding_cache", action="store_true",
                        help="Disable Top-K cache in binding_cache model (use full O(n²) attention)")
+
+    # V10.5: Interference-Aware Proposal Scoring (compositional creativity)
+    # Applied AFTER BCVF, BEFORE phase integration. Task-conditional, entropy-gated.
+    parser.add_argument("--enable_quad_interference", action="store_true",
+                       help="Enable interference-aware proposal scoring for compositional tasks. "
+                            "Boosts mutually consistent proposals. OFF by default.")
+    parser.add_argument("--interference_lambda_text", type=float, default=0.02,
+                       help="Interference strength for text (0.01-0.03). Lower than vision.")
+    parser.add_argument("--interference_min_step", type=int, default=8,
+                       help="Only apply interference after N decoding steps (late decoding).")
+    parser.add_argument("--interference_entropy_gate", type=float, default=1.2,
+                       help="Only apply interference if proposal entropy > threshold.")
+    parser.add_argument("--interference_auto_classify", action="store_true", default=True,
+                       help="Auto-detect compositional tasks and enable interference accordingly.")
+    parser.add_argument("--no_interference_auto_classify", action="store_true",
+                       help="Disable auto-classification (manual control only).")
+    parser.add_argument("--interference_modes", type=str, default="compose,reason,write",
+                       help="Comma-separated interference modes: compose,reason,write")
 
     # V10.0: Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
     # Clean separation: Attention = physics, Annotator = semantics
