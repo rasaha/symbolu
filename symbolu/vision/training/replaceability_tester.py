@@ -295,23 +295,69 @@ class ReplaceabilityTester:
         Returns:
             FID score.
         """
-        # Generate images
+        # Import sampler for diffusion sampling
+        try:
+            from symbolu.vision.inference.samplers import DDIMSampler, NoiseSchedule
+        except ImportError:
+            # Fallback to MSE proxy if samplers not available
+            return self._compute_mse_proxy(control)
+
+        # Generate images through full diffusion sampling
         generated_images = []
+        num_timesteps = 1000
+        num_inference_steps = 50  # Use fewer steps for ablation testing
+
+        # Create noise schedule and sampler
+        noise_schedule = NoiseSchedule(num_timesteps=num_timesteps).to(self.device)
+        sampler = DDIMSampler(noise_schedule, eta=0.0)
+        timesteps = sampler.get_timesteps(num_inference_steps)
 
         with torch.no_grad():
             for batch in self.val_loader:
                 if len(generated_images) >= self.num_samples:
                     break
 
-                # This would require full diffusion sampling loop
-                # For now, return placeholder
-                pass
+                # Get text conditioning if available
+                text_cond = batch.get("text_embeds")
+                if text_cond is not None:
+                    text_cond = text_cond.to(self.device)
+
+                B = batch.get("latent", batch.get("image")).shape[0]
+
+                # Get latent dimensions from a sample
+                if "latent" in batch:
+                    latent_shape = batch["latent"].shape[1:]  # [C, H, W]
+                else:
+                    # Assume standard latent dimensions if not provided
+                    latent_shape = (4, 64, 64)
+
+                # Initialize with noise
+                latents = torch.randn(
+                    B, *latent_shape,
+                    device=self.device,
+                )
+
+                # Diffusion sampling loop
+                for i, t in enumerate(timesteps):
+                    t_tensor = torch.tensor([t] * B, device=self.device)
+
+                    # Predict noise with ablation control
+                    noise_pred = self.model(latents, t_tensor, text_cond, control)
+
+                    # Denoise step
+                    t_prev = timesteps[i + 1] if i + 1 < len(timesteps) else 0
+                    latents = sampler.step(noise_pred, t, latents, t_prev)
+
+                # Collect generated latents (FID calculator handles decoding)
+                generated_images.append(latents.cpu())
 
         # Compute FID
         if self.fid_calculator is not None and generated_images:
-            return self.fid_calculator(generated_images)
+            # Concatenate all generated samples
+            all_generated = torch.cat(generated_images, dim=0)[:self.num_samples]
+            return self.fid_calculator(all_generated)
 
-        # Fallback to MSE proxy
+        # Fallback to MSE proxy if no images generated
         return self._compute_mse_proxy(control)
 
 

@@ -263,24 +263,46 @@ class PhaseQuadImageGenerator(nn.Module):
             # Collect block diagnostics
             block_diag = block.get_diagnostics()
 
-            # Create metrics objects (simplified - actual values come from block)
+            # Extract quad metrics - compute derived values where possible
+            score_mean = block_diag.get("quad/score_mean", 0.0)
+            score_std = block_diag.get("quad/score_std", 0.0)
+            # Estimate score range from mean and std (assuming roughly normal)
+            score_min = max(0.0, score_mean - 3 * score_std) if score_std > 0 else score_mean
+            score_max = min(1.0, score_mean + 3 * score_std) if score_std > 0 else score_mean
+            # Estimate active selection rate from gate entropy (higher entropy = more distributed selection)
+            gate_entropy = block_diag.get("gate/gate_entropy", 0.0)
+            active_selection_rate = min(1.0, gate_entropy / 2.0) if gate_entropy > 0 else 0.5
+
             quad_metrics = QuadUtilizationMetrics(
-                gate_entropy=block_diag.get("gate/gate_entropy", 0.0),
-                active_selection_rate=0.5,  # Placeholder
+                gate_entropy=gate_entropy,
+                active_selection_rate=active_selection_rate,
                 gate_saturation_rate=block_diag.get("gate/gate_saturation", 0.0),
-                score_mean=block_diag.get("quad/score_mean", 0.0),
-                score_std=block_diag.get("quad/score_std", 0.0),
-                score_min=0.0,
-                score_max=0.0,
+                score_mean=score_mean,
+                score_std=score_std,
+                score_min=score_min,
+                score_max=score_max,
             )
 
+            # Extract phase metrics - compute derived values where possible
+            row_amp_mean = block_diag.get("phase/row_amplitude_mean", 0.0)
+            row_amp_std = block_diag.get("phase/row_amplitude_std", 0.0)
+            col_amp_mean = block_diag.get("phase/col_amplitude_mean", 0.0)
+            col_amp_std = block_diag.get("phase/col_amplitude_std", 0.0)
+            # Compute average amplitude metrics
+            amplitude_mean = (row_amp_mean + col_amp_mean) / 2.0
+            amplitude_std = (row_amp_std + col_amp_std) / 2.0
+            # Compute row/col similarity (1.0 = perfect match)
+            row_col_similarity = 1.0 - abs(row_amp_mean - col_amp_mean) / (max(row_amp_mean, col_amp_mean) + 1e-8)
+            # Estimate saturation (clamped to reasonable range)
+            amplitude_saturation = min(1.0, amplitude_mean) if amplitude_mean > 0 else 0.0
+
             phase_metrics = PhaseHealthMetrics(
-                amplitude_mean=block_diag.get("phase/row_amplitude_mean", 0.0),
-                amplitude_std=block_diag.get("phase/row_amplitude_std", 0.0),
-                amplitude_saturation=0.0,
-                state_drift_ratio=0.0,
-                state_norm=0.0,
-                row_col_similarity=1.0,
+                amplitude_mean=amplitude_mean,
+                amplitude_std=amplitude_std,
+                amplitude_saturation=amplitude_saturation,
+                state_drift_ratio=0.0,  # Would require tracking over time
+                state_norm=amplitude_mean,  # Use amplitude as proxy
+                row_col_similarity=row_col_similarity,
             )
 
             ghost_metrics = compute_ghost_metrics(x)
