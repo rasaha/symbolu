@@ -122,6 +122,34 @@ class PhaseCoherenceConfig:
 
 
 @dataclass
+class InterferenceConfig:
+    """
+    Interference-aware proposal scoring configuration.
+
+    Optional "creative amplifier" that boosts mutually consistent proposals.
+    Applied AFTER BCVF, operates only on K proposals (not N tokens).
+
+    Recommended for:
+    - Multi-object composition
+    - Style blending
+    - Scene coherence
+    - Video temporal consistency
+
+    Training curriculum:
+    - Stage A (0-30%): OFF (baseline stability)
+    - Stage B (30-60%): Soft intro (lambda ramps up)
+    - Stage C (60-100%): Full creative mode
+    """
+    enabled: bool = False  # Off by default, enable for creative mode
+    lambda_interference: float = 0.05  # Interference strength (0.03-0.08)
+    min_multiplier: float = 0.8  # Minimum score multiplier (stability)
+    max_multiplier: float = 1.2  # Maximum score multiplier (cap boost)
+    timestep_threshold: float = 0.4  # Only apply in last 40% of denoising
+    warmup_steps: int = 0  # Steps before full strength
+    max_k: int = 64  # Skip if K > this
+
+
+@dataclass
 class BlockConfig:
     """Configuration for CognadeVisionBlock or PhaseQuadDiTBlock."""
     embed_dim: int = 768  # Model width D
@@ -134,6 +162,7 @@ class BlockConfig:
     local: LocalMixerConfig = field(default_factory=LocalMixerConfig)
     dit_style: DiTStyleConfig = field(default_factory=DiTStyleConfig)
     bcvf: BCVFConfig = field(default_factory=BCVFConfig)
+    interference: InterferenceConfig = field(default_factory=InterferenceConfig)
 
 
 @dataclass

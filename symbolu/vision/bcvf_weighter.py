@@ -348,3 +348,161 @@ class HybridBCVFCrossAttention(nn.Module):
         # Mix
         ratio = torch.sigmoid(self.mix_ratio)
         return ratio * bcvf_out + (1 - ratio) * cross_out
+
+
+class BCVFWithInterference(nn.Module):
+    """
+    BCVF proposal weighting with optional interference scoring.
+
+    This class implements the recommended architecture:
+    1. BCVF filters proposals for correctness (REQUIRED, core)
+    2. Interference scoring optionally boosts compositional creativity (OPTIONAL)
+
+    Interference is applied AFTER BCVF and operates only on K proposals,
+    making it a lightweight enhancement for creative generation.
+
+    Args:
+        lambda_f: Forward feasibility weight.
+        lambda_b: Backward alignment weight.
+        lambda_c: Consistency penalty weight.
+        beta: Sharpness of BCVF weighting.
+        interference_enabled: Whether to apply interference scoring.
+        interference_lambda: Strength of interference modifier (0.03-0.08).
+        interference_timestep_threshold: Only apply at timesteps below this ratio.
+    """
+
+    def __init__(
+        self,
+        lambda_f: float = 1.0,
+        lambda_b: float = 1.0,
+        lambda_c: float = 0.5,
+        beta: float = 2.0,
+        interference_enabled: bool = False,
+        interference_lambda: float = 0.05,
+        interference_timestep_threshold: float = 0.4,
+    ):
+        super().__init__()
+
+        # Core BCVF (always active)
+        self.bcvf = BCVFQuadWeighter(
+            lambda_f=lambda_f,
+            lambda_b=lambda_b,
+            lambda_c=lambda_c,
+            beta=beta,
+        )
+
+        # Optional interference scoring
+        self.interference_enabled = interference_enabled
+        self.interference_lambda = interference_lambda
+        self.interference_timestep_threshold = interference_timestep_threshold
+
+        # Diagnostics
+        self._last_interference_stats: Dict[str, float] = {}
+
+    def forward(
+        self,
+        proposals: Tensor,
+        proposal_scores: Tensor,
+        phase_state: Tensor,
+        timestep: Optional[int] = None,
+        max_timestep: int = 1000,
+    ) -> Tensor:
+        """
+        Compute BCVF-weighted proposals with optional interference.
+
+        Args:
+            proposals: TopK retrieved proposals [B, N, K, D].
+            proposal_scores: Raw retrieval scores [B, N, K].
+            phase_state: Current Phase state [B, N, D].
+            timestep: Current diffusion timestep (for conditional interference).
+            max_timestep: Maximum timestep value.
+
+        Returns:
+            weighted_proposals: Weighted combination [B, N, D].
+        """
+        B, N, K, D = proposals.shape
+
+        # Step 1: BCVF consistency filtering (ALWAYS applied)
+        # Get raw weights from BCVF
+        _, bcvf_weights = self.bcvf.forward_with_raw_weights(
+            proposals, proposal_scores, phase_state
+        )  # bcvf_weights: [B, N, K]
+
+        # Step 2: Optional interference scoring
+        final_weights = bcvf_weights
+
+        if self.interference_enabled:
+            # Check timestep threshold
+            should_apply = True
+            if timestep is not None:
+                timestep_ratio = timestep / max_timestep
+                should_apply = timestep_ratio < self.interference_timestep_threshold
+
+            if should_apply and K <= 64:  # Only for reasonable K
+                final_weights, stats = self._apply_interference(
+                    proposals, bcvf_weights
+                )
+                self._last_interference_stats = stats
+            else:
+                self._last_interference_stats = {"interference/applied": 0.0}
+        else:
+            self._last_interference_stats = {"interference/applied": 0.0}
+
+        # Final weighted combination
+        weighted = torch.sum(final_weights.unsqueeze(-1) * proposals, dim=2)
+        return weighted
+
+    def _apply_interference(
+        self,
+        proposals: Tensor,
+        weights: Tensor,
+    ) -> Tuple[Tensor, Dict[str, float]]:
+        """
+        Apply interference-aware rescoring to weights.
+
+        Args:
+            proposals: [B, N, K, D]
+            weights: [B, N, K] BCVF weights
+
+        Returns:
+            rescored_weights: [B, N, K]
+            stats: Diagnostic statistics
+        """
+        eps = 1e-6
+        B, N, K, D = proposals.shape
+
+        # Normalize proposals for cosine similarity
+        p_norm = proposals / (proposals.norm(dim=-1, keepdim=True) + eps)
+
+        # Pairwise similarity between proposals
+        sim = torch.einsum("bnkd,bnqd->bnkq", p_norm, p_norm)  # [B, N, K, K]
+
+        # Zero diagonal
+        eye = torch.eye(K, device=sim.device, dtype=sim.dtype)
+        sim = sim - eye.unsqueeze(0).unsqueeze(0)
+
+        # Compatibility: average similarity with other proposals
+        compat = sim.mean(dim=-1)  # [B, N, K]
+
+        # Compute multiplier with clamping
+        multiplier = (1.0 + self.interference_lambda * compat).clamp(0.8, 1.2)
+
+        # Apply to weights and renormalize
+        rescored = weights * multiplier
+        rescored = rescored / (rescored.sum(dim=-1, keepdim=True) + eps)
+
+        # Diagnostics
+        with torch.no_grad():
+            stats = {
+                "interference/applied": 1.0,
+                "interference/compat_mean": compat.mean().item(),
+                "interference/compat_std": compat.std().item(),
+                "interference/multiplier_mean": multiplier.mean().item(),
+            }
+
+        return rescored, stats
+
+    def get_instrumentation(self) -> Dict[str, float]:
+        """Get combined BCVF + interference diagnostics."""
+        bcvf_stats = self.bcvf.get_instrumentation()
+        return {**bcvf_stats, **self._last_interference_stats}

@@ -42,8 +42,14 @@ from symbolu.vision.cognade_vision_block import CognadeVisionBlock
 from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
 from symbolu.vision.adaln_zero import AdaLNZero, FinalLayer
 from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
-from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
+from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention, BCVFWithInterference
 from symbolu.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
+from symbolu.vision.interference_scoring import (
+    InterferenceConfig,
+    InterferenceScorer,
+    InterferenceCurriculumScheduler,
+    interference_rescore,
+)
 from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
 from symbolu.vision.diagnostics import (
     QuadUtilizationMetrics,
@@ -81,8 +87,14 @@ __all__ = [
     "CrossAttentionToProposals",
     "BCVFQuadWeighter",
     "HybridBCVFCrossAttention",
+    "BCVFWithInterference",
     "PhaseCoherenceLoss",
     "SemanticEntropyMonitor",
+    # Interference Scoring (Optional Creative Mode)
+    "InterferenceConfig",
+    "InterferenceScorer",
+    "InterferenceCurriculumScheduler",
+    "interference_rescore",
     "PhaseQuadImageGenerator",
     # Diagnostics
     "QuadUtilizationMetrics",
