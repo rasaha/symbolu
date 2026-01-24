@@ -815,12 +815,417 @@ Target: < 2x for most inputs (most should pass on first attempt)
 
 ---
 
+## Comparison with Existing LLM Reflection Approaches
+
+### Overview of Current Approaches
+
+| Model/Approach | Reflection Method | Where It Happens | Compute Cost |
+|----------------|-------------------|------------------|--------------|
+| **GPT-4** | Chain-of-Thought prompting | Token space (external) | O(CoT tokens) |
+| **o1/o3** | Internal reasoning tokens | Token space (hidden) | O(reasoning tokens) |
+| **Claude** | Extended thinking | Token space (visible) | O(thinking tokens) |
+| **Gemini Flash Thinking** | Reasoning mode | Token space | O(reasoning tokens) |
+| **Self-Refine** | Generate → Critique → Refine | Token space (multi-turn) | O(3× generation) |
+| **Tree of Thoughts** | Branch & evaluate | Token space (tree search) | O(branches × depth) |
+| **Reflective Phase-Quad** | Latent revision loop | **Latent space** | O(revisions × layer) |
+
+### Architectural Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  o1-STYLE REASONING (Token-Based)                                           │
+│                                                                             │
+│  Input → [Reason₁] → [Reason₂] → ... → [ReasonN] → Output                  │
+│           ↑                                                                 │
+│           └── Each "Reason" is actual tokens (hidden from user)             │
+│               Cost: Full forward pass per reasoning token                   │
+│               Memory: Grows with reasoning length                           │
+│                                                                             │
+│  Pros: Can show work, interpretable, proven at scale                       │
+│  Cons: O(N²) attention over growing context, token overhead                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  REFLECTIVE PHASE-QUAD (Latent-Based)                                       │
+│                                                                             │
+│  Input → [Latent₁] → Critic → [Latent₂] → Critic → [LatentN] → Output      │
+│           ↑                                                                 │
+│           └── Each revision operates on latent representations             │
+│               Cost: One layer pass per revision                             │
+│               Memory: Fixed (Phase state size)                              │
+│                                                                             │
+│  Pros: O(1) memory per revision, efficient iteration, adaptive compute     │
+│  Cons: Less interpretable, requires trained critic, unproven at scale      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Detailed Feature Comparison
+
+| Feature | o1/o3 (Token-Based) | Reflective Phase-Quad |
+|---------|---------------------|----------------------|
+| **Revision mechanism** | Generate more tokens | Re-run through layer |
+| **Revision cost** | O(new_tokens × N²) | O(layer_pass) |
+| **Memory growth** | Linear with reasoning | Constant (Phase state) |
+| **Quality signal** | Process Reward Model | Inference-time Critic |
+| **When quality checked** | Per step (during generation) | Per revision (after generation) |
+| **Backtracking** | Limited (token committed) | Full (latent uncommitted) |
+| **Interpretability** | Can show reasoning trace | Internal only |
+| **Training requirement** | RLHF + PRM | Critic training |
+| **Compute allocation** | Token budget | Quality threshold |
+
+### Efficiency Analysis
+
+```
+Scenario: Solving a math problem requiring 3 revisions
+
+o1-Style (Token-Based):
+  Attempt 1: Generate 100 reasoning tokens → Wrong answer
+  Attempt 2: Generate 150 more tokens (with context) → Still wrong
+  Attempt 3: Generate 200 more tokens (with context) → Correct
+
+  Total tokens: 100 + 150 + 200 = 450 reasoning tokens
+  Attention cost: O(450²) = O(202,500) operations
+  Memory: 450 token embeddings in context
+
+Reflective Phase-Quad (Latent-Based):
+  Attempt 1: Forward pass → Critic: 0.3 → Revise
+  Attempt 2: Forward pass → Critic: 0.6 → Revise
+  Attempt 3: Forward pass → Critic: 0.9 → Output
+
+  Total passes: 3 layer passes + 3 critic evaluations
+  Attention cost: O(3 × N) where N = input length (Phase is O(N))
+  Memory: Fixed Phase state (no context growth)
+
+Efficiency ratio: ~10-100x fewer operations for revision-heavy tasks
+```
+
+### When Each Approach Wins
+
+| Scenario | Winner | Why |
+|----------|--------|-----|
+| **Simple queries** | Tie | Both single-pass |
+| **Multi-step reasoning** | o1 | Proven, interpretable |
+| **Iterative refinement** | Phase-Quad | No context growth |
+| **Long context + revision** | Phase-Quad | O(N) vs O(N²) |
+| **Explainable reasoning** | o1 | Can show trace |
+| **Compute-constrained** | Phase-Quad | More efficient revision |
+| **Scale (100B+ params)** | o1 | Proven at scale |
+
+### What Phase-Quad Could Learn from o1
+
+1. **Process Reward Models**: o1 uses PRMs to evaluate reasoning steps. Phase-Quad's Critic should be similarly trained.
+
+2. **Step-by-step verification**: o1 checks each step. Phase-Quad could add intermediate checkpoints within layers.
+
+3. **Training on reasoning traces**: o1 is trained on human reasoning. Phase-Quad needs similar data for Critic training.
+
+### What o1 Could Learn from Phase-Quad
+
+1. **Latent revision**: Instead of generating tokens to "think", revise in latent space.
+
+2. **Phase memory**: Use O(N) persistent memory instead of growing context.
+
+3. **Adaptive compute**: Stop when quality threshold met, not when token budget exhausted.
+
+---
+
+## Benchmarking Against o1-Style Reasoning
+
+### Benchmark Suite Design
+
+To fairly compare Reflective Phase-Quad against o1-style reasoning, we need benchmarks that test:
+
+1. **Reasoning accuracy** (do both get the right answer?)
+2. **Revision efficiency** (compute per quality improvement)
+3. **Scaling behavior** (how does cost grow with problem difficulty?)
+
+### Benchmark Tasks
+
+```python
+BENCHMARK_TASKS = {
+    # Math reasoning (verifiable correctness)
+    "gsm8k": {
+        "description": "Grade school math word problems",
+        "metric": "exact_match",
+        "difficulty_range": [1, 8],  # steps required
+    },
+
+    # Code generation (executable verification)
+    "humaneval": {
+        "description": "Python function generation",
+        "metric": "pass@1",
+        "difficulty_range": [1, 5],  # complexity
+    },
+
+    # Logical reasoning (formal verification)
+    "logic_grid": {
+        "description": "Logic puzzles with constraints",
+        "metric": "exact_match",
+        "difficulty_range": [3, 10],  # constraints
+    },
+
+    # Multi-step planning (outcome verification)
+    "blocksworld": {
+        "description": "Block stacking planning",
+        "metric": "plan_validity",
+        "difficulty_range": [3, 12],  # blocks
+    },
+}
+```
+
+### Metrics
+
+```python
+@dataclass
+class ReflectionBenchmarkMetrics:
+    # Accuracy
+    accuracy: float                    # Final answer correctness
+    first_attempt_accuracy: float      # Accuracy without revision
+
+    # Efficiency
+    revisions_used: float              # Average revisions per problem
+    compute_per_correct: float         # FLOPs per correct answer
+    tokens_per_correct: float          # Tokens per correct answer (for o1)
+
+    # Scaling
+    accuracy_vs_difficulty: Dict       # Accuracy by difficulty level
+    compute_vs_difficulty: Dict        # Compute by difficulty level
+
+    # Quality dynamics
+    quality_improvement_rate: float    # Avg improvement per revision
+    wasted_revision_rate: float        # Revisions that didn't help
+```
+
+### Benchmark Protocol
+
+```python
+def run_reflection_benchmark(
+    model,
+    model_type: str,  # "o1_style" or "reflective_phase_quad"
+    tasks: List[BenchmarkTask],
+    max_compute_budget: float,
+) -> ReflectionBenchmarkMetrics:
+    """
+    Run benchmark comparing reflection approaches.
+
+    For o1-style:
+        - Measure reasoning tokens generated
+        - Allow up to max_compute_budget tokens
+        - Record intermediate steps if available
+
+    For Reflective Phase-Quad:
+        - Measure revision passes
+        - Allow up to max_compute_budget / layer_cost revisions
+        - Record quality scores per revision
+    """
+    results = []
+
+    for task in tasks:
+        # First attempt (no revision allowed)
+        first_output = model.generate(task.input, allow_revision=False)
+        first_correct = task.verify(first_output)
+
+        # With revision
+        final_output, revision_stats = model.generate(
+            task.input,
+            allow_revision=True,
+            compute_budget=max_compute_budget,
+        )
+        final_correct = task.verify(final_output)
+
+        results.append({
+            "task": task,
+            "first_correct": first_correct,
+            "final_correct": final_correct,
+            "revisions": revision_stats.revision_count,
+            "compute_used": revision_stats.compute_used,
+            "quality_trajectory": revision_stats.quality_scores,
+        })
+
+    return aggregate_metrics(results)
+```
+
+### Expected Results Comparison
+
+```
+BENCHMARK: GSM8K (Math Word Problems)
+=====================================
+
+                          o1-Style    Reflective Phase-Quad
+First-attempt accuracy:   72%         72%
+After revision accuracy:  94%         91%
+Avg revisions/problem:    2.3 (in tokens)  1.8 (in passes)
+Compute per problem:      450 tokens  3.2 layer passes
+Compute efficiency:       1.0x        ~3-5x more efficient
+
+INTERPRETATION:
+- o1 achieves slightly higher accuracy (more mature)
+- Phase-Quad uses significantly less compute per revision
+- Phase-Quad wins on efficiency, o1 wins on peak accuracy
+
+BENCHMARK: HumanEval (Code Generation)
+======================================
+
+                          o1-Style    Reflective Phase-Quad
+First-attempt pass@1:     67%         67%
+After revision pass@1:    89%         85%
+Avg revisions/problem:    1.9 (in tokens)  2.1 (in passes)
+Compute per problem:      380 tokens  4.1 layer passes
+
+INTERPRETATION:
+- Code benefits from token-based "thinking through" (o1 advantage)
+- Phase-Quad still competitive with less compute
+- For code, interpretable reasoning may be genuinely useful
+```
+
+### CLI for Benchmarking
+
+```bash
+# Run reflection benchmark suite
+python train_hard_probes.py --reflection-benchmark
+
+# Compare against o1-style baseline
+python train_hard_probes.py --reflection-benchmark --compare-o1-style
+
+# Specific task
+python train_hard_probes.py --reflection-benchmark --task gsm8k
+
+# With compute budget
+python train_hard_probes.py --reflection-benchmark --compute-budget 1000
+
+# Full comparison report
+python train_hard_probes.py --reflection-benchmark --compare-o1-style \
+    --task all --compute-budget 1000 --output-report reflection_comparison.json
+```
+
+### Implementation Notes for Fair Comparison
+
+```python
+class O1StyleBaseline(nn.Module):
+    """
+    Simulated o1-style reasoning for comparison.
+
+    Uses chain-of-thought tokens (visible or hidden) for reasoning,
+    with a process reward model to score steps.
+    """
+
+    def __init__(self, base_model, prm):
+        self.base_model = base_model
+        self.prm = prm  # Process Reward Model
+
+    def generate_with_reasoning(self, input, max_reasoning_tokens=500):
+        # Generate reasoning tokens
+        reasoning = self.base_model.generate(
+            input + " Let me think step by step:",
+            max_tokens=max_reasoning_tokens,
+        )
+
+        # Score reasoning steps
+        step_scores = self.prm.score_steps(input, reasoning)
+
+        # Generate final answer based on reasoning
+        answer = self.base_model.generate(
+            input + reasoning + " Therefore, the answer is:",
+            max_tokens=50,
+        )
+
+        return answer, {
+            "reasoning_tokens": len(reasoning),
+            "step_scores": step_scores,
+        }
+
+
+class ReflectivePhaseQuadModel(nn.Module):
+    """
+    Reflective Phase-Quad for comparison.
+
+    Uses latent revision loop instead of token-based reasoning.
+    """
+
+    def generate_with_reflection(self, input, max_revisions=5):
+        # See full implementation above
+        ...
+```
+
+---
+
+## Hybrid Approach: Best of Both Worlds
+
+### Combining Token-Based and Latent Reflection
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  HYBRID REFLECTIVE ARCHITECTURE                                             │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Layer 1: Latent Reflection (Phase-Quad style)                        │ │
+│  │  - Fast, efficient revision in latent space                           │ │
+│  │  - For "intuitive" corrections                                        │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                    ↓                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Layer 2: Token-Based Reasoning (o1 style)                            │ │
+│  │  - When latent revision insufficient                                  │ │
+│  │  - For "deliberate" step-by-step reasoning                            │ │
+│  │  - Interpretable trace available                                      │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                    ↓                                        │
+│  Decision: Use latent (fast) or token (thorough) based on:                 │
+│  - Problem complexity estimate                                              │
+│  - Quality improvement rate                                                 │
+│  - Interpretability requirement                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Adaptive Reflection Strategy
+
+```python
+class AdaptiveReflectiveModel(nn.Module):
+    """
+    Combines latent and token-based reflection adaptively.
+
+    Strategy:
+    1. Try latent reflection first (fast, cheap)
+    2. If quality plateaus, switch to token-based (slower, more thorough)
+    3. If interpretability required, use token-based from start
+    """
+
+    def __init__(self, latent_reflector, token_reasoner, router):
+        self.latent = latent_reflector      # Reflective Phase-Quad
+        self.token = token_reasoner          # o1-style
+        self.router = router                 # Decides which to use
+
+    def forward(self, x, require_interpretability=False):
+        # Route decision
+        if require_interpretability:
+            return self.token(x)
+
+        # Try latent first
+        latent_output, latent_stats = self.latent(x, max_revisions=2)
+
+        # Check if quality is sufficient
+        if latent_stats["final_quality"] >= 0.85:
+            return latent_output, {"method": "latent", **latent_stats}
+
+        # Quality plateau? Switch to token-based
+        if latent_stats["quality_improvement_rate"] < 0.05:
+            token_output, token_stats = self.token(x)
+            return token_output, {"method": "token", **token_stats}
+
+        # Continue latent with more budget
+        latent_output, latent_stats = self.latent(x, max_revisions=5)
+        return latent_output, {"method": "latent_extended", **latent_stats}
+```
+
+---
+
 ## References
 
 - Madaan et al., "Self-Refine: Iterative Refinement with Self-Feedback" (2023)
 - Shinn et al., "Reflexion: Language Agents with Verbal Reinforcement Learning" (2023)
 - Yao et al., "Tree of Thoughts: Deliberate Problem Solving with Large Language Models" (2023)
 - Lightman et al., "Let's Verify Step by Step" (Process Reward Models, 2023)
+- OpenAI, "Learning to Reason with LLMs" (o1 System Card, 2024)
 - Phase-Quad Architecture (internal documentation)
 
 ---
@@ -830,3 +1235,4 @@ Target: < 2x for most inputs (most should pass on first attempt)
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | Jan 2026 | Initial design document |
+| 1.1 | Jan 2026 | Added comparison with o1-style reasoning, benchmarking strategy, hybrid approach |
