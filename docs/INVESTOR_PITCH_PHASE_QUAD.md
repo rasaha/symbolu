@@ -159,6 +159,119 @@
 
 ---
 
+## Hardware Efficiency Without Hardware Dependence
+
+### The Real Constraint
+
+Most large language models today are constrained not by compute alone, but by **memory architecture**.
+
+Standard transformer models rely on quadratic attention and large KV caches, which create a hard dependency on high-bandwidth, large-capacity HBM GPUs (such as H100/H200) for long-context inference.
+
+**This dependency is architectural, not an optimization issue.**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  WHY LONG-CONTEXT IS HARDWARE-BOUND TODAY                                   │
+│                                                                             │
+│  Standard Transformer at 1M tokens:                                         │
+│                                                                             │
+│    KV Cache Size = layers × heads × seq_len × head_dim × 2 (K+V)           │
+│                  = 32 × 32 × 1,000,000 × 128 × 2                            │
+│                  = 524 GB                                                   │
+│                                                                             │
+│    Required: Multi-GPU with NVLink, 80GB+ HBM per GPU                       │
+│    Cost: $200K+ hardware investment                                         │
+│                                                                             │
+│  As context grows, memory traffic and synchronization costs dominate,       │
+│  making long-context inference impractical on mid-tier GPUs regardless      │
+│  of software optimizations.                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### How Phase-Quad Changes This
+
+By replacing quadratic attention with:
+- **Linear phase-based memory accumulation**, and
+- **Sparse, proposal-driven global retrieval**
+
+Phase-Quad removes the need for maintaining a full token-level KV cache. Memory usage scales **linearly** with sequence length rather than quadratically.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE-QUAD MEMORY MODEL                                                    │
+│                                                                             │
+│  Phase-Quad at 1M tokens:                                                   │
+│                                                                             │
+│    Phase State = batch × d_phase                                            │
+│                = 1 × 512                                                    │
+│                = 2 KB (constant!)                                           │
+│                                                                             │
+│    Local Attention Window = batch × window × d_model                        │
+│                           = 1 × 128 × 512                                   │
+│                           = 256 KB (constant!)                              │
+│                                                                             │
+│    Quad Memory Bank = num_entries × d_model                                 │
+│                     = 10,000 × 512                                          │
+│                     = 20 MB (bounded!)                                      │
+│                                                                             │
+│    Total: ~21 MB vs 524 GB = 25,000x reduction                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### What This Enables (And What It Doesn't)
+
+**Phase-Quad does not make lower-cost GPUs faster than high-end accelerators.**
+
+Instead, it **removes the architectural requirement** that previously made long-context inference impossible on them.
+
+As a result:
+- Long documents can be processed on **single GPUs**
+- Inference no longer requires **NVLink or multi-GPU synchronization**
+- Memory footprints become **predictable and bounded**
+- Mid-tier data-center GPUs become **viable deployment targets**, not just fallback options
+
+### Practical Implications
+
+| Capability | Standard Transformer | Phase-Quad |
+|------------|---------------------|------------|
+| Long-context inference | Requires large HBM GPUs | Runs on mid-tier GPUs |
+| KV cache growth | Quadratic | **Linear** |
+| Multi-GPU dependency | Common | **Optional** |
+| Deployment flexibility | Limited | **High** |
+| 1M token inference | 8× H100 cluster | **Single A100 or L40** |
+
+### Hardware Strategy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DEPLOYMENT FLEXIBILITY                                                     │
+│                                                                             │
+│  HIGH-END (H100/H200):                                                      │
+│    - Maximum throughput for high-volume APIs                                │
+│    - Frontier-scale training                                                │
+│    - Still optimal when budget allows                                       │
+│                                                                             │
+│  MID-TIER (A100/L40/A10):                                                   │
+│    - Long-context inference NOW POSSIBLE                                    │
+│    - On-premise enterprise deployment                                       │
+│    - Edge/regional data centers                                             │
+│    - 3-5x lower hardware cost                                               │
+│                                                                             │
+│  CONSUMER (RTX 4090):                                                       │
+│    - Development and testing                                                │
+│    - Small-batch inference                                                  │
+│    - Research accessibility                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Bottom Line
+
+> Phase-Quad reduces the structural dependency on ultra-large HBM systems for long-context inference, enabling flexible deployment across a wider range of GPU classes **without architectural compromise**.
+
+High-end GPUs remain optimal for maximum throughput and frontier-scale training. Phase-Quad's contribution is **optional deployment**, not hardware replacement.
+
+---
+
 ## Market Opportunity
 
 ### Total Addressable Market
