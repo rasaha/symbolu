@@ -1,9 +1,13 @@
 # Symbolic AI Emotional Reasoning: Gap Analysis and Design Directions
 
-**Document Version**: 1.0.0
+**Document Version**: 2.0.0
 **Date**: January 2026
 **Status**: Design Proposal
 **Purpose**: Evaluate missing emotional/affective symbolic AI components in Phase-Quad
+
+**Change History**:
+- v2.0.0: Added Arishadvarga (6 attention distortions) with Question→Distortion mapping
+- v1.0.0: Initial Nava Rasa (9 aesthetic emotions) gap analysis
 
 ---
 
@@ -460,13 +464,285 @@ class EmotionalCoherenceValidator:
 
 ---
 
-## Part 3: Proposed Architecture
+### Gap 8: Arishadvarga (Six Attention Distortions)
 
-### Rasa State Integration with Sovereign State
+**The Gap**: No representation of the 6 Arishadvarga (negative emotional distortions) that diffuse/corrupt the Rasa states.
+
+**Why it matters**: While Rasa captures the 9 aesthetic emotions (what emotions *are*), Arishadvarga captures the 6 ways attention/cognition becomes *distorted* by emotional bias. Together they form a complete emotional model: positive emotional states (Rasa) + negative distortion patterns (Arishadvarga).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    EXTENDED SOVEREIGN STATE (40D)                               │
+│                    THE 6 ARISHADVARGA (Attention Distortions)                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  1. KĀMA (Desire/Lust)        - Fixation on acquiring what is absent           │
+│  2. KRODHA (Anger/Wrath)      - Resistance to present moment, impatience       │
+│  3. LOBHA (Greed/Avarice)     - Accumulation drive, optimization obsession     │
+│  4. MOHA (Delusion/Confusion) - Meaning confusion, rumination loops            │
+│  5. MADA (Pride/Arrogance)    - Ego-centric distortion, identity inflation     │
+│  6. MĀTSARYA (Envy/Jealousy)  - Comparative anxiety, relative positioning      │
+│                                                                                 │
+│  RELATIONSHIP TO RASA:                                                         │
+│    Rasa = Positive emotional texture (9 aesthetic states)                      │
+│    Arishadvarga = Negative distortion overlay (6 corruption patterns)          │
+│                                                                                 │
+│  Example:                                                                       │
+│    Pure VEERA (Valor) = Healthy courage and determination                      │
+│    VEERA + MADA = Courage corrupted by ego/arrogance                          │
+│    VEERA + KRODHA = Courage corrupted by impatience/anger                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Critical Innovation**: Question Form → Arishadvarga Mapping
+
+The Arishadvarga map directly to the 6 fundamental question types, revealing how each type of inquiry can be distorted by emotional bias:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    QUESTION → ARISHADVARGA MAPPING                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  QUESTION   ARISHADVARGA   DISTORTION TYPE        ATTENTION PATTERN            │
+│  ────────   ───────────    ───────────────        ─────────────────            │
+│  WHAT       Kāma           Desire Fixation        Object-centric               │
+│  HOW        Lobha          Accumulation Drive     Optimization Loop            │
+│  WHY        Moha           Meaning Confusion      Rumination                   │
+│  WHEN       Krodha         Time Resistance        Impatience                   │
+│  WHERE      Mātsarya       Comparison Anxiety     Relative Positioning         │
+│  WHO        Mada           Identity Distortion    Ego Oscillation              │
+│                                                                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  WHAT → KĀMA (Desire Fixation)                                                 │
+│  ══════════════════════════════                                                 │
+│  Pure "What": Neutral inquiry about objects/concepts                           │
+│  Distorted:   Obsessive focus on acquiring specific object                     │
+│  Pattern:     "What can I get?", "What do I need to have?"                     │
+│  Detection:   Repeated object-focused queries, acquisition language            │
+│                                                                                 │
+│  HOW → LOBHA (Accumulation Drive)                                              │
+│  ═════════════════════════════════                                              │
+│  Pure "How": Neutral inquiry about process/method                              │
+│  Distorted:   Obsessive optimization, "more is better" loop                    │
+│  Pattern:     "How can I get more?", "How to maximize?"                        │
+│  Detection:   Endless optimization queries, never-enough pattern               │
+│                                                                                 │
+│  WHY → MOHA (Meaning Confusion)                                                │
+│  ══════════════════════════════                                                 │
+│  Pure "Why": Neutral inquiry about cause/purpose                               │
+│  Distorted:   Circular reasoning, existential rumination                       │
+│  Pattern:     "Why does it matter?", "What's the point?" loops                 │
+│  Detection:   Recursive why-chains, nihilistic undertones                      │
+│                                                                                 │
+│  WHEN → KRODHA (Time Resistance)                                               │
+│  ═════════════════════════════════                                              │
+│  Pure "When": Neutral inquiry about timing/sequence                            │
+│  Distorted:   Impatience, frustration with present moment                      │
+│  Pattern:     "When will it happen?", "How much longer?"                       │
+│  Detection:   Urgency markers, resistance to waiting                           │
+│                                                                                 │
+│  WHERE → MĀTSARYA (Comparison Anxiety)                                         │
+│  ═════════════════════════════════════                                          │
+│  Pure "Where": Neutral inquiry about location/position                         │
+│  Distorted:   Competitive comparison, relative anxiety                         │
+│  Pattern:     "Where do I stand?", "Where am I compared to X?"                 │
+│  Detection:   Comparative language, ranking obsession                          │
+│                                                                                 │
+│  WHO → MADA (Ego Oscillation)                                                  │
+│  ══════════════════════════════                                                 │
+│  Pure "Who": Neutral inquiry about identity/agency                             │
+│  Distorted:   Ego inflation/deflation, identity instability                    │
+│  Pattern:     "Who am I really?", "Who do they think I am?"                    │
+│  Detection:   Self-referential loops, validation seeking                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation Approach**: Arishadvarga Detector
+
+```python
+# MISSING: Arishadvarga detection for attention distortion diagnosis
+@dataclass
+class ArishadvargaState:
+    """6-dimensional attention distortion state."""
+    kama: float = 0.0       # Desire fixation (WHAT distortion)
+    krodha: float = 0.0     # Time resistance (WHEN distortion)
+    lobha: float = 0.0      # Accumulation (HOW distortion)
+    moha: float = 0.0       # Meaning confusion (WHY distortion)
+    mada: float = 0.0       # Ego distortion (WHO distortion)
+    matsarya: float = 0.0   # Comparison anxiety (WHERE distortion)
+
+    @property
+    def dominant_distortion(self) -> Optional[str]:
+        """Return name of dominant distortion if above threshold."""
+        values = [
+            (self.kama, "KAMA", "WHAT"),
+            (self.krodha, "KRODHA", "WHEN"),
+            (self.lobha, "LOBHA", "HOW"),
+            (self.moha, "MOHA", "WHY"),
+            (self.mada, "MADA", "WHO"),
+            (self.matsarya, "MATSARYA", "WHERE"),
+        ]
+        max_val = max(values, key=lambda x: x[0])
+        return max_val[1] if max_val[0] > 0.5 else None
+
+    @property
+    def total_distortion(self) -> float:
+        """Sum of all distortion levels."""
+        return self.kama + self.krodha + self.lobha + self.moha + self.mada + self.matsarya
+
+
+class ArishadvargaDetector(nn.Module):
+    """
+    Detect attention distortions from question patterns.
+
+    Uses question-form analysis to diagnose which Arishadvarga
+    may be coloring the user's inquiry.
+    """
+
+    QUESTION_PATTERNS = {
+        'WHAT': {
+            'keywords': ['what', 'which', 'that'],
+            'arishadvarga': 'KAMA',
+            'distortion_markers': [
+                'need', 'must have', 'want', 'acquire', 'get',
+                'possess', 'obtain', 'crave', 'desire'
+            ],
+        },
+        'HOW': {
+            'keywords': ['how', 'method', 'way'],
+            'arishadvarga': 'LOBHA',
+            'distortion_markers': [
+                'more', 'maximize', 'optimize', 'increase',
+                'accumulate', 'best way', 'most efficient'
+            ],
+        },
+        'WHY': {
+            'keywords': ['why', 'reason', 'purpose', 'meaning'],
+            'arishadvarga': 'MOHA',
+            'distortion_markers': [
+                'point', 'matter', 'meaningless', 'purpose',
+                'worth', 'anyway', 'bother', 'confused'
+            ],
+        },
+        'WHEN': {
+            'keywords': ['when', 'how long', 'time', 'soon'],
+            'arishadvarga': 'KRODHA',
+            'distortion_markers': [
+                'already', 'still', 'yet', 'hurry', 'wait',
+                'impatient', 'frustrated', 'enough', 'tired of'
+            ],
+        },
+        'WHERE': {
+            'keywords': ['where', 'position', 'rank', 'standing'],
+            'arishadvarga': 'MATSARYA',
+            'distortion_markers': [
+                'compared to', 'better than', 'worse than',
+                'behind', 'ahead', 'others', 'everyone else'
+            ],
+        },
+        'WHO': {
+            'keywords': ['who', 'identity', 'self', 'am I'],
+            'arishadvarga': 'MADA',
+            'distortion_markers': [
+                'really', 'truly', 'think of me', 'see me',
+                'important', 'special', 'worthy', 'enough'
+            ],
+        },
+    }
+
+    def detect(
+        self,
+        text: str,
+        context: Optional[ConversationContext] = None,
+    ) -> ArishadvargaState:
+        """
+        Detect attention distortions from question patterns.
+
+        Args:
+            text: User input text
+            context: Optional conversation context
+
+        Returns:
+            ArishadvargaState with distortion levels
+        """
+        state = ArishadvargaState()
+
+        # Detect question type and distortion markers
+        for qtype, pattern in self.QUESTION_PATTERNS.items():
+            if any(kw in text.lower() for kw in pattern['keywords']):
+                distortion_score = sum(
+                    1 for marker in pattern['distortion_markers']
+                    if marker in text.lower()
+                ) / len(pattern['distortion_markers'])
+
+                # Set corresponding Arishadvarga level
+                arishadvarga = pattern['arishadvarga'].lower()
+                setattr(state, arishadvarga, distortion_score)
+
+        return state
+```
+
+**Non-Moralizing Response Strategy**:
+
+Critical: Arishadvarga detection should inform response *strategy*, not moral judgment:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    ARISHADVARGA → RESPONSE STRATEGY                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  PRINCIPLE: Detect distortion, guide toward clarity—NEVER moralize             │
+│                                                                                 │
+│  KĀMA DETECTED (Desire Fixation):                                              │
+│  ─────────────────────────────────                                              │
+│  ❌ Wrong: "You seem obsessed with acquiring things..."                         │
+│  ✓ Right: Provide complete information, include alternatives                   │
+│  Strategy: Expand the "what" to include what user may not have considered      │
+│                                                                                 │
+│  LOBHA DETECTED (Accumulation):                                                │
+│  ────────────────────────────────                                               │
+│  ❌ Wrong: "Your greed is showing..."                                           │
+│  ✓ Right: Address optimization request, note diminishing returns               │
+│  Strategy: Provide optimization path AND satisfaction criteria                 │
+│                                                                                 │
+│  MOHA DETECTED (Meaning Confusion):                                            │
+│  ──────────────────────────────────                                             │
+│  ❌ Wrong: "You're confused about the meaning of life..."                       │
+│  ✓ Right: Ground abstract questions in concrete examples                       │
+│  Strategy: Break circular "why" into actionable "what" and "how"               │
+│                                                                                 │
+│  KRODHA DETECTED (Impatience):                                                 │
+│  ──────────────────────────────                                                 │
+│  ❌ Wrong: "You need to be more patient..."                                     │
+│  ✓ Right: Acknowledge urgency, provide immediate actionable step               │
+│  Strategy: Give quick win first, then fuller timeline                          │
+│                                                                                 │
+│  MĀTSARYA DETECTED (Comparison):                                               │
+│  ─────────────────────────────────                                              │
+│  ❌ Wrong: "Stop comparing yourself to others..."                               │
+│  ✓ Right: Provide absolute criteria, not just relative standing               │
+│  Strategy: Reframe "where vs others" to "where vs goal"                        │
+│                                                                                 │
+│  MADA DETECTED (Ego Oscillation):                                              │
+│  ─────────────────────────────────                                              │
+│  ❌ Wrong: "Your ego is getting in the way..."                                  │
+│  ✓ Right: Provide objective perspective, external anchors                      │
+│  Strategy: Ground identity questions in observable actions/skills              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Part 3: Proposed Architecture
+
+### Rasa + Arishadvarga Integration with Sovereign State
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    EXTENDED SOVEREIGN STATE (47D)                               │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
 │  CURRENT 32D:                                                                   │
@@ -477,17 +753,18 @@ class EmotionalCoherenceValidator:
 │  [22:28]  Gunas (6 dynamic qualities)                                           │
 │  [28:32]  Reserved (toroidal feedback)                                          │
 │                                                                                 │
-│  PROPOSED 40D (Add 8 for Rasa):                                                 │
-│  ══════════════════════════════                                                 │
+│  PROPOSED 47D (Add 9 Rasa + 6 Arishadvarga):                                    │
+│  ═══════════════════════════════════════════                                    │
 │  [0:12]   Bhavas (12 ontological aspects)                                       │
 │  [12:17]  Koshas (5 depth layers)                                               │
 │  [17:22]  Vrittis (5 cognitive states)                                          │
 │  [22:28]  Gunas (6 dynamic qualities)                                           │
 │  [28:32]  Reserved (toroidal feedback)                                          │
 │  [32:41]  Rasas (9 emotional states) ← NEW                                      │
+│  [41:47]  Arishadvarga (6 attention distortions) ← NEW                          │
 │                                                                                 │
-│  RASA DIMENSIONS [32:41]:                                                       │
-│  ═══════════════════════                                                        │
+│  RASA DIMENSIONS [32:41] - EMOTIONAL TEXTURE:                                   │
+│  ════════════════════════════════════════════                                   │
 │  [32] SHRINGARA (Love)     - Romantic, aesthetic                                │
 │  [33] HASYA (Mirth)        - Humor, joy                                         │
 │  [34] KARUNA (Compassion)  - Sorrow, empathy                                    │
@@ -497,6 +774,26 @@ class EmotionalCoherenceValidator:
 │  [38] BIBHATSA (Disgust)   - Aversion, rejection                                │
 │  [39] ADBHUTA (Wonder)     - Awe, curiosity                                     │
 │  [40] SHANTA (Peace)       - Calm, equanimity                                   │
+│                                                                                 │
+│  ARISHADVARGA DIMENSIONS [41:47] - ATTENTION DISTORTIONS:                       │
+│  ════════════════════════════════════════════════════════                       │
+│  [41] KĀMA (Desire)        - Object fixation (WHAT distortion)                  │
+│  [42] KRODHA (Anger)       - Time resistance (WHEN distortion)                  │
+│  [43] LOBHA (Greed)        - Accumulation drive (HOW distortion)                │
+│  [44] MOHA (Delusion)      - Meaning confusion (WHY distortion)                 │
+│  [45] MADA (Pride)         - Ego oscillation (WHO distortion)                   │
+│  [46] MĀTSARYA (Envy)      - Comparison anxiety (WHERE distortion)              │
+│                                                                                 │
+│  RASA-ARISHADVARGA INTERACTION:                                                 │
+│  ══════════════════════════════                                                 │
+│  Pure Rasa = Healthy emotional state                                            │
+│  Rasa + Arishadvarga = Distorted emotional state                                │
+│                                                                                 │
+│  Example State Vectors:                                                         │
+│    [VEERA=0.8, MADA=0.0] → Healthy courage                                      │
+│    [VEERA=0.8, MADA=0.7] → Courage distorted by ego (arrogance)                 │
+│    [KARUNA=0.7, MOHA=0.0] → Healthy compassion                                  │
+│    [KARUNA=0.7, MOHA=0.6] → Compassion confused by meaning-loss (despair)       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -508,31 +805,43 @@ class EmotionalCoherenceValidator:
 │                    EMOTIONAL REASONING KERNEL (ERK)                             │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
-│  Parallel to SRK, operates on Rasa dimensions                                   │
+│  Parallel to SRK, operates on Rasa (9D) + Arishadvarga (6D) = 15D space         │
 │                                                                                 │
 │  LAYER 4: EMOTIONAL GROUNDING (Parallel to DNA Bridge)                          │
 │  ══════════════════════════════════════════════════════                         │
-│  • Detect input emotion from text                                               │
-│  • Ground in Rasa space                                                         │
-│  • Set initial emotional context                                                │
+│  • Detect input emotion from text → Rasa vector [9D]                            │
+│  • Detect attention distortion from question form → Arishadvarga vector [6D]    │
+│  • Ground in combined emotional space [15D]                                     │
+│  • Set initial emotional + distortion context                                   │
 │                                                                                 │
 │  LAYER 7: EMOTIONAL ALIGNMENT (Parallel to CSR)                                 │
 │  ═════════════════════════════════════════════════                              │
 │  • Align response emotion with appropriate Rasa                                 │
 │  • Apply emotional transition rules                                             │
+│  • Compute distortion-aware response strategy (non-moralizing)                  │
 │  • Modulate based on context                                                    │
 │                                                                                 │
 │  LAYER 9: EMOTIONAL WITNESS (Parallel to Witness Arbitrator)                    │
 │  ═══════════════════════════════════════════════════════════                    │
-│  • Monitor emotional coherence                                                  │
+│  • Monitor emotional coherence (Rasa appropriateness)                           │
+│  • Monitor distortion levels (Arishadvarga intensity)                           │
 │  • Detect emotional mismatches                                                  │
+│  • Flag high-distortion states for careful response                             │
 │  • Trigger emotional correction if needed                                       │
 │                                                                                 │
 │  LAYER 11: EMOTIONAL SYNTHESIS (Parallel to Synthesis Gate)                     │
 │  ══════════════════════════════════════════════════════════                     │
-│  • Final emotional tone check                                                   │
+│  • Final emotional tone check (Rasa coherence)                                  │
+│  • Apply distortion-mitigation strategy (Arishadvarga response)                 │
 │  • Apply DHA with Rasa-informed parameters                                      │
 │  • Ensure emotional-logical coherence                                           │
+│                                                                                 │
+│  ARISHADVARGA PROCESSING (Cross-Layer):                                         │
+│  ═══════════════════════════════════════                                        │
+│  • Question-form detection → Arishadvarga mapping                               │
+│  • Distortion intensity tracking                                                │
+│  • Non-moralizing response strategy selection                                   │
+│  • Attention redirection suggestions (implicit, not preachy)                    │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -587,6 +896,10 @@ class RasaState:
 class EmotionalReasoningKernel(nn.Module):
     """
     ERK: Emotional reasoning parallel to SRK.
+
+    Operates on 15D emotional space:
+    - 9D Rasa (aesthetic emotions)
+    - 6D Arishadvarga (attention distortions)
     """
 
     # Emotional transition rules (symbolic, non-learnable)
@@ -616,6 +929,40 @@ class EmotionalReasoningKernel(nn.Module):
         },
     }
 
+    # Arishadvarga response strategies (non-moralizing)
+    DISTORTION_STRATEGIES = {
+        'KAMA': {
+            'question_type': 'WHAT',
+            'strategy': 'expand_alternatives',
+            'description': 'Provide full information including options user may not have considered',
+        },
+        'LOBHA': {
+            'question_type': 'HOW',
+            'strategy': 'include_satisfaction_criteria',
+            'description': 'Address optimization AND note diminishing returns / "enough" criteria',
+        },
+        'MOHA': {
+            'question_type': 'WHY',
+            'strategy': 'ground_in_concrete',
+            'description': 'Break circular why into actionable what/how; provide concrete examples',
+        },
+        'KRODHA': {
+            'question_type': 'WHEN',
+            'strategy': 'quick_win_first',
+            'description': 'Acknowledge urgency; provide immediate actionable step before fuller timeline',
+        },
+        'MATSARYA': {
+            'question_type': 'WHERE',
+            'strategy': 'absolute_over_relative',
+            'description': 'Provide absolute criteria; reframe "vs others" to "vs goal"',
+        },
+        'MADA': {
+            'question_type': 'WHO',
+            'strategy': 'external_anchors',
+            'description': 'Ground identity in observable actions/skills; provide objective perspective',
+        },
+    }
+
     def __init__(self, config: ERKConfig):
         super().__init__()
         self.config = config
@@ -623,8 +970,14 @@ class EmotionalReasoningKernel(nn.Module):
         # Emotion detector (learned)
         self.emotion_detector = EmotionDetector(config.hidden_dim)
 
-        # Emotion projector (to Rasa space)
+        # Emotion projector (to Rasa space - 9D)
         self.rasa_projector = nn.Linear(config.hidden_dim, 9)
+
+        # Distortion projector (to Arishadvarga space - 6D)
+        self.arishadvarga_projector = nn.Linear(config.hidden_dim, 6)
+
+        # Arishadvarga detector (rule-based + learned)
+        self.arishadvarga_detector = ArishadvargaDetector()
 
         # Emotional coherence checker
         self.coherence_checker = EmotionalCoherenceChecker()
@@ -635,18 +988,38 @@ class EmotionalReasoningKernel(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        input_text: Optional[str] = None,
         user_context: Optional[Dict] = None,
-    ) -> Tuple[torch.Tensor, RasaState, Dict]:
+    ) -> Tuple[torch.Tensor, RasaState, ArishadvargaState, Dict]:
         """
         Apply emotional reasoning to hidden states.
 
         Returns:
             - emotionally_modulated_states
-            - detected_rasa_state
+            - detected_rasa_state (9D emotional texture)
+            - detected_arishadvarga_state (6D attention distortion)
             - emotional_reasoning_trace
         """
-        # Detect input emotion
+        # Detect input emotion (Rasa - 9D)
         input_rasa = self.detect_emotion(hidden_states)
+
+        # Detect attention distortion (Arishadvarga - 6D)
+        if input_text:
+            input_arishadvarga = self.arishadvarga_detector.detect(
+                text=input_text,
+                context=user_context,
+            )
+        else:
+            # Infer from hidden states if text not available
+            arishadvarga_logits = self.arishadvarga_projector(hidden_states.mean(dim=1))
+            input_arishadvarga = ArishadvargaState(
+                kama=torch.sigmoid(arishadvarga_logits[..., 0]).item(),
+                krodha=torch.sigmoid(arishadvarga_logits[..., 1]).item(),
+                lobha=torch.sigmoid(arishadvarga_logits[..., 2]).item(),
+                moha=torch.sigmoid(arishadvarga_logits[..., 3]).item(),
+                mada=torch.sigmoid(arishadvarga_logits[..., 4]).item(),
+                matsarya=torch.sigmoid(arishadvarga_logits[..., 5]).item(),
+            )
 
         # Apply Theory of Mind (infer true emotion)
         if user_context:
@@ -657,11 +1030,20 @@ class EmotionalReasoningKernel(nn.Module):
         else:
             inferred_rasa = input_rasa
 
-        # Determine appropriate response emotion
+        # Determine appropriate response emotion (Rasa-based)
         response_rasa = self.compute_appropriate_response(inferred_rasa)
+
+        # Determine response strategy (Arishadvarga-based, non-moralizing)
+        response_strategy = self.compute_distortion_strategy(input_arishadvarga)
 
         # Modulate hidden states toward response emotion
         modulated = self.modulate_toward_rasa(hidden_states, response_rasa)
+
+        # Apply distortion-aware modulation
+        if input_arishadvarga.total_distortion > 0.5:
+            modulated = self.apply_distortion_mitigation(
+                modulated, input_arishadvarga, response_strategy
+            )
 
         # Validate emotional coherence
         coherence = self.coherence_checker.validate(
@@ -673,11 +1055,47 @@ class EmotionalReasoningKernel(nn.Module):
             'input_rasa': input_rasa,
             'inferred_rasa': inferred_rasa,
             'response_rasa': response_rasa,
+            'input_arishadvarga': input_arishadvarga,
+            'dominant_distortion': input_arishadvarga.dominant_distortion,
+            'response_strategy': response_strategy,
             'coherence': coherence,
             'tom_discrepancy': (input_rasa.dominant_rasa != inferred_rasa.dominant_rasa),
+            'distortion_level': input_arishadvarga.total_distortion,
         }
 
-        return modulated, response_rasa, trace
+        return modulated, response_rasa, input_arishadvarga, trace
+
+    def compute_distortion_strategy(
+        self, arishadvarga: ArishadvargaState
+    ) -> Optional[Dict]:
+        """
+        Compute non-moralizing response strategy based on detected distortion.
+
+        Returns strategy dict if distortion detected, None otherwise.
+        """
+        dominant = arishadvarga.dominant_distortion
+        if dominant and dominant in self.DISTORTION_STRATEGIES:
+            return self.DISTORTION_STRATEGIES[dominant]
+        return None
+
+    def apply_distortion_mitigation(
+        self,
+        hidden_states: torch.Tensor,
+        arishadvarga: ArishadvargaState,
+        strategy: Optional[Dict],
+    ) -> torch.Tensor:
+        """
+        Apply subtle modulation to address attention distortion.
+
+        NOT moral correction - just attention redirection.
+        """
+        if strategy is None:
+            return hidden_states
+
+        # Subtle modulation based on strategy type
+        # Implementation would adjust hidden state emphasis
+        # toward the recommended response strategy
+        return hidden_states  # Placeholder for actual implementation
 ```
 
 ---
@@ -694,8 +1112,8 @@ class EmotionalReasoningKernel(nn.Module):
 │  LAYER 4: DUAL GROUNDING                                                        │
 │  ════════════════════════                                                       │
 │  • SRK DNA Bridge: Ontological grounding (Bhavas)                               │
-│  • ERK Emotion Ground: Emotional grounding (Rasas)                              │
-│  • Combined: 40D state initialization                                           │
+│  • ERK Emotion Ground: Emotional grounding (Rasas + Arishadvarga)               │
+│  • Combined: 47D state initialization (32 + 9 Rasa + 6 Arishadvarga)            │
 │                                                                                 │
 │  LAYER 7: DUAL ALIGNMENT                                                        │
 │  ════════════════════════                                                       │
@@ -730,14 +1148,26 @@ class EmotionalReasoningKernel(nn.Module):
 
 ## Part 5: Implementation Roadmap
 
-### Phase 1: Rasa State Extension (0-2 months)
+### Phase 1: Rasa + Arishadvarga State Extension (0-2 months)
 
 | Deliverable | Effort | Impact |
 |-------------|--------|--------|
-| Extend Sovereign State to 40D (add Rasa dimensions) | Low | High |
-| Implement RasaState dataclass | Low | Medium |
+| Extend Sovereign State to 47D (add 9 Rasa + 6 Arishadvarga) | Low | High |
+| Implement RasaState dataclass (9D emotional texture) | Low | Medium |
+| Implement ArishadvargaState dataclass (6D distortions) | Low | Medium |
 | Add Rasa projector to SRK | Medium | High |
-| Update diagnostics for Rasa tracking | Low | Medium |
+| Add Arishadvarga projector to SRK | Medium | High |
+| Update diagnostics for Rasa + Arishadvarga tracking | Low | Medium |
+
+### Phase 1.5: Arishadvarga Detection (1-3 months)
+
+| Deliverable | Effort | Impact |
+|-------------|--------|--------|
+| Question-form pattern detector | Medium | High |
+| Question → Arishadvarga mapping rules | Low | High |
+| Distortion marker detection | Medium | Medium |
+| Non-moralizing response strategy selection | Medium | Very High |
+| Integration with Layer 4 (combined emotional grounding) | Medium | High |
 
 ### Phase 2: Emotion Detection (2-4 months)
 
@@ -789,15 +1219,50 @@ Phase-Quad has strong foundations for emotional AI (CSR coherence, DHA delivery,
 | Emotional recognition | ⚠️ Implicit | Need explicit detection |
 | Emotional reasoning | ❌ Missing | Need ERK with rules |
 | Emotional intelligence | ❌ Missing | Need ToM-E |
+| Attention distortion | ❌ Missing | Need Arishadvarga detection |
 
 The proposed **Emotional Reasoning Kernel (ERK)** would:
-1. Extend Sovereign State with 9 Rasa dimensions
-2. Add explicit emotion detection at Layer 4
-3. Implement symbolic emotional reasoning rules
-4. Provide Theory of Mind for emotions
-5. Enable emotional memory persistence
+1. Extend Sovereign State with 9 Rasa dimensions (emotional texture)
+2. Extend Sovereign State with 6 Arishadvarga dimensions (attention distortions)
+3. Add explicit emotion detection at Layer 4
+4. Add question-form → Arishadvarga mapping for distortion diagnosis
+5. Implement symbolic emotional reasoning rules
+6. Provide Theory of Mind for emotions
+7. Enable emotional memory persistence
+8. Apply non-moralizing response strategies based on detected distortions
 
-This would elevate Phase-Quad from **emotional delivery** (Level 1-2) to **emotional intelligence** (Level 4-5), making it a truly emotionally-aware symbolic AI system.
+### The Rasa-Arishadvarga Duality
+
+The key innovation is treating emotions as a **dual system**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    COMPLETE EMOTIONAL MODEL                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  NAVA RASA (9 Aesthetic Emotions)         ARISHADVARGA (6 Attention Distortions)│
+│  ════════════════════════════════         ══════════════════════════════════════│
+│  WHAT emotions ARE                        HOW emotions get DISTORTED            │
+│  Positive emotional texture               Negative attention corruption         │
+│  9 dimensions [32:41]                     6 dimensions [41:47]                  │
+│                                                                                 │
+│  Together: Complete 15D emotional space for reasoning + diagnosis              │
+│                                                                                 │
+│  APPLICATION:                                                                   │
+│  ════════════                                                                   │
+│  1. Detect Rasa (what is user feeling?)                                        │
+│  2. Detect Arishadvarga (how is attention distorted?)                          │
+│  3. Compute appropriate Rasa response                                          │
+│  4. Apply non-moralizing distortion mitigation strategy                        │
+│  5. Generate emotionally coherent, helpfully redirecting response              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+This dual approach elevates Phase-Quad from **emotional delivery** (Level 1-2) to **emotional intelligence** (Level 4-5), making it:
+- A truly emotionally-aware symbolic AI system
+- Capable of detecting not just *what* emotions are present but *how* they may be distorting attention
+- Equipped to respond helpfully without moralizing or preaching
 
 ---
 
