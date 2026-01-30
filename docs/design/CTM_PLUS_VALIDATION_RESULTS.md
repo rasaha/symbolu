@@ -8,13 +8,14 @@
 
 CTM+ validation testing reveals that **the algorithm does not outperform existing baselines** on tested workloads:
 
-| Workload | LRU | ARC | CTM+ | CTM+ vs LRU |
-|----------|-----|-----|------|-------------|
-| Zipfian | 85.99% | **88.05%** | 86.41% | +0.42% |
-| Temporal | **72.91%** | 72.86% | 67.05% | **-5.86%** |
-| Mixed | 71.97% | **73.90%** | 68.00% | **-3.97%** |
+| Workload | LRU | ARC | CTM+ | CTM+ vs LRU | CTM+ vs ARC |
+|----------|-----|-----|------|-------------|-------------|
+| Zipfian | 85.99% | **88.05%** | 86.41% | +0.42% | -1.64% |
+| Temporal | **72.91%** | 72.86% | 67.05% | **-5.86%** | -5.81% |
+| Mixed | 71.97% | **73.90%** | 68.00% | **-3.97%** | -5.90% |
+| Hotspot | 31.15% | **37.59%** | 32.94% | +1.79% | **-4.65%** |
 
-**Key Finding:** CTM+ performs **worse** than both LRU and ARC on temporal and mixed workloads.
+**Key Finding:** ARC wins on ALL workloads. CTM+ never beats ARC, and loses to LRU on temporal/mixed.
 
 **Interesting Observation:** CTM+ has lower movement rate and latency due to BCVF conservatism, but this hurts hit rate:
 | Metric | LRU | ARC | CTM+ |
@@ -264,3 +265,18 @@ Improvement:   -3.97% (-5.5%)
 BCVF rejection rate: 27.3%
 Move rate: LRU 46.68%, ARC 31.25%, CTM+ 25.63%
 ```
+
+### Hotspot Workload
+```
+LRU hit rate:  31.15%
+ARC hit rate:  37.59%
+CTM+ hit rate: 32.94%
+CTM+ vs LRU:   +1.79% (+5.7% relative)
+CTM+ vs ARC:   -4.65%
+BCVF rejection rate: 43.6%
+Move rate: LRU 127.37%, ARC 80.37%, CTM+ 55.49%
+Latency: LRU 104,529 ns, ARC 77,169 ns, CTM+ 37,645 ns
+```
+
+**Hotspot Analysis:** ARC's recency/frequency balance shines here (+6.44% over LRU).
+CTM+ improves over LRU but can't match ARC's explicit frequency tracking.
