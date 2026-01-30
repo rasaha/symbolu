@@ -150,6 +150,9 @@ class CTMPlusConfig:
     max_demotions_per_epoch: int = 10000  # Effectively unlimited
     epoch_size: int = 1000  # Accesses per epoch
 
+    # Ablation switches for experimental validation
+    enable_smart_victim: bool = True  # Use CTM+ victim selection vs LRU fallback
+
     @classmethod
     def default(cls) -> "CTMPlusConfig":
         """Return default configuration."""

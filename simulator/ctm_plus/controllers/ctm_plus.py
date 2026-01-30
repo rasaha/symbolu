@@ -1,7 +1,7 @@
 """
 CTM+ (Coherence-Tier Memory Plus) Controller.
 
-Final implementation with ChatGPT's critical fixes + Phase-Adaptive Mode Switcher:
+Final implementation with all ChatGPT improvements:
 1. Phase Integrator: Learns access patterns via streaming accumulator.
 2. USE Coherence: Computes pairwise phase correlation for locality.
 3. BCVF Gate: Bidirectional verification for promotion/demotion.
@@ -10,21 +10,18 @@ Final implementation with ChatGPT's critical fixes + Phase-Adaptive Mode Switche
 6. Predictive Prefetch: Markov model with burst prefetch.
 7. Admission Controller: Scan resistance with regret-based panic mode.
 8. Mode Switcher: Online workload classifier with hysteresis.
+9. Smart Victim Selection: Pre-eviction scoring with ARC-style partitioning.
 
-Key fixes from ChatGPT review:
-- Fixed miss admission bug (was always inserting to Tier0)
-- Fixed _handle_eviction recursion (was re-adding evicted page)
-- Fixed O(n²) in slow_update (was using list.index in loop)
-- Split ShadowTier into ShadowRecency + ShadowFrequency (ARC-like)
-- Fixed Panic Mode to trigger on regret-on-miss, not raw shadow contains
-- Fixed get_stats() returning function instead of value
-- Fixed SCC config mutation (mutate fields, don't reconstruct)
+Key architectural changes:
+- Explicit victim selection BEFORE eviction (not post-hoc protection)
+- Tier0 logically partitioned by p (recency vs frequency sets)
+- ARC-safe weights: 70% recency+frequency, 30% CTM+ signals
+- Loop pinning for temporal workloads
 
-Phase-Adaptive Mode Switcher (ChatGPT design):
-- 5 modes: SCAN, LOOP, HOTSET, CLUSTER, MIXED
-- Online signals: sequentiality, loop rate, hot concentration, etc.
-- Hysteresis + confidence to prevent thrashing
-- Changes parameters, not algorithms
+CTM+ vs ARC distinction:
+- ARC solves capacity allocation (set-level balancing)
+- CTM+ solves victim selection (page-level decision-making)
+- CTM+ degenerates safely to ARC/LRU when predictions are weak
 """
 
 import math
@@ -652,6 +649,7 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
         self._tier1_admissions = 0
+        self._smart_victim_selections = 0
 
     @property
     def name(self) -> str:
@@ -659,6 +657,118 @@ class CTMPlusController(BaseController):
 
     def reset(self) -> None:
         self.__init__(self.config, self.ctm_config)
+
+    def _tier0_partition(self, state: GlobalState) -> Tuple[set, set]:
+        """
+        Logically partition Tier0 into recency and frequency sets using adaptive p.
+
+        ARC-style partitioning:
+        - Recency set (T1-like): pages[:split] sorted by last_access_time
+        - Frequency set (T2-like): pages[split:] sorted by last_access_time
+
+        The split point is determined by shadow tier's p parameter:
+        - p=0.5 means equal split
+        - p>0.5 favors frequency (smaller recency set)
+        - p<0.5 favors recency (larger recency set)
+        """
+        pages = list(state.tier0.pages.values())
+        if not pages:
+            return (set(), set())
+
+        # Sort by recency (most recent first)
+        pages.sort(key=lambda p: p.last_access_time, reverse=True)
+
+        # Split based on adaptive p (p=0.5 -> 50% recency, 50% freq)
+        # Higher p means favor frequency, so recency set is smaller
+        split = int(len(pages) * (1 - self._shadow_tier.p))
+        split = max(1, min(len(pages) - 1, split))  # At least 1 in each
+
+        recency_set = set(p.page_id for p in pages[:split])
+        freq_set = set(p.page_id for p in pages[split:])
+
+        return (recency_set, freq_set)
+
+    def _select_victim(self, state: GlobalState) -> Optional[PageState]:
+        """
+        Score all Tier0 pages and return the worst victim for eviction.
+
+        This is the key to beating ARC: victim selection happens BEFORE eviction,
+        not as post-hoc protection.
+
+        ARC-safe weights (70% recency+frequency, 30% CTM+ signals):
+        - 40% recency_rank (ARC T1-like)
+        - 30% (1-frequency) (ARC T2-like)
+        - 15% (1-reuse) (TransitionTracker signal)
+        - 10% (1-coherence) (structural signal)
+        - -10% neighbor_hotness (cluster protection)
+
+        With ablation switch: falls back to pure LRU when disabled.
+        """
+        if not state.tier0.pages:
+            return None
+
+        # Ablation: if smart victim disabled, use LRU
+        if not self.ctm_config.enable_smart_victim:
+            return min(
+                state.tier0.pages.values(),
+                key=lambda p: p.last_access_time
+            )
+
+        # Get logical partition for ARC-style adaptation
+        recency_set, freq_set = self._tier0_partition(state)
+
+        # Compute recency ranks (lower = older = more likely to evict)
+        pages = list(state.tier0.pages.values())
+        pages.sort(key=lambda p: p.last_access_time)
+        max_time = max(p.last_access_time for p in pages) if pages else 1
+        min_time = min(p.last_access_time for p in pages) if pages else 0
+        time_range = max(1, max_time - min_time)
+
+        best_score = float("inf")
+        victim = None
+
+        for p in pages:
+            # Normalize recency to [0, 1] where 0 = oldest = evict first
+            recency_rank = (p.last_access_time - min_time) / time_range
+
+            # Frequency: higher access_count = less likely to evict
+            frequency = min(1.0, p.access_count / 10.0)
+
+            # CTM+ signals
+            coherence = p.coherence
+            reuse = self._transition_tracker.get_reuse_score(p.page_id)
+            neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(p.page_id, state)
+
+            # Base victim score (lower = evict first)
+            # ARC-safe: 70% is pure ARC logic (recency + frequency)
+            score = (
+                0.40 * recency_rank +           # ARC T1-like: favor recent
+                0.30 * frequency +              # ARC T2-like: favor frequent
+                0.15 * reuse +                  # CTM+ signal: favor predicted reuse
+                0.10 * coherence -              # CTM+ signal: favor coherent
+                0.10 * neighbor_hot             # CTM+ signal: protect clusters
+            )
+
+            # ARC-style partition adjustment
+            # Punish cold pages in wrong partition
+            is_recency = p.page_id in recency_set
+            is_freq = p.page_id in freq_set
+
+            if is_recency and reuse < 0.3:
+                # Cold page in recency partition -> evict more readily
+                score -= 0.15
+            if is_freq and frequency < 0.3:
+                # Weak frequency page in freq partition -> evict more readily
+                score -= 0.15
+
+            if score < best_score:
+                best_score = score
+                victim = p
+
+        if victim is not None:
+            self._smart_victim_selections += 1
+
+        return victim
 
     def on_access(self, state: GlobalState, page_id: int, op_type: OpType) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
@@ -729,22 +839,37 @@ class CTMPlusController(BaseController):
             should_promote = False
 
             if can_promote:
-                # Use adaptive p from shadow tier to weight reuse vs recency
-                if self._shadow_tier.should_favor_frequency():
-                    # Favor frequency: weight reuse higher
-                    combined_score = 0.6 * reuse_score + 0.2 * fast_coh + 0.2 * neighbor_hotness
+                # LOOP PINNING: Fast-track promotion for temporal patterns
+                # This fixes the -4.1% temporal regression by keeping short loops in Tier0
+                if reuse_score > 0.4 and neighbor_hotness > 0.3:
+                    should_promote = True
                 else:
-                    # Favor recency: weight coherence higher
-                    combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
+                    # Use adaptive p from shadow tier to weight reuse vs recency
+                    if self._shadow_tier.should_favor_frequency():
+                        # Favor frequency: weight reuse higher
+                        combined_score = 0.6 * reuse_score + 0.2 * fast_coh + 0.2 * neighbor_hotness
+                    else:
+                        # Favor recency: weight coherence higher
+                        combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
 
-                # Apply mode policy: higher bcvf_threshold_scale = harder to promote
-                # We scale the predicted improvement down to make promotion harder
-                scaled_improvement = combined_score * 0.4 / policy.bcvf_threshold_scale
-                should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
+                    # Apply mode policy: higher bcvf_threshold_scale = harder to promote
+                    # We scale the predicted improvement down to make promotion harder
+                    scaled_improvement = combined_score * 0.4 / policy.bcvf_threshold_scale
+                    should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
 
             if should_promote:
                 state.tier1.remove(page_id)
-                evicted = state.tier0.add(page)
+
+                # EXPLICIT VICTIM SELECTION (the key change)
+                # Select victim BEFORE eviction, not after
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
@@ -778,25 +903,27 @@ class CTMPlusController(BaseController):
             force_promote_on_regret=policy.force_promote_on_regret
         )
 
-        # FIX: Properly handle admission decision
+        # Handle admission decision with EXPLICIT VICTIM SELECTION
         # If should_admit=False, go to Tier1
-        # If should_admit=True and Tier0 not full, go to Tier0
-        # If should_admit=True and Tier0 full, need to evict first
+        # If should_admit=True, go to Tier0 (with smart victim selection if full)
         if should_admit:
-            if not state.tier0.is_full:
-                # Tier0 has space, add directly
-                state.tier0.add(page)
-                promoted = True
-                self._promotions += 1
-            else:
-                # Tier0 is full, add will trigger eviction
-                evicted = state.tier0.add(page)
-                promoted = True
-                self._promotions += 1
-                if evicted is not None:
-                    demoted = self._handle_eviction(state, evicted)
+            # EXPLICIT VICTIM SELECTION (the key change)
+            # Select victim BEFORE eviction, not after
+            evicted = None
+            if state.tier0.is_full:
+                victim = self._select_victim(state)
+                if victim:
+                    state.tier0.remove(victim.page_id)
+                    evicted = victim
+
+            state.tier0.add(page)
+            promoted = True
+            self._promotions += 1
+
+            if evicted is not None:
+                demoted = self._handle_eviction(state, evicted)
         else:
-            # FIX: Admit to Tier1 when admission controller says no
+            # Admit to Tier1 when admission controller says no
             state.tier1.add(page)
             self._tier1_admissions += 1
 
@@ -842,70 +969,53 @@ class CTMPlusController(BaseController):
 
             if state.tier1.contains(next_page):
                 state.tier1.remove(next_page)
-                evicted = state.tier0.add(page)
+
+                # EXPLICIT VICTIM SELECTION for prefetch too
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
                 self._prefetch_promotions += 1
                 self._prefetch_engine.record_prefetch(next_page)
                 prefetched += 1
 
                 if evicted is not None:
                     # Prefetch eviction goes to tier1 and shadow tier
-                    state.tier1.add(evicted)
-                    # Classify based on reuse score
-                    evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
-                    if evicted_reuse > 0.3:
-                        self._shadow_tier.add_to_b2(evicted.page_id)
-                    else:
-                        self._shadow_tier.add_to_b1(evicted.page_id)
+                    self._handle_eviction(state, evicted)
 
     def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
         """
         Handle eviction from Tier 0.
 
-        FIX: Don't re-add evicted page to tier0 (causes infinite loop).
-        Instead, use victim selection before eviction if protection is needed.
-        Mode-adaptive: uses policy.neighbor_protection and bcvf_demote_strictness.
+        SIMPLIFIED: All protection logic is now in _select_victim().
+        This function only demotes the already-selected victim.
+
+        Steps:
+        1. Add evicted page to Tier1
+        2. Record in shadow tier for regret tracking (ARC-like B1/B2)
+        3. Update stats
         """
-        # Get current policy
-        policy = self._current_policy
+        # Demote to tier1
+        state.tier1.add(evicted)
+        evicted.last_demotion_time = state.current_time
 
-        # Get evicted page's reuse score for classification
+        # Classify into appropriate shadow tier based on reuse score
+        # This enables ARC-like adaptation via ghost hits
         evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
-        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(evicted.page_id, state)
-
-        # FIX: Don't re-add to tier0 here - that causes recursion!
-        # Instead, if we want to protect, we should have chosen a different victim.
-        # For now, just do BCVF check and demote.
-
-        should_demote, _ = self._bcvf.should_demote(evicted, state)
-
-        # Use policy's neighbor_protection threshold
-        if should_demote or neighbor_hotness <= policy.neighbor_protection:
-            # Demote to tier1
-            state.tier1.add(evicted)
-            evicted.last_demotion_time = state.current_time
-
-            # FIX: Add to appropriate shadow tier based on reuse (ARC-like B1/B2)
-            if evicted_reuse > 0.3:
-                # High reuse page evicted → B2 (frequency ghost)
-                self._shadow_tier.add_to_b2(evicted.page_id)
-            else:
-                # Low reuse page evicted → B1 (recency ghost)
-                self._shadow_tier.add_to_b1(evicted.page_id)
-
-            self._demotions += 1
-            self._epoch_demotions += 1
-            return True
+        if evicted_reuse > 0.3:
+            # High reuse page evicted → B2 (frequency ghost)
+            self._shadow_tier.add_to_b2(evicted.page_id)
         else:
-            # BCVF rejected demotion and page has hot neighbors
-            # FIX: Instead of re-adding to tier0, just demote with lower priority
-            # This avoids the infinite recursion bug
-            state.tier1.add(evicted)
-            evicted.last_demotion_time = state.current_time
+            # Low reuse page evicted → B1 (recency ghost)
             self._shadow_tier.add_to_b1(evicted.page_id)
-            self._bcvf_rejections += 1
-            self._demotions += 1
-            self._epoch_demotions += 1
-            return True
+
+        self._demotions += 1
+        self._epoch_demotions += 1
+        return True
 
     def on_epoch(self, state: GlobalState, epoch: int) -> None:
         self._epoch_promotions = 0
@@ -951,6 +1061,9 @@ class CTMPlusController(BaseController):
             "shadow_p": self._shadow_tier.p,
             "regret_on_miss_rate": self._shadow_tier.regret_on_miss_rate,
             "tier1_admissions": self._tier1_admissions,
+            # Victim selection stats
+            "smart_victim_selections": self._smart_victim_selections,
+            "smart_victim_enabled": self.ctm_config.enable_smart_victim,
             # Mode switcher stats
             "mode_current": mode_stats["current_mode"],
             "mode_confidence": mode_stats["mode_confidence"],
