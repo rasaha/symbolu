@@ -867,7 +867,12 @@ class CTMPlusController(BaseController):
                     # Apply mode policy: higher bcvf_threshold_scale = harder to promote
                     # We scale the predicted improvement down to make promotion harder
                     scaled_improvement = combined_score * 0.4 / policy.bcvf_threshold_scale
-                    should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
+
+                    # Ablation: bypass BCVF gate if disabled
+                    if not self.ctm_config.enable_bcvf_gate:
+                        should_promote = True  # Always promote without BCVF
+                    else:
+                        should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
 
             if should_promote:
                 state.tier1.remove(page_id)
@@ -900,20 +905,24 @@ class CTMPlusController(BaseController):
         is_regret, ghost_type = self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
         regret_rate = self._shadow_tier.regret_on_miss_rate
 
-        should_admit = self._admission_controller.should_admit(
-            page_id=page_id,
-            reuse_score=reuse_score,
-            cluster_score=neighbor_hotness,
-            access_count=page.access_count,
-            regret_on_miss_rate=regret_rate,
-            is_regret=is_regret,
-            # Mode policy parameters
-            admission_threshold_scale=policy.admission_threshold_scale,
-            scan_penalty=policy.scan_penalty,
-            bypass_boost=policy.bypass_boost,
-            regret_threshold=policy.regret_threshold,
-            force_promote_on_regret=policy.force_promote_on_regret
-        )
+        # Ablation: bypass admission controller if disabled
+        if not self.ctm_config.enable_admission_control:
+            should_admit = True  # Always admit to tier0 without admission control
+        else:
+            should_admit = self._admission_controller.should_admit(
+                page_id=page_id,
+                reuse_score=reuse_score,
+                cluster_score=neighbor_hotness,
+                access_count=page.access_count,
+                regret_on_miss_rate=regret_rate,
+                is_regret=is_regret,
+                # Mode policy parameters
+                admission_threshold_scale=policy.admission_threshold_scale,
+                scan_penalty=policy.scan_penalty,
+                bypass_boost=policy.bypass_boost,
+                regret_threshold=policy.regret_threshold,
+                force_promote_on_regret=policy.force_promote_on_regret
+            )
 
         # Handle admission decision with EXPLICIT VICTIM SELECTION
         # If should_admit=False, go to Tier1

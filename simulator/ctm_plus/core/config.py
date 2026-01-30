@@ -152,6 +152,10 @@ class CTMPlusConfig:
 
     # Ablation switches for experimental validation
     enable_smart_victim: bool = True  # Use CTM+ victim selection vs LRU fallback
+    enable_bcvf_gate: bool = True  # Use BCVF promotion gate vs always promote
+    # DISABLED BY DEFAULT: Admission controller hurts temporal workloads
+    # It mistakes temporal locality for sequential scans and rejects hot pages
+    enable_admission_control: bool = False  # Use admission controller vs always admit
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":
