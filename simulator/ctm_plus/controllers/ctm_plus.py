@@ -13,7 +13,10 @@ existing DRAM+NAND behave smarter.
 
 import math
 import random
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # For forward references
 from collections import deque
 from .base import BaseController
 from ..core.state import GlobalState, PageState, Tier, OpType
@@ -442,6 +445,88 @@ class SCCOptimizer:
             self.beta = max(1.0, self.beta * 0.99)
 
 
+class NeighborTracker:
+    """
+    Tracks co-occurrence patterns to identify correlated pages.
+
+    Maintains a sliding window of recent accesses and builds a
+    neighbor map: page_id -> list of frequently co-accessed pages.
+
+    This enables CTM+ to exploit structure that LRU cannot see.
+    """
+
+    def __init__(self, window_size: int = 16, top_k: int = 8, min_count: int = 3):
+        self.window_size = window_size
+        self.top_k = top_k
+        self.min_count = min_count
+
+        # Recent access window
+        self._recent: deque = deque(maxlen=window_size)
+
+        # Co-occurrence counts: (page_a, page_b) -> count
+        self._cooccurrence: Dict[Tuple[int, int], int] = {}
+
+        # Cached neighbor lists: page_id -> [neighbor_ids]
+        self._neighbors: Dict[int, List[int]] = {}
+
+        # Update interval (rebuild neighbors every N accesses)
+        self._access_count = 0
+        self._rebuild_interval = 1000
+
+    def record_access(self, page_id: int) -> None:
+        """Record an access and update co-occurrence."""
+        # Update co-occurrence with recent pages
+        for recent_page in self._recent:
+            if recent_page != page_id:
+                key = (min(page_id, recent_page), max(page_id, recent_page))
+                self._cooccurrence[key] = self._cooccurrence.get(key, 0) + 1
+
+        self._recent.append(page_id)
+        self._access_count += 1
+
+        # Periodically rebuild neighbor lists
+        if self._access_count % self._rebuild_interval == 0:
+            self._rebuild_neighbors()
+
+    def get_neighbors(self, page_id: int) -> List[int]:
+        """Get top-K neighbors for a page."""
+        return self._neighbors.get(page_id, [])
+
+    def _rebuild_neighbors(self) -> None:
+        """Rebuild neighbor lists from co-occurrence data."""
+        # Group by page
+        page_counts: Dict[int, List[Tuple[int, int]]] = {}
+
+        for (a, b), count in self._cooccurrence.items():
+            if count >= self.min_count:
+                if a not in page_counts:
+                    page_counts[a] = []
+                if b not in page_counts:
+                    page_counts[b] = []
+                page_counts[a].append((b, count))
+                page_counts[b].append((a, count))
+
+        # Build top-K neighbor lists
+        self._neighbors = {}
+        for page_id, neighbors in page_counts.items():
+            # Sort by count descending, take top K
+            neighbors.sort(key=lambda x: x[1], reverse=True)
+            self._neighbors[page_id] = [n[0] for n in neighbors[:self.top_k]]
+
+    def get_neighbor_hotness(self, page_id: int, state: 'GlobalState') -> float:
+        """
+        Compute how "hot" a page's neighbors are.
+
+        Returns a score [0, 1] based on how many neighbors are in tier0.
+        """
+        neighbors = self.get_neighbors(page_id)
+        if not neighbors:
+            return 0.0
+
+        in_tier0 = sum(1 for n in neighbors if state.tier0.contains(n))
+        return in_tier0 / len(neighbors)
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller: Full implementation of Coherence-Tier Memory Plus.
@@ -451,6 +536,7 @@ class CTMPlusController(BaseController):
     - Coherence Computer for fast/slow coherence
     - BCVF Gate for bidirectional verification
     - SCC Optimizer for self-tuning
+    - NeighborTracker for correlated page detection
     """
 
     def __init__(
@@ -466,6 +552,7 @@ class CTMPlusController(BaseController):
         self._coherence = CoherenceComputer(self.ctm_config)
         self._bcvf = BCVFGate(self.ctm_config)
         self._scc = SCCOptimizer(self.ctm_config)
+        self._neighbor_tracker = NeighborTracker()
 
         # Stats
         self._promotions = 0
@@ -473,6 +560,7 @@ class CTMPlusController(BaseController):
         self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time: Dict[int, int] = {}
+        self._neighbor_boosts = 0
 
         # Epoch tracking
         self._epoch_promotions = 0
@@ -487,11 +575,13 @@ class CTMPlusController(BaseController):
         self._coherence = CoherenceComputer(self.ctm_config)
         self._bcvf = BCVFGate(self.ctm_config)
         self._scc = SCCOptimizer(self.ctm_config)
+        self._neighbor_tracker = NeighborTracker()
         self._promotions = 0
         self._demotions = 0
         self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time = {}
+        self._neighbor_boosts = 0
         self._epoch_promotions = 0
         self._epoch_demotions = 0
 
@@ -502,6 +592,9 @@ class CTMPlusController(BaseController):
         op_type: OpType,
     ) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
+
+        # Track co-occurrence for neighbor learning
+        self._neighbor_tracker.record_access(page_id)
 
         # Compute delta_t
         delta_t = self._access_counter - self._last_access_time.get(page_id, 0)
@@ -518,9 +611,22 @@ class CTMPlusController(BaseController):
         page.amplitude = max(page.amplitude, amplitude)  # Keep max amplitude
         page.update_on_access(state.current_time, op_type)
 
+        # Boost coherence of neighbors (key for cluster-awareness)
+        neighbors = self._neighbor_tracker.get_neighbors(page_id)
+        for neighbor_id in neighbors:
+            neighbor = state.all_pages.get(neighbor_id)
+            if neighbor:
+                # Small coherence boost for co-accessed pages
+                neighbor.coherence = min(1.0, neighbor.coherence + 0.02)
+                self._neighbor_boosts += 1
+
         # Compute fast coherence
         mean_phase = state.global_mean_phase
         fast_coh = self._coherence.fast_coherence(page, mean_phase)
+
+        # Factor in neighbor hotness (if neighbors are in tier0, this page is valuable)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
+        adjusted_coh = 0.7 * fast_coh + 0.3 * neighbor_hotness
 
         promoted = False
         demoted = False
@@ -536,15 +642,16 @@ class CTMPlusController(BaseController):
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
 
-            # Check BCVF for promotion
+            # Check BCVF for promotion (use adjusted coherence)
             can_promote = (
                 self._epoch_promotions < self.ctm_config.max_promotions_per_epoch
                 and state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
             )
 
             if can_promote:
+                # Use adjusted coherence that includes neighbor hotness
                 should_promote, weight = self._bcvf.should_promote(
-                    page, state, predicted_hit_improvement=fast_coh * 0.2
+                    page, state, predicted_hit_improvement=adjusted_coh * 0.3
                 )
 
                 if should_promote:
@@ -556,7 +663,7 @@ class CTMPlusController(BaseController):
                     self._epoch_promotions += 1
                     page.last_promotion_time = state.current_time
 
-                    # Handle eviction with BCVF
+                    # Handle eviction with BCVF (consider neighbor protection)
                     if evicted is not None:
                         demoted = self._handle_eviction(state, evicted)
                 else:
@@ -587,7 +694,17 @@ class CTMPlusController(BaseController):
         return (Tier.NONE, latency, promoted, demoted)
 
     def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
-        """Handle evicted page with BCVF verification."""
+        """Handle evicted page with BCVF verification and neighbor protection."""
+        # Check if evicted page has hot neighbors (cluster protection)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(evicted.page_id, state)
+
+        # If page has many hot neighbors, protect it (don't demote)
+        if neighbor_hotness > 0.6:
+            # Keep in tier0 - its cluster is still hot
+            state.tier0.add(evicted)
+            self._bcvf_rejections += 1
+            return False
+
         should_demote, _ = self._bcvf.should_demote(evicted, state)
 
         if should_demote:
@@ -643,4 +760,6 @@ class CTMPlusController(BaseController):
             "scc_threshold": self._scc.threshold,
             "scc_beta": self._scc.beta,
             "tier_coherence": self._scc.compute_tier_coherence,
+            "neighbor_boosts": self._neighbor_boosts,
+            "tracked_neighbors": len(self._neighbor_tracker._neighbors),
         }
