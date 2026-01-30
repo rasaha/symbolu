@@ -527,54 +527,147 @@ class NeighborTracker:
         return in_tier0 / len(neighbors)
 
 
+class ShadowTier:
+    """
+    Ghost cache that tracks recently evicted/bypassed pages.
+
+    This is the key to matching ARC's "regret tracking" capability.
+    When we see a "shadow hit" (miss that was recently evicted),
+    we know we made a wrong decision and should correct it.
+
+    Equivalent to ARC's B1/B2 ghost lists.
+    """
+
+    def __init__(self, max_size: int = 2000):
+        self.max_size = max_size
+        self._pages: deque = deque()
+        self._lookup: set = set()
+
+        # Stats for feedback loop
+        self.shadow_hits = 0
+        self.total_checks = 0
+
+    def add(self, page_id: int) -> None:
+        """Add a page to the shadow tier (was evicted/bypassed)."""
+        if page_id in self._lookup:
+            return
+
+        if len(self._pages) >= self.max_size:
+            removed = self._pages.popleft()
+            self._lookup.discard(removed)
+
+        self._pages.append(page_id)
+        self._lookup.add(page_id)
+
+    def contains(self, page_id: int) -> bool:
+        """Check if page is in shadow tier (was recently evicted)."""
+        self.total_checks += 1
+        hit = page_id in self._lookup
+        if hit:
+            self.shadow_hits += 1
+        return hit
+
+    def remove(self, page_id: int) -> None:
+        """Remove page from shadow tier (being re-admitted)."""
+        self._lookup.discard(page_id)
+
+    @property
+    def shadow_hit_rate(self) -> float:
+        """Rate of shadow hits (indicates eviction regret)."""
+        return self.shadow_hits / self.total_checks if self.total_checks > 0 else 0.0
+
+
 class TransitionTracker:
     """
-    Markov transition model: tracks P(next=j | current=i).
+    Enhanced Markov transition model with:
+    - Recency-weighted transitions (ChatGPT suggestion)
+    - 2-gram support for better pattern capture (Gemini suggestion)
 
     This is the key differentiator from ARC - we can predict
     what's coming next, not just what was recently accessed.
-
-    Uses exponential decay to adapt to changing patterns.
     """
 
-    def __init__(self, top_m: int = 8, decay: float = 0.95):
+    def __init__(self, top_m: int = 8, decay_tau: int = 500):
         self.top_m = top_m
-        self.decay = decay
+        self.decay_tau = decay_tau  # Decay horizon in accesses
 
-        # Transition counts: current_page -> {next_page: score}
+        # 1st-order transitions: current_page -> {next_page: score}
         self._transitions: Dict[int, Dict[int, float]] = {}
 
-        # Last accessed page (for building transitions)
+        # 2nd-order transitions: (prev, current) -> {next_page: score}
+        # Key is (prev ^ current) for efficiency
+        self._transitions_2gram: Dict[int, Dict[int, float]] = {}
+
+        # Access history
         self._last_page: Optional[int] = None
+        self._prev_page: Optional[int] = None  # For 2-gram
+
+        # Last access time for recency weighting
+        self._last_transition_time: Dict[Tuple[int, int], int] = {}
+        self._access_count = 0
 
         # Stats
         self._total_transitions = 0
 
     def record_access(self, page_id: int) -> None:
-        """Record a transition from last page to current page."""
+        """Record a transition with recency-weighted scoring."""
+        self._access_count += 1
+
         if self._last_page is not None and self._last_page != page_id:
-            # Update transition: last_page -> page_id
-            if self._last_page not in self._transitions:
-                self._transitions[self._last_page] = {}
+            # === 1st-order transition ===
+            self._update_transition(
+                self._transitions,
+                self._last_page,
+                page_id,
+                (self._last_page, page_id)
+            )
 
-            trans = self._transitions[self._last_page]
-
-            # Decay existing scores
-            for key in trans:
-                trans[key] *= self.decay
-
-            # Increment transition to current page
-            trans[page_id] = trans.get(page_id, 0.0) + 1.0
-
-            # Keep only top-M transitions
-            if len(trans) > self.top_m * 2:
-                # Prune low-score entries
-                sorted_trans = sorted(trans.items(), key=lambda x: x[1], reverse=True)
-                self._transitions[self._last_page] = dict(sorted_trans[:self.top_m])
+            # === 2nd-order transition (2-gram) ===
+            if self._prev_page is not None:
+                # Key: hash of (prev, last) pair
+                bigram_key = (self._prev_page << 16) ^ self._last_page
+                self._update_transition(
+                    self._transitions_2gram,
+                    bigram_key,
+                    page_id,
+                    (bigram_key, page_id)
+                )
 
             self._total_transitions += 1
 
+        # Update history
+        self._prev_page = self._last_page
         self._last_page = page_id
+
+    def _update_transition(
+        self,
+        trans_dict: Dict[int, Dict[int, float]],
+        key: int,
+        next_page: int,
+        time_key: Tuple[int, int]
+    ) -> None:
+        """Update a transition with recency weighting."""
+        if key not in trans_dict:
+            trans_dict[key] = {}
+
+        trans = trans_dict[key]
+
+        # Compute recency-weighted increment
+        # weight = exp(-Δt / τ) where Δt is time since last this transition
+        last_time = self._last_transition_time.get(time_key, 0)
+        delta_t = self._access_count - last_time
+        weight = math.exp(-delta_t / self.decay_tau) if delta_t > 0 else 1.0
+
+        # Update score with recency weight (more recent = higher weight)
+        trans[next_page] = trans.get(next_page, 0.0) * 0.95 + (1.0 + weight)
+
+        # Record transition time
+        self._last_transition_time[time_key] = self._access_count
+
+        # Prune to top-M
+        if len(trans) > self.top_m * 2:
+            sorted_trans = sorted(trans.items(), key=lambda x: x[1], reverse=True)
+            trans_dict[key] = dict(sorted_trans[:self.top_m])
 
     def get_next_probability(self, current_page: int, next_page: int) -> float:
         """Get P(next_page | current_page)."""
@@ -589,17 +682,39 @@ class TransitionTracker:
         return trans.get(next_page, 0.0) / total
 
     def get_top_predictions(self, current_page: int, k: int = 3) -> List[Tuple[int, float]]:
-        """Get top-K most likely next pages with their probabilities."""
-        if current_page not in self._transitions:
+        """
+        Get top-K most likely next pages using both 1-gram and 2-gram.
+
+        2-gram is preferred when available (more context = better prediction).
+        """
+        predictions = {}
+
+        # Try 2-gram first (if we have prev_page context)
+        if self._prev_page is not None:
+            bigram_key = (self._prev_page << 16) ^ current_page
+            if bigram_key in self._transitions_2gram:
+                trans = self._transitions_2gram[bigram_key]
+                total = sum(trans.values())
+                if total > 0:
+                    for page, score in trans.items():
+                        # 2-gram predictions get higher weight
+                        predictions[page] = predictions.get(page, 0) + 1.5 * (score / total)
+
+        # Add 1-gram predictions
+        if current_page in self._transitions:
+            trans = self._transitions[current_page]
+            total = sum(trans.values())
+            if total > 0:
+                for page, score in trans.items():
+                    predictions[page] = predictions.get(page, 0) + (score / total)
+
+        if not predictions:
             return []
 
-        trans = self._transitions[current_page]
-        total = sum(trans.values())
-        if total == 0:
-            return []
-
-        sorted_trans = sorted(trans.items(), key=lambda x: x[1], reverse=True)
-        return [(page, score / total) for page, score in sorted_trans[:k]]
+        # Normalize and return top-K
+        total = sum(predictions.values())
+        sorted_pred = sorted(predictions.items(), key=lambda x: x[1], reverse=True)
+        return [(page, score / total) for page, score in sorted_pred[:k]]
 
     def get_reuse_score(self, page_id: int) -> float:
         """
@@ -618,10 +733,13 @@ class TransitionTracker:
 
 class AdmissionController:
     """
-    Probabilistic admission controller.
+    Enhanced admission controller with scan-pressure adaptation.
 
-    Decides whether a page from slow tier should be admitted to fast tier.
-    This prevents cache pollution from one-time accesses (scan resistance).
+    Features:
+    - Probabilistic admission based on reuse/cluster scores
+    - Scan detection and penalty
+    - Dynamic adaptation via scan_pressure (ChatGPT suggestion)
+    - loosen_constraints() for shadow hit feedback (Gemini suggestion)
     """
 
     def __init__(
@@ -640,6 +758,12 @@ class AdmissionController:
         self._last_pages: deque = deque(maxlen=8)
         self._sequential_count = 0
 
+        # Scan pressure: adapts admission based on workload phase (ChatGPT suggestion)
+        self._scan_pressure: float = 0.0  # [0, 1]
+        self._unique_pages_window: set = set()
+        self._reuse_count = 0
+        self._window_accesses = 0
+
         # Stats
         self.admits = 0
         self.bypasses = 0
@@ -654,20 +778,35 @@ class AdmissionController:
         """
         Decide whether to admit page to fast tier.
 
-        Args:
-            page_id: Page being accessed
-            reuse_score: Probability of near-term reuse (from TransitionTracker)
-            cluster_score: How active is this page's cluster (0-1)
-            access_count: How many times this page has been accessed
-
-        Returns:
-            True if should admit to fast tier, False to bypass/probation
+        Uses scan-pressure to adapt to workload phases.
         """
+        # Update scan pressure tracking
+        self._window_accesses += 1
+        if page_id in self._unique_pages_window:
+            self._reuse_count += 1
+        self._unique_pages_window.add(page_id)
+
+        # Update scan_pressure every 100 accesses
+        if self._window_accesses >= 100:
+            unique_rate = len(self._unique_pages_window) / self._window_accesses
+            reuse_rate = self._reuse_count / self._window_accesses
+
+            # High unique rate = scanning, low reuse = scanning
+            if unique_rate > 0.8:
+                self._scan_pressure = min(1.0, self._scan_pressure + 0.1)
+            elif reuse_rate > 0.3:
+                self._scan_pressure = max(0.0, self._scan_pressure - 0.1)
+
+            # Reset window
+            self._unique_pages_window.clear()
+            self._reuse_count = 0
+            self._window_accesses = 0
+
         # Detect sequential scan (cache-unfriendly)
         is_sequential = False
         if self._last_pages:
             last = self._last_pages[-1]
-            if abs(page_id - last) <= 2:  # Sequential or near-sequential
+            if abs(page_id - last) <= 2:
                 self._sequential_count += 1
                 if self._sequential_count > 4:
                     is_sequential = True
@@ -676,8 +815,7 @@ class AdmissionController:
 
         self._last_pages.append(page_id)
 
-        # Compute admission probability
-        # p_admit = sigmoid(w1*reuse + w2*cluster - w3*stream)
+        # Compute admission probability with scan-pressure modulation
         stream_score = 1.0 if is_sequential else 0.0
 
         raw_score = (
@@ -688,6 +826,9 @@ class AdmissionController:
 
         # Sigmoid to get probability
         p_admit = 1.0 / (1.0 + math.exp(-4.0 * (raw_score - 0.3)))
+
+        # Modulate by scan pressure (high pressure = more conservative)
+        p_admit *= (1.0 - 0.5 * self._scan_pressure)
 
         # Boost for pages with history
         if access_count > 1:
@@ -703,28 +844,49 @@ class AdmissionController:
 
         return admit
 
+    def loosen_constraints(self) -> None:
+        """
+        Called when shadow hit detected - we were too strict.
+
+        Reduces stream_penalty to admit more pages (Gemini suggestion).
+        """
+        self.stream_penalty = max(0.1, self.stream_penalty - 0.05)
+        self._scan_pressure = max(0.0, self._scan_pressure - 0.1)
+
+    def tighten_constraints(self) -> None:
+        """Called when pollution detected - we were too loose."""
+        self.stream_penalty = min(0.5, self.stream_penalty + 0.02)
+
     @property
     def bypass_rate(self) -> float:
         """Fraction of accesses that bypassed cache."""
         total = self.admits + self.bypasses
         return self.bypasses / total if total > 0 else 0.0
 
+    @property
+    def scan_pressure(self) -> float:
+        """Current scan pressure level."""
+        return self._scan_pressure
+
 
 class PrefetchEngine:
     """
-    Budgeted prefetch engine.
+    Dynamic budgeted prefetch engine.
 
-    Prefetches predicted next pages with strict budget control.
-    This is CTM+'s key differentiator from ARC.
+    Features:
+    - Adaptive budget based on prefetch_hit_rate (Gemini suggestion)
+    - Burst prefetch for confident predictions (ChatGPT suggestion)
     """
 
     def __init__(
         self,
-        budget_per_1k: int = 15,  # Max prefetches per 1000 accesses
-        min_probability: float = 0.3,  # Min P(next) to trigger prefetch
-        max_distance: int = 64,  # Max predicted distance to prefetch
+        initial_budget: int = 15,  # Initial prefetches per 1000 accesses
+        min_probability: float = 0.25,  # Min P(next) to trigger prefetch
+        max_distance: int = 64,
     ):
-        self.budget_per_1k = budget_per_1k
+        self.budget_per_1k = initial_budget
+        self.min_budget = 5
+        self.max_budget = 50
         self.min_probability = min_probability
         self.max_distance = max_distance
 
@@ -737,6 +899,10 @@ class PrefetchEngine:
         self.prefetch_hits = 0
         self.prefetch_misses = 0
         self._pending_prefetches: set = set()
+
+        # For adaptive budgeting
+        self._epoch_hits = 0
+        self._epoch_prefetches = 0
 
     def should_prefetch(self, probability: float) -> bool:
         """Check if we should prefetch given the probability and budget."""
@@ -751,28 +917,52 @@ class PrefetchEngine:
 
         return True
 
+    def get_burst_size(self, confidence: float) -> int:
+        """
+        Get number of pages to prefetch based on confidence (ChatGPT suggestion).
+
+        High confidence = prefetch more (burst), low = prefetch 1.
+        """
+        return min(4, max(1, int(confidence * 6)))
+
     def record_prefetch(self, page_id: int) -> None:
         """Record that we prefetched a page."""
         self._prefetches_this_epoch += 1
+        self._epoch_prefetches += 1
         self.total_prefetches += 1
         self._pending_prefetches.add(page_id)
 
     def record_access(self, page_id: int) -> None:
-        """Record an access (for budget tracking and prefetch hit detection)."""
+        """Record an access with dynamic budget adjustment (Gemini suggestion)."""
         self._epoch_accesses += 1
 
         # Check if this was a prefetched page
         if page_id in self._pending_prefetches:
             self.prefetch_hits += 1
+            self._epoch_hits += 1
             self._pending_prefetches.discard(page_id)
 
-        # Reset epoch
+        # End of epoch: adjust budget based on hit rate
         if self._epoch_accesses >= 1000:
             # Count remaining pending prefetches as misses
             self.prefetch_misses += len(self._pending_prefetches)
+
+            # Dynamic budget adjustment (Gemini suggestion)
+            if self._epoch_prefetches > 0:
+                epoch_hit_rate = self._epoch_hits / self._epoch_prefetches
+                if epoch_hit_rate > 0.5:
+                    # Predictions are good - increase budget
+                    self.budget_per_1k = min(self.max_budget, self.budget_per_1k + 5)
+                elif epoch_hit_rate < 0.1:
+                    # Predictions are bad - decrease budget
+                    self.budget_per_1k = max(self.min_budget, self.budget_per_1k - 5)
+
+            # Reset epoch
             self._pending_prefetches.clear()
             self._prefetches_this_epoch = 0
             self._epoch_accesses = 0
+            self._epoch_hits = 0
+            self._epoch_prefetches = 0
 
     @property
     def prefetch_hit_rate(self) -> float:
@@ -812,9 +1002,12 @@ class CTMPlusController(BaseController):
         self._neighbor_tracker = NeighborTracker()
 
         # NEW: Predictive components (the key to beating ARC)
-        self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
+        self._transition_tracker = TransitionTracker(top_m=8, decay_tau=500)
         self._admission_controller = AdmissionController()
-        self._prefetch_engine = PrefetchEngine(budget_per_1k=15, min_probability=0.3)
+        self._prefetch_engine = PrefetchEngine(initial_budget=15, min_probability=0.25)
+
+        # NEW v2: Shadow tier for regret tracking (like ARC's B1/B2)
+        self._shadow_tier = ShadowTier(max_size=2048)
 
         # Stats
         self._promotions = 0
@@ -824,6 +1017,7 @@ class CTMPlusController(BaseController):
         self._last_access_time: Dict[int, int] = {}
         self._neighbor_boosts = 0
         self._prefetch_promotions = 0
+        self._shadow_hit_promotions = 0
 
         # Epoch tracking
         self._epoch_promotions = 0
@@ -839,9 +1033,10 @@ class CTMPlusController(BaseController):
         self._bcvf = BCVFGate(self.ctm_config)
         self._scc = SCCOptimizer(self.ctm_config)
         self._neighbor_tracker = NeighborTracker()
-        self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
+        self._transition_tracker = TransitionTracker(top_m=8, decay_tau=500)
         self._admission_controller = AdmissionController()
-        self._prefetch_engine = PrefetchEngine(budget_per_1k=15, min_probability=0.3)
+        self._prefetch_engine = PrefetchEngine(initial_budget=15, min_probability=0.25)
+        self._shadow_tier = ShadowTier(max_size=2048)
         self._promotions = 0
         self._demotions = 0
         self._bcvf_rejections = 0
@@ -851,6 +1046,7 @@ class CTMPlusController(BaseController):
         self._prefetch_promotions = 0
         self._epoch_promotions = 0
         self._epoch_demotions = 0
+        self._shadow_hit_promotions = 0
 
     def on_access(
         self,
@@ -916,54 +1112,70 @@ class CTMPlusController(BaseController):
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
 
-            # Check promotion eligibility
-            can_promote = (
-                self._epoch_promotions < self.ctm_config.max_promotions_per_epoch
-                and state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
-            )
-
-            if can_promote:
-                # === NEW: Use transition-based reuse score in promotion decision ===
-                # Combine reuse prediction with coherence
-                combined_score = 0.5 * reuse_score + 0.3 * fast_coh + 0.2 * neighbor_hotness
-
-                should_promote, weight = self._bcvf.should_promote(
-                    page, state, predicted_hit_improvement=combined_score * 0.4
+            # === NEW v2: Check if this is a regret case (page was recently demoted) ===
+            is_shadow_hit = self._shadow_tier.contains(page_id)
+            if is_shadow_hit:
+                # REGRET: We evicted this page but it came back. Force promote!
+                self._shadow_tier.remove(page_id)
+                self._shadow_hit_promotions += 1
+                self._admission_controller.loosen_constraints()
+                should_promote = True
+            else:
+                # Check promotion eligibility
+                can_promote = (
+                    self._epoch_promotions < self.ctm_config.max_promotions_per_epoch
+                    and state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
                 )
 
-                if should_promote:
-                    state.tier1.remove(page_id)
-                    evicted = state.tier0.add(page)
-                    promoted = True
-                    self._promotions += 1
-                    self._epoch_promotions += 1
-                    page.last_promotion_time = state.current_time
-
-                    if evicted is not None:
-                        demoted = self._handle_eviction(state, evicted)
-
-                    # === NEW: Prefetch after promotion ===
-                    self._do_predictive_prefetch(state, page_id)
+                if can_promote:
+                    # Use transition-based reuse score in promotion decision
+                    combined_score = 0.5 * reuse_score + 0.3 * fast_coh + 0.2 * neighbor_hotness
+                    should_promote, weight = self._bcvf.should_promote(
+                        page, state, predicted_hit_improvement=combined_score * 0.4
+                    )
+                    if not should_promote:
+                        self._bcvf_rejections += 1
                 else:
-                    self._bcvf_rejections += 1
+                    should_promote = False
+
+            if should_promote:
+                state.tier1.remove(page_id)
+                evicted = state.tier0.add(page)
+                promoted = True
+                self._promotions += 1
+                self._epoch_promotions += 1
+                page.last_promotion_time = state.current_time
+
+                if evicted is not None:
+                    demoted = self._handle_eviction(state, evicted)
+
+                # Prefetch after promotion
+                self._do_predictive_prefetch(state, page_id)
 
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             return (Tier.TIER1, latency, promoted, demoted)
 
         # Case 3: Miss - add to system
-        # === NEW: Use AdmissionController to decide admission ===
-        access_count = page.access_count
-
-        # Compute cluster score from neighbor hotness
-        cluster_score = neighbor_hotness
-
-        # Decide whether to admit to fast tier
-        should_admit = self._admission_controller.should_admit(
-            page_id=page_id,
-            reuse_score=reuse_score,
-            cluster_score=cluster_score,
-            access_count=access_count,
-        )
+        # === NEW v2: Check shadow tier first (regret detection) ===
+        is_shadow_hit = self._shadow_tier.contains(page_id)
+        if is_shadow_hit:
+            # Shadow hit! We evicted/bypassed this page but it came back.
+            # This means we were too strict - loosen admission constraints.
+            self._admission_controller.loosen_constraints()
+            self._shadow_tier.remove(page_id)
+            self._shadow_hit_promotions += 1
+            # Force admission to tier0 (bypass the admission controller)
+            should_admit = True
+        else:
+            # Normal admission decision
+            access_count = page.access_count
+            cluster_score = neighbor_hotness
+            should_admit = self._admission_controller.should_admit(
+                page_id=page_id,
+                reuse_score=reuse_score,
+                cluster_score=cluster_score,
+                access_count=access_count,
+            )
 
         if should_admit and not state.tier0.is_full:
             # Admit directly to tier0
@@ -982,6 +1194,8 @@ class CTMPlusController(BaseController):
                 demoted = self._handle_eviction(state, evicted)
         else:
             # Bypass: add to tier1 (scan resistance)
+            # Note: We don't add bypassed pages to shadow tier - only evicted pages
+            # Shadow tier tracks "regret" for pages that WERE in tier0 and got evicted
             state.tier1.add(page)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
@@ -992,11 +1206,23 @@ class CTMPlusController(BaseController):
         Prefetch predicted next page(s) based on transition model.
 
         This is CTM+'s key differentiator from ARC.
+        Uses burst prefetch for high-confidence predictions (ChatGPT suggestion).
         """
-        # Get top prediction
-        predictions = self._transition_tracker.get_top_predictions(current_page, k=1)
+        # Get top predictions - get more candidates for burst
+        predictions = self._transition_tracker.get_top_predictions(current_page, k=4)
+
+        if not predictions:
+            return
+
+        # === NEW v2: Burst prefetch based on confidence ===
+        top_confidence = predictions[0][1] if predictions else 0.0
+        burst_size = self._prefetch_engine.get_burst_size(top_confidence)
+        prefetched_count = 0
 
         for next_page, probability in predictions:
+            if prefetched_count >= burst_size:
+                break
+
             # Check if we should prefetch
             if not self._prefetch_engine.should_prefetch(probability):
                 continue
@@ -1012,10 +1238,12 @@ class CTMPlusController(BaseController):
                 evicted = state.tier0.add(page)
                 self._prefetch_promotions += 1
                 self._prefetch_engine.record_prefetch(next_page)
+                prefetched_count += 1
 
                 if evicted is not None:
-                    # Put evicted page in tier1
+                    # Put evicted page in tier1 and track in shadow tier
                     state.tier1.add(evicted)
+                    self._shadow_tier.add(evicted.page_id)
 
     def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
         """Handle evicted page with BCVF verification and neighbor protection."""
@@ -1036,6 +1264,8 @@ class CTMPlusController(BaseController):
             evicted.last_demotion_time = state.current_time
             self._demotions += 1
             self._epoch_demotions += 1
+            # === NEW v2: Track evicted pages in shadow tier for regret detection ===
+            self._shadow_tier.add(evicted.page_id)
             return True
         else:
             # BCVF rejected demotion - put back in tier0 (LRU position)
@@ -1086,10 +1316,16 @@ class CTMPlusController(BaseController):
             "tier_coherence": self._scc.compute_tier_coherence,
             "neighbor_boosts": self._neighbor_boosts,
             "tracked_neighbors": len(self._neighbor_tracker._neighbors),
-            # NEW: Predictive component stats
+            # Predictive component stats
             "prefetch_promotions": self._prefetch_promotions,
             "prefetch_hit_rate": self._prefetch_engine.prefetch_hit_rate,
             "total_prefetches": self._prefetch_engine.total_prefetches,
+            "prefetch_budget": self._prefetch_engine.budget_per_1k,
             "admission_bypass_rate": self._admission_controller.bypass_rate,
+            "scan_pressure": self._admission_controller.scan_pressure,
             "transition_count": self._transition_tracker._total_transitions,
+            # NEW v2: Shadow tier stats
+            "shadow_hit_promotions": self._shadow_hit_promotions,
+            "shadow_hit_rate": self._shadow_tier.shadow_hit_rate,
+            "shadow_tier_size": len(self._shadow_tier._pages),
         }
