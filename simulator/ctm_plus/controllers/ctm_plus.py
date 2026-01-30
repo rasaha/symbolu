@@ -1,7 +1,7 @@
 """
 CTM+ (Coherence-Tier Memory Plus) Controller.
 
-Final implementation with ChatGPT's critical fixes:
+Final implementation with ChatGPT's critical fixes + Phase-Adaptive Mode Switcher:
 1. Phase Integrator: Learns access patterns via streaming accumulator.
 2. USE Coherence: Computes pairwise phase correlation for locality.
 3. BCVF Gate: Bidirectional verification for promotion/demotion.
@@ -9,6 +9,7 @@ Final implementation with ChatGPT's critical fixes:
 5. Dual Shadow Tier: ARC-like B1/B2 ghost caches with adaptive p.
 6. Predictive Prefetch: Markov model with burst prefetch.
 7. Admission Controller: Scan resistance with regret-based panic mode.
+8. Mode Switcher: Online workload classifier with hysteresis.
 
 Key fixes from ChatGPT review:
 - Fixed miss admission bug (was always inserting to Tier0)
@@ -18,6 +19,12 @@ Key fixes from ChatGPT review:
 - Fixed Panic Mode to trigger on regret-on-miss, not raw shadow contains
 - Fixed get_stats() returning function instead of value
 - Fixed SCC config mutation (mutate fields, don't reconstruct)
+
+Phase-Adaptive Mode Switcher (ChatGPT design):
+- 5 modes: SCAN, LOOP, HOTSET, CLUSTER, MIXED
+- Online signals: sequentiality, loop rate, hot concentration, etc.
+- Hysteresis + confidence to prevent thrashing
+- Changes parameters, not algorithms
 """
 
 import math
@@ -30,6 +37,7 @@ if TYPE_CHECKING:
     pass  # For forward references
 
 from .base import BaseController
+from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType
 from ..core.config import SimulatorConfig, CTMPlusConfig
 
@@ -444,7 +452,7 @@ class DualShadowTier:
 
 
 class AdmissionController:
-    """Probabilistic admission controller with regret-based panic mode."""
+    """Probabilistic admission controller with regret-based panic mode and mode-adaptive parameters."""
 
     def __init__(self):
         self._last_pages: deque = deque(maxlen=8)
@@ -460,22 +468,34 @@ class AdmissionController:
         cluster_score: float,
         access_count: int,
         regret_on_miss_rate: float,
-        is_regret: bool
+        is_regret: bool,
+        # Mode policy parameters
+        admission_threshold_scale: float = 1.0,
+        scan_penalty: float = 0.3,
+        bypass_boost: float = 0.0,
+        regret_threshold: float = 0.15,
+        force_promote_on_regret: bool = True
     ) -> bool:
         """
         Decide admission with regret-based panic mode.
 
         FIX: Panic mode triggers on regret-on-miss rate, not raw shadow contains.
         FIX: Also force admit on direct regret (ghost hit on this miss).
+
+        Mode-adaptive parameters:
+        - admission_threshold_scale: Multiplier for admission probability
+        - scan_penalty: Penalty for sequential access patterns
+        - bypass_boost: Extra bypass probability
+        - regret_threshold: Threshold for panic mode
+        - force_promote_on_regret: Whether to force admit on ghost hit
         """
         # Direct regret: this specific miss was a ghost hit
-        if is_regret:
+        if is_regret and force_promote_on_regret:
             self.admits += 1
             return True
 
         # PANIC MODE: High regret-on-miss rate indicates temporal loop failure
-        # Use a short window and higher threshold than before
-        if regret_on_miss_rate > 0.15:  # 15% of recent misses were regrets
+        if regret_on_miss_rate > regret_threshold:
             self._panic_mode = True
             self.admits += 1
             return True
@@ -493,9 +513,19 @@ class AdmissionController:
                 self._sequential_count = 0
         self._last_pages.append(page_id)
 
+        # Apply mode-adaptive scan penalty
         stream_score = 1.0 if is_sequential else 0.0
-        raw_score = 0.4 * reuse_score + 0.3 * cluster_score - 0.3 * stream_score
+        raw_score = 0.4 * reuse_score + 0.3 * cluster_score - scan_penalty * stream_score
+
+        # Compute base admission probability
         p_admit = 1.0 / (1.0 + math.exp(-4.0 * (raw_score - 0.3)))
+
+        # Apply admission threshold scale
+        p_admit = p_admit * admission_threshold_scale
+
+        # Apply bypass boost (negative means less bypassing)
+        p_admit = max(0.0, min(1.0, p_admit - bypass_boost))
+
         if access_count > 1:
             p_admit = min(1.0, p_admit + 0.2)
 
@@ -513,7 +543,7 @@ class AdmissionController:
 
 
 class PrefetchEngine:
-    """Budgeted prefetch engine with burst support."""
+    """Budgeted prefetch engine with burst support and mode-adaptive parameters."""
 
     def __init__(self, budget_per_1k=20, min_probability=0.25):
         self.budget_per_1k = budget_per_1k
@@ -525,21 +555,36 @@ class PrefetchEngine:
         self.prefetch_misses = 0
         self._pending_prefetches: set = set()
 
-    def should_prefetch(self, probability: float) -> bool:
-        budget_remaining = self.budget_per_1k - self._prefetches_this_epoch
-        if budget_remaining <= 0 or probability < self.min_probability:
+    def should_prefetch(
+        self,
+        probability: float,
+        prefetch_enabled: bool = True,
+        budget_scale: float = 1.0,
+        min_prob_override: float = None
+    ) -> bool:
+        """Check if prefetch should happen, considering mode policy."""
+        if not prefetch_enabled:
+            return False
+
+        effective_budget = int(self.budget_per_1k * budget_scale)
+        budget_remaining = effective_budget - self._prefetches_this_epoch
+
+        effective_min_prob = min_prob_override if min_prob_override is not None else self.min_probability
+
+        if budget_remaining <= 0 or probability < effective_min_prob:
             return False
         return True
 
-    def get_burst_size(self, top_probability: float) -> int:
+    def get_burst_size(self, top_probability: float, max_burst: int = 3) -> int:
         """
         FIX: Burst prefetch when probability mass supports it.
         Higher confidence → prefetch more pages.
+        Mode policy can limit max_burst.
         """
         if top_probability > 0.5:
-            return 3
+            return min(3, max_burst)
         elif top_probability > 0.3:
-            return 2
+            return min(2, max_burst)
         return 1
 
     def record_prefetch(self, page_id: int):
@@ -586,6 +631,16 @@ class CTMPlusController(BaseController):
         # FIX: Dual Shadow Tier (ARC-like B1/B2) instead of single FIFO
         self._shadow_tier = DualShadowTier(max_size=config.tier0_size)
 
+        # Phase-Adaptive Mode Switcher
+        self._mode_switcher = ModeSwitchController(
+            temperature=1.0,
+            switch_confidence=0.65,
+            persistence_windows=3,
+            min_switch_interval=2000,
+            window_size=512
+        )
+        self._current_policy: ModePolicy = self._mode_switcher.current_policy
+
         # Stats
         self._promotions = 0
         self._demotions = 0
@@ -624,16 +679,30 @@ class CTMPlusController(BaseController):
         page.amplitude = max(page.amplitude, amplitude)
         page.update_on_access(state.current_time, op_type)
 
-        # Boost neighbors
+        # Get neighbor hotness early (needed for mode switcher)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
+
+        # Update mode switcher and get current policy
+        is_tier0_hit = state.tier0.contains(page_id)
+        _, policy, _ = self._mode_switcher.record_access(
+            page_id=page_id,
+            is_tier0_hit=is_tier0_hit,
+            neighbor_hotness=neighbor_hotness,
+            shadow_hit_rate=self._shadow_tier.regret_on_miss_rate,
+            was_eviction=False
+        )
+        self._current_policy = policy
+
+        # Boost neighbors (scaled by policy)
+        neighbor_boost_amount = 0.02 * policy.neighbor_boost_scale
         for nid in self._neighbor_tracker.get_neighbors(page_id):
             if nid in state.all_pages:
-                state.all_pages[nid].coherence = min(1.0, state.all_pages[nid].coherence + 0.02)
+                state.all_pages[nid].coherence = min(1.0, state.all_pages[nid].coherence + neighbor_boost_amount)
                 self._neighbor_boosts += 1
 
         # Scores
         mean_phase = state.global_mean_phase
         fast_coh = self._coherence.fast_coherence(page, mean_phase)
-        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
         reuse_score = self._transition_tracker.get_reuse_score(page_id)
 
         promoted = False
@@ -643,7 +712,7 @@ class CTMPlusController(BaseController):
         if state.tier0.contains(page_id):
             state.tier0.touch(page_id)
             state.tier0.record_hit()
-            self._do_predictive_prefetch(state, page_id)
+            self._do_predictive_prefetch(state, page_id, policy)
             latency = self._compute_latency(Tier.TIER0, False, False)
             return (Tier.TIER0, latency, False, False)
 
@@ -668,7 +737,10 @@ class CTMPlusController(BaseController):
                     # Favor recency: weight coherence higher
                     combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
 
-                should_promote, _ = self._bcvf.should_promote(page, state, combined_score * 0.4)
+                # Apply mode policy: higher bcvf_threshold_scale = harder to promote
+                # We scale the predicted improvement down to make promotion harder
+                scaled_improvement = combined_score * 0.4 / policy.bcvf_threshold_scale
+                should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
 
             if should_promote:
                 state.tier1.remove(page_id)
@@ -681,7 +753,7 @@ class CTMPlusController(BaseController):
                 if evicted is not None:
                     demoted = self._handle_eviction(state, evicted)
 
-                self._do_predictive_prefetch(state, page_id)
+                self._do_predictive_prefetch(state, page_id, policy)
 
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             return (Tier.TIER1, latency, promoted, demoted)
@@ -697,7 +769,13 @@ class CTMPlusController(BaseController):
             cluster_score=neighbor_hotness,
             access_count=page.access_count,
             regret_on_miss_rate=regret_rate,
-            is_regret=is_regret
+            is_regret=is_regret,
+            # Mode policy parameters
+            admission_threshold_scale=policy.admission_threshold_scale,
+            scan_penalty=policy.scan_penalty,
+            bypass_boost=policy.bypass_boost,
+            regret_threshold=policy.regret_threshold,
+            force_promote_on_regret=policy.force_promote_on_regret
         )
 
         # FIX: Properly handle admission decision
@@ -725,23 +803,37 @@ class CTMPlusController(BaseController):
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         return (Tier.NONE, latency, promoted, demoted)
 
-    def _do_predictive_prefetch(self, state: GlobalState, current_page: int) -> None:
+    def _do_predictive_prefetch(self, state: GlobalState, current_page: int, policy: ModePolicy = None) -> None:
         """
         FIX: Burst prefetch with gating based on probability mass.
+        Mode-adaptive: respects policy.prefetch_enabled, budget_scale, min_prob, burst_size.
         """
+        # Use current policy if not provided
+        if policy is None:
+            policy = self._current_policy
+
+        # Check if prefetch is enabled for current mode
+        if not policy.prefetch_enabled:
+            return
+
         predictions = self._transition_tracker.get_top_predictions(current_page, k=4)
         if not predictions:
             return
 
-        # Determine burst size based on confidence
+        # Determine burst size based on confidence and policy
         top_prob = predictions[0][1] if predictions else 0.0
-        burst_size = self._prefetch_engine.get_burst_size(top_prob)
+        burst_size = self._prefetch_engine.get_burst_size(top_prob, max_burst=policy.prefetch_burst_size)
         prefetched = 0
 
         for next_page, prob in predictions:
             if prefetched >= burst_size:
                 break
-            if not self._prefetch_engine.should_prefetch(prob):
+            if not self._prefetch_engine.should_prefetch(
+                prob,
+                prefetch_enabled=policy.prefetch_enabled,
+                budget_scale=policy.prefetch_budget_scale,
+                min_prob_override=policy.prefetch_min_prob
+            ):
                 continue
 
             page = state.all_pages.get(next_page)
@@ -771,7 +863,11 @@ class CTMPlusController(BaseController):
 
         FIX: Don't re-add evicted page to tier0 (causes infinite loop).
         Instead, use victim selection before eviction if protection is needed.
+        Mode-adaptive: uses policy.neighbor_protection and bcvf_demote_strictness.
         """
+        # Get current policy
+        policy = self._current_policy
+
         # Get evicted page's reuse score for classification
         evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
         neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(evicted.page_id, state)
@@ -782,7 +878,8 @@ class CTMPlusController(BaseController):
 
         should_demote, _ = self._bcvf.should_demote(evicted, state)
 
-        if should_demote or neighbor_hotness <= 0.6:
+        # Use policy's neighbor_protection threshold
+        if should_demote or neighbor_hotness <= policy.neighbor_protection:
             # Demote to tier1
             state.tier1.add(evicted)
             evicted.last_demotion_time = state.current_time
@@ -830,6 +927,9 @@ class CTMPlusController(BaseController):
         )
 
     def get_stats(self) -> dict:
+        # Get mode switcher stats
+        mode_stats = self._mode_switcher.get_stats()
+
         return {
             "promotions": self._promotions,
             "demotions": self._demotions,
@@ -851,4 +951,10 @@ class CTMPlusController(BaseController):
             "shadow_p": self._shadow_tier.p,
             "regret_on_miss_rate": self._shadow_tier.regret_on_miss_rate,
             "tier1_admissions": self._tier1_admissions,
+            # Mode switcher stats
+            "mode_current": mode_stats["current_mode"],
+            "mode_confidence": mode_stats["mode_confidence"],
+            "mode_switches": mode_stats["mode_switches"],
+            "mode_time_fractions": mode_stats["mode_time_fractions"],
+            "mode_signals": mode_stats["signals"],
         }
