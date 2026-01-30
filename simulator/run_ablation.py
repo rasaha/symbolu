@@ -5,7 +5,6 @@ Ablation study for CTM+ components.
 Tests different combinations of:
 - enable_smart_victim: Use CTM+ victim selection vs LRU
 - enable_bcvf_gate: Use BCVF promotion gate vs always promote
-- enable_admission_control: Use admission controller vs always admit
 
 Usage:
     python3 simulator/run_ablation.py [--temporal-only]
@@ -28,14 +27,13 @@ class AblationConfig:
     name: str
     smart_victim: bool
     bcvf_gate: bool
-    admission_control: bool
 
 
 CONFIGS = [
-    AblationConfig("baseline", True, True, True),
-    AblationConfig("no_bcvf", True, False, True),
-    AblationConfig("no_admission", True, True, False),
-    AblationConfig("no_bcvf_no_admission", True, False, False),
+    AblationConfig("baseline", True, True),
+    AblationConfig("no_bcvf", True, False),
+    AblationConfig("no_smart_victim", False, True),
+    AblationConfig("lru_fallback", False, False),
 ]
 
 
@@ -86,7 +84,6 @@ def run_ablation(temporal_only: bool = False, num_events: int = 50000):
             ctm_config = CTMPlusConfig(
                 enable_smart_victim=cfg.smart_victim,
                 enable_bcvf_gate=cfg.bcvf_gate,
-                enable_admission_control=cfg.admission_control,
             )
             ctm = CTMPlusController(config, ctm_config=ctm_config)
 
@@ -102,8 +99,8 @@ def run_ablation(temporal_only: bool = False, num_events: int = 50000):
             flags = []
             if not cfg.bcvf_gate:
                 flags.append("!BCVF")
-            if not cfg.admission_control:
-                flags.append("!ADM")
+            if not cfg.smart_victim:
+                flags.append("!SMART")
             flag_str = f" [{', '.join(flags)}]" if flags else ""
 
             sign = "+" if delta >= 0 else ""

@@ -448,97 +448,6 @@ class DualShadowTier:
         return self.p > 0.5
 
 
-class AdmissionController:
-    """Probabilistic admission controller with regret-based panic mode and mode-adaptive parameters."""
-
-    def __init__(self):
-        self._last_pages: deque = deque(maxlen=8)
-        self._sequential_count = 0
-        self.admits = 0
-        self.bypasses = 0
-        self._panic_mode = False
-
-    def should_admit(
-        self,
-        page_id: int,
-        reuse_score: float,
-        cluster_score: float,
-        access_count: int,
-        regret_on_miss_rate: float,
-        is_regret: bool,
-        # Mode policy parameters
-        admission_threshold_scale: float = 1.0,
-        scan_penalty: float = 0.3,
-        bypass_boost: float = 0.0,
-        regret_threshold: float = 0.15,
-        force_promote_on_regret: bool = True
-    ) -> bool:
-        """
-        Decide admission with regret-based panic mode.
-
-        FIX: Panic mode triggers on regret-on-miss rate, not raw shadow contains.
-        FIX: Also force admit on direct regret (ghost hit on this miss).
-
-        Mode-adaptive parameters:
-        - admission_threshold_scale: Multiplier for admission probability
-        - scan_penalty: Penalty for sequential access patterns
-        - bypass_boost: Extra bypass probability
-        - regret_threshold: Threshold for panic mode
-        - force_promote_on_regret: Whether to force admit on ghost hit
-        """
-        # Direct regret: this specific miss was a ghost hit
-        if is_regret and force_promote_on_regret:
-            self.admits += 1
-            return True
-
-        # PANIC MODE: High regret-on-miss rate indicates temporal loop failure
-        if regret_on_miss_rate > regret_threshold:
-            self._panic_mode = True
-            self.admits += 1
-            return True
-        else:
-            self._panic_mode = False
-
-        # Sequential Scan Detection
-        is_sequential = False
-        if self._last_pages:
-            if abs(page_id - self._last_pages[-1]) <= 2:
-                self._sequential_count += 1
-                if self._sequential_count > 4:
-                    is_sequential = True
-            else:
-                self._sequential_count = 0
-        self._last_pages.append(page_id)
-
-        # Apply mode-adaptive scan penalty
-        stream_score = 1.0 if is_sequential else 0.0
-        raw_score = 0.4 * reuse_score + 0.3 * cluster_score - scan_penalty * stream_score
-
-        # Compute base admission probability
-        p_admit = 1.0 / (1.0 + math.exp(-4.0 * (raw_score - 0.3)))
-
-        # Apply admission threshold scale
-        p_admit = p_admit * admission_threshold_scale
-
-        # Apply bypass boost (negative means less bypassing)
-        p_admit = max(0.0, min(1.0, p_admit - bypass_boost))
-
-        if access_count > 1:
-            p_admit = min(1.0, p_admit + 0.2)
-
-        admit = random.random() < p_admit
-        if admit:
-            self.admits += 1
-        else:
-            self.bypasses += 1
-        return admit
-
-    @property
-    def bypass_rate(self) -> float:
-        total = self.admits + self.bypasses
-        return self.bypasses / total if total > 0 else 0.0
-
-
 class PrefetchEngine:
     """Budgeted prefetch engine with burst support and mode-adaptive parameters."""
 
@@ -622,7 +531,6 @@ class CTMPlusController(BaseController):
         self._scc = SCCOptimizer(self.ctm_config)
         self._neighbor_tracker = NeighborTracker()
         self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
-        self._admission_controller = AdmissionController()
         self._prefetch_engine = PrefetchEngine(budget_per_1k=20, min_probability=0.25)
 
         # FIX: Dual Shadow Tier (ARC-like B1/B2) instead of single FIFO
@@ -648,7 +556,6 @@ class CTMPlusController(BaseController):
         self._prefetch_promotions = 0
         self._epoch_promotions = 0
         self._epoch_demotions = 0
-        self._tier1_admissions = 0
         self._smart_victim_selections = 0
 
     @property
@@ -900,53 +807,25 @@ class CTMPlusController(BaseController):
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             return (Tier.TIER1, latency, promoted, demoted)
 
-        # Case 3: Miss (Admission decision)
-        # FIX: Check regret on actual miss only
-        is_regret, ghost_type = self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
-        regret_rate = self._shadow_tier.regret_on_miss_rate
+        # Case 3: Miss - Always admit to Tier0
+        # NOTE: Admission controller was removed as it hurt temporal workloads
+        # by mistaking temporal locality for sequential scans
+        self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
-        # Ablation: bypass admission controller if disabled
-        if not self.ctm_config.enable_admission_control:
-            should_admit = True  # Always admit to tier0 without admission control
-        else:
-            should_admit = self._admission_controller.should_admit(
-                page_id=page_id,
-                reuse_score=reuse_score,
-                cluster_score=neighbor_hotness,
-                access_count=page.access_count,
-                regret_on_miss_rate=regret_rate,
-                is_regret=is_regret,
-                # Mode policy parameters
-                admission_threshold_scale=policy.admission_threshold_scale,
-                scan_penalty=policy.scan_penalty,
-                bypass_boost=policy.bypass_boost,
-                regret_threshold=policy.regret_threshold,
-                force_promote_on_regret=policy.force_promote_on_regret
-            )
+        # EXPLICIT VICTIM SELECTION before admission
+        evicted = None
+        if state.tier0.is_full:
+            victim = self._select_victim(state)
+            if victim:
+                state.tier0.remove(victim.page_id)
+                evicted = victim
 
-        # Handle admission decision with EXPLICIT VICTIM SELECTION
-        # If should_admit=False, go to Tier1
-        # If should_admit=True, go to Tier0 (with smart victim selection if full)
-        if should_admit:
-            # EXPLICIT VICTIM SELECTION (the key change)
-            # Select victim BEFORE eviction, not after
-            evicted = None
-            if state.tier0.is_full:
-                victim = self._select_victim(state)
-                if victim:
-                    state.tier0.remove(victim.page_id)
-                    evicted = victim
+        state.tier0.add(page)
+        promoted = True
+        self._promotions += 1
 
-            state.tier0.add(page)
-            promoted = True
-            self._promotions += 1
-
-            if evicted is not None:
-                demoted = self._handle_eviction(state, evicted)
-        else:
-            # Admit to Tier1 when admission controller says no
-            state.tier1.add(page)
-            self._tier1_admissions += 1
+        if evicted is not None:
+            demoted = self._handle_eviction(state, evicted)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         return (Tier.NONE, latency, promoted, demoted)
@@ -1074,14 +953,12 @@ class CTMPlusController(BaseController):
             "prefetch_promotions": self._prefetch_promotions,
             "prefetch_hit_rate": self._prefetch_engine.prefetch_hit_rate,
             "total_prefetches": self._prefetch_engine.total_prefetches,
-            "admission_bypass_rate": self._admission_controller.bypass_rate,
             "transition_count": self._transition_tracker._total_transitions,
             # Shadow tier stats (ARC-like)
             "shadow_b1_hits": self._shadow_tier.b1_hits,
             "shadow_b2_hits": self._shadow_tier.b2_hits,
             "shadow_p": self._shadow_tier.p,
             "regret_on_miss_rate": self._shadow_tier.regret_on_miss_rate,
-            "tier1_admissions": self._tier1_admissions,
             # Victim selection stats
             "smart_victim_selections": self._smart_victim_selections,
             "smart_victim_enabled": self.ctm_config.enable_smart_victim,
