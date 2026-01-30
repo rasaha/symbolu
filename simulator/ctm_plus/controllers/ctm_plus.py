@@ -1,16 +1,18 @@
 """
 CTM+ (Coherence-Tier Memory Plus) Controller.
 
-Final implementation with all ChatGPT improvements:
+Core components:
 1. Phase Integrator: Learns access patterns via streaming accumulator.
 2. USE Coherence: Computes pairwise phase correlation for locality.
-3. BCVF Gate: Bidirectional verification for promotion/demotion.
-4. SCC Optimizer: Self-tunes parameters based on global coherence.
-5. Dual Shadow Tier: ARC-like B1/B2 ghost caches with adaptive p.
-6. Predictive Prefetch: Markov model with burst prefetch.
-7. Admission Controller: Scan resistance with regret-based panic mode.
-8. Mode Switcher: Online workload classifier with hysteresis.
-9. Smart Victim Selection: Pre-eviction scoring with ARC-style partitioning.
+3. Dual Shadow Tier: ARC-like B1/B2 ghost caches with adaptive p.
+4. Predictive Prefetch: Markov model with burst prefetch.
+5. Mode Switcher: Online workload classifier with hysteresis.
+6. Smart Victim Selection: Pre-eviction scoring with ARC-style partitioning.
+
+Removed components (ablation showed no impact):
+- BCVF Gate: Had zero effect on hit rate
+- SCC Optimizer: Depended on BCVF
+- Admission Controller: Hurt temporal workloads by mistaking locality for scans
 
 Key architectural changes:
 - Explicit victim selection BEFORE eviction (not post-hoc protection)
@@ -26,7 +28,6 @@ CTM+ vs ARC distinction:
 
 import math
 import random
-from dataclasses import replace
 from typing import Tuple, List, Optional, Dict, TYPE_CHECKING
 from collections import deque
 
@@ -137,110 +138,6 @@ class CoherenceComputer:
             phi_j = hist_j[-(k + 1)] if k < len(hist_j) else hist_j[0]
             total += math.cos(phi_i - phi_j)
         return total / min_len
-
-
-class BCVFGate:
-    """BCVF (Bidirectional Coherence Verification Framework) decision gate."""
-
-    def __init__(self, config: CTMPlusConfig):
-        self.config = config.bcvf
-        self._rejections = 0
-        self._approvals = 0
-
-    def should_promote(self, page: PageState, state: GlobalState, predicted_hit_improvement: float = 0.1) -> Tuple[bool, float]:
-        s_f = self._forward_score_promote(page, predicted_hit_improvement)
-        s_b = self._backward_score(page)
-        L = (self.config.lambda_f * (1 - s_f) ** 2 +
-             self.config.lambda_b * (1 - s_b) ** 2 +
-             self.config.lambda_c * (s_f - s_b) ** 2)
-        w = math.exp(-self.config.beta * L)
-        approved = w > self.config.threshold
-        if approved:
-            self._approvals += 1
-        else:
-            self._rejections += 1
-        return (approved, w)
-
-    def should_demote(self, page: PageState, state: GlobalState) -> Tuple[bool, float]:
-        s_f = self._forward_score_demote(page)
-        s_b = self._backward_score_demote(page)
-        L = (self.config.lambda_f * (1 - s_f) ** 2 +
-             self.config.lambda_b * (1 - s_b) ** 2 +
-             self.config.lambda_c * (s_f - s_b) ** 2)
-        w = math.exp(-self.config.beta * L)
-        approved = w > self.config.threshold
-        return (approved, w)
-
-    def _forward_score_promote(self, page, hit_imp):
-        score = self.config.alpha_latency * min(1.0, hit_imp * 2) + self.config.alpha_miss * page.amplitude
-        return 1.0 / (1.0 + math.exp(-score * 4))
-
-    def _forward_score_demote(self, page):
-        return 1.0 - page.amplitude
-
-    def _backward_score(self, page):
-        score = (self.config.beta_heat * (1 - page.heat) +
-                 self.config.beta_coherence * page.coherence +
-                 self.config.beta_uncertainty * (1 - page.uncertainty) +
-                 self.config.beta_drift * (1 - page.drift))
-        return 1.0 / (1.0 + math.exp(-score * 4))
-
-    def _backward_score_demote(self, page):
-        score = (self.config.beta_heat * (1 - page.heat) +
-                 self.config.beta_coherence * (1 - page.coherence) +
-                 self.config.beta_uncertainty * page.uncertainty)
-        return 1.0 / (1.0 + math.exp(-score * 4))
-
-    @property
-    def rejection_rate(self) -> float:
-        total = self._rejections + self._approvals
-        return self._rejections / total if total > 0 else 0.0
-
-
-class SCCOptimizer:
-    """SCC (Semantic Coherence Controller) for self-tuning parameters."""
-
-    def __init__(self, config: CTMPlusConfig):
-        self.config = config.scc
-        self.threshold = config.bcvf.threshold
-        self.beta = config.bcvf.beta
-        self._coherence_history: deque = deque(maxlen=10)
-        self._threshold_history: deque = deque(maxlen=10)
-
-    def compute_tier_coherence(self, state: GlobalState) -> float:
-        tier0_pages = list(state.tier0.pages.values())
-        if not tier0_pages:
-            return 0.0
-        c_bar = sum(p.coherence for p in tier0_pages) / len(tier0_pages)
-        r_bar = state.tier0.hit_rate
-        u_bar = sum(1 - p.uncertainty for p in tier0_pages) / len(tier0_pages)
-        if len(tier0_pages) > 1:
-            phases = [p.phase for p in tier0_pages]
-            mean = sum(phases) / len(phases)
-            var = sum((p - mean) ** 2 for p in phases) / len(phases)
-            p_bar = 1.0 / (1.0 + var)
-        else:
-            p_bar = 0.5
-        return (self.config.alpha * c_bar + self.config.beta * r_bar +
-                self.config.gamma * u_bar + self.config.delta * p_bar)
-
-    def update(self, state: GlobalState, bcvf: BCVFGate) -> None:
-        curr_coh = self.compute_tier_coherence(state)
-        self._coherence_history.append(curr_coh)
-        self._threshold_history.append(self.threshold)
-        if len(self._coherence_history) < 3:
-            return
-
-        c_prev, c_curr = self._coherence_history[-2], self._coherence_history[-1]
-        t_prev, t_curr = self._threshold_history[-2], self._threshold_history[-1]
-
-        grad = (c_curr - c_prev) / (t_curr - t_prev + 1e-6) if abs(t_curr - t_prev) > 1e-6 else 0.0
-        self.threshold = max(0.3, min(0.9, self.threshold + self.config.learning_rate * grad))
-
-        if bcvf.rejection_rate > 0.5:
-            self.beta = min(5.0, self.beta * 1.01)
-        elif bcvf.rejection_rate < 0.1:
-            self.beta = max(1.0, self.beta * 0.99)
 
 
 class NeighborTracker:
@@ -527,8 +424,6 @@ class CTMPlusController(BaseController):
         # Components
         self._phase_integrator = PhaseIntegrator(self.ctm_config)
         self._coherence = CoherenceComputer(self.ctm_config)
-        self._bcvf = BCVFGate(self.ctm_config)
-        self._scc = SCCOptimizer(self.ctm_config)
         self._neighbor_tracker = NeighborTracker()
         self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
         self._prefetch_engine = PrefetchEngine(budget_per_1k=20, min_probability=0.25)
@@ -549,7 +444,6 @@ class CTMPlusController(BaseController):
         # Stats
         self._promotions = 0
         self._demotions = 0
-        self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time: Dict[int, int] = {}
         self._neighbor_boosts = 0
@@ -771,15 +665,9 @@ class CTMPlusController(BaseController):
                         # Favor recency: weight coherence higher
                         combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
 
-                    # Apply mode policy: higher bcvf_threshold_scale = harder to promote
-                    # We scale the predicted improvement down to make promotion harder
-                    scaled_improvement = combined_score * 0.4 / policy.bcvf_threshold_scale
-
-                    # Ablation: bypass BCVF gate if disabled
-                    if not self.ctm_config.enable_bcvf_gate:
-                        should_promote = True  # Always promote without BCVF
-                    else:
-                        should_promote, _ = self._bcvf.should_promote(page, state, scaled_improvement)
+                    # NOTE: BCVF gate removed - ablation showed no effect on hit rate
+                    # Simply promote based on combined score threshold
+                    should_promote = combined_score > 0.3
 
             if should_promote:
                 state.tier1.remove(page_id)
@@ -927,14 +815,6 @@ class CTMPlusController(BaseController):
 
         # FIX: Use co-occurrence neighbors for coherence, not sorted ID adjacency
         self._coherence.slow_update(state, self._neighbor_tracker)
-        self._scc.update(state, self._bcvf)
-
-        # FIX: Use dataclasses.replace() for frozen dataclass
-        self._bcvf.config = replace(
-            self._bcvf.config,
-            threshold=self._scc.threshold,
-            beta=self._scc.beta
-        )
 
     def get_stats(self) -> dict:
         # Get mode switcher stats
@@ -943,10 +823,6 @@ class CTMPlusController(BaseController):
         return {
             "promotions": self._promotions,
             "demotions": self._demotions,
-            "bcvf_rejections": self._bcvf_rejections,
-            "bcvf_rejection_rate": self._bcvf.rejection_rate,
-            "scc_threshold": self._scc.threshold,
-            "scc_beta": self._scc.beta,
             # FIX: Call the function with state argument
             "neighbor_boosts": self._neighbor_boosts,
             "tracked_neighbors": len(self._neighbor_tracker._neighbors),

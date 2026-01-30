@@ -2,9 +2,7 @@
 """
 Ablation study for CTM+ components.
 
-Tests different combinations of:
-- enable_smart_victim: Use CTM+ victim selection vs LRU
-- enable_bcvf_gate: Use BCVF promotion gate vs always promote
+Tests enable_smart_victim: Use CTM+ victim selection vs LRU fallback
 
 Usage:
     python3 simulator/run_ablation.py [--temporal-only]
@@ -26,14 +24,11 @@ from ctm_plus.traces import generate_synthetic_trace
 class AblationConfig:
     name: str
     smart_victim: bool
-    bcvf_gate: bool
 
 
 CONFIGS = [
-    AblationConfig("baseline", True, True),
-    AblationConfig("no_bcvf", True, False),
-    AblationConfig("no_smart_victim", False, True),
-    AblationConfig("lru_fallback", False, False),
+    AblationConfig("baseline", True),
+    AblationConfig("lru_fallback", False),
 ]
 
 
@@ -83,7 +78,6 @@ def run_ablation(temporal_only: bool = False, num_events: int = 50000):
         for cfg in CONFIGS:
             ctm_config = CTMPlusConfig(
                 enable_smart_victim=cfg.smart_victim,
-                enable_bcvf_gate=cfg.bcvf_gate,
             )
             ctm = CTMPlusController(config, ctm_config=ctm_config)
 
@@ -96,12 +90,7 @@ def run_ablation(temporal_only: bool = False, num_events: int = 50000):
 
             results[workload_name][cfg.name] = hit_rate
 
-            flags = []
-            if not cfg.bcvf_gate:
-                flags.append("!BCVF")
-            if not cfg.smart_victim:
-                flags.append("!SMART")
-            flag_str = f" [{', '.join(flags)}]" if flags else ""
+            flag_str = " [!SMART]" if not cfg.smart_victim else ""
 
             sign = "+" if delta >= 0 else ""
             print(f"  {cfg.name:25s}: {hit_rate:.2%} ({sign}{delta:.2%} vs ARC){flag_str}")
