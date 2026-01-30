@@ -13,7 +13,10 @@ existing DRAM+NAND behave smarter.
 
 import math
 import random
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # For forward references
 from collections import deque
 from .base import BaseController
 from ..core.state import GlobalState, PageState, Tier, OpType
@@ -442,6 +445,342 @@ class SCCOptimizer:
             self.beta = max(1.0, self.beta * 0.99)
 
 
+class NeighborTracker:
+    """
+    Tracks co-occurrence patterns to identify correlated pages.
+
+    Maintains a sliding window of recent accesses and builds a
+    neighbor map: page_id -> list of frequently co-accessed pages.
+
+    This enables CTM+ to exploit structure that LRU cannot see.
+    """
+
+    def __init__(self, window_size: int = 16, top_k: int = 8, min_count: int = 3):
+        self.window_size = window_size
+        self.top_k = top_k
+        self.min_count = min_count
+
+        # Recent access window
+        self._recent: deque = deque(maxlen=window_size)
+
+        # Co-occurrence counts: (page_a, page_b) -> count
+        self._cooccurrence: Dict[Tuple[int, int], int] = {}
+
+        # Cached neighbor lists: page_id -> [neighbor_ids]
+        self._neighbors: Dict[int, List[int]] = {}
+
+        # Update interval (rebuild neighbors every N accesses)
+        self._access_count = 0
+        self._rebuild_interval = 1000
+
+    def record_access(self, page_id: int) -> None:
+        """Record an access and update co-occurrence."""
+        # Update co-occurrence with recent pages
+        for recent_page in self._recent:
+            if recent_page != page_id:
+                key = (min(page_id, recent_page), max(page_id, recent_page))
+                self._cooccurrence[key] = self._cooccurrence.get(key, 0) + 1
+
+        self._recent.append(page_id)
+        self._access_count += 1
+
+        # Periodically rebuild neighbor lists
+        if self._access_count % self._rebuild_interval == 0:
+            self._rebuild_neighbors()
+
+    def get_neighbors(self, page_id: int) -> List[int]:
+        """Get top-K neighbors for a page."""
+        return self._neighbors.get(page_id, [])
+
+    def _rebuild_neighbors(self) -> None:
+        """Rebuild neighbor lists from co-occurrence data."""
+        # Group by page
+        page_counts: Dict[int, List[Tuple[int, int]]] = {}
+
+        for (a, b), count in self._cooccurrence.items():
+            if count >= self.min_count:
+                if a not in page_counts:
+                    page_counts[a] = []
+                if b not in page_counts:
+                    page_counts[b] = []
+                page_counts[a].append((b, count))
+                page_counts[b].append((a, count))
+
+        # Build top-K neighbor lists
+        self._neighbors = {}
+        for page_id, neighbors in page_counts.items():
+            # Sort by count descending, take top K
+            neighbors.sort(key=lambda x: x[1], reverse=True)
+            self._neighbors[page_id] = [n[0] for n in neighbors[:self.top_k]]
+
+    def get_neighbor_hotness(self, page_id: int, state: 'GlobalState') -> float:
+        """
+        Compute how "hot" a page's neighbors are.
+
+        Returns a score [0, 1] based on how many neighbors are in tier0.
+        """
+        neighbors = self.get_neighbors(page_id)
+        if not neighbors:
+            return 0.0
+
+        in_tier0 = sum(1 for n in neighbors if state.tier0.contains(n))
+        return in_tier0 / len(neighbors)
+
+
+class TransitionTracker:
+    """
+    Markov transition model: tracks P(next=j | current=i).
+
+    This is the key differentiator from ARC - we can predict
+    what's coming next, not just what was recently accessed.
+
+    Uses exponential decay to adapt to changing patterns.
+    """
+
+    def __init__(self, top_m: int = 8, decay: float = 0.95):
+        self.top_m = top_m
+        self.decay = decay
+
+        # Transition counts: current_page -> {next_page: score}
+        self._transitions: Dict[int, Dict[int, float]] = {}
+
+        # Last accessed page (for building transitions)
+        self._last_page: Optional[int] = None
+
+        # Stats
+        self._total_transitions = 0
+
+    def record_access(self, page_id: int) -> None:
+        """Record a transition from last page to current page."""
+        if self._last_page is not None and self._last_page != page_id:
+            # Update transition: last_page -> page_id
+            if self._last_page not in self._transitions:
+                self._transitions[self._last_page] = {}
+
+            trans = self._transitions[self._last_page]
+
+            # Decay existing scores
+            for key in trans:
+                trans[key] *= self.decay
+
+            # Increment transition to current page
+            trans[page_id] = trans.get(page_id, 0.0) + 1.0
+
+            # Keep only top-M transitions
+            if len(trans) > self.top_m * 2:
+                # Prune low-score entries
+                sorted_trans = sorted(trans.items(), key=lambda x: x[1], reverse=True)
+                self._transitions[self._last_page] = dict(sorted_trans[:self.top_m])
+
+            self._total_transitions += 1
+
+        self._last_page = page_id
+
+    def get_next_probability(self, current_page: int, next_page: int) -> float:
+        """Get P(next_page | current_page)."""
+        if current_page not in self._transitions:
+            return 0.0
+
+        trans = self._transitions[current_page]
+        total = sum(trans.values())
+        if total == 0:
+            return 0.0
+
+        return trans.get(next_page, 0.0) / total
+
+    def get_top_predictions(self, current_page: int, k: int = 3) -> List[Tuple[int, float]]:
+        """Get top-K most likely next pages with their probabilities."""
+        if current_page not in self._transitions:
+            return []
+
+        trans = self._transitions[current_page]
+        total = sum(trans.values())
+        if total == 0:
+            return []
+
+        sorted_trans = sorted(trans.items(), key=lambda x: x[1], reverse=True)
+        return [(page, score / total) for page, score in sorted_trans[:k]]
+
+    def get_reuse_score(self, page_id: int) -> float:
+        """
+        Estimate how likely this page is to be accessed soon.
+
+        Looks at all pages that transition TO this page.
+        """
+        score = 0.0
+        for src, trans in self._transitions.items():
+            if page_id in trans:
+                total = sum(trans.values())
+                if total > 0:
+                    score += trans[page_id] / total
+        return min(1.0, score)
+
+
+class AdmissionController:
+    """
+    Probabilistic admission controller.
+
+    Decides whether a page from slow tier should be admitted to fast tier.
+    This prevents cache pollution from one-time accesses (scan resistance).
+    """
+
+    def __init__(
+        self,
+        base_admit_prob: float = 0.8,
+        reuse_weight: float = 0.4,
+        cluster_weight: float = 0.3,
+        stream_penalty: float = 0.3,
+    ):
+        self.base_admit_prob = base_admit_prob
+        self.reuse_weight = reuse_weight
+        self.cluster_weight = cluster_weight
+        self.stream_penalty = stream_penalty
+
+        # Track sequential access patterns (scan detection)
+        self._last_pages: deque = deque(maxlen=8)
+        self._sequential_count = 0
+
+        # Stats
+        self.admits = 0
+        self.bypasses = 0
+
+    def should_admit(
+        self,
+        page_id: int,
+        reuse_score: float,
+        cluster_score: float,
+        access_count: int,
+    ) -> bool:
+        """
+        Decide whether to admit page to fast tier.
+
+        Args:
+            page_id: Page being accessed
+            reuse_score: Probability of near-term reuse (from TransitionTracker)
+            cluster_score: How active is this page's cluster (0-1)
+            access_count: How many times this page has been accessed
+
+        Returns:
+            True if should admit to fast tier, False to bypass/probation
+        """
+        # Detect sequential scan (cache-unfriendly)
+        is_sequential = False
+        if self._last_pages:
+            last = self._last_pages[-1]
+            if abs(page_id - last) <= 2:  # Sequential or near-sequential
+                self._sequential_count += 1
+                if self._sequential_count > 4:
+                    is_sequential = True
+            else:
+                self._sequential_count = 0
+
+        self._last_pages.append(page_id)
+
+        # Compute admission probability
+        # p_admit = sigmoid(w1*reuse + w2*cluster - w3*stream)
+        stream_score = 1.0 if is_sequential else 0.0
+
+        raw_score = (
+            self.reuse_weight * reuse_score
+            + self.cluster_weight * cluster_score
+            - self.stream_penalty * stream_score
+        )
+
+        # Sigmoid to get probability
+        p_admit = 1.0 / (1.0 + math.exp(-4.0 * (raw_score - 0.3)))
+
+        # Boost for pages with history
+        if access_count > 1:
+            p_admit = min(1.0, p_admit + 0.2)
+
+        # Make decision
+        admit = random.random() < p_admit
+
+        if admit:
+            self.admits += 1
+        else:
+            self.bypasses += 1
+
+        return admit
+
+    @property
+    def bypass_rate(self) -> float:
+        """Fraction of accesses that bypassed cache."""
+        total = self.admits + self.bypasses
+        return self.bypasses / total if total > 0 else 0.0
+
+
+class PrefetchEngine:
+    """
+    Budgeted prefetch engine.
+
+    Prefetches predicted next pages with strict budget control.
+    This is CTM+'s key differentiator from ARC.
+    """
+
+    def __init__(
+        self,
+        budget_per_1k: int = 15,  # Max prefetches per 1000 accesses
+        min_probability: float = 0.3,  # Min P(next) to trigger prefetch
+        max_distance: int = 64,  # Max predicted distance to prefetch
+    ):
+        self.budget_per_1k = budget_per_1k
+        self.min_probability = min_probability
+        self.max_distance = max_distance
+
+        # Budget tracking
+        self._prefetches_this_epoch = 0
+        self._epoch_accesses = 0
+
+        # Stats
+        self.total_prefetches = 0
+        self.prefetch_hits = 0
+        self.prefetch_misses = 0
+        self._pending_prefetches: set = set()
+
+    def should_prefetch(self, probability: float) -> bool:
+        """Check if we should prefetch given the probability and budget."""
+        # Check budget
+        budget_remaining = self.budget_per_1k - self._prefetches_this_epoch
+        if budget_remaining <= 0:
+            return False
+
+        # Check probability threshold
+        if probability < self.min_probability:
+            return False
+
+        return True
+
+    def record_prefetch(self, page_id: int) -> None:
+        """Record that we prefetched a page."""
+        self._prefetches_this_epoch += 1
+        self.total_prefetches += 1
+        self._pending_prefetches.add(page_id)
+
+    def record_access(self, page_id: int) -> None:
+        """Record an access (for budget tracking and prefetch hit detection)."""
+        self._epoch_accesses += 1
+
+        # Check if this was a prefetched page
+        if page_id in self._pending_prefetches:
+            self.prefetch_hits += 1
+            self._pending_prefetches.discard(page_id)
+
+        # Reset epoch
+        if self._epoch_accesses >= 1000:
+            # Count remaining pending prefetches as misses
+            self.prefetch_misses += len(self._pending_prefetches)
+            self._pending_prefetches.clear()
+            self._prefetches_this_epoch = 0
+            self._epoch_accesses = 0
+
+    @property
+    def prefetch_hit_rate(self) -> float:
+        """Fraction of prefetches that were actually used."""
+        total = self.prefetch_hits + self.prefetch_misses
+        return self.prefetch_hits / total if total > 0 else 0.0
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller: Full implementation of Coherence-Tier Memory Plus.
@@ -451,6 +790,10 @@ class CTMPlusController(BaseController):
     - Coherence Computer for fast/slow coherence
     - BCVF Gate for bidirectional verification
     - SCC Optimizer for self-tuning
+    - NeighborTracker for correlated page detection
+    - TransitionTracker for Markov predictions (NEW)
+    - AdmissionController for probabilistic admission (NEW)
+    - PrefetchEngine for budgeted prefetch (NEW)
     """
 
     def __init__(
@@ -466,6 +809,12 @@ class CTMPlusController(BaseController):
         self._coherence = CoherenceComputer(self.ctm_config)
         self._bcvf = BCVFGate(self.ctm_config)
         self._scc = SCCOptimizer(self.ctm_config)
+        self._neighbor_tracker = NeighborTracker()
+
+        # NEW: Predictive components (the key to beating ARC)
+        self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
+        self._admission_controller = AdmissionController()
+        self._prefetch_engine = PrefetchEngine(budget_per_1k=15, min_probability=0.3)
 
         # Stats
         self._promotions = 0
@@ -473,6 +822,8 @@ class CTMPlusController(BaseController):
         self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time: Dict[int, int] = {}
+        self._neighbor_boosts = 0
+        self._prefetch_promotions = 0
 
         # Epoch tracking
         self._epoch_promotions = 0
@@ -487,11 +838,17 @@ class CTMPlusController(BaseController):
         self._coherence = CoherenceComputer(self.ctm_config)
         self._bcvf = BCVFGate(self.ctm_config)
         self._scc = SCCOptimizer(self.ctm_config)
+        self._neighbor_tracker = NeighborTracker()
+        self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
+        self._admission_controller = AdmissionController()
+        self._prefetch_engine = PrefetchEngine(budget_per_1k=15, min_probability=0.3)
         self._promotions = 0
         self._demotions = 0
         self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time = {}
+        self._neighbor_boosts = 0
+        self._prefetch_promotions = 0
         self._epoch_promotions = 0
         self._epoch_demotions = 0
 
@@ -502,6 +859,13 @@ class CTMPlusController(BaseController):
         op_type: OpType,
     ) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
+
+        # === NEW: Track transitions for Markov predictions ===
+        self._transition_tracker.record_access(page_id)
+        self._prefetch_engine.record_access(page_id)
+
+        # Track co-occurrence for neighbor learning
+        self._neighbor_tracker.record_access(page_id)
 
         # Compute delta_t
         delta_t = self._access_counter - self._last_access_time.get(page_id, 0)
@@ -515,12 +879,24 @@ class CTMPlusController(BaseController):
 
         # Update page state
         page.phase = phase
-        page.amplitude = max(page.amplitude, amplitude)  # Keep max amplitude
+        page.amplitude = max(page.amplitude, amplitude)
         page.update_on_access(state.current_time, op_type)
 
-        # Compute fast coherence
+        # Boost coherence of neighbors
+        neighbors = self._neighbor_tracker.get_neighbors(page_id)
+        for neighbor_id in neighbors:
+            neighbor = state.all_pages.get(neighbor_id)
+            if neighbor:
+                neighbor.coherence = min(1.0, neighbor.coherence + 0.02)
+                self._neighbor_boosts += 1
+
+        # Compute coherence scores
         mean_phase = state.global_mean_phase
         fast_coh = self._coherence.fast_coherence(page, mean_phase)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
+
+        # === NEW: Get reuse prediction from transition model ===
+        reuse_score = self._transition_tracker.get_reuse_score(page_id)
 
         promoted = False
         demoted = False
@@ -529,6 +905,10 @@ class CTMPlusController(BaseController):
         if state.tier0.contains(page_id):
             state.tier0.touch(page_id)
             state.tier0.record_hit()
+
+            # === NEW: Predictive prefetch after tier0 hit ===
+            self._do_predictive_prefetch(state, page_id)
+
             latency = self._compute_latency(Tier.TIER0, False, False)
             return (Tier.TIER0, latency, False, False)
 
@@ -536,19 +916,22 @@ class CTMPlusController(BaseController):
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
 
-            # Check BCVF for promotion
+            # Check promotion eligibility
             can_promote = (
                 self._epoch_promotions < self.ctm_config.max_promotions_per_epoch
                 and state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
             )
 
             if can_promote:
+                # === NEW: Use transition-based reuse score in promotion decision ===
+                # Combine reuse prediction with coherence
+                combined_score = 0.5 * reuse_score + 0.3 * fast_coh + 0.2 * neighbor_hotness
+
                 should_promote, weight = self._bcvf.should_promote(
-                    page, state, predicted_hit_improvement=fast_coh * 0.2
+                    page, state, predicted_hit_improvement=combined_score * 0.4
                 )
 
                 if should_promote:
-                    # Promote
                     state.tier1.remove(page_id)
                     evicted = state.tier0.add(page)
                     promoted = True
@@ -556,9 +939,11 @@ class CTMPlusController(BaseController):
                     self._epoch_promotions += 1
                     page.last_promotion_time = state.current_time
 
-                    # Handle eviction with BCVF
                     if evicted is not None:
                         demoted = self._handle_eviction(state, evicted)
+
+                    # === NEW: Prefetch after promotion ===
+                    self._do_predictive_prefetch(state, page_id)
                 else:
                     self._bcvf_rejections += 1
 
@@ -566,12 +951,28 @@ class CTMPlusController(BaseController):
             return (Tier.TIER1, latency, promoted, demoted)
 
         # Case 3: Miss - add to system
-        # Use coherence to decide initial tier
-        if fast_coh > 0.6 and not state.tier0.is_full:
-            # High coherence - add to tier0
+        # === NEW: Use AdmissionController to decide admission ===
+        access_count = page.access_count
+
+        # Compute cluster score from neighbor hotness
+        cluster_score = neighbor_hotness
+
+        # Decide whether to admit to fast tier
+        should_admit = self._admission_controller.should_admit(
+            page_id=page_id,
+            reuse_score=reuse_score,
+            cluster_score=cluster_score,
+            access_count=access_count,
+        )
+
+        if should_admit and not state.tier0.is_full:
+            # Admit directly to tier0
             state.tier0.add(page)
-        elif fast_coh > 0.6:
-            # High coherence but tier0 full - promote with eviction
+            promoted = True
+            self._promotions += 1
+            self._epoch_promotions += 1
+        elif should_admit:
+            # Admit with eviction
             evicted = state.tier0.add(page)
             promoted = True
             self._promotions += 1
@@ -580,14 +981,54 @@ class CTMPlusController(BaseController):
             if evicted is not None:
                 demoted = self._handle_eviction(state, evicted)
         else:
-            # Low coherence - add to tier1
+            # Bypass: add to tier1 (scan resistance)
             state.tier1.add(page)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         return (Tier.NONE, latency, promoted, demoted)
 
+    def _do_predictive_prefetch(self, state: GlobalState, current_page: int) -> None:
+        """
+        Prefetch predicted next page(s) based on transition model.
+
+        This is CTM+'s key differentiator from ARC.
+        """
+        # Get top prediction
+        predictions = self._transition_tracker.get_top_predictions(current_page, k=1)
+
+        for next_page, probability in predictions:
+            # Check if we should prefetch
+            if not self._prefetch_engine.should_prefetch(probability):
+                continue
+
+            # Check if page exists and is in tier1
+            page = state.all_pages.get(next_page)
+            if page is None:
+                continue
+
+            if state.tier1.contains(next_page):
+                # Prefetch: promote from tier1 to tier0
+                state.tier1.remove(next_page)
+                evicted = state.tier0.add(page)
+                self._prefetch_promotions += 1
+                self._prefetch_engine.record_prefetch(next_page)
+
+                if evicted is not None:
+                    # Put evicted page in tier1
+                    state.tier1.add(evicted)
+
     def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
-        """Handle evicted page with BCVF verification."""
+        """Handle evicted page with BCVF verification and neighbor protection."""
+        # Check if evicted page has hot neighbors (cluster protection)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(evicted.page_id, state)
+
+        # If page has many hot neighbors, protect it (don't demote)
+        if neighbor_hotness > 0.6:
+            # Keep in tier0 - its cluster is still hot
+            state.tier0.add(evicted)
+            self._bcvf_rejections += 1
+            return False
+
         should_demote, _ = self._bcvf.should_demote(evicted, state)
 
         if should_demote:
@@ -608,9 +1049,13 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
 
-        # Slow-path coherence update
-        if epoch % 10 == 0:  # Every 10 epochs
-            self._coherence.slow_update(state)
+        # Apply decay to pages not recently accessed
+        # This updates amplitude, uncertainty, drift based on time since last access
+        for page in list(state.tier0.pages.values()) + list(state.tier1.pages.values()):
+            page.decay(state.current_time, decay_rate=0.001)
+
+        # Slow-path coherence update - now every epoch instead of every 10
+        self._coherence.slow_update(state)
 
         # SCC parameter tuning
         self._scc.update(state, self._bcvf)
@@ -639,4 +1084,12 @@ class CTMPlusController(BaseController):
             "scc_threshold": self._scc.threshold,
             "scc_beta": self._scc.beta,
             "tier_coherence": self._scc.compute_tier_coherence,
+            "neighbor_boosts": self._neighbor_boosts,
+            "tracked_neighbors": len(self._neighbor_tracker._neighbors),
+            # NEW: Predictive component stats
+            "prefetch_promotions": self._prefetch_promotions,
+            "prefetch_hit_rate": self._prefetch_engine.prefetch_hit_rate,
+            "total_prefetches": self._prefetch_engine.total_prefetches,
+            "admission_bypass_rate": self._admission_controller.bypass_rate,
+            "transition_count": self._transition_tracker._total_transitions,
         }

@@ -64,8 +64,8 @@ Examples:
     input_group.add_argument(
         "--pattern",
         type=str,
-        choices=["uniform", "zipf", "sequential", "hotspot", "temporal", "mixed"],
-        help="Synthetic workload pattern",
+        choices=["uniform", "zipf", "sequential", "hotspot", "temporal", "mixed", "clustered", "correlated"],
+        help="Synthetic workload pattern (clustered/correlated test CTM+'s cluster-awareness)",
     )
     input_group.add_argument(
         "--generate",

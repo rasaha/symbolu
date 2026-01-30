@@ -58,7 +58,7 @@ class BCVFConfig:
     lambda_b: float = 0.35  # Backward penalty weight
     lambda_c: float = 0.25  # Consistency penalty weight
     beta: float = 2.0  # Temperature parameter
-    threshold: float = 0.6  # Decision threshold τ
+    threshold: float = 0.4  # Decision threshold τ (was 0.6, too conservative)
 
     # Forward score weights (α)
     alpha_latency: float = 0.6  # Weight for latency improvement
@@ -142,10 +142,12 @@ class CTMPlusConfig:
     coherence: CoherenceConfig = field(default_factory=CoherenceConfig)
 
     # Promotion/demotion specific
-    promotion_cooldown: int = 100  # Min accesses before re-promoting demoted page
-    demotion_cooldown: int = 50  # Min accesses before re-demoting promoted page
-    max_promotions_per_epoch: int = 100  # Prevent thrashing
-    max_demotions_per_epoch: int = 100  # Prevent thrashing
+    # NOTE: Previous values (100, 50, 100, 100) were too restrictive
+    # and handicapped CTM+ vs LRU/ARC which have no such limits
+    promotion_cooldown: int = 10  # Min accesses before re-promoting demoted page
+    demotion_cooldown: int = 10  # Min accesses before re-demoting promoted page
+    max_promotions_per_epoch: int = 10000  # Effectively unlimited
+    max_demotions_per_epoch: int = 10000  # Effectively unlimited
     epoch_size: int = 1000  # Accesses per epoch
 
     @classmethod
