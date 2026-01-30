@@ -520,7 +520,7 @@ class CTMPlusController(BaseController):
             return min(pages, key=lambda p: p.last_access_time)
 
         # SAMPLING: Pick k random candidates + always include LRU victim
-        sample_size = min(32, n)
+        sample_size = min(self.ctm_config.victim_sample_size, n)
 
         # Always include the LRU page (oldest) as a candidate
         lru_page = min(pages, key=lambda p: p.last_access_time)
@@ -654,7 +654,9 @@ class CTMPlusController(BaseController):
             if can_promote:
                 # LOOP PINNING: Fast-track promotion for temporal patterns
                 # This fixes the -4.1% temporal regression by keeping short loops in Tier0
-                if reuse_score > 0.4 and neighbor_hotness > 0.3:
+                reuse_thresh = self.ctm_config.loop_pin_reuse_threshold
+                neighbor_thresh = self.ctm_config.loop_pin_neighbor_threshold
+                if reuse_score > reuse_thresh and neighbor_hotness > neighbor_thresh:
                     should_promote = True
                 else:
                     # Use adaptive p from shadow tier to weight reuse vs recency
@@ -665,9 +667,8 @@ class CTMPlusController(BaseController):
                         # Favor recency: weight coherence higher
                         combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
 
-                    # NOTE: BCVF gate removed - ablation showed no effect on hit rate
-                    # Simply promote based on combined score threshold
-                    should_promote = combined_score > 0.3
+                    # Promote based on combined score threshold (configurable)
+                    should_promote = combined_score > self.ctm_config.promotion_threshold
 
             if should_promote:
                 state.tier1.remove(page_id)

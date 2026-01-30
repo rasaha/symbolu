@@ -102,6 +102,12 @@ class CTMPlusConfig:
     max_demotions_per_epoch: int = 10000  # Effectively unlimited
     epoch_size: int = 1000  # Accesses per epoch
 
+    # Victim selection thresholds (configurable for tuning)
+    victim_sample_size: int = 48  # Sample size for O(k) victim selection (was 32)
+    promotion_threshold: float = 0.3  # Min combined score to promote from tier1
+    loop_pin_reuse_threshold: float = 0.4  # Reuse score threshold for loop pinning
+    loop_pin_neighbor_threshold: float = 0.3  # Neighbor hotness for loop pinning
+
     # Ablation switches for experimental validation
     enable_smart_victim: bool = True  # Use CTM+ victim selection vs LRU fallback
     # NOTE: BCVF gate removed - ablation showed zero effect on hit rate
