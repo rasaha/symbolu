@@ -690,10 +690,12 @@ class CTMPlusController(BaseController):
 
     def _select_victim(self, state: GlobalState) -> Optional[PageState]:
         """
-        Score all Tier0 pages and return the worst victim for eviction.
+        Score Tier0 pages and return the worst victim for eviction.
 
-        This is the key to beating ARC: victim selection happens BEFORE eviction,
-        not as post-hoc protection.
+        OPTIMIZED: Uses sampling for O(k) instead of O(n) complexity.
+        - Sample k candidates from tier0 (default k=32)
+        - Score only sampled candidates
+        - Falls back to LRU on small caches
 
         ARC-safe weights (70% recency+frequency, 30% CTM+ signals):
         - 40% recency_rank (ARC T1-like)
@@ -701,43 +703,57 @@ class CTMPlusController(BaseController):
         - 15% (1-reuse) (TransitionTracker signal)
         - 10% (1-coherence) (structural signal)
         - -10% neighbor_hotness (cluster protection)
-
-        With ablation switch: falls back to pure LRU when disabled.
         """
         if not state.tier0.pages:
             return None
 
+        pages = list(state.tier0.pages.values())
+        n = len(pages)
+
         # Ablation: if smart victim disabled, use LRU
         if not self.ctm_config.enable_smart_victim:
-            return min(
-                state.tier0.pages.values(),
-                key=lambda p: p.last_access_time
-            )
+            return min(pages, key=lambda p: p.last_access_time)
 
-        # Get logical partition for ARC-style adaptation
-        recency_set, freq_set = self._tier0_partition(state)
+        # For small caches, just use LRU (fast path)
+        if n <= 16:
+            return min(pages, key=lambda p: p.last_access_time)
 
-        # Compute recency ranks (lower = older = more likely to evict)
-        pages = list(state.tier0.pages.values())
-        pages.sort(key=lambda p: p.last_access_time)
-        max_time = max(p.last_access_time for p in pages) if pages else 1
-        min_time = min(p.last_access_time for p in pages) if pages else 0
+        # SAMPLING: Pick k random candidates + always include LRU victim
+        sample_size = min(32, n)
+
+        # Always include the LRU page (oldest) as a candidate
+        lru_page = min(pages, key=lambda p: p.last_access_time)
+
+        # Random sample of other candidates
+        if n > sample_size:
+            sampled = random.sample(pages, sample_size - 1)
+            if lru_page not in sampled:
+                sampled.append(lru_page)
+        else:
+            sampled = pages
+
+        # Get time range for normalization (from full cache, but fast)
+        max_time = max(p.last_access_time for p in pages)
+        min_time = lru_page.last_access_time
         time_range = max(1, max_time - min_time)
+
+        # Get adaptive p for partition logic
+        p = self._shadow_tier.p
 
         best_score = float("inf")
         victim = None
 
-        for p in pages:
+        for page in sampled:
             # Normalize recency to [0, 1] where 0 = oldest = evict first
-            recency_rank = (p.last_access_time - min_time) / time_range
+            recency_rank = (page.last_access_time - min_time) / time_range
 
             # Frequency: higher access_count = less likely to evict
-            frequency = min(1.0, p.access_count / 10.0)
+            frequency = min(1.0, page.access_count / 10.0)
 
             # CTM+ signals
-            coherence = p.coherence
-            reuse = self._transition_tracker.get_reuse_score(p.page_id)
-            neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(p.page_id, state)
+            coherence = page.coherence
+            reuse = self._transition_tracker.get_reuse_score(page.page_id)
+            neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(page.page_id, state)
 
             # Base victim score (lower = evict first)
             # ARC-safe: 70% is pure ARC logic (recency + frequency)
@@ -749,21 +765,17 @@ class CTMPlusController(BaseController):
                 0.10 * neighbor_hot             # CTM+ signal: protect clusters
             )
 
-            # ARC-style partition adjustment
-            # Punish cold pages in wrong partition
-            is_recency = p.page_id in recency_set
-            is_freq = p.page_id in freq_set
-
-            if is_recency and reuse < 0.3:
-                # Cold page in recency partition -> evict more readily
-                score -= 0.15
-            if is_freq and frequency < 0.3:
-                # Weak frequency page in freq partition -> evict more readily
-                score -= 0.15
+            # Simplified partition penalty based on p
+            # If p > 0.5 (favor frequency), penalize low-freq pages more
+            # If p < 0.5 (favor recency), penalize low-recency pages more
+            if p > 0.5 and frequency < 0.3:
+                score -= 0.10 * (p - 0.5) * 2  # Scale by how much p favors freq
+            elif p < 0.5 and recency_rank < 0.3:
+                score -= 0.10 * (0.5 - p) * 2  # Scale by how much p favors recency
 
             if score < best_score:
                 best_score = score
-                victim = p
+                victim = page
 
         if victim is not None:
             self._smart_victim_selections += 1
