@@ -608,9 +608,13 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
 
-        # Slow-path coherence update
-        if epoch % 10 == 0:  # Every 10 epochs
-            self._coherence.slow_update(state)
+        # Apply decay to pages not recently accessed
+        # This updates amplitude, uncertainty, drift based on time since last access
+        for page in list(state.tier0.pages.values()) + list(state.tier1.pages.values()):
+            page.decay(state.current_time, decay_rate=0.001)
+
+        # Slow-path coherence update - now every epoch instead of every 10
+        self._coherence.slow_update(state)
 
         # SCC parameter tuning
         self._scc.update(state, self._bcvf)
