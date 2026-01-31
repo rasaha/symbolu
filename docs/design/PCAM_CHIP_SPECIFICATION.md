@@ -575,6 +575,228 @@ A: NEITHER. There are no "semantic queries."
    PCAM hardware is numerically sophisticated but semantically ignorant.
 ```
 
+### 2.7 CTM+ Integration: Memory Tiering Coordination
+
+A critical architectural question: Should CTM+ (Coherence-Tier Memory) controller logic reside on the PCAM chip, or remain separate?
+
+**The Relationship Between PCAM and CTM+**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PCAM: "WHAT should I attend to?"                               │
+│  - Input: query_block_id                                        │
+│  - Output: relevant key_block_ids + scores                      │
+│  - Manages: attention relationships (small metadata)            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ "These blocks are important"
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  CTM+: "WHERE should data live?"                                │
+│  - Input: importance signals, access patterns                   │
+│  - Output: tier placement decisions (HBM/DRAM/SSD)              │
+│  - Manages: actual KV cache data (large vectors)                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Design Decision: Hybrid Approach (CTM+ Lite On-Chip)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PCAM CHIP (Primary Product)                   │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                 PCAM Core (must have)                    │   │
+│  │  • Edge storage, decay computation, top-K selection      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           CTM+ Lite (on-chip, lightweight)               │   │
+│  │  • Importance signal generation (score → tier hint)      │   │
+│  │  • Simple classification: HOT / WARM / COLD              │   │
+│  │  • NOT full DMA/tiering (that stays external)            │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  Output: (key_ids, scores, tier_hints)                          │
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          │ tier_hints = {HOT, WARM, COLD}
+                          ↓
+┌─────────────────────────────────────────────────────────────────┐
+│        EXTERNAL: Memory Controller / CXL Controller              │
+│                                                                  │
+│  • Receives tier_hints from PCAM                                │
+│  • Executes actual data movement (DMA)                          │
+│  • Manages physical memory tiers                                │
+│  • Runs in: GPU memory controller, CXL device, smart SSD        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**CTM+ Lite: What Lives On the PCAM Chip**
+
+```python
+# CTM+ Lite: Classifies importance, doesn't move data
+
+def pcam_attend_with_tier_hints(query_block_id):
+    # Standard PCAM operation
+    edges = lookup_edges(query_block_id)
+    scores = compute_scores(edges)
+    top_k = select_top_k(scores, k=64)
+
+    # CTM+ Lite addition: classify each result
+    tier_hints = []
+    for (key_id, score) in top_k:
+        if score > THRESHOLD_HOT:      # e.g., 0.7
+            hint = HOT                  # Keep in HBM
+        elif score > THRESHOLD_WARM:   # e.g., 0.3
+            hint = WARM                 # OK in DRAM
+        else:
+            hint = COLD                 # Can demote to SSD
+        tier_hints.append((key_id, hint))
+
+    return top_k, tier_hints
+```
+
+**Hardware Cost of CTM+ Lite: Minimal**
+
+| Component | Logic Gates | Notes |
+|-----------|-------------|-------|
+| Two comparators per edge | ~100 gates × 64 | Compare score vs thresholds |
+| 2-bit hint encoder | ~20 gates × 64 | HOT=11, WARM=10, COLD=01 |
+| Threshold registers | 2 × 8 bits | Configurable via software |
+| **Total addition** | **~8K gates** | <1% of PCAM chip area |
+
+**What Stays ON vs OFF the Chip**
+
+| CTM+ Function | On PCAM? | Reason |
+|---------------|----------|--------|
+| Importance scoring | ✓ Yes | Already computing attention scores |
+| Tier classification | ✓ Yes | Trivial threshold logic (8K gates) |
+| Hint output | ✓ Yes | 2 bits per result, negligible bandwidth |
+| Ghost caches (B1/B2) | ✗ No | Needs global eviction tracking |
+| DMA scheduling | ✗ No | Requires physical memory interfaces |
+| Wear leveling | ✗ No | SSD-specific, not attention-related |
+| Full tier state | ✗ No | Must track ALL blocks, not just queried |
+
+**System Data Flow with CTM+ Integration**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         PCAM CHIP                                │
+│                                                                  │
+│  Input: query_block_id                                          │
+│                     ↓                                            │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Edge Lookup → Decay → Score → Top-K → Tier Classify    │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                     ↓                                            │
+│  Output: [(key_id, score, tier_hint), ...]                      │
+│                                                                  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+          ┌──────────────────┴──────────────────┐
+          ↓                                      ↓
+┌─────────────────────┐              ┌─────────────────────────┐
+│  GPU Attention      │              │  Memory Controller      │
+│                     │              │  (CTM+ Full)            │
+│  Uses: key_ids,     │              │                         │
+│        scores       │              │  Uses: tier_hints to    │
+│                     │              │  - Prefetch HOT → HBM   │
+│  Computes sparse    │              │  - Keep WARM in DRAM    │
+│  attention over     │              │  - Demote COLD → SSD    │
+│  candidates         │              │                         │
+└─────────────────────┘              └─────────────────────────┘
+```
+
+**Why This Split Makes Sense**
+
+```
+PCAM knows:                     CTM+ (external) knows:
+─────────────                   ──────────────────────
+Per-query importance            Global memory state
+"Block 100 is HOT for query 42" "Block 100 is in DRAM tier"
+
+Local, per-request view         Global, system-wide view
+Small state (edges only)        Large state (all KV blocks)
+Fast (every attention)          Slower (periodic tiering)
+```
+
+**Alternative: Full CTM+ On-Chip (Not Recommended)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│            UNIFIED CHIP (PCAM + Full CTM+)                       │
+│                                                                  │
+│  ┌─────────────────────┐  ┌─────────────────────────────────┐  │
+│  │     PCAM Core       │  │         Full CTM+ Core          │  │
+│  │                     │  │                                 │  │
+│  │  • Edge storage     │──│  • Tier state for ALL blocks    │  │
+│  │  • Score compute    │  │  • Ghost caches (B1, B2)        │  │
+│  │  • Top-K select     │  │  • DMA scheduling               │  │
+│  │                     │  │  • Promotion/demotion logic     │  │
+│  └─────────────────────┘  └─────────────────────────────────┘  │
+│                                                                  │
+│  Problems:                                                       │
+│  • CTM+ needs state for ALL KV blocks (100K+), not just edges   │
+│  • DMA requires physical memory interfaces (complex PHY)        │
+│  • Makes chip larger, more expensive, less flexible             │
+│  • CTM+ logic may already exist in memory controller            │
+└─────────────────────────────────────────────────────────────────┘
+
+Verdict: Overkill. Keep CTM+ Full external.
+```
+
+**Interface Specification: PCAM → CTM+ Hints**
+
+```
+PCAM Output Format (per ATTEND response):
+
+┌────────────────────────────────────────────────────────────┐
+│  Header (8 bytes)                                          │
+│  ┌──────────┬──────────┬──────────┬──────────────────────┐ │
+│  │ num_results (16b) │ seq_id (16b) │ reserved (32b)    │ │
+│  └──────────┴──────────┴──────────┴──────────────────────┘ │
+├────────────────────────────────────────────────────────────┤
+│  Results (6 bytes each × num_results)                      │
+│  ┌──────────┬──────────┬──────────┐                       │
+│  │ key_id   │ score    │ tier_hint│  × 64                 │
+│  │ (32b)    │ (8b)     │ (2b+pad) │                       │
+│  └──────────┴──────────┴──────────┘                       │
+│                                                            │
+│  tier_hint encoding:                                       │
+│    0b11 = HOT   (keep in HBM, high priority)              │
+│    0b10 = WARM  (DRAM is fine)                            │
+│    0b01 = COLD  (can demote to SSD)                       │
+│    0b00 = EVICT (safe to remove entirely)                 │
+└────────────────────────────────────────────────────────────┘
+```
+
+**Summary: CTM+ Integration Decision**
+
+```
+Q: Does CTM+ memory controller logic reside in the chip?
+
+A: PARTIALLY.
+
+   ON the PCAM chip (CTM+ Lite):
+   ✓ Importance scoring (already computed)
+   ✓ Tier classification (HOT/WARM/COLD)
+   ✓ Hint generation (2 bits per result)
+   Cost: ~8K gates (<1% chip area)
+
+   OFF the PCAM chip (CTM+ Full, external):
+   ✗ Global tier state management
+   ✗ DMA scheduling and execution
+   ✗ Ghost caches for eviction tracking
+   ✗ Physical memory interfaces
+   Location: Memory controller, CXL device, or smart SSD
+
+   Rationale:
+   • PCAM has LOCAL view (per-query importance)
+   • CTM+ needs GLOBAL view (all blocks across all sequences)
+   • Clean separation: PCAM says WHAT matters, CTM+ decides WHERE
+```
+
 ---
 
 ## 3. The Paradigm Shift
