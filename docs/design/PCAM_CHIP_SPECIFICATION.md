@@ -1,6 +1,6 @@
 # PCAM: Phase-Coherent Attention Memory
 
-## Chip Specification Document v0.1
+## Chip Specification Document v0.6
 
 **Status**: Draft
 **Authors**: Symbol-U Research
@@ -3296,6 +3296,1070 @@ and enables capabilities competitors cannot match.
 
 ---
 
+### Appendix H: Simulation & Validation Plan
+
+This appendix defines an industry-grade validation plan for PCAM, framed against real deployment constraints (vLLM/TensorRT-LLM/DeepSpeed style), not academic benchmarks.
+
+**Core Principle:** We must prove two things simultaneously:
+1. **System outcomes** — Real throughput, latency, and quality improvements
+2. **Implementability** — Bounded state, bounded update rate, predictable tail latency
+
+---
+
+#### H.1 Phase 0: Acceptance Criteria (Define Before Coding)
+
+Before writing any simulator code, lock these acceptance gates:
+
+##### H.1.1 Three "Must Win" Outcomes
+
+| Gate | Metric | Threshold | Rationale |
+|------|--------|-----------|-----------|
+| **G1: Quality-Preserving Memory Reduction** | Same quality at reduced KV memory | ≥2× effective context at equal memory, OR same context at ≥30% less KV memory | Proves attention tracking works |
+| **G2: Throughput Win** | tok/s improvement | ≥15% improvement in at least one workload class | Proves system-level benefit |
+| **G3: Tail Latency Control** | p99 overhead from PCAM path | ≤5% degradation OR stays within target SLA | Proves production viability |
+
+**If PCAM doesn't hit all three, silicon is not justified.**
+
+##### H.1.2 Mandatory Baselines (Non-Negotiable)
+
+Every experiment must compare against these three baselines:
+
+| Baseline | Description | Why It Matters |
+|----------|-------------|----------------|
+| **Sink+LRU** | Pin first K tokens (sinks), LRU for rest | Simplest reasonable baseline |
+| **H2O (Heavy Hitters)** | Evict based on accumulated attention mass | State-of-the-art academic baseline |
+| **Industry-Style** | Sinks + attention-aware + ghost/adaptation | What a well-engineered production system would do |
+
+The "Industry-Style" baseline definition:
+```
+Industry-Style Baseline:
+├─ Pinned sinks: first 4-8 tokens always retained
+├─ Recent window: last 256-512 tokens always retained
+├─ Attention-aware: track per-block attention score (EMA)
+├─ Ghost buffer: recently evicted blocks tracked for recall
+├─ Adaptive budget: adjust retention by layer importance
+└─ No novel hardware: pure software on existing GPU
+```
+
+##### H.1.3 Mandatory Metrics
+
+Every experiment must report:
+
+| Metric | Description | How Measured |
+|--------|-------------|--------------|
+| **tok/s** | End-to-end throughput | Wall-clock tokens generated / time |
+| **p50 latency** | Median per-token latency | Per-token timing distribution |
+| **p95 latency** | 95th percentile latency | Tail behavior under normal load |
+| **p99 latency** | 99th percentile latency | Tail behavior under pressure |
+| **Quality proxy** | Task accuracy or perplexity | Choose ONE, stick to it |
+| **Memory budget** | KV cache size as % of full | Sweep: 5%, 10%, 15%, 25%, 50% |
+| **Multi-tenant** | Behavior under concurrent sequences | 8, 16, 32 concurrent sequences |
+
+**Quality Proxy Options (pick one):**
+- Perplexity on held-out set (most principled)
+- "Important token retention" correlation with quality
+- Task-specific accuracy (MMLU, NarrativeQA, etc.)
+
+##### H.1.4 Mandatory Workloads
+
+| Workload | Description | Key Stress |
+|----------|-------------|------------|
+| **Multi-turn Chat** | 10+ turn conversations | Revisiting early context |
+| **Long-context Summarization** | 32K-128K documents | Distributed attention patterns |
+| **DocQA / RAG** | Question answering over retrieved docs | Sparse relevant spans |
+| **Code Completion** | File-level code with dependencies | Structured dependencies |
+| **Multi-tenant Batch** | Mixed-length concurrent sequences | Contention + fairness |
+
+---
+
+#### H.2 Simulation Architecture
+
+##### H.2.1 What to Model: Cycle-Accurate vs. Statistical
+
+| Component | Modeling Approach | Rationale |
+|-----------|-------------------|-----------|
+| **ATTEND pipeline** | Cycle-accurate | Critical path; must know exact latency |
+| **UPDATE pipeline** | Cycle-accurate | Write path timing matters for consistency |
+| **Top-K selection** | Cycle-accurate | Dominates ATTEND latency |
+| **DECAY** | Statistical | Background; not on critical path |
+| **Bank conflicts** | Cycle-accurate | Major source of tail latency |
+| **Host interface** | Latency model (not cycle) | PCIe/CXL has known characteristics |
+| **Memory arrays** | Statistical | SRAM/eDRAM timing is well-characterized |
+| **Analog crossbar** | **NOT MODELED in v0/v1** | Deferred to v2 |
+| **Phase math** | **NOT MODELED in v0/v1** | Optional feature, not core thesis |
+
+##### H.2.2 v0 Simulator Scope (In Scope)
+
+```
+v0 Simulator Components:
+═══════════════════════════════════════════════════════════════
+
+IN SCOPE (must model):
+├─ ATTEND pipeline
+│   ├─ Query hash computation (fixed latency: 10 cycles)
+│   ├─ Bank address calculation
+│   ├─ Parallel bank read (variable: bank conflicts)
+│   ├─ Top-K selection network (parallel compare-swap)
+│   └─ Result formatting and return
+│
+├─ UPDATE pipeline
+│   ├─ Write coalescing buffer
+│   ├─ Bank arbitration
+│   ├─ Read-modify-write for weight updates
+│   └─ Write completion tracking
+│
+├─ Top-K Selection
+│   ├─ Bitonic sort network (configurable K)
+│   ├─ Streaming Top-K for large candidate sets
+│   └─ K=32, 64, 128 configurations
+│
+├─ DECAY (background)
+│   ├─ Per-bank decay sweep rate
+│   ├─ Interference with foreground ops
+│   └─ Configurable decay schedules
+│
+├─ Bank Conflict Model
+│   ├─ Number of banks: 16, 32, 64, 128
+│   ├─ Conflict probability under load
+│   ├─ Queueing at bank arbiters
+│   └─ Worst-case vs. average latency
+│
+└─ Host Interface Latency Model
+    ├─ PCIe Gen5 x16: 150ns base, 32GB/s BW
+    ├─ CXL 2.0: 80ns base, 64GB/s BW
+    └─ On-package: 20ns base, 256GB/s BW
+
+OUT OF SCOPE (v0):
+├─ Analog crossbar (deferred to v2)
+├─ Full phase coherence math (optional, disabled)
+├─ Power modeling (not needed for functional validation)
+├─ Thermal modeling
+└─ Detailed transistor-level timing
+```
+
+##### H.2.3 Simulator Outputs
+
+The simulator must produce:
+
+```python
+class PCAMSimulatorOutput:
+    # Per-operation metrics
+    attend_latency_ns: List[float]      # Per ATTEND call
+    update_latency_ns: List[float]      # Per UPDATE call
+    bank_conflicts: int                  # Total conflicts
+    queue_depth_max: int                 # Peak queueing
+
+    # Aggregate metrics
+    attend_throughput: float             # ATTEND ops/sec
+    update_throughput: float             # UPDATE ops/sec
+    effective_bandwidth: float           # GB/s utilized
+
+    # Quality metrics
+    hit_rate: float                      # Fraction of useful candidates
+    candidate_set_coverage: float        # % of true top-K captured
+    retention_quality: float             # Correlation with optimal retention
+
+    # Latency distribution
+    attend_p50_ns: float
+    attend_p95_ns: float
+    attend_p99_ns: float
+```
+
+---
+
+#### H.3 Traces and Workloads
+
+##### H.3.1 Trace Format Specification
+
+```python
+@dataclass
+class PCAMTrace:
+    """Standardized trace format for PCAM simulation."""
+
+    # Metadata
+    model_name: str           # e.g., "llama-70b"
+    sequence_id: int          # For multi-tenant
+    context_length: int       # Total sequence length
+
+    # Per-step records
+    steps: List[TraceStep]
+
+@dataclass
+class TraceStep:
+    step_id: int
+    timestamp_ns: int
+
+    # KV block access pattern
+    blocks_accessed: List[int]        # Block IDs touched
+    attention_scores: Dict[int, float] # Block ID -> attention weight
+
+    # Ground truth for evaluation
+    true_top_k: List[int]             # Optimal Top-K blocks
+
+    # For multi-tenant
+    sequence_id: int
+    batch_position: int
+```
+
+##### H.3.2 Real Traces (If Available)
+
+| Source | Description | Access |
+|--------|-------------|--------|
+| vLLM production logs | Block access patterns from real deployments | Requires partnership |
+| ShareGPT conversations | Real multi-turn dialogs | Public dataset |
+| Long-context benchmarks | SCROLLS, NarrativeQA, etc. | Public |
+
+##### H.3.3 Synthetic Trace Generation
+
+When real traces are unavailable, generate standardized synthetic traces:
+
+```python
+class SyntheticTraceGenerator:
+    """Generate realistic traces without proprietary data."""
+
+    def generate_chat_trace(
+        self,
+        num_turns: int = 10,
+        tokens_per_turn: Tuple[int, int] = (50, 200),
+        revisit_probability: float = 0.3,  # Prob of referencing earlier turn
+    ) -> PCAMTrace:
+        """Multi-turn chat with context revisitation."""
+
+    def generate_long_context_trace(
+        self,
+        context_length: int = 65536,
+        query_positions: List[int] = None,  # Where queries occur
+        attention_locality: float = 0.7,     # Fraction local attention
+    ) -> PCAMTrace:
+        """Long document with distributed attention."""
+
+    def generate_rag_trace(
+        self,
+        num_docs: int = 5,
+        doc_length: int = 2048,
+        relevant_docs: int = 2,
+    ) -> PCAMTrace:
+        """RAG with sparse relevant spans."""
+
+    def generate_code_trace(
+        self,
+        file_length: int = 4096,
+        import_distance: int = 1000,  # Distance to dependency references
+    ) -> PCAMTrace:
+        """Code with structured dependencies."""
+
+    def generate_multitenant_trace(
+        self,
+        num_sequences: int = 32,
+        length_distribution: str = "mixed",  # "uniform", "mixed", "heavy-tail"
+    ) -> List[PCAMTrace]:
+        """Concurrent sequences for batched inference."""
+```
+
+##### H.3.4 Trace Validation
+
+Synthetic traces must match real attention patterns:
+
+| Property | Validation Method |
+|----------|-------------------|
+| Attention sparsity | Compare to measured LLaMA/GPT attention maps |
+| Temporal locality | Match observed recency bias |
+| Structural patterns | Verify sink/anchor concentration |
+| Cross-layer correlation | Ensure layer-wise patterns are realistic |
+
+---
+
+#### H.4 Integration Target: vLLM
+
+vLLM is the recommended first integration target due to:
+- Clean block-based KV cache abstraction
+- Active development and community
+- Representative of production inference systems
+- Open source with good instrumentation
+
+##### H.4.1 vLLM Architecture (Relevant Components)
+
+```
+vLLM Architecture (PCAM Integration Points):
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────┐
+│                      vLLM Scheduler                          │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────┐                 │
+│  │  Block Manager  │◄──►│  Block Allocator │                │
+│  │  (KV blocks)    │    │  (GPU memory)    │                │
+│  └────────┬────────┘    └─────────────────┘                 │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌─────────────────┐    ┌─────────────────┐                 │
+│  │  Eviction Hook  │◄──►│  PCAM Interface │  ◄── NEW        │
+│  │  (policy)       │    │  (attention map) │                │
+│  └────────┬────────┘    └─────────────────┘                 │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │              Attention Execution                         ││
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐                  ││
+│  │  │ Paged   │  │ Sparse  │  │ PCAM    │  ◄── NEW         ││
+│  │  │ Attn    │  │ Attn    │  │ Attn    │                  ││
+│  │  └─────────┘  └─────────┘  └─────────┘                  ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+##### H.4.2 Exact Integration Points
+
+**Integration Point 1: Block Manager Eviction Hook**
+
+```python
+# File: vllm/core/block_manager.py
+
+class PCAMEvictor:
+    """PCAM-guided eviction policy for KV blocks."""
+
+    def __init__(self, pcam_interface: PCAMInterface):
+        self.pcam = pcam_interface
+
+    def select_victim_blocks(
+        self,
+        sequence_id: int,
+        num_blocks_needed: int,
+        current_blocks: List[int],
+    ) -> List[int]:
+        """Select blocks to evict based on PCAM attention scores."""
+
+        # Get PCAM's view of block importance
+        block_scores = self.pcam.get_block_scores(sequence_id, current_blocks)
+
+        # Never evict: sinks, recent window, anchors
+        protected = self._get_protected_blocks(sequence_id)
+
+        # Sort by score, evict lowest
+        candidates = [(b, s) for b, s in block_scores.items() if b not in protected]
+        candidates.sort(key=lambda x: x[1])
+
+        return [b for b, _ in candidates[:num_blocks_needed]]
+```
+
+**Integration Point 2: Sparse Attention via PCAM Candidates**
+
+```python
+# File: vllm/attention/pcam_attention.py
+
+class PCAMSparseAttention:
+    """Compute attention only on PCAM-selected candidates."""
+
+    def __init__(self, pcam: PCAMInterface, config: PCAMConfig):
+        self.pcam = pcam
+        self.k = config.top_k           # Candidates from PCAM
+        self.recent = config.recent_window   # Always include
+        self.anchors = config.num_anchors    # Pinned sinks
+
+    def forward(
+        self,
+        query: torch.Tensor,          # [batch, heads, 1, dim]
+        key_cache: PagedKVCache,
+        value_cache: PagedKVCache,
+        sequence_id: int,
+    ) -> torch.Tensor:
+
+        # 1. Get candidate blocks from PCAM
+        candidates = self.pcam.attend(
+            query_block_id=self._current_block(sequence_id),
+            k=self.k,
+        )
+
+        # 2. Add mandatory blocks (sinks + recent)
+        sink_blocks = list(range(self.anchors))
+        recent_blocks = self._get_recent_blocks(sequence_id, self.recent)
+
+        all_blocks = set(candidates) | set(sink_blocks) | set(recent_blocks)
+
+        # 3. Compute attention only on selected blocks
+        keys = key_cache.gather_blocks(list(all_blocks))
+        values = value_cache.gather_blocks(list(all_blocks))
+
+        output = flash_attention(query, keys, values)
+
+        # 4. Update PCAM with observed attention
+        attention_weights = self._get_attention_weights()  # From flash attention
+        self.pcam.update_batch(sequence_id, all_blocks, attention_weights)
+
+        return output
+```
+
+**Integration Point 3: PCAM as Tier Hint Provider**
+
+```python
+# File: vllm/core/memory_tier.py
+
+class PCAMTierHints:
+    """PCAM provides hints for memory tiering (GPU/CPU/disk)."""
+
+    def get_tier_recommendations(
+        self,
+        sequence_id: int,
+        all_blocks: List[int],
+    ) -> Dict[int, MemoryTier]:
+        """
+        Returns recommended tier for each block.
+
+        Tiers:
+          HOT  -> Keep in GPU HBM
+          WARM -> Move to CPU DRAM (prefetch-able)
+          COLD -> Move to disk/NVMe (eviction candidate)
+        """
+
+        scores = self.pcam.get_block_scores(sequence_id, all_blocks)
+
+        recommendations = {}
+        for block_id, score in scores.items():
+            if score > self.hot_threshold:
+                recommendations[block_id] = MemoryTier.HOT
+            elif score > self.warm_threshold:
+                recommendations[block_id] = MemoryTier.WARM
+            else:
+                recommendations[block_id] = MemoryTier.COLD
+
+        return recommendations
+```
+
+##### H.4.3 PCAM Interface Specification
+
+```python
+class PCAMInterface:
+    """Interface between vLLM and PCAM (simulator or hardware)."""
+
+    def attend(
+        self,
+        query_block_id: int,
+        k: int = 64,
+        sequence_id: int = 0,
+    ) -> List[Tuple[int, float]]:
+        """
+        Get top-K candidate blocks for this query.
+
+        Returns: List of (block_id, score) tuples, sorted by score descending.
+        Latency target: <100ns for simulator, <500ns for software
+        """
+
+    def update(
+        self,
+        query_block_id: int,
+        key_block_id: int,
+        weight: float,
+        sequence_id: int = 0,
+    ) -> None:
+        """
+        Update attention relationship between blocks.
+
+        Latency target: <200ns for simulator, <1μs for software
+        """
+
+    def update_batch(
+        self,
+        sequence_id: int,
+        block_ids: List[int],
+        weights: List[float],
+    ) -> None:
+        """Batch update for efficiency."""
+
+    def get_block_scores(
+        self,
+        sequence_id: int,
+        block_ids: List[int],
+    ) -> Dict[int, float]:
+        """Get current attention scores for blocks."""
+
+    def decay(
+        self,
+        rate: float = 0.99,
+        sequence_id: Optional[int] = None,
+    ) -> None:
+        """Apply decay to all weights."""
+
+    def allocate_sequence(self, sequence_id: int, max_blocks: int) -> None:
+        """Allocate state for new sequence."""
+
+    def free_sequence(self, sequence_id: int) -> None:
+        """Release sequence state."""
+```
+
+---
+
+#### H.5 Hardware-Fidelity Modeling
+
+##### H.5.1 Host ↔ Device Interconnect Models
+
+| Interconnect | Base Latency | Bandwidth | PCAM Suitability |
+|--------------|--------------|-----------|------------------|
+| **PCIe Gen5 x16** | 150ns | 32 GB/s | Viable for batched ops |
+| **CXL 2.0** | 80ns | 64 GB/s | Good for fine-grained |
+| **CXL 3.0** | 50ns | 128 GB/s | Ideal for v1 |
+| **On-package** | 20ns | 256 GB/s | Best, but harder integration |
+
+**Latency Breakdown Model:**
+
+```
+Total ATTEND Latency =
+    Host_to_Device +           # Interconnect (80-150ns)
+    Command_Decode +           # Fixed (5ns)
+    Bank_Access +              # Variable (20-50ns + conflicts)
+    TopK_Selection +           # Fixed (30-50ns for K=64)
+    Result_Format +            # Fixed (5ns)
+    Device_to_Host             # Interconnect (80-150ns)
+
+Example (CXL 2.0, K=64, no conflicts):
+    80 + 5 + 25 + 40 + 5 + 80 = 235ns total
+```
+
+##### H.5.2 Banking Model
+
+```python
+class PCAMBankModel:
+    """Model bank conflicts and queueing."""
+
+    def __init__(
+        self,
+        num_banks: int = 64,
+        bank_width: int = 256,      # bits per read
+        bank_cycle_ns: float = 2.0, # Bank access time
+    ):
+        self.num_banks = num_banks
+        self.bank_queues = [Queue() for _ in range(num_banks)]
+
+    def model_attend(
+        self,
+        query_hash: int,
+        num_candidates: int,
+    ) -> Tuple[float, int]:
+        """
+        Model ATTEND operation latency.
+
+        Returns: (latency_ns, num_conflicts)
+        """
+
+        # Determine which banks are accessed
+        banks_needed = self._hash_to_banks(query_hash, num_candidates)
+
+        # Check for conflicts with in-flight operations
+        conflicts = 0
+        max_wait = 0
+        for bank in banks_needed:
+            wait_time = self.bank_queues[bank].depth * self.bank_cycle_ns
+            max_wait = max(max_wait, wait_time)
+            if wait_time > 0:
+                conflicts += 1
+
+        # Total latency
+        base_latency = self.bank_cycle_ns * ceil(num_candidates / self.num_banks)
+        total_latency = base_latency + max_wait
+
+        return total_latency, conflicts
+```
+
+##### H.5.3 Contention Under Batched Inference
+
+```
+Batch Size vs. Bank Utilization:
+═══════════════════════════════════════════════════════════════
+
+Batch Size | Concurrent ATTEND | Expected Conflicts | Avg Latency
+-----------|-------------------|--------------------|--------------
+    1      |        1          |      ~0%           |   50ns
+    8      |        8          |     ~2%            |   52ns
+   16      |       16          |     ~8%            |   58ns
+   32      |       32          |    ~25%            |   75ns
+   64      |       64          |    ~50%            |  120ns
+
+Mitigation strategies:
+├─ Bank interleaving: Hash-based distribution across banks
+├─ Request coalescing: Merge overlapping reads
+├─ Priority scheduling: Critical-path requests first
+└─ Banked pipelines: Multiple Top-K units in parallel
+```
+
+##### H.5.4 Required Ops/Second Calculation
+
+```python
+def calculate_required_ops(
+    batch_size: int,
+    seq_len: int,
+    layers: int,
+    heads: int,
+    tokens_per_sec: float,
+) -> Dict[str, float]:
+    """Calculate required PCAM ops for given inference throughput."""
+
+    # One ATTEND per (batch * layer * head) per token
+    attends_per_token = batch_size * layers * heads
+
+    # One UPDATE per attended block per token (average K updates)
+    updates_per_token = attends_per_token * K_AVG  # K_AVG ~ 64
+
+    return {
+        "attend_ops_per_sec": attends_per_token * tokens_per_sec,
+        "update_ops_per_sec": updates_per_token * tokens_per_sec,
+    }
+
+# Example: LLaMA-70B, batch=32, 100 tok/s target
+required = calculate_required_ops(
+    batch_size=32,
+    seq_len=4096,  # Not used in per-token calc
+    layers=80,
+    heads=64,
+    tokens_per_sec=100,
+)
+# attend_ops_per_sec = 32 * 80 * 64 * 100 = 16.4M ops/sec
+# update_ops_per_sec = 16.4M * 64 = 1.05B ops/sec
+
+# Can PCAM deliver this?
+# At 50ns/ATTEND: 20M ops/sec capacity → YES (32% utilization)
+# At 200ns/UPDATE: 5M ops/sec capacity → NEED BATCHING/COALESCING
+```
+
+---
+
+#### H.6 Validation Phases and Milestones
+
+##### H.6.1 Phase 1: Trace-Driven Simulator (v0)
+
+**Goal:** Validate attention-tracking thesis without hardware assumptions.
+
+**Deliverables:**
+```
+v0 Simulator Deliverables:
+├─ PCAMSimulator class (Python)
+├─ Trace ingestor for standardized format
+├─ Baseline implementations (Sink+LRU, H2O, Industry-Style)
+├─ Metrics collector (hit rate, coverage, latency dist)
+└─ Comparison report generator
+
+Timeline: 4-6 weeks
+Team: 1-2 engineers
+```
+
+**Success Criteria (v0 → v1 gate):**
+
+| Metric | Target | Rationale |
+|--------|--------|-----------|
+| Candidate coverage | ≥80% of true top-K captured | Proves attention tracking works |
+| Hit rate vs. baselines | ≥15% improvement over H2O | Meaningful advantage |
+| Simulated latency | <500ns for ATTEND | Software path is viable |
+
+**What v0 Does NOT Prove:**
+- Real system throughput (no vLLM integration)
+- Hardware feasibility (no cycle-accurate model)
+- Quality impact (no end-to-end inference)
+
+##### H.6.2 Phase 2: vLLM Integration Prototype
+
+**Goal:** Prove end-to-end system benefits.
+
+**Deliverables:**
+```
+v1 Prototype Deliverables:
+├─ PCAMInterface implementation (software, in-process)
+├─ vLLM block manager integration (eviction hook)
+├─ vLLM sparse attention path (PCAM-guided)
+├─ End-to-end benchmark suite
+└─ Quality proxy measurement
+
+Timeline: 6-8 weeks (after v0)
+Team: 2-3 engineers
+```
+
+**Measurements:**
+
+```python
+class PrototypeBenchmark:
+    """Measurements for v1 prototype."""
+
+    workloads = [
+        "multi_turn_chat_10turns",
+        "long_context_64k",
+        "docqa_5docs",
+        "code_completion_4k",
+        "multitenant_32seq",
+    ]
+
+    baselines = [
+        "sink_lru",
+        "h2o",
+        "industry_style",
+    ]
+
+    memory_budgets = [0.05, 0.10, 0.15, 0.25, 0.50]  # % of full KV
+
+    metrics = [
+        "tokens_per_second",
+        "latency_p50_ms",
+        "latency_p95_ms",
+        "latency_p99_ms",
+        "quality_proxy",      # Perplexity or accuracy
+        "gpu_memory_used_gb",
+        "pcam_overhead_pct",  # PCAM path latency / total
+    ]
+```
+
+**Success Criteria (v1 → v2 gate):**
+
+| Metric | Target | Measured Against |
+|--------|--------|------------------|
+| Throughput | ≥15% improvement | Best baseline, same quality |
+| Quality | <1% degradation | Full attention baseline |
+| p99 latency | ≤5% overhead | Same workload without PCAM |
+| Memory reduction | ≥30% | Same quality level |
+| At least ONE workload class | ≥25% throughput win | All baselines |
+
+##### H.6.3 Phase 3: Hardware-Fidelity Simulator
+
+**Goal:** Prove hardware is feasible at required performance.
+
+**Deliverables:**
+```
+v2 Hardware Simulator Deliverables:
+├─ Cycle-accurate ATTEND pipeline model
+├─ Cycle-accurate UPDATE pipeline model
+├─ Bank conflict and queueing model
+├─ Top-K selection network model
+├─ Host interface latency model
+├─ Contention analysis under batch load
+└─ Performance projection report
+
+Timeline: 4-6 weeks (parallel with v1)
+Team: 1-2 engineers (hardware background)
+```
+
+**Success Criteria (v2 → FPGA gate):**
+
+| Metric | Target | Rationale |
+|--------|--------|-----------|
+| ATTEND latency (p50) | <100ns | Must be faster than DRAM access |
+| ATTEND latency (p99) | <500ns | Tail must be bounded |
+| ATTEND throughput | >20M ops/sec | Support batch=32 at 100 tok/s |
+| UPDATE throughput | >100M ops/sec (coalesced) | Handle update stream |
+| Bank utilization | <70% at batch=32 | Headroom for contention |
+| Area estimate | <10mm² at 16nm | Cost-feasible |
+| Power estimate | <5W | Thermally feasible |
+
+##### H.6.4 Phase 4: FPGA Prototype (v3)
+
+**Goal:** Validate hardware implementation.
+
+**Scope:**
+```
+FPGA Prototype Scope:
+├─ Target: Xilinx Alveo U250 or similar
+├─ Interface: PCIe Gen4 x16
+├─ Capacity: 1M entries (subset of full scale)
+├─ Clock: 200-300 MHz target
+│
+├─ Implement:
+│   ├─ ATTEND pipeline (full)
+│   ├─ UPDATE pipeline (full)
+│   ├─ Top-K selection (K=64)
+│   ├─ Bank arbitration (16-32 banks)
+│   └─ Host DMA interface
+│
+└─ Do NOT implement:
+    ├─ Analog crossbar
+    ├─ Phase coherence
+    └─ Full-scale capacity
+```
+
+**Success Criteria (FPGA → Tape-out):**
+
+| Metric | Target | Rationale |
+|--------|--------|-----------|
+| ATTEND latency (p50) | <200ns | Including PCIe overhead |
+| ATTEND latency (p99) | <1μs | Bounded tail on real system |
+| Sustained throughput | >5M ops/sec | Proves architecture works |
+| vLLM integration | Working end-to-end | Real inference, not just ops |
+| Throughput gain | ≥15% vs baseline | Matches simulation prediction |
+
+---
+
+#### H.7 Go/No-Go Decision Gates
+
+##### H.7.1 Gate Structure
+
+```
+PCAM Development Gates:
+═══════════════════════════════════════════════════════════════
+
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│  v0     │────►│  v1     │────►│  v2     │────►│  FPGA   │────► Silicon
+│ Sim     │     │ Proto   │     │ HW Sim  │     │ Proto   │
+└────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘
+     │               │               │               │
+   GATE 1          GATE 2          GATE 3          GATE 4
+
+GATE 1: Does attention tracking work?
+GATE 2: Does it help real inference?
+GATE 3: Can hardware deliver required perf?
+GATE 4: Does real hardware match predictions?
+```
+
+##### H.7.2 Detailed Gate Criteria
+
+**GATE 1: v0 Simulator → v1 Prototype**
+
+| Criterion | Threshold | Evidence Required |
+|-----------|-----------|-------------------|
+| Candidate coverage | ≥80% | Trace-driven simulation report |
+| Hit rate delta | ≥15% vs H2O | Statistical analysis |
+| Algorithm scalability | O(log n) or better | Complexity analysis |
+| State overhead | <5% of KV size | Memory analysis |
+
+**Decision:** If ALL criteria met → proceed to v1. Otherwise, redesign or cancel.
+
+---
+
+**GATE 2: v1 Prototype → v2 Hardware Sim**
+
+| Criterion | Threshold | Evidence Required |
+|-----------|-----------|-------------------|
+| Throughput win | ≥15% in ≥1 workload | vLLM benchmark suite |
+| Quality preservation | <1% degradation | Perplexity/accuracy metrics |
+| p99 overhead | ≤5% | Latency distribution |
+| Memory win | ≥30% reduction | Same quality level |
+| Works at scale | 32+ concurrent seqs | Multi-tenant benchmark |
+
+**Decision:** If ALL criteria met → proceed to v2 AND FPGA planning. Otherwise:
+- If close (within 50% of targets): iterate on v1
+- If not close: cancel hardware path, keep as software optimization
+
+---
+
+**GATE 3: v2 Hardware Sim → FPGA**
+
+| Criterion | Threshold | Evidence Required |
+|-----------|-----------|-------------------|
+| ATTEND latency | <100ns (p50), <500ns (p99) | Cycle-accurate simulation |
+| ATTEND throughput | >20M ops/sec | Steady-state simulation |
+| UPDATE throughput | >100M ops/sec | With coalescing |
+| Area estimate | <10mm² at 16nm | Synthesis estimate |
+| Power estimate | <5W | Activity-based estimate |
+| Bank utilization | <70% at batch=32 | Contention simulation |
+
+**Decision:** If ALL criteria met → proceed to FPGA. Otherwise:
+- If area/power issue: explore different process node or architecture
+- If performance issue: reduce scope or add parallelism
+- If fundamental: cancel hardware, focus on software
+
+---
+
+**GATE 4: FPGA → Tape-out**
+
+| Criterion | Threshold | Evidence Required |
+|-----------|-----------|-------------------|
+| Real latency | <200ns ATTEND (p50) | FPGA measurements |
+| Real throughput | >5M ops/sec | Sustained benchmark |
+| vLLM end-to-end | Working, ≥15% gain | Full integration test |
+| Matches simulation | Within 2× of predictions | Correlation analysis |
+| Reliability | <0.01% error rate | Extended testing |
+| No blocking issues | - | Engineering review |
+
+**Decision:** If ALL criteria met → proceed to ASIC tape-out. Otherwise:
+- If performance gap: iterate on FPGA
+- If fundamental issue: redesign or cancel
+
+---
+
+#### H.8 What's NOT Required for v1
+
+To reduce risk and accelerate validation, these features are explicitly **deferred**:
+
+##### H.8.1 Deferred to v2/Later
+
+| Feature | Why Deferred | Minimal Alternative |
+|---------|--------------|---------------------|
+| **Analog crossbar** | High risk, unproven at scale | Digital lookup (proven) |
+| **Phase coherence** | Optional feature, not core | Disabled by default |
+| **GATE instruction** | Optimization, not fundamental | Software gating |
+| **COHERE instruction** | v2 feature | Software-based coherence |
+| **Multi-chip scaling** | Scale-out can wait | Single chip first |
+| **Advanced decay** | Many schemes, can iterate | Simple exponential |
+| **Power optimization** | Get it working first | Accept 2× power budget |
+
+##### H.8.2 v1 Minimal Feature Set
+
+**The thesis is proven if we demonstrate:**
+
+```
+Minimal v1 Feature Set (Must Have):
+═══════════════════════════════════════════════════════════════
+
+1. ATTEND operation works at required latency
+   └─ Prove: <100ns for K=64 candidate retrieval
+
+2. UPDATE operation scales to required throughput
+   └─ Prove: >100M coalesced updates/sec
+
+3. Attention tracking improves candidate quality
+   └─ Prove: ≥80% coverage of true top-K
+
+4. End-to-end system benefits
+   └─ Prove: ≥15% throughput gain OR ≥30% memory reduction
+
+5. Tail latency is bounded
+   └─ Prove: p99 < 5× p50
+
+Everything else is optimization.
+```
+
+---
+
+#### H.9 Implementation Roadmap
+
+##### H.9.1 Timeline Overview
+
+```
+PCAM Validation Timeline:
+═══════════════════════════════════════════════════════════════
+
+Month 1-2:   v0 Trace-Driven Simulator
+             ├─ Define trace format
+             ├─ Implement simulator core
+             ├─ Implement baselines
+             └─ Run initial experiments
+
+Month 2-3:   v0 Validation + GATE 1
+             ├─ Full workload coverage
+             ├─ Statistical analysis
+             └─ Go/No-Go decision
+
+Month 3-5:   v1 vLLM Integration
+             ├─ PCAM interface implementation
+             ├─ Block manager integration
+             ├─ Sparse attention path
+             └─ Benchmark suite
+
+Month 5-6:   v1 Validation + GATE 2
+             ├─ Full benchmark run
+             ├─ Quality validation
+             └─ Go/No-Go decision
+
+Month 4-6:   v2 Hardware Simulator (parallel)
+             ├─ Cycle-accurate model
+             ├─ Bank conflict model
+             └─ Performance projection
+
+Month 6-7:   GATE 3 Decision
+             └─ Hardware feasibility verdict
+
+Month 7-12:  FPGA Prototype (if gates pass)
+             ├─ RTL development
+             ├─ FPGA bring-up
+             └─ Integration testing
+
+Month 12:    GATE 4 Decision
+             └─ Tape-out readiness
+```
+
+##### H.9.2 Resource Requirements
+
+| Phase | Duration | Engineers | Skills Needed |
+|-------|----------|-----------|---------------|
+| v0 Simulator | 6 weeks | 1-2 | Python, ML systems |
+| v1 Prototype | 8 weeks | 2-3 | vLLM, PyTorch, CUDA |
+| v2 HW Sim | 6 weeks | 1-2 | RTL, hardware modeling |
+| FPGA | 20 weeks | 3-4 | FPGA, PCIe, vLLM |
+
+**Total headcount:** 4-6 engineers over 12 months to FPGA validation.
+
+---
+
+#### H.10 Risk Mitigation
+
+##### H.10.1 Technical Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Attention patterns not predictable | Medium | Fatal | Early trace analysis in v0 |
+| Update rate too high | Medium | High | Coalescing, sampling |
+| Tail latency unpredictable | Medium | High | Bank over-provisioning |
+| vLLM integration complex | Low | Medium | Clean interface design |
+| FPGA doesn't scale | Low | Medium | Conservative initial target |
+
+##### H.10.2 Decision Points
+
+```
+Key Decision Points:
+═══════════════════════════════════════════════════════════════
+
+Week 4 (v0 midpoint):
+  "Is attention tracking fundamentally working?"
+  └─ If no: investigate why before continuing
+
+Week 8 (GATE 1):
+  "Should we build a prototype?"
+  └─ If no: cancel or redesign
+
+Week 16 (GATE 2):
+  "Is hardware investment justified?"
+  └─ If no: keep as software-only optimization
+
+Week 24 (GATE 3):
+  "Can we build the hardware?"
+  └─ If no: redesign architecture
+
+Week 48 (GATE 4):
+  "Should we tape out?"
+  └─ If no: iterate on FPGA
+```
+
+---
+
+#### H.11 Summary: Acceptance Criteria
+
+```
+PCAM Validation Summary:
+═══════════════════════════════════════════════════════════════
+
+MUST PROVE (all required for silicon):
+├─ Quality-preserving memory reduction: ≥2× context OR ≥30% less KV
+├─ Throughput improvement: ≥15% tok/s in ≥1 workload class
+├─ Tail latency control: p99 overhead ≤5%
+├─ Hardware feasibility: <100ns ATTEND, <10mm², <5W
+└─ Real integration: Working vLLM end-to-end
+
+MUST BEAT (all baselines):
+├─ Sink+LRU
+├─ H2O (Heavy Hitters)
+└─ Industry-style (sinks + attention-aware + ghost/adapt)
+
+MUST MEASURE (all metrics):
+├─ tok/s (throughput)
+├─ p50/p95/p99 latency
+├─ Quality proxy (perplexity or accuracy)
+├─ Memory budget sweep (5%, 10%, 15%, 25%, 50%)
+└─ Multi-tenant behavior (8, 16, 32 concurrent)
+
+MUST VALIDATE ON (all workloads):
+├─ Multi-turn chat
+├─ Long-context summarization
+├─ DocQA / RAG
+├─ Code completion
+└─ Multi-tenant mixed batch
+
+NOT REQUIRED FOR v1:
+├─ Analog crossbar
+├─ Phase coherence math
+├─ GATE/COHERE instructions
+├─ Multi-chip scaling
+└─ Power optimization
+
+This plan provides clear go/no-go gates with quantified thresholds.
+If PCAM cannot meet these bars, silicon investment is not justified.
+If it does meet them, the data will be compelling.
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
 ## Document History
 
 | Version | Date | Changes |
@@ -3305,6 +4369,7 @@ and enables capabilities competitors cannot match.
 | 0.3 | 2026-01-31 | v1 silicon improvements: minimal ISA, optional phase, realistic costs |
 | 0.4 | 2026-01-31 | Added comprehensive competitive analysis (Appendix F) |
 | 0.5 | 2026-01-31 | Added cost-benefit analysis with ROI calculations (Appendix G) |
+| 0.6 | 2026-01-31 | Added industry-grade simulation & validation plan (Appendix H) |
 
 ---
 
