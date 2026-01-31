@@ -44,6 +44,15 @@ CTM_plus/
 │       ├── benchmark.cu     # Performance benchmark
 │       ├── CMakeLists.txt   # CMake build system
 │       └── Makefile         # Make build system
+├── vLLM/
+│   ├── setup.py             # Package installer
+│   ├── README.md            # vLLM integration docs
+│   └── ctm_plus_vllm/       # Python package
+│       ├── __init__.py      # Package init
+│       ├── config.py        # Configuration
+│       ├── evictor.py       # CTM+ eviction policy
+│       ├── block_manager.py # Block space manager
+│       └── example.py       # Usage example
 └── ../simulator/
     └── ctm_plus/            # Python simulator
         ├── controllers/
@@ -145,6 +154,45 @@ int main() {
 
     return 0;
 }
+```
+
+### vLLM Integration
+
+```bash
+# Install
+cd CTM_plus/vLLM
+pip install -e .
+
+# Run example
+python -m ctm_plus_vllm.example
+```
+
+**Using in your vLLM application:**
+
+```python
+from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+
+# Create block manager with CTM+
+config = CTMvLLMConfig.for_llm_inference()
+manager = CTMBlockSpaceManager(
+    block_size=16,
+    num_gpu_blocks=1000,
+    num_cpu_blocks=10000,
+    ctm_config=config,
+)
+
+# Allocate blocks for a sequence
+blocks = manager.allocate(sequence_id=1, num_blocks=10)
+
+# Access blocks (triggers CTM+ tracking)
+manager.access(sequence_id=1, block_indices=[0, 1, 2])
+
+# Free blocks when done
+manager.free(sequence_id=1)
+
+# Get statistics
+stats = manager.get_stats()
+print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
 ```
 
 ## Configuration
@@ -314,19 +362,34 @@ for (int gpu = 0; gpu < num_gpus; gpu++) {
 
 ### With vLLM (PagedAttention)
 
-CTM+ can replace the default block manager's eviction policy:
+CTM+ provides a drop-in block manager for vLLM:
 
 ```python
-# In vllm block manager
-from ctm_plus.controllers.ctm_plus import CTMPlusController
+from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
 
-class CTMBlockManager:
-    def __init__(self, ...):
-        self.ctm = CTMPlusController(config)
+# Preset configs for different use cases
+config = CTMvLLMConfig.for_llm_inference()    # Chat/completion
+config = CTMvLLMConfig.for_batch_inference()  # Batch processing
+config = CTMvLLMConfig.for_streaming()        # Continuous generation
 
-    def get_victim_block(self):
-        return self.ctm.select_victim(state)
+# Create block manager
+manager = CTMBlockSpaceManager(
+    block_size=16,
+    num_gpu_blocks=1000,
+    num_cpu_blocks=10000,
+    ctm_config=config,
+)
+
+# Pin important sequences to prevent eviction
+manager.pin_sequence(sequence_id=1)
+
+# Monitor performance
+stats = manager.get_stats()
+print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
+print(f"Adaptive p: {stats['adaptive_p']:.3f}")
 ```
+
+See `CTM_plus/vLLM/README.md` for full integration instructions.
 
 ### With Linux Memory Tiering
 
@@ -376,6 +439,7 @@ print(f'CTM+: {ctm_result.metrics.hit_rate:.2%}')
 - GPL-2.0 (Kernel module)
 - MIT (Python simulator)
 - MIT (CUDA library)
+- MIT (vLLM integration)
 
 ## References
 
