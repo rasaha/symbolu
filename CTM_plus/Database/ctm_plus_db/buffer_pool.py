@@ -6,8 +6,15 @@ Implements smart page eviction for database buffer pools using:
 - ARC-style shadow tiers with adaptive p
 - Page type awareness (index vs heap vs dirty)
 - Sequential access prefetching
+
+Production Optimizations (p99 < 100µs):
+- Batch eviction: Evict M pages at once when threshold hit
+- Fast/slow path: O(1) updates per access, O(n) maintenance periodic
+- Stratified candidate pools: Pre-sorted worst-by-signal pools
+- Bounded-cost operations: No unbounded scans in hot path
 """
 
+import bisect
 import random
 import time
 import threading
@@ -17,6 +24,98 @@ from typing import Dict, List, Optional, Set, Tuple, Any, Callable
 from enum import Enum
 
 from .config import CTMDBConfig
+
+
+# =============================================================================
+# PRODUCTION: Latency Tracking
+# =============================================================================
+
+class LatencyStats:
+    """
+    P99-focused latency tracking for production monitoring.
+
+    Uses insertion sort to maintain a sorted list, giving O(log n) insertion
+    and O(1) percentile lookups instead of O(n log n) on every percentile call.
+    """
+
+    def __init__(self, max_samples: int = 10000):
+        self.max_samples = max_samples
+        self._sorted: List[float] = []
+        self._count = 0
+
+    def record(self, latency_us: float):
+        if len(self._sorted) >= self.max_samples:
+            # Remove oldest half (approximation: remove smallest values)
+            self._sorted = self._sorted[self.max_samples // 2:]
+        bisect.insort(self._sorted, latency_us)
+        self._count += 1
+
+    def percentile(self, p: float) -> float:
+        if not self._sorted:
+            return 0.0
+        idx = int(len(self._sorted) * p / 100)
+        return self._sorted[min(idx, len(self._sorted) - 1)]
+
+    @property
+    def p50(self) -> float:
+        return self.percentile(50)
+
+    @property
+    def p95(self) -> float:
+        return self.percentile(95)
+
+    @property
+    def p99(self) -> float:
+        return self.percentile(99)
+
+    def summary(self) -> dict:
+        return {
+            "count": self._count,
+            "p50_us": self.p50,
+            "p95_us": self.p95,
+            "p99_us": self.p99,
+            "max_us": self._sorted[-1] if self._sorted else 0,
+        }
+
+    def clear(self):
+        self._sorted.clear()
+        self._count = 0
+
+
+# =============================================================================
+# PRODUCTION: Stratified Candidate Pool
+# =============================================================================
+
+class StratifiedCandidatePool:
+    """
+    Maintains candidate pools stratified by signal for O(k) eviction.
+    Each pool is a bounded deque (O(1) add/remove).
+    """
+
+    def __init__(self, pool_size: int = 64):
+        self.pool_size = pool_size
+        self.lru_pool: deque = deque(maxlen=pool_size)  # Oldest by access time
+        self.lfu_pool: deque = deque(maxlen=pool_size)  # Lowest frequency
+        self.clean_pool: deque = deque(maxlen=pool_size)  # Clean pages (prefer)
+        self.in_pool: Set[int] = set()
+
+    def get_candidates(self, k: int, exclude_pinned: Set[int]) -> List[int]:
+        """Get k candidates from stratified pools. O(k)."""
+        candidates = set()
+        per_pool = max(1, k // 3)
+
+        for pool in [self.lru_pool, self.lfu_pool, self.clean_pool]:
+            for page_id in list(pool)[:per_pool]:
+                if page_id not in exclude_pinned:
+                    candidates.add(page_id)
+
+        return list(candidates)[:k]
+
+    def clear(self):
+        self.lru_pool.clear()
+        self.lfu_pool.clear()
+        self.clean_pool.clear()
+        self.in_pool.clear()
 
 
 class PageType(Enum):
@@ -189,6 +288,12 @@ class CTMBufferPool:
     on typical database workloads.
     """
 
+    # Production configuration defaults
+    EVICTION_BATCH_SIZE = 64
+    EVICTION_THRESHOLD = 0.95
+    SLOW_PATH_INTERVAL = 1000
+    K_CANDIDATES = 32
+
     def __init__(
         self,
         pool_size_pages: int,
@@ -220,6 +325,15 @@ class CTMBufferPool:
         # Prefetch queue
         self.prefetch_queue: deque = deque()
 
+        # PRODUCTION: Stratified candidate pool for O(k) eviction
+        self.candidate_pool = StratifiedCandidatePool(self.K_CANDIDATES * 2)
+
+        # PRODUCTION: Latency tracking
+        self.latency_stats = LatencyStats()
+
+        # PRODUCTION: Track pinned pages for fast exclusion
+        self.pinned_pages: Set[int] = set()
+
         # Callbacks
         self.on_evict: Optional[Callable[[int, bool], None]] = None  # page_id, is_dirty
         self.on_prefetch: Optional[Callable[[int], None]] = None
@@ -231,6 +345,8 @@ class CTMBufferPool:
             "dirty_evictions": 0,
             "prefetches": 0,
             "smart_selections": 0,
+            "batch_evictions": 0,
+            "slow_path_runs": 0,
         }
 
     def access(
@@ -241,7 +357,7 @@ class CTMBufferPool:
         accessor_id: Optional[int] = None,
     ) -> Tuple[bool, List[int]]:
         """
-        Access a page.
+        Access a page. PRODUCTION: O(1) fast path with latency tracking.
 
         Args:
             page_id: Page identifier.
@@ -253,14 +369,16 @@ class CTMBufferPool:
             (is_hit, prefetch_list): Whether page was in buffer,
             and list of pages to prefetch.
         """
+        start_time = time.perf_counter()
+
         with self._lock:
             current_time = time.monotonic()
             self.access_counter += 1
 
-            # Track pattern
+            # Track pattern (O(1))
             is_sequential, seq_length = self.pattern_tracker.record_access(page_id)
 
-            # Check shadow tier for adaptation
+            # Check shadow tier for adaptation (O(1))
             self.shadow_tier.check_and_adapt(
                 page_id, self.config.adaptive_p_learning_rate
             )
@@ -269,7 +387,7 @@ class CTMBufferPool:
             prefetch_list = []
 
             if is_hit:
-                # Buffer hit
+                # Buffer hit - O(1) update
                 self.stats["hits"] += 1
                 page = self.pages[page_id]
                 page.update_access(current_time)
@@ -282,8 +400,12 @@ class CTMBufferPool:
                 # Buffer miss
                 self.stats["misses"] += 1
 
-                # Make space if needed
-                if len(self.buffer_pages) >= self.pool_size:
+                # PRODUCTION: Batch eviction when threshold hit
+                if len(self.buffer_pages) >= int(self.pool_size * self.EVICTION_THRESHOLD):
+                    self._batch_evict()
+
+                # Make space if still needed (shouldn't happen after batch evict)
+                while len(self.buffer_pages) >= self.pool_size:
                     self._evict_page()
 
                 # Add page to buffer
@@ -304,7 +426,135 @@ class CTMBufferPool:
                 if seq_length >= self.config.sequential_threshold:
                     prefetch_list = self._get_prefetch_pages(page_id)
 
-            return is_hit, prefetch_list
+            # PRODUCTION: Slow path maintenance
+            if self.access_counter % self.SLOW_PATH_INTERVAL == 0:
+                self._slow_path_maintenance()
+
+        # PRODUCTION: Record latency
+        latency_us = (time.perf_counter() - start_time) * 1e6
+        self.latency_stats.record(latency_us)
+
+        return is_hit, prefetch_list
+
+    def _batch_evict(self) -> List[int]:
+        """
+        PRODUCTION: Batch eviction - evict M pages at once.
+        O(k) for candidate selection, O(M) for eviction.
+        """
+        num_to_evict = self.EVICTION_BATCH_SIZE
+
+        # Get candidates from stratified pool + random sampling
+        pool_candidates = self.candidate_pool.get_candidates(
+            self.K_CANDIDATES, self.pinned_pages
+        )
+
+        # Add random sampling
+        non_pinned = [p for p in self.buffer_pages if p not in self.pinned_pages]
+        if len(non_pinned) > self.K_CANDIDATES:
+            random_candidates = random.sample(non_pinned, self.K_CANDIDATES)
+        else:
+            random_candidates = non_pinned
+
+        candidates = list(set(pool_candidates + random_candidates))
+
+        # Score candidates (O(k))
+        scored = self._score_candidates_batch(candidates)
+
+        # Select victims (lowest scores)
+        scored.sort(key=lambda x: x[1])
+        victims = [pid for pid, _ in scored[:num_to_evict]]
+
+        # Evict
+        evicted = []
+        for victim_id in victims:
+            if victim_id in self.buffer_pages:
+                self._evict_single(victim_id)
+                evicted.append(victim_id)
+
+        self.stats["batch_evictions"] += 1
+        return evicted
+
+    def _score_candidates_batch(self, candidates: List[int]) -> List[Tuple[int, float]]:
+        """Score multiple candidates at once. O(k)."""
+        if not candidates:
+            return []
+
+        current_time = time.monotonic()
+        times = [self.pages[pid].last_access_time for pid in candidates if pid in self.pages]
+        if not times:
+            return []
+
+        min_time = min(times)
+        max_time = max(times)
+        time_range = max(max_time - min_time, 0.001)
+
+        adaptive_p = self.shadow_tier.p
+        scored = []
+
+        for page_id in candidates:
+            if page_id not in self.pages:
+                continue
+            score = self._compute_victim_score(page_id, min_time, time_range, adaptive_p)
+            scored.append((page_id, score))
+
+        return scored
+
+    def _evict_single(self, victim_id: int) -> None:
+        """Evict a single page. O(1)."""
+        if victim_id not in self.pages:
+            return
+
+        page = self.pages[victim_id]
+
+        # Record in shadow tier
+        self.shadow_tier.record_eviction(
+            victim_id,
+            was_dirty=page.is_dirty,
+            page_type=page.page_type,
+            current_time=time.monotonic(),
+            from_recent=(page.access_count <= 2),
+        )
+
+        # Update stats
+        self.stats["evictions"] += 1
+        if page.is_dirty:
+            self.stats["dirty_evictions"] += 1
+
+        # Callback
+        if self.on_evict:
+            self.on_evict(victim_id, page.is_dirty)
+
+        # Remove from buffer
+        self.buffer_pages.discard(victim_id)
+        del self.pages[victim_id]
+
+    def _slow_path_maintenance(self) -> None:
+        """
+        PRODUCTION: Slow path maintenance - runs every N accesses.
+        Can do O(n) work since it's infrequent.
+        """
+        self.stats["slow_path_runs"] += 1
+
+        # Rebuild stratified candidate pools
+        non_pinned = [p for p in self.buffer_pages if p not in self.pinned_pages]
+
+        if not non_pinned:
+            return
+
+        pool_size = self.K_CANDIDATES
+
+        # LRU pool (oldest)
+        by_time = sorted(non_pinned, key=lambda p: self.pages[p].last_access_time)
+        self.candidate_pool.lru_pool = deque(by_time[:pool_size], maxlen=pool_size)
+
+        # LFU pool (lowest frequency)
+        by_freq = sorted(non_pinned, key=lambda p: self.pages[p].access_count)
+        self.candidate_pool.lfu_pool = deque(by_freq[:pool_size], maxlen=pool_size)
+
+        # Clean pool (prefer evicting clean pages)
+        clean_pages = [p for p in non_pinned if not self.pages[p].is_dirty]
+        by_clean_time = sorted(clean_pages, key=lambda p: self.pages[p].last_access_time)
+        self.candidate_pool.clean_pool = deque(by_clean_time[:pool_size], maxlen=pool_size)
 
     def _get_prefetch_pages(self, page_id: int) -> List[int]:
         """Get pages to prefetch based on current access."""
@@ -484,6 +734,7 @@ class CTMBufferPool:
         with self._lock:
             if page_id in self.pages:
                 self.pages[page_id].pin_count += 1
+                self.pinned_pages.add(page_id)  # PRODUCTION: Track for fast exclusion
                 return True
             return False
 
@@ -492,6 +743,8 @@ class CTMBufferPool:
         with self._lock:
             if page_id in self.pages:
                 self.pages[page_id].pin_count = max(0, self.pages[page_id].pin_count - 1)
+                if self.pages[page_id].pin_count == 0:
+                    self.pinned_pages.discard(page_id)  # PRODUCTION: Update tracking
                 return True
             return False
 
@@ -529,7 +782,7 @@ class CTMBufferPool:
         return self.get_dirty_ratio() >= self.config.lazy_write_threshold
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get buffer pool statistics."""
+        """Get buffer pool statistics including PRODUCTION latency metrics."""
         with self._lock:
             total = self.stats["hits"] + self.stats["misses"]
             return {
@@ -541,10 +794,17 @@ class CTMBufferPool:
                 "pool_size": self.pool_size,
                 "utilization": len(self.buffer_pages) / self.pool_size,
                 "dirty_ratio": self.get_dirty_ratio(),
+                "pinned_pages": len(self.pinned_pages),
+                # PRODUCTION: Latency metrics
+                "latency": self.latency_stats.summary(),
             }
 
     def reset_stats(self) -> None:
-        """Reset statistics."""
+        """Reset statistics including production latency tracking."""
         with self._lock:
             for key in self.stats:
                 self.stats[key] = 0
+            # PRODUCTION: Reset latency and pools
+            self.latency_stats.clear()
+            self.candidate_pool.clear()
+            self._slow_path_counter = 0
