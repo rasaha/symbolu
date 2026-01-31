@@ -53,6 +53,16 @@ CTM_plus/
 │       ├── evictor.py       # CTM+ eviction policy
 │       ├── block_manager.py # Block space manager
 │       └── example.py       # Usage example
+├── DeepSpeed/
+│   ├── setup.py             # Package installer
+│   ├── README.md            # DeepSpeed integration docs
+│   └── ctm_plus_deepspeed/  # Python package
+│       ├── __init__.py      # Package init
+│       ├── config.py        # Configuration
+│       ├── offload_manager.py # CTM+ offload manager
+│       ├── zero_integration.py # ZeRO-Offload support
+│       ├── inference.py     # Inference manager
+│       └── example.py       # Usage example
 └── ../simulator/
     └── ctm_plus/            # Python simulator
         ├── controllers/
@@ -193,6 +203,48 @@ manager.free(sequence_id=1)
 # Get statistics
 stats = manager.get_stats()
 print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
+```
+
+### DeepSpeed Integration
+
+```bash
+# Install
+cd CTM_plus/DeepSpeed
+pip install -e .
+
+# Run example
+python -m ctm_plus_deepspeed.example
+```
+
+**Using for ZeRO-Offload:**
+
+```python
+from ctm_plus_deepspeed import CTMOffloadManager, CTMDeepSpeedConfig
+
+# Create offload manager
+config = CTMDeepSpeedConfig.for_zero_offload()
+manager = CTMOffloadManager(
+    gpu_memory_bytes=40 * 1024**3,   # 40GB GPU
+    cpu_memory_bytes=256 * 1024**3,  # 256GB CPU
+    config=config,
+)
+
+# Register model tensors
+manager.register_tensor(
+    tensor_id="layer.0.weight",
+    name="layer.0.weight",
+    size_bytes=4096 * 4096 * 4,
+)
+
+# Track access (returns prefetch suggestions)
+needs_fetch, prefetch_list = manager.on_access(
+    "layer.0.weight", in_compute_graph=True
+)
+
+# Get statistics
+stats = manager.get_stats()
+print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
+print(f"Offloads: {stats['offloads']}")
 ```
 
 ## Configuration
@@ -391,6 +443,40 @@ print(f"Adaptive p: {stats['adaptive_p']:.3f}")
 
 See `CTM_plus/vLLM/README.md` for full integration instructions.
 
+### With DeepSpeed (ZeRO-Offload)
+
+CTM+ provides intelligent offloading for DeepSpeed training and inference:
+
+```python
+from ctm_plus_deepspeed import CTMZeROOffload, CTMDeepSpeedConfig
+
+# Create ZeRO offload manager
+zero = CTMZeROOffload(
+    gpu_memory_bytes=24 * 1024**3,
+    cpu_memory_bytes=128 * 1024**3,
+    config=CTMDeepSpeedConfig.for_zero_offload(),
+    zero_stage=2,
+)
+
+# Register parameters and optimizer states
+zero.register_parameter("param.0", "layer.0.weight", size_bytes)
+zero.register_optimizer_state("opt.0.m", "layer.0", size_bytes, "param.0", "momentum")
+
+# Training loop with automatic offload management
+for batch in dataloader:
+    zero.begin_forward()
+    loss = model(batch)
+    zero.end_forward()
+
+    zero.begin_backward()
+    loss.backward()
+    zero.end_backward()
+
+    zero.step()
+```
+
+See `CTM_plus/DeepSpeed/README.md` for full integration instructions.
+
 ### With Linux Memory Tiering
 
 ```bash
@@ -440,6 +526,7 @@ print(f'CTM+: {ctm_result.metrics.hit_rate:.2%}')
 - MIT (Python simulator)
 - MIT (CUDA library)
 - MIT (vLLM integration)
+- MIT (DeepSpeed integration)
 
 ## References
 
