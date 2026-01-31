@@ -886,32 +886,11 @@ PCAM-Enabled Pipeline:
 
 ## 3. Theoretical Foundation
 
-### 3.1 Working Memory (Cognitive Science)
+### 3.1 One-Line Definition
 
-Human working memory does not store raw sensory data. It stores:
-- **Relevance**: What matters right now
-- **Associations**: How things relate to each other
-- **Salience**: What should capture attention
-- **Temporal markers**: When things happened
+> **PCAM is a near-memory accelerator that stores and updates compressed attention metadata to guide sparse attention and memory placement in long-context inference.**
 
-PCAM mirrors this: instead of storing raw tokens, store their attention relationships.
-
-**Baddeley's Working Memory Model (adapted):**
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                 Central Executive                        │
-│            (Attention Control System)                    │
-│                                                         │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│   │ Phonological│  │Visuospatial │  │  Episodic   │    │
-│   │   Loop      │  │  Sketchpad  │  │   Buffer    │    │
-│   │ (verbal)    │  │  (visual)   │  │ (binding)   │    │
-│   └─────────────┘  └─────────────┘  └─────────────┘    │
-│                                                         │
-│   PCAM Analog: Stores WHAT IS ATTENDED TO, not raw data │
-└─────────────────────────────────────────────────────────┘
-```
+That's the entire value proposition. The rest of this section provides mathematical justification.
 
 ### 3.2 Attention Mechanisms in Transformers
 
@@ -930,7 +909,9 @@ Where:
 2. Discarded after use
 3. Contains sparse useful information (most weights ≈ 0)
 
-### 3.3 Phase Coherence (Symbol-U Framework)
+### 3.3 Phase Coherence (Optional Extension)
+
+> **Note:** Phase coherence is an optional feature disabled by default in v1. See Section 7.5 for implementation details. This section provides theoretical background for future versions.
 
 From Symbol-U's Phase-Quad model, attention can be understood through phase relationships:
 
@@ -949,7 +930,7 @@ $$C_{ij} = \cos(\phi_i - \phi_j)$$
 High coherence (phases aligned) → items should attend to each other
 Low coherence (phases opposed) → items are unrelated
 
-**PCAM stores these phase relationships**, not raw attention weights.
+**v1 stores attention weights only.** Phase storage is a v2 optimization when proven valuable.
 
 ### 3.4 Why Compression is Necessary
 
@@ -1388,22 +1369,45 @@ Combine digital control with analog weight storage:
 └─────────────────────────────────────────────────────────┘
 ```
 
+### 6.5 Critical Implementation Note
+
+> **All functional correctness and performance targets are achievable with a fully digital SRAM implementation.**
+
+Analog compute-in-memory (memristor, ReRAM, PCM) is an **optimization**, not a **dependency**:
+
+| Aspect | Digital SRAM (v1) | Analog NVM (v2+) |
+|--------|-------------------|------------------|
+| Functional correctness | ✓ Complete | ✓ Complete |
+| Performance targets | ✓ Met | ✓ Exceeded |
+| Time to market | 18-24 months | 36-48 months |
+| Technology risk | Low | Medium-High |
+| Density | Baseline | 2-4x improvement |
+| Power | Baseline | 30-50% reduction |
+
+**v1 shipping strategy:** Pure digital SRAM. Proven technology, achievable schedule.
+
+**v2 optimization path:** Add analog weight storage when ReRAM/PCM processes mature.
+
+This ensures PCAM is not blocked by emerging memory technology readiness.
+
 ---
 
 ## 7. Instruction Set Architecture
 
 ### 7.1 Design Philosophy
 
-PCAM ISA is designed around attention operations, not load/store:
+**V1 Silicon Principle: Minimal viable ISA.**
 
-| Traditional ISA | PCAM ISA |
-|----------------|----------|
+Silicon verification cost scales with instruction count. For v1, we ship with 4 core instructions. Extended instructions are implemented as software macros or deferred to v2.
+
+| Traditional ISA | PCAM v1 ISA |
+|----------------|-------------|
 | LOAD addr → reg | ATTEND query → candidates |
 | STORE reg → addr | UPDATE query, key, weight |
-| MOV src → dst | BIND item_a ↔ item_b |
 | NOP | DECAY rate |
+| MOV | CONFIG params |
 
-### 7.2 Core Instructions
+### 7.2 Core Instructions (v1 Silicon)
 
 #### 7.2.1 ATTEND (Read attention state)
 
@@ -1413,8 +1417,8 @@ ATTEND query_block_id, k → candidate_set
 Semantics:
   1. Look up edges for query_block_id
   2. Apply decay based on current timestamp
-  3. Score and rank by (weight × coherence)
-  4. Return top-k candidates + anchors
+  3. Score and rank by weight (phase scoring optional, see 7.5)
+  4. Return top-k candidates
 
 Encoding (32 bits):
 ┌────────┬──────────────────┬────────┐
@@ -1429,56 +1433,24 @@ Throughput: 1 per cycle (pipelined)
 #### 7.2.2 UPDATE (Write attention state)
 
 ```
-UPDATE query_block_id, key_block_id, weight, phase
+UPDATE query_block_id, key_block_id, weight
 
 Semantics:
   1. Locate edge (query, key) if exists
   2. Apply EMA: w_new = λ·w_old + (1-λ)·weight
-  3. Update phase: φ_new = circular_ema(φ_old, phase)
-  4. If new edge: insert if weight > min, evict min
+  3. If new edge: insert if weight > min, evict min
 
-Encoding (64 bits):
-┌────────┬──────────────────┬──────────────────┬────────┬────────┐
-│ opcode │  query_block_id  │  key_block_id    │ weight │ phase  │
-│ 4 bits │     20 bits      │     20 bits      │ 8 bits │ 8 bits │
-└────────┴──────────────────┴──────────────────┴────────┴────────┘
+Encoding (48 bits):
+┌────────┬──────────────────┬──────────────────┬────────┐
+│ opcode │  query_block_id  │  key_block_id    │ weight │
+│ 4 bits │     20 bits      │     20 bits      │ 8 bits │
+└────────┴──────────────────┴──────────────────┴────────┘
 
 Latency: 100-200 ns
 Throughput: 1 per 2 cycles
 ```
 
-#### 7.2.3 BIND (Create association)
-
-```
-BIND item_a, item_b, weight, phase
-
-Semantics:
-  Create bidirectional attention edge between items
-  Used for explicit relationship marking (e.g., coreference)
-
-Encoding (64 bits):
-┌────────┬──────────────────┬──────────────────┬────────┬────────┐
-│ opcode │     item_a       │     item_b       │ weight │ phase  │
-│ 4 bits │     20 bits      │     20 bits      │ 8 bits │ 8 bits │
-└────────┴──────────────────┴──────────────────┴────────┴────────┘
-```
-
-#### 7.2.4 UNBIND (Remove association)
-
-```
-UNBIND item_a, item_b
-
-Semantics:
-  Remove edge between items (set weight to 0)
-
-Encoding (48 bits):
-┌────────┬──────────────────┬──────────────────┐
-│ opcode │     item_a       │     item_b       │
-│ 4 bits │     20 bits      │     20 bits      │
-└────────┴──────────────────┴──────────────────┘
-```
-
-#### 7.2.5 DECAY (Global decay)
+#### 7.2.3 DECAY (Background decay)
 
 ```
 DECAY rate, [block_range]
@@ -1486,6 +1458,7 @@ DECAY rate, [block_range]
 Semantics:
   Apply multiplicative decay to all weights in range
   w_i ← w_i × rate
+  Runs in background without blocking ATTEND/UPDATE
 
 Encoding (32 bits):
 ┌────────┬────────┬──────────────────────────┐
@@ -1493,93 +1466,149 @@ Encoding (32 bits):
 │ 4 bits │ 8 bits │        20 bits           │
 └────────┴────────┴──────────────────────────┘
 
-Note: Can run in background without blocking reads
+Latency: Background (1000+ ns for full sweep)
+Throughput: Non-blocking
 ```
 
-#### 7.2.6 COMPETE (Winner-take-all)
+#### 7.2.4 CONFIG (Set parameters)
 
 ```
-COMPETE candidate_set, k → winners
+CONFIG param_id, value
 
 Semantics:
-  Given a set of candidates with scores, return top-k
-  Hardware-accelerated sorting/selection
+  Set runtime configuration parameters:
+  - param 0: K (top-K count, default 64)
+  - param 1: λ (EMA decay, default 0.95)
+  - param 2: tier_threshold_hot (default 0.7)
+  - param 3: tier_threshold_warm (default 0.3)
+  - param 4: phase_enable (0=off, 1=on, default 0)
 
 Encoding (32 bits):
-┌────────┬──────────────────────────┬────────┐
-│ opcode │    candidate_set_ptr     │   k    │
-│ 4 bits │        20 bits           │ 8 bits │
-└────────┴──────────────────────────┴────────┘
+┌────────┬────────┬──────────────────────────┐
+│ opcode │param_id│         value            │
+│ 4 bits │ 4 bits │        24 bits           │
+└────────┴────────┴──────────────────────────┘
 
-Latency: 20-50 ns (dedicated sorting network)
+Latency: 10 ns
+Throughput: Immediate
 ```
 
-#### 7.2.7 COHERE (Compute coherence)
+### 7.3 Instruction Timing (v1)
 
-```
-COHERE item_set → coherence_score
+| Instruction | Latency (ns) | Throughput | Notes |
+|-------------|--------------|------------|-------|
+| ATTEND | 50-100 | 1/cycle | Read-only, pipelined |
+| UPDATE | 100-200 | 0.5/cycle | Read-modify-write |
+| DECAY | background | non-blocking | Bulk operation |
+| CONFIG | 10 | immediate | Register write |
 
-Semantics:
-  Compute average pairwise phase coherence of a set
-  C = (1/|S|²) Σ_{i,j∈S} cos(φ_i - φ_j)
+### 7.4 Extended Instructions (v2 / Software Macros)
 
-Encoding (32 bits):
-┌────────┬────────────────────────────────────┐
-│ opcode │         item_set_ptr               │
-│ 4 bits │            28 bits                 │
-└────────┴────────────────────────────────────┘
+The following operations are **not in v1 silicon**. They are implemented as software macros that compile to ATTEND + UPDATE sequences, or deferred to v2 silicon.
 
-Latency: 50-100 ns
-```
+#### 7.4.1 BIND (Software Macro)
 
-#### 7.2.8 ANCHOR (Register anchor)
-
-```
-ANCHOR position, type, score
-
-Semantics:
-  Register a position as an anchor (always-attend)
-
-Encoding (48 bits):
-┌────────┬──────────────────┬────────┬────────┐
-│ opcode │    position      │  type  │ score  │
-│ 4 bits │     20 bits      │ 8 bits │ 8 bits │
-└────────┴──────────────────┴────────┴────────┘
+```python
+# BIND(a, b, weight) compiles to:
+def BIND(a, b, weight):
+    UPDATE(a, b, weight)   # a → b edge
+    UPDATE(b, a, weight)   # b → a edge (bidirectional)
 ```
 
-#### 7.2.9 GATE (Conditional operation)
+#### 7.4.2 UNBIND (Software Macro)
 
-```
-GATE condition, operation
-
-Semantics:
-  Execute operation only if condition met
-  Conditions: weight > threshold, coherence > threshold, etc.
-
-Encoding (64 bits):
-┌────────┬────────┬────────────────────────────────────────────┐
-│ opcode │  cond  │              operation                     │
-│ 4 bits │ 4 bits │               56 bits                      │
-└────────┴────────┴────────────────────────────────────────────┘
+```python
+# UNBIND(a, b) compiles to:
+def UNBIND(a, b):
+    UPDATE(a, b, 0)        # Set weight to 0
+    UPDATE(b, a, 0)        # Both directions
 ```
 
-### 7.3 Instruction Timing
+#### 7.4.3 ANCHOR (Software via CONFIG + Reserved Edges)
 
-| Instruction | Latency (ns) | Throughput (ops/cycle) | Notes |
-|------------|--------------|------------------------|-------|
-| ATTEND | 50-100 | 1 | Read-only, pipelined |
-| UPDATE | 100-200 | 0.5 | Read-modify-write |
-| BIND | 150-250 | 0.5 | Two UPDATE ops |
-| UNBIND | 50-100 | 1 | Mark as deleted |
-| DECAY | 1000+ | background | Bulk operation |
-| COMPETE | 20-50 | 2 | Dedicated hardware |
-| COHERE | 50-100 | 1 | Phase comparators |
-| ANCHOR | 20-50 | 2 | CAM write |
-| GATE | +10 | - | Adds to base op |
+```python
+# Anchors are implemented as reserved edge slots
+# Software maintains anchor list, injects into candidate set
+def add_anchor(position, score):
+    anchor_list.append((position, score))
 
-### 7.4 Programming Model
+def pcam_attend_with_anchors(query):
+    candidates = ATTEND(query)
+    return candidates.union(anchor_list)  # Software merge
+```
 
-#### 7.4.1 Basic Usage Pattern
+#### 7.4.4 COMPETE (Software / GPU)
+
+```python
+# Top-K selection done on GPU after ATTEND returns candidates
+def compete(candidates, k):
+    return torch.topk(candidates.scores, k)
+```
+
+#### 7.4.5 COHERE (v2 Candidate)
+
+```
+COHERE is deferred to v2 silicon.
+
+Rationale:
+- Requires phase hardware (optional in v1)
+- Pairwise computation is expensive
+- Can be computed on GPU for v1 deployments
+
+v2 implementation:
+  Hardware: Dedicated phase comparator array
+  Latency: 50-100 ns
+```
+
+#### 7.4.6 GATE (v2 Candidate)
+
+```
+GATE is deferred to v2 silicon.
+
+Rationale:
+- Conditional execution adds verification complexity
+- Not critical for core PCAM value proposition
+- Software can implement conditionals
+
+v2 implementation:
+  Hardware: Condition evaluation unit
+  Encoding: 64-bit instruction with embedded operation
+```
+
+### 7.5 Phase Coherence: Optional Feature
+
+**Phase is an optional secondary scoring channel that can be disabled at compile time.**
+
+| Configuration | Weight | Timestamp/Decay | Phase |
+|---------------|--------|-----------------|-------|
+| v1 Minimal | ✓ Mandatory | ✓ Mandatory | ✗ Disabled |
+| v1 Full | ✓ Mandatory | ✓ Mandatory | ○ Optional |
+| v2 | ✓ Mandatory | ✓ Mandatory | ✓ Enabled |
+
+**Rationale for optional phase:**
+1. Phase adds ~15% die area (phase comparators, storage)
+2. Phase value is unproven in production workloads
+3. v1 can ship without phase; v2 adds when proven
+
+**Edge format with optional phase:**
+
+```
+v1 Minimal Edge (48 bits):
+┌──────────┬────────┬────────────┐
+│  key_id  │ weight │ timestamp  │
+│  24 bits │ 8 bits │  16 bits   │
+└──────────┴────────┴────────────┘
+
+v1 Full Edge (64 bits, phase enabled via CONFIG):
+┌──────────┬────────┬────────┬────────────┐
+│  key_id  │ weight │ phase  │ timestamp  │
+│  24 bits │ 8 bits │ 8 bits │  24 bits   │
+└──────────┴────────┴────────┴────────────┘
+```
+
+### 7.6 Programming Model
+
+#### 7.6.1 Basic Usage Pattern
 
 ```python
 # Pseudo-code for PCAM-guided attention
@@ -2168,11 +2197,23 @@ Turn 10: User asks about Project Alpha
 **Deliverables:**
 - [ ] ASIC RTL (synthesis-ready)
 - [ ] Physical design (place & route)
-- [ ] Tape-out (TSMC 7nm or similar)
+- [ ] Tape-out
 - [ ] Chip bring-up and validation
 
+**Process Node Strategy:**
+
+> **Initial ASIC targets a mature node (12nm / 16nm) to reduce NRE risk.**
+
+| Node | Tape-out Cost | Risk | Rationale |
+|------|---------------|------|-----------|
+| 7nm | $15-25M | High | Cutting edge, long schedule |
+| 12nm | $5-8M | Medium | Good density, proven process |
+| 16nm | $3-5M | Low | Mature, fast turnaround |
+
+**Recommendation:** Start at 16nm for v1, migrate to 7nm for v2 if volume justifies.
+
 **Success criteria:**
-- Meet area/power targets (50mm², 5W)
+- Meet area/power targets (50mm² @ 16nm, 25mm² @ 7nm)
 - Production-grade reliability
 - Datacenter deployment-ready
 
@@ -2195,13 +2236,27 @@ Turn 10: User asks about Project Alpha
 
 ### 12.5 Resource Requirements
 
-| Phase | Engineering | Hardware | Total Cost |
-|-------|-------------|----------|------------|
+**Conservative estimate (16nm node, tight scope):**
+
+| Phase | Engineering | Hardware/NRE | Total Cost |
+|-------|-------------|--------------|------------|
 | Simulation | 2 FTE × 6mo | $50K (cloud) | $400K |
-| FPGA | 4 FTE × 12mo | $200K (boards) | $1.2M |
-| ASIC | 8 FTE × 18mo | $5M (tape-out) | $8M |
-| Product | 12 FTE × 18mo | $2M (NRE) | $10M |
-| **Total** | | | **~$20M** |
+| FPGA | 4 FTE × 12mo | $200K (boards) | $1.4M |
+| ASIC (16nm) | 6 FTE × 18mo | $4M (tape-out) | $7M |
+| Product | 8 FTE × 12mo | $1M (NRE) | $5M |
+| **Total (16nm)** | | | **~$14M** |
+
+**Aggressive estimate (7nm node, full feature set):**
+
+| Phase | Engineering | Hardware/NRE | Total Cost |
+|-------|-------------|--------------|------------|
+| Simulation | 2 FTE × 6mo | $50K | $400K |
+| FPGA | 4 FTE × 12mo | $200K | $1.4M |
+| ASIC (7nm) | 10 FTE × 24mo | $20M (tape-out) | $28M |
+| Product | 12 FTE × 18mo | $3M (NRE) | $12M |
+| **Total (7nm)** | | | **~$42M** |
+
+**Recommendation:** Start with 16nm ($14M) to prove market. Raise Series B for 7nm migration.
 
 ---
 
@@ -2285,6 +2340,44 @@ A: PCAM tracks edges at the block level, agnostic to attention head configuratio
 **Q: Is this patentable?**
 A: Likely yes. Novel aspects include: attention state as persistent memory, phase-coherent edge scoring, hardware-accelerated attention lookup.
 
+### Appendix E: Cognitive Science Background (Optional Reading)
+
+This appendix provides cognitive science context for PCAM. **This section is optional** and not required to understand the hardware design.
+
+**Working Memory in Cognitive Science**
+
+Human working memory does not store raw sensory data. It stores:
+- **Relevance**: What matters right now
+- **Associations**: How things relate to each other
+- **Salience**: What should capture attention
+- **Temporal markers**: When things happened
+
+PCAM mirrors this principle: instead of storing raw tokens, store their attention relationships.
+
+**Baddeley's Working Memory Model (adapted):**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Central Executive                        │
+│            (Attention Control System)                    │
+│                                                         │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
+│   │ Phonological│  │Visuospatial │  │  Episodic   │    │
+│   │   Loop      │  │  Sketchpad  │  │   Buffer    │    │
+│   │ (verbal)    │  │  (visual)   │  │ (binding)   │    │
+│   └─────────────┘  └─────────────┘  └─────────────┘    │
+│                                                         │
+│   PCAM Analog: Stores WHAT IS ATTENDED TO, not raw data │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** The brain doesn't cache raw pixels or soundwaves. It caches relevance and relationships. PCAM does the same for transformer attention.
+
+**Caveats for hardware reviewers:**
+- This analogy is inspirational, not prescriptive
+- PCAM design is driven by transformer math, not neuroscience
+- Hardware specifications are independent of cognitive theory
+
 ---
 
 ## Document History
@@ -2292,6 +2385,8 @@ A: Likely yes. Novel aspects include: attention state as persistent memory, phas
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1 | 2026-01-31 | Initial draft |
+| 0.2 | 2026-01-31 | Added fundamental design questions (Section 2) |
+| 0.3 | 2026-01-31 | v1 silicon improvements: minimal ISA, optional phase, realistic costs |
 
 ---
 
