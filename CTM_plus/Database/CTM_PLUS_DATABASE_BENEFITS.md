@@ -537,18 +537,250 @@ Buffer Pool Statistics
 
 ## 8. Comparison with Other Algorithms
 
-### 8.1 Algorithm Comparison
+### 8.1 Basic Algorithms
 
-| Algorithm | Hit Rate | Scan Resistant | Adaptive | Complexity | Overhead |
-|-----------|----------|----------------|----------|------------|----------|
-| LRU | Baseline | No | No | O(1) | Minimal |
+#### FIFO (First-In, First-Out)
+
+```
+How it works:
+  - Pages evicted in order they arrived
+  - No tracking of access patterns
+  - Simple queue structure
+
+  [Page A] → [Page B] → [Page C] → [Page D]
+     ↑                                 ↑
+   Evict                            Insert
+```
+
+| Aspect | FIFO | CTM+ | Winner |
+|--------|------|------|--------|
+| Hit rate | Poor | +15-25% better | CTM+ |
+| Implementation | Very simple | Complex | FIFO |
+| Memory overhead | Minimal | Low | FIFO |
+| Scan resistance | None | Yes | CTM+ |
+| Use case | Simple caches | Databases | - |
+
+**FIFO Problem - Bélády's Anomaly:**
+```
+More cache can mean MORE misses with FIFO (paradox)
+CTM+ never exhibits this behavior
+```
+
+**When FIFO is acceptable:**
+- Very simple systems where complexity is unacceptable
+- Write-once, read-rarely data
+- When hit rate doesn't matter much
+
+---
+
+#### LIFO (Last-In, First-Out)
+
+```
+How it works:
+  - Most recently added page evicted first
+  - Stack-based structure
+  - Opposite of intuition for caching
+
+  [Page D] ← Most recent (evict first)
+  [Page C]
+  [Page B]
+  [Page A] ← Oldest (stays longest)
+```
+
+| Aspect | LIFO | CTM+ | Winner |
+|--------|------|------|--------|
+| Hit rate | Very poor | +20-40% better | CTM+ |
+| Temporal locality | Destroys it | Exploits it | CTM+ |
+| Use case | Almost none | General purpose | CTM+ |
+
+**LIFO is rarely used for caching because:**
+```
+New pages are often "hot" - just accessed, likely accessed again
+LIFO evicts them immediately - worst possible decision
+```
+
+**Only valid LIFO use cases:**
+- Stack-based algorithms (function call frames)
+- Undo buffers (most recent action undone first)
+- NOT suitable for database buffer pools
+
+---
+
+#### MRU (Most Recently Used)
+
+```
+How it works:
+  - Evict the page accessed most recently
+  - Exact opposite of LRU
+  - Counter-intuitive but useful for specific patterns
+
+  Access: A B C D A B C D A B C D  (cyclic)
+
+  LRU with 3 slots:  Always misses (worst case)
+  MRU with 3 slots:  Hits after warmup
+```
+
+| Aspect | MRU | CTM+ | Winner |
+|--------|-----|------|--------|
+| Cyclic workloads | Excellent | Good | MRU |
+| General workloads | Poor | Excellent | CTM+ |
+| Random access | Same as LRU | Same as LRU | Tie |
+| Mixed patterns | Fails badly | Handles well | CTM+ |
+
+**MRU Sweet Spot:**
+```
+Workload: Sequential scan that repeats
+  - Read pages 1,2,3,4,5,6,7,8,9,10 then repeat
+  - Cache size: 5 pages
+
+LRU keeps: 6,7,8,9,10 → Misses on 1,2,3,4,5
+MRU keeps: 1,2,3,4,5 → Hits on 1,2,3,4,5 (after 10 evicts 10)
+
+MRU is optimal here!
+```
+
+**Why CTM+ is still better:**
+```python
+# CTM+ detects cyclic patterns via reuse distance tracking
+# Automatically behaves like MRU when beneficial
+reuse_distance = time_since_last_access(page)
+if reuse_distance == expected_cycle_length:
+    # This is cyclic - boost score to keep it
+    score += cyclic_pattern_bonus
+```
+
+---
+
+#### Clock (Second Chance)
+
+```
+How it works:
+  - Circular buffer with "reference bit" per page
+  - On access: Set reference bit = 1
+  - On eviction: Scan clockwise
+    - If ref bit = 1: Clear it, move on (second chance)
+    - If ref bit = 0: Evict this page
+
+     ┌──────────────────┐
+     │    Clock Hand    │
+     ▼                  │
+  [A:1] → [B:0] → [C:1] → [D:1]
+    ↑                        │
+    └────────────────────────┘
+```
+
+| Aspect | Clock | CTM+ | Winner |
+|--------|-------|------|--------|
+| Hit rate | ~LRU | +5-10% vs LRU | CTM+ |
+| CPU overhead | Very low | Low | Clock |
+| Scan resistance | None | Yes | CTM+ |
+| Implementation | Simple | Complex | Clock |
+| Used in | Linux, PostgreSQL | New systems | - |
+
+**Clock Advantages:**
+```
+- O(1) amortized eviction (single bit check)
+- No list manipulation needed
+- Cache-friendly memory access
+- Good enough for many workloads
+```
+
+**Clock Limitations (CTM+ solves):**
+```
+1. No frequency information
+   Clock: Page accessed 1x vs 1000x treated same after bit clear
+   CTM+:  Frequency score protects hot pages
+
+2. No scan resistance
+   Clock: Full table scan sets all bits, clears hot page bits
+   CTM+:  Scan detection prevents pollution
+
+3. No adaptation
+   Clock: Fixed behavior regardless of workload
+   CTM+:  Adapts recency/frequency balance via p parameter
+```
+
+**PostgreSQL uses Clock - why switch to CTM+?**
+```
+PostgreSQL shared_buffers with Clock:
+  - Works well for simple OLTP
+  - Struggles with mixed OLTP+OLAP
+  - Large scans destroy cache efficiency
+
+With CTM+:
+  - Same OLTP performance
+  - OLAP scans don't pollute
+  - 2-5% better hit rate overall
+```
+
+---
+
+### 8.2 Advanced Algorithms
+
+| Algorithm | Hit Rate vs LRU | Scan Resistant | Adaptive | Complexity | Overhead |
+|-----------|-----------------|----------------|----------|------------|----------|
+| FIFO | -10-20% | No | No | O(1) | Minimal |
+| LIFO | -20-40% | No | No | O(1) | Minimal |
+| MRU | Varies widely | For cycles only | No | O(1) | Minimal |
+| Clock | ~Same | No | No | O(1) | Very Low |
+| LRU | Baseline | No | No | O(1) | Low |
 | LRU-K | +5-10% | Partial | No | O(n) | High |
 | 2Q | +3-5% | Yes | No | O(1) | Low |
 | ARC | +5-8% | Yes | Yes | O(1) | Low |
 | LIRS | +6-10% | Yes | Yes | O(1) | Medium |
 | **CTM+** | **+5-10%** | **Yes** | **Yes** | **O(k)** | **Low** |
 
-### 8.2 When to Choose CTM+
+### 8.3 Visual Comparison: Scan Behavior
+
+```
+Scenario: 1000-page buffer, OLTP hot set (100 pages), then 5000-page scan
+
+FIFO:
+  Before scan: [Hot pages: 100] [Other: 900]
+  After scan:  [Scan pages: 1000] ← All hot pages gone
+  Recovery:    Must reload all 100 hot pages
+
+LIFO:
+  Before scan: [Hot pages: 100] [Other: 900]
+  After scan:  [Hot pages: 100] [Scan: 900] ← Hot preserved!
+  But:         During scan, newest hot pages evicted first (bad)
+
+MRU:
+  Before scan: [Hot pages: 100] [Other: 900]
+  After scan:  [Hot pages: 100] [First 900 scan pages]
+  Note:        Good for scan, but terrible for OLTP after
+
+Clock:
+  Before scan: [Hot:100, ref=1] [Other:900, ref=0/1]
+  During scan: Scan sets ref bits, clears hot page bits
+  After scan:  [Mixed mess] ← Hot pages likely evicted
+  Recovery:    Similar to FIFO
+
+LRU:
+  Before scan: [Hot pages at MRU end] [Cold at LRU end]
+  After scan:  [All scan pages] ← Hot pages pushed out
+  Recovery:    Must reload all 100 hot pages
+
+CTM+:
+  Before scan: [Hot pages: score=0.8+] [Cold: score=0.2-0.4]
+  During scan: Scan pages get low scores (no frequency)
+  After scan:  [Hot pages: 100] [Recent scan: 900]
+  Recovery:    None needed - hot pages never left!
+```
+
+### 8.4 Workload-Specific Recommendations
+
+| Workload | Best Algorithm | Second Choice | Avoid |
+|----------|---------------|---------------|-------|
+| Pure OLTP | CTM+ / ARC | LRU / Clock | LIFO |
+| Pure OLAP (scans) | MRU | CTM+ | LRU |
+| Mixed OLTP+OLAP | **CTM+** | ARC | Clock, LRU |
+| Cyclic patterns | MRU | CTM+ | FIFO |
+| Zipfian (hot spots) | CTM+ / LRU-K | ARC | FIFO, MRU |
+| Uniform random | Any (all same) | - | - |
+| Unknown/changing | **CTM+** | ARC | Static algorithms |
+
+### 8.5 When to Choose Each
 
 **Choose CTM+ when:**
 - Mixed workloads (OLTP + analytics)
@@ -562,10 +794,24 @@ Buffer Pool Statistics
 - Workload is well-understood and stable
 - Already integrated and working well
 
+**Consider Clock when:**
+- Absolute minimum CPU overhead required
+- Simple OLTP-only workload
+- Already using PostgreSQL/Linux defaults
+
+**Consider MRU when:**
+- Known cyclic/looping access patterns
+- Sequential scans that repeat
+- Batch processing with predictable patterns
+
 **Stick with LRU when:**
-- Working set fits in memory
-- Pure sequential workloads
-- Lowest possible CPU overhead required
+- Working set fits entirely in memory
+- Need simplest possible implementation
+- Historical compatibility required
+
+**Avoid FIFO/LIFO for databases:**
+- Almost never the right choice
+- Only for specialized non-cache uses
 
 ---
 
