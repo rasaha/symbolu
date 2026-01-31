@@ -36,6 +36,14 @@ CTM_plus/
 │       ├── ctm_plus_module.c # Module interface
 │       ├── Makefile         # Build system
 │       └── README.md        # Kernel module docs
+├── CUDA/
+│   └── ctm_plus/            # CUDA/GPU implementation
+│       ├── ctm_plus.cuh     # CUDA header and API
+│       ├── ctm_plus.cu      # CUDA implementation
+│       ├── example.cu       # Usage example
+│       ├── benchmark.cu     # Performance benchmark
+│       ├── CMakeLists.txt   # CMake build system
+│       └── Makefile         # Make build system
 └── ../simulator/
     └── ctm_plus/            # Python simulator
         ├── controllers/
@@ -88,6 +96,57 @@ cat /sys/kernel/ctm_plus/stats
 sudo rmmod ctm_plus
 ```
 
+### CUDA/GPU
+
+```bash
+# Build with CMake
+cd CTM_plus/CUDA/ctm_plus
+mkdir build && cd build
+cmake ..
+make
+
+# Or build with Make
+cd CTM_plus/CUDA/ctm_plus
+make
+
+# Run example
+LD_LIBRARY_PATH=. ./example
+
+# Run benchmark
+LD_LIBRARY_PATH=. ./benchmark
+```
+
+**Using in your CUDA application:**
+
+```cpp
+#include "ctm_plus.cuh"
+
+int main() {
+    ctm::initialize_device(0);
+
+    // Create controller (1000 tier0 pages, 100000 tier1 pages)
+    ctm::Controller ctrl(1000, 100000);
+
+    // Process page accesses (device pointers)
+    uint64_t* d_page_ids;    // Your page IDs on GPU
+    bool* d_promotions;       // Output: pages to promote
+    bool* d_demotions;        // Output: pages to demote
+
+    ctrl.on_access_batch(d_page_ids, num_pages, d_promotions, d_demotions);
+
+    // Select victims for eviction
+    uint64_t* d_victims;
+    ctrl.select_victims(num_to_evict, d_victims);
+
+    // Get statistics
+    ctm::Stats stats = ctrl.get_stats();
+    printf("Hit rate: %.2f%%\n",
+           100.0 * stats.tier0_hits / (stats.tier0_hits + stats.misses));
+
+    return 0;
+}
+```
+
 ## Configuration
 
 ### Python Simulator
@@ -126,6 +185,45 @@ cat /sys/kernel/ctm_plus/stats
 
 # Reset statistics
 echo reset > /sys/kernel/ctm_plus/stats
+```
+
+### CUDA/GPU
+
+```cpp
+#include "ctm_plus.cuh"
+
+// Create controller with custom stream
+cudaStream_t stream;
+cudaStreamCreate(&stream);
+ctm::Controller ctrl(tier0_pages, tier1_pages, stream);
+
+// Configure at runtime
+ctm::Config config;
+config.victim_sample_size = 64;
+config.promotion_threshold = 0.25f;
+config.enable_smart_victim = true;
+ctrl.set_config(config);
+
+// Async operations on stream
+ctrl.on_access_batch(d_page_ids, num_pages, d_promotions, d_demotions);
+ctrl.select_victims(num_victims, d_victim_ids);
+
+// Synchronize when needed
+ctrl.synchronize();
+```
+
+**Memory allocation with CTM+ hints:**
+
+```cpp
+void* ptr;
+// Allocate with preferred tier (0=HBM/fast, 1=DDR/slow)
+ctm::ctm_malloc_managed(&ptr, size, 0);  // Prefer HBM
+
+// Use normally
+// ...
+
+// Free
+ctm::ctm_free(ptr);
 ```
 
 ## Algorithm Details
@@ -183,6 +281,33 @@ config = CTMPlusConfig(
 ```python
 # Default config works well
 config = CTMPlusConfig()
+```
+
+### GPU Memory (HBM vs GDDR)
+
+```cpp
+// For GPU memory tiering (H100, MI300X, etc.)
+ctm::Config config;
+config.victim_sample_size = 48;      // Balance accuracy vs latency
+config.promotion_threshold = 0.3f;   // Moderate threshold
+config.enable_smart_victim = true;   // Use smart selection
+
+ctm::Controller ctrl(hbm_pages, gddr_pages, stream);
+ctrl.set_config(config);
+```
+
+### Multi-GPU Unified Memory
+
+```cpp
+// For unified memory across GPUs
+for (int gpu = 0; gpu < num_gpus; gpu++) {
+    cudaSetDevice(gpu);
+    controllers[gpu] = new ctm::Controller(
+        local_hbm_pages,
+        remote_hbm_pages + host_pages,
+        streams[gpu]
+    );
+}
 ```
 
 ## Integration
@@ -248,8 +373,9 @@ print(f'CTM+: {ctm_result.metrics.hit_rate:.2%}')
 
 ## License
 
-GPL-2.0 (Kernel module)
-MIT (Python simulator)
+- GPL-2.0 (Kernel module)
+- MIT (Python simulator)
+- MIT (CUDA library)
 
 ## References
 
