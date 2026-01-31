@@ -366,6 +366,215 @@ Value proposition:
 └─────────────────────────────────────────────────────────┘
 ```
 
+### 2.6 Hardware vs. Software: Where Do Semantics Live?
+
+A critical question: Can "semantic" queries exist in hardware, or is it purely a software abstraction? At the physical layer, we only have transistors storing bits.
+
+**The Reality: No "Semantics" in Hardware**
+
+```
+Physical Reality:
+
+Transistor: ON or OFF (1 or 0)
+Memory cell: stores voltage/charge → interpreted as bits
+Logic gate: boolean operations on bits
+
+There is NO "meaning" at this level. Never.
+```
+
+**What PCAM Actually Stores (Hardware View)**
+
+The "semantic" part is an encoding illusion:
+
+```
+What we SAY:                    What hardware SEES:
+─────────────                   ──────────────────
+"Query block 42"                → 0x0000002A (32 bits)
+"Key block 100"                 → 0x00000064 (32 bits)
+"Attention weight 0.8"          → 0xCC (8 bits, quantized)
+"Phase relationship 2.4 rad"    → 0x3D (8 bits, quantized)
+
+The NUMBERS are stored. The MEANING is external interpretation.
+```
+
+**The Two-Layer Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 1: SOFTWARE (Semantic Understanding)                      │
+│                                                                  │
+│  • Tokenization: "The cat sat" → [464, 3215, 872]               │
+│  • Embedding: token_id → 4096-dim vector                        │
+│  • Block grouping: tokens → block_id                            │
+│  • Attention computation: which blocks matter                    │
+│                                                                  │
+│  This layer CREATES the semantic mappings. Runs on CPU/GPU.     │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               │ Passes: block_ids, weights, phases
+                               │ (just numbers, no meaning)
+                               ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER 2: HARDWARE (Numerical Operations Only)                   │
+│                                                                  │
+│  • Store: edge = (query_id, key_id, weight, phase, timestamp)   │
+│  • Lookup: query_id → all edges for this query                  │
+│  • Compute: score = weight × decay(timestamp)                   │
+│  • Sort: return top-K by score                                  │
+│                                                                  │
+│  This layer EXECUTES numerical ops. Zero "understanding".       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**What PCAM Hardware Actually Executes**
+
+```
+ATTEND(query_block_id = 42):
+
+Step 1: Hash Lookup (standard memory operation)
+   address = hash(42) = 0x1A80
+   edge_list = memory[0x1A80 : 0x1A80 + 512]
+
+Step 2: Decode Edges (bit extraction)
+   for each 64-bit entry in edge_list:
+       key_id    = entry[63:32]   // bits 63-32
+       weight    = entry[31:24]   // bits 31-24
+       phase     = entry[23:16]   // bits 23-16
+       timestamp = entry[15:0]    // bits 15-0
+
+Step 3: Compute Scores (fixed-point arithmetic)
+   current_time = clock_counter
+   for each edge:
+       age = current_time - timestamp
+       decay = lookup_table[age]      // exp(-λ×age) pre-computed
+       score = weight × decay         // 8-bit multiply
+
+Step 4: Sort/Select (parallel comparators)
+   top_k = sorting_network(edges, by=score, k=64)
+
+Step 5: Return
+   output = [(key_id, score) for edge in top_k]
+
+Every operation is numerical. Nothing semantic.
+```
+
+**Where Does "Meaning" Come From?**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  TRAINING TIME (offline, on GPU cluster)                         │
+│                                                                  │
+│  Neural network learns:                                          │
+│  • Which tokens should attend to which (via backprop)           │
+│  • Patterns encoded as attention weights                        │
+│  • Converted to block-level edges for PCAM                      │
+│                                                                  │
+│  The "semantics" are BAKED INTO the numerical weights.          │
+│  PCAM stores these numbers without knowing what they mean.      │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               │ Learned edge weights (just numbers)
+                               ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  INFERENCE TIME (on PCAM hardware)                               │
+│                                                                  │
+│  PCAM lookup: "Block 42 historically attended to                │
+│  blocks [100, 57, 203] with weights [0.8, 0.6, 0.5]"           │
+│                                                                  │
+│  No "understanding" - just returning stored numbers that        │
+│  happen to encode learned semantic relationships.               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Hardware Implementation: Digital Logic (No Magic)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PCAM Digital Implementation                                     │
+│                                                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │    SRAM     │───►│   Decay     │───►│   Sorter    │───► Out │
+│  │  (storage)  │    │   Unit      │    │  (top-K)    │         │
+│  │  bits only  │    │  (multiply) │    │(comparators)│         │
+│  └─────────────┘    └─────────────┘    └─────────────┘         │
+│                                                                  │
+│  Standard digital circuits. No exotic "semantic" hardware.       │
+│  The advantage: computation happens near data (less movement).   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Optional: Analog Compute-in-Memory (Advanced)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Analog Implementation (future optimization)                     │
+│                                                                  │
+│  Memristor/ReRAM crossbar:                                       │
+│                                                                  │
+│       Query vector (voltages)                                    │
+│           ↓   ↓   ↓                                              │
+│    ─────[G]─[G]─[G]───── G = conductance = stored weight        │
+│          │   │   │                                               │
+│    ─────[G]─[G]─[G]───── I = V × G (Ohm's law, physics)         │
+│          │   │   │                                               │
+│    ─────[G]─[G]─[G]───── Column current = dot product           │
+│          ↓   ↓   ↓                                               │
+│       Score outputs (currents)                                   │
+│                                                                  │
+│  Matrix-vector multiply via physics, not logic gates.            │
+│  Still just numbers - no "semantics" in the physics either.      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Summary: The Semantic/Hardware Boundary**
+
+| Layer | What It Does | Where It Runs |
+|-------|--------------|---------------|
+| Tokenization | Text → token IDs | Software (CPU) |
+| Embedding | Token IDs → vectors | Software (GPU) |
+| Block grouping | Tokens → block IDs | Software |
+| Attention learning | Learn which blocks relate | Software (training) |
+| **Edge storage** | **Store (id, id, weight) tuples** | **PCAM hardware** |
+| **Score computation** | **Multiply, decay, sort** | **PCAM hardware** |
+| **Top-K selection** | **Return highest scores** | **PCAM hardware** |
+| Result interpretation | Block IDs → tokens → text | Software |
+
+**The Real Innovation (Clarified)**
+
+PCAM is NOT "semantic memory" - that phrase is misleading.
+
+PCAM IS: **A specialized numerical co-processor that returns pre-filtered, scored results instead of raw data.**
+
+```
+Traditional cache:  key → value           (exact lookup)
+PCAM:               key → ranked_results  (computed lookup)
+
+The computation (decay × weight, sort) happens AT the memory.
+The "semantics" are in how the weights were learned, not in hardware.
+```
+
+**Simple Answer**
+
+```
+Q: Do semantic queries live in hardware or software?
+
+A: NEITHER. There are no "semantic queries."
+
+   - The QUERY is a number (block_id = 42)
+   - The RESPONSE is computed numbers (key_ids + scores)
+   - The MEANING exists only in human interpretation
+
+   Hardware does: hash → multiply → sort → return
+   Software does: create IDs, interpret results
+
+   "Semantics" exist in:
+   1. How block_ids were assigned (tokenization)
+   2. How weights were learned (neural network training)
+   3. How results are used (attention computation)
+
+   PCAM hardware is numerically sophisticated but semantically ignorant.
+```
+
 ---
 
 ## 3. The Paradigm Shift
