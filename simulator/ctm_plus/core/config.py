@@ -43,52 +43,6 @@ class SimulatorConfig:
 
 
 @dataclass(frozen=True)
-class BCVFConfig:
-    """
-    BCVF (Bidirectional Coherence Verification Framework) parameters.
-
-    The BCVF Lagrangian:
-        L(i,A) = λ_f(1-s_f)² + λ_b(1-s_b)² + λ_c(s_f-s_b)²
-
-    Action weight:
-        w(i,A) = e^{-β·L(i,A)}
-    """
-
-    lambda_f: float = 0.40  # Forward penalty weight
-    lambda_b: float = 0.35  # Backward penalty weight
-    lambda_c: float = 0.25  # Consistency penalty weight
-    beta: float = 2.0  # Temperature parameter
-    threshold: float = 0.4  # Decision threshold τ (was 0.6, too conservative)
-
-    # Forward score weights (α)
-    alpha_latency: float = 0.6  # Weight for latency improvement
-    alpha_miss: float = 0.4  # Weight for miss reduction
-
-    # Backward score weights (β)
-    beta_heat: float = 0.25  # Weight for (1 - heat)
-    beta_coherence: float = 0.30  # Weight for coherence
-    beta_uncertainty: float = 0.20  # Weight for (1 - uncertainty)
-    beta_drift: float = 0.25  # Weight for (1 - drift)
-
-
-@dataclass(frozen=True)
-class SCCConfig:
-    """
-    SCC (Semantic Coherence Controller) parameters.
-
-    Per-tier coherence:
-        C_tier = α·c̄ + β·R̄ + γ·(1-ū) + δ·P̄
-    """
-
-    alpha: float = 0.30  # Coherence weight
-    beta: float = 0.25  # Reuse/hit-rate weight
-    gamma: float = 0.25  # Certainty weight (1 - entropy)
-    delta: float = 0.20  # Predictability weight
-    learning_rate: float = 0.01  # Parameter update rate ρ
-    update_interval: int = 10000  # Update every N accesses
-
-
-@dataclass(frozen=True)
 class PhaseIntegratorConfig:
     """
     Phase Integrator configuration for pattern learning.
@@ -136,8 +90,6 @@ class CTMPlusConfig:
     This is the main configuration object passed to CTMPlusController.
     """
 
-    bcvf: BCVFConfig = field(default_factory=BCVFConfig)
-    scc: SCCConfig = field(default_factory=SCCConfig)
     phase: PhaseIntegratorConfig = field(default_factory=PhaseIntegratorConfig)
     coherence: CoherenceConfig = field(default_factory=CoherenceConfig)
 
@@ -150,6 +102,17 @@ class CTMPlusConfig:
     max_demotions_per_epoch: int = 10000  # Effectively unlimited
     epoch_size: int = 1000  # Accesses per epoch
 
+    # Victim selection thresholds (configurable for tuning)
+    victim_sample_size: int = 48  # Sample size for O(k) victim selection (was 32)
+    promotion_threshold: float = 0.3  # Min combined score to promote from tier1
+    loop_pin_reuse_threshold: float = 0.4  # Reuse score threshold for loop pinning
+    loop_pin_neighbor_threshold: float = 0.3  # Neighbor hotness for loop pinning
+
+    # Ablation switches for experimental validation
+    enable_smart_victim: bool = True  # Use CTM+ victim selection vs LRU fallback
+    # NOTE: BCVF gate removed - ablation showed zero effect on hit rate
+    # NOTE: Admission controller removed - it hurt temporal workloads
+
     @classmethod
     def default(cls) -> "CTMPlusConfig":
         """Return default configuration."""
@@ -159,7 +122,6 @@ class CTMPlusConfig:
     def aggressive(cls) -> "CTMPlusConfig":
         """More aggressive promotion, for high-locality workloads."""
         return cls(
-            bcvf=BCVFConfig(threshold=0.5, beta=3.0),
             phase=PhaseIntegratorConfig(decay_gamma=0.9),
         )
 
@@ -167,6 +129,5 @@ class CTMPlusConfig:
     def conservative(cls) -> "CTMPlusConfig":
         """Conservative promotion, for random workloads."""
         return cls(
-            bcvf=BCVFConfig(threshold=0.7, beta=1.5),
             phase=PhaseIntegratorConfig(decay_gamma=0.99),
         )
