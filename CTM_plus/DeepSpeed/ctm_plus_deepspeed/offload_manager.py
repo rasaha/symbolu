@@ -14,6 +14,7 @@ Production Optimizations (p99 < 100µs):
 - Bounded-cost operations: No unbounded scans in hot path
 """
 
+import bisect
 import random
 import time
 import threading
@@ -29,23 +30,31 @@ from .config import CTMDeepSpeedConfig
 # PRODUCTION: Latency Tracking
 # =============================================================================
 
-@dataclass
 class LatencyStats:
-    """P99-focused latency tracking for production monitoring."""
-    samples: List[float] = field(default_factory=list)
-    max_samples: int = 10000
+    """
+    P99-focused latency tracking for production monitoring.
+
+    Uses insertion sort to maintain a sorted list, giving O(log n) insertion
+    and O(1) percentile lookups instead of O(n log n) on every percentile call.
+    """
+
+    def __init__(self, max_samples: int = 10000):
+        self.max_samples = max_samples
+        self._sorted: List[float] = []
+        self._count = 0
 
     def record(self, latency_us: float):
-        if len(self.samples) >= self.max_samples:
-            self.samples = self.samples[-self.max_samples // 2:]
-        self.samples.append(latency_us)
+        if len(self._sorted) >= self.max_samples:
+            # Remove oldest half (approximation: remove smallest values)
+            self._sorted = self._sorted[self.max_samples // 2:]
+        bisect.insort(self._sorted, latency_us)
+        self._count += 1
 
     def percentile(self, p: float) -> float:
-        if not self.samples:
+        if not self._sorted:
             return 0.0
-        sorted_samples = sorted(self.samples)
-        idx = int(len(sorted_samples) * p / 100)
-        return sorted_samples[min(idx, len(sorted_samples) - 1)]
+        idx = int(len(self._sorted) * p / 100)
+        return self._sorted[min(idx, len(self._sorted) - 1)]
 
     @property
     def p50(self) -> float:
@@ -61,12 +70,16 @@ class LatencyStats:
 
     def summary(self) -> dict:
         return {
-            "count": len(self.samples),
+            "count": self._count,
             "p50_us": self.p50,
             "p95_us": self.p95,
             "p99_us": self.p99,
-            "max_us": max(self.samples) if self.samples else 0,
+            "max_us": self._sorted[-1] if self._sorted else 0,
         }
+
+    def clear(self):
+        self._sorted.clear()
+        self._count = 0
 
 
 # =============================================================================
@@ -150,11 +163,13 @@ class ShadowEntry:
 class AccessPatternTracker:
     """Tracks tensor access patterns for prefetching."""
 
-    def __init__(self, window_size: int = 32):
+    def __init__(self, window_size: int = 32, max_history: int = 10000):
         self.window_size = window_size
+        self.max_history = max_history
         self.access_history: deque = deque(maxlen=window_size * 10)
         self.transitions: Dict[str, Dict[str, int]] = {}
         self.last_tensor: Optional[str] = None
+        self._history_count = 0
 
     def record_access(self, tensor_id: str) -> None:
         """Record tensor access and update transitions."""
@@ -166,8 +181,34 @@ class AccessPatternTracker:
             self.transitions[self.last_tensor][tensor_id] = (
                 self.transitions[self.last_tensor].get(tensor_id, 0) + 1
             )
+            self._history_count += 1
+
+            # Decay periodically to prevent unbounded growth
+            if self._history_count > self.max_history:
+                self._decay_transitions()
 
         self.last_tensor = tensor_id
+
+    def _decay_transitions(self) -> None:
+        """Decay transition counts by half and prune zeros."""
+        for src in list(self.transitions.keys()):
+            for dst in list(self.transitions[src].keys()):
+                self.transitions[src][dst] //= 2
+                if self.transitions[src][dst] == 0:
+                    del self.transitions[src][dst]
+            if not self.transitions[src]:
+                del self.transitions[src]
+        self._history_count //= 2
+
+    def remove_tensor(self, tensor_id: str) -> None:
+        """Remove tensor from tracking (called on unregister)."""
+        if tensor_id in self.transitions:
+            del self.transitions[tensor_id]
+        for src in list(self.transitions.keys()):
+            if tensor_id in self.transitions[src]:
+                del self.transitions[src][tensor_id]
+                if not self.transitions[src]:
+                    del self.transitions[src]
 
     def predict_next(self, tensor_id: str, k: int = 3) -> List[str]:
         """Predict next k tensors likely to be accessed."""
@@ -281,6 +322,9 @@ class CTMOffloadManager:
         self.gpu_tensors: Set[str] = set()
         self.cpu_tensors: Set[str] = set()
 
+        # PRODUCTION: Cached pinned set for O(1) lookup
+        self.pinned_tensors: Set[str] = set()
+
         self.pattern_tracker = AccessPatternTracker(self.config.neighbor_window)
         self.shadow_tier = DualShadowTier(self.config.shadow_size)
         self.shadow_tier.p = self.config.initial_p
@@ -288,8 +332,8 @@ class CTMOffloadManager:
         self.access_counter = 0
         self._lock = threading.RLock()
 
-        # Prefetch queue
-        self.prefetch_queue: deque = deque()
+        # Prefetch queue (bounded to prevent memory growth)
+        self.prefetch_queue: deque = deque(maxlen=256)
 
         # Callbacks for actual data movement (set by DeepSpeed integration)
         self.on_offload: Optional[Callable[[str], None]] = None
@@ -334,8 +378,10 @@ class CTMOffloadManager:
             # Apply pinning rules
             if is_optimizer_state and self.config.pin_optimizer_states:
                 state.pinned = True
+                self.pinned_tensors.add(tensor_id)
             if is_gradient and self.config.pin_gradients:
                 state.pinned = True
+                self.pinned_tensors.add(tensor_id)
 
             self.tensors[tensor_id] = state
 
@@ -347,7 +393,7 @@ class CTMOffloadManager:
                 self.cpu_used_bytes += size_bytes
 
     def unregister_tensor(self, tensor_id: str) -> None:
-        """Unregister a tensor."""
+        """Unregister a tensor. Cleans up from all tracking structures."""
         with self._lock:
             if tensor_id not in self.tensors:
                 return
@@ -359,6 +405,10 @@ class CTMOffloadManager:
             elif tensor_id in self.cpu_tensors:
                 self.cpu_tensors.remove(tensor_id)
                 self.cpu_used_bytes -= state.size_bytes
+
+            # Clean up from caches and trackers
+            self.pinned_tensors.discard(tensor_id)
+            self.pattern_tracker.remove_tensor(tensor_id)
 
             del self.tensors[tensor_id]
 
@@ -426,8 +476,11 @@ class CTMOffloadManager:
                         prefetch_list.append(pred_id)
                         self._queue_prefetch(pred_id)
 
-            # PRODUCTION: Check if batch offload needed
-            gpu_utilization = self.gpu_used_bytes / self.gpu_memory_bytes
+            # PRODUCTION: Check if batch offload needed (guard division by zero)
+            if self.gpu_memory_bytes > 0:
+                gpu_utilization = self.gpu_used_bytes / self.gpu_memory_bytes
+            else:
+                gpu_utilization = 0.0
             if gpu_utilization >= OFFLOAD_THRESHOLD:
                 self._batch_offload()
 
@@ -662,10 +715,10 @@ class CTMOffloadManager:
         """
         offloaded = []
 
-        # Get pinned tensor IDs to exclude
-        pinned = {
+        # Use cached pinned_tensors and add in_compute_graph tensors
+        pinned = self.pinned_tensors | {
             tid for tid, state in self.tensors.items()
-            if state.pinned or state.in_compute_graph
+            if state.in_compute_graph
         }
 
         # Get candidates from stratified pools
@@ -768,16 +821,18 @@ class CTMOffloadManager:
                 self.candidate_pool.in_pool.add(tid)
 
     def pin_tensor(self, tensor_id: str) -> None:
-        """Pin tensor to prevent offloading."""
+        """Pin tensor to prevent offloading. Updates cached pinned_tensors."""
         with self._lock:
             if tensor_id in self.tensors:
                 self.tensors[tensor_id].pinned = True
+                self.pinned_tensors.add(tensor_id)
 
     def unpin_tensor(self, tensor_id: str) -> None:
-        """Unpin tensor to allow offloading."""
+        """Unpin tensor to allow offloading. Updates cached pinned_tensors."""
         with self._lock:
             if tensor_id in self.tensors:
                 self.tensors[tensor_id].pinned = False
+                self.pinned_tensors.discard(tensor_id)
 
     def set_compute_graph(self, tensor_ids: List[str], in_graph: bool) -> None:
         """Mark tensors as in/out of compute graph."""
@@ -810,6 +865,7 @@ class CTMOffloadManager:
                 "total_accesses": total,
                 "gpu_hit_rate": self.stats["gpu_hits"] / total if total > 0 else 0.0,
                 "adaptive_p": self.shadow_tier.p,
+                "pinned_tensors": len(self.pinned_tensors),
                 **memory,
                 # PRODUCTION: Latency metrics
                 "latency": self.latency_stats.summary(),
@@ -826,6 +882,6 @@ class CTMOffloadManager:
             for key in self.stats:
                 self.stats[key] = 0
             # PRODUCTION: Reset latency and pools
-            self.latency_stats = LatencyStats()
+            self.latency_stats.clear()
             self.candidate_pool.clear()
             self._slow_path_counter = 0

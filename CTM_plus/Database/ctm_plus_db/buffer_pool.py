@@ -14,10 +14,10 @@ Production Optimizations (p99 < 100µs):
 - Bounded-cost operations: No unbounded scans in hot path
 """
 
+import bisect
 import random
 import time
 import threading
-import statistics
 from collections import deque, OrderedDict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Any, Callable
@@ -30,23 +30,31 @@ from .config import CTMDBConfig
 # PRODUCTION: Latency Tracking
 # =============================================================================
 
-@dataclass
 class LatencyStats:
-    """P99-focused latency tracking for production monitoring."""
-    samples: List[float] = field(default_factory=list)
-    max_samples: int = 10000
+    """
+    P99-focused latency tracking for production monitoring.
+
+    Uses insertion sort to maintain a sorted list, giving O(log n) insertion
+    and O(1) percentile lookups instead of O(n log n) on every percentile call.
+    """
+
+    def __init__(self, max_samples: int = 10000):
+        self.max_samples = max_samples
+        self._sorted: List[float] = []
+        self._count = 0
 
     def record(self, latency_us: float):
-        if len(self.samples) >= self.max_samples:
-            self.samples = self.samples[-self.max_samples // 2:]
-        self.samples.append(latency_us)
+        if len(self._sorted) >= self.max_samples:
+            # Remove oldest half (approximation: remove smallest values)
+            self._sorted = self._sorted[self.max_samples // 2:]
+        bisect.insort(self._sorted, latency_us)
+        self._count += 1
 
     def percentile(self, p: float) -> float:
-        if not self.samples:
+        if not self._sorted:
             return 0.0
-        sorted_samples = sorted(self.samples)
-        idx = int(len(sorted_samples) * p / 100)
-        return sorted_samples[min(idx, len(sorted_samples) - 1)]
+        idx = int(len(self._sorted) * p / 100)
+        return self._sorted[min(idx, len(self._sorted) - 1)]
 
     @property
     def p50(self) -> float:
@@ -62,12 +70,16 @@ class LatencyStats:
 
     def summary(self) -> dict:
         return {
-            "count": len(self.samples),
+            "count": self._count,
             "p50_us": self.p50,
             "p95_us": self.p95,
             "p99_us": self.p99,
-            "max_us": max(self.samples) if self.samples else 0,
+            "max_us": self._sorted[-1] if self._sorted else 0,
         }
+
+    def clear(self):
+        self._sorted.clear()
+        self._count = 0
 
 
 # =============================================================================
@@ -788,7 +800,11 @@ class CTMBufferPool:
             }
 
     def reset_stats(self) -> None:
-        """Reset statistics."""
+        """Reset statistics including production latency tracking."""
         with self._lock:
             for key in self.stats:
                 self.stats[key] = 0
+            # PRODUCTION: Reset latency and pools
+            self.latency_stats.clear()
+            self.candidate_pool.clear()
+            self._slow_path_counter = 0
