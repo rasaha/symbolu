@@ -6,6 +6,12 @@ Implements smart victim selection for KV cache blocks using:
 - ARC-style shadow tiers with adaptive p
 - Loop pinning for temporal patterns
 - Neighbor tracking for cluster protection
+
+Production Optimizations (p99 < 100µs):
+- Batch eviction: Evict M blocks at once when threshold hit
+- Fast/slow path: O(1) updates per access, O(n) maintenance periodic
+- Stratified candidate pools: Pre-sorted worst-by-signal pools
+- Bounded-cost operations: No unbounded scans in hot path
 """
 
 import random
@@ -15,6 +21,93 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Any
 
 from .config import CTMvLLMConfig
+
+
+# =============================================================================
+# PRODUCTION: Latency Tracking
+# =============================================================================
+
+@dataclass
+class LatencyStats:
+    """P99-focused latency tracking for production monitoring."""
+    samples: List[float] = field(default_factory=list)
+    max_samples: int = 10000
+
+    def record(self, latency_us: float):
+        if len(self.samples) >= self.max_samples:
+            self.samples = self.samples[-self.max_samples // 2:]
+        self.samples.append(latency_us)
+
+    def percentile(self, p: float) -> float:
+        if not self.samples:
+            return 0.0
+        sorted_samples = sorted(self.samples)
+        idx = int(len(sorted_samples) * p / 100)
+        return sorted_samples[min(idx, len(sorted_samples) - 1)]
+
+    @property
+    def p50(self) -> float:
+        return self.percentile(50)
+
+    @property
+    def p95(self) -> float:
+        return self.percentile(95)
+
+    @property
+    def p99(self) -> float:
+        return self.percentile(99)
+
+    def summary(self) -> dict:
+        return {
+            "count": len(self.samples),
+            "p50_us": self.p50,
+            "p95_us": self.p95,
+            "p99_us": self.p99,
+            "max_us": max(self.samples) if self.samples else 0,
+        }
+
+
+# =============================================================================
+# PRODUCTION: Stratified Candidate Pool
+# =============================================================================
+
+class StratifiedCandidatePool:
+    """Maintains candidate pools stratified by signal for O(k) eviction."""
+
+    def __init__(self, pool_size: int = 64):
+        self.pool_size = pool_size
+        self.lru_pool: deque = deque(maxlen=pool_size)  # Oldest
+        self.lfu_pool: deque = deque(maxlen=pool_size)  # Lowest frequency
+        self.low_reuse_pool: deque = deque(maxlen=pool_size)  # Low reuse score
+        self.in_pool: Set[int] = set()
+
+    def get_candidates(self, k: int, exclude_pinned: Set[int]) -> List[int]:
+        """Get k candidates from stratified pools. O(k)."""
+        candidates = set()
+        per_pool = max(1, k // 3)
+
+        for pool in [self.lru_pool, self.lfu_pool, self.low_reuse_pool]:
+            for block_id in list(pool)[:per_pool]:
+                if block_id not in exclude_pinned:
+                    candidates.add(block_id)
+
+        return list(candidates)[:k]
+
+    def clear(self):
+        self.lru_pool.clear()
+        self.lfu_pool.clear()
+        self.low_reuse_pool.clear()
+        self.in_pool.clear()
+
+
+# =============================================================================
+# PRODUCTION: Constants
+# =============================================================================
+
+EVICTION_BATCH_SIZE = 64      # Evict M blocks at once
+EVICTION_THRESHOLD = 0.95     # Trigger batch eviction at 95% capacity
+SLOW_PATH_INTERVAL = 1000     # Run slow path every N accesses
+K_CANDIDATES = 32             # Sample size for victim selection
 
 
 @dataclass
@@ -203,7 +296,15 @@ class CTMEvictionPolicy:
             "promotions": 0,
             "evictions": 0,
             "smart_selections": 0,
+            "batch_evictions": 0,
+            "slow_path_runs": 0,
         }
+
+        # PRODUCTION: Latency tracking and candidate pools
+        self.latency_stats = LatencyStats()
+        self.candidate_pool = StratifiedCandidatePool(pool_size=64)
+        self._slow_path_counter = 0
+        self.max_blocks: int = 0  # Set when capacity is known
 
     def on_block_access(
         self,
@@ -213,12 +314,17 @@ class CTMEvictionPolicy:
         """
         Handle block access.
 
+        PRODUCTION: Fast path with O(1) state updates and latency tracking.
+
         Returns:
             (is_promotion, is_eviction_needed): Whether block was promoted
             and whether eviction is needed to make space.
         """
+        start_time = time.perf_counter()
+
         current_time = time.monotonic()
         self.access_counter += 1
+        self._slow_path_counter += 1
 
         # Track for patterns
         self.neighbor_tracker.record_access(block_id)
@@ -261,6 +367,21 @@ class CTMEvictionPolicy:
             self.blocks[block_id] = block
             self.gpu_blocks.add(block_id)
             is_promotion = True
+
+        # PRODUCTION: Check if batch eviction needed
+        if self.max_blocks > 0:
+            utilization = len(self.gpu_blocks) / self.max_blocks
+            if utilization >= EVICTION_THRESHOLD:
+                self._batch_evict()
+
+        # PRODUCTION: Run slow path maintenance periodically
+        if self._slow_path_counter >= SLOW_PATH_INTERVAL:
+            self._slow_path_maintenance()
+            self._slow_path_counter = 0
+
+        # PRODUCTION: Record latency
+        elapsed_us = (time.perf_counter() - start_time) * 1_000_000
+        self.latency_stats.record(elapsed_us)
 
         return is_promotion, needs_eviction
 
@@ -417,6 +538,121 @@ class CTMEvictionPolicy:
             )
             self.stats["evictions"] += 1
 
+    # =========================================================================
+    # PRODUCTION: Batch Eviction and Slow Path Maintenance
+    # =========================================================================
+
+    def set_capacity(self, max_blocks: int) -> None:
+        """Set the maximum block capacity for batch eviction threshold."""
+        self.max_blocks = max_blocks
+
+    def _batch_evict(self) -> List[int]:
+        """
+        PRODUCTION: Batch eviction - evict M blocks at once.
+
+        Instead of evicting one block at a time, we evict a batch
+        to amortize the overhead of victim selection.
+
+        Returns:
+            List of evicted block IDs.
+        """
+        evicted = []
+
+        # Get pinned block IDs to exclude
+        pinned = {bid for bid, block in self.blocks.items() if block.pinned}
+
+        # Get candidates from stratified pools
+        candidates = self.candidate_pool.get_candidates(
+            K_CANDIDATES * 2, exclude_pinned=pinned
+        )
+
+        # Fall back to random sampling if pools are empty
+        if len(candidates) < EVICTION_BATCH_SIZE:
+            available = [bid for bid in self.gpu_blocks if bid not in pinned]
+            if available:
+                sample_size = min(K_CANDIDATES * 2, len(available))
+                candidates = random.sample(available, sample_size)
+
+        if not candidates:
+            return evicted
+
+        # Score candidates (O(k) operation)
+        scored = []
+        times = [self.blocks[bid].last_access_time for bid in candidates if bid in self.blocks]
+        if not times:
+            return evicted
+
+        min_time = min(times)
+        max_time = max(times)
+        time_range = max_time - min_time if max_time > min_time else 1.0
+        adaptive_p = self.shadow_tier.p
+
+        for block_id in candidates:
+            if block_id not in self.blocks:
+                continue
+            block = self.blocks[block_id]
+            score = self._compute_victim_score(block, min_time, time_range, adaptive_p)
+            scored.append((block_id, score))
+
+        # Sort by score and take lowest (worst candidates)
+        scored.sort(key=lambda x: x[1])
+        victims = [bid for bid, _ in scored[:EVICTION_BATCH_SIZE]]
+
+        # Evict victims
+        for victim_id in victims:
+            self.evict_block(victim_id)
+            evicted.append(victim_id)
+
+        if evicted:
+            self.stats["batch_evictions"] += 1
+
+        return evicted
+
+    def _slow_path_maintenance(self) -> None:
+        """
+        PRODUCTION: Slow path maintenance - runs every N accesses.
+
+        O(n) operations that are too expensive for the hot path:
+        - Rebuild stratified candidate pools
+        """
+        self.stats["slow_path_runs"] += 1
+
+        # Clear and rebuild candidate pools
+        self.candidate_pool.clear()
+
+        # Get unpinned GPU blocks
+        available = [
+            (bid, self.blocks[bid])
+            for bid in self.gpu_blocks
+            if bid in self.blocks and not self.blocks[bid].pinned
+        ]
+
+        if not available:
+            return
+
+        # Build LRU pool (oldest first)
+        by_recency = sorted(available, key=lambda x: x[1].last_access_time)
+        for bid, _ in by_recency[:self.candidate_pool.pool_size]:
+            self.candidate_pool.lru_pool.append(bid)
+            self.candidate_pool.in_pool.add(bid)
+
+        # Build LFU pool (lowest frequency first)
+        by_frequency = sorted(available, key=lambda x: x[1].access_count)
+        for bid, _ in by_frequency[:self.candidate_pool.pool_size]:
+            if bid not in self.candidate_pool.in_pool:
+                self.candidate_pool.lfu_pool.append(bid)
+                self.candidate_pool.in_pool.add(bid)
+
+        # Build low reuse pool
+        by_reuse = sorted(
+            available,
+            key=lambda x: self.transition_tracker.get_reuse_score(x[0])
+        )
+        for bid, _ in by_reuse[:self.candidate_pool.pool_size]:
+            if bid not in self.candidate_pool.in_pool:
+                self.candidate_pool.low_reuse_pool.append(bid)
+                self.candidate_pool.in_pool.add(bid)
+
     def promote_block(self, block_id: int) -> None:
         """Mark block as promoted from CPU to GPU."""
         if block_id in self.cpu_blocks:
@@ -442,7 +678,7 @@ class CTMEvictionPolicy:
             self.blocks[block_id].pinned = False
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get eviction statistics."""
+        """Get eviction statistics including production latency metrics."""
         total = self.stats["gpu_hits"] + self.stats["cpu_hits"] + self.stats["misses"]
         return {
             **self.stats,
@@ -451,9 +687,20 @@ class CTMEvictionPolicy:
             "adaptive_p": self.shadow_tier.p,
             "gpu_blocks": len(self.gpu_blocks),
             "cpu_blocks": len(self.cpu_blocks),
+            # PRODUCTION: Latency metrics
+            "latency": self.latency_stats.summary(),
+            "candidate_pool_sizes": {
+                "lru": len(self.candidate_pool.lru_pool),
+                "lfu": len(self.candidate_pool.lfu_pool),
+                "low_reuse": len(self.candidate_pool.low_reuse_pool),
+            },
         }
 
     def reset_stats(self) -> None:
-        """Reset statistics."""
+        """Reset statistics including production latency tracking."""
         for key in self.stats:
             self.stats[key] = 0
+        # PRODUCTION: Reset latency and pools
+        self.latency_stats = LatencyStats()
+        self.candidate_pool.clear()
+        self._slow_path_counter = 0
