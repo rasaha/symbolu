@@ -2378,6 +2378,531 @@ PCAM mirrors this principle: instead of storing raw tokens, store their attentio
 - PCAM design is driven by transformer math, not neuroscience
 - Hardware specifications are independent of cognitive theory
 
+### Appendix F: Competitive Analysis
+
+This appendix provides detailed comparison of PCAM against existing solutions across six categories.
+
+#### F.1 Software KV Cache Optimization
+
+**H2O (Heavy Hitter Oracle) - Zhang et al., 2023**
+
+```
+Approach: Keep attention sinks (first tokens) + recent window + heavy hitters
+Implementation: Software policy on GPU
+Complexity: O(n) eviction decisions
+
+Strengths:
+- No hardware changes required
+- Works with existing inference stacks
+- Proven quality preservation
+
+Weaknesses:
+- Heavy hitter detection adds latency per token
+- Fixed heuristic, not learned
+- No cross-request learning
+
+PCAM Advantage:
+- Hardware-accelerated lookup (<100ns vs ~1μs software)
+- Learns patterns across requests
+- Integrates with memory tiering (CTM+)
+```
+
+**StreamingLLM - Xiao et al., 2023**
+
+```
+Approach: Sliding window + attention sinks for infinite context
+Implementation: Software modification to attention
+Complexity: O(1) memory, O(window) attention
+
+Strengths:
+- Enables "infinite" context streaming
+- Simple implementation
+- Low memory overhead
+
+Weaknesses:
+- Loses information outside window
+- Cannot retrieve distant context
+- Fixed window size
+
+PCAM Advantage:
+- Retrieves distant context via learned edges
+- Adaptive window based on content
+- Persistent memory of important blocks
+```
+
+**Scissorhands - Liu et al., 2023**
+
+```
+Approach: Importance-based KV cache pruning
+Implementation: Software pruning during inference
+Complexity: O(n) importance scoring
+
+Strengths:
+- Content-aware eviction
+- Better quality than LRU
+- No training changes
+
+Weaknesses:
+- Scoring overhead per token
+- No persistence across requests
+- CPU/GPU bound
+
+PCAM Advantage:
+- Dedicated hardware for scoring
+- Persistent learned importance
+- Sub-100ns decisions
+```
+
+**vLLM PagedAttention - Kwon et al., 2023**
+
+```
+Approach: Paged memory management for KV cache
+Implementation: Memory allocator optimization
+Complexity: O(1) allocation, standard attention
+
+Strengths:
+- Eliminates memory fragmentation
+- Enables dynamic batching
+- Production-proven
+
+Weaknesses:
+- Doesn't reduce attention compute
+- No intelligent eviction (uses basic policies)
+- Pages are equal priority
+
+PCAM Relationship: COMPLEMENTARY
+- vLLM manages physical pages
+- PCAM signals which pages are important
+- Integration: PCAM tier hints → vLLM eviction policy
+```
+
+#### F.2 Sparse Attention Methods
+
+**Longformer - Beltagy et al., 2020**
+
+```
+Approach: Local attention window + global tokens
+Pattern: Fixed at model architecture time
+Complexity: O(n × window) instead of O(n²)
+
+Strengths:
+- Proven for long documents
+- No runtime overhead
+- Well-understood tradeoffs
+
+Weaknesses:
+- Pattern fixed at training
+- Cannot adapt to content
+- Global tokens must be predetermined
+
+PCAM Advantage:
+- Pattern learned at runtime
+- Adapts to actual attention needs
+- No architectural changes to model
+```
+
+**BigBird - Zaheer et al., 2020**
+
+```
+Approach: Local + random + global attention
+Pattern: Fixed sparsity with random component
+Complexity: O(n × (window + random + global))
+
+Strengths:
+- Theoretical approximation guarantees
+- Works for various tasks
+
+Weaknesses:
+- Random attention is wasteful
+- Fixed pattern doesn't adapt
+- Requires model retraining
+
+PCAM Advantage:
+- Learned patterns, not random
+- No retraining required
+- Runtime adaptation
+```
+
+**Flash Attention - Dao et al., 2022**
+
+```
+Approach: IO-aware exact attention algorithm
+Pattern: Dense (computes full attention)
+Complexity: Still O(n²) compute, but memory-efficient
+
+Strengths:
+- Exact attention (no approximation)
+- 2-4x faster than naive implementation
+- Memory efficient (tiling)
+
+Weaknesses:
+- Still O(n²) compute
+- Doesn't reduce FLOPs
+- Memory bandwidth bound at long context
+
+PCAM Relationship: COMPLEMENTARY
+- Flash Attention computes attention efficiently
+- PCAM reduces WHAT Flash Attention computes
+- Combined: O(nK) sparse attention with Flash efficiency
+```
+
+**Ring Attention - Liu et al., 2023**
+
+```
+Approach: Distribute attention across devices
+Pattern: Full attention, distributed compute
+Complexity: O(n²/devices) per device
+
+Strengths:
+- Enables very long context (1M+)
+- Scales with device count
+
+Weaknesses:
+- Still O(n²) total compute
+- Communication overhead
+- Requires multiple devices
+
+PCAM Relationship: COMPLEMENTARY
+- Ring Attention distributes work
+- PCAM reduces work per device
+- Combined: Efficient distributed sparse attention
+```
+
+#### F.3 Memory and Storage Hardware
+
+**CXL Memory Pooling (Compute Express Link)**
+
+```
+Approach: Disaggregated memory over fabric
+Vendors: Intel, Samsung, Micron, SK Hynix
+Complexity: Memory expansion, not intelligence
+
+Strengths:
+- Industry standard (CXL 3.0)
+- Enables memory pooling
+- Vendor ecosystem
+
+Weaknesses:
+- Passive memory (no compute)
+- No attention awareness
+- Just capacity expansion
+
+PCAM Opportunity:
+- PCAM as CXL Type 2 device
+- Adds intelligence to memory pool
+- "Smart CXL memory" positioning
+```
+
+**Intel Optane Persistent Memory**
+
+```
+Approach: Fast persistent storage tier
+Technology: 3D XPoint
+Complexity: Passive storage with byte addressability
+
+Strengths:
+- Persistence without power
+- Faster than SSD
+- Byte addressable
+
+Weaknesses (and why discontinued):
+- Cost per GB too high
+- No compute capability
+- Market fit unclear
+
+PCAM Lesson:
+- Pure storage play is difficult
+- Must add compute value
+- PCAM computes during read (differentiated)
+```
+
+**Samsung/SK Hynix CXL Memory**
+
+```
+Approach: CXL-attached DRAM expansion
+Products: CMM-D, CMM-H (DRAM/HBM over CXL)
+Complexity: Memory capacity expansion
+
+Strengths:
+- Production available
+- Standard CXL interface
+- Large capacity
+
+Weaknesses:
+- No intelligence
+- Just more memory
+- Doesn't reduce compute
+
+PCAM Differentiation:
+- Not competing on capacity
+- Competing on intelligence
+- "Memory that knows what matters"
+```
+
+#### F.4 AI Accelerators
+
+**NVIDIA H100/B100 GPU**
+
+```
+Approach: General-purpose AI accelerator
+Focus: Matrix multiply, tensor operations
+Complexity: Full dense computation
+
+Strengths:
+- Dominant market position
+- Mature software ecosystem (CUDA)
+- Continuous improvement
+
+PCAM Relationship: COMPLEMENTARY
+- GPU does compute
+- PCAM guides what to compute
+- Integration: PCAM → sparse candidate set → GPU attention
+```
+
+**Google TPU v5**
+
+```
+Approach: Custom matrix multiply accelerator
+Focus: Training and inference
+Complexity: Systolic array architecture
+
+Strengths:
+- Optimized for transformers
+- Integrated with Google stack
+
+PCAM Relationship: COMPLEMENTARY
+- Same as GPU
+- PCAM reduces TPU attention work
+```
+
+**Groq LPU**
+
+```
+Approach: Deterministic inference accelerator
+Focus: Low-latency inference
+Complexity: SRAM-only, no external memory
+
+Strengths:
+- Predictable latency
+- Very fast for small models
+
+Weaknesses:
+- Limited by on-chip SRAM
+- Long context requires external memory
+
+PCAM Opportunity:
+- PCAM could extend Groq to long context
+- Store attention state off-chip
+- Retrieve efficiently for sparse attention
+```
+
+**Cerebras WSE-3**
+
+```
+Approach: Wafer-scale engine
+Focus: Massive on-chip SRAM (44GB)
+Complexity: Entire wafer as single chip
+
+Strengths:
+- Huge SRAM capacity
+- Model fits on chip
+- High memory bandwidth
+
+PCAM Opportunity:
+- PCAM logic could be integrated
+- Use portion of SRAM for attention state
+- Native sparse attention support
+```
+
+#### F.5 Neuromorphic and Analog AI
+
+**Intel Loihi 2**
+
+```
+Approach: Spiking neural network accelerator
+Model: Event-driven, asynchronous
+Complexity: Neuromorphic computation
+
+Strengths:
+- Low power for sparse events
+- Bio-inspired learning
+
+Weaknesses:
+- Different computational model
+- Not compatible with transformers
+- Limited software ecosystem
+
+PCAM Difference:
+- PCAM is continuous, not spiking
+- PCAM works with standard transformers
+- Different target application
+```
+
+**IBM NorthPole**
+
+```
+Approach: Digital AI accelerator
+Focus: Inference with on-chip weights
+Complexity: Near-memory compute
+
+Strengths:
+- High efficiency for inference
+- Weights stored on-chip
+
+Weaknesses:
+- Static weights only
+- No dynamic state updates
+
+PCAM Difference:
+- PCAM stores dynamic state
+- Updates every token
+- Learned, not fixed
+```
+
+**Mythic M1076**
+
+```
+Approach: Analog compute-in-memory
+Technology: Flash cells for weights
+Complexity: Matrix multiply in analog
+
+Strengths:
+- High efficiency for inference
+- Compute in memory
+
+Weaknesses:
+- Static weights (inference only)
+- No online updates
+- Analog noise
+
+PCAM Difference:
+- PCAM updates continuously
+- Digital for v1 (proven)
+- Analog optional for v2
+```
+
+#### F.6 Computational Storage
+
+**Samsung SmartSSD**
+
+```
+Approach: FPGA + SSD for near-data compute
+Focus: Database, analytics acceleration
+Complexity: General purpose computation
+
+Strengths:
+- Near-data processing
+- Reduces data movement
+
+Weaknesses:
+- General purpose (not attention-specific)
+- FPGA programming complexity
+- Limited for AI workloads
+
+PCAM Difference:
+- Purpose-built for attention
+- Simpler programming model
+- Optimized for transformer workloads
+```
+
+**NGD Systems Newport**
+
+```
+Approach: ARM cores in SSD controller
+Focus: Computational storage
+Complexity: General purpose compute near storage
+
+Strengths:
+- Standard ARM programming
+- Near-data compute
+
+Weaknesses:
+- General purpose
+- Not AI-specific
+- Limited compute power
+
+PCAM Difference:
+- Specialized for attention metadata
+- Hardware-optimized operations
+- Integrated with AI inference stack
+```
+
+#### F.7 Competitive Positioning Matrix
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        COMPETITIVE POSITIONING                               │
+│                                                                              │
+│  High │                                    ┌─────────┐                      │
+│       │                                    │  PCAM   │                      │
+│   A   │            ┌──────────┐            │(future) │                      │
+│   t   │            │ Learned  │            └────┬────┘                      │
+│   t   │            │ Sparse   │                 │                           │
+│   e   │            │ (H2O)    │            ┌────┴────┐                      │
+│   n   │            └──────────┘            │  PCAM   │                      │
+│   t   │                                    │  (v1)   │                      │
+│   i   │   ┌──────────┐                     └─────────┘                      │
+│   o   │   │ Fixed    │                                                      │
+│   n   │   │ Sparse   │    ┌──────────┐                                     │
+│       │   │(Longform)│    │ Flash    │                                     │
+│   A   │   └──────────┘    │ Attention│                                     │
+│   w   │                   └──────────┘                                     │
+│   a   │                                                                     │
+│   r   │   ┌──────────┐    ┌──────────┐    ┌──────────┐                     │
+│   e   │   │ CXL      │    │ GPU/TPU  │    │Neuromorph│                     │
+│   n   │   │ Memory   │    │          │    │          │                     │
+│   e   │   └──────────┘    └──────────┘    └──────────┘                     │
+│   s   │                                                                     │
+│   s   │                                                                     │
+│  Low  └─────────────────────────────────────────────────────────────────────│
+│        Software              ──────►              Hardware                  │
+│                         Implementation                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### F.8 PCAM Unique Value Summary
+
+**What no existing solution provides:**
+
+| Capability | H2O | Longformer | Flash | CXL | GPU | PCAM |
+|------------|-----|------------|-------|-----|-----|------|
+| Hardware-accelerated lookup | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Learned dynamic patterns | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Persistent attention state | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Sub-100ns decisions | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Memory tier integration | ✗ | ✗ | ✗ | Partial | ✗ | ✓ |
+| Cross-request learning | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+
+**PCAM's Competitive Moat:**
+
+```
+1. FIRST MOVER: No existing "attention accelerator" category
+   - GPUs accelerate compute
+   - CXL expands memory
+   - PCAM accelerates attention metadata (new category)
+
+2. INTEGRATION DEPTH: Works with existing stacks
+   - Complements GPU/TPU (doesn't replace)
+   - Complements vLLM (guides eviction)
+   - Complements CXL (adds intelligence)
+
+3. LEARNING ADVANTAGE: Gets better with use
+   - Static solutions don't improve
+   - PCAM learns attention patterns
+   - More requests → better predictions
+
+4. HARDWARE ECONOMICS: Dedicated silicon
+   - Software can be copied
+   - Hardware requires investment
+   - 18-24 month lead time is barrier
+```
+
+**One-Line Positioning:**
+
+> "PCAM is to attention what GPU is to matrix multiply:
+> a dedicated accelerator for a specific, high-frequency operation
+> that dominates AI workload performance."
+
 ---
 
 ## Document History
@@ -2387,6 +2912,7 @@ PCAM mirrors this principle: instead of storing raw tokens, store their attentio
 | 0.1 | 2026-01-31 | Initial draft |
 | 0.2 | 2026-01-31 | Added fundamental design questions (Section 2) |
 | 0.3 | 2026-01-31 | v1 silicon improvements: minimal ISA, optional phase, realistic costs |
+| 0.4 | 2026-01-31 | Added comprehensive competitive analysis (Appendix F) |
 
 ---
 
