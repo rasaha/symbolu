@@ -63,6 +63,18 @@ CTM_plus/
 │       ├── zero_integration.py # ZeRO-Offload support
 │       ├── inference.py     # Inference manager
 │       └── example.py       # Usage example
+├── Database/
+│   ├── setup.py             # Package installer
+│   ├── README.md            # Database integration docs
+│   └── ctm_plus_db/         # Python package
+│       ├── __init__.py      # Package init
+│       ├── config.py        # Configuration
+│       ├── buffer_pool.py   # CTM+ buffer pool
+│       ├── page_cache.py    # Generic page cache
+│       ├── postgres.py      # PostgreSQL integration
+│       ├── redis_cache.py   # Redis-style cache
+│       ├── generic.py       # Generic KV cache
+│       └── example.py       # Usage example
 └── ../simulator/
     └── ctm_plus/            # Python simulator
         ├── controllers/
@@ -245,6 +257,55 @@ needs_fetch, prefetch_list = manager.on_access(
 stats = manager.get_stats()
 print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
 print(f"Offloads: {stats['offloads']}")
+```
+
+### Database Integration
+
+```bash
+# Install
+cd CTM_plus/Database
+pip install -e .
+
+# Run example
+python -m ctm_plus_db.example
+```
+
+**Using for buffer pool management:**
+
+```python
+from ctm_plus_db import CTMBufferPool, CTMDBConfig
+
+# Create buffer pool
+config = CTMDBConfig.for_oltp()
+pool = CTMBufferPool(
+    pool_size_pages=10000,
+    page_size_bytes=8192,
+    config=config,
+)
+
+# Access pages
+is_hit, prefetch_list = pool.access(page_id=12345, is_write=False)
+
+# Get eviction victim
+victim = pool.select_victim()
+
+# Get statistics
+stats = pool.get_stats()
+print(f"Hit Rate: {stats['hit_rate']:.2%}")
+```
+
+**Redis-style caching:**
+
+```python
+from ctm_plus_db import RedisCTMCache, CTMDBConfig
+
+cache = RedisCTMCache(
+    maxmemory=1024 * 1024 * 1024,  # 1GB
+    config=CTMDBConfig.for_redis(),
+)
+
+cache.set("key", "value", ex=3600)  # 1 hour TTL
+value = cache.get("key")
 ```
 
 ## Configuration
@@ -477,6 +538,36 @@ for batch in dataloader:
 
 See `CTM_plus/DeepSpeed/README.md` for full integration instructions.
 
+### With Databases (PostgreSQL, Redis)
+
+CTM+ provides buffer pool management for database systems:
+
+```python
+from ctm_plus_db import CTMBufferPool, PostgresCTMExtension, RedisCTMCache
+from ctm_plus_db import CTMDBConfig
+
+# PostgreSQL buffer pool
+pg = PostgresCTMExtension(
+    shared_buffers=8192,
+    config=CTMDBConfig.for_postgres(),
+)
+
+# Redis-style caching
+redis = RedisCTMCache(
+    maxmemory=1024 * 1024 * 1024,
+    config=CTMDBConfig.for_redis(),
+)
+redis.set("session:123", session_data)
+
+# Generic buffer pool
+pool = CTMBufferPool(
+    pool_size_pages=10000,
+    config=CTMDBConfig.for_oltp(),
+)
+```
+
+See `CTM_plus/Database/README.md` for full integration instructions.
+
 ### With Linux Memory Tiering
 
 ```bash
@@ -527,6 +618,7 @@ print(f'CTM+: {ctm_result.metrics.hit_rate:.2%}')
 - MIT (CUDA library)
 - MIT (vLLM integration)
 - MIT (DeepSpeed integration)
+- MIT (Database integration)
 
 ## References
 
