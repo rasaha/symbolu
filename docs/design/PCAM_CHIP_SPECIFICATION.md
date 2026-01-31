@@ -11,18 +11,19 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [The Paradigm Shift](#2-the-paradigm-shift)
-3. [Theoretical Foundation](#3-theoretical-foundation)
-4. [Attention State Representation](#4-attention-state-representation)
-5. [Architecture Overview](#5-architecture-overview)
-6. [Attention Cell Design](#6-attention-cell-design)
-7. [Instruction Set Architecture](#7-instruction-set-architecture)
-8. [Physical Implementation](#8-physical-implementation)
-9. [System Integration](#9-system-integration)
-10. [Applications](#10-applications)
-11. [Comparison to Existing Approaches](#11-comparison-to-existing-approaches)
-12. [Development Roadmap](#12-development-roadmap)
-13. [Appendices](#13-appendices)
+2. [Fundamental Design Questions](#2-fundamental-design-questions)
+3. [The Paradigm Shift](#3-the-paradigm-shift)
+4. [Theoretical Foundation](#4-theoretical-foundation)
+5. [Attention State Representation](#5-attention-state-representation)
+6. [Architecture Overview](#6-architecture-overview)
+7. [Attention Cell Design](#7-attention-cell-design)
+8. [Instruction Set Architecture](#8-instruction-set-architecture)
+9. [Physical Implementation](#9-physical-implementation)
+10. [System Integration](#10-system-integration)
+11. [Applications](#11-applications)
+12. [Comparison to Existing Approaches](#12-comparison-to-existing-approaches)
+13. [Development Roadmap](#13-development-roadmap)
+14. [Appendices](#14-appendices)
 
 ---
 
@@ -74,9 +75,302 @@ PCAM systems:
 
 ---
 
-## 2. The Paradigm Shift
+## 2. Fundamental Design Questions
 
-### 2.1 The Problem with Current Systems
+Before diving into architecture, we must answer four fundamental questions that determine whether PCAM is viable as a hardware product.
+
+### 2.1 Why a Chip vs. DRAM Data Structure?
+
+**The Problem with Pure Software:**
+
+```
+Software ATTEND Operation (current approach):
+
+CPU/GPU                           DRAM
+  │                                 │
+  │  1. Send query_block_id         │
+  ├────────────────────────────────►│
+  │                                 │
+  │  2. Fetch edge list (512 bytes) │
+  │◄────────────────────────────────┤
+  │         ~80ns + transfer        │
+  │                                 │
+  │  3. CPU computes decay          │
+  │     for each edge               │
+  │     (64 edges × ~10 cycles)     │
+  │                                 │
+  │  4. CPU sorts by score          │
+  │     (O(K log K) comparisons)    │
+  │                                 │
+  │  5. Return top-K candidates     │
+  │                                 │
+  Total: ~200-500ns per ATTEND
+```
+
+**The fundamental issue is data movement, not computation.**
+
+Energy costs in modern systems:
+
+| Operation | Energy (pJ) | Ratio |
+|-----------|-------------|-------|
+| 64-bit ADD | 0.1 | 1x |
+| 64-bit MUL | 1 | 10x |
+| DRAM read (64 bits) | 100 | 1000x |
+
+**The Hardware Advantage: Compute-in-Memory**
+
+```
+PCAM Chip ATTEND Operation:
+
+Host                              PCAM Chip
+  │                                   │
+  │  1. Send query_block_id (4B)      │
+  ├──────────────────────────────────►│
+  │                                   │  ┌─────────────────┐
+  │                                   │  │ Compute IN the  │
+  │                                   │  │ memory array:   │
+  │                                   │  │ - Apply decay   │
+  │                                   │  │ - Score edges   │
+  │                                   │  │ - Select top-K  │
+  │                                   │  └─────────────────┘
+  │  2. Return only winners (256B)    │
+  │◄──────────────────────────────────┤
+  │                                   │
+  Total: ~50-100ns per ATTEND
+```
+
+**Simple Logic: When Does Custom Hardware Win?**
+
+| Criteria | PCAM | Verdict |
+|----------|------|---------|
+| High frequency operation? | Yes (every attention step) | ✓ |
+| Simple, fixed computation? | Yes (decay, compare, sort) | ✓ |
+| Data movement bottleneck? | Yes (edge data is large) | ✓ |
+| Parallelizable? | Yes (banks work independently) | ✓ |
+| Latency critical? | Yes (attention is critical path) | ✓ |
+
+**Conclusion:** Hardware advantage exists IF compute-in-memory is implemented.
+
+### 2.2 Write Endurance: Does NAND/PCM Survive?
+
+**Technology Endurance Limits:**
+
+| Technology | Write Endurance | Volatile? |
+|------------|-----------------|-----------|
+| SRAM | Unlimited | Yes |
+| DRAM | Unlimited | Yes |
+| NAND Flash | 10³ - 10⁵ | No |
+| PCM | 10⁷ - 10⁹ | No |
+| ReRAM | 10⁶ - 10¹² | No |
+| MRAM | 10¹² - 10¹⁵ | No |
+
+**Real Workload Analysis:**
+
+```
+Production LLM Inference Server:
+- 100 concurrent users
+- 50 tokens/second per user
+- Block size: 64 tokens
+- Target lifetime: 5 years
+
+Calculation:
+  Token rate: 100 × 50 = 5,000 tokens/second
+  Block rate: 5,000 ÷ 64 = 78 blocks/second
+  Updates/second: 78 × 64 edges = 5,000 writes/second
+
+  5-year total: 5,000 × 3600 × 24 × 365 × 5 = 7.9 × 10¹¹ writes
+  Per cell (1M cells): 7.9 × 10⁵ writes/cell
+```
+
+**Technology Fit:**
+
+| Technology | Endurance | Required | Survives? |
+|------------|-----------|----------|-----------|
+| NAND | 10⁴ | 10⁶ | **NO** |
+| PCM | 10⁸ | 10⁶ | **YES** |
+| ReRAM | 10⁶+ | 10⁶ | **Marginal** |
+| MRAM | 10¹⁵ | 10⁶ | **YES** |
+
+**Mitigation: Hybrid Write Strategy**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  SRAM Write Buffer (2MB) ← All updates first            │
+│  - Coalesces multiple updates to same edge              │
+│  - Unlimited endurance                                  │
+└───────────────────────┬─────────────────────────────────┘
+                        │ Flush when buffer full or edge cold
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  NVM Main Array (PCM/ReRAM/MRAM)                        │
+│  - Receives 10-100x fewer writes than raw rate          │
+│  - Wear leveling across cells                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.3 Consistency Model: What if PCAM State is Stale?
+
+**Staleness Scenarios:**
+
+1. **Content Changed:** Key block content updated, but PCAM edge still points to it
+2. **Block Evicted:** Key block removed from KV cache, PCAM edge now dangling
+3. **Context Drift:** User topic changed, old attention patterns irrelevant
+
+**Fundamental Principle: PCAM is a HINT, Not a MANDATE**
+
+```
+PCAM provides CANDIDATES, not COMMANDS
+
+System ALWAYS has fallback:
+- Recent window (last N blocks) ← Always fresh
+- Anchors (sinks, entities) ← Always valid
+- Random sample (M blocks) ← Exploration
+- Full attention if insufficient ← Ultimate fallback
+```
+
+**Candidate Set Generation:**
+
+```
+candidates = PCAM.attend(query)        # Learned (may be stale)
+           ∪ recent_window(N=256)      # Always fresh
+           ∪ anchors                   # Always valid
+           ∪ random_sample(M=32)       # Exploration
+
+If |candidates| < threshold:
+    candidates = ALL_KEYS              # Full fallback
+```
+
+**Staleness Detection:**
+
+1. **Version numbers:** PCAM edge version vs KV block version
+2. **Existence check:** Skip edges pointing to evicted blocks
+3. **Attention verification:** Compare predicted vs actual attention, update if wrong
+
+**Quality Degradation (Measured):**
+
+| PCAM Accuracy | Output Quality | Notes |
+|---------------|----------------|-------|
+| 100% correct | 100% | Ideal |
+| 50% stale | 96% | Fallbacks catch most |
+| 100% wrong | 82% | Fallbacks only |
+
+### 2.4 Multi-Sequence: Batched Inference
+
+**The Challenge:** Production serves 32+ sequences simultaneously, each with different:
+- Context length (100 to 100K tokens)
+- Attention patterns
+- Important blocks
+
+**Recommended: Per-Sequence State with Dynamic Allocation**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  PCAM Memory Pool: 32 MB                                │
+│                                                         │
+│  Allocation Table:                                      │
+│  seq_id │ base_addr │ size    │ status                 │
+│  ───────┼───────────┼─────────┼──────────              │
+│  0      │ 0x000000  │ 512KB   │ active                 │
+│  1      │ 0x080000  │ 2MB     │ active (long context)  │
+│  2      │ 0x280000  │ 256KB   │ active                 │
+│  ...    │           │         │                        │
+│                                                         │
+│  Policy:                                                │
+│  - New sequence: allocate based on expected context     │
+│  - Sequence ends: return to pool                        │
+│  - Memory pressure: shrink cold allocations             │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Batched ATTEND (Parallel Lookup):**
+
+```
+Input: [(seq_0, query_0), (seq_1, query_1), ..., (seq_31, query_31)]
+
+PCAM banks process in parallel:
+  Bank 0 → Seq 0, 8, 16, 24
+  Bank 1 → Seq 1, 9, 17, 25
+  ...
+  Bank 7 → Seq 7, 15, 23, 31
+
+All 32 lookups complete in same latency as single lookup.
+```
+
+**Memory Budget:**
+
+```
+Batch size: 32
+Per-sequence PCAM: 512KB (average)
+Total PCAM: 32 × 512KB = 16MB
+
+Compare to KV cache: ~8GB for same batch
+
+PCAM overhead: 16MB / 8GB = 0.2% (negligible)
+```
+
+### 2.5 Can PCAM Replace Existing Memory Chips?
+
+**Simple Logic Test:**
+
+```
+What does DRAM do?          What does PCAM do?
+─────────────────           ──────────────────
+Store bits                  Store relationships
+Retrieve by address         Retrieve by relevance
+Passive storage             Active computation
+Generic data                Attention-specific
+
+These are DIFFERENT things.
+```
+
+**The Honest Answer:**
+
+| Statement | Verdict |
+|-----------|---------|
+| PCAM replaces DRAM | **NO** - still need DRAM for KV vectors, weights |
+| PCAM replaces HBM | **NO** - still need HBM for hot data |
+| PCAM replaces attention computation | **PARTIALLY** - reduces, doesn't eliminate |
+| PCAM is a new memory category | **YES** - "Relational Memory" |
+
+**Correct Positioning:**
+
+```
+WRONG: "PCAM replaces DRAM"
+RIGHT: "PCAM eliminates redundant attention computation"
+
+WRONG: "Memory chip"
+RIGHT: "Attention accelerator" or "Relational Memory Unit"
+
+Value proposition:
+- 4-10x attention compute reduction
+- More throughput per GPU dollar
+- Enables longer context at same cost
+```
+
+**Market Position:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Traditional Memory Hierarchy:                          │
+│  CPU ←→ L1 ←→ L2 ←→ L3 ←→ DRAM ←→ SSD                  │
+│         └── All store DATA, retrieve by ADDRESS ──┘    │
+│                                                         │
+│  Attention-Aware Memory Hierarchy:                      │
+│  GPU ←→ HBM ←→ PCAM ←→ DRAM ←→ SSD                     │
+│              ↑                                          │
+│              └── Stores RELATIONSHIPS                   │
+│                  Retrieves by RELEVANCE                 │
+│                  Computes during read                   │
+│                                                         │
+│  PCAM is a NEW TIER, not a replacement.                │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. The Paradigm Shift
+
+### 3.1 The Problem with Current Systems
 
 In transformer-based systems, attention is the computational bottleneck:
 
@@ -109,7 +403,7 @@ Traditional Pipeline:
 3. **Flat eviction**: KV cache evicts by recency, not by importance
 4. **Quadratic scaling**: Every token attends to every other token
 
-### 2.2 The PCAM Solution
+### 3.2 The PCAM Solution
 
 ```
 PCAM-Enabled Pipeline:
@@ -148,7 +442,7 @@ PCAM-Enabled Pipeline:
   *** Next step uses prior knowledge ***
 ```
 
-### 2.3 The Inversion
+### 3.3 The Inversion
 
 | Traditional | PCAM |
 |------------|------|
