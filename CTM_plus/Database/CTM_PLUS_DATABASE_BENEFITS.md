@@ -715,6 +715,106 @@ With CTM+:
 
 ---
 
+#### TinyLFU (Tiny Least Frequently Used)
+
+```
+How it works:
+  - Admission filter using Count-Min Sketch
+  - Tracks frequency with minimal memory (~8 bits per item)
+  - New item only admitted if frequency > victim's frequency
+  - Often paired with W-TinyLFU (window + main cache)
+
+  [Incoming] → [Bloom Filter] → [Count-Min Sketch] → Admit?
+                                        ↓
+                              Compare freq vs victim
+```
+
+| Aspect | TinyLFU | CTM+ | Winner |
+|--------|---------|------|--------|
+| Hit rate | Excellent (5 stars) | Excellent (4.5 stars) | TinyLFU (slight) |
+| Overhead | Very Low (5 stars) | Low (3.5 stars) | TinyLFU |
+| Predictive | No | Yes | CTM+ |
+| Prefetch | No | Yes | CTM+ |
+| Multi-signal reasoning | No | Yes | CTM+ |
+| Hardware mapping | Weak | Strong | CTM+ |
+| Controller logic | Simple | Rich | CTM+ |
+
+**Where CTM+ Sits (Important)**
+
+> **CTM+ is not trying to beat TinyLFU head-on.**
+>
+> It is in a *different power dimension*.
+
+```
+TinyLFU excels at:
+  - Pure software caching (Caffeine, Guava)
+  - Single-tier memory decisions
+  - Minimal overhead admission control
+  - Near-optimal hit rates for in-memory caches
+
+CTM+ excels at:
+  - Multi-tier memory management (HBM ↔ DDR ↔ SSD)
+  - Hardware-aware placement decisions
+  - Predictive prefetching
+  - Coordinated eviction + promotion + migration
+```
+
+**Key Insight:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  TinyLFU is unbeatable as a PURE SOFTWARE CACHE.            │
+│                                                             │
+│  CTM+ becomes powerful when it CONTROLS MEMORY MOVEMENT,    │
+│  not just eviction.                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**When to use TinyLFU:**
+- Application-level caches (Caffeine in Java)
+- Single-tier in-memory caching
+- When overhead must be absolute minimum
+- No need for hardware awareness
+
+**When to use CTM+:**
+- Database buffer pools with disk backing
+- GPU memory tiering (HBM ↔ DDR)
+- Multi-tier storage systems
+- When you control data placement, not just eviction
+
+**Technical Comparison:**
+
+| Feature | TinyLFU | CTM+ |
+|---------|---------|------|
+| Frequency tracking | Count-Min Sketch | Explicit counters |
+| Recency tracking | Window cache | Timestamp + decay |
+| Admission policy | Frequency gate | Multi-signal score |
+| Memory per entry | ~8 bits | ~64 bytes |
+| Prefetch support | None | Yes |
+| Tier awareness | None | Full |
+| Dirty page handling | N/A | Penalty scoring |
+
+**Hybrid Possibility:**
+
+```python
+# CTM+ can use TinyLFU as admission filter
+class CTMWithTinyLFUAdmission:
+    def __init__(self):
+        self.tinylfu = TinyLFU(size=100000)  # Admission filter
+        self.ctm_pool = CTMBufferPool(...)    # Main management
+
+    def access(self, page_id):
+        # TinyLFU decides admission
+        if self.tinylfu.should_admit(page_id):
+            # CTM+ manages placement and eviction
+            return self.ctm_pool.access(page_id)
+        else:
+            # Rejected by frequency filter
+            return self.bypass_to_disk(page_id)
+```
+
+---
+
 ### 8.2 Advanced Algorithms
 
 | Algorithm | Hit Rate vs LRU | Scan Resistant | Adaptive | Complexity | Overhead |
@@ -728,6 +828,7 @@ With CTM+:
 | 2Q | +3-5% | Yes | No | O(1) | Low |
 | ARC | +5-8% | Yes | Yes | O(1) | Low |
 | LIRS | +6-10% | Yes | Yes | O(1) | Medium |
+| TinyLFU | +8-12% | Yes | Partial | O(1) | Very Low |
 | **CTM+** | **+5-10%** | **Yes** | **Yes** | **O(k)** | **Low** |
 
 ### 8.3 Visual Comparison: Scan Behavior
