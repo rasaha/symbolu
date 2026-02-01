@@ -68,6 +68,54 @@ This report documents the comprehensive validation of the PCAM (Phase-Coherent A
 - Recency window bonus (boost recent blocks)
 - Auto sink detection (protect frequently-attended early blocks)
 
+### Coverage Limitations Analysis
+
+#### Long-Context (57% Coverage)
+
+**Root Cause:** Balanced local/distant attention with sparse distant references.
+
+| Metric | Value | Impact |
+|--------|-------|--------|
+| Local attention ratio | 50% | Recency window captures half |
+| Distant attention ratio | 50% | Sparse, unpredictable distant blocks |
+| Query overlap | ~40% | Moderate pattern repeatability |
+
+**Why limited:**
+- Distant attention targets vary per query (different document sections)
+- No consistent "anchor" blocks like code imports
+- Attention spans thousands of tokens with sparse hits
+
+**Mitigation applied:** Wide recency window (48 blocks) captures local patterns effectively.
+
+#### RAG (31% Coverage)
+
+**Root Cause:** Semantic relevance is fundamentally unpredictable from attention history.
+
+| Metric | Value | Impact |
+|--------|-------|--------|
+| Distant attention ratio | 78% | Most attention to document chunks |
+| Query-to-query overlap | 21-30% | Each query needs different chunks |
+| Consistent blocks | Few | Random sampling within relevant docs |
+
+**Why limited:**
+1. **Semantic unpredictability**: Which document chunks answer a question depends on query semantics, not attention history
+2. **Intra-document variation**: Even within relevant documents, different queries need different specific blocks
+3. **No learnable pattern**: Unlike code (consistent imports) or chat (recency), RAG attention is determined by meaning
+
+**Example:**
+```
+Query 1: "What is the capital?" → needs blocks [15, 35, 268] from doc A
+Query 2: "When was it founded?" → needs blocks [2, 51, 285] from doc A
+Same document, completely different blocks - only 25% overlap
+```
+
+**Fundamental limitation:** PCAM predicts from **attention history**, but RAG requires **semantic understanding**. Solutions would require:
+- Query embeddings (what is being asked)
+- Chunk embeddings (semantic similarity)
+- Learned retrieval models (fine-tuned prediction)
+
+These are outside PCAM's hardware scope (attention caching, not semantic retrieval).
+
 ---
 
 ## 1. Configuration
