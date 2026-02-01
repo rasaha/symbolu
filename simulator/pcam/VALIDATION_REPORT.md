@@ -116,57 +116,77 @@ Same document, completely different blocks - only 25% overlap
 
 These are outside PCAM's hardware scope (attention caching, not semantic retrieval).
 
-### Architectural Positioning: PCAM in the Inference Pipeline
+### Architectural Positioning: Hardware vs Software Controller
 
-**Key Insight:** PCAM should sit **after semantic narrowing**, not replace it.
+**Key Insight:** PCAM hardware excels at predictable attention patterns. For workloads requiring semantic understanding, use a software controller instead.
+
+#### Recommended Workload Routing
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Inference Pipeline                           │
+│                     Workload Router                             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  [Query] ──► [Semantic Retrieval] ──► [PCAM Refinement] ──► [LLM] │
-│              (RAG/embedding-based)    (attention-based)          │
-│              Narrows to ~1000 chunks  Refines to top-K          │
+│  [Detect Workload Pattern]                                      │
+│         │                                                       │
+│         ├──► Chat/Code ─────────► PCAM Hardware (fast path)    │
+│         │                         100%/89% coverage, sub-µs    │
+│         │                                                       │
+│         └──► Long-Context/RAG ──► Software Controller          │
+│                                   + semantic retrieval          │
+│                                   Higher coverage possible      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Why this architecture works:**
+#### When to Use PCAM Hardware vs Software Controller
 
-| Stage | Role | Coverage |
-|-------|------|----------|
-| Semantic Retrieval | Narrows candidates by meaning | High recall, lower precision |
-| PCAM Refinement | Selects by attention history | High precision within pre-filtered set |
+| Workload | PCAM HW Coverage | Recommendation | Rationale |
+|----------|------------------|----------------|-----------|
+| **Chat** | 100% | ✅ **Hardware** | Predictable recency patterns |
+| **Code** | 89% | ✅ **Hardware** | Consistent import/anchor patterns |
+| **Long-Context** | 57% | ⚠️ **Software** | Needs semantic signals for distant blocks |
+| **RAG** | 31% | ⚠️ **Software** | Requires query-document semantic matching |
 
-**PCAM excels when:**
-1. **Chat/Code** - Semantic narrowing not needed; attention patterns are predictable
-2. **Long-Context** - Works within a single document; PCAM handles local + anchor patterns
-3. **RAG (hybrid)** - Retriever provides document set; PCAM refines block selection within retrieved docs
+#### Why Software for Long-Context/RAG?
 
-**What improves Long-Context & RAG further (outside pure PCAM):**
+**The fundamental limitation:**
+- PCAM predicts from **attention history**
+- Long-Context/RAG require **semantic understanding**
+- Hardware cannot store embeddings or run retrieval models
 
-1. **Query-conditioned signals**
-   - Query embeddings
-   - Question type classification
+**Software controller advantages for these workloads:**
+1. **Query embeddings** - Understand what is being asked
+2. **Chunk semantics** - Document/section-level hints
+3. **Retrieval integration** - Vector DB, embedding search
+4. **Higher coverage** - Can reach 80%+ with semantic signals
 
-2. **Chunk semantics**
-   - Document-level or section-level hints
-   - Pre-computed topic clusters
+**Trade-off analysis:**
 
-3. **Hybrid pipeline**
-   - Retrieval narrows candidates (semantic)
-   - PCAM refines within that set (attention-based)
+| Approach | Coverage | Latency | Complexity |
+|----------|----------|---------|------------|
+| PCAM HW (Long-Context) | 57% | Sub-µs | Low |
+| PCAM HW (RAG) | 31% | Sub-µs | Low |
+| Software + Retrieval | 80%+ | ~10ms | Higher |
+| Hybrid (Retrieval → PCAM) | 70%+ | ~5ms | Medium |
 
-**Hardware role clarification:**
+#### Hardware Role Clarification
 
-PCAM is a **hardware accelerator for attention refinement**, not a replacement for semantic understanding. Its value proposition:
+PCAM hardware is a **specialized accelerator for predictable attention patterns**, not a general-purpose solution:
 
-- **Store attention patterns, not embeddings** - Compact, predictable hardware
-- **Accelerate the refinement stage** - Sub-microsecond candidate selection
-- **Complement retrieval systems** - Work together, not compete
+- **Best for:** Chat, Code - where attention is learnable from history
+- **Not designed for:** Semantic retrieval, embedding similarity
+- **Value proposition:** Sub-microsecond latency for the right workloads
 
-This positioning preserves PCAM's strengths while acknowledging its boundaries.
+**Deployment recommendation:**
+```
+Production System
+├── Workload Classifier (lightweight)
+├── Chat/Code requests ──► PCAM Hardware Accelerator
+└── Long-Context/RAG ────► Software Controller + Vector DB
+```
+
+This routing maximizes hardware utilization for high-value workloads while ensuring optimal coverage for semantic workloads.
 
 ---
 
