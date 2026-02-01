@@ -116,6 +116,58 @@ Same document, completely different blocks - only 25% overlap
 
 These are outside PCAM's hardware scope (attention caching, not semantic retrieval).
 
+### Architectural Positioning: PCAM in the Inference Pipeline
+
+**Key Insight:** PCAM should sit **after semantic narrowing**, not replace it.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Inference Pipeline                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [Query] ──► [Semantic Retrieval] ──► [PCAM Refinement] ──► [LLM] │
+│              (RAG/embedding-based)    (attention-based)          │
+│              Narrows to ~1000 chunks  Refines to top-K          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why this architecture works:**
+
+| Stage | Role | Coverage |
+|-------|------|----------|
+| Semantic Retrieval | Narrows candidates by meaning | High recall, lower precision |
+| PCAM Refinement | Selects by attention history | High precision within pre-filtered set |
+
+**PCAM excels when:**
+1. **Chat/Code** - Semantic narrowing not needed; attention patterns are predictable
+2. **Long-Context** - Works within a single document; PCAM handles local + anchor patterns
+3. **RAG (hybrid)** - Retriever provides document set; PCAM refines block selection within retrieved docs
+
+**What improves Long-Context & RAG further (outside pure PCAM):**
+
+1. **Query-conditioned signals**
+   - Query embeddings
+   - Question type classification
+
+2. **Chunk semantics**
+   - Document-level or section-level hints
+   - Pre-computed topic clusters
+
+3. **Hybrid pipeline**
+   - Retrieval narrows candidates (semantic)
+   - PCAM refines within that set (attention-based)
+
+**Hardware role clarification:**
+
+PCAM is a **hardware accelerator for attention refinement**, not a replacement for semantic understanding. Its value proposition:
+
+- **Store attention patterns, not embeddings** - Compact, predictable hardware
+- **Accelerate the refinement stage** - Sub-microsecond candidate selection
+- **Complement retrieval systems** - Work together, not compete
+
+This positioning preserves PCAM's strengths while acknowledging its boundaries.
+
 ---
 
 ## 1. Configuration
