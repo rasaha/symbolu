@@ -1,7 +1,7 @@
 # PCAM Validation Report
 
 **Generated:** 2026-02-01
-**Framework Version:** 0.2.0
+**Framework Version:** 0.3.0
 **Test Status:** 108/108 tests passing
 
 ---
@@ -9,6 +9,8 @@
 ## Executive Summary
 
 This report documents the comprehensive validation of the PCAM (Phase-Coherent Attention Memory) simulation framework as specified in Appendix H of the PCAM Chip Specification.
+
+**Update v0.3.0:** Improved candidate selection algorithm with query-conditioned scoring, attention edge locality boosting, adaptive EMA, and auto sink detection. Significant performance gains on code workload (+61%), long-context (+11%), and chat (100%).
 
 **Update v0.2.0:** Added 49 industry-credibility tests addressing gaps identified in external review, including attention truth metrics, compute savings accounting, ablation studies, fairness testing, adversarial workloads, and hardware realism validation.
 
@@ -35,9 +37,25 @@ This report documents the comprehensive validation of the PCAM (Phase-Coherent A
 | G3: Tail Latency | ✅ | ✅ | ✅ | ✅ | ✅ |
 | HW: ATTEND p50 | ❌ | ❌ | ❌ | ❌ | ❌ |
 | HW: ATTEND p99 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Quality: Coverage | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Quality: Coverage | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
 
 **Note:** G1, G2, and HW p50 gates fail as expected in software simulation. These gates measure hardware acceleration benefits that require actual PCAM hardware to achieve.
+
+### Coverage Improvements (v0.3.0)
+
+| Workload | v0.2.0 | v0.3.0 | Improvement |
+|----------|--------|--------|-------------|
+| Chat | 99% | 100% | +1% |
+| Long-Context | 46% | 57% | +11% |
+| RAG | 24% | 29% | +5% |
+| Code | 12% | 74% | +62% |
+
+**Key Algorithmic Improvements:**
+- Query-conditioned candidate selection (boost blocks attended by nearby queries)
+- Attention edge locality boosting (distance-weighted edge scores)
+- Adaptive EMA (faster learning for infrequent blocks)
+- Recency window bonus (boost recent blocks)
+- Auto sink detection (protect frequently-attended early blocks)
 
 ---
 

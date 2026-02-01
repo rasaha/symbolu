@@ -18,10 +18,26 @@ class BlockScore:
     score: float
     last_access_step: int = 0
     access_count: int = 0
+    # Track unique query sources for global importance
+    unique_query_sources: Set[int] = field(default_factory=set)
+    # Cumulative attention weight
+    cumulative_weight: float = 0.0
 
     def __lt__(self, other: "BlockScore") -> bool:
         """For heap operations - lower score = eviction candidate."""
         return self.score < other.score
+
+    @property
+    def global_importance(self) -> float:
+        """
+        Global importance based on how many different queries attend to this block.
+        Blocks attended by many queries are likely important anchors.
+        """
+        if not self.unique_query_sources:
+            return 0.0
+        diversity = len(self.unique_query_sources)
+        avg_weight = self.cumulative_weight / max(1, self.access_count)
+        return math.log1p(diversity) * avg_weight
 
 
 @dataclass
@@ -59,12 +75,18 @@ class SequenceState:
     total_updates: int = 0
     current_step: int = 0
 
-    def get_top_k(self, k: int, exclude: Optional[Set[int]] = None) -> List[Tuple[int, float]]:
+    def get_top_k(
+        self,
+        k: int,
+        query_block_id: Optional[int] = None,
+        exclude: Optional[Set[int]] = None,
+    ) -> List[Tuple[int, float]]:
         """
-        Get top-K blocks by score.
+        Get top-K blocks by score, optionally conditioned on query.
 
         Args:
             k: Number of blocks to return
+            query_block_id: If provided, boost blocks with edges from this query
             exclude: Block IDs to exclude from results
 
         Returns:
@@ -72,14 +94,42 @@ class SequenceState:
         """
         exclude = exclude or set()
 
-        candidates = [
-            (bs.score, bs.block_id)
-            for bs in self.block_scores.values()
-            if bs.block_id not in exclude
-        ]
+        # Start with base block scores
+        candidates = {}
+        for bs in self.block_scores.values():
+            if bs.block_id not in exclude:
+                candidates[bs.block_id] = bs.score
+
+        # Add query-conditioned scores from attention edges
+        if query_block_id is not None:
+            # Find blocks that have been attended to from nearby queries
+            query_window = 16  # Look at queries within this range
+            for (src_query, dst_key), weight in self.attention_edges.items():
+                if dst_key in exclude:
+                    continue
+                # Boost blocks that nearby queries attended to
+                query_distance = abs(src_query - query_block_id)
+                if query_distance <= query_window:
+                    locality_boost = 1.0 / (1.0 + query_distance * 0.1)
+                    edge_score = weight * locality_boost
+                    candidates[dst_key] = candidates.get(dst_key, 0) + edge_score
+
+        # Always include protected blocks (sinks/anchors) with minimum score
+        for protected in self.protected_blocks:
+            if protected not in exclude:
+                candidates[protected] = max(candidates.get(protected, 0), 0.1)
+
+        # Add recency bonus for recent blocks
+        if query_block_id is not None:
+            recency_window = 32  # Recent blocks to boost
+            for block_id in range(max(0, query_block_id - recency_window), query_block_id + 1):
+                if block_id not in exclude:
+                    recency_boost = 0.5 * (1.0 - (query_block_id - block_id) / recency_window)
+                    candidates[block_id] = candidates.get(block_id, 0) + recency_boost
 
         # Use heapq for efficient top-K
-        top_k = heapq.nlargest(k, candidates)
+        scored = [(score, block_id) for block_id, score in candidates.items()]
+        top_k = heapq.nlargest(k, scored)
 
         return [(block_id, score) for score, block_id in top_k]
 
@@ -94,21 +144,46 @@ class SequenceState:
         edge_key = (query_block, key_block)
         self.attention_edges[edge_key] = weight
 
-        # Update block score using EMA
+        # Update block score using improved scoring
         if key_block not in self.block_scores:
             self.block_scores[key_block] = BlockScore(
                 block_id=key_block,
                 score=weight,
                 last_access_step=step,
                 access_count=1,
+                unique_query_sources={query_block},
+                cumulative_weight=weight,
             )
         else:
             bs = self.block_scores[key_block]
-            # Exponential moving average
-            alpha = 0.3
+            # Track query sources for global importance
+            bs.unique_query_sources.add(query_block)
+            bs.cumulative_weight += weight
+
+            # Adaptive EMA: more weight to new observations for infrequent blocks
+            # This helps sparse patterns (long-context, RAG, code) learn faster
+            base_alpha = 0.2
+            frequency_boost = min(0.5, bs.access_count * 0.05)  # More frequent = more stable
+            alpha = base_alpha + (0.5 - frequency_boost)  # Range: 0.2-0.7
+
+            # Combine new weight with existing score
             bs.score = alpha * weight + (1 - alpha) * bs.score
+
+            # Add frequency boost for consistently accessed blocks
+            frequency_boost = math.log1p(bs.access_count) * 0.01
+            bs.score = bs.score + frequency_boost
+
             bs.last_access_step = step
             bs.access_count += 1
+
+        # Auto-detect sink blocks: early blocks accessed by many different queries
+        # Sinks are the first few blocks that receive attention from distant queries
+        sink_threshold = 4  # First N blocks can become sinks
+        if key_block < sink_threshold:
+            bs = self.block_scores[key_block]
+            # If block is accessed frequently and from distant queries, mark as sink
+            if bs.access_count >= 5 and (query_block - key_block) > 10:
+                self.protected_blocks.add(key_block)
 
     def apply_decay(self, decay_rate: float) -> None:
         """Apply decay to all scores."""
@@ -198,8 +273,8 @@ class AttentionState:
         # Calculate bank conflicts
         bank_conflicts = self._calculate_bank_conflicts(sequence_id, k)
 
-        # Get top-K candidates
-        candidates = seq.get_top_k(k)
+        # Get top-K candidates, conditioned on query block
+        candidates = seq.get_top_k(k, query_block_id=query_block_id)
 
         return candidates, bank_conflicts
 
