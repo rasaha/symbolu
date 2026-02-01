@@ -99,9 +99,9 @@ class SequenceState:
 
         Heuristics:
         - CHAT: Short context, mostly local attention
-        - LONG_CONTEXT: Large context, high coverage density
-        - CODE: Many consistent early blocks (imports) + moderate context
-        - RAG: High distant + sparse early blocks (semantic)
+        - LONG_CONTEXT: Large context, balanced or local attention
+        - CODE: High distant attention + many consistent early blocks (imports)
+        - RAG: High distant attention + scattered consistency (semantic)
         """
         if self.total_updates < 20:
             return WorkloadPattern.UNKNOWN
@@ -123,30 +123,18 @@ class SequenceState:
 
         # Context size estimation
         max_block = max((bs.block_id for bs in self.block_scores.values()), default=0)
-        min_block = min((bs.block_id for bs in self.block_scores.values()), default=0)
-
-        # Coverage density: how many blocks vs the range they span
-        block_range = max_block - min_block
-        attended_blocks = len(self.block_scores)
-        coverage_density = attended_blocks / max(1, block_range) if block_range > 0 else 1.0
 
         # Detection logic (order matters!)
         if max_block < 100 and local_ratio > 0.8:
             # Short context, almost all local -> CHAT
             return WorkloadPattern.CHAT
 
-        # CODE: Moderate context with VERY consistent early blocks
-        # Use stricter threshold and smaller context requirement
-        if max_block < 550 and high_diversity_early >= 25:
+        if distant_ratio > 0.7 and high_diversity_early >= 30:
+            # Very high distant + many consistent early blocks -> CODE (imports)
             return WorkloadPattern.CODE
 
-        # LONG_CONTEXT: Large context OR high coverage density
-        # Key: coverage_density > 0.5 indicates dense sequential access
-        if max_block > 1000 or coverage_density > 0.5:
-            return WorkloadPattern.LONG_CONTEXT
-
-        # RAG: High distant attention, less dense coverage
-        if distant_ratio > 0.6 and coverage_density < 0.5:
+        if distant_ratio > 0.6 and high_diversity_early < 30:
+            # High distant but fewer consistent early blocks -> RAG (scattered)
             return WorkloadPattern.RAG
 
         if local_ratio >= 0.4:
