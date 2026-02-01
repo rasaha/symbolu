@@ -21,20 +21,6 @@ class WorkloadPattern(Enum):
     CODE = "code"           # Local + consistent far dependencies
 
 
-class GenerationPhase(Enum):
-    """
-    Generation phase for phase-based attention strategies.
-
-    Long-context workloads exhibit distinct phases similar to "phase quad" LLM models:
-    - EARLY: Context building, broad capture
-    - MID: Selective attention, anchor maintenance
-    - LATE: May revisit early context, anchor recall boost
-    """
-    EARLY = "early"     # 0-25% of generation
-    MID = "mid"         # 25-75% of generation
-    LATE = "late"       # 75-100% of generation
-
-
 @dataclass
 class BlockScore:
     """Score for a single KV block."""
@@ -107,21 +93,15 @@ class SequenceState:
     _query_positions: List[int] = field(default_factory=list)  # Recent query positions
     _detection_window: int = 50  # Re-detect every N updates
 
-    # Phase-based state for long-context (phase quad logic)
-    current_phase: GenerationPhase = GenerationPhase.EARLY
-    _max_query_seen: int = 0  # Max query block position seen
-    _generation_start: int = 0  # Where generation started (after prefill)
-    _anchor_blocks: Set[int] = field(default_factory=set)  # Blocks consistently attended in early phases
-
     def detect_workload(self) -> WorkloadPattern:
         """
         Detect workload pattern based on attention characteristics.
 
         Heuristics:
         - CHAT: Short context, mostly local attention
-        - LONG_CONTEXT: Large context, sequential queries, local + distant attention
+        - LONG_CONTEXT: Large context, balanced or local attention
         - CODE: High distant attention + many consistent early blocks (imports)
-        - RAG: Sparse semantic attention, queries to document chunks
+        - RAG: High distant attention + scattered consistency (semantic)
         """
         if self.total_updates < 20:
             return WorkloadPattern.UNKNOWN
@@ -143,19 +123,6 @@ class SequenceState:
 
         # Context size estimation
         max_block = max((bs.block_id for bs in self.block_scores.values()), default=0)
-        min_block = min((bs.block_id for bs in self.block_scores.values()), default=0)
-
-        # Check for sequential query progression (LONG_CONTEXT characteristic)
-        # Look at unique query sources - are they spread across context?
-        all_query_positions = set()
-        for bs in self.block_scores.values():
-            all_query_positions.update(bs.unique_query_sources)
-        query_spread = max(all_query_positions, default=0) - min(all_query_positions, default=0)
-
-        # Check if attention covers a wide range (not just sparse chunks)
-        block_spread = max_block - min_block
-        attended_blocks = len(self.block_scores)
-        coverage_density = attended_blocks / max(1, block_spread) if block_spread > 0 else 1.0
 
         # Detection logic (order matters!)
         if max_block < 100 and local_ratio > 0.8:
@@ -166,14 +133,8 @@ class SequenceState:
             # Very high distant + many consistent early blocks -> CODE (imports)
             return WorkloadPattern.CODE
 
-        # LONG_CONTEXT: Large context, has both local AND distant attention
-        # Key: coverage_density > 0.3 means blocks are spread out (not RAG-like sparse)
-        # Also: local_ratio > 0.15 means there's meaningful local attention
-        if max_block > 1000 and local_ratio > 0.15 and coverage_density > 0.1:
-            return WorkloadPattern.LONG_CONTEXT
-
-        if distant_ratio > 0.6 and coverage_density < 0.1:
-            # High distant, sparse coverage -> RAG (scattered semantic)
+        if distant_ratio > 0.6 and high_diversity_early < 30:
+            # High distant but fewer consistent early blocks -> RAG (scattered)
             return WorkloadPattern.RAG
 
         if local_ratio >= 0.4:
@@ -181,61 +142,6 @@ class SequenceState:
             return WorkloadPattern.LONG_CONTEXT
 
         return WorkloadPattern.LONG_CONTEXT  # Default fallback
-
-    def detect_phase(self, query_block_id: int) -> GenerationPhase:
-        """
-        Detect current generation phase for phase-based strategies.
-
-        Phase quad logic for long-context workloads:
-        - EARLY (0-25%): Context building, broad capture, anchor identification
-        - MID (25-75%): Selective attention, maintain established anchors
-        - LATE (75-100%): May revisit early context, anchor recall boost
-
-        Args:
-            query_block_id: Current query block position
-
-        Returns:
-            Current GenerationPhase
-        """
-        # Track first query as generation start
-        if self._generation_start == 0:
-            self._generation_start = query_block_id
-
-        # Update max query seen
-        if query_block_id > self._max_query_seen:
-            self._max_query_seen = query_block_id
-
-        # Use attend count to determine phase (not position-based)
-        # This is more robust for long-context where queries are sequential
-        total_expected_queries = 100  # Reasonable estimate for typical workload
-
-        # Use actual attend count as progress indicator
-        progress = self.total_attends / total_expected_queries
-
-        # Phase boundaries based on generation progress
-        if progress < 0.25:
-            return GenerationPhase.EARLY
-        elif progress < 0.75:
-            return GenerationPhase.MID
-        else:
-            return GenerationPhase.LATE
-
-    def identify_anchors(self) -> None:
-        """
-        Identify anchor blocks during EARLY phase.
-
-        Anchors are blocks that receive consistent attention from multiple
-        different query positions - they represent structurally important
-        context that should be retained throughout generation.
-        """
-        # Only identify anchors during EARLY phase
-        if self.current_phase != GenerationPhase.EARLY:
-            return
-
-        # Blocks accessed by 3+ different queries are potential anchors
-        for bs in self.block_scores.values():
-            if len(bs.unique_query_sources) >= 3:
-                self._anchor_blocks.add(bs.block_id)
 
     def get_top_k(
         self,
@@ -265,7 +171,6 @@ class SequenceState:
 
         # Workload-adaptive parameters
         pattern = self.detected_pattern
-        anchor_boost_enabled = False  # Default, set per-pattern
         if pattern == WorkloadPattern.CHAT:
             recency_window = 24
             recency_strength = 0.6
@@ -273,31 +178,9 @@ class SequenceState:
             diversity_boost_enabled = False
             global_importance_enabled = False
         elif pattern == WorkloadPattern.LONG_CONTEXT:
-            # Phase-based logic for long-context (phase quad approach)
-            if query_block_id is not None:
-                self.current_phase = self.detect_phase(query_block_id)
-                self.identify_anchors()  # Build anchor set during EARLY phase
-
-            phase = self.current_phase
-            if phase == GenerationPhase.EARLY:
-                # EARLY: Broad capture, anchor identification
-                recency_window = 64  # Wide window for context building
-                recency_strength = 0.4  # Less recency bias, more diverse capture
-                query_window = 30  # Broad query context
-                anchor_boost_enabled = False  # Still building anchors
-            elif phase == GenerationPhase.MID:
-                # MID: Selective attention, maintain established anchors
-                recency_window = 48
-                recency_strength = 0.5
-                query_window = 20
-                anchor_boost_enabled = True  # Use identified anchors
-            else:  # LATE
-                # LATE: Anchor recall boost, may revisit early context
-                recency_window = 32  # Narrower local focus
-                recency_strength = 0.4  # Less recency, more anchor recall
-                query_window = 16
-                anchor_boost_enabled = True  # Strong anchor recall
-
+            recency_window = 48
+            recency_strength = 0.5
+            query_window = 20
             diversity_boost_enabled = False
             global_importance_enabled = False
         elif pattern == WorkloadPattern.CODE:
@@ -370,24 +253,6 @@ class SequenceState:
                 # Boost blocks that have high global importance
                 if bs.global_importance > 0.1:
                     candidates[bs.block_id] = candidates.get(bs.block_id, 0) + bs.global_importance * 0.3
-
-        # Anchor boost for LONG_CONTEXT phase logic
-        # In MID/LATE phases, boost anchors identified during EARLY phase
-        if anchor_boost_enabled and self._anchor_blocks:
-            phase = self.current_phase
-            # Stronger boost in LATE phase (anchor recall)
-            anchor_strength = 0.4 if phase == GenerationPhase.LATE else 0.25
-
-            for anchor_id in self._anchor_blocks:
-                if anchor_id in exclude:
-                    continue
-                # Boost anchors that have strong historical importance
-                if anchor_id in self.block_scores:
-                    bs = self.block_scores[anchor_id]
-                    # Scale boost by how many queries attended this anchor
-                    diversity_factor = min(1.0, len(bs.unique_query_sources) / 10.0)
-                    anchor_boost = anchor_strength * diversity_factor
-                    candidates[anchor_id] = candidates.get(anchor_id, 0) + anchor_boost
 
         # Use heapq for efficient top-K
         scored = [(score, block_id) for block_id, score in candidates.items()]
