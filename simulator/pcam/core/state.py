@@ -22,6 +22,41 @@ class WorkloadPattern(Enum):
 
 
 @dataclass
+class Section:
+    """
+    Coarse-level section for soft hierarchical prior.
+
+    CRITICAL: Hierarchy is a PRIOR, not a FILTER.
+    Sections provide a scoring boost, not eligibility gating.
+
+    Sections group blocks into regions (16-32 blocks per section).
+    High-scoring sections boost their member blocks' scores.
+    But blocks outside top sections can STILL be selected.
+    """
+    section_id: int
+    start_block: int
+    end_block: int  # Exclusive
+
+    # Section-level attention statistics
+    total_attention: float = 0.0
+    access_count: int = 0
+    unique_queries: Set[int] = field(default_factory=set)
+
+    @property
+    def score(self) -> float:
+        """Section importance score based on attention history."""
+        if self.access_count == 0:
+            return 0.0
+        avg_attention = self.total_attention / self.access_count
+        diversity_factor = math.log1p(len(self.unique_queries))
+        return avg_attention * diversity_factor
+
+    @property
+    def block_count(self) -> int:
+        return self.end_block - self.start_block
+
+
+@dataclass
 class PhaseCluster:
     """
     Cluster of co-activated blocks for phase-based candidate expansion.
@@ -136,6 +171,46 @@ class SequenceState:
     _last_query_blocks: Set[int] = field(default_factory=set)  # Blocks from last query for co-activation
     _phase_mode_enabled: bool = False  # Whether to use cluster-based selection
     _cluster_rebuild_interval: int = 25  # Rebuild clusters every N queries
+
+    # Soft Hierarchical Prior: sections provide scoring boost, not eligibility filter
+    _sections: Dict[int, Section] = field(default_factory=dict)  # section_id -> Section
+    _section_size: int = 16  # Blocks per section
+    _section_boost_alpha: float = 0.15  # Section boost coefficient (α < 1.0)
+
+    def _get_or_create_section(self, block_id: int) -> Section:
+        """Get or create section for a block."""
+        section_id = block_id // self._section_size
+        if section_id not in self._sections:
+            start = section_id * self._section_size
+            end = (section_id + 1) * self._section_size
+            self._sections[section_id] = Section(
+                section_id=section_id,
+                start_block=start,
+                end_block=end,
+            )
+        return self._sections[section_id]
+
+    def _update_section_stats(self, query_block: int, key_block: int, weight: float) -> None:
+        """Update section-level statistics when a block is accessed."""
+        section = self._get_or_create_section(key_block)
+        section.total_attention += weight
+        section.access_count += 1
+        section.unique_queries.add(query_block)
+
+    def _get_section_boost(self, block_id: int) -> float:
+        """
+        Get soft hierarchical boost for a block based on its section.
+
+        Returns a small additive bonus (not a gate) based on section importance.
+        Blocks in high-attention sections get a boost, but blocks elsewhere
+        are NOT excluded - they just don't get the bonus.
+        """
+        section_id = block_id // self._section_size
+        if section_id not in self._sections:
+            return 0.0
+        section = self._sections[section_id]
+        # Soft boost: α * section_score (α ≈ 0.15)
+        return self._section_boost_alpha * section.score
 
     def detect_workload(self) -> WorkloadPattern:
         """
@@ -502,6 +577,16 @@ class SequenceState:
                 if bs.global_importance > 0.1:
                     candidates[bs.block_id] = candidates.get(bs.block_id, 0) + bs.global_importance * 0.3
 
+        # Soft Hierarchical Prior: section boost for Long-Context and RAG
+        # CRITICAL: This is ADDITIVE (prior), not SUBSTITUTIVE (filter)
+        # Blocks in high-attention sections get a small boost
+        # Blocks elsewhere are NOT excluded - they can still be selected
+        if pattern in (WorkloadPattern.LONG_CONTEXT, WorkloadPattern.RAG) and self._sections:
+            for block_id in candidates:
+                section_boost = self._get_section_boost(block_id)
+                if section_boost > 0:
+                    candidates[block_id] += section_boost
+
         # Phase-mode: check if we should use cluster-based selection
         # Only for Long-Context and RAG where individual block prediction fails
         self._phase_mode_enabled = self._should_enable_phase_mode()
@@ -541,6 +626,10 @@ class SequenceState:
         # Track blocks for co-activation (Phase Coherence)
         # Accumulate blocks - will be processed in next get_top_k call
         self._last_query_blocks.add(key_block)
+
+        # Update section-level statistics for soft hierarchical prior
+        # IMPORTANT: Updates always flow to blocks regardless of section selection
+        self._update_section_stats(query_block, key_block, weight)
 
         # Track attention distance for workload detection
         distance = abs(query_block - key_block)
@@ -727,6 +816,7 @@ class AttentionState:
         block_ids: List[int],
         weights: List[float],
         step: int,
+        query_block_id: Optional[int] = None,
     ) -> int:
         """
         Batch UPDATE operation.
@@ -737,8 +827,8 @@ class AttentionState:
         if seq is None:
             return 0
 
-        # Assume updates are from current query block
-        query_block = step // 16  # Rough approximation
+        # Use provided query_block_id if available, else approximate
+        query_block = query_block_id if query_block_id is not None else step // 16
 
         count = 0
         for block_id, weight in zip(block_ids, weights):

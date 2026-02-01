@@ -248,6 +248,7 @@ class SoftwarePCAMInterface(PCAMInterface):
         sequence_id: int,
         block_ids: List[int],
         weights: List[float],
+        query_block_id: Optional[int] = None,
     ) -> Tuple[int, float]:
         """Batch UPDATE with coalesced latency."""
         count = self.state.update_batch(
@@ -255,6 +256,7 @@ class SoftwarePCAMInterface(PCAMInterface):
             block_ids=block_ids,
             weights=weights,
             step=self._step,
+            query_block_id=query_block_id,
         )
 
         # Coalesced latency is sublinear
