@@ -7,8 +7,18 @@ Tracks attention relationships, block scores, and bank states.
 from dataclasses import dataclass, field
 from typing import Dict, List, Set, Tuple, Optional
 from collections import defaultdict
+from enum import Enum
 import heapq
 import math
+
+
+class WorkloadPattern(Enum):
+    """Detected workload pattern for adaptive strategies."""
+    UNKNOWN = "unknown"
+    CHAT = "chat"           # Local attention, sequential
+    LONG_CONTEXT = "long_context"  # Local + sparse distant
+    RAG = "rag"             # Sparse semantic (unpredictable)
+    CODE = "code"           # Local + consistent far dependencies
 
 
 @dataclass
@@ -57,7 +67,7 @@ class BankState:
 
 @dataclass
 class SequenceState:
-    """Per-sequence attention state."""
+    """Per-sequence attention state with workload-adaptive strategies."""
     sequence_id: int
     max_blocks: int
 
@@ -75,6 +85,64 @@ class SequenceState:
     total_updates: int = 0
     current_step: int = 0
 
+    # Workload detection state
+    detected_pattern: WorkloadPattern = WorkloadPattern.UNKNOWN
+    _distant_attention_count: int = 0  # Attention to blocks >100 away
+    _local_attention_count: int = 0    # Attention to blocks <50 away
+    _consistent_distant_blocks: Set[int] = field(default_factory=set)  # Distant blocks hit by multiple queries
+    _query_positions: List[int] = field(default_factory=list)  # Recent query positions
+    _detection_window: int = 50  # Re-detect every N updates
+
+    def detect_workload(self) -> WorkloadPattern:
+        """
+        Detect workload pattern based on attention characteristics.
+
+        Heuristics:
+        - CHAT: Short context, mostly local attention
+        - LONG_CONTEXT: Large context, balanced or local attention
+        - CODE: High distant attention + many consistent early blocks (imports)
+        - RAG: High distant attention + scattered consistency (semantic)
+        """
+        if self.total_updates < 20:
+            return WorkloadPattern.UNKNOWN
+
+        # Calculate metrics
+        total_attention = self._distant_attention_count + self._local_attention_count
+        if total_attention == 0:
+            return WorkloadPattern.UNKNOWN
+
+        distant_ratio = self._distant_attention_count / total_attention
+        local_ratio = self._local_attention_count / total_attention
+
+        # Check for consistent early blocks (code imports pattern)
+        # CODE has many early blocks (< 50) accessed by many different queries
+        high_diversity_early = sum(
+            1 for bs in self.block_scores.values()
+            if len(bs.unique_query_sources) >= 5 and bs.block_id < 50
+        )
+
+        # Context size estimation
+        max_block = max((bs.block_id for bs in self.block_scores.values()), default=0)
+
+        # Detection logic (order matters!)
+        if max_block < 100 and local_ratio > 0.8:
+            # Short context, almost all local -> CHAT
+            return WorkloadPattern.CHAT
+
+        if distant_ratio > 0.7 and high_diversity_early >= 30:
+            # Very high distant + many consistent early blocks -> CODE (imports)
+            return WorkloadPattern.CODE
+
+        if distant_ratio > 0.6 and high_diversity_early < 30:
+            # High distant but fewer consistent early blocks -> RAG (scattered)
+            return WorkloadPattern.RAG
+
+        if local_ratio >= 0.4:
+            # Balanced or local-dominant -> LONG_CONTEXT
+            return WorkloadPattern.LONG_CONTEXT
+
+        return WorkloadPattern.LONG_CONTEXT  # Default fallback
+
     def get_top_k(
         self,
         k: int,
@@ -82,7 +150,7 @@ class SequenceState:
         exclude: Optional[Set[int]] = None,
     ) -> List[Tuple[int, float]]:
         """
-        Get top-K blocks by score, optionally conditioned on query.
+        Get top-K blocks by score with workload-adaptive strategies.
 
         Args:
             k: Number of blocks to return
@@ -94,6 +162,46 @@ class SequenceState:
         """
         exclude = exclude or set()
 
+        # Update workload detection after sufficient data
+        if self.total_updates >= 50 and self.detected_pattern == WorkloadPattern.UNKNOWN:
+            self.detected_pattern = self.detect_workload()
+        elif self.total_updates % self._detection_window == 0 and self.total_updates >= 100:
+            # Re-detect periodically after initial detection
+            self.detected_pattern = self.detect_workload()
+
+        # Workload-adaptive parameters
+        pattern = self.detected_pattern
+        if pattern == WorkloadPattern.CHAT:
+            recency_window = 24
+            recency_strength = 0.6
+            query_window = 12
+            diversity_boost_enabled = False
+            global_importance_enabled = False
+        elif pattern == WorkloadPattern.LONG_CONTEXT:
+            recency_window = 48
+            recency_strength = 0.5
+            query_window = 20
+            diversity_boost_enabled = False
+            global_importance_enabled = False
+        elif pattern == WorkloadPattern.CODE:
+            recency_window = 32
+            recency_strength = 0.4
+            query_window = 16
+            diversity_boost_enabled = True  # Enable for imports
+            global_importance_enabled = False
+        elif pattern == WorkloadPattern.RAG:
+            recency_window = 16
+            recency_strength = 0.3
+            query_window = 8
+            diversity_boost_enabled = False
+            global_importance_enabled = True  # Enable for RAG
+        else:  # UNKNOWN - use balanced defaults
+            recency_window = 32
+            recency_strength = 0.5
+            query_window = 16
+            diversity_boost_enabled = False
+            global_importance_enabled = False
+
         # Start with base block scores
         candidates = {}
         for bs in self.block_scores.values():
@@ -102,12 +210,9 @@ class SequenceState:
 
         # Add query-conditioned scores from attention edges
         if query_block_id is not None:
-            # Find blocks that have been attended to from nearby queries
-            query_window = 16  # Look at queries within this range
             for (src_query, dst_key), weight in self.attention_edges.items():
                 if dst_key in exclude:
                     continue
-                # Boost blocks that nearby queries attended to
                 query_distance = abs(src_query - query_block_id)
                 if query_distance <= query_window:
                     locality_boost = 1.0 / (1.0 + query_distance * 0.1)
@@ -119,13 +224,35 @@ class SequenceState:
             if protected not in exclude:
                 candidates[protected] = max(candidates.get(protected, 0), 0.1)
 
-        # Add recency bonus for recent blocks
+        # Add recency bonus for recent blocks (adaptive strength)
         if query_block_id is not None:
-            recency_window = 32  # Recent blocks to boost
             for block_id in range(max(0, query_block_id - recency_window), query_block_id + 1):
                 if block_id not in exclude:
-                    recency_boost = 0.5 * (1.0 - (query_block_id - block_id) / recency_window)
+                    recency_boost = recency_strength * (1.0 - (query_block_id - block_id) / recency_window)
                     candidates[block_id] = candidates.get(block_id, 0) + recency_boost
+
+        # Diversity boost for CODE workloads (imports attended by many queries)
+        if diversity_boost_enabled and query_block_id is not None:
+            for bs in self.block_scores.values():
+                if bs.block_id in exclude:
+                    continue
+                # Only boost distant blocks with high query diversity
+                distance = abs(bs.block_id - query_block_id)
+                if distance > 50:
+                    query_diversity = len(bs.unique_query_sources)
+                    if query_diversity >= 3:
+                        diversity_boost = math.log1p(query_diversity) * 0.2
+                        candidates[bs.block_id] = candidates.get(bs.block_id, 0) + diversity_boost
+
+        # Global importance boost for RAG workloads
+        # Helps identify consistently important blocks across queries
+        if global_importance_enabled:
+            for bs in self.block_scores.values():
+                if bs.block_id in exclude:
+                    continue
+                # Boost blocks that have high global importance
+                if bs.global_importance > 0.1:
+                    candidates[bs.block_id] = candidates.get(bs.block_id, 0) + bs.global_importance * 0.3
 
         # Use heapq for efficient top-K
         scored = [(score, block_id) for block_id, score in candidates.items()]
@@ -140,9 +267,16 @@ class SequenceState:
         weight: float,
         step: int,
     ) -> None:
-        """Update attention edge weight."""
+        """Update attention edge weight and workload detection metrics."""
         edge_key = (query_block, key_block)
         self.attention_edges[edge_key] = weight
+
+        # Track attention distance for workload detection
+        distance = abs(query_block - key_block)
+        if distance > 100:
+            self._distant_attention_count += 1
+        elif distance < 50:
+            self._local_attention_count += 1
 
         # Update block score using improved scoring
         if key_block not in self.block_scores:

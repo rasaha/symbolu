@@ -1,7 +1,7 @@
 # PCAM Validation Report
 
 **Generated:** 2026-02-01
-**Framework Version:** 0.3.0
+**Framework Version:** 0.4.0
 **Test Status:** 108/108 tests passing
 
 ---
@@ -9,6 +9,8 @@
 ## Executive Summary
 
 This report documents the comprehensive validation of the PCAM (Phase-Coherent Attention Memory) simulation framework as specified in Appendix H of the PCAM Chip Specification.
+
+**Update v0.4.0:** Implemented workload-adaptive strategies with automatic pattern detection. PCAM now detects workload type (chat, long-context, RAG, code) and applies optimized scoring strategies. Code workload improved to 88.6% (+15% vs v0.3.0).
 
 **Update v0.3.0:** Improved candidate selection algorithm with query-conditioned scoring, attention edge locality boosting, adaptive EMA, and auto sink detection. Significant performance gains on code workload (+61%), long-context (+11%), and chat (100%).
 
@@ -41,16 +43,25 @@ This report documents the comprehensive validation of the PCAM (Phase-Coherent A
 
 **Note:** G1, G2, and HW p50 gates fail as expected in software simulation. These gates measure hardware acceleration benefits that require actual PCAM hardware to achieve.
 
-### Coverage Improvements (v0.3.0)
+### Coverage Improvements (v0.4.0 Workload-Adaptive)
 
-| Workload | v0.2.0 | v0.3.0 | Improvement |
-|----------|--------|--------|-------------|
-| Chat | 99% | 100% | +1% |
-| Long-Context | 46% | 57% | +11% |
-| RAG | 24% | 29% | +5% |
-| Code | 12% | 74% | +62% |
+| Workload | v0.2.0 | v0.3.0 | v0.4.0 | Total Improvement |
+|----------|--------|--------|--------|-------------------|
+| Chat | 99% | 100% | 100% | +1% |
+| Long-Context | 46% | 57% | 57% | +11% |
+| RAG | 24% | 29% | 31% | +7% |
+| Code | 12% | 74% | 89% | +77% |
 
-**Key Algorithmic Improvements:**
+**Workload-Adaptive Strategies (v0.4.0):**
+
+| Pattern | Detection Heuristic | Strategy Applied |
+|---------|---------------------|------------------|
+| **Chat** | Short context, >80% local attention | Strong recency (0.6), narrow window |
+| **Long-Context** | Balanced attention (40%+ local) | Wide recency window (48 blocks) |
+| **RAG** | >60% distant, sparse consistency | Global importance boost |
+| **Code** | >70% distant, many consistent early blocks | Diversity boost for imports |
+
+**Base Algorithmic Improvements (v0.3.0):**
 - Query-conditioned candidate selection (boost blocks attended by nearby queries)
 - Attention edge locality boosting (distance-weighted edge scores)
 - Adaptive EMA (faster learning for infrequent blocks)
