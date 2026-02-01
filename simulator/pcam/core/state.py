@@ -22,6 +22,40 @@ class WorkloadPattern(Enum):
 
 
 @dataclass
+class PhaseCluster:
+    """
+    Cluster of co-activated blocks for phase-based candidate expansion.
+
+    Blocks that tend to be attended together across queries form coherent
+    "phase clusters" - useful for Long-Context and RAG where individual
+    block prediction fails but cluster prediction succeeds.
+    """
+    cluster_id: int
+    blocks: Set[int] = field(default_factory=set)
+    centroid: float = 0.0  # Average block position
+    last_activation_step: int = 0
+    activation_count: int = 0
+    total_weight: float = 0.0
+
+    def update_centroid(self) -> None:
+        """Recalculate centroid from current blocks."""
+        if self.blocks:
+            self.centroid = sum(self.blocks) / len(self.blocks)
+        else:
+            self.centroid = 0.0
+
+    @property
+    def coherence_score(self) -> float:
+        """How coherent/useful is this cluster."""
+        if not self.blocks or self.activation_count == 0:
+            return 0.0
+        # More activations + reasonable size = better cluster
+        size_factor = min(1.0, len(self.blocks) / 8.0)  # Ideal ~8 blocks
+        activation_factor = math.log1p(self.activation_count) * 0.5
+        return size_factor * activation_factor
+
+
+@dataclass
 class BlockScore:
     """Score for a single KV block."""
     block_id: int
@@ -93,6 +127,16 @@ class SequenceState:
     _query_positions: List[int] = field(default_factory=list)  # Recent query positions
     _detection_window: int = 50  # Re-detect every N updates
 
+    # Phase coherence state for cluster-based candidate expansion
+    # Tracks which blocks are attended together (co-activation)
+    _co_activation: Dict[Tuple[int, int], int] = field(default_factory=dict)  # (block_a, block_b) -> count
+    _phase_clusters: Dict[int, PhaseCluster] = field(default_factory=dict)  # cluster_id -> PhaseCluster
+    _block_to_cluster: Dict[int, int] = field(default_factory=dict)  # block_id -> cluster_id
+    _next_cluster_id: int = 0
+    _last_query_blocks: Set[int] = field(default_factory=set)  # Blocks from last query for co-activation
+    _phase_mode_enabled: bool = False  # Whether to use cluster-based selection
+    _cluster_rebuild_interval: int = 25  # Rebuild clusters every N queries
+
     def detect_workload(self) -> WorkloadPattern:
         """
         Detect workload pattern based on attention characteristics.
@@ -143,6 +187,205 @@ class SequenceState:
 
         return WorkloadPattern.LONG_CONTEXT  # Default fallback
 
+    def _update_co_activation(self, blocks_attended: Set[int], step: int) -> None:
+        """
+        Track co-activation between blocks attended in the same query.
+
+        When multiple blocks are attended together, they form a coherent group
+        that should be selected together in future queries.
+        """
+        # Only track for Long-Context and RAG patterns
+        if self.detected_pattern not in (WorkloadPattern.LONG_CONTEXT, WorkloadPattern.RAG):
+            return
+
+        # Limit to top blocks by weight to avoid O(n^2) explosion
+        # For efficiency, sample pairs rather than computing all
+        blocks_list = list(blocks_attended)[:32]  # Top 32 blocks
+
+        # Update co-activation counts for sampled pairs
+        for i, block_a in enumerate(blocks_list):
+            for block_b in blocks_list[i + 1:min(i + 8, len(blocks_list))]:
+                # Use sorted tuple as key
+                pair = (min(block_a, block_b), max(block_a, block_b))
+                self._co_activation[pair] = self._co_activation.get(pair, 0) + 1
+
+    def finalize_step(self, blocks_attended: Set[int], step: int) -> None:
+        """
+        Called after each step to update co-activation tracking.
+
+        This should be called after all updates for a single attention step
+        have been processed.
+        """
+        self._update_co_activation(blocks_attended, step)
+
+    def _should_enable_phase_mode(self) -> bool:
+        """
+        Detect when PCAM is struggling and phase-mode should be enabled.
+
+        Signals that indicate phase-mode would help:
+        - High distant attention ratio (sparse attention)
+        - Low query overlap (different blocks per query)
+        - Pattern is LONG_CONTEXT or RAG
+        """
+        # Only enable for patterns where individual block prediction fails
+        if self.detected_pattern not in (WorkloadPattern.LONG_CONTEXT, WorkloadPattern.RAG):
+            return False
+
+        # Need sufficient data
+        if self.total_attends < 10:
+            return False
+
+        # Check distant attention ratio
+        total = self._distant_attention_count + self._local_attention_count
+        if total == 0:
+            return False
+        distant_ratio = self._distant_attention_count / total
+
+        # High distant attention = sparse, unpredictable patterns
+        # Threshold 0.4 covers both Long-Context (~46%) and RAG (~68%)
+        return distant_ratio > 0.4
+
+    def _build_clusters(self) -> None:
+        """
+        Build phase clusters from co-activation data.
+
+        Uses a simple greedy clustering approach:
+        1. Find strongly co-activated pairs
+        2. Merge into clusters
+        3. Limit cluster sizes for efficiency
+        """
+        if not self._co_activation:
+            return
+
+        # Reset clusters
+        self._phase_clusters.clear()
+        self._block_to_cluster.clear()
+
+        # Find strongly co-activated pairs (threshold: 3+ co-activations)
+        strong_pairs = [
+            (pair, count) for pair, count in self._co_activation.items()
+            if count >= 3
+        ]
+        strong_pairs.sort(key=lambda x: -x[1])  # Sort by count descending
+
+        # Greedy clustering
+        for (block_a, block_b), count in strong_pairs:
+            cluster_a = self._block_to_cluster.get(block_a)
+            cluster_b = self._block_to_cluster.get(block_b)
+
+            if cluster_a is None and cluster_b is None:
+                # Both unassigned - create new cluster
+                cluster_id = self._next_cluster_id
+                self._next_cluster_id += 1
+                cluster = PhaseCluster(
+                    cluster_id=cluster_id,
+                    blocks={block_a, block_b},
+                    activation_count=count,
+                )
+                cluster.update_centroid()
+                self._phase_clusters[cluster_id] = cluster
+                self._block_to_cluster[block_a] = cluster_id
+                self._block_to_cluster[block_b] = cluster_id
+
+            elif cluster_a is not None and cluster_b is None:
+                # Add block_b to cluster_a
+                cluster = self._phase_clusters[cluster_a]
+                if len(cluster.blocks) < 16:  # Max cluster size
+                    cluster.blocks.add(block_b)
+                    cluster.activation_count += count
+                    cluster.update_centroid()
+                    self._block_to_cluster[block_b] = cluster_a
+
+            elif cluster_a is None and cluster_b is not None:
+                # Add block_a to cluster_b
+                cluster = self._phase_clusters[cluster_b]
+                if len(cluster.blocks) < 16:
+                    cluster.blocks.add(block_a)
+                    cluster.activation_count += count
+                    cluster.update_centroid()
+                    self._block_to_cluster[block_a] = cluster_b
+
+            # If both assigned to different clusters, don't merge (keep clusters distinct)
+
+    def _get_cluster_expanded_candidates(
+        self,
+        k: int,
+        query_block_id: Optional[int],
+        exclude: Set[int],
+        base_candidates: Dict[int, float],
+    ) -> List[Tuple[int, float]]:
+        """
+        Get candidates using cluster-based expansion.
+
+        Instead of picking top-K individual blocks, pick top-M clusters
+        and expand to blocks within those clusters.
+
+        Args:
+            k: Total number of candidates to return
+            query_block_id: Current query position
+            exclude: Blocks to exclude
+            base_candidates: Initial block scores from standard method
+
+        Returns:
+            List of (block_id, score) tuples
+        """
+        if not self._phase_clusters:
+            # No clusters built yet - fall back to standard selection
+            scored = [(score, block_id) for block_id, score in base_candidates.items()]
+            top_k = heapq.nlargest(k, scored)
+            return [(block_id, score) for score, block_id in top_k]
+
+        # Score clusters based on their blocks' scores
+        cluster_scores: Dict[int, float] = {}
+        for cluster_id, cluster in self._phase_clusters.items():
+            # Cluster score = sum of member block scores + coherence bonus
+            member_scores = sum(
+                base_candidates.get(block, 0) for block in cluster.blocks
+            )
+            coherence_bonus = cluster.coherence_score * 0.5
+            cluster_scores[cluster_id] = member_scores + coherence_bonus
+
+        # Select fewer clusters - leave room for high-scoring individual blocks
+        # Only use ~30% of k for cluster expansion, rest for individual blocks
+        cluster_budget = int(k * 0.3)
+        avg_cluster_size = sum(len(c.blocks) for c in self._phase_clusters.values()) / max(1, len(self._phase_clusters))
+        m = max(2, int(cluster_budget / max(4, avg_cluster_size)))
+
+        scored_clusters = [(score, cid) for cid, score in cluster_scores.items()]
+        top_clusters = heapq.nlargest(m, scored_clusters)
+
+        # Expand clusters to get candidate blocks
+        cluster_blocks: Set[int] = set()
+        for _, cluster_id in top_clusters:
+            cluster = self._phase_clusters[cluster_id]
+            cluster_blocks.update(cluster.blocks - exclude)
+
+        # Fill remaining slots with highest-scoring individual blocks
+        remaining = k - len(cluster_blocks)
+        if remaining > 0:
+            # Get blocks not in selected clusters
+            non_cluster_candidates = {
+                bid: score for bid, score in base_candidates.items()
+                if bid not in cluster_blocks and bid not in exclude
+            }
+            sorted_non_cluster = sorted(
+                non_cluster_candidates.items(), key=lambda x: -x[1]
+            )[:remaining]
+            cluster_blocks.update(bid for bid, _ in sorted_non_cluster)
+
+        # Build final result with scores
+        result = []
+        for block_id in cluster_blocks:
+            score = base_candidates.get(block_id, 0.1)
+            # Boost blocks from clusters
+            if block_id in self._block_to_cluster:
+                score *= 1.2
+            result.append((block_id, score))
+
+        # Sort by score and return top-K
+        result.sort(key=lambda x: -x[1])
+        return result[:k]
+
     def get_top_k(
         self,
         k: int,
@@ -161,6 +404,11 @@ class SequenceState:
             List of (block_id, score) tuples, sorted by score descending
         """
         exclude = exclude or set()
+
+        # Finalize co-activation from previous query's blocks
+        if self._last_query_blocks:
+            self._update_co_activation(self._last_query_blocks, self.current_step)
+            self._last_query_blocks = set()
 
         # Update workload detection after sufficient data
         if self.total_updates >= 50 and self.detected_pattern == WorkloadPattern.UNKNOWN:
@@ -254,7 +502,26 @@ class SequenceState:
                 if bs.global_importance > 0.1:
                     candidates[bs.block_id] = candidates.get(bs.block_id, 0) + bs.global_importance * 0.3
 
-        # Use heapq for efficient top-K
+        # Phase-mode: check if we should use cluster-based selection
+        # Only for Long-Context and RAG where individual block prediction fails
+        self._phase_mode_enabled = self._should_enable_phase_mode()
+
+        if self._phase_mode_enabled:
+            # Rebuild clusters periodically
+            if self.total_attends % self._cluster_rebuild_interval == 0:
+                self._build_clusters()
+
+            # Add cluster coherence bonus to candidates (don't replace selection)
+            if self._phase_clusters:
+                for cluster in self._phase_clusters.values():
+                    if cluster.coherence_score > 0.1:
+                        # Boost all blocks in coherent clusters
+                        cluster_boost = cluster.coherence_score * 0.15
+                        for block_id in cluster.blocks:
+                            if block_id in candidates:
+                                candidates[block_id] += cluster_boost
+
+        # Standard selection: use heapq for efficient top-K
         scored = [(score, block_id) for block_id, score in candidates.items()]
         top_k = heapq.nlargest(k, scored)
 
@@ -270,6 +537,10 @@ class SequenceState:
         """Update attention edge weight and workload detection metrics."""
         edge_key = (query_block, key_block)
         self.attention_edges[edge_key] = weight
+
+        # Track blocks for co-activation (Phase Coherence)
+        # Accumulate blocks - will be processed in next get_top_k call
+        self._last_query_blocks.add(key_block)
 
         # Track attention distance for workload detection
         distance = abs(query_block - key_block)
@@ -318,6 +589,13 @@ class SequenceState:
             # If block is accessed frequently and from distant queries, mark as sink
             if bs.access_count >= 5 and (query_block - key_block) > 10:
                 self.protected_blocks.add(key_block)
+
+        # Track query position for co-activation detection
+        if not self._query_positions or self._query_positions[-1] != query_block:
+            self._query_positions.append(query_block)
+            # Keep limited history
+            if len(self._query_positions) > 100:
+                self._query_positions = self._query_positions[-100:]
 
     def apply_decay(self, decay_rate: float) -> None:
         """Apply decay to all scores."""
