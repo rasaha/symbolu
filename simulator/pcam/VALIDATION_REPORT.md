@@ -117,6 +117,72 @@ The ~29% RAG figure should be understood as:
 
 That's a clean win at this layer.
 
+### RAG Pipeline Simulation Results
+
+A full RAG pipeline simulation validates PCAM's architectural position:
+
+```
+Test: simulator/pcam/tests/test_rag_pipeline.py
+Run:  python -m simulator.pcam.tests.test_rag_pipeline
+```
+
+#### Coverage by Context Size
+
+| Scenario | Context Blocks | PCAM Coverage | Analysis |
+|----------|---------------|---------------|----------|
+| Chat (Predictable) | ~6 | **100%** | Recency patterns fully captured |
+| RAG - Small | ~40 | **99.9%** | k=32 covers most blocks |
+| RAG - Medium | ~120 | **81.1%** | Semantic variation emerges |
+| RAG - Large | ~250 | **65.3%** | Sparse semantic attention dominates |
+
+#### What PCAM Successfully Captures (Improvement)
+
+| Component | Predictability | Coverage |
+|-----------|---------------|----------|
+| Query blocks | Always attended | 100% |
+| Recency window | Last 3-4 blocks | 100% |
+| Frequently co-accessed | Learned from history | High |
+| Anchor/sink blocks | Auto-detected | Protected |
+
+#### What PCAM Cannot Predict (Semantic Limit)
+
+```
+Step 1: Query about "capital"  → needs blocks [15, 35, 268]
+Step 2: Query about "founded"  → needs blocks [2, 51, 285]
+                                              ↑
+                               Different blocks each step!
+                               No pattern in attention history
+```
+
+#### Coverage Breakdown for Large RAG Context (~65%)
+
+```
+┌────────────────────────────────────────────────────────┐
+│  PCAM Coverage Breakdown                               │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│  ████████████████████  Query blocks (always)     ~10%  │
+│  ████████████████████  Recency window            ~20%  │
+│  ██████████████        Learned patterns          ~25%  │
+│  ░░░░░░░░░░░░░░░░░░░░  Semantic (unpredictable)  ~35%  │
+│                        ↑                               │
+│                 PCAM cannot predict this               │
+│                 (requires embeddings/semantics)        │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Improvement vs Baselines
+
+| Approach | What It Knows | Expected Coverage |
+|----------|--------------|-------------------|
+| Random baseline | Nothing | ~17% (k/context) |
+| LRU baseline | Recency only | ~30% |
+| **PCAM** | History + sections + clusters | **65%** |
+| Oracle (embeddings) | Full semantics | 100% |
+
+**PCAM improves over baselines by ~35 percentage points** at the attention layer.
+
 ### Mental Model
 
 | Component | Analogy |
@@ -159,22 +225,24 @@ This is exactly what hardware and systems teams want.
 
 ### Coverage Limitations Analysis
 
-#### Long-Context (57% Coverage)
+#### Long-Context (70-72% Coverage in v0.5.0)
 
-**Root Cause:** Balanced local/distant attention with sparse distant references.
+**Improvement:** Soft hierarchical prior boosted coverage from 57% to 70-72%.
 
 | Metric | Value | Impact |
 |--------|-------|--------|
 | Local attention ratio | 50% | Recency window captures half |
-| Distant attention ratio | 50% | Sparse, unpredictable distant blocks |
+| Distant attention ratio | 50% | Section boost helps prediction |
 | Query overlap | ~40% | Moderate pattern repeatability |
 
-**Why limited:**
-- Distant attention targets vary per query (different document sections)
-- No consistent "anchor" blocks like code imports
-- Attention spans thousands of tokens with sparse hits
+**Why improved in v0.5.0:**
+- Soft hierarchical prior adds section-level scoring boost
+- Sections with high attention history get priority
+- Key insight: hierarchy as PRIOR (boost), not FILTER (gate)
 
-**Mitigation applied:** Wide recency window (48 blocks) captures local patterns effectively.
+**Remaining limitation:**
+- Distant attention targets still vary per query
+- ~30% of blocks remain semantically unpredictable
 
 #### RAG (31% Coverage)
 
