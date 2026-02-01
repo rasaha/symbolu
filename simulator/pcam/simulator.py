@@ -130,6 +130,7 @@ class PCAMSimulator:
                     sequence_id=step.sequence_id,
                     block_ids=block_ids,
                     weights=weights,
+                    query_block_id=step.query_block_id,
                 )
 
                 collector.record_update(
