@@ -582,6 +582,78 @@ The framework's value is **making AI reliable through behavioral control** - not
 
 ---
 
+### Streaming Coherence
+
+**Status:** Not implemented as a core component
+
+**What it would include:**
+- Early stopping (halt generation mid-stream if coherence drops)
+- Token-level drift detection (catch topic drift as tokens arrive)
+- Real-time guards (check each token against safety/coherence rules)
+
+**Why we don't include it:**
+
+This is a **nice optimization, not core functionality**. The engineering patterns are straightforward and copyable - they don't provide structural leverage.
+
+| Aspect | Turn-Level (Our Approach) | Token-Level (Streaming) |
+|--------|--------------------------|-------------------------|
+| Coherence checks | 1 per turn | 500-2000 per turn |
+| Compute cost | Low | 500-2000x higher |
+| Benefit | Catches all issues | Catches issues ~50 tokens earlier |
+| ROI | High | Negative for most apps |
+
+**The hard work is already done:**
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Coherence metrics | ✅ Implemented | `coherence_tracker.py` |
+| Drift detection | ✅ Implemented | `CoherenceEngine.detect_drift()` |
+| Intervention triggers | ✅ Implemented | `CoherenceEngine.check_intervention()` |
+| Early stopping | 🔄 Just wire to streaming | Apply existing checks to callback |
+
+The *structural innovation* (what to measure, how to detect drift) exists. Streaming is just *when* to apply it.
+
+**The key insight:**
+
+```
+❌ Streaming coherence thinking:
+   "Let the agent start, then stop it mid-stream if it drifts"
+   (Reactive, wastes tokens, confusing UX)
+
+✅ Our approach:
+   "Gate actions BEFORE they start using ConfidenceGate"
+   (Proactive, saves tokens, clear UX)
+```
+
+**When streaming coherence would actually help:**
+
+| Use Case | Value | Our Alternative |
+|----------|-------|-----------------|
+| Long-form (10K+ tokens) | High | Chunked generation with turn-level checks |
+| Real-time chatbots | Medium | Turn-level checks are fast enough |
+| Code generation | Medium | Post-generation validation is cleaner |
+| Short responses (<500 tokens) | Low | Turn-level is sufficient |
+
+**If you need streaming coherence:**
+
+Wire our existing metrics to your streaming callback:
+```python
+from symbolu.agentic_framework import CoherenceEngine
+
+engine = CoherenceEngine()
+
+def on_token(token: str, accumulated: str):
+    # Check coherence periodically (e.g., every 100 tokens)
+    if len(accumulated) % 100 == 0:
+        metrics = engine.compute_metrics(accumulated, context)
+        if metrics.internal_consistency < 0.4:
+            raise StopGeneration("Coherence degraded")
+```
+
+The framework provides the *what* (coherence metrics). Streaming is just the *when* - and for 95% of use cases, turn-level checking is sufficient.
+
+---
+
 ## Real-World Use Cases
 
 ### 1. Customer Support Bot
