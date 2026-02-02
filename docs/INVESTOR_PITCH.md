@@ -62,6 +62,10 @@ Symbolu delivers **dramatic cost reductions** across every dimension of enterpri
 │   ▏                                                          $0/year           │
 │   └── Pure symbolic processing                              (100% savings)     │
 │                                                                                 │
+│   SENTINEL AGENTIC FRAMEWORK (Autonomous Agents)                               │
+│   ████                                                       $72,000/year      │
+│   └── Safety-gated automation + local critics               (93% savings)      │
+│                                                                                 │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -101,13 +105,13 @@ Symbolu delivers **dramatic cost reductions** across every dimension of enterpri
 
 ### Infrastructure Cost Comparison
 
-| Infrastructure | Traditional LLM | Symbolu Enterprise Search | Symbolu Enterprise Chat | Symbolu Cascade |
-|----------------|-----------------|---------------------------|-------------------------|-----------------|
-| **GPU Required** | 4-8× A100 ($200K+) | None ($0) | 1× A10 ($4K) | 1-2× A10 ($8K) |
-| **CPU Cores** | 32+ | 4 | 8 | 16 |
-| **RAM** | 64GB+ | 4GB | 16GB | 32GB |
-| **Monthly Cloud** | ~$5,000 | ~$100 | ~$500 | ~$1,500 |
-| **Annual Infra** | $60,000 | $1,200 | $6,000 | $18,000 |
+| Infrastructure | Traditional LLM | Symbolu Enterprise Search | Symbolu Enterprise Chat | Symbolu Cascade | Sentinel Agentic |
+|----------------|-----------------|---------------------------|-------------------------|-----------------|------------------|
+| **GPU Required** | 4-8× A100 ($200K+) | None ($0) | 1× A10 ($4K) | 1-2× A10 ($8K) | 1× A10 ($4K) |
+| **CPU Cores** | 32+ | 4 | 8 | 16 | 8 |
+| **RAM** | 64GB+ | 4GB | 16GB | 32GB | 16GB |
+| **Monthly Cloud** | ~$5,000 | ~$100 | ~$500 | ~$1,500 | ~$500 |
+| **Annual Infra** | $60,000 | $1,200 | $6,000 | $18,000 | $6,000 |
 
 ### Total Cost of Ownership (TCO) Analysis
 
@@ -727,6 +731,169 @@ DeepSeek and other models have no feedback mechanism for generation stability. S
 
 ---
 
+## Sentinel: Safe Agentic AI Framework
+
+### The Agentic AI Challenge
+
+Current agentic frameworks face a fundamental problem: **autonomy without safety**. Agents that can take actions are either too dangerous (AutoGPT) or too limited (simple chatbots).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         THE AGENTIC AI DILEMMA                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   DANGEROUS AUTONOMY (AutoGPT, etc.)                                            │
+│   ─────────────────────────────────                                             │
+│   Agent decides what to do → Executes → Hope for the best                       │
+│   ✗ No confidence gates                                                         │
+│   ✗ No safety contracts                                                         │
+│   ✗ Unpredictable behavior                                                      │
+│                                                                                  │
+│   LIMITED ASSISTANTS (Chatbots)                                                 │
+│   ────────────────────────────                                                  │
+│   User asks → Agent responds → User acts                                        │
+│   ✗ No autonomy                                                                 │
+│   ✗ No proactive behavior                                                       │
+│   ✗ Human bottleneck                                                            │
+│                                                                                  │
+│   SENTINEL (Safe Autonomy)                                                      │
+│   ────────────────────────                                                      │
+│   Agent proposes → Confidence gate → Safety check → Execute or escalate        │
+│   ✓ Gated autonomy                                                              │
+│   ✓ Proactive with guardrails                                                   │
+│   ✓ Human-in-loop when needed                                                   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Sentinel Architecture: Ten Core Components
+
+| # | Component | Purpose | Differentiation |
+|---|-----------|---------|-----------------|
+| 1 | **Goal Decomposition** | Understand user intent | Structured action plans |
+| 2 | **Memory Store** | Persistent context | Semantic search built-in |
+| 3 | **Reflective Loop** | Self-revision | Mandatory, not optional |
+| 4 | **Coherence Tracker** | Monitor consistency | 7 metrics, drift detection |
+| 5 | **Safety Contract** | Gate actions | Fail-closed design |
+| 6 | **Local Critic** | Cheap evaluation | **100x cost reduction** |
+| 7 | **Adaptive Policy** | Learn from sessions | Structural leverage |
+| 8 | **Confidence Gate** | Behavioral control | Controls, not annotates |
+| 9 | **MCP Gateway** | Tool integration | Risk-classified execution |
+| 10 | **Proactive Scheduler** | Autonomous tasks | min_confidence gated |
+
+### Key Innovation: Confidence-Gated Proactivity
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    CONFIDENCE-GATED PROACTIVITY                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   Traditional Proactivity:                                                      │
+│   Agent wants to help → Does something → Maybe good, maybe disaster             │
+│                                                                                  │
+│   Sentinel Proactivity:                                                         │
+│   Agent wants to help                                                           │
+│        │                                                                        │
+│        ▼                                                                        │
+│   ┌──────────────────┐                                                         │
+│   │ Confidence Gate  │  min_confidence = 0.7                                   │
+│   │ (8 signal sources)│                                                         │
+│   └────────┬─────────┘                                                         │
+│            │                                                                    │
+│   ┌────────┴────────┐                                                          │
+│   │                 │                                                           │
+│   ▼                 ▼                                                           │
+│   Confident      Uncertain                                                      │
+│   (≥0.7)         (<0.7)                                                        │
+│   │               │                                                             │
+│   ▼               ▼                                                             │
+│   Execute      Escalate to Human                                               │
+│                                                                                  │
+│   KEY INSIGHT: min_confidence turns liability into feature                      │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### MCP Gateway: Industry-Standard Tool Integration
+
+Sentinel uses the **Model Context Protocol (MCP)** - adopted by OpenAI, Google, and Linux Foundation - for tool integration:
+
+| Risk Level | Examples | Min Confidence | Human Escalation |
+|------------|----------|----------------|------------------|
+| **READ_ONLY** | list_files, search | 0.30 | Never |
+| **WRITE** | create_file, update | 0.50 | If uncertain |
+| **EXECUTE** | run_script, send_email | 0.70 | Often |
+| **DESTRUCTIVE** | delete_files, drop_table | 0.85 | Always confirm |
+| **PRIVILEGED** | admin_access | 0.95 | Always confirm |
+
+### Proactive Scheduler: Safe Automation
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                       PROACTIVE SCHEDULER                                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   Safety Constraints:                                                           │
+│   ─────────────────                                                             │
+│   • Default = OFF (must explicitly enable)                                      │
+│   • min_confidence = 0.7 (every task must meet threshold)                       │
+│   • Cron-style only (no reactive loops)                                         │
+│   • Full audit trail (every execution logged)                                   │
+│   • MCP Gateway integration (reuses safety stack)                               │
+│                                                                                  │
+│   Example Usage:                                                                │
+│   ─────────────                                                                 │
+│   scheduler = create_proactive_scheduler(gateway, enabled=True)                 │
+│   scheduler.add_task(create_task(                                              │
+│       name="daily_backup",                                                      │
+│       schedule="0 2 * * *",      # 2 AM daily                                  │
+│       tool_name="backup_database",                                             │
+│       min_confidence=0.8,        # Higher for important tasks                  │
+│   ))                                                                            │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Local Critic: 100x Cost Reduction
+
+| Method | Cost per 1,000 Evaluations | Speed |
+|--------|---------------------------|-------|
+| GPT-4 API | $30.00 | 500ms |
+| Claude API | $15.00 | 400ms |
+| **Local Phi-3 (Sentinel)** | **$0.10** | **150ms** |
+| Rule-based | $0.00 | 1ms |
+
+### Sentinel vs Competitors
+
+| Framework | Safety | Autonomy | Cost Control | Score |
+|-----------|--------|----------|--------------|-------|
+| **AutoGPT** | ❌ None | ✓ High | ❌ High costs | 5/10 |
+| **LangChain** | ⚠️ User-added | ⚠️ Limited | ❌ High costs | 6/10 |
+| **CrewAI** | ⚠️ Basic | ✓ Multi-agent | ❌ High costs | 6/10 |
+| **OpenAI Assistants** | ⚠️ Basic | ⚠️ Limited | ❌ Vendor lock | 6.5/10 |
+| **Sentinel** | ✓ Built-in | ✓ Gated | ✓ Local critics | **7.5-8/10** |
+
+### Production Metrics
+
+| Metric | Value |
+|--------|-------|
+| **Total Tests** | 421 passing |
+| **Components** | 10 core modules |
+| **Version** | 1.5.0 |
+| **Test Coverage** | All components |
+
+### Sentinel Use Cases
+
+| Use Case | Value Proposition |
+|----------|-------------------|
+| **Workflow Automation** | Scheduled tasks with safety gates |
+| **DevOps Agents** | Safe infrastructure automation |
+| **Customer Support** | Autonomous ticket routing/resolution |
+| **Data Pipeline** | Monitored ETL with human escalation |
+| **Compliance Workflows** | Audit-ready automated processes |
+
+---
+
 ## The Problem: Enterprise AI is Broken
 
 ### Current State of Enterprise AI
@@ -825,30 +992,38 @@ This enables:
 
 ## High-Level Architecture
 
-### Three-Tier Deployment Model
+### Four-Product Portfolio
 
-Symbolu offers three deployment tiers with increasing capability and cost:
+Symbolu offers four products addressing different enterprise AI needs:
 
-#### Tier 1: Enterprise Search
+#### Product 1: Enterprise Search
 - **Processing**: Pure symbolic (10D STL)
 - **Latency**: ~0.15ms average
 - **Cost**: $0 per query
 - **Use Cases**: Intent classification, document filtering, search routing, audit trails
 - **Best For**: High-volume, simple queries
 
-#### Tier 2: Enterprise Chat
+#### Product 2: Enterprise Chat
 - **Processing**: STL + 7B specialist models
 - **Latency**: ~500ms average
 - **Cost**: ~$0.001 per query
 - **Use Cases**: Specialized chat, domain expertise, customer support
 - **Best For**: Balanced cost and capability
 
-#### Tier 3: Cascade
+#### Product 3: Cascade
 - **Processing**: STL + 768D embeddings + LLM fallback
 - **Latency**: 100ms - 1s depending on routing
 - **Cost**: ~$0.005 per query average
 - **Use Cases**: Full capability, complex reasoning, edge cases
 - **Best For**: Quality-critical applications
+
+#### Product 4: Sentinel Agentic Framework
+- **Processing**: Safety-gated LLM agents with local critics
+- **Latency**: Variable (depends on task complexity)
+- **Cost**: ~$0.002 per query average (100x savings via local critics)
+- **Use Cases**: Autonomous workflows, scheduled tasks, tool integration
+- **Best For**: Enterprise automation with safety requirements
+- **Game Changer Score**: 7.5-8/10
 
 ### Core System Components
 
@@ -1320,6 +1495,6 @@ For investment inquiries and technical demonstrations, please contact the Symbol
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: January 2026*
-*Includes: AGI Architecture, SRK, VL-JEPA, 32D Sovereign State, Industry Comparison*
+*Document Version: 3.0*
+*Last Updated: February 2026*
+*Includes: AGI Architecture, SRK, VL-JEPA, 32D Sovereign State, Industry Comparison, Sentinel Agentic Framework*
