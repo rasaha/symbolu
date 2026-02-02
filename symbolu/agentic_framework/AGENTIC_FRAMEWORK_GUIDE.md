@@ -20,10 +20,11 @@ This framework adds a "management layer" that helps AI assistants:
 - **Be cost-effective** (local critic for cheap reflection)
 - **Learn from experience** (adaptive policy engine)
 - **Act on confidence, not display it** (confidence gate)
+- **Safely use external tools** (MCP gateway)
 
 ---
 
-## The Eight Core Components
+## The Nine Core Components
 
 ### 1. Goal Decomposition (The "What Do You Really Want?" Module)
 
@@ -463,6 +464,185 @@ permissive_gate = create_permissive_confidence_gate()
 - Budget allocation ensures uncertain responses get more scrutiny
 - Memory gating prevents low-confidence responses from polluting context
 - Action gating provides defense-in-depth beyond safety contracts
+
+---
+
+### 9. MCP Gateway (The "Safe Tool Integration" Module)
+
+**Plain English:** Safely connects AI agents to external tools (file systems, databases, APIs) using the industry-standard Model Context Protocol (MCP), with risk-based access control.
+
+**This Is NOT Wide-Open Tool Access:**
+```
+❌ Dangerous Approach:
+   Agent wants to delete files → Call MCP → Files deleted
+   (No oversight. Hope for the best.)
+
+✅ Our Approach:
+   Agent wants to delete files → Classify risk → Check confidence → Gate execution
+   (Every tool call goes through ConfidenceGate + SafetyContract)
+```
+
+**Tool Risk Levels:**
+
+| Risk Level | Examples | Min Confidence | Human Escalation |
+|------------|----------|----------------|------------------|
+| **READ_ONLY** | list_files, search, get_config | 0.30 | Never |
+| **WRITE** | create_file, update_record | 0.50 | If uncertain |
+| **EXECUTE** | run_script, send_email | 0.70 | Often |
+| **DESTRUCTIVE** | delete_files, drop_table | 0.85 | Always confirm |
+| **PRIVILEGED** | admin_access, modify_permissions | 0.95 | Always confirm |
+
+**How It Works:**
+
+```
+Tool Call Request
+       │
+       ▼
+┌─────────────────┐
+│ Risk Classifier │  ← Classifies tool by name/description
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Confidence Gate │  ← Checks signals meet min_confidence
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Safety Contract │  ← Verifies preconditions met
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Human Escalation│  ← If destructive/privileged, confirm
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Execute + Log  │  ← Call MCP with timeout, audit trail
+└─────────────────┘
+```
+
+**Example Flow:**
+
+```
+User: "Delete all temporary files"
+
+Step 1: Parse tool call
+  - Tool: "delete_files"
+  - Args: {"pattern": "*.tmp"}
+
+Step 2: Classify risk
+  - Name "delete" matches DESTRUCTIVE patterns
+  - Risk level: DESTRUCTIVE
+
+Step 3: Build confidence signals
+  - Quality: 0.7 (clear request)
+  - Coherence: 0.8 (consistent context)
+  - Action reversibility: 0.0 (can't undelete)
+  - Action complexity: 0.8 (multiple files)
+
+Step 4: Check ConfidenceGate
+  - Min confidence for DESTRUCTIVE: 0.85
+  - Current confidence: 0.58
+  - Requires: HUMAN_CONFIRMATION
+
+Step 5: Escalate to human
+  - "This will delete all .tmp files. Confirm? [y/n]"
+
+Step 6: If confirmed → Execute with audit log
+  - Timestamp, tool, args, result, user confirmation
+```
+
+**Usage:**
+
+```python
+from symbolu.agentic_framework import (
+    SafeMCPGateway,
+    MCPToolCall,
+    create_safe_mcp_gateway,
+    create_mock_mcp_gateway,
+)
+
+# Create gateway with your MCP client
+gateway = create_safe_mcp_gateway(
+    mcp_client=your_mcp_client,
+    default_timeout=30.0,
+)
+
+# Or use mock for testing
+gateway = create_mock_mcp_gateway()
+
+# Call a tool
+tool_call = MCPToolCall(
+    tool_name="read_file",
+    arguments={"path": "/data/config.json"},
+)
+
+# Gateway handles: risk classification → confidence check → safety check → execute
+result = await gateway.call_tool(tool_call)
+
+if result.success:
+    print(result.result)
+else:
+    print(f"Blocked: {result.error}")
+```
+
+**With Custom Confidence Signals:**
+
+```python
+from symbolu.agentic_framework import ConfidenceSignals
+
+# Provide context for better gating decisions
+signals = ConfidenceSignals(
+    quality_score=0.9,
+    coherence_score=0.85,
+    action_complexity=0.6,
+    action_reversibility=0.8,  # Can be undone
+)
+
+result = await gateway.call_tool(tool_call, signals=signals)
+```
+
+**Human Confirmation Callback:**
+
+```python
+async def ask_user(question: str) -> bool:
+    response = input(f"{question} [y/n]: ")
+    return response.lower() == 'y'
+
+gateway = create_safe_mcp_gateway(
+    mcp_client=client,
+    human_confirmation_callback=ask_user,
+)
+
+# For destructive/privileged tools, callback will be invoked
+result = await gateway.call_tool(MCPToolCall(
+    tool_name="delete_database",
+    arguments={"name": "production"},
+))
+```
+
+**Audit Trail:**
+
+```python
+# Get all audit entries
+audit_log = gateway.get_audit_log()
+
+for entry in audit_log:
+    print(f"{entry.timestamp}: {entry.tool_name}")
+    print(f"  Risk: {entry.risk_level}")
+    print(f"  Result: {'Success' if entry.success else entry.error}")
+    print(f"  Confirmed: {entry.human_confirmed}")
+```
+
+**Why It Matters:**
+- **Industry standard:** MCP is adopted by OpenAI, Google, Linux Foundation
+- **Risk-aware:** Tools classified by danger level, not treated uniformly
+- **Gated execution:** Every tool call through ConfidenceGate before execution
+- **Audit trail:** Full logging for compliance and debugging
+- **Human-in-loop:** Destructive actions require explicit confirmation
+- **Fail-closed:** If uncertain, block the action
 
 ---
 
@@ -932,6 +1112,7 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | **Local Critic** | **Cheap quality evaluation** | **100x cost reduction** |
 | **Adaptive Policy** | **Learns from experience** | **Structural leverage, not logs** |
 | **Confidence Gate** | **Behavioral confidence control** | **Confidence controls, not annotates** |
+| **MCP Gateway** | **Safe tool integration** | **Risk-gated MCP access** |
 
 **Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
 

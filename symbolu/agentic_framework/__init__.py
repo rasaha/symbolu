@@ -12,6 +12,7 @@ A framework for building agentic AI systems that wrap existing LLM APIs
 6. Local Critic - Cost-optimized quality evaluation (10-100x cheaper)
 7. Adaptive Policy Engine - Policy-level memory that modifies behavior
 8. Confidence Gate - Behavioral confidence control (gates execution, not annotations)
+9. MCP Gateway - Safe tool integration with risk-based access control
 
 Usage:
     from symbolu.agentic_framework import AgenticLLMWrapper
@@ -90,6 +91,18 @@ from symbolu.agentic_framework.confidence_gate import (
     signals_from_policy_decision,
     merge_signals,
 )
+from symbolu.agentic_framework.mcp_gateway import (
+    SafeMCPGateway,
+    MCPToolCall,
+    MCPToolResult,
+    ToolRiskLevel,
+    ToolRiskClassifier,
+    AuditEntry,
+    MCPClientInterface,
+    MockMCPClient,
+    create_safe_mcp_gateway,
+    create_mock_mcp_gateway,
+)
 
 __all__ = [
     # Main agent
@@ -154,6 +167,17 @@ __all__ = [
     "signals_from_coherence_metrics",
     "signals_from_policy_decision",
     "merge_signals",
+    # MCP Gateway (safe tool integration)
+    "SafeMCPGateway",
+    "MCPToolCall",
+    "MCPToolResult",
+    "ToolRiskLevel",
+    "ToolRiskClassifier",
+    "AuditEntry",
+    "MCPClientInterface",
+    "MockMCPClient",
+    "create_safe_mcp_gateway",
+    "create_mock_mcp_gateway",
 ]
 
-__version__ = "1.3.0"  # Added Confidence Gate (behavioral control)
+__version__ = "1.4.0"  # Added MCP Gateway (safe tool integration)
