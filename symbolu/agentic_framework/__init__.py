@@ -11,6 +11,7 @@ A framework for building agentic AI systems that wrap existing LLM APIs
 5. Safety Contract - Fail-closed action gating
 6. Local Critic - Cost-optimized quality evaluation (10-100x cheaper)
 7. Adaptive Policy Engine - Policy-level memory that modifies behavior
+8. Confidence Gate - Behavioral confidence control (gates execution, not annotations)
 
 Usage:
     from symbolu.agentic_framework import AgenticLLMWrapper
@@ -70,6 +71,25 @@ from symbolu.agentic_framework.adaptive_policy import (
     PerformanceSnapshot,
     create_adaptive_policy_engine,
 )
+from symbolu.agentic_framework.confidence_gate import (
+    ConfidenceGate,
+    ConfidenceSignals,
+    UnifiedConfidence,
+    EscalationLevel,
+    EscalationDecision,
+    ExecutionMode,
+    ExecutionPermission,
+    BudgetAllocation,
+    MemoryWeight,
+    ConfidenceGateDecision,
+    create_confidence_gate,
+    create_strict_confidence_gate,
+    create_permissive_confidence_gate,
+    signals_from_critique,
+    signals_from_coherence_metrics,
+    signals_from_policy_decision,
+    merge_signals,
+)
 
 __all__ = [
     # Main agent
@@ -116,6 +136,24 @@ __all__ = [
     "SessionPerformanceHistory",
     "PerformanceSnapshot",
     "create_adaptive_policy_engine",
+    # Confidence Gate (behavioral confidence control)
+    "ConfidenceGate",
+    "ConfidenceSignals",
+    "UnifiedConfidence",
+    "EscalationLevel",
+    "EscalationDecision",
+    "ExecutionMode",
+    "ExecutionPermission",
+    "BudgetAllocation",
+    "MemoryWeight",
+    "ConfidenceGateDecision",
+    "create_confidence_gate",
+    "create_strict_confidence_gate",
+    "create_permissive_confidence_gate",
+    "signals_from_critique",
+    "signals_from_coherence_metrics",
+    "signals_from_policy_decision",
+    "merge_signals",
 ]
 
-__version__ = "1.2.0"  # Added Adaptive Policy Engine
+__version__ = "1.3.0"  # Added Confidence Gate (behavioral control)

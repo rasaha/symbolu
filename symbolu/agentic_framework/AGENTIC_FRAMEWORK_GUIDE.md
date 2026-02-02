@@ -19,10 +19,11 @@ This framework adds a "management layer" that helps AI assistants:
 - **Stay within safe boundaries** (safety contracts)
 - **Be cost-effective** (local critic for cheap reflection)
 - **Learn from experience** (adaptive policy engine)
+- **Act on confidence, not display it** (confidence gate)
 
 ---
 
-## The Seven Core Components
+## The Eight Core Components
 
 ### 1. Goal Decomposition (The "What Do You Really Want?" Module)
 
@@ -315,6 +316,153 @@ print(f"Trajectory: {decision.trajectory}")
 - Provides structural leverage, not commodity log retrieval
 - Based on CTM+ (Coherence Tier Memory) research
 - Enables true adaptive behavior without retraining
+
+---
+
+### 8. Confidence Gate (The "Confidence That Controls Behavior" Module)
+
+**Plain English:** Confidence scores that actually CONTROL what the AI does, not just numbers displayed to users.
+
+**This Is NOT Cosmetic Confidence:**
+```
+❌ Cosmetic Approach:
+   Generate response → Compute confidence → Display "85% confident"
+   (User sees a number. Nothing changes.)
+
+✅ Behavioral Approach:
+   Generate response → Compute confidence → Gate execution
+   (Low confidence = more revisions, human escalation, blocked actions)
+```
+
+**What Confidence Actually Controls:**
+
+| Control | Low Confidence | High Confidence |
+|---------|---------------|-----------------|
+| **Escalation** | HALT or CONFIRM required | No escalation |
+| **Revisions** | 5 max, 75% quality bar | 2 max, 85% quality bar |
+| **Memory** | Don't store (pollutes context) | Store permanently |
+| **Execution** | BLOCKED or require confirmation | FULL execution |
+| **Attention** | 1.5x compute budget | 0.9x compute budget |
+
+**Escalation Levels:**
+
+```
+Confidence ≥ 0.75  →  NONE      (Proceed normally)
+0.55 ≤ C < 0.75    →  NOTIFY    (Inform human, but proceed)
+0.35 ≤ C < 0.55    →  CONFIRM   (Require human confirmation)
+C < 0.35           →  HALT      (Stop and wait for human)
+```
+
+**Confidence Signal Sources:**
+
+The gate aggregates existing signals from the framework:
+
+| Signal Source | Signals Used |
+|--------------|--------------|
+| QualityCritique | overall_score, coherence, correctness |
+| CoherenceMetrics | internal_consistency, goal_alignment, volatility |
+| AdaptivePolicyEngine | trajectory_confidence, session_stability |
+| Action Analysis | complexity, reversibility |
+
+**Example Flow:**
+
+```
+User: "Delete all files in /home"
+
+Step 1: Aggregate signals
+  - Quality score: 0.6 (ambiguous request)
+  - Coherence: 0.7 (consistent with context)
+  - Action reversibility: 0.0 (irreversible!)
+  - Action complexity: 0.9 (high risk)
+
+Step 2: Compute unified confidence
+  - Overall confidence: 0.38 (weighted average)
+
+Step 3: Gate decisions
+  - Escalation: CONFIRM (requires human confirmation)
+  - Execution: BLOCKED (irreversible + low confidence)
+  - Memory: Don't store
+  - Budget: 5 revisions allowed, self-check required
+
+Result: "I need confirmation before deleting files. This action is irreversible."
+```
+
+**Usage:**
+
+```python
+from symbolu.agentic_framework import (
+    ConfidenceGate,
+    ConfidenceSignals,
+    create_confidence_gate,
+    create_strict_confidence_gate,
+    signals_from_critique,
+    signals_from_coherence_metrics,
+    merge_signals,
+)
+
+# Create gate (or use create_strict_confidence_gate() for high-stakes)
+gate = create_confidence_gate()
+
+# Build signals from existing framework components
+critique_signals = signals_from_critique(quality_critique)
+coherence_signals = signals_from_coherence_metrics(coherence_metrics)
+combined = merge_signals(critique_signals, coherence_signals)
+
+# Add action-specific signals
+combined.action_complexity = 0.9      # High complexity
+combined.action_reversibility = 0.0   # Cannot undo
+
+# Get gating decision
+decision = gate.evaluate(combined, action="file_delete")
+
+# Use the decision
+if decision.escalation.requires_human:
+    await get_human_confirmation(decision.escalation.suggested_questions)
+
+if decision.execution.can_execute:
+    execute_action()
+else:
+    explain_instead()
+
+if decision.memory.should_store:
+    store_with_weight(decision.memory.retention_weight)
+```
+
+**Quick Check for Simple Cases:**
+
+```python
+# Fast check with just quality and coherence
+can_proceed, reason = gate.quick_check(
+    quality_score=0.8,
+    coherence_score=0.9,
+    action="search"
+)
+
+if not can_proceed:
+    print(f"Blocked: {reason}")
+```
+
+**Preset Configurations:**
+
+```python
+# Standard gate (balanced)
+standard_gate = create_confidence_gate()
+
+# Strict gate (high-stakes applications)
+strict_gate = create_strict_confidence_gate()
+# Thresholds: halt=0.45, confirm=0.65, notify=0.85
+
+# Permissive gate (rapid prototyping)
+permissive_gate = create_permissive_confidence_gate()
+# Thresholds: halt=0.20, confirm=0.40, notify=0.60
+```
+
+**Why It Matters:**
+- Confidence CONTROLS behavior, doesn't just annotate output
+- Automatic escalation prevents AI from acting on uncertain decisions
+- Budget allocation ensures uncertain responses get more scrutiny
+- Memory gating prevents low-confidence responses from polluting context
+- Action gating provides defense-in-depth beyond safety contracts
 
 ---
 
@@ -652,8 +800,9 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | Safety Contract | Gates dangerous actions | Prevents harmful outcomes |
 | **Local Critic** | **Cheap quality evaluation** | **100x cost reduction** |
 | **Adaptive Policy** | **Learns from experience** | **Structural leverage, not logs** |
+| **Confidence Gate** | **Behavioral confidence control** | **Confidence controls, not annotates** |
 
-**Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference.
+**Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
 
 ---
 
