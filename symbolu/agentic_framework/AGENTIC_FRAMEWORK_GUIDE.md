@@ -523,6 +523,65 @@ permissive_gate = create_permissive_confidence_gate()
 
 ---
 
+## Design Decisions: What We Don't Include
+
+### Tool Use With Rollback
+
+**Status:** Not implemented as a core component
+
+**What it would include:**
+- Sandboxed execution (Docker, subprocess isolation)
+- Undo/rollback capabilities
+- Compensating actions for failed operations
+
+**Why we don't include it:**
+
+This is **commodity infrastructure**, not a differentiator. Every serious agentic framework will have these capabilities - they're table stakes, not a competitive advantage.
+
+| Component | Status | Reasoning |
+|-----------|--------|-----------|
+| Sandboxed execution | Use existing tools | Docker, VMs, chroot are decades old and well-solved |
+| File undo | Trivial to add | Git-style snapshots, backup-before-modify |
+| Compensating actions | Standard patterns | Saga pattern (1987), database transactions (1970s) |
+
+**The key insight:**
+
+```
+❌ Infrastructure thinking:
+   "We need rollback because agents make mistakes"
+   (Everyone has this. No moat.)
+
+✅ Our approach:
+   "We prevent mistakes through behavioral confidence gating"
+   (ConfidenceGate + SafetyContract block risky actions BEFORE execution)
+```
+
+**What we do instead:**
+
+1. **Prevention over recovery:** ConfidenceGate blocks low-confidence actions
+2. **Escalation over rollback:** Uncertain actions require human confirmation
+3. **Safety contracts:** Irreversible actions are blocked unless explicitly permitted
+
+**If you need rollback:**
+
+Use existing, proven tools:
+```python
+# For file operations
+import shutil
+shutil.copy(file_path, f"{file_path}.backup")  # Before modification
+
+# For subprocess isolation
+import subprocess
+subprocess.run(cmd, timeout=30)  # With timeout
+
+# For full isolation
+# Use Docker or similar containerization
+```
+
+The framework's value is **making AI reliable through behavioral control** - not reinventing container orchestration or transaction management.
+
+---
+
 ## Real-World Use Cases
 
 ### 1. Customer Support Bot
