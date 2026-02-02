@@ -21,10 +21,11 @@ This framework adds a "management layer" that helps AI assistants:
 - **Learn from experience** (adaptive policy engine)
 - **Act on confidence, not display it** (confidence gate)
 - **Safely use external tools** (MCP gateway)
+- **Execute tasks autonomously** (proactive scheduler)
 
 ---
 
-## The Nine Core Components
+## The Ten Core Components
 
 ### 1. Goal Decomposition (The "What Do You Really Want?" Module)
 
@@ -646,6 +647,100 @@ for entry in audit_log:
 
 ---
 
+### 10. Proactive Scheduler (The "Autonomous Task Execution" Module)
+
+**Plain English:** Executes tasks autonomously on a schedule, with the same safety controls as interactive actions.
+
+**This Is NOT Uncontrolled Automation:**
+```
+❌ Dangerous Approach:
+   Agent decides to "help" by cleaning up files every hour
+   (No oversight. Agent does whatever it thinks is helpful.)
+
+✅ Our Approach:
+   User explicitly defines scheduled tasks with confidence thresholds
+   (Default OFF. Explicit schedules. Full audit trail.)
+```
+
+**Key Safety Constraints:**
+
+| Constraint | Why It Matters |
+|------------|---------------|
+| **Default = OFF** | Must explicitly enable scheduler |
+| **min_confidence = 0.7** | Every task must meet confidence threshold |
+| **Cron-style only** | No reactive loops or event triggers |
+| **Explicit schedules** | User defines exactly when tasks run |
+| **Full audit trail** | Every execution logged |
+| **MCP Gateway integration** | Reuses existing safety infrastructure |
+
+**Usage:**
+
+```python
+from symbolu.agentic_framework import (
+    create_proactive_scheduler,
+    create_mock_mcp_gateway,
+    create_task,
+)
+
+# Create gateway and scheduler
+gateway = create_mock_mcp_gateway()
+scheduler = create_proactive_scheduler(
+    mcp_gateway=gateway,
+    enabled=True,  # Must explicitly enable
+)
+
+# Schedule a task
+task = create_task(
+    name="daily_backup",
+    schedule="0 2 * * *",  # 2 AM daily (cron syntax)
+    tool_name="backup_database",
+    parameters={"target": "production"},
+    min_confidence=0.8,  # Higher threshold for important tasks
+)
+scheduler.add_task(task)
+
+# Run scheduler
+await scheduler.run()  # Runs continuously, checking every minute
+```
+
+**With Human Review:**
+
+```python
+# High-risk tasks can require human approval
+task = ScheduledTask(
+    name="weekly_cleanup",
+    schedule="0 3 * * 0",  # Sunday 3 AM
+    tool_name="delete_old_logs",
+    parameters={"older_than_days": 30},
+    require_human_review=True,  # Human must approve before execution
+)
+```
+
+**Monitoring:**
+
+```python
+# Check execution history
+history = scheduler.get_execution_history(
+    task_name="daily_backup",
+    success_only=True,
+    limit=10,
+)
+
+# Get statistics
+stats = scheduler.get_statistics()
+print(f"Success rate: {stats['success_rate']:.1%}")
+print(f"Enabled tasks: {stats['enabled_tasks']}")
+```
+
+**Why It Matters:**
+- **Proactivity + MCP = real automation** (not just a demo)
+- **min_confidence: 0.7** turns liability into feature
+- **Explicit schedules** prevent runaway automation
+- **Audit trail** enables debugging and compliance
+- **Same safety stack** as interactive actions
+
+---
+
 ## How It All Works Together
 
 ```
@@ -1113,6 +1208,7 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | **Adaptive Policy** | **Learns from experience** | **Structural leverage, not logs** |
 | **Confidence Gate** | **Behavioral confidence control** | **Confidence controls, not annotates** |
 | **MCP Gateway** | **Safe tool integration** | **Risk-gated MCP access** |
+| **Proactive Scheduler** | **Autonomous task execution** | **Scheduled automation with safety** |
 
 **Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
 

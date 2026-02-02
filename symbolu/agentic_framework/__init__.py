@@ -13,6 +13,7 @@ A framework for building agentic AI systems that wrap existing LLM APIs
 7. Adaptive Policy Engine - Policy-level memory that modifies behavior
 8. Confidence Gate - Behavioral confidence control (gates execution, not annotations)
 9. MCP Gateway - Safe tool integration with risk-based access control
+10. Proactive Scheduler - Autonomous task execution with safety controls
 
 Usage:
     from symbolu.agentic_framework import AgenticLLMWrapper
@@ -103,6 +104,16 @@ from symbolu.agentic_framework.mcp_gateway import (
     create_safe_mcp_gateway,
     create_mock_mcp_gateway,
 )
+from symbolu.agentic_framework.proactive_scheduler import (
+    ProactiveScheduler,
+    ScheduledTask,
+    ExecutionRecord,
+    CronExpression,
+    TaskStatus,
+    ScheduleType,
+    create_proactive_scheduler,
+    create_task,
+)
 
 __all__ = [
     # Main agent
@@ -178,6 +189,15 @@ __all__ = [
     "MockMCPClient",
     "create_safe_mcp_gateway",
     "create_mock_mcp_gateway",
+    # Proactive Scheduler (autonomous task execution)
+    "ProactiveScheduler",
+    "ScheduledTask",
+    "ExecutionRecord",
+    "CronExpression",
+    "TaskStatus",
+    "ScheduleType",
+    "create_proactive_scheduler",
+    "create_task",
 ]
 
-__version__ = "1.4.0"  # Added MCP Gateway (safe tool integration)
+__version__ = "1.5.0"  # Added Proactive Scheduler (autonomous task execution)

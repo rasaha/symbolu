@@ -1,13 +1,13 @@
 # Agentic Framework Test Results
 
 **Date:** 2026-02-02
-**Version:** 1.4.0
+**Version:** 1.5.0
 **Status:** All Tests Passing
 
 ## Summary
 
 ```
-378 passed in 0.97s
+421 passed in 1.42s
 ```
 
 ## Test Coverage by Module
@@ -16,6 +16,7 @@
 |--------|-------|-------------|
 | `test_confidence_gate.py` | 74 | Behavioral confidence control |
 | `test_mcp_gateway.py` | 48 | Safe tool integration with MCP |
+| `test_proactive_scheduler.py` | 43 | Autonomous task execution |
 | `test_adaptive_policy.py` | 39 | Policy-level memory and adaptation |
 | `test_llm_adapters.py` | 35 | LLM client adapters and mocks |
 | `test_local_critic.py` | 33 | Cost-optimized local evaluation |
@@ -47,6 +48,7 @@
 | AdaptivePolicy | 39 | ✅ Pass |
 | ConfidenceGate | 74 | ✅ Pass |
 | MCPGateway | 48 | ✅ Pass |
+| ProactiveScheduler | 43 | ✅ Pass |
 
 ### Infrastructure
 
@@ -107,6 +109,71 @@ The MCP Gateway (v1.4.0) has comprehensive test coverage:
 - Empty parameters
 - Unknown tool classification
 - Audit disabled mode
+
+## Proactive Scheduler Test Details
+
+The Proactive Scheduler (v1.5.0) has comprehensive test coverage:
+
+### CronExpression Tests (8)
+- Valid expression parsing
+- Invalid expression rejection
+- Wildcard matching
+- Exact value matching
+- Range matching
+- Step value matching
+- Next run calculation
+- Same-day next run
+
+### ScheduledTask Tests (5)
+- Task creation with defaults
+- Minimum confidence validation (>= 0.5)
+- Custom confidence thresholds
+- Next run calculation
+- Serialization (to_dict)
+
+### Scheduler Creation Tests (3)
+- Default disabled state
+- Explicit enable
+- Enable/disable toggling
+
+### Task Management Tests (5)
+- Add task
+- Duplicate task rejection
+- Remove task
+- Get task by name
+- Enable/disable specific tasks
+
+### Due Tasks Tests (4)
+- Empty scheduler
+- Future tasks not due
+- Past tasks are due
+- Disabled tasks not due
+
+### Execution Tests (5)
+- Successful execution
+- Low confidence blocking
+- Human review without callback
+- Human review denied
+- Human review approved
+
+### Run Once Tests (2)
+- Disabled scheduler no-op
+- Enabled scheduler executes
+
+### History Tests (3)
+- Get execution history
+- Filter by task name
+- Filter by success/failure
+
+### Statistics Tests (2)
+- Get statistics
+- Success rate calculation
+
+### Factory and Serialization Tests (4)
+- create_proactive_scheduler factory
+- Default disabled from factory
+- ExecutionRecord serialization
+- Scheduler serialization
 
 ## Confidence Gate Test Details
 
@@ -175,6 +242,12 @@ python -m pytest symbolu/agentic_framework/tests/ -q
 - **Platform:** Linux
 
 ## Recent Changes
+
+### v1.5.0 (2026-02-02)
+- Added Proactive Scheduler with 43 tests
+- Autonomous task execution with safety controls
+- MCP Gateway integration for tool execution
+- Default OFF, min_confidence 0.7 safety constraints
 
 ### v1.4.0 (2026-02-02)
 - Added MCP Gateway with 48 tests
