@@ -46,6 +46,18 @@ from symbolu.agentic_framework.safety_contract import (
     SafetyContract,
     SafetyContractEvaluator,
 )
+from symbolu.agentic_framework.local_critic import (
+    LocalCritic,
+    OllamaBackend,
+    TransformersBackend,
+    LlamaCppBackend,
+    CostAwareCriticSelector,
+    SelectionStrategy,
+    create_ollama_critic,
+    create_transformers_critic,
+    create_llamacpp_critic,
+    create_cost_aware_critic,
+)
 
 __all__ = [
     # Main agent
@@ -72,6 +84,17 @@ __all__ = [
     # Safety
     "SafetyContract",
     "SafetyContractEvaluator",
+    # Local Critics (cheap reflection)
+    "LocalCritic",
+    "OllamaBackend",
+    "TransformersBackend",
+    "LlamaCppBackend",
+    "CostAwareCriticSelector",
+    "SelectionStrategy",
+    "create_ollama_critic",
+    "create_transformers_critic",
+    "create_llamacpp_critic",
+    "create_cost_aware_critic",
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"  # Added local critic support
