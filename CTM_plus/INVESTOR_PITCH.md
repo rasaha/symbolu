@@ -1,10 +1,10 @@
-# SymbolU: The Future of Efficient AI Computing
+# Cognade: The Future of Efficient AI Computing
 
 ## Solving the Trillion-Dollar AI Efficiency Crisis
 
 **The Problem:** Today's AI models are economically unsustainable. A single GPT-4 query costs 10x more than traditional search. At 100K queries/day, enterprises spend $1M+ annually on inference alone. The culprit? Quadratic attention complexity (O(n²)) that explodes memory and compute costs as context grows.
 
-**Our Solution:** SymbolU's Phase-Quad architecture delivers **O(n) linear complexity**—the same quality at a fraction of the cost. Combined with our CTM+ intelligent memory controller and purpose-built silicon, we enable AI deployment at scale without breaking the bank.
+**Our Solution:** Cognade's Phase-Quad architecture delivers **O(n) linear complexity**—the same quality at a fraction of the cost. Combined with our CTM+ intelligent memory controller and purpose-built silicon, we enable AI deployment at scale without breaking the bank.
 
 ---
 
@@ -116,7 +116,7 @@ Our chip architectures deliver 1000x improvements over GPU software implementati
 
 **Phase-Quad Model Results:**
 
-| Benchmark | Standard | SymbolU | Advantage |
+| Benchmark | Standard | Cognade | Advantage |
 |-----------|----------|---------|-----------|
 | WikiText-103 PPL | 21.46 (355M params) | 21.46 (162M params) | **54% fewer parameters** |
 | Long-Range Arena | 65% | **100%** | Pathfinder 8K solved |
@@ -172,7 +172,7 @@ Our chip architectures deliver 1000x improvements over GPU software implementati
 
 ## Summary
 
-SymbolU isn't incremental optimization—it's a fundamental rethinking of how AI computes attention. Our Phase-Quad architecture, CTM+ memory controller, and purpose-built silicon together deliver:
+Cognade isn't incremental optimization—it's a fundamental rethinking of how AI computes attention. Our Phase-Quad architecture, CTM+ memory controller, and purpose-built silicon together deliver:
 
 | Capability | Improvement |
 |------------|-------------|
