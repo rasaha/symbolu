@@ -1,5 +1,7 @@
 # Sentinel: A Layman's Guide
 
+**Version:** 1.5.0 | **Game Changer Score:** 7.5-8/10 | [Full Assessment](./docs/SENTINEL_SCORE.md)
+
 ## What Is Sentinel?
 
 Think of Sentinel as a **smart wrapper** that goes around existing AI assistants (like ChatGPT, Claude, or Gemini) to make them more reliable, self-aware, and safer.
@@ -1311,6 +1313,7 @@ quality_strategy = SelectionStrategy(
 
 ## Further Reading
 
+- **Game Changer Score:** See [SENTINEL_SCORE.md](./docs/SENTINEL_SCORE.md) for full assessment
 - **Implementation Details:** See `symbolu/agentic_framework/` source code
 - **Validation:** Run `python -m symbolu.agentic_framework.validate`
 - **Tests:** Run `pytest symbolu/agentic_framework/tests/ -v`
