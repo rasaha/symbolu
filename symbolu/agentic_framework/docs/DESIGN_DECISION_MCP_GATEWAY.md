@@ -6,7 +6,7 @@
 
 ## Summary
 
-The MCP Gateway provides safe integration with external tools using the Model Context Protocol (MCP), with risk-based access control that integrates with the framework's existing safety components.
+The MCP Gateway provides safe integration with external tools using the Model Context Protocol (MCP), with risk-based access control that integrates with Sentinel's existing safety components.
 
 ## Problem Statement
 
@@ -205,4 +205,4 @@ gateway = create_mock_mcp_gateway(strict=False, audit_enabled=True)
 
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)
 - [ConfidenceGate Design Decision](./DESIGN_DECISION_CONFIDENCE_GATE.md)
-- [Framework Guide - MCP Gateway Section](./AGENTIC_FRAMEWORK_GUIDE.md#9-mcp-gateway)
+- [Sentinel Guide - MCP Gateway Section](../AGENTIC_FRAMEWORK_GUIDE.md#9-mcp-gateway)

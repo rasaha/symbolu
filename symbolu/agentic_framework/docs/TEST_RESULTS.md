@@ -1,4 +1,4 @@
-# Agentic Framework Test Results
+# Sentinel Test Results
 
 **Date:** 2026-02-02
 **Version:** 1.5.0

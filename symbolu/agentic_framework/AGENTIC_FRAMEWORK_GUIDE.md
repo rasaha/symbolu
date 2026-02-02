@@ -1,8 +1,8 @@
-# Agentic LLM Framework: A Layman's Guide
+# Sentinel: A Layman's Guide
 
-## What Is This Framework?
+## What Is Sentinel?
 
-Think of this framework as a **smart wrapper** that goes around existing AI assistants (like ChatGPT, Claude, or Gemini) to make them more reliable, self-aware, and safer.
+Think of Sentinel as a **smart wrapper** that goes around existing AI assistants (like ChatGPT, Claude, or Gemini) to make them more reliable, self-aware, and safer.
 
 Imagine you hired a new employee. They're smart, but they:
 - Sometimes give answers without thinking them through
@@ -11,7 +11,7 @@ Imagine you hired a new employee. They're smart, but they:
 - Might take actions they shouldn't
 - Cost a fortune for simple questions
 
-This framework adds a "management layer" that helps AI assistants:
+Sentinel adds a "management layer" that helps AI assistants:
 - **Think before speaking** (reflective loop)
 - **Remember conversations** (memory store)
 - **Know what you actually want** (goal decomposition)
@@ -1043,7 +1043,7 @@ Us:         Smart routing: Local ($0.0001) → API ($0.01) only when needed
 
 ### vs. LangChain
 
-| Aspect | LangChain | Agentic LLM Framework |
+| Aspect | LangChain | Sentinel |
 |--------|-----------|----------------------|
 | Focus | Prompt chaining & tools | Quality & safety & cost |
 | Memory | External vector stores | Built-in with semantic search |
@@ -1057,7 +1057,7 @@ Us:         Smart routing: Local ($0.0001) → API ($0.01) only when needed
 
 ### vs. AutoGPT
 
-| Aspect | AutoGPT | Agentic LLM Framework |
+| Aspect | AutoGPT | Sentinel |
 |--------|---------|----------------------|
 | Autonomy | Fully autonomous | Human-in-loop preferred |
 | Safety | Limited guardrails | Fail-closed by default |
@@ -1070,7 +1070,7 @@ Us:         Smart routing: Local ($0.0001) → API ($0.01) only when needed
 
 ### vs. OpenAI Assistants API
 
-| Aspect | OpenAI Assistants | Agentic LLM Framework |
+| Aspect | OpenAI Assistants | Sentinel |
 |--------|-------------------|----------------------|
 | Provider | OpenAI only | Any LLM provider |
 | Memory | OpenAI-managed | User-controlled |
@@ -1210,7 +1210,7 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | **MCP Gateway** | **Safe tool integration** | **Risk-gated MCP access** |
 | **Proactive Scheduler** | **Autonomous task execution** | **Scheduled automation with safety** |
 
-**Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
+**Bottom Line:** Sentinel doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
 
 ---
 

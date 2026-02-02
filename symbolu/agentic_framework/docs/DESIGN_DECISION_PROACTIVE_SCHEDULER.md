@@ -6,7 +6,7 @@
 
 ## Summary
 
-The Proactive Scheduler enables autonomous task execution on explicit schedules with full safety controls. It integrates with MCP Gateway and ConfidenceGate to ensure proactive actions maintain the framework's safety guarantees.
+The Proactive Scheduler enables autonomous task execution on explicit schedules with full safety controls. It integrates with MCP Gateway and ConfidenceGate to ensure proactive actions maintain Sentinel's safety guarantees.
 
 ## Problem Statement
 
@@ -297,4 +297,4 @@ print(f"Total executions: {stats['total_executions']}")
 ## References
 
 - [MCP Gateway Design Decision](./DESIGN_DECISION_MCP_GATEWAY.md)
-- [Framework Guide - Proactive Scheduler Section](./AGENTIC_FRAMEWORK_GUIDE.md)
+- [Sentinel Guide - Proactive Scheduler Section](../AGENTIC_FRAMEWORK_GUIDE.md)

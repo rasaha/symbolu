@@ -88,7 +88,7 @@ tools:
 
 ### 2. Capability Allowlist
 
-Skills declare capabilities; framework verifies against allowlist:
+Skills declare capabilities; Sentinel verifies against allowlist:
 
 ```python
 ALLOWED_CAPABILITIES = {
@@ -230,7 +230,7 @@ registry.unregister("backup-tools")
 ### Runtime
 
 - Skills run in same process (no sandbox)
-- Capabilities enforced by framework, not isolation
+- Capabilities enforced by Sentinel, not isolation
 - Monitor skill behavior through audit logs
 
 ### Updates

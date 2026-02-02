@@ -1,5 +1,5 @@
 """
-Agentic LLM Framework
+Sentinel - Agentic LLM Framework
 
 A framework for building agentic AI systems that wrap existing LLM APIs
 (ChatGPT, Gemini, Claude, etc.) with:
