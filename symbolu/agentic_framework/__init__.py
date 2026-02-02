@@ -9,6 +9,8 @@ A framework for building agentic AI systems that wrap existing LLM APIs
 3. Reflective Generation - Self-revising responses with quality critic
 4. Coherence Tracking - Track conversation-level coherence metrics
 5. Safety Contract - Fail-closed action gating
+6. Local Critic - Cost-optimized quality evaluation (10-100x cheaper)
+7. Adaptive Policy Engine - Policy-level memory that modifies behavior
 
 Usage:
     from symbolu.agentic_framework import AgenticLLMWrapper
@@ -58,6 +60,16 @@ from symbolu.agentic_framework.local_critic import (
     create_llamacpp_critic,
     create_cost_aware_critic,
 )
+from symbolu.agentic_framework.adaptive_policy import (
+    AdaptivePolicyEngine,
+    SessionTrajectory,
+    ToolPermission,
+    PolicyDecision,
+    PolicyParameters,
+    SessionPerformanceHistory,
+    PerformanceSnapshot,
+    create_adaptive_policy_engine,
+)
 
 __all__ = [
     # Main agent
@@ -95,6 +107,15 @@ __all__ = [
     "create_transformers_critic",
     "create_llamacpp_critic",
     "create_cost_aware_critic",
+    # Adaptive Policy Engine (policy-level memory)
+    "AdaptivePolicyEngine",
+    "SessionTrajectory",
+    "ToolPermission",
+    "PolicyDecision",
+    "PolicyParameters",
+    "SessionPerformanceHistory",
+    "PerformanceSnapshot",
+    "create_adaptive_policy_engine",
 ]
 
-__version__ = "1.1.0"  # Added local critic support
+__version__ = "1.2.0"  # Added Adaptive Policy Engine

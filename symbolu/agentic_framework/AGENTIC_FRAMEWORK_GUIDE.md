@@ -18,10 +18,11 @@ This framework adds a "management layer" that helps AI assistants:
 - **Monitor their own quality** (coherence tracking)
 - **Stay within safe boundaries** (safety contracts)
 - **Be cost-effective** (local critic for cheap reflection)
+- **Learn from experience** (adaptive policy engine)
 
 ---
 
-## The Six Core Components
+## The Seven Core Components
 
 ### 1. Goal Decomposition (The "What Do You Really Want?" Module)
 
@@ -202,6 +203,118 @@ critic = create_cost_aware_critic(
 - 10-100x cost reduction without significant quality loss
 - Enables always-on quality monitoring that was previously too expensive
 - Keeps sensitive data local (no API calls for evaluation)
+
+---
+
+### 7. Adaptive Policy Engine (The "Learn From Experience" Module)
+
+**Plain English:** The AI learns from past interactions to improve future behavior - not by storing logs, but by adjusting its internal operating parameters.
+
+**This Is NOT Commodity Learning:**
+```
+❌ Commodity Approach:
+   Logs → Embeddings → RAG retrieval
+   (Everyone does this. No moat.)
+
+✅ Our Structural Approach:
+   Past Performance → Policy Parameters → Behavior Change
+   (Real leverage. Modifies budgets, thresholds, tool access.)
+```
+
+**What It Actually Modifies:**
+
+| Parameter | How It Changes | Based On |
+|-----------|---------------|----------|
+| Quality thresholds | Relaxed when improving, tightened when declining | Quality trend |
+| Revision budget | Increased when revisions needed frequently | Revision rate |
+| Tool permissions | Expanded with good coherence, restricted with instability | Coherence history |
+| Response style | "grounded" for fear, "reflective" for hope | Session trajectory |
+| Attention budget | Increased for struggling sessions | Trajectory type |
+| Decay rates | Slower decay for recovering sessions | Recovery pattern |
+
+**Session Trajectory Classification:**
+
+The engine classifies each session into one of 8 trajectory types:
+
+| Trajectory | Pattern | Policy Response |
+|------------|---------|-----------------|
+| **hope_driven** | Improving quality, breakthroughs | Encourage exploration, relax thresholds |
+| **fear_driven** | Fragmentation, high volatility | Ground responses, increase attention |
+| **expansion_driven** | Good quality, exploring | Support growth, allow experimentation |
+| **stabilization_driven** | Recovering from decline | Gentle guidance, gradual normalization |
+| **overcorrection** | Sharp oscillations | Add damping, reduce revision budget |
+| **avoidance_driven** | Flat metrics, low engagement | Encourage engagement, exploratory style |
+| **stable** | Consistent high coherence | Allow deeper reflection |
+| **unknown** | Not enough data | Default conservative behavior |
+
+**SCC-Inspired Parameter Tuning:**
+
+Uses gradient descent on policy parameters (inspired by CTM+ Self-tuning Coherence Control):
+
+```
+θ_{t+1} = θ_t + ρ * ∇_θ C_global(t)
+
+Where:
+  θ = Policy parameters (thresholds, budgets, etc.)
+  ρ = Learning rate (default 0.05)
+  C_global = Global coherence/quality metric
+  ∇_θ = Gradient based on recent performance
+```
+
+**Example Flow:**
+
+```
+Turn 1: Quality=0.5, Coherence=0.4
+        → Engine records: "struggling"
+        → Increases attention budget
+
+Turn 2: Quality=0.6, Coherence=0.5
+        → Engine records: "improving"
+        → Classifies as "stabilization_driven"
+        → Sets response style to "grounded"
+
+Turn 3: Quality=0.8, Coherence=0.7
+        → Engine records: "breakthrough!"
+        → Classifies as "hope_driven"
+        → Relaxes quality thresholds
+        → Upgrades tool permissions
+```
+
+**Usage:**
+
+```python
+from symbolu.agentic_framework import (
+    AdaptivePolicyEngine,
+    create_adaptive_policy_engine,
+)
+
+# Create engine
+engine = create_adaptive_policy_engine(learning_rate=0.05)
+
+# Record turn performance
+engine.record_turn(
+    session_id="session-123",
+    quality_score=0.85,
+    revision_count=0,
+    coherence_score=0.78,
+)
+
+# Get policy decision for next turn
+decision = engine.get_policy_decision("session-123")
+
+# Use in your agent
+print(f"Quality threshold: {decision.quality_threshold}")
+print(f"Revision budget: {decision.revision_budget}")
+print(f"Tool permission: {decision.tool_permission}")
+print(f"Response style: {decision.response_style}")
+print(f"Trajectory: {decision.trajectory}")
+```
+
+**Why It Matters:**
+- Goes beyond "store what worked" to "modify how I behave"
+- Provides structural leverage, not commodity log retrieval
+- Based on CTM+ (Coherence Tier Memory) research
+- Enables true adaptive behavior without retraining
 
 ---
 
@@ -538,6 +651,7 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | Coherence Tracker | Monitors consistency | Catches degradation early |
 | Safety Contract | Gates dangerous actions | Prevents harmful outcomes |
 | **Local Critic** | **Cheap quality evaluation** | **100x cost reduction** |
+| **Adaptive Policy** | **Learns from experience** | **Structural leverage, not logs** |
 
 **Bottom Line:** This framework doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference.
 
