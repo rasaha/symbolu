@@ -51,6 +51,7 @@ class OrchestratorConfig:
     silence_timeout_ms: float = 2000     # Max silence before end-of-turn
     max_turn_duration_ms: float = 60000  # Max single turn duration
     response_timeout_ms: float = 30000   # Max time waiting for LLM response
+    sentinel_timeout_ms: float = 15000   # Timeout for Sentinel calls (MEDIUM FIX)
 
     # Barge-in
     barge_in_config: Optional[BargeInConfig] = None
@@ -135,6 +136,8 @@ class VoiceOrchestrator:
         # Active tasks for cancellation
         self._response_tasks: Dict[str, asyncio.Task] = {}
         self._tts_tasks: Dict[str, asyncio.Task] = {}
+        # CRITICAL FIX: Lock for protecting task dictionaries during concurrent access
+        self._tasks_lock = asyncio.Lock()
 
         # Metrics
         self._turn_metrics: Dict[str, TurnMetrics] = {}
@@ -185,7 +188,7 @@ class VoiceOrchestrator:
         session = self._sessions.pop(session_id, None)
         if session:
             session.end()
-            self._cancel_session_tasks(session_id)
+            await self._cancel_session_tasks(session_id)
             logger.info(f"Ended voice session: {session_id}")
         return session
 
@@ -395,7 +398,13 @@ class VoiceOrchestrator:
         self,
         request: VoiceRequest
     ) -> Dict[str, Any]:
-        """Process request through Sentinel framework."""
+        """Process request through Sentinel framework.
+
+        MEDIUM FIX: Added timeout to prevent indefinite hangs.
+
+        Raises:
+            asyncio.TimeoutError: If Sentinel doesn't respond within timeout
+        """
         # Handle confirmation responses
         if request.is_confirmation:
             text_lower = request.text.lower()
@@ -415,9 +424,27 @@ class VoiceOrchestrator:
         if request.continuation_context:
             input_text = f"{request.continuation_context}\n\nUser: {request.text}"
 
-        # Call Sentinel
-        result = self.sentinel.run(input_text)
-        return result
+        # Call Sentinel with timeout protection
+        timeout_seconds = self.config.sentinel_timeout_ms / 1000
+
+        try:
+            # Wrap synchronous sentinel.run in executor for async timeout support
+            loop = asyncio.get_event_loop()
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, self.sentinel.run, input_text),
+                timeout=timeout_seconds
+            )
+            return result
+
+        except asyncio.TimeoutError:
+            logger.error(
+                f"Sentinel timeout after {timeout_seconds}s for session {request.session_id}"
+            )
+            return {
+                "response": "I apologize, but I'm taking longer than expected to process your request. Could you please try again?",
+                "quality_score": 0.3,
+                "error": "sentinel_timeout"
+            }
 
     def _build_response(
         self,
@@ -464,9 +491,18 @@ class VoiceOrchestrator:
         """Handle user interruption during agent speech."""
         logger.info(f"Barge-in detected in session {session.session_id}")
 
-        # Cancel TTS task
-        if session.current_response_id in self._tts_tasks:
-            self._tts_tasks[session.current_response_id].cancel()
+        # Cancel TTS task with lock protection
+        task_to_cancel = None
+        async with self._tasks_lock:
+            if session.current_response_id in self._tts_tasks:
+                task_to_cancel = self._tts_tasks.pop(session.current_response_id, None)
+
+        if task_to_cancel:
+            task_to_cancel.cancel()
+            try:
+                await task_to_cancel
+            except asyncio.CancelledError:
+                pass
 
         # Record interruption
         session.record_interruption(InterruptionType.BARGE_IN)
@@ -494,19 +530,41 @@ class VoiceOrchestrator:
         classification, confidence = self._barge_in_handler.classify_interruption(event)
         logger.debug(f"Interruption classified as '{classification}' ({confidence:.2f})")
 
-    def _cancel_session_tasks(self, session_id: str) -> None:
-        """Cancel all active tasks for a session."""
-        # Cancel response tasks
-        for key in list(self._response_tasks.keys()):
-            if key.startswith(session_id):
-                self._response_tasks[key].cancel()
-                del self._response_tasks[key]
+    async def _cancel_session_tasks(self, session_id: str) -> None:
+        """Cancel all active tasks for a session.
 
-        # Cancel TTS tasks
-        for key in list(self._tts_tasks.keys()):
-            if key.startswith(session_id):
-                self._tts_tasks[key].cancel()
-                del self._tts_tasks[key]
+        CRITICAL FIX: Uses async lock to prevent race conditions during
+        concurrent task cancellation.
+        """
+        async with self._tasks_lock:
+            # Cancel response tasks
+            tasks_to_cancel = []
+            keys_to_remove = []
+            for key in list(self._response_tasks.keys()):
+                if key.startswith(session_id):
+                    tasks_to_cancel.append(self._response_tasks[key])
+                    keys_to_remove.append(key)
+
+            for key in keys_to_remove:
+                self._response_tasks.pop(key, None)
+
+            # Cancel TTS tasks
+            keys_to_remove = []
+            for key in list(self._tts_tasks.keys()):
+                if key.startswith(session_id):
+                    tasks_to_cancel.append(self._tts_tasks[key])
+                    keys_to_remove.append(key)
+
+            for key in keys_to_remove:
+                self._tts_tasks.pop(key, None)
+
+        # Cancel tasks outside the lock to avoid deadlock
+        for task in tasks_to_cancel:
+            task.cancel()
+
+        # Wait for tasks to complete cancellation
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
     def _get_default_voice_id(self) -> str:
         """Get default voice ID for error responses."""

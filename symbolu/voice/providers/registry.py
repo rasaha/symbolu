@@ -33,6 +33,99 @@ class ProviderHealth(Enum):
     UNKNOWN = "unknown"
 
 
+class CircuitState(Enum):
+    """Circuit breaker states."""
+    CLOSED = "closed"       # Normal operation
+    OPEN = "open"           # Failing, rejecting requests
+    HALF_OPEN = "half_open" # Testing if service recovered
+
+
+@dataclass
+class CircuitBreaker:
+    """Circuit breaker for provider resilience.
+
+    MEDIUM FIX: Implements circuit breaker pattern to prevent
+    cascading failures and allow graceful recovery.
+
+    States:
+    - CLOSED: Normal operation, requests pass through
+    - OPEN: Service failing, requests rejected immediately
+    - HALF_OPEN: Testing recovery with limited requests
+    """
+    failure_threshold: int = 5          # Failures before opening
+    recovery_timeout: float = 30.0      # Seconds before half-open
+    half_open_max_calls: int = 3        # Max calls in half-open
+
+    state: CircuitState = CircuitState.CLOSED
+    failure_count: int = 0
+    success_count: int = 0
+    last_failure_time: Optional[datetime] = None
+    half_open_calls: int = 0
+
+    def record_success(self) -> None:
+        """Record a successful call."""
+        self.success_count += 1
+
+        if self.state == CircuitState.HALF_OPEN:
+            self.half_open_calls += 1
+            if self.half_open_calls >= self.half_open_max_calls:
+                # Enough successful calls, close the circuit
+                self._close()
+        elif self.state == CircuitState.CLOSED:
+            # Reset failure count on success
+            self.failure_count = 0
+
+    def record_failure(self) -> None:
+        """Record a failed call."""
+        self.failure_count += 1
+        self.last_failure_time = datetime.utcnow()
+
+        if self.state == CircuitState.HALF_OPEN:
+            # Any failure in half-open reopens circuit
+            self._open()
+        elif self.state == CircuitState.CLOSED:
+            if self.failure_count >= self.failure_threshold:
+                self._open()
+
+    def can_execute(self) -> bool:
+        """Check if a request should be allowed through."""
+        if self.state == CircuitState.CLOSED:
+            return True
+
+        if self.state == CircuitState.OPEN:
+            # Check if recovery timeout has passed
+            if self.last_failure_time:
+                elapsed = (datetime.utcnow() - self.last_failure_time).total_seconds()
+                if elapsed >= self.recovery_timeout:
+                    self._half_open()
+                    return True
+            return False
+
+        if self.state == CircuitState.HALF_OPEN:
+            # Allow limited calls in half-open
+            return self.half_open_calls < self.half_open_max_calls
+
+        return False
+
+    def _open(self) -> None:
+        """Open the circuit."""
+        self.state = CircuitState.OPEN
+        logger.warning("Circuit breaker OPENED - rejecting requests")
+
+    def _close(self) -> None:
+        """Close the circuit."""
+        self.state = CircuitState.CLOSED
+        self.failure_count = 0
+        self.half_open_calls = 0
+        logger.info("Circuit breaker CLOSED - normal operation resumed")
+
+    def _half_open(self) -> None:
+        """Transition to half-open state."""
+        self.state = CircuitState.HALF_OPEN
+        self.half_open_calls = 0
+        logger.info("Circuit breaker HALF-OPEN - testing recovery")
+
+
 @dataclass
 class ProviderStatus:
     """Status information for a provider."""
@@ -85,9 +178,12 @@ class ProviderAdapter:
     has_stt: bool = True
     has_tts: bool = True
     priority: int = 0  # Lower = higher priority
+    circuit_breaker: CircuitBreaker = field(default_factory=CircuitBreaker)
 
     def __post_init__(self):
         self.status = ProviderStatus(name=self.name)
+        if not isinstance(self.circuit_breaker, CircuitBreaker):
+            self.circuit_breaker = CircuitBreaker()
 
 
 class ProviderRegistry:
@@ -264,7 +360,15 @@ class ProviderRegistry:
         )
 
     def _is_provider_available(self, provider: ProviderAdapter) -> bool:
-        """Check if a provider is available for use."""
+        """Check if a provider is available for use.
+
+        MEDIUM FIX: Now includes circuit breaker check for better resilience.
+        """
+        # First check circuit breaker
+        if not provider.circuit_breaker.can_execute():
+            logger.debug(f"Provider '{provider.name}' circuit breaker is OPEN")
+            return False
+
         status = provider.status
 
         # Unknown health - assume available
@@ -297,11 +401,15 @@ class ProviderRegistry:
         """Mark a provider as healthy after successful operation."""
         if name in self._providers:
             self._providers[name].status.record_success(latency_ms)
+            # Also update circuit breaker
+            self._providers[name].circuit_breaker.record_success()
 
     def mark_unhealthy(self, name: str, error: str = "") -> None:
         """Mark a provider as unhealthy after failed operation."""
         if name in self._providers:
             self._providers[name].status.record_failure(error)
+            # Also update circuit breaker
+            self._providers[name].circuit_breaker.record_failure()
 
     def get_status(self, name: Optional[str] = None) -> Dict[str, ProviderStatus]:
         """

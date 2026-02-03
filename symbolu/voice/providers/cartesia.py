@@ -143,7 +143,11 @@ class CartesiaSTT(STTProvider):
                         pass
 
         except Exception as e:
-            if "connection" in str(e).lower():
+            # IMPROVED: Use exception type checking instead of string matching
+            if isinstance(e, (ConnectionError, OSError, TimeoutError)):
+                raise ProviderUnavailableError("cartesia", str(e))
+            error_msg = str(e).lower()
+            if any(kw in error_msg for kw in ("connection", "network", "timeout", "refused")):
                 raise ProviderUnavailableError("cartesia", str(e))
             raise STTError(str(e), provider="cartesia")
 
@@ -296,7 +300,11 @@ class CartesiaTTS(TTSProvider):
                 sequence += 1
 
         except Exception as e:
-            if "connection" in str(e).lower():
+            # IMPROVED: Use exception type checking instead of string matching
+            if isinstance(e, (ConnectionError, OSError, TimeoutError)):
+                raise ProviderUnavailableError("cartesia", str(e))
+            error_msg = str(e).lower()
+            if any(kw in error_msg for kw in ("connection", "network", "timeout", "refused")):
                 raise ProviderUnavailableError("cartesia", str(e))
             raise TTSError(str(e), provider="cartesia")
 

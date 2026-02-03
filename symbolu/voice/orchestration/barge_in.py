@@ -208,8 +208,16 @@ class BargeInHandler:
         Returns:
             Context string for continuation
         """
+        # HIGH FIX: Add bounds checking to prevent issues with string slicing
+        if not interrupted_text:
+            return ""
+
+        spoken_len = len(spoken_portion) if spoken_portion else 0
+
+        # Ensure spoken_len doesn't exceed interrupted_text length
+        spoken_len = min(spoken_len, len(interrupted_text))
+
         # Calculate remaining unsaid portion
-        spoken_len = len(spoken_portion)
         remaining = interrupted_text[spoken_len:].strip()
 
         if not remaining:

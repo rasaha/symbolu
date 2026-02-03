@@ -52,6 +52,8 @@ from .registry import (
     ProviderRegistry,
     ProviderHealth,
     ProviderStatus,
+    CircuitBreaker,
+    CircuitState,
 )
 
 from .cartesia import (
@@ -75,6 +77,7 @@ __all__ = [
     # Enums
     "TranscriptType",
     "ProviderHealth",
+    "CircuitState",
 
     # Data classes
     "WordTimestamp",
@@ -83,6 +86,7 @@ __all__ = [
     "AudioChunk",
     "VoiceInfo",
     "ProviderStatus",
+    "CircuitBreaker",
 
     # Abstract base classes
     "STTProvider",

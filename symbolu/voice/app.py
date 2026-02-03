@@ -171,6 +171,8 @@ class VoiceAgentApp:
 
     def _init_sentinel(self) -> None:
         """Initialize Sentinel framework."""
+        self._using_mock_sentinel = False
+
         try:
             from symbolu.agentic_framework.agent import AgenticLLMWrapper
 
@@ -184,12 +186,25 @@ class VoiceAgentApp:
             )
             logger.info("Initialized Sentinel framework")
 
-        except ImportError:
+        except ImportError as e:
+            # CRITICAL FIX: Explicit alerting when using mock Sentinel
+            self._using_mock_sentinel = True
             logger.warning(
-                "Sentinel framework not available. "
-                "Using mock implementation for testing."
+                "IMPORTANT: Sentinel framework not available (import failed: %s). "
+                "Using MockSentinel - responses will NOT use the full agentic pipeline. "
+                "Install symbolu.agentic_framework for production use.",
+                str(e)
             )
             self.sentinel = MockSentinel()
+
+    @property
+    def is_using_mock_sentinel(self) -> bool:
+        """Check if running with mock Sentinel instead of real framework.
+
+        IMPORTANT: When True, the voice agent is NOT using the full
+        Sentinel agentic pipeline and responses will be limited.
+        """
+        return getattr(self, '_using_mock_sentinel', False)
 
     def _create_llm_client(self) -> Any:
         """Create LLM client based on configuration."""
@@ -313,19 +328,49 @@ class VoiceAgentApp:
         Args:
             websocket: WebSocket connection
             session_id: Optional session ID
+
+        Raises:
+            ValueError: If session_id is invalid
+            RuntimeError: If orchestrator is not initialized
         """
-        # Create session
-        session = await self.start_session(session_id)
+        # HIGH FIX: Validate session_id if provided
+        if session_id is not None:
+            # Sanitize session_id - only allow alphanumeric, hyphens, underscores
+            import re
+            if not re.match(r'^[a-zA-Z0-9_-]{1,128}$', session_id):
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid session_id format. Must be alphanumeric with hyphens/underscores, max 128 chars."
+                })
+                await websocket.close(code=1008)  # Policy violation
+                return
 
-        # Send session info
-        await websocket.send_json({
-            "type": "session_started",
-            "session_id": session.session_id,
-            "stt_provider": session.stt_provider,
-            "tts_provider": session.tts_provider,
-        })
+        # HIGH FIX: Check orchestrator is available
+        if self.orchestrator is None:
+            await websocket.send_json({
+                "type": "error",
+                "message": "Voice orchestrator not initialized. Check provider configuration."
+            })
+            await websocket.close(code=1011)  # Internal error
+            return
 
+        session = None
         try:
+            # Create session
+            session = await self.start_session(session_id)
+
+            # Send session info (include mock sentinel warning)
+            session_info = {
+                "type": "session_started",
+                "session_id": session.session_id,
+                "stt_provider": session.stt_provider,
+                "tts_provider": session.tts_provider,
+            }
+            if self.is_using_mock_sentinel:
+                session_info["warning"] = "Using MockSentinel - limited functionality"
+
+            await websocket.send_json(session_info)
+
             # Create async audio stream from websocket
             async def audio_stream():
                 async for message in websocket.iter_bytes():
@@ -343,15 +388,23 @@ class VoiceAgentApp:
                         "type": "response_complete"
                     })
 
+        except asyncio.CancelledError:
+            logger.info(f"WebSocket connection cancelled: {session_id}")
+            raise
+
         except Exception as e:
-            logger.error(f"WebSocket error: {e}")
-            await websocket.send_json({
-                "type": "error",
-                "message": str(e)
-            })
+            logger.error(f"WebSocket error: {e}", exc_info=True)
+            try:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": str(e)
+                })
+            except Exception:
+                pass  # Connection may already be closed
 
         finally:
-            await self.end_session(session.session_id)
+            if session:
+                await self.end_session(session.session_id)
 
     def create_fastapi_app(self) -> Any:
         """
@@ -389,12 +442,25 @@ class VoiceAgentApp:
         async def health():
             provider_health = await self.providers.health_check()
             all_healthy = all(provider_health.values())
+
+            # IMPROVED: Include Sentinel status in health check
+            status = "healthy"
+            if not all_healthy:
+                status = "degraded"
+            if self.is_using_mock_sentinel:
+                status = "degraded" if status == "healthy" else status
+
             return JSONResponse(
                 status_code=200 if all_healthy else 503,
                 content={
-                    "status": "healthy" if all_healthy else "degraded",
+                    "status": status,
                     "providers": provider_health,
-                    "active_sessions": len(self._active_sessions)
+                    "active_sessions": len(self._active_sessions),
+                    "using_mock_sentinel": self.is_using_mock_sentinel,
+                    "warning": (
+                        "Running with MockSentinel - not using full agentic pipeline"
+                        if self.is_using_mock_sentinel else None
+                    )
                 }
             )
 

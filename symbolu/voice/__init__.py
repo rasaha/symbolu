@@ -63,6 +63,8 @@ from .providers import (
     ProviderRegistry,
     ProviderHealth,
     ProviderStatus,
+    CircuitBreaker,
+    CircuitState,
 
     # Base types
     STTProvider,
@@ -82,6 +84,17 @@ from .providers import (
     ProviderError,
     STTError,
     TTSError,
+)
+
+# Protocols (for type checking and loose coupling)
+from .protocols import (
+    SentinelProtocol,
+    CoherenceStateProtocol,
+    CoherenceMetricsProtocol,
+    SafetyContractProtocol,
+    LLMClientProtocol,
+    BaseSentinelAdapter,
+    validate_sentinel,
 )
 
 # Orchestration
@@ -123,6 +136,8 @@ __all__ = [
     "ProviderRegistry",
     "ProviderHealth",
     "ProviderStatus",
+    "CircuitBreaker",
+    "CircuitState",
 
     # Provider base types
     "STTProvider",
@@ -142,6 +157,15 @@ __all__ = [
     "ProviderError",
     "STTError",
     "TTSError",
+
+    # Protocols (for type checking)
+    "SentinelProtocol",
+    "CoherenceStateProtocol",
+    "CoherenceMetricsProtocol",
+    "SafetyContractProtocol",
+    "LLMClientProtocol",
+    "BaseSentinelAdapter",
+    "validate_sentinel",
 
     # Orchestration
     "VoiceOrchestrator",

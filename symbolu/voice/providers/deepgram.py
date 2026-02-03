@@ -177,14 +177,31 @@ class DeepgramSTT(STTProvider):
                     yield event
 
             finally:
+                # Cancel the send task
                 send_task.cancel()
                 try:
                     await send_task
                 except asyncio.CancelledError:
                     pass
 
+                # CRITICAL FIX: Drain the event queue to prevent memory leak
+                # This is necessary when cancellation occurs before all events are consumed
+                drained_count = 0
+                while not event_queue.empty():
+                    try:
+                        event_queue.get_nowait()
+                        drained_count += 1
+                    except asyncio.QueueEmpty:
+                        break
+                if drained_count > 0:
+                    logger.debug(f"Drained {drained_count} events from queue during cleanup")
+
         except Exception as e:
-            if "connection" in str(e).lower() or "network" in str(e).lower():
+            # IMPROVED: Use exception type checking instead of string matching
+            if isinstance(e, (ConnectionError, OSError, TimeoutError)):
+                raise ProviderUnavailableError("deepgram", str(e))
+            error_msg = str(e).lower()
+            if any(kw in error_msg for kw in ("connection", "network", "timeout", "refused")):
                 raise ProviderUnavailableError("deepgram", str(e))
             raise STTError(str(e), provider="deepgram")
 
@@ -379,7 +396,11 @@ class DeepgramTTS(TTSProvider):
             return response.read()
 
         except Exception as e:
-            if "connection" in str(e).lower():
+            # IMPROVED: Use exception type checking instead of string matching
+            if isinstance(e, (ConnectionError, OSError, TimeoutError)):
+                raise ProviderUnavailableError("deepgram", str(e))
+            error_msg = str(e).lower()
+            if any(kw in error_msg for kw in ("connection", "network", "timeout", "refused")):
                 raise ProviderUnavailableError("deepgram", str(e))
             raise TTSError(str(e), provider="deepgram")
 

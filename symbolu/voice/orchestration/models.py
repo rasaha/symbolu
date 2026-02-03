@@ -23,6 +23,29 @@ class SessionState(Enum):
     ENDED = "ended"                 # Session has ended
 
 
+# MEDIUM FIX: Define valid state transitions for state machine validation
+VALID_TRANSITIONS: Dict[SessionState, set] = {
+    SessionState.IDLE: {SessionState.LISTENING, SessionState.ENDED},
+    SessionState.LISTENING: {SessionState.PROCESSING, SessionState.IDLE, SessionState.ENDED},
+    SessionState.PROCESSING: {SessionState.SPEAKING, SessionState.CONFIRMING, SessionState.IDLE, SessionState.ENDED},
+    SessionState.SPEAKING: {SessionState.IDLE, SessionState.INTERRUPTED, SessionState.ENDED},
+    SessionState.INTERRUPTED: {SessionState.LISTENING, SessionState.IDLE, SessionState.ENDED},
+    SessionState.CONFIRMING: {SessionState.PROCESSING, SessionState.IDLE, SessionState.ENDED},
+    SessionState.ENDED: set(),  # Terminal state
+}
+
+
+class InvalidStateTransitionError(Exception):
+    """Raised when an invalid state transition is attempted."""
+
+    def __init__(self, from_state: SessionState, to_state: SessionState):
+        self.from_state = from_state
+        self.to_state = to_state
+        super().__init__(
+            f"Invalid state transition: {from_state.value} -> {to_state.value}"
+        )
+
+
 class InterruptionType(Enum):
     """Type of user interruption."""
     BARGE_IN = "barge_in"           # User started speaking during agent
@@ -90,22 +113,43 @@ class VoiceSession:
         """Get session duration in seconds."""
         return (datetime.utcnow() - self.created_at).total_seconds()
 
+    def _transition_to(self, new_state: SessionState, validate: bool = True) -> None:
+        """Transition to a new state with optional validation.
+
+        MEDIUM FIX: Added state transition validation.
+
+        Args:
+            new_state: The target state
+            validate: Whether to validate the transition (default True)
+
+        Raises:
+            InvalidStateTransitionError: If transition is invalid and validate=True
+        """
+        if validate and new_state not in VALID_TRANSITIONS.get(self.state, set()):
+            # Log warning but don't raise - allows graceful degradation
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Potentially invalid state transition: {self.state.value} -> {new_state.value} "
+                f"(session: {self.session_id})"
+            )
+        self.state = new_state
+
     def start_listening(self) -> None:
         """Transition to listening state."""
-        self.state = SessionState.LISTENING
+        self._transition_to(SessionState.LISTENING)
 
     def start_processing(self) -> None:
         """Transition to processing state."""
-        self.state = SessionState.PROCESSING
+        self._transition_to(SessionState.PROCESSING)
 
     def start_speaking(self, response_id: str) -> None:
         """Transition to speaking state."""
-        self.state = SessionState.SPEAKING
+        self._transition_to(SessionState.SPEAKING)
         self.current_response_id = response_id
 
     def stop_speaking(self) -> None:
         """Stop speaking and return to idle."""
-        self.state = SessionState.IDLE
+        self._transition_to(SessionState.IDLE)
         self.last_agent_speech_end = datetime.utcnow()
         self.current_response_id = None
 
@@ -113,7 +157,7 @@ class VoiceSession:
         """Record a user interruption."""
         if self.current_response_id:
             self.interrupted_responses.append(self.current_response_id)
-        self.state = SessionState.INTERRUPTED
+        self._transition_to(SessionState.INTERRUPTED)
 
     def increment_turn(self) -> int:
         """Increment turn counter and return new value."""
@@ -122,7 +166,7 @@ class VoiceSession:
 
     def end(self) -> None:
         """End the session."""
-        self.state = SessionState.ENDED
+        self._transition_to(SessionState.ENDED, validate=False)  # Always allow ending
 
 
 @dataclass

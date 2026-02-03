@@ -273,6 +273,22 @@ class P10ProsodyMapper:
 
         return base
 
+    def _escape_ssml(self, text: str) -> str:
+        """Escape SSML special characters to prevent injection.
+
+        MEDIUM FIX: Prevent SSML injection attacks by escaping special characters.
+
+        Args:
+            text: Raw text that may contain SSML-like content
+
+        Returns:
+            Escaped text safe for SSML embedding
+        """
+        import html
+        # Escape XML/HTML entities
+        escaped = html.escape(text, quote=True)
+        return escaped
+
     def compute_ssml(
         self,
         text: str,
@@ -293,7 +309,8 @@ class P10ProsodyMapper:
         Returns:
             Text with SSML prosody markers
         """
-        ssml_text = text
+        # MEDIUM FIX: Escape user text to prevent SSML injection
+        ssml_text = self._escape_ssml(text)
 
         if coherence_state is not None:
             ssml_text = self._add_coherence_ssml(ssml_text, coherence_state)
