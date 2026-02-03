@@ -14,14 +14,275 @@ Learning Modes:
 1. Offline: Learn from collected experience buffer
 2. Online: Continuous learning during operation (with safety constraints)
 3. Imitation: Learn from demonstrations
+
+Implementation: Hybrid approach using only numpy (no PyTorch/JAX dependency)
+- NumpyMLP: Simple feedforward network with manual backprop
+- REINFORCE: Policy gradient algorithm with baseline
 """
 
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Callable, Tuple
 from enum import Enum
 import numpy as np
+import pickle
+import logging
 
 from symbolu_robotics.core.types import Layer12D, ActuatorCommand
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Numpy-based Neural Network (No External Dependencies)
+# ============================================================================
+
+class NumpyMLP:
+    """
+    Simple Multi-Layer Perceptron using only numpy.
+
+    Implements forward pass, backward pass, and gradient descent.
+    No external ML framework required.
+    """
+
+    def __init__(
+        self,
+        layer_sizes: List[int],
+        activation: str = 'relu',
+        output_activation: str = 'linear',
+    ):
+        """
+        Initialize MLP with Xavier initialization.
+
+        Args:
+            layer_sizes: List of layer dimensions [input, hidden1, ..., output]
+            activation: Hidden layer activation ('relu', 'tanh', 'sigmoid')
+            output_activation: Output activation ('linear', 'tanh', 'softmax')
+        """
+        self.layer_sizes = layer_sizes
+        self.activation = activation
+        self.output_activation = output_activation
+        self.n_layers = len(layer_sizes) - 1
+
+        # Initialize weights and biases with Xavier initialization
+        self.weights: List[np.ndarray] = []
+        self.biases: List[np.ndarray] = []
+
+        for i in range(self.n_layers):
+            fan_in = layer_sizes[i]
+            fan_out = layer_sizes[i + 1]
+            # Xavier initialization
+            std = np.sqrt(2.0 / (fan_in + fan_out))
+            w = np.random.randn(fan_in, fan_out) * std
+            b = np.zeros(fan_out)
+            self.weights.append(w)
+            self.biases.append(b)
+
+        # For storing activations during forward pass (needed for backprop)
+        self._activations: List[np.ndarray] = []
+        self._pre_activations: List[np.ndarray] = []
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """
+        Forward pass through the network.
+
+        Args:
+            x: Input array of shape (batch_size, input_dim) or (input_dim,)
+
+        Returns:
+            Output array of shape (batch_size, output_dim)
+        """
+        # Ensure 2D input
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
+
+        self._activations = [x]
+        self._pre_activations = []
+
+        for i in range(self.n_layers):
+            # Linear transformation
+            z = x @ self.weights[i] + self.biases[i]
+            self._pre_activations.append(z)
+
+            # Apply activation
+            if i < self.n_layers - 1:
+                # Hidden layers
+                x = self._apply_activation(z, self.activation)
+            else:
+                # Output layer
+                x = self._apply_activation(z, self.output_activation)
+
+            self._activations.append(x)
+
+        return x
+
+    def backward(
+        self,
+        grad_output: np.ndarray,
+        learning_rate: float = 0.001,
+        clip_grad: float = 1.0,
+    ) -> None:
+        """
+        Backward pass with gradient descent update.
+
+        Args:
+            grad_output: Gradient of loss w.r.t. output
+            learning_rate: Learning rate for SGD
+            clip_grad: Maximum gradient norm for clipping
+        """
+        grad = grad_output
+
+        for i in range(self.n_layers - 1, -1, -1):
+            # Gradient through activation
+            if i == self.n_layers - 1:
+                grad = grad * self._activation_derivative(
+                    self._pre_activations[i], self.output_activation
+                )
+            else:
+                grad = grad * self._activation_derivative(
+                    self._pre_activations[i], self.activation
+                )
+
+            # Compute gradients for weights and biases
+            grad_w = self._activations[i].T @ grad
+            grad_b = grad.sum(axis=0)
+
+            # Gradient clipping
+            grad_w_norm = np.linalg.norm(grad_w)
+            if grad_w_norm > clip_grad:
+                grad_w = grad_w * clip_grad / grad_w_norm
+
+            # Update weights and biases
+            self.weights[i] -= learning_rate * grad_w
+            self.biases[i] -= learning_rate * grad_b
+
+            # Propagate gradient to previous layer
+            if i > 0:
+                grad = grad @ self.weights[i].T
+
+    def _apply_activation(self, z: np.ndarray, activation: str) -> np.ndarray:
+        """Apply activation function."""
+        if activation == 'relu':
+            return np.maximum(0, z)
+        elif activation == 'tanh':
+            return np.tanh(z)
+        elif activation == 'sigmoid':
+            return 1 / (1 + np.exp(-np.clip(z, -500, 500)))
+        elif activation == 'softmax':
+            exp_z = np.exp(z - z.max(axis=-1, keepdims=True))
+            return exp_z / exp_z.sum(axis=-1, keepdims=True)
+        else:  # linear
+            return z
+
+    def _activation_derivative(self, z: np.ndarray, activation: str) -> np.ndarray:
+        """Compute derivative of activation function."""
+        if activation == 'relu':
+            return (z > 0).astype(float)
+        elif activation == 'tanh':
+            return 1 - np.tanh(z) ** 2
+        elif activation == 'sigmoid':
+            s = 1 / (1 + np.exp(-np.clip(z, -500, 500)))
+            return s * (1 - s)
+        else:  # linear, softmax (handled separately)
+            return np.ones_like(z)
+
+    def get_weights(self) -> Dict[str, np.ndarray]:
+        """Get all weights as a dictionary."""
+        return {
+            f'w{i}': w.copy() for i, w in enumerate(self.weights)
+        } | {
+            f'b{i}': b.copy() for i, b in enumerate(self.biases)
+        }
+
+    def set_weights(self, weights: Dict[str, np.ndarray]) -> None:
+        """Set weights from a dictionary."""
+        for i in range(self.n_layers):
+            if f'w{i}' in weights:
+                self.weights[i] = weights[f'w{i}'].copy()
+            if f'b{i}' in weights:
+                self.biases[i] = weights[f'b{i}'].copy()
+
+    def copy(self) -> 'NumpyMLP':
+        """Create a copy of this network."""
+        new_net = NumpyMLP(self.layer_sizes, self.activation, self.output_activation)
+        new_net.set_weights(self.get_weights())
+        return new_net
+
+
+class GaussianPolicy:
+    """
+    Gaussian policy for continuous action spaces.
+
+    Outputs mean and log_std for each action dimension.
+    """
+
+    def __init__(self, state_dim: int, action_dim: int, hidden_dims: List[int]):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+        # Network outputs mean for each action
+        layer_sizes = [state_dim] + hidden_dims + [action_dim]
+        self.mean_net = NumpyMLP(layer_sizes, activation='tanh', output_activation='tanh')
+
+        # Learnable log standard deviation (state-independent for stability)
+        self.log_std = np.zeros(action_dim)
+        self._log_std_min = -20
+        self._log_std_max = 2
+
+    def forward(self, state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Get action distribution parameters.
+
+        Returns:
+            mean: Action mean
+            std: Action standard deviation
+        """
+        mean = self.mean_net.forward(state)
+        std = np.exp(np.clip(self.log_std, self._log_std_min, self._log_std_max))
+        return mean, std
+
+    def sample(self, state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Sample action from policy.
+
+        Returns:
+            action: Sampled action
+            log_prob: Log probability of the action
+        """
+        mean, std = self.forward(state)
+
+        # Sample from Gaussian
+        noise = np.random.randn(*mean.shape)
+        action = mean + std * noise
+
+        # Compute log probability
+        log_prob = -0.5 * (
+            ((action - mean) / std) ** 2 +
+            2 * np.log(std) +
+            np.log(2 * np.pi)
+        ).sum(axis=-1)
+
+        return action, log_prob
+
+    def log_prob(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
+        """Compute log probability of action given state."""
+        mean, std = self.forward(state)
+        return -0.5 * (
+            ((action - mean) / std) ** 2 +
+            2 * np.log(std) +
+            np.log(2 * np.pi)
+        ).sum(axis=-1)
+
+    def get_weights(self) -> Dict[str, np.ndarray]:
+        """Get all policy weights."""
+        weights = self.mean_net.get_weights()
+        weights['log_std'] = self.log_std.copy()
+        return weights
+
+    def set_weights(self, weights: Dict[str, np.ndarray]) -> None:
+        """Set policy weights."""
+        self.mean_net.set_weights(weights)
+        if 'log_std' in weights:
+            self.log_std = weights['log_std'].copy()
 
 
 class LearningMode(Enum):
@@ -173,15 +434,18 @@ class SkillLearner:
     - Safety-constrained online learning
     - Modulates BCVF action selection
 
-    Skeleton Implementation:
-    - Core data structures and interfaces defined
-    - Neural network training requires external framework (PyTorch/JAX)
-    - Provides hooks for integration
+    Implementation: REINFORCE with baseline using numpy-only neural networks.
+    No external ML frameworks required.
     """
 
-    def __init__(self, config: Optional[SkillConfig] = None):
+    # Dimensions
+    STATE_DIM = 12  # 12D ontological state
+    ACTION_DIM = 7  # Default: 6 joints + 1 gripper
+
+    def __init__(self, config: Optional[SkillConfig] = None, action_dim: int = 7):
         self._config = config or SkillConfig()
         self._mode = LearningMode.DISABLED
+        self._action_dim = action_dim
 
         # Experience storage
         self._buffer = ExperienceBuffer(
@@ -201,6 +465,37 @@ class SkillLearner:
         self._total_experiences = 0
         self._avg_reward = 0.0
         self._avg_coherence = 0.0
+
+        # Neural networks (numpy-based)
+        self._policy: Optional[GaussianPolicy] = None
+        self._value_net: Optional[NumpyMLP] = None
+        self._initialize_networks()
+
+        # Training state
+        self._training_step = 0
+
+        logger.info(f"SkillLearner initialized with state_dim={self.STATE_DIM}, action_dim={action_dim}")
+
+    def _initialize_networks(self) -> None:
+        """Initialize policy and value networks."""
+        hidden_dims = self._config.hidden_dims
+
+        # Policy network: state -> action distribution
+        self._policy = GaussianPolicy(
+            state_dim=self.STATE_DIM,
+            action_dim=self._action_dim,
+            hidden_dims=hidden_dims,
+        )
+
+        # Value network: state -> scalar value (baseline)
+        value_layers = [self.STATE_DIM] + hidden_dims + [1]
+        self._value_net = NumpyMLP(
+            layer_sizes=value_layers,
+            activation='tanh',
+            output_activation='linear',
+        )
+
+        logger.debug(f"Networks initialized: policy hidden={hidden_dims}, value hidden={hidden_dims}")
 
     @property
     def mode(self) -> LearningMode:
@@ -341,10 +636,9 @@ class SkillLearner:
 
     def train_step(self) -> Dict[str, float]:
         """
-        Perform one training step.
+        Perform one training step using REINFORCE with baseline.
 
-        Skeleton: Returns placeholder metrics.
-        Actual implementation requires neural network framework.
+        Uses numpy-based neural networks - no external ML framework required.
         """
         if self._mode == LearningMode.DISABLED:
             return {"status": "disabled"}
@@ -364,19 +658,133 @@ class SkillLearner:
         if len(valid_batch) < self._config.batch_size // 2:
             return {"status": "low_quality_data", "valid_samples": len(valid_batch)}
 
-        # Placeholder: Actual training would happen here
-        # This would involve:
-        # 1. Extract states, actions, rewards, next_states
-        # 2. Compute TD targets
-        # 3. Update policy network
-        # 4. Update value network
-        # 5. Update priorities
+        # Extract batch data
+        states = np.array([exp.state for exp in valid_batch])
+        actions = np.array([exp.action for exp in valid_batch])
+        coherences = np.array([exp.coherence for exp in valid_batch])
 
-        return {
+        # Compute returns for each experience
+        returns = np.array([
+            self._compute_single_return(exp, valid_batch)
+            for exp in valid_batch
+        ])
+
+        # Normalize returns for stability
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+
+        # === Value Network Update (baseline) ===
+        values = self._value_net.forward(states).flatten()
+        value_loss = np.mean((values - returns) ** 2)
+
+        # Gradient: d(MSE)/d(output) = 2 * (values - returns) / n
+        value_grad = 2 * (values - returns).reshape(-1, 1) / len(valid_batch)
+        self._value_net.backward(value_grad, learning_rate=self._config.learning_rate)
+
+        # === Policy Network Update (REINFORCE) ===
+        # Compute advantages (returns - baseline)
+        advantages = returns - values
+
+        # Weight by coherence (Symbolu-specific: trust high-coherence experiences more)
+        weighted_advantages = advantages * (0.5 + 0.5 * coherences)
+
+        # Compute policy gradient
+        policy_loss = self._update_policy(states, actions, weighted_advantages)
+
+        # Update training state
+        self._training_step += 1
+
+        # Update priorities in buffer based on TD error
+        td_errors = np.abs(returns - values)
+        indices = list(range(len(valid_batch)))
+        priorities = (td_errors * (1 + coherences)).tolist()
+        self._buffer.update_priorities(indices, priorities)
+
+        # Update active skill metrics if applicable
+        if self._active_skill and self._active_skill in self._skills:
+            skill = self._skills[self._active_skill]
+            skill.avg_coherence = 0.9 * skill.avg_coherence + 0.1 * coherences.mean()
+            skill.policy_weights = self._policy.get_weights()
+            skill.value_weights = self._value_net.get_weights()
+
+        metrics = {
             "status": "trained",
             "batch_size": len(valid_batch),
-            "avg_coherence": np.mean([e.coherence for e in valid_batch]),
+            "policy_loss": float(policy_loss),
+            "value_loss": float(value_loss),
+            "avg_advantage": float(advantages.mean()),
+            "avg_coherence": float(coherences.mean()),
+            "training_step": self._training_step,
         }
+
+        logger.debug(f"Training step {self._training_step}: policy_loss={policy_loss:.4f}, value_loss={value_loss:.4f}")
+
+        return metrics
+
+    def _compute_single_return(self, exp: Experience, batch: List[Experience]) -> float:
+        """Compute return for a single experience."""
+        # For now, use the reward directly weighted by coherence
+        # In a full implementation, this would trace through the episode
+        return exp.reward * (1 + exp.coherence)
+
+    def _update_policy(
+        self,
+        states: np.ndarray,
+        actions: np.ndarray,
+        advantages: np.ndarray,
+    ) -> float:
+        """
+        Update policy using REINFORCE gradient.
+
+        Policy gradient: ∇J = E[∇log π(a|s) * A(s,a)]
+        """
+        # Ensure actions match network output dimension
+        if actions.shape[1] > self._action_dim:
+            actions = actions[:, :self._action_dim]
+        elif actions.shape[1] < self._action_dim:
+            # Pad with zeros if needed
+            padded = np.zeros((actions.shape[0], self._action_dim))
+            padded[:, :actions.shape[1]] = actions
+            actions = padded
+
+        # Get current policy output
+        means, stds = self._policy.forward(states)
+
+        # Compute log probability gradient
+        # For Gaussian: ∇_μ log π = (a - μ) / σ²
+        # ∇_σ log π = ((a - μ)² - σ²) / σ³
+        action_diff = actions - means
+
+        # Policy gradient for mean network
+        # ∇_θ J = ∇_θ μ * ∇_μ log π * A
+        # = ∇_θ μ * (a - μ) / σ² * A
+        grad_mean = action_diff / (stds ** 2)
+        weighted_grad = grad_mean * advantages.reshape(-1, 1)
+
+        # Backpropagate through mean network
+        # Negate because we want to maximize (gradient ascent)
+        self._policy.mean_net.backward(
+            -weighted_grad / len(states),
+            learning_rate=self._config.learning_rate,
+            clip_grad=self._config.max_online_update_rate,
+        )
+
+        # Update log_std (simple gradient descent)
+        # ∇_log_σ J = ((a - μ)² / σ² - 1) * A
+        grad_log_std = ((action_diff ** 2) / (stds ** 2) - 1) * advantages.reshape(-1, 1)
+        self._policy.log_std -= self._config.learning_rate * grad_log_std.mean(axis=0)
+
+        # Clip log_std
+        self._policy.log_std = np.clip(
+            self._policy.log_std,
+            self._policy._log_std_min,
+            self._policy._log_std_max,
+        )
+
+        # Compute policy loss for logging (negative expected advantage)
+        log_probs = self._policy.log_prob(states, actions)
+        policy_loss = -np.mean(log_probs * advantages)
+
+        return policy_loss
 
     def get_action_modifier(
         self,
@@ -386,8 +794,7 @@ class SkillLearner:
         """
         Get learned action modification.
 
-        Skeleton: Returns base action unchanged.
-        Actual implementation would apply learned policy.
+        Applies the learned policy to modify the base action.
 
         Returns:
             Modified action and confidence score.
@@ -402,29 +809,176 @@ class SkillLearner:
         if skill is None or not skill.is_trained():
             return base_action, 0.0
 
-        # Placeholder: Would apply policy here
-        confidence = skill.success_rate * skill.avg_coherence
+        # Load skill weights if different from current
+        if skill.policy_weights is not None:
+            self._policy.set_weights(skill.policy_weights)
 
-        return base_action, confidence
+        # Get policy action
+        state_array = np.array(state).reshape(1, -1)
+        action, log_prob = self._policy.sample(state_array)
+        action = action.flatten()
+
+        # Blend policy action with base action based on skill confidence
+        confidence = skill.success_rate * skill.avg_coherence
+        blend_factor = min(confidence, self._config.max_online_update_rate)
+
+        # Create modified action
+        modified = ActuatorCommand(
+            target_velocities=base_action.target_velocities,
+            target_positions=base_action.target_positions,
+            target_torques=base_action.target_torques,
+            gripper_position=base_action.gripper_position,
+        )
+
+        # Apply learned modifications (scaled by blend factor)
+        if modified.target_velocities is not None and len(action) >= 6:
+            policy_vel = action[:6] * blend_factor
+            modified.target_velocities = (
+                (1 - blend_factor) * modified.target_velocities +
+                blend_factor * policy_vel
+            )
+
+        if modified.gripper_position is not None and len(action) >= 7:
+            policy_grip = action[6] * blend_factor
+            modified.gripper_position = (
+                (1 - blend_factor) * modified.gripper_position +
+                blend_factor * np.clip(policy_grip, 0, 1)
+            )
+
+        return modified, confidence
 
     def get_bcvf_modifier(self, state: Layer12D) -> np.ndarray:
         """
         Get learned modifier for BCVF action selection.
 
         Returns array of weights to multiply with BCVF scores.
-        Skeleton: Returns ones (no modification).
+        Based on value network's assessment of state.
         """
-        return np.ones(4)  # Placeholder for 4 action types
+        if self._mode == LearningMode.DISABLED or self._value_net is None:
+            return np.ones(4)
+
+        # Use value network to assess state quality
+        state_array = np.array(state).reshape(1, -1)
+        value = self._value_net.forward(state_array).flatten()[0]
+
+        # Convert value to modifier weights
+        # Higher value -> more confident in learned behaviors
+        # Weights for: [move_to, grasp, release, wait]
+        base_weight = 1.0 + 0.5 * np.tanh(value)  # Range: [0.5, 1.5]
+
+        # Different weights for different action types based on training
+        modifiers = np.array([
+            base_weight,        # move_to
+            base_weight * 0.8,  # grasp (more conservative)
+            base_weight * 0.9,  # release
+            1.0,                # wait (always neutral)
+        ])
+
+        return modifiers
 
     def save(self, path: str) -> None:
-        """Save learned skills to file."""
-        # Placeholder: Would serialize skills
-        pass
+        """
+        Save learned skills to file using pickle (stdlib).
+
+        Saves:
+        - Configuration
+        - All learned skills with their weights
+        - Training metrics
+        """
+        data = {
+            'version': 2,
+            'config': {
+                'learning_rate': self._config.learning_rate,
+                'discount_factor': self._config.discount_factor,
+                'batch_size': self._config.batch_size,
+                'buffer_size': self._config.buffer_size,
+                'hidden_dims': self._config.hidden_dims,
+                'coherence_reward_weight': self._config.coherence_reward_weight,
+                'task_reward_weight': self._config.task_reward_weight,
+            },
+            'action_dim': self._action_dim,
+            'skills': {},
+            'metrics': {
+                'total_experiences': self._total_experiences,
+                'episode_count': self._episode_count,
+                'avg_reward': self._avg_reward,
+                'avg_coherence': self._avg_coherence,
+                'training_step': self._training_step,
+            },
+            'policy_weights': self._policy.get_weights() if self._policy else None,
+            'value_weights': self._value_net.get_weights() if self._value_net else None,
+        }
+
+        # Save each skill
+        for name, skill in self._skills.items():
+            data['skills'][name] = {
+                'name': skill.name,
+                'description': skill.description,
+                'policy_weights': skill.policy_weights,
+                'value_weights': skill.value_weights,
+                'success_rate': skill.success_rate,
+                'avg_coherence': skill.avg_coherence,
+                'training_episodes': skill.training_episodes,
+                'version': skill.version,
+            }
+
+        with open(path, 'wb') as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        logger.info(f"Saved {len(self._skills)} skills to {path}")
 
     def load(self, path: str) -> None:
-        """Load learned skills from file."""
-        # Placeholder: Would deserialize skills
-        pass
+        """
+        Load learned skills from file.
+
+        Restores skills and optionally the current network weights.
+        """
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+
+        # Version check
+        version = data.get('version', 1)
+        if version < 1:
+            raise ValueError(f"Incompatible save format version: {version}")
+
+        # Restore action dimension if saved
+        if 'action_dim' in data and data['action_dim'] != self._action_dim:
+            logger.warning(
+                f"Action dimension mismatch: saved={data['action_dim']}, "
+                f"current={self._action_dim}. Re-initializing networks."
+            )
+            self._action_dim = data['action_dim']
+            self._initialize_networks()
+
+        # Restore skills
+        self._skills = {}
+        for name, skill_data in data.get('skills', {}).items():
+            self._skills[name] = LearnedSkill(
+                name=skill_data['name'],
+                description=skill_data.get('description', ''),
+                policy_weights=skill_data.get('policy_weights'),
+                value_weights=skill_data.get('value_weights'),
+                success_rate=skill_data.get('success_rate', 0.0),
+                avg_coherence=skill_data.get('avg_coherence', 0.0),
+                training_episodes=skill_data.get('training_episodes', 0),
+                version=skill_data.get('version', 1),
+            )
+
+        # Restore metrics
+        metrics = data.get('metrics', {})
+        self._total_experiences = metrics.get('total_experiences', 0)
+        self._episode_count = metrics.get('episode_count', 0)
+        self._avg_reward = metrics.get('avg_reward', 0.0)
+        self._avg_coherence = metrics.get('avg_coherence', 0.0)
+        self._training_step = metrics.get('training_step', 0)
+
+        # Restore current network weights
+        if data.get('policy_weights') and self._policy:
+            self._policy.set_weights(data['policy_weights'])
+        if data.get('value_weights') and self._value_net:
+            self._value_net.set_weights(data['value_weights'])
+
+        logger.info(f"Loaded {len(self._skills)} skills from {path}")
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get learning metrics."""

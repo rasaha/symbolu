@@ -15,14 +15,249 @@ Key Features:
 - Constraint satisfaction (joint limits, collisions)
 - Real-time replanning at ~50Hz
 - Uncertainty-aware via learned dynamics
+
+Implementation: Hybrid approach using only numpy
+- BFGS quasi-Newton optimization with numerical gradients
+- No external optimization libraries required (CasADi, scipy, etc.)
 """
 
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Tuple, Callable
 from enum import Enum
 import numpy as np
+import logging
+import time
 
 from symbolu_robotics.core.types import Layer12D, ActuatorCommand, RobotPose
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Numpy-based Optimization (No External Dependencies)
+# ============================================================================
+
+class NumpyBFGS:
+    """
+    BFGS quasi-Newton optimizer using only numpy.
+
+    Implements the Broyden-Fletcher-Goldfarb-Shanno algorithm
+    for unconstrained optimization.
+    """
+
+    def __init__(
+        self,
+        max_iterations: int = 50,
+        tolerance: float = 1e-6,
+        grad_tolerance: float = 1e-5,
+        line_search_max_iter: int = 20,
+    ):
+        self.max_iterations = max_iterations
+        self.tolerance = tolerance
+        self.grad_tolerance = grad_tolerance
+        self.line_search_max_iter = line_search_max_iter
+
+    def minimize(
+        self,
+        fun: Callable[[np.ndarray], float],
+        x0: np.ndarray,
+        bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    ) -> Tuple[np.ndarray, float, int, bool]:
+        """
+        Minimize function using BFGS.
+
+        Args:
+            fun: Objective function f(x) -> scalar
+            x0: Initial guess
+            bounds: Optional (lower, upper) bounds
+
+        Returns:
+            x_opt: Optimal solution
+            f_opt: Optimal function value
+            iterations: Number of iterations
+            converged: Whether optimization converged
+        """
+        x = x0.copy().flatten()
+        n = len(x)
+        H = np.eye(n)  # Initial inverse Hessian approximation
+
+        f = fun(x)
+        grad = self._numerical_gradient(fun, x)
+
+        for iteration in range(self.max_iterations):
+            # Check gradient convergence
+            grad_norm = np.linalg.norm(grad)
+            if grad_norm < self.grad_tolerance:
+                return x, f, iteration, True
+
+            # Search direction
+            p = -H @ grad
+
+            # Line search (Armijo backtracking)
+            alpha = self._line_search(fun, x, p, f, grad)
+
+            if alpha < 1e-10:
+                # Line search failed, try gradient descent step
+                alpha = 0.001
+                p = -grad
+
+            # Update position
+            s = alpha * p
+            x_new = x + s
+
+            # Apply bounds if provided
+            if bounds is not None:
+                x_new = np.clip(x_new, bounds[0], bounds[1])
+                s = x_new - x
+
+            # Evaluate new point
+            f_new = fun(x_new)
+            grad_new = self._numerical_gradient(fun, x_new)
+
+            # Check function value convergence
+            if abs(f_new - f) < self.tolerance:
+                return x_new, f_new, iteration, True
+
+            # BFGS update
+            y = grad_new - grad
+
+            # Curvature condition check
+            sy = np.dot(s, y)
+            if sy > 1e-10:
+                # Valid curvature - update inverse Hessian
+                rho = 1.0 / sy
+                I = np.eye(n)
+                V = I - rho * np.outer(s, y)
+                H = V @ H @ V.T + rho * np.outer(s, s)
+
+            # Update state
+            x = x_new
+            f = f_new
+            grad = grad_new
+
+        return x, f, self.max_iterations, False
+
+    def _numerical_gradient(
+        self,
+        fun: Callable[[np.ndarray], float],
+        x: np.ndarray,
+        eps: float = 1e-7,
+    ) -> np.ndarray:
+        """Compute gradient using central differences."""
+        grad = np.zeros_like(x)
+        for i in range(len(x)):
+            x_plus = x.copy()
+            x_minus = x.copy()
+            x_plus[i] += eps
+            x_minus[i] -= eps
+            grad[i] = (fun(x_plus) - fun(x_minus)) / (2 * eps)
+        return grad
+
+    def _line_search(
+        self,
+        fun: Callable[[np.ndarray], float],
+        x: np.ndarray,
+        p: np.ndarray,
+        f0: float,
+        grad: np.ndarray,
+        c1: float = 1e-4,
+        rho: float = 0.5,
+    ) -> float:
+        """
+        Backtracking line search with Armijo condition.
+
+        Returns step size alpha.
+        """
+        alpha = 1.0
+        dphi0 = np.dot(grad, p)
+
+        if dphi0 >= 0:
+            # Not a descent direction
+            return 0.0
+
+        for _ in range(self.line_search_max_iter):
+            x_new = x + alpha * p
+            f_new = fun(x_new)
+
+            # Armijo condition
+            if f_new <= f0 + c1 * alpha * dphi0:
+                return alpha
+
+            alpha *= rho
+
+        return alpha
+
+
+class NumpyProjectedGD:
+    """
+    Projected gradient descent for constrained optimization.
+
+    Simpler but more robust for constrained problems.
+    """
+
+    def __init__(
+        self,
+        max_iterations: int = 100,
+        learning_rate: float = 0.01,
+        tolerance: float = 1e-6,
+        adaptive_lr: bool = True,
+    ):
+        self.max_iterations = max_iterations
+        self.learning_rate = learning_rate
+        self.tolerance = tolerance
+        self.adaptive_lr = adaptive_lr
+
+    def minimize(
+        self,
+        fun: Callable[[np.ndarray], float],
+        x0: np.ndarray,
+        bounds: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    ) -> Tuple[np.ndarray, float, int, bool]:
+        """Minimize with projected gradient descent."""
+        x = x0.copy().flatten()
+        f = fun(x)
+        lr = self.learning_rate
+
+        for iteration in range(self.max_iterations):
+            # Numerical gradient
+            grad = self._numerical_gradient(fun, x)
+
+            # Gradient descent step
+            x_new = x - lr * grad
+
+            # Project to bounds
+            if bounds is not None:
+                x_new = np.clip(x_new, bounds[0], bounds[1])
+
+            f_new = fun(x_new)
+
+            # Adaptive learning rate
+            if self.adaptive_lr:
+                if f_new < f:
+                    lr *= 1.1  # Increase if improving
+                else:
+                    lr *= 0.5  # Decrease if not improving
+                    x_new = x  # Reject step
+                    f_new = f
+
+            # Check convergence
+            if np.linalg.norm(x_new - x) < self.tolerance:
+                return x_new, f_new, iteration, True
+
+            x = x_new
+            f = f_new
+
+        return x, f, self.max_iterations, False
+
+    def _numerical_gradient(self, fun, x, eps=1e-7):
+        grad = np.zeros_like(x)
+        for i in range(len(x)):
+            x_plus = x.copy()
+            x_minus = x.copy()
+            x_plus[i] += eps
+            x_minus[i] -= eps
+            grad[i] = (fun(x_plus) - fun(x_minus)) / (2 * eps)
+        return grad
 
 
 class MPCStatus(Enum):
@@ -237,9 +472,8 @@ class MPCPlanner:
     - SCC coherence-aware cost shaping
     - BCVF action candidate evaluation
 
-    Skeleton Implementation:
-    - Core data structures defined
-    - Simple gradient-free optimization (for production, use CasADi/IPOPT)
+    Implementation: Numpy-based BFGS optimization.
+    No external optimization libraries required.
     """
 
     def __init__(self, config: Optional[MPCConfig] = None):
@@ -253,6 +487,26 @@ class MPCPlanner:
         # State
         self._last_solution: Optional[List[np.ndarray]] = None
         self._warmstart_enabled = True
+
+        # Initialize optimizer
+        self._optimizer = NumpyBFGS(
+            max_iterations=self._config.max_iterations,
+            tolerance=self._config.tolerance,
+        )
+
+        # Alternative optimizer for constrained problems
+        self._constrained_optimizer = NumpyProjectedGD(
+            max_iterations=self._config.max_iterations * 2,
+            learning_rate=0.1,
+            tolerance=self._config.tolerance,
+        )
+
+        # Bounds for actions
+        self._action_dim = 7  # 6 joints + gripper
+        self._action_lower = np.array([-self._config.velocity_limit] * 6 + [0.0])
+        self._action_upper = np.array([self._config.velocity_limit] * 6 + [1.0])
+
+        logger.debug(f"MPCPlanner initialized with horizon={self._config.control_horizon}")
 
     def set_dynamics_model(self, model) -> None:
         """Set learned dynamics model for prediction."""
@@ -277,81 +531,92 @@ class MPCPlanner:
         goal_state: Optional[Layer12D] = None,
     ) -> MPCResult:
         """
-        Plan optimal control action via MPC.
+        Plan optimal control action via MPC using BFGS optimization.
 
         Process:
         1. Initialize with warmstart from previous solution
-        2. Predict trajectory using dynamics model
-        3. Optimize control sequence
-        4. Check constraints
+        2. Define cost function over flattened action sequence
+        3. Optimize using numpy-based BFGS
+        4. Check constraints and handle violations
         5. Return first action (receding horizon)
         """
-        import time
         start_time = time.time()
-
-        # Initialize action sequence
-        if self._warmstart_enabled and self._last_solution is not None:
-            # Shift warmstart
-            action_sequence = self._last_solution[1:] + [self._last_solution[-1]]
-        else:
-            action_sequence = [np.zeros(7) for _ in range(self._config.control_horizon)]
 
         # Set goal as terminal if provided
         if goal_state is not None:
             self._cost_fn._terminal_state = goal_state
 
-        # Simple optimization loop (gradient-free for skeleton)
-        best_cost = float('inf')
-        best_sequence = action_sequence.copy()
-        all_violations = []
+        # Initialize action sequence (flattened for optimizer)
+        horizon = self._config.control_horizon
+        if self._warmstart_enabled and self._last_solution is not None:
+            # Shift warmstart
+            x0 = np.concatenate(self._last_solution[1:] + [self._last_solution[-1]])
+        else:
+            x0 = np.zeros(horizon * self._action_dim)
 
-        for iteration in range(self._config.max_iterations):
-            # Evaluate current sequence
+        # Define cost function for optimizer
+        def cost_fn(x_flat: np.ndarray) -> float:
+            actions = [x_flat[i*self._action_dim:(i+1)*self._action_dim]
+                      for i in range(horizon)]
+
             trajectory, coherences, cost = self._simulate_trajectory(
-                current_state,
-                action_sequence,
-                current_coherence,
+                current_state, actions, current_coherence
             )
 
-            # Check constraints
-            violations = []
-            for i, action in enumerate(action_sequence):
-                prev = action_sequence[i-1] if i > 0 else None
-                violations.extend(self._constraints.check_all(
+            # Add constraint violation penalties
+            for i, action in enumerate(actions):
+                prev = actions[i-1] if i > 0 else None
+                violations = self._constraints.check_all(
                     trajectory[i] if i < len(trajectory) else current_state,
-                    action,
-                    prev,
-                ))
+                    action, prev
+                )
+                cost += len(violations) * 100.0
 
-            if violations:
-                cost += len(violations) * 100.0  # Penalty
-                all_violations = violations
+            return cost
 
-            if cost < best_cost:
-                best_cost = cost
-                best_sequence = [a.copy() for a in action_sequence]
+        # Setup bounds
+        lower_bounds = np.tile(self._action_lower, horizon)
+        upper_bounds = np.tile(self._action_upper, horizon)
+        bounds = (lower_bounds, upper_bounds)
 
-            # Check convergence
-            if cost < self._config.tolerance:
-                break
+        # Run optimization
+        x_opt, f_opt, iterations, converged = self._constrained_optimizer.minimize(
+            cost_fn, x0, bounds=bounds
+        )
 
-            # Simple perturbation (would use gradient in production)
-            action_sequence = self._perturb_sequence(action_sequence, iteration)
+        # Check if we have time for refinement with BFGS
+        elapsed_ms = (time.time() - start_time) * 1000
+        if converged and elapsed_ms < self._config.timeout_ms * 0.5:
+            # Refine with BFGS
+            x_refined, f_refined, extra_iters, _ = self._optimizer.minimize(
+                cost_fn, x_opt, bounds=bounds
+            )
+            if f_refined < f_opt:
+                x_opt = x_refined
+                f_opt = f_refined
+                iterations += extra_iters
 
-            # Check timeout
-            elapsed_ms = (time.time() - start_time) * 1000
-            if elapsed_ms > self._config.timeout_ms:
-                break
+        # Extract action sequence
+        best_sequence = [x_opt[i*self._action_dim:(i+1)*self._action_dim]
+                        for i in range(horizon)]
 
         # Save for warmstart
         self._last_solution = best_sequence
 
         # Simulate final trajectory
         trajectory, coherences, final_cost = self._simulate_trajectory(
-            current_state,
-            best_sequence,
-            current_coherence,
+            current_state, best_sequence, current_coherence
         )
+
+        # Check final constraint violations
+        all_violations = []
+        for i, action in enumerate(best_sequence):
+            prev = best_sequence[i-1] if i > 0 else None
+            violations = self._constraints.check_all(
+                trajectory[i] if i < len(trajectory) else current_state,
+                action, prev
+            )
+            all_violations.extend(violations)
 
         # Compute coherence penalty
         coherence_penalty = sum(
@@ -363,11 +628,11 @@ class MPCPlanner:
         elapsed_ms = (time.time() - start_time) * 1000
         if all_violations:
             status = MPCStatus.INFEASIBLE
-        elif iteration >= self._config.max_iterations - 1:
+        elif not converged:
             status = MPCStatus.MAX_ITER
         elif elapsed_ms >= self._config.timeout_ms:
             status = MPCStatus.TIMEOUT
-        elif best_cost < self._config.tolerance * 10:
+        elif f_opt < self._config.tolerance * 10:
             status = MPCStatus.OPTIMAL
         else:
             status = MPCStatus.SUBOPTIMAL
@@ -380,13 +645,18 @@ class MPCPlanner:
             control_mode="velocity",
         )
 
+        logger.debug(
+            f"MPC solved: status={status.value}, cost={f_opt:.4f}, "
+            f"iterations={iterations}, time={elapsed_ms:.1f}ms"
+        )
+
         return MPCResult(
             status=status,
             optimal_action=optimal_cmd,
             predicted_trajectory=trajectory,
             predicted_coherence=coherences,
-            cost=best_cost,
-            iterations=iteration + 1,
+            cost=f_opt,
+            iterations=iterations,
             solve_time_ms=elapsed_ms,
             constraint_violations=all_violations,
             coherence_penalty=coherence_penalty,
