@@ -115,6 +115,32 @@ from symbolu.agentic_framework.proactive_scheduler import (
     create_task,
 )
 
+# Coding Tools (file operations, search, code quality, execution, git, tests)
+from symbolu.agentic_framework.coding_tools import (
+    # File tools
+    FileReadTool,
+    FileWriteTool,
+    FileEditTool,
+    # Search tools
+    GlobTool,
+    GrepTool,
+    # Code quality
+    CodeCritic,
+    CodeCritique,
+    # Execution
+    CodeRunner,
+    SandboxExecutor,
+    # Git
+    GitTools,
+    # Project understanding
+    ProjectAnalyzer,
+    ProjectContext,
+    # Testing
+    TestRunner,
+    # Factory
+    create_coding_tools_gateway,
+)
+
 __all__ = [
     # Main agent
     "AgenticLLMWrapper",
@@ -198,6 +224,21 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
+    # Coding Tools (file operations, search, code quality, execution, git, tests)
+    "FileReadTool",
+    "FileWriteTool",
+    "FileEditTool",
+    "GlobTool",
+    "GrepTool",
+    "CodeCritic",
+    "CodeCritique",
+    "CodeRunner",
+    "SandboxExecutor",
+    "GitTools",
+    "ProjectAnalyzer",
+    "ProjectContext",
+    "TestRunner",
+    "create_coding_tools_gateway",
 ]
 
-__version__ = "1.5.0"  # Added Proactive Scheduler (autonomous task execution)
+__version__ = "1.6.0"  # Added Coding Tools (file operations, search, code quality, execution, git, tests)

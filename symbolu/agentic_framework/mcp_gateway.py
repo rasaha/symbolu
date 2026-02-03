@@ -213,27 +213,87 @@ class ToolRiskClassifier:
     READ_ONLY_PATTERNS = [
         "read", "get", "fetch", "search", "list", "query", "find",
         "describe", "show", "view", "check", "inspect", "analyze",
+        # Code-specific read operations
+        "glob", "grep", "file_read", "code_read", "code_search",
+        "git_status", "git_diff", "git_log", "git_show",
+        "project_context", "discover",
     ]
 
     WRITE_PATTERNS = [
         "write", "create", "add", "insert", "update", "set", "put",
         "post", "send", "upload", "save", "modify", "edit",
+        # Code-specific write operations
+        "file_write", "file_edit", "code_write", "code_edit",
+        "git_add", "git_commit", "git_checkout", "git_branch",
     ]
 
     EXECUTE_PATTERNS = [
         "execute", "run", "eval", "shell", "command", "script",
         "invoke", "call", "spawn", "process",
+        # Code-specific execution
+        "code_execute", "test_run", "build", "compile",
+        "lint", "format", "sandbox",
     ]
 
     DESTRUCTIVE_PATTERNS = [
         "delete", "remove", "drop", "truncate", "clear", "purge",
         "destroy", "wipe", "reset", "revoke",
+        # Code-specific destructive operations
+        "git_reset_hard", "git_clean", "rm", "unlink",
     ]
 
     PRIVILEGED_PATTERNS = [
         "admin", "sudo", "root", "credential", "secret", "token",
         "password", "key", "certificate", "permission", "grant",
+        # Code-specific privileged operations
+        "git_push", "git_force_push", "git_network",
+        "deploy", "publish", "release",
     ]
+
+    # Explicit code tool classifications (overrides pattern matching)
+    CODE_TOOL_CLASSIFICATIONS = {
+        # Read-only
+        "file_read": ToolRiskLevel.READ_ONLY,
+        "code_read": ToolRiskLevel.READ_ONLY,
+        "glob": ToolRiskLevel.READ_ONLY,
+        "grep": ToolRiskLevel.READ_ONLY,
+        "code_search": ToolRiskLevel.READ_ONLY,
+        "project_context": ToolRiskLevel.READ_ONLY,
+        "git_status": ToolRiskLevel.READ_ONLY,
+        "git_diff": ToolRiskLevel.READ_ONLY,
+        "git_log": ToolRiskLevel.READ_ONLY,
+        "git_show": ToolRiskLevel.READ_ONLY,
+        "code_critic": ToolRiskLevel.READ_ONLY,
+        "code_lint": ToolRiskLevel.READ_ONLY,
+        "test_discover": ToolRiskLevel.READ_ONLY,
+
+        # Write
+        "file_write": ToolRiskLevel.WRITE,
+        "file_edit": ToolRiskLevel.WRITE,
+        "code_write": ToolRiskLevel.WRITE,
+        "code_edit": ToolRiskLevel.WRITE,
+        "git_add": ToolRiskLevel.WRITE,
+        "git_commit": ToolRiskLevel.WRITE,
+        "git_checkout": ToolRiskLevel.WRITE,
+        "git_branch": ToolRiskLevel.WRITE,
+
+        # Execute
+        "code_execute": ToolRiskLevel.EXECUTE,
+        "sandbox_execute": ToolRiskLevel.EXECUTE,
+        "test_run": ToolRiskLevel.EXECUTE,
+        "build": ToolRiskLevel.EXECUTE,
+
+        # Privileged (network)
+        "git_push": ToolRiskLevel.PRIVILEGED,
+        "git_pull": ToolRiskLevel.PRIVILEGED,
+        "git_fetch": ToolRiskLevel.PRIVILEGED,
+        "git_network": ToolRiskLevel.PRIVILEGED,
+
+        # Destructive
+        "git_reset_hard": ToolRiskLevel.DESTRUCTIVE,
+        "git_force_push": ToolRiskLevel.DESTRUCTIVE,
+        "file_delete": ToolRiskLevel.DESTRUCTIVE,
+    }
 
     # Forbidden capabilities that SafetyContract blocks
     FORBIDDEN_CAPABILITIES = {
@@ -270,8 +330,12 @@ class ToolRiskClassifier:
         if tool_name in self.overrides:
             return self.overrides[tool_name]
 
-        # Normalize for pattern matching
+        # Check code tool classifications (exact match)
         name_lower = tool_name.lower()
+        if name_lower in self.CODE_TOOL_CLASSIFICATIONS:
+            return self.CODE_TOOL_CLASSIFICATIONS[name_lower]
+
+        # Normalize for pattern matching
         desc_lower = description.lower()
         combined = f"{name_lower} {desc_lower}"
 
