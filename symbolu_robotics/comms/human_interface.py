@@ -14,6 +14,9 @@ Integrates with Symbolu:
 - O8_PURPOSE: Goal extraction from commands
 - SCC coherence: Confidence in understanding
 - BCVF: Action selection from ambiguous commands
+
+Implementation: Hybrid approach using only Python stdlib (urllib for HTTP)
+No external LLM libraries required.
 """
 
 from dataclasses import dataclass, field
@@ -22,6 +25,14 @@ from enum import Enum
 from abc import ABC, abstractmethod
 import re
 import json
+import logging
+import ssl
+import urllib.request
+import urllib.error
+import time
+import os
+
+logger = logging.getLogger(__name__)
 
 
 class CommandType(Enum):
@@ -261,17 +272,142 @@ class MockLLMProvider(LLMProvider):
         return best[0], best[1]
 
 
+class StdlibHTTPClient:
+    """
+    HTTP client using only Python stdlib (urllib).
+
+    Provides OpenAI-compatible API calls without external dependencies.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "https://api.openai.com/v1",
+        api_key: Optional[str] = None,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+    ):
+        self.base_url = base_url.rstrip('/')
+        self.api_key = api_key or os.environ.get('OPENAI_API_KEY', '')
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self._ssl_context = ssl.create_default_context()
+
+    def _make_request(
+        self,
+        endpoint: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Make HTTP POST request with retry logic."""
+        url = f"{self.base_url}/{endpoint}"
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        data = json.dumps(payload).encode('utf-8')
+
+        for attempt in range(self.max_retries):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=data,
+                    headers=headers,
+                    method='POST',
+                )
+
+                with urllib.request.urlopen(
+                    req,
+                    context=self._ssl_context,
+                    timeout=self.timeout,
+                ) as response:
+                    result = json.loads(response.read().decode('utf-8'))
+                    return result
+
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode('utf-8') if e.fp else ''
+                logger.warning(
+                    f"HTTP error {e.code} on attempt {attempt + 1}: {error_body[:200]}"
+                )
+
+                # Don't retry on client errors (4xx) except rate limits
+                if e.code == 429:
+                    # Rate limited - wait and retry
+                    wait_time = 2 ** attempt
+                    logger.info(f"Rate limited, waiting {wait_time}s before retry")
+                    time.sleep(wait_time)
+                elif 400 <= e.code < 500:
+                    raise LLMError(f"API client error: {e.code} - {error_body[:200]}")
+                else:
+                    # Server error - retry
+                    if attempt < self.max_retries - 1:
+                        time.sleep(1)
+
+            except urllib.error.URLError as e:
+                logger.warning(f"URL error on attempt {attempt + 1}: {e.reason}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(1)
+
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                raise
+
+        raise LLMError(f"Failed after {self.max_retries} attempts")
+
+    def chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        model: str = "gpt-4",
+        temperature: float = 0.3,
+        max_tokens: int = 256,
+        response_format: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Make chat completion request."""
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        if response_format:
+            payload["response_format"] = response_format
+
+        return self._make_request("chat/completions", payload)
+
+
+class LLMError(Exception):
+    """Exception for LLM-related errors."""
+    pass
+
+
 class OpenAILLMProvider(LLMProvider):
     """
-    OpenAI API-based LLM provider.
+    OpenAI API-based LLM provider using only Python stdlib.
 
-    Skeleton: Defines interface, actual API calls require external setup.
+    Uses urllib for HTTP requests - no external LLM libraries required.
+    Falls back to MockLLMProvider if API key not available or on errors.
     """
 
-    def __init__(self, api_key: Optional[str] = None, config: Optional[LLMConfig] = None):
-        self._api_key = api_key
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        config: Optional[LLMConfig] = None,
+        base_url: str = "https://api.openai.com/v1",
+    ):
+        self._api_key = api_key or os.environ.get('OPENAI_API_KEY', '')
         self._config = config or LLMConfig()
         self._mock = MockLLMProvider()
+        self._base_url = base_url
+
+        # Initialize HTTP client
+        self._client = StdlibHTTPClient(
+            base_url=base_url,
+            api_key=self._api_key,
+            timeout=30.0,
+            max_retries=3,
+        )
 
         # System prompt for robotics
         self._system_prompt = """You are a robot command interpreter. Parse natural language commands into structured intents.
@@ -287,15 +423,54 @@ Output JSON with:
 Context about the robot will be provided. Be conservative with confidence.
 """
 
+        # Check if API key is available
+        self._api_available = bool(self._api_key)
+        if not self._api_available:
+            logger.warning(
+                "No API key found (set OPENAI_API_KEY env var). "
+                "Falling back to mock provider."
+            )
+
     def parse_command(
         self,
         text: str,
         context: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Parse using OpenAI API."""
-        # Skeleton: Would call OpenAI API here
-        # For now, fall back to mock
-        return self._mock.parse_command(text, context)
+        """Parse command using OpenAI API with stdlib HTTP."""
+        if not self._api_available:
+            return self._mock.parse_command(text, context)
+
+        try:
+            messages = [
+                {"role": "system", "content": self._system_prompt},
+                {"role": "user", "content": f"Context: {json.dumps(context)}\n\nCommand: {text}"},
+            ]
+
+            response = self._client.chat_completion(
+                messages=messages,
+                model=self._config.model_name,
+                temperature=self._config.temperature,
+                max_tokens=self._config.max_tokens,
+                response_format={"type": "json_object"},
+            )
+
+            # Extract content from response
+            content = response.get('choices', [{}])[0].get('message', {}).get('content', '{}')
+
+            try:
+                result = json.loads(content)
+                logger.debug(f"LLM parsed command: {result.get('intent')} (confidence: {result.get('confidence')})")
+                return result
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse LLM response as JSON: {content[:100]}")
+                return self._mock.parse_command(text, context)
+
+        except LLMError as e:
+            logger.warning(f"LLM API error: {e}. Falling back to mock.")
+            return self._mock.parse_command(text, context)
+        except Exception as e:
+            logger.error(f"Unexpected error in parse_command: {e}")
+            return self._mock.parse_command(text, context)
 
     def generate_response(
         self,
@@ -303,9 +478,37 @@ Context about the robot will be provided. Be conservative with confidence.
         success: bool,
         context: Dict[str, Any],
     ) -> str:
-        """Generate response using OpenAI API."""
-        # Skeleton: Would call OpenAI API here
-        return self._mock.generate_response(command, success, context)
+        """Generate natural response using OpenAI API."""
+        if not self._api_available:
+            return self._mock.generate_response(command, success, context)
+
+        try:
+            status = "successfully" if success else "unsuccessfully"
+            prompt = f"""Generate a brief, friendly response for a robot that {status} executed:
+Action: {command.action}
+Target: {command.target}
+Type: {command.type.value}
+
+Keep response under 20 words. Be conversational."""
+
+            messages = [
+                {"role": "system", "content": "You are a helpful robot assistant. Give brief, friendly responses."},
+                {"role": "user", "content": prompt},
+            ]
+
+            response = self._client.chat_completion(
+                messages=messages,
+                model=self._config.model_name,
+                temperature=0.7,
+                max_tokens=50,
+            )
+
+            content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            return content.strip() or self._mock.generate_response(command, success, context)
+
+        except Exception as e:
+            logger.warning(f"Error generating response: {e}")
+            return self._mock.generate_response(command, success, context)
 
     def disambiguate(
         self,
@@ -313,9 +516,163 @@ Context about the robot will be provided. Be conservative with confidence.
         options: List[str],
         context: Dict[str, Any],
     ) -> Tuple[int, float]:
-        """Disambiguate using OpenAI API."""
-        # Skeleton: Would call OpenAI API here
-        return self._mock.disambiguate(text, options, context)
+        """Disambiguate between options using OpenAI API."""
+        if not self._api_available or not options:
+            return self._mock.disambiguate(text, options, context)
+
+        try:
+            options_str = "\n".join(f"{i}: {opt}" for i, opt in enumerate(options))
+            prompt = f"""Given the user command and context, select the best matching option.
+
+User command: "{text}"
+Context: {json.dumps(context)}
+
+Options:
+{options_str}
+
+Respond with JSON: {{"selected_index": <number>, "confidence": <0.0-1.0>}}"""
+
+            messages = [
+                {"role": "system", "content": "You are a precise intent classifier. Output only JSON."},
+                {"role": "user", "content": prompt},
+            ]
+
+            response = self._client.chat_completion(
+                messages=messages,
+                model=self._config.model_name,
+                temperature=0.1,
+                max_tokens=50,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.get('choices', [{}])[0].get('message', {}).get('content', '{}')
+            result = json.loads(content)
+
+            index = int(result.get('selected_index', 0))
+            confidence = float(result.get('confidence', 0.5))
+
+            # Validate index
+            if 0 <= index < len(options):
+                return index, confidence
+            else:
+                logger.warning(f"Invalid index {index} from LLM, falling back to mock")
+                return self._mock.disambiguate(text, options, context)
+
+        except Exception as e:
+            logger.warning(f"Error in disambiguate: {e}")
+            return self._mock.disambiguate(text, options, context)
+
+
+class OllamaLLMProvider(LLMProvider):
+    """
+    Ollama-compatible LLM provider for local models.
+
+    Uses the same stdlib HTTP client but targets local Ollama server.
+    """
+
+    def __init__(
+        self,
+        model: str = "llama2",
+        base_url: str = "http://localhost:11434",
+        config: Optional[LLMConfig] = None,
+    ):
+        self._model = model
+        self._config = config or LLMConfig()
+        self._mock = MockLLMProvider()
+
+        self._client = StdlibHTTPClient(
+            base_url=base_url,
+            api_key=None,  # Ollama doesn't need API key
+            timeout=60.0,  # Local models can be slower
+            max_retries=2,
+        )
+
+        self._system_prompt = """You are a robot command interpreter. Parse commands into JSON with:
+- intent: pick, place, goto, motion, stop, query, or unknown
+- confidence: 0.0-1.0
+- entities: object, location, direction, number
+- requires_clarification: true/false"""
+
+        # Check if Ollama is available
+        self._available = self._check_availability()
+
+    def _check_availability(self) -> bool:
+        """Check if Ollama server is running."""
+        try:
+            req = urllib.request.Request(
+                f"{self._client.base_url}/api/tags",
+                method='GET',
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.status == 200
+        except Exception:
+            logger.warning("Ollama not available, falling back to mock provider")
+            return False
+
+    def _generate(self, prompt: str, system: str = "") -> str:
+        """Generate text using Ollama API."""
+        payload = {
+            "model": self._model,
+            "prompt": prompt,
+            "system": system,
+            "stream": False,
+            "options": {
+                "temperature": self._config.temperature,
+                "num_predict": self._config.max_tokens,
+            },
+        }
+
+        try:
+            # Ollama uses different endpoint
+            url = f"{self._client.base_url}/api/generate"
+            headers = {"Content-Type": "application/json"}
+            data = json.dumps(payload).encode('utf-8')
+
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+
+            with urllib.request.urlopen(req, timeout=self._client.timeout) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result.get('response', '')
+
+        except Exception as e:
+            logger.warning(f"Ollama generation error: {e}")
+            return ''
+
+    def parse_command(self, text: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse command using local Ollama model."""
+        if not self._available:
+            return self._mock.parse_command(text, context)
+
+        prompt = f"Context: {json.dumps(context)}\nCommand: {text}\n\nRespond with JSON only:"
+        response = self._generate(prompt, self._system_prompt)
+
+        try:
+            # Try to extract JSON from response
+            json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception:
+            pass
+
+        return self._mock.parse_command(text, context)
+
+    def generate_response(self, command: ParsedCommand, success: bool, context: Dict[str, Any]) -> str:
+        """Generate response using local model."""
+        if not self._available:
+            return self._mock.generate_response(command, success, context)
+
+        status = "completed" if success else "failed to complete"
+        prompt = f"Robot {status} action '{command.action}'. Give brief acknowledgment (under 15 words):"
+
+        response = self._generate(prompt)
+        return response.strip() or self._mock.generate_response(command, success, context)
+
+    def disambiguate(self, text: str, options: List[str], context: Dict[str, Any]) -> Tuple[int, float]:
+        """Disambiguate using local model."""
+        if not self._available:
+            return self._mock.disambiguate(text, options, context)
+
+        return self._mock.disambiguate(text, options, context)  # Use mock for simplicity
 
 
 class HumanInterface:

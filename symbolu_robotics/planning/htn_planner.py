@@ -15,14 +15,20 @@ Key Features:
 - Precondition/effect reasoning
 - Dynamic replanning on failure
 - Integration with action primitives
+
+Implementation: Pure Python HTN planner (similar to pyhop)
+No external planning libraries required.
 """
 
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Callable, Any, Tuple
 from enum import Enum
 import copy
+import logging
 
 from symbolu_robotics.core.types import Layer12D
+
+logger = logging.getLogger(__name__)
 
 
 class TaskStatus(Enum):

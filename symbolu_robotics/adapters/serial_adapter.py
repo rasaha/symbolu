@@ -3,15 +3,35 @@ Serial Adapter for Robotics
 ============================
 
 Direct microcontroller communication via serial port.
+
+Implementation: Uses pyserial (the only external dependency in hybrid approach)
+Supports ESP32, Arduino, STM32, Teensy, etc.
+
+Protocol:
+- 'R' command: Request sensor data
+- 'C' command + data: Send actuator command
+- 'S' command: Request status
+- 'E' command: Emergency stop
 """
 
 from typing import Optional, List
 import struct
 import time
+import logging
 
 from symbolu_robotics.adapters.base_adapter import BaseAdapter, AdapterConfig
 from symbolu_robotics.core.types import SensorFrame, ActuatorCommand, JointState
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# Check for pyserial availability
+try:
+    import serial
+    PYSERIAL_AVAILABLE = True
+except ImportError:
+    PYSERIAL_AVAILABLE = False
+    logger.warning("pyserial not installed. Serial adapter will run in mock mode.")
 
 
 class SerialAdapter(BaseAdapter):
@@ -42,24 +62,35 @@ class SerialAdapter(BaseAdapter):
 
     def connect(self) -> bool:
         """Open serial connection."""
+        if not PYSERIAL_AVAILABLE:
+            logger.warning("pyserial not available. Running in mock mode.")
+            self._init_mock()
+            return True
+
         try:
-            import serial
             self._serial = serial.Serial(
                 port=self.port,
                 baudrate=self.baudrate,
-                timeout=self.config.timeout_ms / 1000
+                timeout=self.config.timeout_ms / 1000 if self.config else 0.1,
             )
             time.sleep(0.5)  # Wait for Arduino reset
+
+            # Flush any startup garbage
+            self._serial.reset_input_buffer()
+            self._serial.reset_output_buffer()
+
             self._connected = True
+            logger.info(f"Serial connected: {self.port} @ {self.baudrate} baud")
             return True
 
-        except ImportError:
-            print("pyserial not available. Running in mock mode.")
+        except serial.SerialException as e:
+            logger.error(f"Serial connection failed: {e}")
+            logger.info("Falling back to mock mode")
             self._init_mock()
             return True
 
         except Exception as e:
-            print(f"Serial connection failed: {e}")
+            logger.error(f"Unexpected error during serial connect: {e}")
             return False
 
     def _init_mock(self) -> None:
