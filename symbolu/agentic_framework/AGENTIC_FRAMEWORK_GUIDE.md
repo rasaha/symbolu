@@ -1,6 +1,6 @@
 # Sentinel: A Layman's Guide
 
-**Version:** 1.5.0 | **Game Changer Score:** 7.5-8/10 | [Full Assessment](./docs/SENTINEL_SCORE.md)
+**Version:** 1.6.0 | **Game Changer Score:** 7.5-8/10 | [Full Assessment](./docs/SENTINEL_SCORE.md)
 
 ## What Is Sentinel?
 
@@ -24,10 +24,11 @@ Sentinel adds a "management layer" that helps AI assistants:
 - **Act on confidence, not display it** (confidence gate)
 - **Safely use external tools** (MCP gateway)
 - **Execute tasks autonomously** (proactive scheduler)
+- **Work with code like a developer** (coding tools)
 
 ---
 
-## The Ten Core Components
+## The Eleven Core Components
 
 ### 1. Goal Decomposition (The "What Do You Really Want?" Module)
 
@@ -743,6 +744,270 @@ print(f"Enabled tasks: {stats['enabled_tasks']}")
 
 ---
 
+### 11. Coding Tools (The "Work With Code Like a Developer" Module)
+
+**Plain English:** Gives AI agents the ability to read, write, search, analyze, and execute code - just like a human developer using an IDE.
+
+**This Enables Claude Code-Style Capabilities:**
+```
+❌ Without Coding Tools:
+   Agent can only talk about code, not work with it
+   (Limited to explaining what it would do, hypothetically)
+
+✅ With Coding Tools:
+   Agent reads files, makes edits, runs tests, commits changes
+   (Full developer workflow, with safety controls)
+```
+
+**Tool Categories:**
+
+| Category | Tools | Capabilities |
+|----------|-------|--------------|
+| **File Operations** | FileReadTool, FileWriteTool, FileEditTool | Read with line numbers, atomic writes, precise edits |
+| **Code Search** | GlobTool, GrepTool | Pattern-based file search, regex content search |
+| **Code Quality** | CodeCritic | Syntax, lint, security, style analysis |
+| **Execution** | SandboxExecutor, CodeRunner | Isolated execution for Python, Node, Bash |
+| **Git Operations** | GitTools | status, diff, log, add, commit, push, pull |
+| **Project Understanding** | ProjectAnalyzer | Language detection, framework, dependencies |
+| **Testing** | TestRunner | pytest, jest, go test, cargo test |
+
+**Risk Classification:**
+
+All coding tools are integrated with the MCP Gateway risk system:
+
+| Tool | Risk Level | Min Confidence | Human Escalation |
+|------|------------|----------------|------------------|
+| file_read, code_search | READ_ONLY | 0.30 | Never |
+| file_write, file_edit | WRITE | 0.50 | If uncertain |
+| code_execute, test_run | EXECUTE | 0.70 | Often |
+| git_push | PRIVILEGED | 0.95 | Always confirm |
+| git_reset_hard | DESTRUCTIVE | 0.85 | Always confirm |
+
+**File Operations:**
+
+```python
+from symbolu.agentic_framework import FileReadTool, FileWriteTool, FileEditTool
+
+# Read files with line numbers
+reader = FileReadTool()
+result = reader.read("/path/to/file.py")
+print(result["content"])  # Shows content with line numbers
+print(result["total_lines"])
+
+# Read specific line range
+result = reader.read("/path/to/file.py", offset=100, limit=50)
+
+# Write files atomically (with backup)
+writer = FileWriteTool()
+result = writer.write("/path/to/new_file.py", content, create_backup=True)
+
+# Make precise edits (like sed but safer)
+editor = FileEditTool()
+result = editor.edit(
+    "/path/to/file.py",
+    old_string="def old_function():",
+    new_string="def renamed_function():",
+)
+# old_string must be unique in the file - prevents ambiguous edits
+```
+
+**Code Search:**
+
+```python
+from symbolu.agentic_framework import GlobTool, GrepTool
+
+# Find files by pattern
+glob_tool = GlobTool()
+files = glob_tool.search("**/*.py", path="/project")
+# Returns: ["/project/main.py", "/project/utils/helper.py", ...]
+
+# Search content with regex
+grep_tool = GrepTool()
+matches = grep_tool.search(
+    pattern=r"def\s+\w+_handler\(",
+    path="/project",
+    glob="*.py",
+)
+# Returns files and line numbers containing the pattern
+```
+
+**Code Quality Analysis:**
+
+```python
+from symbolu.agentic_framework import CodeCritic
+
+critic = CodeCritic()
+
+# Analyze Python code
+critique = critic.analyze(code, language="python")
+
+print(f"Score: {critique.overall_score}")
+print(f"Syntax valid: {critique.syntax_valid}")
+
+# Security issues flagged
+for issue in critique.security_issues:
+    print(f"SECURITY: Line {issue.line}: {issue.message}")
+
+# Lint issues
+for issue in critique.lint_issues:
+    print(f"LINT: {issue.severity} - {issue.message}")
+
+# Style suggestions
+for suggestion in critique.style_issues:
+    print(f"STYLE: {suggestion.message}")
+```
+
+**Sandboxed Code Execution:**
+
+```python
+from symbolu.agentic_framework import CodeRunner, SandboxConfig
+
+# Configure sandbox
+config = SandboxConfig(
+    timeout_seconds=30.0,
+    max_stdout_bytes=100_000,
+    use_temp_dir=True,
+)
+
+runner = CodeRunner(config)
+
+# Run Python code
+result = runner.run('''
+import math
+print(f"Pi = {math.pi}")
+''', language="python")
+
+if result.success:
+    print(result.stdout)  # "Pi = 3.141592..."
+else:
+    print(f"Error: {result.error}")
+
+# Run JavaScript
+result = runner.run('console.log("Hello from Node")', language="javascript")
+
+# Execute with timeout
+result = runner.run(long_running_code, timeout=5.0)
+if result.status == ExecutionStatus.TIMEOUT:
+    print("Code took too long")
+```
+
+**Git Operations:**
+
+```python
+from symbolu.agentic_framework import GitTools
+
+git = GitTools(repo_path="/my/project")
+
+# Read operations (safe)
+status = git.status()
+print(f"Modified: {status.modified}")
+print(f"Untracked: {status.untracked}")
+
+diff = git.diff()  # Current changes
+log = git.log(n=10)  # Recent commits
+
+# Write operations (require higher confidence)
+git.add(["file1.py", "file2.py"])
+result = git.commit("Fix bug in parser")
+
+# Network operations (privileged)
+git.push()  # Requires human confirmation via MCP Gateway
+git.pull()
+```
+
+**Project Understanding:**
+
+```python
+from symbolu.agentic_framework import ProjectAnalyzer
+
+analyzer = ProjectAnalyzer()
+context = analyzer.analyze("/path/to/project")
+
+print(f"Languages: {context.languages}")  # ["python", "javascript"]
+print(f"Framework: {context.framework}")  # "django"
+print(f"Package manager: {context.package_manager}")  # "pip"
+print(f"Test framework: {context.test_framework}")  # "pytest"
+
+# Get project structure
+for file_info in context.files[:10]:
+    print(f"{file_info.path}: {file_info.language}")
+```
+
+**Test Execution:**
+
+```python
+from symbolu.agentic_framework import TestRunner
+
+runner = TestRunner()
+
+# Auto-detect and run tests
+result = runner.run("/project")  # Detects pytest, jest, etc.
+
+print(f"Passed: {result.passed}")
+print(f"Failed: {result.failed}")
+print(f"Duration: {result.duration_ms}ms")
+
+# Run specific test file
+result = runner.run_file("/project/tests/test_parser.py")
+
+# Run with pattern
+result = runner.run("/project", pattern="test_auth*")
+```
+
+**MCP Gateway Integration:**
+
+All coding tools work through the MCP Gateway with full safety controls:
+
+```python
+from symbolu.agentic_framework import create_coding_tools_gateway
+
+# Create gateway with all coding tools
+gateway = create_coding_tools_gateway(
+    project_root="/my/project",
+    human_confirmation_callback=ask_user,
+)
+
+# Tools are automatically risk-classified
+# READ_ONLY: file_read, glob, grep
+# WRITE: file_write, file_edit, git_add, git_commit
+# EXECUTE: code_execute, test_run
+# PRIVILEGED: git_push, git_fetch
+
+# Gateway handles confidence checks before execution
+result = await gateway.call_tool(
+    MCPToolCall(tool_name="file_write", arguments={...}),
+    signals=ConfidenceSignals(quality_score=0.9, ...)
+)
+```
+
+**Code Action Types in Goal Decomposition:**
+
+The Goal Decomposition module recognizes coding intents:
+
+```python
+# When user says: "Fix the bug in parser.py line 42"
+# Goal decomposition extracts:
+{
+    "actions": [
+        {"type": "code_read", "target": "parser.py"},
+        {"type": "code_edit", "target": "parser.py", "line": 42},
+        {"type": "test_run", "scope": "affected"},
+    ],
+    "is_code_task": True,
+    "has_destructive_action": False,
+}
+```
+
+**Why It Matters:**
+- **Closes the capability gap** between chat-only agents and developer tools
+- **Same safety infrastructure** as all other Sentinel components
+- **Risk-aware execution** prevents destructive actions without confirmation
+- **Full audit trail** of all file operations and code executions
+- **Integrated with Confidence Gate** for behavioral control
+- **Works with any codebase** - auto-detects language, framework, test tools
+
+---
+
 ## How It All Works Together
 
 ```
@@ -1211,6 +1476,7 @@ python -m symbolu.agentic_framework.benchmark_critics --json
 | **Confidence Gate** | **Behavioral confidence control** | **Confidence controls, not annotates** |
 | **MCP Gateway** | **Safe tool integration** | **Risk-gated MCP access** |
 | **Proactive Scheduler** | **Autonomous task execution** | **Scheduled automation with safety** |
+| **Coding Tools** | **Developer workflow capabilities** | **Read, write, execute code safely** |
 
 **Bottom Line:** Sentinel doesn't make AI smarter - it makes AI more reliable, predictable, safe, and **affordable** by adding oversight layers that catch problems before they reach users, while keeping costs under control through intelligent local inference and behavioral confidence gating.
 
