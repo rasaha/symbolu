@@ -422,6 +422,36 @@ except ImportError as e:
 
 
 # =============================================================================
+# CAUSAL DATASETS (COPA, e-CARE, Synthetic SCM)
+# =============================================================================
+# Datasets with known causal structure for training and evaluating
+# the Causal World Model:
+#   - COPA: Choice of Plausible Alternatives (commonsense causal reasoning)
+#   - e-CARE: Explainable Causal Reasoning with explanations
+#   - Synthetic SCM: Structural Causal Models with ground-truth graphs
+
+try:
+    from symbolu.causal_datasets import (
+        CausalDataLoader,
+        CausalDatasetConfig,
+        CausalTorchDataset,
+        CausalExample,
+        COPADataset,
+        ECareDataset,
+        SyntheticSCMDataset,
+        create_causal_dataloader,
+        load_copa,
+        load_ecare,
+        load_synthetic_scm,
+    )
+    CAUSAL_DATASETS_AVAILABLE = True
+except ImportError as e:
+    CAUSAL_DATASETS_AVAILABLE = False
+    print(f"Note: Causal Datasets modules not available for import: {e}")
+    print("      Causal dataset benchmarks will use synthetic data.")
+
+
+# =============================================================================
 # NO-WRITE CONTRACTS (V10.6.2)
 # =============================================================================
 # From ChatGPT Gap Analysis (Appendix D.5):
@@ -5934,6 +5964,141 @@ def run_causal_world_model_benchmarks(
     print(f"    World state: {'YES' if results['full_model']['has_world_state'] else 'NO'}")
 
     # -------------------------------------------------------------------------
+    # TEST 6: Causal Datasets Evaluation
+    # -------------------------------------------------------------------------
+    print("\n--- TEST 6: Causal Datasets Evaluation ---")
+
+    results["datasets"] = {}
+
+    if CAUSAL_DATASETS_AVAILABLE:
+        print(f"  Loading dataset: {args.cwm_dataset}")
+
+        # Determine which datasets to load
+        if args.cwm_dataset == "all":
+            dataset_names = ["copa", "ecare", "scm"]
+        else:
+            dataset_names = [args.cwm_dataset]
+
+        # Create dataset config
+        ds_config = CausalDatasetConfig(
+            copa_split=args.copa_split,
+            ecare_split=args.ecare_split,
+            ecare_include_explanations=args.ecare_explanations,
+            scm_num_samples=args.scm_num_samples,
+            scm_num_variables=args.scm_num_variables,
+            scm_edge_probability=args.scm_edge_probability,
+            scm_noise_std=args.scm_noise_std,
+            scm_intervention_prob=args.scm_intervention_prob,
+            scm_include_counterfactuals=args.scm_counterfactuals,
+        )
+
+        # Load each dataset
+        for ds_name in dataset_names:
+            print(f"\n    --- {ds_name.upper()} Dataset ---")
+
+            try:
+                if ds_name == "copa":
+                    dataset = COPADataset(
+                        split=ds_config.copa_split,
+                        max_samples=args.cwm_dataset_samples,
+                    )
+                elif ds_name == "ecare":
+                    dataset = ECareDataset(
+                        split=ds_config.ecare_split,
+                        include_explanations=ds_config.ecare_include_explanations,
+                        max_samples=args.cwm_dataset_samples,
+                    )
+                elif ds_name == "scm":
+                    dataset = SyntheticSCMDataset(
+                        num_samples=min(ds_config.scm_num_samples, args.cwm_dataset_samples),
+                        num_variables=ds_config.scm_num_variables,
+                        edge_probability=ds_config.scm_edge_probability,
+                        noise_std=ds_config.scm_noise_std,
+                        intervention_prob=ds_config.scm_intervention_prob,
+                        include_counterfactuals=ds_config.scm_include_counterfactuals,
+                    )
+                else:
+                    continue
+
+                print(f"      Total examples: {len(dataset)}")
+
+                # Analyze dataset
+                num_causal = sum(1 for i in range(min(len(dataset), 100))
+                               if dataset[i].label == 1)
+                num_non_causal = min(len(dataset), 100) - num_causal
+
+                print(f"      Causal examples (sample): {num_causal}")
+                print(f"      Non-causal examples (sample): {num_non_causal}")
+
+                # Check for causal graphs
+                num_with_graph = sum(1 for i in range(min(len(dataset), 100))
+                                    if dataset.get_causal_graph(i) is not None)
+                print(f"      With causal graph: {num_with_graph}")
+
+                # Sample example
+                if len(dataset) > 0:
+                    example = dataset[0]
+                    print(f"\n      Sample example:")
+                    print(f"        Premise: {example.premise[:60]}...")
+                    print(f"        Hypothesis: {example.hypothesis[:60]}...")
+                    print(f"        Label: {example.label}")
+                    if example.explanation:
+                        print(f"        Explanation: {example.explanation[:60]}...")
+
+                # Run model on dataset samples
+                print(f"\n      Running model on {min(10, len(dataset))} samples...")
+
+                torch_dataset = CausalTorchDataset(
+                    dataset,
+                    tokenizer=None,
+                    max_seq_len=64,
+                    d_model=d_model,
+                )
+
+                correct = 0
+                total = 0
+                total_dag_loss = 0.0
+
+                for i in range(min(10, len(torch_dataset))):
+                    batch = torch_dataset[i]
+                    x = batch["input_embeds"].unsqueeze(0).to(device)
+                    true_label = batch["label"].item()
+
+                    with torch.no_grad():
+                        output, causal_state, dag_loss = model(x)
+
+                    total_dag_loss += dag_loss.item()
+
+                    # Simple prediction based on output norm
+                    pred_label = 1 if output.norm() > output.mean() else 0
+                    if pred_label == true_label:
+                        correct += 1
+                    total += 1
+
+                accuracy = correct / total if total > 0 else 0.0
+                avg_dag_loss = total_dag_loss / total if total > 0 else 0.0
+
+                results["datasets"][ds_name] = {
+                    "num_examples": len(dataset),
+                    "accuracy_sample": accuracy,
+                    "avg_dag_loss": avg_dag_loss,
+                    "num_causal": num_causal,
+                    "num_non_causal": num_non_causal,
+                    "num_with_graph": num_with_graph,
+                }
+
+                print(f"      Accuracy (sample): {accuracy:.1%}")
+                print(f"      Avg DAG loss: {avg_dag_loss:.6f}")
+
+            except Exception as e:
+                print(f"      Error loading {ds_name}: {e}")
+                results["datasets"][ds_name] = {"error": str(e)}
+
+    else:
+        print("  Causal datasets module not available. Skipping dataset tests.")
+        results["datasets"]["error"] = "Module not available"
+
+    # -------------------------------------------------------------------------
     # Summary
     # -------------------------------------------------------------------------
     print("\n" + "=" * 70)
@@ -11032,6 +11197,41 @@ Examples:
                         help="Run extended intervention benchmarks.")
     parser.add_argument("--cwm-benchmark-counterfactual", action="store_true",
                         help="Run extended counterfactual benchmarks.")
+
+    # ==========================================================================
+    # CAUSAL DATASETS (COPA, e-CARE, Synthetic SCM)
+    # ==========================================================================
+    parser.add_argument("--cwm-dataset", type=str, default="scm",
+                        choices=["copa", "ecare", "scm", "all"],
+                        help="Causal dataset to use. 'all' loads all three. Default: scm")
+    parser.add_argument("--cwm-dataset-split", type=str, default="train",
+                        help="Dataset split (train/validation/test). Default: train")
+    parser.add_argument("--cwm-dataset-samples", type=int, default=1000,
+                        help="Number of samples to load. Default: 1000")
+
+    # COPA-specific
+    parser.add_argument("--copa-split", type=str, default="train",
+                        help="COPA dataset split. Default: train")
+
+    # e-CARE-specific
+    parser.add_argument("--ecare-split", type=str, default="train",
+                        help="e-CARE dataset split. Default: train")
+    parser.add_argument("--ecare-explanations", action="store_true", default=True,
+                        help="Include causal explanations in e-CARE data.")
+
+    # Synthetic SCM-specific
+    parser.add_argument("--scm-num-samples", type=int, default=10000,
+                        help="Number of SCM samples to generate. Default: 10000")
+    parser.add_argument("--scm-num-variables", type=int, default=10,
+                        help="Number of variables in SCM. Default: 10")
+    parser.add_argument("--scm-edge-probability", type=float, default=0.3,
+                        help="Edge probability in SCM DAG. Default: 0.3")
+    parser.add_argument("--scm-noise-std", type=float, default=0.1,
+                        help="Noise standard deviation in SCM. Default: 0.1")
+    parser.add_argument("--scm-intervention-prob", type=float, default=0.2,
+                        help="Probability of interventional examples. Default: 0.2")
+    parser.add_argument("--scm-counterfactuals", action="store_true", default=True,
+                        help="Include counterfactual examples in SCM data.")
 
     # Device
     parser.add_argument("--device", type=str,
