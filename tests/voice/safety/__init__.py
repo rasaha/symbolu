@@ -1,0 +1,1 @@
+"""Voice safety gate tests."""
