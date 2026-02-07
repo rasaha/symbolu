@@ -13,6 +13,8 @@ with expected outcomes. This ensures correctness of:
   - Diagonal pattern detection
   - Fibonacci ratio validation
   - Composite probability scoring
+  - RSI divergence detection (regular & hidden)
+  - Per-pattern RSI divergence scoring
 """
 
 import math
@@ -395,9 +397,207 @@ def detect_diagonal(pivots, fib_tolerance=DEFAULT_FIB_TOLERANCE):
     return (diag_type, confidence, is_leading)
 
 
-def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum):
-    """Weighted composite probability: 40% pattern + 25% MTF + 20% trend + 15% momentum."""
+def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum, p_rsi=None):
+    """Weighted composite probability.
+    Without RSI: 40% pattern + 25% MTF + 20% trend + 15% momentum (legacy).
+    With RSI:    35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI.
+    """
+    if p_rsi is not None:
+        return p_pattern * 0.35 + p_mtf * 0.20 + p_trend * 0.15 + p_momentum * 0.15 + p_rsi * 0.15
     return p_pattern * 0.40 + p_mtf * 0.25 + p_trend * 0.20 + p_momentum * 0.15
+
+
+# ============================================================================
+# RSI DIVERGENCE DETECTION (translated from Pine Script)
+# ============================================================================
+
+def detect_divergence_at_highs(prices, rsi_values, newer_idx, older_idx):
+    """
+    Detect divergence between two high pivots.
+    Returns: 1 = regular bearish, 2 = hidden bearish, 0 = none.
+    """
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(rsi_values) or older_idx >= len(rsi_values)):
+        return 0
+    p_new = prices[newer_idx]
+    p_old = prices[older_idx]
+    r_new = rsi_values[newer_idx]
+    r_old = rsi_values[older_idx]
+    if p_new is None or p_old is None or r_new is None or r_old is None:
+        return 0
+    # Regular bearish: price higher high, RSI lower high
+    if p_new > p_old and r_new < r_old:
+        return 1
+    # Hidden bearish: price lower high, RSI higher high
+    if p_new < p_old and r_new > r_old:
+        return 2
+    return 0
+
+
+def detect_divergence_at_lows(prices, rsi_values, newer_idx, older_idx):
+    """
+    Detect divergence between two low pivots.
+    Returns: -1 = regular bullish, -2 = hidden bullish, 0 = none.
+    """
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(rsi_values) or older_idx >= len(rsi_values)):
+        return 0
+    p_new = prices[newer_idx]
+    p_old = prices[older_idx]
+    r_new = rsi_values[newer_idx]
+    r_old = rsi_values[older_idx]
+    if p_new is None or p_old is None or r_new is None or r_old is None:
+        return 0
+    # Regular bullish: price lower low, RSI higher low
+    if p_new < p_old and r_new > r_old:
+        return -1
+    # Hidden bullish: price higher low, RSI lower low
+    if p_new > p_old and r_new < r_old:
+        return -2
+    return 0
+
+
+def compute_impulse_rsi_score(active_bull, prices, rsi_values, rsi_ob=70, rsi_os=30):
+    """
+    Compute RSI divergence score for a completed impulse pattern.
+    Returns: (div_type, div_score)
+    """
+    div_type = 0
+    div_score = 0.5
+    if active_bull:
+        div = detect_divergence_at_highs(prices, rsi_values, 0, 2)
+        if div == 1:
+            div_type = 1
+            div_score = 1.0
+        elif rsi_values[0] > rsi_ob:
+            div_score = 0.75
+        elif rsi_values[0] < rsi_os:
+            div_score = 0.25
+    else:
+        div = detect_divergence_at_lows(prices, rsi_values, 0, 2)
+        if div == -1:
+            div_type = -1
+            div_score = 1.0
+        elif rsi_values[0] < rsi_os:
+            div_score = 0.75
+        elif rsi_values[0] > rsi_ob:
+            div_score = 0.25
+    return (div_type, div_score)
+
+
+def compute_correction_rsi_score(abc_type, prices, rsi_values, rsi_ob=70, rsi_os=30):
+    """
+    Compute RSI divergence score for ABC correction.
+    Returns: (div_type, div_score)
+    """
+    div_type = 0
+    div_score = 0.5
+    if abc_type > 0:  # Bearish ABC
+        div = detect_divergence_at_highs(prices, rsi_values, 0, 2)
+        if div == 1:
+            div_type = 1
+            div_score = 0.90
+        elif rsi_values[0] > rsi_ob:
+            div_score = 0.30
+    elif abc_type < 0:  # Bullish ABC
+        div = detect_divergence_at_lows(prices, rsi_values, 0, 2)
+        if div == -1:
+            div_type = -1
+            div_score = 0.90
+        elif rsi_values[0] < rsi_os:
+            div_score = 0.30
+    return (div_type, div_score)
+
+
+def compute_wxy_rsi_score(wxy_type, prices, rsi_values, rsi_ob=70, rsi_os=30):
+    """
+    Compute RSI divergence score for WXY pattern.
+    Returns: (div_type, div_score)
+    """
+    div_type = 0
+    div_score = 0.5
+    if wxy_type > 0:  # Bearish WXY
+        div = detect_divergence_at_lows(prices, rsi_values, 0, 2)
+        if div == -1:
+            div_type = -1
+            div_score = 1.0
+        elif rsi_values[0] < rsi_os:
+            div_score = 0.75
+    elif wxy_type < 0:  # Bullish WXY
+        div = detect_divergence_at_highs(prices, rsi_values, 0, 2)
+        if div == 1:
+            div_type = 1
+            div_score = 1.0
+        elif rsi_values[0] > rsi_ob:
+            div_score = 0.75
+    return (div_type, div_score)
+
+
+def compute_wxyxz_rsi_score(wxyz_type, prices, rsi_values, rsi_ob=70, rsi_os=30):
+    """
+    Compute RSI divergence score for WXYXZ pattern with double divergence check.
+    Returns: (div_type, div_score)
+    """
+    div_type = 0
+    div_score = 0.5
+    if wxyz_type > 0:  # Bearish WXYXZ
+        div_zw = detect_divergence_at_lows(prices, rsi_values, 0, 4)
+        div_zy = detect_divergence_at_lows(prices, rsi_values, 0, 2)
+        if div_zw == -1 and div_zy == -1:
+            div_type = -1
+            div_score = 1.0
+        elif div_zw == -1 or div_zy == -1:
+            div_type = -1
+            div_score = 0.85
+        elif rsi_values[0] < rsi_os:
+            div_score = 0.70
+    elif wxyz_type < 0:  # Bullish WXYXZ
+        div_zw = detect_divergence_at_highs(prices, rsi_values, 0, 4)
+        div_zy = detect_divergence_at_highs(prices, rsi_values, 0, 2)
+        if div_zw == 1 and div_zy == 1:
+            div_type = 1
+            div_score = 1.0
+        elif div_zw == 1 or div_zy == 1:
+            div_type = 1
+            div_score = 0.85
+        elif rsi_values[0] > rsi_ob:
+            div_score = 0.70
+    return (div_type, div_score)
+
+
+def compute_diagonal_rsi_score(diag_type, is_leading, prices, rsi_values, rsi_ob=70, rsi_os=30):
+    """
+    Compute RSI divergence score for diagonal patterns.
+    Returns: (div_type, div_score)
+    """
+    div_type = 0
+    div_score = 0.5
+    if not is_leading:  # Ending diagonal
+        if diag_type > 0:
+            div = detect_divergence_at_highs(prices, rsi_values, 0, 2)
+            if div == 1:
+                div_type = 1
+                div_score = 1.0
+            elif rsi_values[0] > rsi_ob:
+                div_score = 0.80
+        elif diag_type < 0:
+            div = detect_divergence_at_lows(prices, rsi_values, 0, 2)
+            if div == -1:
+                div_type = -1
+                div_score = 1.0
+            elif rsi_values[0] < rsi_os:
+                div_score = 0.80
+    else:  # Leading diagonal: check W3 RSI strength
+        rsi_w3 = rsi_values[0] if len(rsi_values) > 0 else None
+        rsi_w1 = rsi_values[4] if len(rsi_values) > 4 else None
+        if rsi_w3 is not None and rsi_w1 is not None:
+            if diag_type > 0 and rsi_w3 > rsi_w1:
+                div_score = 0.80
+            elif diag_type < 0 and rsi_w3 < rsi_w1:
+                div_score = 0.80
+            else:
+                div_score = 0.40
+    return (div_type, div_score)
 
 
 # ============================================================================
@@ -702,37 +902,359 @@ class TestDiagonal(unittest.TestCase):
 class TestCompositeProbability(unittest.TestCase):
     """Test composite probability scoring."""
 
-    def test_perfect_alignment(self):
-        """All components at 1.0 → composite = 1.0."""
+    def test_perfect_alignment_legacy(self):
+        """All components at 1.0 without RSI → composite = 1.0."""
         result = compute_composite_probability(1.0, 1.0, 1.0, 1.0)
         self.assertAlmostEqual(result, 1.0)
 
-    def test_zero_alignment(self):
-        """All components at 0.0 → composite = 0.0."""
+    def test_zero_alignment_legacy(self):
+        """All components at 0.0 without RSI → composite = 0.0."""
         result = compute_composite_probability(0.0, 0.0, 0.0, 0.0)
         self.assertAlmostEqual(result, 0.0)
 
-    def test_weights_sum_to_1(self):
-        """Verify weights: 0.40 + 0.25 + 0.20 + 0.15 = 1.0."""
+    def test_legacy_weights_sum_to_1(self):
+        """Verify legacy weights: 0.40 + 0.25 + 0.20 + 0.15 = 1.0."""
         self.assertAlmostEqual(0.40 + 0.25 + 0.20 + 0.15, 1.0)
 
-    def test_pattern_dominant(self):
-        """Pattern has highest weight (40%), so it dominates."""
-        high_pattern = compute_composite_probability(1.0, 0.0, 0.0, 0.0)
-        high_mtf = compute_composite_probability(0.0, 1.0, 0.0, 0.0)
-        self.assertGreater(high_pattern, high_mtf)
+    def test_rsi_weights_sum_to_1(self):
+        """Verify RSI weights: 0.35 + 0.20 + 0.15 + 0.15 + 0.15 = 1.0."""
+        self.assertAlmostEqual(0.35 + 0.20 + 0.15 + 0.15 + 0.15, 1.0)
 
-    def test_mixed_probability(self):
-        """Typical mixed scenario: 60% pattern, 67% MTF, 50% trend, 33% momentum."""
-        result = compute_composite_probability(0.6, 0.67, 0.5, 0.33)
-        expected = 0.6 * 0.40 + 0.67 * 0.25 + 0.5 * 0.20 + 0.33 * 0.15
+    def test_perfect_alignment_with_rsi(self):
+        """All 5 components at 1.0 → composite = 1.0."""
+        result = compute_composite_probability(1.0, 1.0, 1.0, 1.0, p_rsi=1.0)
+        self.assertAlmostEqual(result, 1.0)
+
+    def test_zero_alignment_with_rsi(self):
+        """All 5 components at 0.0 → composite = 0.0."""
+        result = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_pattern_still_dominant_with_rsi(self):
+        """Pattern has highest weight (35%), so it still dominates."""
+        high_pattern = compute_composite_probability(1.0, 0.0, 0.0, 0.0, p_rsi=0.0)
+        high_mtf = compute_composite_probability(0.0, 1.0, 0.0, 0.0, p_rsi=0.0)
+        high_rsi = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=1.0)
+        self.assertGreater(high_pattern, high_mtf)
+        self.assertGreater(high_pattern, high_rsi)
+
+    def test_mixed_probability_with_rsi(self):
+        """Typical mixed scenario with RSI component."""
+        result = compute_composite_probability(0.6, 0.67, 0.5, 0.33, p_rsi=0.85)
+        expected = 0.6 * 0.35 + 0.67 * 0.20 + 0.5 * 0.15 + 0.33 * 0.15 + 0.85 * 0.15
         self.assertAlmostEqual(result, expected)
 
-    def test_mtf_disabled_neutral(self):
-        """When MTF is disabled, p_mtf=0.5, p_trend=0.5, p_momentum=0.5."""
-        result = compute_composite_probability(0.6, 0.5, 0.5, 0.5)
-        # = 0.6*0.4 + 0.5*0.25 + 0.5*0.2 + 0.5*0.15 = 0.24 + 0.125 + 0.10 + 0.075 = 0.54
-        self.assertAlmostEqual(result, 0.54)
+    def test_rsi_boost_effect(self):
+        """RSI at 1.0 vs 0.5 should boost composite by 0.075."""
+        base = compute_composite_probability(0.5, 0.5, 0.5, 0.5, p_rsi=0.5)
+        boosted = compute_composite_probability(0.5, 0.5, 0.5, 0.5, p_rsi=1.0)
+        self.assertAlmostEqual(boosted - base, 0.075)
+
+    def test_mtf_disabled_neutral_with_rsi(self):
+        """When MTF is disabled (neutral), RSI still contributes."""
+        result = compute_composite_probability(0.6, 0.5, 0.5, 0.5, p_rsi=1.0)
+        expected = 0.6 * 0.35 + 0.5 * 0.20 + 0.5 * 0.15 + 0.5 * 0.15 + 1.0 * 0.15
+        self.assertAlmostEqual(result, expected)
+
+
+class TestRSIDivergenceDetection(unittest.TestCase):
+    """Test RSI divergence detection functions."""
+
+    def test_regular_bearish_divergence(self):
+        """Price higher high + RSI lower high → regular bearish (1)."""
+        prices = [110, 90, 100]       # idx 0 higher than idx 2
+        rsi =    [60,  40, 70]        # idx 0 lower than idx 2
+        result = detect_divergence_at_highs(prices, rsi, 0, 2)
+        self.assertEqual(result, 1)
+
+    def test_hidden_bearish_divergence(self):
+        """Price lower high + RSI higher high → hidden bearish (2)."""
+        prices = [95,  90, 100]       # idx 0 lower than idx 2
+        rsi =    [75,  40, 65]        # idx 0 higher than idx 2
+        result = detect_divergence_at_highs(prices, rsi, 0, 2)
+        self.assertEqual(result, 2)
+
+    def test_no_divergence_at_highs(self):
+        """Price and RSI both higher → no divergence."""
+        prices = [110, 90, 100]
+        rsi =    [75,  40, 65]        # Both price and RSI higher → no divergence
+        result = detect_divergence_at_highs(prices, rsi, 0, 2)
+        self.assertEqual(result, 0)
+
+    def test_regular_bullish_divergence(self):
+        """Price lower low + RSI higher low → regular bullish (-1)."""
+        prices = [85,  110, 90]       # idx 0 lower than idx 2
+        rsi =    [35,  70,  25]       # idx 0 higher than idx 2
+        result = detect_divergence_at_lows(prices, rsi, 0, 2)
+        self.assertEqual(result, -1)
+
+    def test_hidden_bullish_divergence(self):
+        """Price higher low + RSI lower low → hidden bullish (-2)."""
+        prices = [95,  110, 90]       # idx 0 higher than idx 2
+        rsi =    [20,  70,  30]       # idx 0 lower than idx 2
+        result = detect_divergence_at_lows(prices, rsi, 0, 2)
+        self.assertEqual(result, -2)
+
+    def test_no_divergence_at_lows_concordant(self):
+        """Price lower low + RSI lower low → no divergence (concordant move)."""
+        prices = [85,  110, 90]       # idx 0 (85) lower than idx 2 (90)
+        rsi =    [20,  70,  30]       # idx 0 (20) lower than idx 2 (30)
+        result = detect_divergence_at_lows(prices, rsi, 0, 2)
+        # p_new < p_old, r_new < r_old → neither bullish nor hidden condition met → 0
+        self.assertEqual(result, 0)
+
+    def test_none_values_return_zero(self):
+        """None RSI values should return 0 (no divergence)."""
+        prices = [110, 90, 100]
+        rsi =    [None, 40, 70]
+        self.assertEqual(detect_divergence_at_highs(prices, rsi, 0, 2), 0)
+        self.assertEqual(detect_divergence_at_lows(prices, rsi, 0, 2), 0)
+
+    def test_out_of_bounds_returns_zero(self):
+        """Out of bounds indices should return 0."""
+        prices = [100, 90]
+        rsi =    [50, 40]
+        self.assertEqual(detect_divergence_at_highs(prices, rsi, 0, 5), 0)
+        self.assertEqual(detect_divergence_at_lows(prices, rsi, 0, 5), 0)
+
+    def test_equal_prices_no_divergence(self):
+        """Equal prices at both pivots → no divergence."""
+        prices = [100, 90, 100]
+        rsi =    [60,  40, 70]
+        # p_new == p_old → neither > nor < → returns 0
+        self.assertEqual(detect_divergence_at_highs(prices, rsi, 0, 2), 0)
+
+
+class TestImpulseRSIDivergence(unittest.TestCase):
+    """Test RSI divergence scoring for impulse patterns."""
+
+    def test_bullish_impulse_bearish_divergence(self):
+        """Bullish impulse W5 top: price higher, RSI lower → bearish div confirms exhaustion."""
+        # pivot[0] = W5 high, pivot[2] = W3 high
+        prices = [155, 130, 150, 110, 120, 100]
+        rsi =    [65,  40,  75,  35,  55,  45]
+        # W5 price (155) > W3 price (150), W5 RSI (65) < W3 RSI (75) → regular bearish
+        div_type, div_score = compute_impulse_rsi_score(True, prices, rsi)
+        self.assertEqual(div_type, 1, "Should detect regular bearish divergence")
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bearish_impulse_bullish_divergence(self):
+        """Bearish impulse W5 bottom: price lower, RSI higher → bullish div confirms exhaustion."""
+        prices = [45,  70,  50,  90,  80,  100]
+        rsi =    [35,  60,  25,  65,  55,  50]
+        # W5 price (45) < W3 price (50), W5 RSI (35) > W3 RSI (25) → regular bullish
+        div_type, div_score = compute_impulse_rsi_score(False, prices, rsi)
+        self.assertEqual(div_type, -1, "Should detect regular bullish divergence")
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bullish_impulse_overbought_no_divergence(self):
+        """RSI overbought at W5 without divergence → partial confirmation (0.75)."""
+        prices = [155, 130, 140, 110, 120, 100]
+        rsi =    [78,  40,  65,  35,  55,  45]
+        # W5 price (155) > W3 price (140), W5 RSI (78) > W3 RSI (65) → no divergence
+        # But RSI > 70 (overbought) → 0.75
+        div_type, div_score = compute_impulse_rsi_score(True, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.75)
+
+    def test_bullish_impulse_oversold_contradicts(self):
+        """RSI oversold at W5 top → contradicts (0.25)."""
+        prices = [155, 130, 140, 110, 120, 100]
+        rsi =    [25,  40,  20,  35,  55,  45]
+        # W5 RSI (25) < 30 → oversold at top = contradiction
+        div_type, div_score = compute_impulse_rsi_score(True, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.25)
+
+    def test_neutral_rsi_at_impulse(self):
+        """RSI in neutral zone with no divergence → default 0.5."""
+        prices = [155, 130, 140, 110, 120, 100]
+        rsi =    [60,  40,  55,  35,  50,  45]
+        # No divergence (both price & RSI higher), RSI not extreme → 0.5
+        div_type, div_score = compute_impulse_rsi_score(True, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.5)
+
+
+class TestCorrectionRSIDivergence(unittest.TestCase):
+    """Test RSI divergence scoring for ABC correction patterns."""
+
+    def test_bearish_abc_divergence(self):
+        """Bearish ABC: B high (pivot[0]) weaker than A start (pivot[2]) → confirms C down."""
+        prices = [95,  80,  100]
+        rsi =    [55,  30,  70]
+        # B price (95) < A start (100), B RSI (55) < A RSI (70) → no div (concordant)
+        # Wait: for bearish divergence at highs(0,2): p_new=95 < p_old=100 and r_new=55 > r_old=70? No.
+        # Let me set up proper bearish divergence: price lower high but RSI higher high
+        # Actually the Pine Script checks for regular bearish (p_new > p_old, r_new < r_old)
+        # For B wave bounce showing weakness: B price is lower high than A start is rare
+        # Let's test with actual divergence
+        prices2 = [102, 80,  100]     # B higher than A start
+        rsi2 =    [60,  30,  70]      # But RSI lower → regular bearish
+        div_type, div_score = compute_correction_rsi_score(1, prices2, rsi2)
+        self.assertEqual(div_type, 1)
+        self.assertAlmostEqual(div_score, 0.90)
+
+    def test_bullish_abc_divergence(self):
+        """Bullish ABC: B low weaker than A start → confirms C up."""
+        prices = [98,  120, 100]      # B price (98) < A start (100) → lower low
+        rsi =    [35,  70,  25]       # B RSI (35) > A RSI (25) → higher low
+        div_type, div_score = compute_correction_rsi_score(-1, prices, rsi)
+        self.assertEqual(div_type, -1)
+        self.assertAlmostEqual(div_score, 0.90)
+
+    def test_bearish_abc_overbought(self):
+        """Bearish ABC with RSI overbought at B but no divergence → 0.30."""
+        prices = [105, 80,  100]      # Price and RSI both higher
+        rsi =    [75,  30,  65]       # RSI > 70 (overbought) but no divergence
+        div_type, div_score = compute_correction_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.30)
+
+    def test_neutral_abc_no_divergence(self):
+        """ABC correction with neutral RSI → default 0.5."""
+        prices = [105, 80,  100]
+        rsi =    [60,  30,  55]       # Both higher, not extreme
+        div_type, div_score = compute_correction_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.5)
+
+
+class TestWXYRSIDivergence(unittest.TestCase):
+    """Test RSI divergence scoring for WXY patterns."""
+
+    def test_bearish_wxy_bullish_divergence(self):
+        """Bearish WXY: Y low vs W low shows bullish divergence → correction exhaustion."""
+        # Y-end (pivot[0]) vs W-end (pivot[2]) at lows
+        prices = [68,  90,  70,  100]   # Y price (68) < W price (70) → lower low
+        rsi =    [32,  60,  25,  55]    # Y RSI (32) > W RSI (25) → higher low
+        div_type, div_score = compute_wxy_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, -1, "Should detect bullish divergence → correction ending")
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bullish_wxy_bearish_divergence(self):
+        """Bullish WXY: Y high vs W high shows bearish divergence → correction exhaustion."""
+        prices = [132, 110, 130, 100]   # Y price (132) > W price (130) → higher high
+        rsi =    [60,  40,  68,  45]    # Y RSI (60) < W RSI (68) → lower high
+        div_type, div_score = compute_wxy_rsi_score(-1, prices, rsi)
+        self.assertEqual(div_type, 1, "Should detect bearish divergence")
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bearish_wxy_oversold(self):
+        """Bearish WXY: Y at oversold without divergence → 0.75."""
+        prices = [68,  90,  75,  100]   # Y lower than W
+        rsi =    [22,  60,  28,  55]    # Y RSI (22) < W RSI (28) → concordant (no div)
+        # But RSI < 30 → oversold → 0.75
+        div_type, div_score = compute_wxy_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.75)
+
+    def test_neutral_wxy(self):
+        """WXY with neutral RSI → default 0.5."""
+        prices = [75,  90,  80,  100]
+        rsi =    [40,  60,  45,  55]    # Concordant, not extreme
+        div_type, div_score = compute_wxy_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.5)
+
+
+class TestWXYXZRSIDivergence(unittest.TestCase):
+    """Test RSI divergence scoring for WXYXZ patterns."""
+
+    def test_bearish_wxyxz_double_divergence(self):
+        """Bearish WXYXZ: Z vs W AND Z vs Y both show bullish divergence → max score."""
+        # Z(idx0) vs Y(idx2) vs W(idx4) — all at lows
+        prices = [60,  85,  65,  90,  70,  100]  # Z<Y<W price lows
+        rsi =    [38,  60,  30,  65,  25,  55]    # Z>Y>W RSI → both divergences
+        div_type, div_score = compute_wxyxz_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, -1)
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bearish_wxyxz_single_divergence(self):
+        """Bearish WXYXZ: only Z vs W divergence → 0.85."""
+        prices = [60,  85,  65,  90,  70,  100]
+        rsi =    [28,  60,  30,  65,  25,  55]
+        # Z vs W: p=60<70, r=28>25 → bullish div ✓
+        # Z vs Y: p=60<65, r=28<30 → concordant, no div
+        div_type, div_score = compute_wxyxz_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, -1)
+        self.assertAlmostEqual(div_score, 0.85)
+
+    def test_bullish_wxyxz_double_divergence(self):
+        """Bullish WXYXZ: Z vs W AND Z vs Y both show bearish divergence → max score."""
+        prices = [140, 115, 135, 110, 130, 100]  # Z>Y>W price highs
+        rsi =    [62,  40,  68,  35,  75,  45]    # Z<Y<W RSI → both divergences
+        div_type, div_score = compute_wxyxz_rsi_score(-1, prices, rsi)
+        self.assertEqual(div_type, 1)
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_wxyxz_oversold_no_divergence(self):
+        """WXYXZ with oversold RSI but no divergence → 0.70."""
+        prices = [60,  85,  65,  90,  70,  100]
+        rsi =    [22,  60,  24,  65,  26,  55]    # All concordant (lower), RSI < 30
+        div_type, div_score = compute_wxyxz_rsi_score(1, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.70)
+
+
+class TestDiagonalRSIDivergence(unittest.TestCase):
+    """Test RSI divergence scoring for diagonal patterns."""
+
+    def test_bullish_ending_diagonal_bearish_div(self):
+        """Bullish ending diagonal: W5 vs W3 bearish divergence → confirms reversal."""
+        # Ending diagonal (not leading): W5 high (idx0) vs W3 high (idx2)
+        prices = [128, 115, 125, 107, 120, 100]
+        rsi =    [62,  40,  70,  35,  55,  45]
+        # W5 price (128) > W3 price (125), W5 RSI (62) < W3 RSI (70) → regular bearish
+        div_type, div_score = compute_diagonal_rsi_score(1, False, prices, rsi)
+        self.assertEqual(div_type, 1)
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_bearish_ending_diagonal_bullish_div(self):
+        """Bearish ending diagonal: W5 vs W3 bullish divergence → confirms reversal."""
+        prices = [72,  85,  75,  93,  80,  100]
+        rsi =    [38,  60,  30,  65,  55,  50]
+        # W5 price (72) < W3 price (75), W5 RSI (38) > W3 RSI (30) → regular bullish
+        div_type, div_score = compute_diagonal_rsi_score(-1, False, prices, rsi)
+        self.assertEqual(div_type, -1)
+        self.assertAlmostEqual(div_score, 1.0)
+
+    def test_ending_diagonal_overbought(self):
+        """Ending diagonal with overbought RSI but no divergence → 0.80."""
+        prices = [128, 115, 120, 107, 115, 100]
+        rsi =    [78,  40,  65,  35,  55,  45]
+        # W5 price > W3 price, W5 RSI > W3 RSI → no divergence
+        # But RSI > 70 → overbought → 0.80
+        div_type, div_score = compute_diagonal_rsi_score(1, False, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.80)
+
+    def test_leading_diagonal_w3_strong(self):
+        """Leading diagonal: W3 RSI exceeds W1 RSI → 0.80 (trend starting)."""
+        prices = [128, 115, 125, 107, 118, 100]
+        rsi =    [70,  40,  60,  35,  55,  45]
+        # Leading: rsi_w3=rsi[0]=70, rsi_w1=rsi[4]=55 → W3 > W1 ✓
+        div_type, div_score = compute_diagonal_rsi_score(1, True, prices, rsi)
+        self.assertEqual(div_type, 0, "Leading diagonals don't set divergence type")
+        self.assertAlmostEqual(div_score, 0.80)
+
+    def test_leading_diagonal_w3_weak(self):
+        """Leading diagonal: W3 RSI weaker than W1 → 0.40 (suspicious)."""
+        prices = [128, 115, 125, 107, 118, 100]
+        rsi =    [50,  40,  60,  35,  65,  45]
+        # Leading: rsi_w3=rsi[0]=50, rsi_w1=rsi[4]=65 → W3 < W1 → weak
+        div_type, div_score = compute_diagonal_rsi_score(1, True, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.40)
+
+    def test_neutral_ending_diagonal(self):
+        """Ending diagonal with neutral RSI and no divergence → 0.5."""
+        prices = [128, 115, 120, 107, 115, 100]
+        rsi =    [60,  40,  55,  35,  50,  45]
+        # No divergence (both higher), RSI not extreme → 0.5
+        div_type, div_score = compute_diagonal_rsi_score(1, False, prices, rsi)
+        self.assertEqual(div_type, 0)
+        self.assertAlmostEqual(div_score, 0.5)
 
 
 class TestEdgeCases(unittest.TestCase):

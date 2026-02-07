@@ -46,6 +46,17 @@ mtf_filter      = input.bool(true, "MTF Confluence Filter", group="Multi-Timefra
 mtf_boost       = input.bool(true, "MTF Confidence Boost", group="Multi-Timeframe",
     tooltip="Boost confidence when all 3 timeframes align.")
 
+// --- RSI Divergence Confirmation ---
+rsi_period      = input.int(14, "RSI Period", minval=2, maxval=50,
+    group="RSI Confirmation",
+    tooltip="RSI period for divergence detection. Standard: 14.")
+rsi_ob          = input.float(70.0, "RSI Overbought", minval=50, maxval=95, step=5,
+    group="RSI Confirmation",
+    tooltip="RSI overbought level. Helps confirm Wave 5 exhaustion.")
+rsi_os          = input.float(30.0, "RSI Oversold", minval=5, maxval=50, step=5,
+    group="RSI Confirmation",
+    tooltip="RSI oversold level. Helps confirm correction completion.")
+
 // --- Display ---
 show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
 show_wave_labels = input.bool(true, "Show Wave Labels (1-5, A-B-C, W-X-Y-Z)", group="Display")
@@ -82,6 +93,7 @@ FIB_2618 = 2.618
 // ============================================================================
 
 atr_val = ta.atr(atr_length)
+rsi_value = ta.rsi(close, rsi_period)
 
 // Minimum move size to qualify as a valid swing
 min_move = zigzag_mode == "ATR" ? atr_val * atr_multiplier : close * pct_threshold / 100.0
@@ -94,50 +106,58 @@ pl = ta.pivotlow(low, pivot_lookback, pivot_lookback)
 var float[]  piv_price  = array.new_float(14, na)
 var int[]    piv_bar    = array.new_int(14, na)
 var bool[]   piv_isHigh = array.new_bool(14, false)
+var float[]  piv_rsi    = array.new_float(14, na)   // RSI at each pivot bar
 var int      piv_count  = 0
 
 // Push a new pivot onto our arrays (index 0 = most recent)
-push_pivot(float price, int bar_idx, bool isHigh) =>
+push_pivot(float price, int bar_idx, bool isHigh, float rsi_at_piv) =>
     array.pop(piv_price)
     array.unshift(piv_price, price)
     array.pop(piv_bar)
     array.unshift(piv_bar, bar_idx)
     array.pop(piv_isHigh)
     array.unshift(piv_isHigh, isHigh)
+    array.pop(piv_rsi)
+    array.unshift(piv_rsi, rsi_at_piv)
 
 // Filter and store pivot highs
 if not na(ph)
     piv_bar_idx = bar_index - pivot_lookback
+    rsi_at_pivot = rsi_value[pivot_lookback]  // RSI at the pivot bar
     last_isHigh = piv_count > 0 ? array.get(piv_isHigh, 0) : false
     last_price  = piv_count > 0 ? array.get(piv_price, 0)  : na
     if last_isHigh and not na(last_price)
         if ph > last_price
             array.set(piv_price, 0, ph)
             array.set(piv_bar,   0, piv_bar_idx)
+            array.set(piv_rsi,   0, rsi_at_pivot)
     else
         move_ok = na(last_price) ? true : math.abs(ph - last_price) >= min_move
         if move_ok
-            push_pivot(ph, piv_bar_idx, true)
+            push_pivot(ph, piv_bar_idx, true, rsi_at_pivot)
             piv_count := math.min(piv_count + 1, 14)
 
 if not na(pl)
     piv_bar_idx = bar_index - pivot_lookback
+    rsi_at_pivot = rsi_value[pivot_lookback]
     last_isHigh = piv_count > 0 ? array.get(piv_isHigh, 0) : false
     last_price  = piv_count > 0 ? array.get(piv_price, 0)  : na
     if not last_isHigh and not na(last_price)
         if pl < last_price
             array.set(piv_price, 0, pl)
             array.set(piv_bar,   0, piv_bar_idx)
+            array.set(piv_rsi,   0, rsi_at_pivot)
     else
         move_ok = na(last_price) ? true : math.abs(pl - last_price) >= min_move
         if move_ok
-            push_pivot(pl, piv_bar_idx, false)
+            push_pivot(pl, piv_bar_idx, false, rsi_at_pivot)
             piv_count := math.min(piv_count + 1, 14)
 
 // Helper: get pivot data (0 = most recent)
 get_price(int idx) => array.get(piv_price, idx)
 get_bar(int idx)   => array.get(piv_bar, idx)
 get_high(int idx)  => array.get(piv_isHigh, idx)
+get_rsi(int idx)   => array.get(piv_rsi, idx)
 
 // ============================================================================
 // FIBONACCI HELPERS
@@ -936,6 +956,247 @@ else
     pattern_type := "none"
 
 // ============================================================================
+// RSI DIVERGENCE DETECTION
+// ============================================================================
+//
+// Detects divergences between price and RSI at wave pivot points.
+// Divergence types and their Elliott Wave significance:
+//
+//   Regular Bearish: Price higher high, RSI lower high
+//     → Wave 5 exhaustion, ending diagonal completion
+//
+//   Regular Bullish: Price lower low, RSI higher low
+//     → Wave C/Y/Z completion, correction ending
+//
+//   Hidden Bullish: Price higher low, RSI lower low
+//     → Wave 2/4 correction ending, trend continuation
+//
+//   Hidden Bearish: Price lower high, RSI higher high
+//     → Bearish Wave 2/4 correction ending, downtrend continuation
+//
+// Each pattern type maps to specific divergence checks between
+// relevant pivot pairs (e.g., Wave 3 vs Wave 5 for impulses).
+// ============================================================================
+
+// Divergence detection between two pivot indices
+// Returns: 1 = regular bearish, 2 = hidden bearish,
+//         -1 = regular bullish, -2 = hidden bullish, 0 = none
+detect_divergence_at_highs(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    r_new = get_rsi(newer_idx)
+    r_old = get_rsi(older_idx)
+    if not na(p_new) and not na(p_old) and not na(r_new) and not na(r_old)
+        // Regular bearish: price higher high, RSI lower high
+        if p_new > p_old and r_new < r_old
+            result := 1
+        // Hidden bearish: price lower high, RSI higher high
+        else if p_new < p_old and r_new > r_old
+            result := 2
+    result
+
+detect_divergence_at_lows(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    r_new = get_rsi(newer_idx)
+    r_old = get_rsi(older_idx)
+    if not na(p_new) and not na(p_old) and not na(r_new) and not na(r_old)
+        // Regular bullish: price lower low, RSI higher low
+        if p_new < p_old and r_new > r_old
+            result := -1
+        // Hidden bullish: price higher low, RSI lower low
+        else if p_new > p_old and r_new < r_old
+            result := -2
+    result
+
+// ── Per-pattern RSI divergence analysis ──
+// Compute divergence score for the active pattern and direction.
+// Score: 1.0 = strong confirming divergence
+//        0.75 = confirming RSI extreme (overbought/oversold)
+//        0.5 = neutral
+//        0.25 = RSI contradicts
+//        0.0 = strong contradicting divergence
+
+rsi_div_type = 0       // Divergence type detected (for dashboard)
+rsi_div_score = 0.5    // Probability component (default neutral)
+rsi_at_signal = rsi_value  // Current RSI for display
+
+if pattern_type == "impulse" and piv_count >= 6
+    // Bullish impulse complete → expect exhaustion/reversal DOWN
+    // Check Wave 5 (pivot[0] = high) vs Wave 3 (pivot[2] = high) for bearish divergence
+    if active_bull
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Regular bearish divergence at W5 → confirms exhaustion
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if get_rsi(0) > rsi_ob  // RSI overbought at W5 peak
+            rsi_div_score := 0.75
+        else if get_rsi(0) < rsi_os  // RSI oversold contradicts (shouldn't be at a top)
+            rsi_div_score := 0.25
+    // Bearish impulse complete → expect reversal UP
+    else
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Regular bullish divergence at W5 → confirms exhaustion
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if get_rsi(0) < rsi_os  // RSI oversold at W5 bottom
+            rsi_div_score := 0.75
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.25
+
+else if pattern_type == "partial" and piv_count >= 4
+    // Wave 2 done → expect Wave 3 in trend direction
+    if active_bull and (active_wave == 2)
+        // Hidden bullish divergence at W2 low (pivot[1]) vs W0 low (pivot[3])
+        div = detect_divergence_at_lows(1, 3)
+        if div == -2  // Hidden bullish → confirms trend continuation
+            rsi_div_type := -2
+            rsi_div_score := 1.0
+        else if get_rsi(1) < rsi_os  // RSI oversold at W2 → good entry zone
+            rsi_div_score := 0.80
+        else if get_rsi(1) > rsi_ob  // RSI overbought at a low? Contradicts
+            rsi_div_score := 0.20
+        else
+            rsi_div_score := 0.5
+    else if not active_bull and (active_wave == -2)
+        // Hidden bearish divergence at W2 high (pivot[1]) vs W0 high (pivot[3])
+        div = detect_divergence_at_highs(1, 3)
+        if div == 2   // Hidden bearish → confirms downtrend continuation
+            rsi_div_type := 2
+            rsi_div_score := 1.0
+        else if get_rsi(1) > rsi_ob
+            rsi_div_score := 0.80
+        else if get_rsi(1) < rsi_os
+            rsi_div_score := 0.20
+        else
+            rsi_div_score := 0.5
+    // In Wave 3 → RSI should be at its strongest
+    else if active_wave == 3 or active_wave == -3
+        rsi_current = get_rsi(0)
+        rsi_w1_end  = get_rsi(2)
+        if not na(rsi_current) and not na(rsi_w1_end)
+            // Wave 3 RSI should exceed Wave 1 RSI (strongest wave)
+            if active_bull and rsi_current > rsi_w1_end
+                rsi_div_score := 0.85
+            else if not active_bull and rsi_current < rsi_w1_end
+                rsi_div_score := 0.85
+            else
+                rsi_div_score := 0.40  // W3 weaker than W1 → suspicious
+
+else if pattern_type == "correction" and piv_count >= 3
+    // ABC correction: check A-end vs B-end for weakening momentum
+    if abc_type > 0  // Bearish ABC (H-L-H): B high (pivot[0]) vs A start high (pivot[2])
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Bearish divergence → B wave bounce is weakening → confirms C down
+            rsi_div_type := 1
+            rsi_div_score := 0.90
+        else if get_rsi(0) > rsi_ob  // RSI still overbought at B → may push higher
+            rsi_div_score := 0.30
+        else
+            rsi_div_score := 0.5
+    else if abc_type < 0  // Bullish ABC (L-H-L): B low (pivot[0]) vs A start low (pivot[2])
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Bullish divergence → B wave decline weakening → confirms C up
+            rsi_div_type := -1
+            rsi_div_score := 0.90
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.30
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "wxy" and piv_count >= 4
+    // WXY: check Y-end vs W-end for divergence (correction exhaustion)
+    if wxy_type > 0  // Bearish WXY: Y low (pivot[0]) vs W low (pivot[2])
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Bullish divergence at Y vs W → correction exhausting → buy
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.75
+        else
+            rsi_div_score := 0.5
+    else if wxy_type < 0  // Bullish WXY: Y high (pivot[0]) vs W high (pivot[2])
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Bearish divergence at Y vs W → correction exhausting → sell
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.75
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "wxyxz" and piv_count >= 6
+    // WXYXZ: check Z-end vs W-end and Z vs Y for divergence
+    if wxyz_type > 0  // Bearish WXYXZ: Z low (pivot[0]) vs W low (pivot[4])
+        div_zw = detect_divergence_at_lows(0, 4)
+        div_zy = detect_divergence_at_lows(0, 2)
+        if div_zw == -1 and div_zy == -1  // Double bullish divergence Z<W and Z<Y
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if div_zw == -1 or div_zy == -1  // Single divergence
+            rsi_div_type := -1
+            rsi_div_score := 0.85
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.70
+        else
+            rsi_div_score := 0.5
+    else if wxyz_type < 0  // Bullish WXYXZ: Z high (pivot[0]) vs W high (pivot[4])
+        div_zw = detect_divergence_at_highs(0, 4)
+        div_zy = detect_divergence_at_highs(0, 2)
+        if div_zw == 1 and div_zy == 1
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if div_zw == 1 or div_zy == 1
+            rsi_div_type := 1
+            rsi_div_score := 0.85
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.70
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "diagonal" and piv_count >= 6
+    // Ending diagonal → expect sharp reversal (divergence confirms)
+    if not diag_is_leading
+        if diag_type > 0  // Bullish ending diagonal → sell signal
+            // Wave 5 high (pivot[0]) vs Wave 3 high (pivot[2])
+            div = detect_divergence_at_highs(0, 2)
+            if div == 1  // Bearish divergence confirms reversal
+                rsi_div_type := 1
+                rsi_div_score := 1.0
+            else if get_rsi(0) > rsi_ob
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.5
+        else  // Bearish ending diagonal → buy signal
+            div = detect_divergence_at_lows(0, 2)
+            if div == -1
+                rsi_div_type := -1
+                rsi_div_score := 1.0
+            else if get_rsi(0) < rsi_os
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.5
+    // Leading diagonal → new trend starting, check W3 strength
+    else
+        rsi_w3 = get_rsi(0)  // Most recent pivot
+        rsi_w1 = get_rsi(4)  // Wave 1 end
+        if not na(rsi_w3) and not na(rsi_w1)
+            if diag_type > 0 and rsi_w3 > rsi_w1  // Bullish: W3 RSI > W1 RSI
+                rsi_div_score := 0.80
+            else if diag_type < 0 and rsi_w3 < rsi_w1
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.40
+
+// RSI divergence label text for dashboard
+rsi_div_label = rsi_div_type == 1 ? "BEAR DIV" :
+    rsi_div_type == 2 ? "HID BEAR" :
+    rsi_div_type == -1 ? "BULL DIV" :
+    rsi_div_type == -2 ? "HID BULL" : "NONE"
+
+// ============================================================================
 // ELLIOTT WAVE OSCILLATOR (5-34 SMA difference)
 // ============================================================================
 ewo_fast = ta.sma(close, 5)
@@ -1491,14 +1752,15 @@ if pattern_type == "wxyxz" and piv_count >= 6
 // COMPOSITE PROBABILITY SCORING
 // ============================================================================
 //
-// Combines multiple independent probability components:
-//   P_pattern  = Pattern confidence (0-100%) — Fibonacci rule alignment
-//   P_mtf      = MTF agreement (0-100%) — how many TFs agree
-//   P_trend    = Trend alignment (0-100%) — SMA position across TFs
-//   P_momentum = Momentum alignment (0-100%) — EWO direction across TFs
+// Combines five independent probability components:
+//   P_pattern   = Pattern confidence (0-100%) — Fibonacci rule alignment
+//   P_mtf       = MTF agreement (0-100%) — how many TFs agree
+//   P_trend     = Trend alignment (0-100%) — SMA position across TFs
+//   P_momentum  = Momentum alignment (0-100%) — EWO direction across TFs
+//   P_rsi       = RSI divergence confirmation (0-100%) — divergence at wave pivots
 //
-//   Composite  = weighted average:
-//     40% pattern + 25% MTF + 20% trend + 15% momentum
+//   Composite = weighted average:
+//     35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI
 //
 // The composite represents "structural probability" — how well the
 // current price structure across timeframes matches the expected
@@ -1550,8 +1812,11 @@ if mtf_enabled
 else
     p_momentum := 0.5
 
-// Composite probability (weighted average)
-composite_prob = p_pattern * 0.40 + p_mtf * 0.25 + p_trend * 0.20 + p_momentum * 0.15
+// P_rsi: RSI divergence confirmation (already computed above)
+p_rsi = rsi_div_score
+
+// Composite probability (weighted average — 5 components)
+composite_prob = p_pattern * 0.35 + p_mtf * 0.20 + p_trend * 0.15 + p_momentum * 0.15 + p_rsi * 0.15
 
 // Per-TF directional probability (shown in signal panel)
 tf1_dir_prob = 0.0
@@ -1716,7 +1981,8 @@ prob_bar(float prob) =>
 
 // Build full signal text
 build_signal_text(string dir, string reason, float prob, float target,
-    float stop, float rr, float tf1p, float tf2p, float tf3p) =>
+    float stop, float rr, float tf1p, float tf2p, float tf3p,
+    string div_lbl, float rsi_val, float rsi_score) =>
     txt = dir + " | " + reason
     txt += "\nProb: " + prob_bar(prob)
     if not na(target)
@@ -1725,6 +1991,9 @@ build_signal_text(string dir, string reason, float prob, float target,
         txt += "\nSL: " + str.tostring(stop, format.mintick)
     if not na(rr)
         txt += "\nR:R  1:" + str.tostring(rr, "#.#")
+    txt += "\n── RSI ──"
+    txt += "\nRSI: " + str.tostring(nz(rsi_val, 0), "#.#") + " | " + div_lbl
+    txt += "\nRSI Conf: " + str.tostring(rsi_score * 100, "#") + "%"
     if mtf_enabled
         txt += "\n── Per TF ──"
         txt += "\n" + timeframe.period + ": " + str.tostring(tf1p * 100, "#") + "%"
@@ -1736,7 +2005,8 @@ var label sig_proj_lbl = na
 
 if show_signals and buy_signal
     lbl_txt = build_signal_text("BUY", signal_reason, composite_prob,
-        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score)
     lbl_clr = composite_prob >= 0.65 ? color.new(color.lime, 5) :
         composite_prob >= 0.45 ? color.new(color.green, 10) :
         color.new(color.olive, 15)
@@ -1747,7 +2017,8 @@ if show_signals and buy_signal
 
 if show_signals and sell_signal
     lbl_txt = build_signal_text("SELL", signal_reason, composite_prob,
-        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score)
     lbl_clr = composite_prob >= 0.65 ? color.new(color.fuchsia, 5) :
         composite_prob >= 0.45 ? color.new(color.purple, 10) :
         color.new(color.maroon, 15)
@@ -1758,7 +2029,8 @@ if show_signals and sell_signal
 
 if show_signals and exhaustion_bull
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
-        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score)
     label.delete(sig_proj_lbl)
     sig_proj_lbl := label.new(bar_index, high, lbl_txt,
         style=label.style_label_down, color=color.new(color.orange, 10),
@@ -1766,7 +2038,8 @@ if show_signals and exhaustion_bull
 
 if show_signals and exhaustion_bear
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
-        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score)
     label.delete(sig_proj_lbl)
     sig_proj_lbl := label.new(bar_index, low, lbl_txt,
         style=label.style_label_up, color=color.new(color.orange, 10),
@@ -1829,7 +2102,7 @@ bgcolor(bg)
 // INFO DASHBOARD
 // ============================================================================
 if show_table and barstate.islast
-    var table dashboard = table.new(position.top_right, 2, 25,
+    var table dashboard = table.new(position.top_right, 2, 29,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 
     // Header
@@ -1977,11 +2250,39 @@ if show_table and barstate.islast
         table.cell(dashboard, 1, 10 + det_i, det_txt,
             text_color=det_clr, text_halign=text.align_right, text_size=size.tiny)
 
+    // ── RSI Divergence Section ──
+    table.cell(dashboard, 0, 16, "─── RSI Confirm ───", text_color=color.new(color.white, 40),
+        text_halign=text.align_left, text_size=size.tiny)
+    table.merge_cells(dashboard, 0, 16, 1, 16)
+
+    rsi_txt = str.tostring(rsi_at_signal, "#.#")
+    rsi_zone = rsi_at_signal >= rsi_ob ? " OB" : rsi_at_signal <= rsi_os ? " OS" : ""
+    rsi_clr = rsi_at_signal >= rsi_ob ? color.red : rsi_at_signal <= rsi_os ? color.lime : color.gray
+    table.cell(dashboard, 0, 17, "RSI(" + str.tostring(rsi_period) + ")", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 17, rsi_txt + rsi_zone,
+        text_color=rsi_clr, text_halign=text.align_right, text_size=size.small)
+
+    div_clr = rsi_div_type == 1 or rsi_div_type == 2 ? color.red :
+        rsi_div_type == -1 or rsi_div_type == -2 ? color.lime : color.gray
+    table.cell(dashboard, 0, 18, "Divergence", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 18, rsi_div_label,
+        text_color=div_clr, text_halign=text.align_right, text_size=size.small)
+
+    rsi_score_clr = rsi_div_score >= 0.75 ? color.lime :
+        rsi_div_score >= 0.5 ? color.yellow :
+        rsi_div_score >= 0.25 ? color.orange : color.red
+    table.cell(dashboard, 0, 19, "RSI Conf", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 19, str.tostring(rsi_div_score * 100, "#") + "%",
+        text_color=rsi_score_clr, text_halign=text.align_right, text_size=size.small)
+
     // ── Multi-Timeframe Section ──
     if mtf_enabled
-        table.cell(dashboard, 0, 16, "─── MTF (3 TFs) ───", text_color=color.new(color.white, 40),
+        table.cell(dashboard, 0, 20, "─── MTF (3 TFs) ───", text_color=color.new(color.white, 40),
             text_halign=text.align_left, text_size=size.tiny)
-        table.merge_cells(dashboard, 0, 16, 1, 16)
+        table.merge_cells(dashboard, 0, 20, 1, 20)
 
         // Helper: phase to display string and color
         phase_to_str(int p) =>
@@ -2001,37 +2302,37 @@ if show_table and barstate.islast
             mtf_bull_confluence ? color.green :
             mtf_bear_confluence ? color.orange :
             color.gray
-        table.cell(dashboard, 0, 17, "Confluence", text_color=color.gray,
+        table.cell(dashboard, 0, 21, "Confluence", text_color=color.gray,
             text_halign=text.align_left, text_size=size.small)
-        table.cell(dashboard, 1, 17, confl_txt, text_color=confl_clr,
+        table.cell(dashboard, 1, 21, confl_txt, text_color=confl_clr,
             text_halign=text.align_right, text_size=size.small)
 
         // TF1 (current chart): phase + EWO
         tf1_name = timeframe.period
         ewo1_dir = tf1_rising ? "+" : "-"
-        table.cell(dashboard, 0, 18, "TF1 " + tf1_name, text_color=color.gray,
+        table.cell(dashboard, 0, 22, "TF1 " + tf1_name, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 18, phase_to_str(tf1_phase) + " " + str.tostring(tf1_ewo, "#.#") + ewo1_dir,
+        table.cell(dashboard, 1, 22, phase_to_str(tf1_phase) + " " + str.tostring(tf1_ewo, "#.#") + ewo1_dir,
             text_color=phase_to_clr(tf1_phase), text_halign=text.align_right, text_size=size.tiny)
 
         // TF2 (higher): phase + EWO
         ewo2_dir = tf2_rising ? "+" : "-"
-        table.cell(dashboard, 0, 19, "TF2 " + mtf_tf2, text_color=color.gray,
+        table.cell(dashboard, 0, 23, "TF2 " + mtf_tf2, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 19, phase_to_str(tf2_phase) + " " + str.tostring(tf2_ewo, "#.#") + ewo2_dir,
+        table.cell(dashboard, 1, 23, phase_to_str(tf2_phase) + " " + str.tostring(tf2_ewo, "#.#") + ewo2_dir,
             text_color=phase_to_clr(tf2_phase), text_halign=text.align_right, text_size=size.tiny)
 
         // TF3 (highest): phase + EWO
         ewo3_dir = tf3_rising ? "+" : "-"
-        table.cell(dashboard, 0, 20, "TF3 " + mtf_tf3, text_color=color.gray,
+        table.cell(dashboard, 0, 24, "TF3 " + mtf_tf3, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 20, phase_to_str(tf3_phase) + " " + str.tostring(tf3_ewo, "#.#") + ewo3_dir,
+        table.cell(dashboard, 1, 24, phase_to_str(tf3_phase) + " " + str.tostring(tf3_ewo, "#.#") + ewo3_dir,
             text_color=phase_to_clr(tf3_phase), text_halign=text.align_right, text_size=size.tiny)
 
         // SMA alignment per TF
-        table.cell(dashboard, 0, 21, "─── Trend ───", text_color=color.new(color.white, 40),
+        table.cell(dashboard, 0, 25, "─── Trend ───", text_color=color.new(color.white, 40),
             text_halign=text.align_left, text_size=size.tiny)
-        table.merge_cells(dashboard, 0, 21, 1, 21)
+        table.merge_cells(dashboard, 0, 25, 1, 25)
 
         // TF1 trend
         tf1_trend_txt = tf1_above50 and tf1_above200 ? ">50 >200" :
@@ -2039,9 +2340,9 @@ if show_table and barstate.islast
             not tf1_above50 and not tf1_above200 ? "<50 <200" : "<50 >200"
         tf1_trend_clr = tf1_above50 and tf1_above200 ? color.lime :
             not tf1_above50 and not tf1_above200 ? color.red : color.yellow
-        table.cell(dashboard, 0, 22, tf1_name, text_color=color.gray,
+        table.cell(dashboard, 0, 26, tf1_name, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 22, tf1_trend_txt,
+        table.cell(dashboard, 1, 26, tf1_trend_txt,
             text_color=tf1_trend_clr, text_halign=text.align_right, text_size=size.tiny)
 
         // TF2 trend
@@ -2050,9 +2351,9 @@ if show_table and barstate.islast
             not tf2_above50 and not tf2_above200 ? "<50 <200" : "<50 >200"
         tf2_trend_clr = tf2_above50 and tf2_above200 ? color.lime :
             not tf2_above50 and not tf2_above200 ? color.red : color.yellow
-        table.cell(dashboard, 0, 23, mtf_tf2, text_color=color.gray,
+        table.cell(dashboard, 0, 27, mtf_tf2, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 23, tf2_trend_txt,
+        table.cell(dashboard, 1, 27, tf2_trend_txt,
             text_color=tf2_trend_clr, text_halign=text.align_right, text_size=size.tiny)
 
         // TF3 trend
@@ -2061,9 +2362,9 @@ if show_table and barstate.islast
             not tf3_above50 and not tf3_above200 ? "<50 <200" : "<50 >200"
         tf3_trend_clr = tf3_above50 and tf3_above200 ? color.lime :
             not tf3_above50 and not tf3_above200 ? color.red : color.yellow
-        table.cell(dashboard, 0, 24, mtf_tf3, text_color=color.gray,
+        table.cell(dashboard, 0, 28, mtf_tf3, text_color=color.gray,
             text_halign=text.align_left, text_size=size.tiny)
-        table.cell(dashboard, 1, 24, tf3_trend_txt,
+        table.cell(dashboard, 1, 28, tf3_trend_txt,
             text_color=tf3_trend_clr, text_halign=text.align_right, text_size=size.tiny)
 
 // ============================================================================
@@ -2097,6 +2398,14 @@ alertcondition(buy_signal and mtf_strong_bull, "MTF Confirmed Buy",
     "EW: Buy signal with all 3 timeframes bullish — highest conviction")
 alertcondition(sell_signal and mtf_strong_bear, "MTF Confirmed Sell",
     "EW: Sell signal with all 3 timeframes bearish — highest conviction")
+alertcondition(rsi_div_type == 1 and rsi_div_type[1] != 1, "RSI Bearish Divergence",
+    "EW RSI: Bearish divergence detected at wave pivot")
+alertcondition(rsi_div_type == -1 and rsi_div_type[1] != -1, "RSI Bullish Divergence",
+    "EW RSI: Bullish divergence detected at wave pivot")
+alertcondition(buy_signal and rsi_div_score >= 0.85, "RSI Confirmed Buy",
+    "EW: Buy signal with strong RSI divergence confirmation")
+alertcondition(sell_signal and rsi_div_score >= 0.85, "RSI Confirmed Sell",
+    "EW: Sell signal with strong RSI divergence confirmation")
 
 // ============================================================================
 // HIDDEN PLOTS (for data window and external indicators)
@@ -2107,6 +2416,9 @@ plot(ewo_value, "EWO", display=display.none)
 plot(last_signal, "Signal Direction", display=display.none)
 plot(mtf_score, "MTF Score", display=display.none)
 plot(composite_prob, "Composite Probability", display=display.none)
+plot(rsi_value, "RSI Value", display=display.none)
+plot(rsi_div_score, "RSI Div Score", display=display.none)
+plot(rsi_div_type, "RSI Div Type", display=display.none)
 
 // Data window exports
 plot(active_conf * 100, "Pattern Confidence %", color=color.new(color.purple, 100), display=display.data_window)
@@ -2114,6 +2426,9 @@ plot(composite_prob * 100, "Composite Probability %", color=color.new(color.lime
 plot(p_mtf * 100, "MTF Agreement %", color=color.new(color.aqua, 100), display=display.data_window)
 plot(p_trend * 100, "Trend Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
 plot(p_momentum * 100, "Momentum Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_rsi * 100, "RSI Confirmation %", color=color.new(color.orange, 100), display=display.data_window)
+plot(rsi_value, "RSI Value", color=color.new(color.orange, 100), display=display.data_window)
+plot(rsi_div_type, "RSI Divergence Type", color=color.new(color.orange, 100), display=display.data_window)
 plot(ewo_value, "EWO (Chart TF)", color=color.new(color.blue, 100), display=display.data_window)
 plot(mtf_score, "MTF Confluence Score", color=color.new(color.aqua, 100), display=display.data_window)
 plot(tf1_dir_prob * 100, "TF1 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
