@@ -5,7 +5,7 @@
 
 //@version=6
 indicator("SymbolU Elliott Wave", shorttitle="SymbolU EW", overlay=true,
-    max_lines_count=500, max_labels_count=500, max_bars_back=5000)
+    max_lines_count=500, max_labels_count=500)
 
 // ============================================================================
 // INPUTS
@@ -98,13 +98,12 @@ var int      piv_count  = 0
 
 // Push a new pivot onto our arrays (index 0 = most recent)
 push_pivot(float price, int bar_idx, bool isHigh) =>
-    for i = 13 to 1
-        array.set(piv_price,  i, array.get(piv_price,  i - 1))
-        array.set(piv_bar,    i, array.get(piv_bar,    i - 1))
-        array.set(piv_isHigh, i, array.get(piv_isHigh, i - 1))
-    array.set(piv_price,  0, price)
-    array.set(piv_bar,    0, bar_idx)
-    array.set(piv_isHigh, 0, isHigh)
+    array.pop(piv_price)
+    array.unshift(piv_price, price)
+    array.pop(piv_bar)
+    array.unshift(piv_bar, bar_idx)
+    array.pop(piv_isHigh)
+    array.unshift(piv_isHigh, isHigh)
 
 // Filter and store pivot highs
 if not na(ph)
@@ -756,7 +755,7 @@ detect_diagonal() =>
 
             if w1 > 0 and w3 > 0 and w5 > 0
                 // KEY: Wave 4 overlaps Wave 1 territory
-                w4_overlaps_w1 = p1 < p4  // Wave 4 low below Wave 1 high
+                w4_overlaps_w1 = p1 < p4 and p1 > p5  // Wave 4 low below Wave 1 high but above Wave 1 start
 
                 // Wave 2 doesn't retrace beyond Wave 1 start
                 w2_valid = p3 > p5
@@ -817,7 +816,7 @@ detect_diagonal() =>
             w5 = p1 - p0  // down
 
             if w1 > 0 and w3 > 0 and w5 > 0
-                w4_overlaps_w1 = p1 > p4  // Wave 4 high above Wave 1 low
+                w4_overlaps_w1 = p1 > p4 and p1 < p5  // Wave 4 high above Wave 1 low but below Wave 1 start
                 w2_valid = p3 < p5
                 w3_not_shortest = w3 >= w1 or w3 >= w5
 
@@ -935,6 +934,118 @@ else
     active_conf  := 0.0
     active_label := "---"
     pattern_type := "none"
+
+// ============================================================================
+// ELLIOTT WAVE OSCILLATOR (5-34 SMA difference)
+// ============================================================================
+ewo_fast = ta.sma(close, 5)
+ewo_slow = ta.sma(close, 34)
+ewo_value = ewo_fast - ewo_slow
+
+// ============================================================================
+// MULTI-TIMEFRAME WAVE ANALYSIS (3 Timeframes)
+// ============================================================================
+//
+// Analyzes wave structure on 3 timeframes simultaneously:
+//   TF1 = Current chart timeframe (detailed pattern detection above)
+//   TF2 = Higher timeframe (e.g., 1H) — medium-term context
+//   TF3 = Highest timeframe (e.g., 4H/Daily) — macro trend
+//
+// For each higher TF, we compute:
+//   - Elliott Wave Oscillator (EWO = SMA5 - SMA34)
+//   - EWO momentum (rising vs falling)
+//   - Trend position (price vs SMA 50 and SMA 200)
+//   - Wave phase classification:
+//       +2 = Strong bullish (EWO+, rising, above both SMAs)
+//       +1 = Bullish (EWO+ or above SMA50)
+//        0 = Neutral / mixed
+//       -1 = Bearish (EWO- or below SMA50)
+//       -2 = Strong bearish (EWO-, falling, below both SMAs)
+//
+// Confluence Score: sum of phase signs across 3 TFs
+//   +3 = All bullish (strongest)
+//   +2 = 2 bullish, 1 neutral/bearish
+//    0 = Mixed
+//   -2 = 2 bearish
+//   -3 = All bearish (strongest)
+// ============================================================================
+
+// MTF wave phase function — can be called via request.security()
+// Returns: [ewo, ewo_rising, above_sma50, above_sma200, phase]
+mtf_wave_analysis() =>
+    mtf_ewo_f = ta.sma(close, 5)
+    mtf_ewo_s = ta.sma(close, 34)
+    mtf_ewo   = mtf_ewo_f - mtf_ewo_s
+    mtf_ewo_rising = mtf_ewo > mtf_ewo[1]
+
+    mtf_sma50  = ta.sma(close, 50)
+    mtf_sma200 = ta.sma(close, 200)
+    mtf_a50  = close > mtf_sma50
+    mtf_a200 = close > mtf_sma200
+
+    mtf_phase = 0
+    if mtf_ewo > 0 and mtf_ewo_rising and mtf_a50 and mtf_a200
+        mtf_phase := 2   // Strong bull
+    else if (mtf_ewo > 0 and mtf_a50) or (mtf_a50 and mtf_a200)
+        mtf_phase := 1   // Bull
+    else if mtf_ewo < 0 and not mtf_ewo_rising and not mtf_a50 and not mtf_a200
+        mtf_phase := -2  // Strong bear
+    else if (mtf_ewo < 0 and not mtf_a50) or (not mtf_a50 and not mtf_a200)
+        mtf_phase := -1  // Bear
+    // else 0 = neutral
+
+    [mtf_ewo, mtf_ewo_rising, mtf_a50, mtf_a200, mtf_phase]
+
+// --- TF1: Current chart (reuse EWO from above, only compute SMA50/200) ---
+tf1_ewo = ewo_value
+tf1_rising = ewo_value > ewo_value[1]
+tf1_sma50  = ta.sma(close, 50)
+tf1_sma200 = ta.sma(close, 200)
+tf1_above50  = close > tf1_sma50
+tf1_above200 = close > tf1_sma200
+tf1_phase = 0
+if tf1_ewo > 0 and tf1_rising and tf1_above50 and tf1_above200
+    tf1_phase := 2
+else if (tf1_ewo > 0 and tf1_above50) or (tf1_above50 and tf1_above200)
+    tf1_phase := 1
+else if tf1_ewo < 0 and not tf1_rising and not tf1_above50 and not tf1_above200
+    tf1_phase := -2
+else if (tf1_ewo < 0 and not tf1_above50) or (not tf1_above50 and not tf1_above200)
+    tf1_phase := -1
+
+// --- TF2: Higher timeframe ---
+[tf2_ewo, tf2_rising, tf2_above50, tf2_above200, tf2_phase] = request.security(
+    syminfo.tickerid, mtf_tf2, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- TF3: Highest timeframe ---
+[tf3_ewo, tf3_rising, tf3_above50, tf3_above200, tf3_phase] = request.security(
+    syminfo.tickerid, mtf_tf3, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- Confluence Scoring ---
+tf1_sign = tf1_phase > 0 ? 1 : tf1_phase < 0 ? -1 : 0
+tf2_sign = tf2_phase > 0 ? 1 : tf2_phase < 0 ? -1 : 0
+tf3_sign = tf3_phase > 0 ? 1 : tf3_phase < 0 ? -1 : 0
+
+mtf_score = tf1_sign + tf2_sign + tf3_sign  // Range: -3 to +3
+
+// Confluence flags
+mtf_bull_confluence   = mtf_score >= 2    // At least 2 TFs bullish
+mtf_bear_confluence   = mtf_score <= -2   // At least 2 TFs bearish
+mtf_strong_bull       = mtf_score == 3    // All 3 TFs bullish
+mtf_strong_bear       = mtf_score == -3   // All 3 TFs bearish
+mtf_conflicting       = mtf_score == 0    // Fully mixed
+
+// MTF allows signal (bypass if MTF disabled or filter disabled)
+mtf_allows_buy  = not mtf_enabled or not mtf_filter or mtf_bull_confluence
+mtf_allows_sell = not mtf_enabled or not mtf_filter or mtf_bear_confluence
+
+// Confidence boost from MTF alignment
+mtf_conf_boost = 0.0
+if mtf_enabled and mtf_boost
+    if mtf_strong_bull or mtf_strong_bear
+        mtf_conf_boost := 0.15  // All 3 TFs agree
+    else if mtf_bull_confluence or mtf_bear_confluence
+        mtf_conf_boost := 0.05  // 2 of 3 agree
 
 // ============================================================================
 // FIBONACCI LEVEL DRAWING
@@ -1080,12 +1191,7 @@ if barstate.isconfirmed and show_targets and piv_count >= 4
 // ZIGZAG VISUALIZATION
 // ============================================================================
 
-var line zz_line_0 = na
-var line zz_line_1 = na
-var line zz_line_2 = na
-var line zz_line_3 = na
-var line zz_line_4 = na
-var line zz_line_5 = na
+var line[] zz_lines = array.new_line(6, na)
 
 if show_zigzag and barstate.isconfirmed and piv_count >= 2
     // How many segments to draw depends on the pattern
@@ -1111,24 +1217,8 @@ if show_zigzag and barstate.isconfirmed and piv_count >= 2
 
             zz_width = pattern_type == "diagonal" ? 3 : 2
 
-            if i == 0
-                line.delete(zz_line_0)
-                zz_line_0 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
-            if i == 1
-                line.delete(zz_line_1)
-                zz_line_1 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
-            if i == 2
-                line.delete(zz_line_2)
-                zz_line_2 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
-            if i == 3
-                line.delete(zz_line_3)
-                zz_line_3 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
-            if i == 4
-                line.delete(zz_line_4)
-                zz_line_4 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
-            if i == 5
-                line.delete(zz_line_5)
-                zz_line_5 := line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width)
+            line.delete(array.get(zz_lines, i))
+            array.set(zz_lines, i, line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width))
 
 // ============================================================================
 // DIAGONAL TRENDLINES (wedge)
@@ -1182,6 +1272,14 @@ if barstate.isconfirmed and show_zigzag and pattern_type == "diagonal" and piv_c
 // WAVE LABELS ON CHART
 // ============================================================================
 
+var label[] wave_labels_arr = array.new_label(0)
+
+if show_wave_labels and barstate.isconfirmed
+    // Clean up previous wave labels to prevent memory leak
+    for i = array.size(wave_labels_arr) - 1 to 0
+        label.delete(array.get(wave_labels_arr, i))
+    array.clear(wave_labels_arr)
+
 if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
     if pattern_type == "impulse" and piv_count >= 6
         wave_labels_str = array.from("0", "5", "4", "3", "2", "1")
@@ -1193,15 +1291,15 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
                 lbl_txt = array.get(wave_labels_str, i)
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
                 lbl_color = active_bull ? color_impulse_up : color_impulse_down
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=lbl_color,
-                    textcolor=color.white, size=size.small)
+                    textcolor=color.white, size=size.small))
         origin_p = get_price(5)
         origin_b = get_bar(5)
         if not na(origin_p) and not na(origin_b)
-            label.new(origin_b, origin_p, "0",
+            array.push(wave_labels_arr, label.new(origin_b, origin_p, "0",
                 style=get_high(5) ? label.style_label_down : label.style_label_up,
-                color=color.gray, textcolor=color.white, size=size.tiny)
+                color=color.gray, textcolor=color.white, size=size.tiny))
 
     if pattern_type == "diagonal" and piv_count >= 6
         // Same 5-wave labeling but with diagonal prefix
@@ -1215,15 +1313,15 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
             if not na(piv_p) and not na(piv_b) and i > 0
                 lbl_txt = array.get(diag_labels, i)
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=color_diagonal,
-                    textcolor=color.black, size=size.small)
+                    textcolor=color.black, size=size.small))
         origin_p = get_price(5)
         origin_b = get_bar(5)
         if not na(origin_p) and not na(origin_b)
-            label.new(origin_b, origin_p, "0",
+            array.push(wave_labels_arr, label.new(origin_b, origin_p, "0",
                 style=get_high(5) ? label.style_label_down : label.style_label_up,
-                color=color.gray, textcolor=color.white, size=size.tiny)
+                color=color.gray, textcolor=color.white, size=size.tiny))
 
     if pattern_type == "correction" and piv_count >= 3
         abc_labels = array.from("C", "B", "A")
@@ -1234,9 +1332,9 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
             if not na(piv_p) and not na(piv_b)
                 lbl_txt = array.get(abc_labels, i)
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=color_corrective,
-                    textcolor=color.white, size=size.small)
+                    textcolor=color.white, size=size.small))
 
     if pattern_type == "wxy" and piv_count >= 4
         wxy_labels = array.from("Y", "X", "W", "0")
@@ -1247,9 +1345,9 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
             if not na(piv_p) and not na(piv_b)
                 lbl_txt = array.get(wxy_labels, i)
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=color_complex,
-                    textcolor=color.white, size=size.small)
+                    textcolor=color.white, size=size.small))
 
     if pattern_type == "wxyxz" and piv_count >= 6
         wxyz_labels = array.from("Z", "X'", "Y", "X", "W", "0")
@@ -1260,9 +1358,9 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
             if not na(piv_p) and not na(piv_b)
                 lbl_txt = array.get(wxyz_labels, i)
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=color_complex,
-                    textcolor=color.white, size=size.small)
+                    textcolor=color.white, size=size.small))
 
     if pattern_type == "partial" and piv_count >= 4
         partial_labels = active_wave == 3 or active_wave == -3 ?
@@ -1275,9 +1373,9 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
             if not na(piv_p) and not na(piv_b) and lbl_txt != "-"
                 lbl_style = piv_h ? label.style_label_down : label.style_label_up
                 lbl_color = active_bull ? color_impulse_up : color_impulse_down
-                label.new(piv_b, piv_p, lbl_txt,
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
                     style=lbl_style, color=lbl_color,
-                    textcolor=color.white, size=size.small)
+                    textcolor=color.white, size=size.small))
 
 // ============================================================================
 // PRICE PROJECTION ENGINE
@@ -1298,7 +1396,6 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
 
 // --- Compute price targets and stops based on wave position ---
 var float sig_target  = na   // Primary Fibonacci target price
-var float sig_target2 = na   // Secondary (extended) target
 var float sig_stop    = na   // Invalidation / stop-loss level
 var float sig_entry   = na   // Entry price at signal
 var float sig_rr      = na   // Risk:Reward ratio
@@ -1610,11 +1707,12 @@ plotshape(show_signals and exhaustion_bear, "Bear Exhaustion", shape.xcross,
 
 // Format probability bar: ████░░░░░░ 45%
 prob_bar(float prob) =>
-    filled = math.round(prob * 10)
+    p = nz(prob, 0.0)
+    filled = math.round(p * 10)
     bar = ""
     for i = 0 to 9
         bar += i < filled ? "█" : "░"
-    bar + " " + str.tostring(prob * 100, "#") + "%"
+    bar + " " + str.tostring(p * 100, "#") + "%"
 
 // Build full signal text
 build_signal_text(string dir, string reason, float prob, float target,
@@ -1634,13 +1732,16 @@ build_signal_text(string dir, string reason, float prob, float target,
         txt += "\n" + mtf_tf3 + ": " + str.tostring(tf3p * 100, "#") + "%"
     txt
 
+var label sig_proj_lbl = na
+
 if show_signals and buy_signal
     lbl_txt = build_signal_text("BUY", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
     lbl_clr = composite_prob >= 0.65 ? color.new(color.lime, 5) :
         composite_prob >= 0.45 ? color.new(color.green, 10) :
         color.new(color.olive, 15)
-    label.new(bar_index, low, lbl_txt,
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, low, lbl_txt,
         style=label.style_label_up, color=lbl_clr,
         textcolor=color.white, size=size.small)
 
@@ -1650,21 +1751,24 @@ if show_signals and sell_signal
     lbl_clr = composite_prob >= 0.65 ? color.new(color.fuchsia, 5) :
         composite_prob >= 0.45 ? color.new(color.purple, 10) :
         color.new(color.maroon, 15)
-    label.new(bar_index, high, lbl_txt,
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, high, lbl_txt,
         style=label.style_label_down, color=lbl_clr,
         textcolor=color.white, size=size.small)
 
 if show_signals and exhaustion_bull
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
-    label.new(bar_index, high, lbl_txt,
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, high, lbl_txt,
         style=label.style_label_down, color=color.new(color.orange, 10),
         textcolor=color.white, size=size.small)
 
 if show_signals and exhaustion_bear
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
-    label.new(bar_index, low, lbl_txt,
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, low, lbl_txt,
         style=label.style_label_up, color=color.new(color.orange, 10),
         textcolor=color.white, size=size.small)
 
@@ -1720,109 +1824,12 @@ if show_background and pattern_type != "none"
         bg := diag_is_leading ? color.new(color.yellow, 92) : color.new(color.yellow, 86)
 bgcolor(bg)
 
-// ============================================================================
-// ELLIOTT WAVE OSCILLATOR (5-34 SMA difference)
-// ============================================================================
-ewo_fast = ta.sma(close, 5)
-ewo_slow = ta.sma(close, 34)
-ewo_value = ewo_fast - ewo_slow
-
-// ============================================================================
-// MULTI-TIMEFRAME WAVE ANALYSIS (3 Timeframes)
-// ============================================================================
-//
-// Analyzes wave structure on 3 timeframes simultaneously:
-//   TF1 = Current chart timeframe (detailed pattern detection above)
-//   TF2 = Higher timeframe (e.g., 1H) — medium-term context
-//   TF3 = Highest timeframe (e.g., 4H/Daily) — macro trend
-//
-// For each higher TF, we compute:
-//   - Elliott Wave Oscillator (EWO = SMA5 - SMA34)
-//   - EWO momentum (rising vs falling)
-//   - Trend position (price vs SMA 50 and SMA 200)
-//   - Wave phase classification:
-//       +2 = Strong bullish (EWO+, rising, above both SMAs)
-//       +1 = Bullish (EWO+ or above SMA50)
-//        0 = Neutral / mixed
-//       -1 = Bearish (EWO- or below SMA50)
-//       -2 = Strong bearish (EWO-, falling, below both SMAs)
-//
-// Confluence Score: sum of phase signs across 3 TFs
-//   +3 = All bullish (strongest)
-//   +2 = 2 bullish, 1 neutral/bearish
-//    0 = Mixed
-//   -2 = 2 bearish
-//   -3 = All bearish (strongest)
-// ============================================================================
-
-// MTF wave phase function — can be called via request.security()
-// Returns: [ewo, ewo_rising, above_sma50, above_sma200, phase]
-mtf_wave_analysis() =>
-    mtf_ewo_f = ta.sma(close, 5)
-    mtf_ewo_s = ta.sma(close, 34)
-    mtf_ewo   = mtf_ewo_f - mtf_ewo_s
-    mtf_ewo_rising = mtf_ewo > mtf_ewo[1]
-
-    mtf_sma50  = ta.sma(close, 50)
-    mtf_sma200 = ta.sma(close, 200)
-    mtf_a50  = close > mtf_sma50
-    mtf_a200 = close > mtf_sma200
-
-    mtf_phase = 0
-    if mtf_ewo > 0 and mtf_ewo_rising and mtf_a50 and mtf_a200
-        mtf_phase := 2   // Strong bull
-    else if (mtf_ewo > 0 and mtf_a50) or (mtf_a50 and mtf_a200)
-        mtf_phase := 1   // Bull
-    else if mtf_ewo < 0 and not mtf_ewo_rising and not mtf_a50 and not mtf_a200
-        mtf_phase := -2  // Strong bear
-    else if (mtf_ewo < 0 and not mtf_a50) or (not mtf_a50 and not mtf_a200)
-        mtf_phase := -1  // Bear
-    // else 0 = neutral
-
-    [mtf_ewo, mtf_ewo_rising, mtf_a50, mtf_a200, mtf_phase]
-
-// --- TF1: Current chart ---
-[tf1_ewo, tf1_rising, tf1_above50, tf1_above200, tf1_phase] = mtf_wave_analysis()
-
-// --- TF2: Higher timeframe ---
-[tf2_ewo, tf2_rising, tf2_above50, tf2_above200, tf2_phase] = request.security(
-    syminfo.tickerid, mtf_tf2, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
-
-// --- TF3: Highest timeframe ---
-[tf3_ewo, tf3_rising, tf3_above50, tf3_above200, tf3_phase] = request.security(
-    syminfo.tickerid, mtf_tf3, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
-
-// --- Confluence Scoring ---
-tf1_sign = tf1_phase > 0 ? 1 : tf1_phase < 0 ? -1 : 0
-tf2_sign = tf2_phase > 0 ? 1 : tf2_phase < 0 ? -1 : 0
-tf3_sign = tf3_phase > 0 ? 1 : tf3_phase < 0 ? -1 : 0
-
-mtf_score = tf1_sign + tf2_sign + tf3_sign  // Range: -3 to +3
-
-// Confluence flags
-mtf_bull_confluence   = mtf_score >= 2    // At least 2 TFs bullish
-mtf_bear_confluence   = mtf_score <= -2   // At least 2 TFs bearish
-mtf_strong_bull       = mtf_score == 3    // All 3 TFs bullish
-mtf_strong_bear       = mtf_score == -3   // All 3 TFs bearish
-mtf_conflicting       = mtf_score == 0    // Fully mixed
-
-// MTF allows signal (bypass if MTF disabled or filter disabled)
-mtf_allows_buy  = not mtf_enabled or not mtf_filter or mtf_bull_confluence
-mtf_allows_sell = not mtf_enabled or not mtf_filter or mtf_bear_confluence
-
-// Confidence boost from MTF alignment
-mtf_conf_boost = 0.0
-if mtf_enabled and mtf_boost
-    if mtf_strong_bull or mtf_strong_bear
-        mtf_conf_boost := 0.15  // All 3 TFs agree
-    else if mtf_bull_confluence or mtf_bear_confluence
-        mtf_conf_boost := 0.05  // 2 of 3 agree
 
 // ============================================================================
 // INFO DASHBOARD
 // ============================================================================
 if show_table and barstate.islast
-    var table dashboard = table.new(position.top_right, 2, 24,
+    var table dashboard = table.new(position.top_right, 2, 25,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 
     // Header
@@ -2048,6 +2055,17 @@ if show_table and barstate.islast
         table.cell(dashboard, 1, 23, tf2_trend_txt,
             text_color=tf2_trend_clr, text_halign=text.align_right, text_size=size.tiny)
 
+        // TF3 trend
+        tf3_trend_txt = tf3_above50 and tf3_above200 ? ">50 >200" :
+            tf3_above50 ? ">50 <200" :
+            not tf3_above50 and not tf3_above200 ? "<50 <200" : "<50 >200"
+        tf3_trend_clr = tf3_above50 and tf3_above200 ? color.lime :
+            not tf3_above50 and not tf3_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 24, mtf_tf3, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 24, tf3_trend_txt,
+            text_color=tf3_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
 // ============================================================================
 // ALERTS
 // ============================================================================
@@ -2070,7 +2088,7 @@ alertcondition(pattern_type == "wxy" and pattern_type[1] != "wxy", "WXY Double D
 alertcondition(pattern_type == "wxyxz" and pattern_type[1] != "wxyxz", "WXYXZ Triple Detected",
     "EW: WXYXZ triple combination (complex correction) identified")
 alertcondition(pattern_type == "diagonal" and pattern_type[1] != "diagonal", "Diagonal Detected",
-    "EW: Diagonal pattern identified — " + active_label)
+    "EW: Diagonal pattern identified")
 alertcondition(mtf_strong_bull and not mtf_strong_bull[1], "MTF All Bullish",
     "EW MTF: All 3 timeframes now bullish — strong confluence")
 alertcondition(mtf_strong_bear and not mtf_strong_bear[1], "MTF All Bearish",
