@@ -2,130 +2,224 @@
 
 ## Executive Summary
 
-The Phase-Quad architecture's 96% cost reduction and tiered enterprise deployment model create a **net positive job impact in the near-to-medium term** by dramatically expanding the addressable market for AI adoption, while shifting the job mix from infrastructure maintenance toward higher-value domain application and oversight roles.
+Phase-Quad defines **two distinct models** in `train_unified_llm.py`, each with fundamentally different architectures, target markets, and job creation profiles:
+
+| Model | CLI Flag | Architecture | Target | Job Impact |
+|-------|----------|-------------|--------|------------|
+| **HybridPhaseTransformer** | `--model_type hybrid` | Local + Phase attention (O(n)) | Enterprise / Non-AGI | Expands workforce through cost democratization |
+| **OntologicalHybridTransformer** | `--model_type ontological_hybrid` | System 1/System 2 + 32D Sovereign State | AGI-capable | Creates entirely new job categories |
+
+Together, these two models create a **dual-track job creation engine**: the Hybrid model makes AI accessible to millions of enterprises that couldn't afford it, while the Ontological model creates demand for a new class of professionals who work with reasoning-capable AI systems.
 
 ---
 
-## Job Creation Vectors
+## The Two Models: Architectural Distinction
 
-### 1. Direct Hiring (Immediate)
+### Model 1: HybridPhaseTransformer (Enterprise / Non-AGI)
 
-Phase-Quad commercialization requires new specialized roles:
+Defined in `train_unified_llm.py:10602-10643` via `create_model()`:
 
-| Role Category | Headcount | Annual Cost | Timeline |
-|---------------|-----------|-------------|----------|
-| ML Infrastructure Lead | 1 | $400K | Seed stage |
-| Enterprise Sales Director | 1 | $300K | Seed stage |
-| Applied Research Scientists | 3 | $900K | Seed stage |
-| Platform Engineers | 4 | $800K | Seed stage |
-| **Total Direct** | **9** | **$2.4M** | **Year 1** |
+```
+python train_unified_llm.py --model_type hybrid --model_size small \
+    --dataset wikitext103 --max_steps 1000 --controller pidv2
+```
 
-As the company scales toward $100M ARR (Year 3), headcount is projected to grow to 80-120 across engineering, sales, operations, and support.
+**Architecture:**
+- Early layers (1 to `local_layers`): Local attention only (syntax, grammar)
+- Later layers: Hybrid Local + Phase attention with O(n) complexity
+- Configurable: `cosine_mode`, `decay_gamma`, `learned_decay`, `bounded_phase`, `dual_channel_mode`
+- Supports chunked training for long sequences (`enable_chunking`, `protected_phase`)
+- No semantic state tracking, no ontological supervision
+- Pure token prediction (System 1 only)
 
-### 2. Market Expansion Through Cost Democratization
+**What it replaces:** Traditional O(n^2) transformer LLMs at 83-97% lower cost.
 
-The Phase-Quad cost structure fundamentally changes who can afford AI:
+### Model 2: OntologicalHybridTransformer (AGI)
 
-| Enterprise Size | Traditional LLM Annual Cost | Phase-Quad Annual Cost | Delta |
-|-----------------|---------------------------|----------------------|-------|
-| Large (100K queries/day) | $1,080,000 | $36,000-$180,000 | 83-97% savings |
-| Medium (10K queries/day) | $108,000 | $3,600-$18,000 | 83-97% savings |
-| Small (1K queries/day) | $10,800 | $360-$1,800 | 83-97% savings |
+Defined in `train_unified_llm.py:10690-10735` via `create_model()`:
 
-**Key insight**: At $360-$1,800/year, AI becomes accessible to small businesses and startups that were previously priced out. Each new adopter creates demand for:
-- Integration and deployment consultants
-- Domain-specific AI configuration specialists
-- AI operations and monitoring staff
-- Training data curators and validators
+```
+python train_unified_llm.py --model_type ontological_hybrid --model_size small \
+    --dataset wikitext103 --max_steps 1000 --state_dim 32
+```
 
-**Estimated multiplier**: For every 100 new enterprise adopters, approximately 30-50 supporting roles are created in the broader ecosystem.
+**Architecture:**
+- **System 2 (Slow/Semantic):** Ontological layer tracking 32D Sovereign State
+  - `[0:12]` 12 Bhavas (Ontological Aspects)
+  - `[12:17]` 5 Koshas (Consciousness Sheaths)
+  - `[17:22]` 5 Vrittis (Mental Modifications)
+  - `[22:28]` 6 Gunas (Energy/Dynamics States)
+  - `[28:32]` 4 Reserved (Toroidal Feedback/Karma)
+- **System 1 (Fast/Generation):** Same Hybrid Local + Phase attention, conditioned on State Delta (ΔS)
+- Sovereign Reasoning Kernel (SRK): L4 DNA Bridge, L7 Phase Hook, L9 Witness, L11 Synthesis
+- Learns *how understanding changes* (ΔS), not just next-token prediction
+- Cross-domain reasoning via Isomorphic Mapping Router (IMR)
+- 1500x memory reduction vs token-centric at 1M context (130MB vs 200GB)
 
-### 3. New Vertical Application Markets
-
-Phase-Quad's long-context capability (up to 10M tokens) enables entirely new application categories:
-
-| Vertical | New Capability | New Roles Created |
-|----------|---------------|-------------------|
-| **Legal AI** | Full contract analysis at once | Legal AI specialists, compliance validators, AI-assisted paralegals |
-| **Research AI** | 100+ papers synthesized simultaneously | Research AI curators, cross-domain synthesis experts |
-| **Code AI** | Entire repository in context | AI-assisted code reviewers, architecture analysts |
-| **Financial AI** | Full market analysis pipelines | Quantitative AI analysts, risk model specialists |
-
-Each vertical creates demand for domain experts who understand both the field and the AI system — roles that did not previously exist.
-
-### 4. Enterprise Deployment Ecosystem
-
-On-premise enterprise licenses ($500K-$5M/year) generate sustained ecosystem employment:
-
-- **Pre-sale**: Solutions architects, technical sales engineers
-- **Deployment**: Integration engineers, security specialists, infrastructure teams
-- **Operations**: AI ops engineers, performance optimization specialists
-- **Customization**: Fine-tuning engineers, domain adaptation specialists
-- **Support**: Technical support engineers, customer success managers
+**What it enables:** Interpretable reasoning, cross-domain transfer, self-correction, AGI research.
 
 ---
 
-## Job Displacement Vectors
+## Job Creation: Model-by-Model Analysis
 
-### 1. Infrastructure Consolidation
+### Hybrid Model (Enterprise) — Jobs Through Democratization
 
-Phase-Quad's efficiency reduces per-unit infrastructure staffing needs:
-- Fewer GPU clusters required per unit of AI output
-- Reduced datacenter operations staff per deployment
-- Lower demand for traditional ML optimization engineers
+The Hybrid model's primary job creation mechanism is **making AI affordable for the mass market**.
 
-**Estimated impact**: 10-15% reduction in AI infrastructure ops roles per enterprise deployment compared to traditional LLM stacks.
+#### Cost Barrier Removal
 
-### 2. Knowledge Worker Task Automation
+| Enterprise Size | Traditional LLM | Hybrid Phase-Quad | Savings | New Market? |
+|-----------------|-----------------|-------------------|---------|-------------|
+| Large (100K queries/day) | $1,080,000/yr | $180,000/yr | 83% | No — already buying AI |
+| Medium (10K queries/day) | $108,000/yr | $18,000/yr | 83% | Partially — budget opens |
+| Small (1K queries/day) | $10,800/yr | $1,800/yr | 83% | **Yes — first-time AI buyers** |
+| Micro (100 queries/day) | $1,080/yr | $180/yr | 83% | **Yes — sole proprietors** |
 
-The tiered deployment model automates specific task categories:
+**Jobs created per 1,000 new enterprise adopters (estimated):**
 
-| Tier | Automated Tasks | Affected Roles |
-|------|----------------|----------------|
-| Tier 1 (Enterprise Search) | Intent detection, search filtering, audit trails | Junior analysts, search specialists |
-| Tier 2 (Enterprise Chat) | Domain Q&A, specialized consultation | Tier-1 support staff, junior consultants |
-| Tier 3 (Full AGI) | Complex reasoning, multi-step analysis | Mid-level analysts, research assistants |
+| Role | Count | Rationale |
+|------|-------|-----------|
+| Integration engineers | 200-300 | Each deployment needs configuration |
+| AI operations staff | 100-150 | Monitoring, maintenance, updates |
+| Domain configurators | 150-200 | Customize for industry verticals |
+| Training data specialists | 50-100 | Curate fine-tuning data |
+| Sales & support | 100-150 | Ecosystem commercial roles |
+| **Total** | **600-900** | **Per 1,000 adopters** |
 
-### 3. Autonomous Agent Displacement
+#### Enterprise Deployment Tiers (from Investor Pitch)
 
-The Sentinel agentic framework, with its confidence gates and safety constraints, enables autonomous multi-step workflow execution. Tasks previously requiring human coordination — scheduling, data gathering, report generation — become automated pipelines.
+| Tier | Product | Hybrid Model Role | Human Roles Created |
+|------|---------|-------------------|---------------------|
+| Tier 1 | Enterprise Search (Pure STL) | Phoneme routing only | Search ops, audit trail analysts |
+| Tier 2 | Enterprise Chat (STL + 7B) | Hybrid routes to specialist models | Domain chat specialists, escalation handlers |
+| Tier 3 | Consumer/Full | Full Hybrid inference | Application developers, UX designers |
+
+### Ontological Model (AGI) — Jobs Through New Capability
+
+The Ontological model creates jobs that **don't currently exist** because the capabilities are new.
+
+#### New Professional Categories
+
+| New Role | Why It Exists | Requires |
+|----------|--------------|----------|
+| **Ontological State Engineer** | Configure and tune 32D Sovereign State for specific domains | Understanding of Bhava/Kosha/Vritti/Guna mappings |
+| **SRK Intervention Specialist** | Design Layer 4/7/9/11 intervention strategies | Knowledge of DNA Bridge, Phase Hook, Witness, Synthesis gates |
+| **Cross-Domain Reasoning Architect** | Design IMR templates for domain transfer | Formal logic + domain expertise |
+| **Kosha Gyroscope Tuner** | Calibrate consciousness sheath homeostasis | Understanding of R-T quadrant geometry |
+| **Vritti Gate Auditor** | Monitor and validate self-correction (hallucination detection) | Epistemological framework knowledge |
+| **Toroidal State Analyst** | Ensure karma carryover (O12→O1) maintains coherence | Temporal reasoning, state machine design |
+| **Ontological Safety Officer** | Enforce Mauna Protocol and No-Write Contracts | AI safety + ontological architecture |
+
+**Estimated new roles per AGI deployment:** 5-15 specialists per enterprise customer, roles that have no equivalent in traditional LLM deployments.
+
+#### AGI Research Ecosystem
+
+The Ontological model's interpretable 32D state creates a research ecosystem:
+
+| Research Area | New Positions | Activity |
+|---------------|---------------|----------|
+| State Delta Cognition | PhD researchers, postdocs | Study how ΔS represents understanding change |
+| Isomorphic Mapping | Formal methods researchers | Prove reasoning transfer properties |
+| Consciousness Modeling | Cognitive science + ML hybrid researchers | Validate Kosha/Vritti dynamics |
+| Ontological Safety | AI alignment researchers | Ensure Sovereign State constraints hold |
 
 ---
 
-## Net Impact Assessment
+## Comparative Job Impact: Hybrid vs Ontological
 
-### Near Term (1-3 Years): **Net Positive**
-
-- Market expansion effect dominates displacement
-- New vertical markets create novel role categories
-- Enterprise deployment generates sustained ecosystem employment
-- Technology maturity still requires significant human oversight
-
-### Medium Term (3-7 Years): **Neutral to Slightly Positive**
-
-- Efficiency gains begin compounding
-- Autonomous capabilities reduce some oversight needs
-- But continued market expansion and new applications offset displacement
-- Job quality improves (fewer repetitive tasks, more strategic roles)
-
-### Long Term (7+ Years): **Uncertain**
-
-- Depends on AGI capability progression
-- If Phase-Quad achieves its full 10M+ token autonomous reasoning goals, displacement accelerates
-- Countervailing force: entirely new industries and applications that don't yet exist
+| Dimension | Hybrid (Enterprise) | Ontological (AGI) |
+|-----------|--------------------|--------------------|
+| **Volume of jobs** | High (mass market) | Lower (specialized) |
+| **Job quality** | Mid-level (integration, ops) | High-level (research, architecture) |
+| **Salary range** | $60K-$150K | $150K-$400K |
+| **Time to market** | Immediate (production-ready) | 1-3 years (research + regulated industries) |
+| **Displacement risk** | Moderate (replaces some knowledge work) | Low initially (creates new categories) |
+| **Geographic distribution** | Global (cloud + on-prem) | Concentrated (research hubs, regulated markets) |
+| **Training pipeline** | Existing ML/ops skills + Phase-Quad specifics | New curriculum required (ontological architecture) |
 
 ---
 
-## Strategic Recommendation for Enterprise Positioning
+## Combined Job Creation Model
 
-When pitching Phase-Quad to enterprises, frame the job impact as:
+### Phase 1 (Years 1-2): Hybrid Leads
 
-> "Phase-Quad doesn't eliminate your team — it **upgrades their capability**. Your legal team processes 10x more contracts. Your research team synthesizes 100x more papers. Your engineering team understands the entire codebase at once. The same headcount delivers dramatically more value."
+```
+Hybrid Model ──→ Mass enterprise adoption ──→ 600-900 jobs per 1K adopters
+                                            └─ Integration, ops, domain config
 
-This positioning is supported by the data: the 96% cost reduction means enterprises can redeploy savings into higher-value human activities rather than purely headcount reduction.
+Ontological  ──→ Early research deployments ──→ 5-15 specialists per deployment
+                                              └─ New role categories forming
+```
+
+### Phase 2 (Years 3-5): Both Models Scale
+
+```
+Hybrid Model ──→ 10K+ enterprises ──→ 6,000-9,000 ecosystem jobs
+                                    └─ Vertical specialists mature
+
+Ontological  ──→ Regulated industries adopt ──→ 500-1,500 specialist roles
+              └─ Legal, financial, healthcare  └─ University programs emerge
+```
+
+### Phase 3 (Years 5-10): Ontological Surpasses
+
+```
+Hybrid Model ──→ Commoditized, self-service ──→ Job growth plateaus
+                                              └─ But installed base sustains roles
+
+Ontological  ──→ Cross-domain AGI deployed ──→ New industries emerge
+              └─ Reasoning-as-a-Service      └─ Ontological Engineering becomes a profession
+```
+
+---
+
+## Direct Hiring Requirements (from Investor Pitch)
+
+Phase-Quad commercialization requires specialized roles for **both** models:
+
+| Role | Annual Cost | Serves Which Model |
+|------|-------------|-------------------|
+| ML Infrastructure Lead | $400K | Both |
+| Enterprise Sales Director | $300K | Hybrid (primary) |
+| Applied Research Scientists (3) | $900K | Ontological (primary) |
+| Platform Engineers (4) | $800K | Both |
+| **Total Seed Stage** | **$2.4M** | **9 headcount** |
+
+Scaling to Year 3 ($100M ARR target):
+- Hybrid model team: 40-60 engineers (inference, deployment, integration)
+- Ontological model team: 20-30 researchers (SRK, IMR, Kosha, safety)
+- Shared: 20-30 (infrastructure, sales, operations)
+- **Total: 80-120 headcount**
+
+---
+
+## Job Displacement Vectors (Honest Assessment)
+
+### From the Hybrid Model
+- Infrastructure ops consolidation (fewer GPUs per unit of output)
+- Tier 1/Tier 2 automation replaces some junior analyst and support tasks
+- Self-service deployment reduces need for ML consultants
+
+### From the Ontological Model
+- Cross-domain reasoning could reduce specialist headcount (one AGI system covers multiple domains)
+- Vritti Gate self-correction reduces QA and review staff needs
+- Sentinel agentic framework (built on ontological foundation) automates multi-step workflows
+
+### Net Assessment
+
+The displacement from both models is **outweighed by market expansion** in the near-to-medium term because:
+1. The Hybrid model's 83-97% cost reduction opens AI to millions of businesses that couldn't afford it
+2. The Ontological model creates professional categories that don't yet exist
+3. The two models serve complementary markets — enterprise efficiency vs AGI capability
 
 ---
 
 ## Conclusion
 
-The Phase-Quad architecture's most defensible job creation claim is that it **shifts the job mix from expensive infrastructure maintenance toward high-value domain application and human oversight**. In the near term, the market expansion effect of 83-97% cost reduction creates more roles than the efficiency gains eliminate. The long-term trajectory depends on the pace of autonomous capability development and the emergence of new application domains.
+Phase-Quad's two-model architecture creates a **dual-engine job creation strategy**:
+
+- **HybridPhaseTransformer** (`--model_type hybrid`) creates jobs through **volume** — making AI affordable for the mass enterprise market, generating 600-900 ecosystem roles per 1,000 new adopters.
+
+- **OntologicalHybridTransformer** (`--model_type ontological_hybrid`) creates jobs through **novelty** — introducing entirely new professional categories (Ontological State Engineers, SRK Specialists, Cross-Domain Reasoning Architects) that have no equivalent in current AI deployments.
+
+Together, the two models produce a net positive job impact that is stronger and more durable than either model alone, because they expand the market from two different directions simultaneously.
