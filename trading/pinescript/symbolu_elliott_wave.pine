@@ -34,6 +34,18 @@ strict_rules    = input.bool(true, "Strict Wave Rules",
     group="Wave Rules",
     tooltip="Enforce all three cardinal Elliott Wave rules strictly.")
 
+// --- Multi-Timeframe Analysis ---
+mtf_enabled     = input.bool(true, "Enable MTF Analysis", group="Multi-Timeframe",
+    tooltip="Analyze wave structure across 3 timeframes for confluence.")
+mtf_tf2         = input.timeframe("60", "Timeframe 2 (Higher)", group="Multi-Timeframe",
+    tooltip="Medium timeframe. E.g., 60 = 1H if your chart is 5m/15m.")
+mtf_tf3         = input.timeframe("240", "Timeframe 3 (Highest)", group="Multi-Timeframe",
+    tooltip="Highest timeframe. E.g., 240 = 4H or D = Daily.")
+mtf_filter      = input.bool(true, "MTF Confluence Filter", group="Multi-Timeframe",
+    tooltip="When enabled, buy/sell signals require at least 2 of 3 timeframes to agree on direction.")
+mtf_boost       = input.bool(true, "MTF Confidence Boost", group="Multi-Timeframe",
+    tooltip="Boost confidence when all 3 timeframes align.")
+
 // --- Display ---
 show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
 show_wave_labels = input.bool(true, "Show Wave Labels (1-5, A-B-C, W-X-Y-Z)", group="Display")
@@ -1302,11 +1314,16 @@ ending_diag_bear_reversal = pattern_type == "diagonal" and not diag_is_leading a
 leading_diag_bull = pattern_type == "diagonal" and diag_is_leading and diag_type > 0 and diag_conf >= 0.30
 leading_diag_bear = pattern_type == "diagonal" and diag_is_leading and diag_type < 0 and diag_conf >= 0.30
 
-// Aggregate signals
-buy_signal  = (wave2_buy or abc_buy or wxy_buy or wxyz_buy or ending_diag_bull_reversal) and last_signal != 1
-sell_signal = (wave2_sell or abc_sell or wxy_sell or wxyz_sell or ending_diag_bear_reversal) and last_signal != -1
+// Aggregate signals — MTF confluence filters buy/sell, exhaustion is always shown
+buy_signal  = (wave2_buy or abc_buy or wxy_buy or wxyz_buy or ending_diag_bull_reversal) and last_signal != 1 and mtf_allows_buy
+sell_signal = (wave2_sell or abc_sell or wxy_sell or wxyz_sell or ending_diag_bear_reversal) and last_signal != -1 and mtf_allows_sell
 exhaustion_bull = (wave5_exhaustion_bull or leading_diag_bull) and last_signal != -1
 exhaustion_bear = (wave5_exhaustion_bear or leading_diag_bear) and last_signal != 1
+
+// Apply MTF confidence boost to active confidence
+if mtf_enabled and mtf_boost
+    if (active_bull and mtf_bull_confluence) or (not active_bull and mtf_bear_confluence)
+        active_conf := math.min(1.0, active_conf + mtf_conf_boost)
 
 if buy_signal
     last_signal   := 1
@@ -1339,15 +1356,17 @@ plotshape(show_signals and exhaustion_bull, "Bull Exhaustion", shape.xcross,
 plotshape(show_signals and exhaustion_bear, "Bear Exhaustion", shape.xcross,
     location.belowbar, color.new(color.orange, 0), size=size.small)
 
-// Signal labels
+// Signal labels — include MTF confluence info
+mtf_tag = mtf_enabled ? (mtf_strong_bull or mtf_strong_bear ? "\nMTF: 3/3" :
+    mtf_bull_confluence or mtf_bear_confluence ? "\nMTF: 2/3" : "\nMTF: weak") : ""
 if show_signals and buy_signal
     label.new(bar_index, low, "BUY\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%",
+        str.tostring(active_conf * 100, "#.#") + "%" + mtf_tag,
         style=label.style_label_up, color=color.new(color.lime, 10),
         textcolor=color.white, size=size.small)
 if show_signals and sell_signal
     label.new(bar_index, high, "SELL\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%",
+        str.tostring(active_conf * 100, "#.#") + "%" + mtf_tag,
         style=label.style_label_down, color=color.new(color.fuchsia, 10),
         textcolor=color.white, size=size.small)
 if show_signals and exhaustion_bull
@@ -1391,10 +1410,101 @@ ewo_slow = ta.sma(close, 34)
 ewo_value = ewo_fast - ewo_slow
 
 // ============================================================================
+// MULTI-TIMEFRAME WAVE ANALYSIS (3 Timeframes)
+// ============================================================================
+//
+// Analyzes wave structure on 3 timeframes simultaneously:
+//   TF1 = Current chart timeframe (detailed pattern detection above)
+//   TF2 = Higher timeframe (e.g., 1H) — medium-term context
+//   TF3 = Highest timeframe (e.g., 4H/Daily) — macro trend
+//
+// For each higher TF, we compute:
+//   - Elliott Wave Oscillator (EWO = SMA5 - SMA34)
+//   - EWO momentum (rising vs falling)
+//   - Trend position (price vs SMA 50 and SMA 200)
+//   - Wave phase classification:
+//       +2 = Strong bullish (EWO+, rising, above both SMAs)
+//       +1 = Bullish (EWO+ or above SMA50)
+//        0 = Neutral / mixed
+//       -1 = Bearish (EWO- or below SMA50)
+//       -2 = Strong bearish (EWO-, falling, below both SMAs)
+//
+// Confluence Score: sum of phase signs across 3 TFs
+//   +3 = All bullish (strongest)
+//   +2 = 2 bullish, 1 neutral/bearish
+//    0 = Mixed
+//   -2 = 2 bearish
+//   -3 = All bearish (strongest)
+// ============================================================================
+
+// MTF wave phase function — can be called via request.security()
+// Returns: [ewo, ewo_rising, above_sma50, above_sma200, phase]
+mtf_wave_analysis() =>
+    mtf_ewo_f = ta.sma(close, 5)
+    mtf_ewo_s = ta.sma(close, 34)
+    mtf_ewo   = mtf_ewo_f - mtf_ewo_s
+    mtf_ewo_rising = mtf_ewo > mtf_ewo[1]
+
+    mtf_sma50  = ta.sma(close, 50)
+    mtf_sma200 = ta.sma(close, 200)
+    mtf_a50  = close > mtf_sma50
+    mtf_a200 = close > mtf_sma200
+
+    mtf_phase = 0
+    if mtf_ewo > 0 and mtf_ewo_rising and mtf_a50 and mtf_a200
+        mtf_phase := 2   // Strong bull
+    else if (mtf_ewo > 0 and mtf_a50) or (mtf_a50 and mtf_a200)
+        mtf_phase := 1   // Bull
+    else if mtf_ewo < 0 and not mtf_ewo_rising and not mtf_a50 and not mtf_a200
+        mtf_phase := -2  // Strong bear
+    else if (mtf_ewo < 0 and not mtf_a50) or (not mtf_a50 and not mtf_a200)
+        mtf_phase := -1  // Bear
+    // else 0 = neutral
+
+    [mtf_ewo, mtf_ewo_rising, mtf_a50, mtf_a200, mtf_phase]
+
+// --- TF1: Current chart ---
+[tf1_ewo, tf1_rising, tf1_above50, tf1_above200, tf1_phase] = mtf_wave_analysis()
+
+// --- TF2: Higher timeframe ---
+[tf2_ewo, tf2_rising, tf2_above50, tf2_above200, tf2_phase] = request.security(
+    syminfo.tickerid, mtf_tf2, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- TF3: Highest timeframe ---
+[tf3_ewo, tf3_rising, tf3_above50, tf3_above200, tf3_phase] = request.security(
+    syminfo.tickerid, mtf_tf3, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- Confluence Scoring ---
+tf1_sign = tf1_phase > 0 ? 1 : tf1_phase < 0 ? -1 : 0
+tf2_sign = tf2_phase > 0 ? 1 : tf2_phase < 0 ? -1 : 0
+tf3_sign = tf3_phase > 0 ? 1 : tf3_phase < 0 ? -1 : 0
+
+mtf_score = tf1_sign + tf2_sign + tf3_sign  // Range: -3 to +3
+
+// Confluence flags
+mtf_bull_confluence   = mtf_score >= 2    // At least 2 TFs bullish
+mtf_bear_confluence   = mtf_score <= -2   // At least 2 TFs bearish
+mtf_strong_bull       = mtf_score == 3    // All 3 TFs bullish
+mtf_strong_bear       = mtf_score == -3   // All 3 TFs bearish
+mtf_conflicting       = mtf_score == 0    // Fully mixed
+
+// MTF allows signal (bypass if MTF disabled or filter disabled)
+mtf_allows_buy  = not mtf_enabled or not mtf_filter or mtf_bull_confluence
+mtf_allows_sell = not mtf_enabled or not mtf_filter or mtf_bear_confluence
+
+// Confidence boost from MTF alignment
+mtf_conf_boost = 0.0
+if mtf_enabled and mtf_boost
+    if mtf_strong_bull or mtf_strong_bear
+        mtf_conf_boost := 0.15  // All 3 TFs agree
+    else if mtf_bull_confluence or mtf_bear_confluence
+        mtf_conf_boost := 0.05  // 2 of 3 agree
+
+// ============================================================================
 // INFO DASHBOARD
 // ============================================================================
 if show_table and barstate.islast
-    var table dashboard = table.new(position.top_right, 2, 16,
+    var table dashboard = table.new(position.top_right, 2, 24,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 
     // Header
@@ -1430,12 +1540,13 @@ if show_table and barstate.islast
     table.cell(dashboard, 0, 3, "Status", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
     table.cell(dashboard, 1, 3, active_label, text_color=wave_color, text_halign=text.align_right, text_size=size.small)
 
-    // Confidence
+    // Confidence (with MTF boost indicator)
     conf_color = active_conf >= 0.6 ? color.lime :
         active_conf >= 0.4 ? color.yellow :
         active_conf >= 0.2 ? color.orange : color.gray
+    conf_suffix = mtf_enabled and mtf_conf_boost > 0 ? " +" : ""
     table.cell(dashboard, 0, 4, "Confidence", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
-    table.cell(dashboard, 1, 4, str.tostring(active_conf * 100, "#.#") + "%",
+    table.cell(dashboard, 1, 4, str.tostring(active_conf * 100, "#.#") + "%" + conf_suffix,
         text_color=conf_color, text_halign=text.align_right, text_size=size.small)
 
     // Fibonacci ratios section header
@@ -1541,6 +1652,84 @@ if show_table and barstate.islast
         table.cell(dashboard, 1, 10 + det_i, det_txt,
             text_color=det_clr, text_halign=text.align_right, text_size=size.tiny)
 
+    // ── Multi-Timeframe Section ──
+    if mtf_enabled
+        table.cell(dashboard, 0, 16, "─── MTF (3 TFs) ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 16, 1, 16)
+
+        // Helper: phase to display string and color
+        phase_to_str(int p) =>
+            p == 2 ? "S.BULL" : p == 1 ? "BULL" : p == -1 ? "BEAR" : p == -2 ? "S.BEAR" : "NEUT"
+        phase_to_clr(int p) =>
+            p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
+
+        // Confluence summary
+        confl_txt = mtf_strong_bull ? "ALL BULL (3/3)" :
+            mtf_strong_bear ? "ALL BEAR (3/3)" :
+            mtf_bull_confluence ? "BULL (2/3)" :
+            mtf_bear_confluence ? "BEAR (2/3)" :
+            mtf_conflicting ? "MIXED (0)" :
+            mtf_score > 0 ? "LEAN BULL" : "LEAN BEAR"
+        confl_clr = mtf_strong_bull ? color.lime :
+            mtf_strong_bear ? color.red :
+            mtf_bull_confluence ? color.green :
+            mtf_bear_confluence ? color.orange :
+            color.gray
+        table.cell(dashboard, 0, 17, "Confluence", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 17, confl_txt, text_color=confl_clr,
+            text_halign=text.align_right, text_size=size.small)
+
+        // TF1 (current chart): phase + EWO
+        tf1_name = timeframe.period
+        ewo1_dir = tf1_rising ? "+" : "-"
+        table.cell(dashboard, 0, 18, "TF1 " + tf1_name, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 18, phase_to_str(tf1_phase) + " " + str.tostring(tf1_ewo, "#.#") + ewo1_dir,
+            text_color=phase_to_clr(tf1_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // TF2 (higher): phase + EWO
+        ewo2_dir = tf2_rising ? "+" : "-"
+        table.cell(dashboard, 0, 19, "TF2 " + mtf_tf2, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 19, phase_to_str(tf2_phase) + " " + str.tostring(tf2_ewo, "#.#") + ewo2_dir,
+            text_color=phase_to_clr(tf2_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // TF3 (highest): phase + EWO
+        ewo3_dir = tf3_rising ? "+" : "-"
+        table.cell(dashboard, 0, 20, "TF3 " + mtf_tf3, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 20, phase_to_str(tf3_phase) + " " + str.tostring(tf3_ewo, "#.#") + ewo3_dir,
+            text_color=phase_to_clr(tf3_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // SMA alignment per TF
+        table.cell(dashboard, 0, 21, "─── Trend ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 21, 1, 21)
+
+        // TF1 trend
+        tf1_trend_txt = tf1_above50 and tf1_above200 ? ">50 >200" :
+            tf1_above50 ? ">50 <200" :
+            not tf1_above50 and not tf1_above200 ? "<50 <200" : "<50 >200"
+        tf1_trend_clr = tf1_above50 and tf1_above200 ? color.lime :
+            not tf1_above50 and not tf1_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 22, tf1_name, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 22, tf1_trend_txt,
+            text_color=tf1_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
+        // TF2 trend
+        tf2_trend_txt = tf2_above50 and tf2_above200 ? ">50 >200" :
+            tf2_above50 ? ">50 <200" :
+            not tf2_above50 and not tf2_above200 ? "<50 <200" : "<50 >200"
+        tf2_trend_clr = tf2_above50 and tf2_above200 ? color.lime :
+            not tf2_above50 and not tf2_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 23, mtf_tf2, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 23, tf2_trend_txt,
+            text_color=tf2_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
 // ============================================================================
 // ALERTS
 // ============================================================================
@@ -1564,6 +1753,14 @@ alertcondition(pattern_type == "wxyxz" and pattern_type[1] != "wxyxz", "WXYXZ Tr
     "EW: WXYXZ triple combination (complex correction) identified")
 alertcondition(pattern_type == "diagonal" and pattern_type[1] != "diagonal", "Diagonal Detected",
     "EW: Diagonal pattern identified — " + active_label)
+alertcondition(mtf_strong_bull and not mtf_strong_bull[1], "MTF All Bullish",
+    "EW MTF: All 3 timeframes now bullish — strong confluence")
+alertcondition(mtf_strong_bear and not mtf_strong_bear[1], "MTF All Bearish",
+    "EW MTF: All 3 timeframes now bearish — strong confluence")
+alertcondition(buy_signal and mtf_strong_bull, "MTF Confirmed Buy",
+    "EW: Buy signal with all 3 timeframes bullish — highest conviction")
+alertcondition(sell_signal and mtf_strong_bear, "MTF Confirmed Sell",
+    "EW: Sell signal with all 3 timeframes bearish — highest conviction")
 
 // ============================================================================
 // HIDDEN PLOTS (for data window and external indicators)
@@ -1572,7 +1769,11 @@ plot(active_conf, "Confidence", display=display.none)
 plot(active_wave, "Wave Number", display=display.none)
 plot(ewo_value, "EWO", display=display.none)
 plot(last_signal, "Signal Direction", display=display.none)
+plot(mtf_score, "MTF Score", display=display.none)
 
 // Data window exports
 plot(active_conf * 100, "Confidence %", color=color.new(color.purple, 100), display=display.data_window)
 plot(ewo_value, "Elliott Wave Oscillator", color=color.new(color.blue, 100), display=display.data_window)
+plot(mtf_score, "MTF Confluence Score", color=color.new(color.aqua, 100), display=display.data_window)
+plot(tf2_ewo, "TF2 EWO", color=color.new(color.aqua, 100), display=display.data_window)
+plot(tf3_ewo, "TF3 EWO", color=color.new(color.aqua, 100), display=display.data_window)
