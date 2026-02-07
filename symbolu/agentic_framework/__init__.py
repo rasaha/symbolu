@@ -114,6 +114,22 @@ from symbolu.agentic_framework.proactive_scheduler import (
     create_proactive_scheduler,
     create_task,
 )
+from symbolu.agentic_framework.adaptive_prompts import (
+    AutoReasoningPipeline,
+    AdaptivePromptEngine,
+    AdaptivePromptTemplates,
+    ComplexityDetector,
+    ReasoningDepth,
+    ComplexitySignal,
+    ReasoningStage,
+    ComplexityAnalysis,
+    ReasoningStep,
+    AdaptivePromptResult,
+    create_adaptive_pipeline,
+    create_progressive_pipeline,
+    create_always_deep_pipeline,
+    create_conservative_pipeline,
+)
 
 __all__ = [
     # Main agent
@@ -198,6 +214,21 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
+    # Adaptive Prompts (automated AI reasoning)
+    "AutoReasoningPipeline",
+    "AdaptivePromptEngine",
+    "AdaptivePromptTemplates",
+    "ComplexityDetector",
+    "ReasoningDepth",
+    "ComplexitySignal",
+    "ReasoningStage",
+    "ComplexityAnalysis",
+    "ReasoningStep",
+    "AdaptivePromptResult",
+    "create_adaptive_pipeline",
+    "create_progressive_pipeline",
+    "create_always_deep_pipeline",
+    "create_conservative_pipeline",
 ]
 
-__version__ = "1.5.0"  # Added Proactive Scheduler (autonomous task execution)
+__version__ = "1.6.0"  # Added Adaptive Prompts (automated AI reasoning)
