@@ -1280,13 +1280,203 @@ if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
                     textcolor=color.white, size=size.small)
 
 // ============================================================================
-// TRADING SIGNALS
+// PRICE PROJECTION ENGINE
+// ============================================================================
+//
+// Computes price targets, stop-loss levels, and probability scores
+// for each signal, combining:
+//   1. Pattern-based Fibonacci targets (where the next wave should reach)
+//   2. Wave invalidation levels (where the pattern breaks = stop loss)
+//   3. Composite probability from pattern confidence + MTF alignment
+//   4. Per-timeframe directional probability
+//   5. Risk/Reward ratio from target vs stop
+//
+// The probability is NOT a statistical forecast — it's a composite score
+// reflecting how well the current structure matches ideal Elliott Wave
+// geometry across multiple timeframes.
+// ============================================================================
+
+// --- Compute price targets and stops based on wave position ---
+var float sig_target  = na   // Primary Fibonacci target price
+var float sig_target2 = na   // Secondary (extended) target
+var float sig_stop    = na   // Invalidation / stop-loss level
+var float sig_entry   = na   // Entry price at signal
+var float sig_rr      = na   // Risk:Reward ratio
+
+// Projection for bullish partial (Wave 2 done → Wave 3 target)
+proj_bull_w3_target = float(na)
+proj_bull_w3_stop   = float(na)
+if pattern_type == "partial" and (active_wave == 2) and piv_count >= 4
+    w1s = get_price(3)
+    w1e = get_price(2)
+    w2e = get_price(1)
+    if not na(w1s) and not na(w1e) and not na(w2e)
+        w1_sz = math.abs(w1e - w1s)
+        proj_bull_w3_target := w2e + w1_sz * FIB_1618   // W3 = 161.8% of W1
+        proj_bull_w3_stop   := w1s                        // Below W1 start invalidates
+
+// Projection for bearish partial (Wave 2 done → Wave 3 target)
+proj_bear_w3_target = float(na)
+proj_bear_w3_stop   = float(na)
+if pattern_type == "partial" and (active_wave == -2) and piv_count >= 4
+    w1s = get_price(3)
+    w1e = get_price(2)
+    w2e = get_price(1)
+    if not na(w1s) and not na(w1e) and not na(w2e)
+        w1_sz = math.abs(w1e - w1s)
+        proj_bear_w3_target := w2e - w1_sz * FIB_1618
+        proj_bear_w3_stop   := w1s
+
+// Projection for impulse completion (Wave 5 done → correction target)
+proj_impulse_target = float(na)
+proj_impulse_stop   = float(na)
+if pattern_type == "impulse" and piv_count >= 6
+    imp_start = get_price(5)
+    imp_end   = get_price(0)
+    w4_level  = get_price(1)  // Wave 4 = first support/resistance
+    if not na(imp_start) and not na(imp_end) and not na(w4_level)
+        move = math.abs(imp_end - imp_start)
+        if active_bull
+            proj_impulse_target := imp_end - move * FIB_382  // Correction to 38.2%
+            proj_impulse_stop   := imp_end + move * 0.1      // Slightly above W5 end
+        else
+            proj_impulse_target := imp_end + move * FIB_382
+            proj_impulse_stop   := imp_end - move * 0.1
+
+// Projection for correction completion (ABC/WXY → trend resumption)
+proj_corr_target = float(na)
+proj_corr_stop   = float(na)
+if (pattern_type == "correction" or pattern_type == "wxy") and piv_count >= 3
+    corr_start = get_price(2)
+    corr_x     = get_price(1)
+    corr_end   = get_price(0)
+    if not na(corr_start) and not na(corr_x) and not na(corr_end)
+        a_sz = math.abs(corr_x - corr_start)
+        is_bear_corr = (pattern_type == "correction" and abc_type > 0) or
+            (pattern_type == "wxy" and wxy_type > 0)
+        if is_bear_corr  // Bearish correction done → buy
+            proj_corr_target := corr_end + a_sz * FIB_1618
+            proj_corr_stop   := corr_end - a_sz * 0.15
+        else  // Bullish correction done → sell
+            proj_corr_target := corr_end - a_sz * FIB_1618
+            proj_corr_stop   := corr_end + a_sz * 0.15
+
+// Projection for ending diagonal (sharp reversal to origin)
+proj_diag_target = float(na)
+proj_diag_stop   = float(na)
+if pattern_type == "diagonal" and not diag_is_leading and piv_count >= 6
+    diag_origin = get_price(5)
+    diag_end    = get_price(0)
+    if not na(diag_origin) and not na(diag_end)
+        proj_diag_target := diag_origin  // Full reversal to diagonal start
+        diag_move = math.abs(diag_end - diag_origin)
+        if diag_type > 0  // Bullish diagonal ending → sell
+            proj_diag_stop := diag_end + diag_move * 0.1
+        else  // Bearish diagonal ending → buy
+            proj_diag_stop := diag_end - diag_move * 0.1
+
+// WXYXZ projection (after triple combination, expect strong trend resumption)
+proj_wxyz_target = float(na)
+proj_wxyz_stop   = float(na)
+if pattern_type == "wxyxz" and piv_count >= 6
+    wxyz_start = get_price(5)
+    wxyz_end   = get_price(0)
+    if not na(wxyz_start) and not na(wxyz_end)
+        wxyz_range = math.abs(wxyz_end - wxyz_start)
+        if wxyz_type > 0  // Bearish WXYXZ done → buy
+            proj_wxyz_target := wxyz_end + wxyz_range * FIB_1618
+            proj_wxyz_stop   := wxyz_end - wxyz_range * 0.15
+        else
+            proj_wxyz_target := wxyz_end - wxyz_range * FIB_1618
+            proj_wxyz_stop   := wxyz_end + wxyz_range * 0.15
+
+// ============================================================================
+// COMPOSITE PROBABILITY SCORING
+// ============================================================================
+//
+// Combines multiple independent probability components:
+//   P_pattern  = Pattern confidence (0-100%) — Fibonacci rule alignment
+//   P_mtf      = MTF agreement (0-100%) — how many TFs agree
+//   P_trend    = Trend alignment (0-100%) — SMA position across TFs
+//   P_momentum = Momentum alignment (0-100%) — EWO direction across TFs
+//
+//   Composite  = weighted average:
+//     40% pattern + 25% MTF + 20% trend + 15% momentum
+//
+// The composite represents "structural probability" — how well the
+// current price structure across timeframes matches the expected
+// Elliott Wave geometry for the projected move.
+// ============================================================================
+
+// P_pattern: already have active_conf (0.0 - 1.0)
+p_pattern = active_conf
+
+// P_mtf: MTF directional agreement
+p_mtf = 0.0
+if mtf_enabled
+    // For buy signals, count bullish TFs; for sell, count bearish TFs
+    bull_tfs = (tf1_phase > 0 ? 1.0 : 0.0) + (tf2_phase > 0 ? 1.0 : 0.0) + (tf3_phase > 0 ? 1.0 : 0.0)
+    bear_tfs = (tf1_phase < 0 ? 1.0 : 0.0) + (tf2_phase < 0 ? 1.0 : 0.0) + (tf3_phase < 0 ? 1.0 : 0.0)
+    p_mtf := active_bull ? bull_tfs / 3.0 : bear_tfs / 3.0
+else
+    p_mtf := 0.5  // Neutral when disabled
+
+// P_trend: SMA alignment across TFs (price above both SMAs = full trend)
+p_trend = 0.0
+if mtf_enabled
+    if active_bull
+        t1 = (tf1_above50 ? 0.5 : 0.0) + (tf1_above200 ? 0.5 : 0.0)
+        t2 = (tf2_above50 ? 0.5 : 0.0) + (tf2_above200 ? 0.5 : 0.0)
+        t3 = (tf3_above50 ? 0.5 : 0.0) + (tf3_above200 ? 0.5 : 0.0)
+        p_trend := (t1 + t2 + t3) / 3.0
+    else
+        t1 = (not tf1_above50 ? 0.5 : 0.0) + (not tf1_above200 ? 0.5 : 0.0)
+        t2 = (not tf2_above50 ? 0.5 : 0.0) + (not tf2_above200 ? 0.5 : 0.0)
+        t3 = (not tf3_above50 ? 0.5 : 0.0) + (not tf3_above200 ? 0.5 : 0.0)
+        p_trend := (t1 + t2 + t3) / 3.0
+else
+    p_trend := 0.5
+
+// P_momentum: EWO direction agreement
+p_momentum = 0.0
+if mtf_enabled
+    if active_bull
+        m1 = tf1_ewo > 0 and tf1_rising ? 1.0 : tf1_ewo > 0 ? 0.5 : 0.0
+        m2 = tf2_ewo > 0 and tf2_rising ? 1.0 : tf2_ewo > 0 ? 0.5 : 0.0
+        m3 = tf3_ewo > 0 and tf3_rising ? 1.0 : tf3_ewo > 0 ? 0.5 : 0.0
+        p_momentum := (m1 + m2 + m3) / 3.0
+    else
+        m1 = tf1_ewo < 0 and not tf1_rising ? 1.0 : tf1_ewo < 0 ? 0.5 : 0.0
+        m2 = tf2_ewo < 0 and not tf2_rising ? 1.0 : tf2_ewo < 0 ? 0.5 : 0.0
+        m3 = tf3_ewo < 0 and not tf3_rising ? 1.0 : tf3_ewo < 0 ? 0.5 : 0.0
+        p_momentum := (m1 + m2 + m3) / 3.0
+else
+    p_momentum := 0.5
+
+// Composite probability (weighted average)
+composite_prob = p_pattern * 0.40 + p_mtf * 0.25 + p_trend * 0.20 + p_momentum * 0.15
+
+// Per-TF directional probability (shown in signal panel)
+tf1_dir_prob = 0.0
+tf2_dir_prob = 0.0
+tf3_dir_prob = 0.0
+if active_bull
+    tf1_dir_prob := tf1_phase == 2 ? 0.9 : tf1_phase == 1 ? 0.7 : tf1_phase == 0 ? 0.5 : tf1_phase == -1 ? 0.3 : 0.1
+    tf2_dir_prob := tf2_phase == 2 ? 0.9 : tf2_phase == 1 ? 0.7 : tf2_phase == 0 ? 0.5 : tf2_phase == -1 ? 0.3 : 0.1
+    tf3_dir_prob := tf3_phase == 2 ? 0.9 : tf3_phase == 1 ? 0.7 : tf3_phase == 0 ? 0.5 : tf3_phase == -1 ? 0.3 : 0.1
+else
+    tf1_dir_prob := tf1_phase == -2 ? 0.9 : tf1_phase == -1 ? 0.7 : tf1_phase == 0 ? 0.5 : tf1_phase == 1 ? 0.3 : 0.1
+    tf2_dir_prob := tf2_phase == -2 ? 0.9 : tf2_phase == -1 ? 0.7 : tf2_phase == 0 ? 0.5 : tf2_phase == 1 ? 0.3 : 0.1
+    tf3_dir_prob := tf3_phase == -2 ? 0.9 : tf3_phase == -1 ? 0.7 : tf3_phase == 0 ? 0.5 : tf3_phase == 1 ? 0.3 : 0.1
+
+// ============================================================================
+// TRADING SIGNALS (with projections)
 // ============================================================================
 
 var int    last_signal   = 0
 var string signal_reason = ""
 
-// Wave 2 completion → Buy for Wave 3
+// Wave 2 completion → Buy/Sell for Wave 3
 wave2_buy = pattern_type == "partial" and (active_wave == 2) and active_conf >= 0.25
 wave2_sell = pattern_type == "partial" and (active_wave == -2) and active_conf >= 0.25
 
@@ -1294,57 +1484,106 @@ wave2_sell = pattern_type == "partial" and (active_wave == -2) and active_conf >
 wave5_exhaustion_bull = pattern_type == "impulse" and bull5_valid and bull5_conf >= 0.4
 wave5_exhaustion_bear = pattern_type == "impulse" and bear5_valid and bear5_conf >= 0.4
 
-// ABC completion → Counter-trend entry for C wave
+// ABC/WXY/WXYXZ completion → Counter-trend / trend resumption
 abc_buy  = pattern_type == "correction" and abc_type == -1 and abc_conf >= 0.3
 abc_sell = pattern_type == "correction" and abc_type == 1 and abc_conf >= 0.3
-
-// WXY completion → Complex correction nearing end, trend resumption expected
-wxy_buy  = pattern_type == "wxy" and wxy_type > 0 and wxy_conf >= 0.3  // Bearish WXY done = buy
-wxy_sell = pattern_type == "wxy" and wxy_type < 0 and wxy_conf >= 0.3  // Bullish WXY done = sell
-
-// WXYXZ completion → Strong reversal expected after triple combination
+wxy_buy  = pattern_type == "wxy" and wxy_type > 0 and wxy_conf >= 0.3
+wxy_sell = pattern_type == "wxy" and wxy_type < 0 and wxy_conf >= 0.3
 wxyz_buy  = pattern_type == "wxyxz" and wxyz_type > 0 and wxyz_conf >= 0.35
 wxyz_sell = pattern_type == "wxyxz" and wxyz_type < 0 and wxyz_conf >= 0.35
 
-// Ending diagonal → Sharp reversal signal
+// Diagonal signals
 ending_diag_bull_reversal = pattern_type == "diagonal" and not diag_is_leading and diag_type < 0 and diag_conf >= 0.35
 ending_diag_bear_reversal = pattern_type == "diagonal" and not diag_is_leading and diag_type > 0 and diag_conf >= 0.35
-
-// Leading diagonal → Trend confirmation (after Wave 2 pullback expected)
 leading_diag_bull = pattern_type == "diagonal" and diag_is_leading and diag_type > 0 and diag_conf >= 0.30
 leading_diag_bear = pattern_type == "diagonal" and diag_is_leading and diag_type < 0 and diag_conf >= 0.30
 
-// Aggregate signals — MTF confluence filters buy/sell, exhaustion is always shown
+// Aggregate signals — MTF confluence filters buy/sell
 buy_signal  = (wave2_buy or abc_buy or wxy_buy or wxyz_buy or ending_diag_bull_reversal) and last_signal != 1 and mtf_allows_buy
 sell_signal = (wave2_sell or abc_sell or wxy_sell or wxyz_sell or ending_diag_bear_reversal) and last_signal != -1 and mtf_allows_sell
 exhaustion_bull = (wave5_exhaustion_bull or leading_diag_bull) and last_signal != -1
 exhaustion_bear = (wave5_exhaustion_bear or leading_diag_bear) and last_signal != 1
 
-// Apply MTF confidence boost to active confidence
+// Apply MTF confidence boost
 if mtf_enabled and mtf_boost
     if (active_bull and mtf_bull_confluence) or (not active_bull and mtf_bear_confluence)
         active_conf := math.min(1.0, active_conf + mtf_conf_boost)
 
+// Assign projections to active signal
 if buy_signal
     last_signal   := 1
-    signal_reason := wave2_buy ? "W2→W3 Entry" :
-        abc_buy ? "ABC Done" :
-        wxy_buy ? "WXY Done" :
-        wxyz_buy ? "WXYXZ Done" :
-        ending_diag_bull_reversal ? "ED Reversal" : "Buy"
+    sig_entry     := close
+    if wave2_buy
+        signal_reason := "W2→W3 Entry"
+        sig_target    := proj_bull_w3_target
+        sig_stop      := proj_bull_w3_stop
+    else if abc_buy or wxy_buy
+        signal_reason := abc_buy ? "ABC Done" : "WXY Done"
+        sig_target    := proj_corr_target
+        sig_stop      := proj_corr_stop
+    else if wxyz_buy
+        signal_reason := "WXYXZ Done"
+        sig_target    := proj_wxyz_target
+        sig_stop      := proj_wxyz_stop
+    else if ending_diag_bull_reversal
+        signal_reason := "ED Reversal"
+        sig_target    := proj_diag_target
+        sig_stop      := proj_diag_stop
+    else
+        signal_reason := "Buy"
+    // Compute R:R
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
 if sell_signal
     last_signal   := -1
-    signal_reason := wave2_sell ? "W2→W3 Short" :
-        abc_sell ? "ABC Done" :
-        wxy_sell ? "WXY Done" :
-        wxyz_sell ? "WXYXZ Done" :
-        ending_diag_bear_reversal ? "ED Reversal" : "Sell"
+    sig_entry     := close
+    if wave2_sell
+        signal_reason := "W2→W3 Short"
+        sig_target    := proj_bear_w3_target
+        sig_stop      := proj_bear_w3_stop
+    else if abc_sell or wxy_sell
+        signal_reason := abc_sell ? "ABC Done" : "WXY Done"
+        sig_target    := proj_corr_target
+        sig_stop      := proj_corr_stop
+    else if wxyz_sell
+        signal_reason := "WXYXZ Done"
+        sig_target    := proj_wxyz_target
+        sig_stop      := proj_wxyz_stop
+    else if ending_diag_bear_reversal
+        signal_reason := "ED Reversal"
+        sig_target    := proj_diag_target
+        sig_stop      := proj_diag_stop
+    else
+        signal_reason := "Sell"
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
 if exhaustion_bull
     last_signal   := -1
+    sig_entry     := close
     signal_reason := leading_diag_bull ? "LD W2 Pull Expected" : "W5 Exhaustion"
+    sig_target    := proj_impulse_target
+    sig_stop      := proj_impulse_stop
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
 if exhaustion_bear
     last_signal   := 1
+    sig_entry     := close
     signal_reason := leading_diag_bear ? "LD W2 Pull Expected" : "W5 Exhaustion"
+    sig_target    := proj_impulse_target
+    sig_stop      := proj_impulse_stop
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
 
 // Plot signals
 plotshape(show_signals and buy_signal, "Buy Signal", shape.triangleup,
@@ -1356,29 +1595,108 @@ plotshape(show_signals and exhaustion_bull, "Bull Exhaustion", shape.xcross,
 plotshape(show_signals and exhaustion_bear, "Bear Exhaustion", shape.xcross,
     location.belowbar, color.new(color.orange, 0), size=size.small)
 
-// Signal labels — include MTF confluence info
-mtf_tag = mtf_enabled ? (mtf_strong_bull or mtf_strong_bear ? "\nMTF: 3/3" :
-    mtf_bull_confluence or mtf_bear_confluence ? "\nMTF: 2/3" : "\nMTF: weak") : ""
+// ============================================================================
+// SIGNAL PROJECTION LABELS (Price Target + Probability + R:R)
+// ============================================================================
+//
+// Each signal label now shows:
+//   Line 1: Direction + reason
+//   Line 2: Composite probability (weighted: pattern + MTF + trend + momentum)
+//   Line 3: Target price (Fibonacci projection)
+//   Line 4: Stop price (wave invalidation)
+//   Line 5: Risk:Reward ratio
+//   Line 6: Per-TF directional probability
+// ============================================================================
+
+// Format probability bar: ████░░░░░░ 45%
+prob_bar(float prob) =>
+    filled = math.round(prob * 10)
+    bar = ""
+    for i = 0 to 9
+        bar += i < filled ? "█" : "░"
+    bar + " " + str.tostring(prob * 100, "#") + "%"
+
+// Build full signal text
+build_signal_text(string dir, string reason, float prob, float target,
+    float stop, float rr, float tf1p, float tf2p, float tf3p) =>
+    txt = dir + " | " + reason
+    txt += "\nProb: " + prob_bar(prob)
+    if not na(target)
+        txt += "\nTP: " + str.tostring(target, format.mintick)
+    if not na(stop)
+        txt += "\nSL: " + str.tostring(stop, format.mintick)
+    if not na(rr)
+        txt += "\nR:R  1:" + str.tostring(rr, "#.#")
+    if mtf_enabled
+        txt += "\n── Per TF ──"
+        txt += "\n" + timeframe.period + ": " + str.tostring(tf1p * 100, "#") + "%"
+        txt += "\n" + mtf_tf2 + ": " + str.tostring(tf2p * 100, "#") + "%"
+        txt += "\n" + mtf_tf3 + ": " + str.tostring(tf3p * 100, "#") + "%"
+    txt
+
 if show_signals and buy_signal
-    label.new(bar_index, low, "BUY\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%" + mtf_tag,
-        style=label.style_label_up, color=color.new(color.lime, 10),
+    lbl_txt = build_signal_text("BUY", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+    lbl_clr = composite_prob >= 0.65 ? color.new(color.lime, 5) :
+        composite_prob >= 0.45 ? color.new(color.green, 10) :
+        color.new(color.olive, 15)
+    label.new(bar_index, low, lbl_txt,
+        style=label.style_label_up, color=lbl_clr,
         textcolor=color.white, size=size.small)
+
 if show_signals and sell_signal
-    label.new(bar_index, high, "SELL\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%" + mtf_tag,
-        style=label.style_label_down, color=color.new(color.fuchsia, 10),
+    lbl_txt = build_signal_text("SELL", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+    lbl_clr = composite_prob >= 0.65 ? color.new(color.fuchsia, 5) :
+        composite_prob >= 0.45 ? color.new(color.purple, 10) :
+        color.new(color.maroon, 15)
+    label.new(bar_index, high, lbl_txt,
+        style=label.style_label_down, color=lbl_clr,
         textcolor=color.white, size=size.small)
+
 if show_signals and exhaustion_bull
-    label.new(bar_index, high, "EXHAUSTION\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%",
+    lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+    label.new(bar_index, high, lbl_txt,
         style=label.style_label_down, color=color.new(color.orange, 10),
         textcolor=color.white, size=size.small)
+
 if show_signals and exhaustion_bear
-    label.new(bar_index, low, "EXHAUSTION\n" + signal_reason + "\nConf: " +
-        str.tostring(active_conf * 100, "#.#") + "%",
+    lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob)
+    label.new(bar_index, low, lbl_txt,
         style=label.style_label_up, color=color.new(color.orange, 10),
         textcolor=color.white, size=size.small)
+
+// ============================================================================
+// SIGNAL TARGET/STOP LINES (drawn on chart at signal)
+// ============================================================================
+var line sig_target_line = na
+var line sig_stop_line   = na
+var label sig_target_lbl = na
+var label sig_stop_lbl   = na
+
+if (buy_signal or sell_signal or exhaustion_bull or exhaustion_bear) and show_signals
+    line.delete(sig_target_line)
+    line.delete(sig_stop_line)
+    label.delete(sig_target_lbl)
+    label.delete(sig_stop_lbl)
+
+    if not na(sig_target)
+        sig_target_line := line.new(bar_index, sig_target, bar_index + 30, sig_target,
+            color=color.new(color.lime, 30), style=line.style_dashed, width=2)
+        sig_target_lbl  := label.new(bar_index + 32, sig_target,
+            "TP " + str.tostring(sig_target, format.mintick),
+            style=label.style_label_left, color=color.new(color.lime, 50),
+            textcolor=color.white, size=size.tiny)
+
+    if not na(sig_stop)
+        sig_stop_line := line.new(bar_index, sig_stop, bar_index + 30, sig_stop,
+            color=color.new(color.red, 30), style=line.style_dashed, width=2)
+        sig_stop_lbl  := label.new(bar_index + 32, sig_stop,
+            "SL " + str.tostring(sig_stop, format.mintick),
+            style=label.style_label_left, color=color.new(color.red, 50),
+            textcolor=color.white, size=size.tiny)
 
 // ============================================================================
 // BACKGROUND COLOR — Wave Phase
@@ -1770,10 +2088,17 @@ plot(active_wave, "Wave Number", display=display.none)
 plot(ewo_value, "EWO", display=display.none)
 plot(last_signal, "Signal Direction", display=display.none)
 plot(mtf_score, "MTF Score", display=display.none)
+plot(composite_prob, "Composite Probability", display=display.none)
 
 // Data window exports
-plot(active_conf * 100, "Confidence %", color=color.new(color.purple, 100), display=display.data_window)
-plot(ewo_value, "Elliott Wave Oscillator", color=color.new(color.blue, 100), display=display.data_window)
+plot(active_conf * 100, "Pattern Confidence %", color=color.new(color.purple, 100), display=display.data_window)
+plot(composite_prob * 100, "Composite Probability %", color=color.new(color.lime, 100), display=display.data_window)
+plot(p_mtf * 100, "MTF Agreement %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_trend * 100, "Trend Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_momentum * 100, "Momentum Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(ewo_value, "EWO (Chart TF)", color=color.new(color.blue, 100), display=display.data_window)
 plot(mtf_score, "MTF Confluence Score", color=color.new(color.aqua, 100), display=display.data_window)
-plot(tf2_ewo, "TF2 EWO", color=color.new(color.aqua, 100), display=display.data_window)
-plot(tf3_ewo, "TF3 EWO", color=color.new(color.aqua, 100), display=display.data_window)
+plot(tf1_dir_prob * 100, "TF1 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(tf2_dir_prob * 100, "TF2 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(tf3_dir_prob * 100, "TF3 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(sig_rr, "Risk:Reward Ratio", color=color.new(color.yellow, 100), display=display.data_window)
