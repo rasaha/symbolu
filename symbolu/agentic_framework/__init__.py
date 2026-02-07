@@ -126,6 +126,7 @@ from symbolu.agentic_framework.adaptive_prompts import (
     ReasoningStep,
     AdaptivePromptResult,
     create_adaptive_pipeline,
+    create_progressive_pipeline,
     create_always_deep_pipeline,
     create_conservative_pipeline,
 )
@@ -225,6 +226,7 @@ __all__ = [
     "ReasoningStep",
     "AdaptivePromptResult",
     "create_adaptive_pipeline",
+    "create_progressive_pipeline",
     "create_always_deep_pipeline",
     "create_conservative_pipeline",
 ]

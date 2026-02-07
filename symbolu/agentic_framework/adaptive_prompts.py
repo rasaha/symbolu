@@ -2,18 +2,24 @@
 Automated Adaptive AI Prompts for Phase-Quad LLM Model
 =======================================================
 
-Generates more complex reasoning chains AUTOMATICALLY without user asking.
-The system detects when deeper reasoning is needed and escalates transparently,
-while still exposing results to the user in an accessible way.
+Progressive disclosure reasoning system. ALWAYS starts SHALLOW and lets the
+user pull deeper reasoning when THEY are ready -- never pushes information
+faster than the user can assimilate.
 
-CORE IDEA:
-    User sends simple query -> System detects complexity -> Auto-generates
-    multi-step reasoning chain -> Returns enriched response the user can use.
+DESIGN PHILOSOPHY:
+    Start shallow -> Offer depth -> User pulls when ready -> Deepen one level
+
+    The system detects complexity to KNOW how deep it CAN go, but it does NOT
+    auto-escalate by default. Instead it:
+    1. Answers at SHALLOW depth (fast, concise)
+    2. Tells the user: "deeper reasoning available (DEEP, 3 signals detected)"
+    3. Waits for the user to call deepen() to go one level deeper
+    4. Each deepen() adds exactly one reasoning stage
 
 THREE-STAGE PIPELINE:
-    1. ComplexityDetector: Analyzes input to classify reasoning depth needed
+    1. ComplexityDetector: Analyzes input to classify reasoning depth available
     2. AdaptivePromptEngine: Builds multi-step prompt chains for each depth level
-    3. AutoReasoningPipeline: Orchestrates execution, fusing results back together
+    3. AutoReasoningPipeline: Orchestrates execution with progressive disclosure
 
 REASONING DEPTH LEVELS:
     - SHALLOW: Direct answer, no chain needed (simple facts, greetings)
@@ -30,12 +36,13 @@ INTEGRATION:
 
 INVARIANTS:
     - INV-AP-1: Never downgrades user-requested depth
-    - INV-AP-2: Auto-escalation is transparent (metadata always exposed)
+    - INV-AP-2: Depth metadata always exposed (user sees what's available)
     - INV-AP-3: Reasoning chain is deterministic for same input + state
     - INV-AP-4: User can always access the full reasoning trace
+    - INV-AP-5: Default mode never auto-escalates (progressive disclosure)
 
 Author: Symbol-U Adaptive Prompts System
-Version: 1.0
+Version: 2.0
 """
 
 from __future__ import annotations
@@ -169,6 +176,12 @@ class AdaptivePromptResult:
 
     Contains final response, full reasoning chain, and metadata.
     The user can access both the polished response and the reasoning trace.
+
+    Progressive disclosure fields:
+    - depth_available: The deepest level the system CAN go (detected)
+    - depth_used: The level actually executed (starts SHALLOW)
+    - can_deepen: Whether calling deepen() would produce more reasoning
+    - depth_hint: Human-readable hint about available depth
     """
     # Final output
     final_response: str
@@ -179,6 +192,10 @@ class AdaptivePromptResult:
     depth_used: ReasoningDepth = ReasoningDepth.SHALLOW
     was_auto_escalated: bool = False
 
+    # Progressive disclosure: what's available vs what was used
+    depth_available: ReasoningDepth = ReasoningDepth.SHALLOW
+    max_depth: ReasoningDepth = ReasoningDepth.RECURSIVE
+
     # Complexity analysis
     complexity_analysis: Optional[ComplexityAnalysis] = None
 
@@ -186,12 +203,41 @@ class AdaptivePromptResult:
     total_duration_ms: float = 0.0
     total_llm_calls: int = 0
 
+    # Internal: preserved for deepen() to work
+    _query: str = field(default="", repr=False)
+    _context: str = field(default="", repr=False)
+
+    @property
+    def can_deepen(self) -> bool:
+        """Whether deeper reasoning is available."""
+        return self.depth_used < min(self.depth_available, self.max_depth)
+
+    @property
+    def depth_hint(self) -> str:
+        """Human-readable hint about available depth."""
+        if not self.can_deepen:
+            return ""
+
+        next_depth = ReasoningDepth(self.depth_used + 1)
+        signals = []
+        if self.complexity_analysis:
+            signals = [s.value for s in self.complexity_analysis.signals]
+
+        signal_text = f" ({', '.join(signals)})" if signals else ""
+        return (
+            f"Deeper reasoning available: {next_depth.name}{signal_text}. "
+            f"Call deepen() to explore further."
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "final_response": self.final_response,
             "quality_score": self.quality_score,
             "reasoning_chain": [step.to_dict() for step in self.reasoning_chain],
             "depth_used": self.depth_used.name,
+            "depth_available": self.depth_available.name,
+            "can_deepen": self.can_deepen,
+            "depth_hint": self.depth_hint,
             "was_auto_escalated": self.was_auto_escalated,
             "complexity_analysis": self.complexity_analysis.to_dict() if self.complexity_analysis else None,
             "total_duration_ms": self.total_duration_ms,
@@ -208,6 +254,8 @@ class AdaptivePromptResult:
         parts.append(f"[Reasoning Depth: {self.depth_used.name}]")
         if self.was_auto_escalated:
             parts.append("[Auto-escalated: deeper reasoning was triggered automatically]")
+        if self.can_deepen:
+            parts.append(f"[{self.depth_hint}]")
         parts.append("")
 
         for i, step in enumerate(self.reasoning_chain, 1):
@@ -826,17 +874,18 @@ class AdaptivePromptEngine:
 
 class AutoReasoningPipeline:
     """
-    Orchestrates automatic multi-step reasoning without user asking.
+    Orchestrates progressive-disclosure reasoning.
 
-    This is the main entry point. It:
-    1. Detects input complexity automatically
-    2. Builds the appropriate reasoning chain
-    3. Executes each step through the LLM
-    4. Fuses results into a coherent response
-    5. Exposes the full reasoning trace to the user
+    PHILOSOPHY: Start SHALLOW. Offer depth. Let user pull.
 
-    The user just calls `pipeline.run(query)` and gets a rich result
-    with both the answer and the reasoning chain they can inspect.
+    The pipeline:
+    1. ALWAYS starts at SHALLOW depth (1 LLM call)
+    2. Detects complexity to know how deep it CAN go
+    3. Tells the user via depth_hint: "deeper available"
+    4. User calls deepen() to go one level deeper
+    5. Each deepen() is incremental -- never jumps multiple levels
+
+    Auto-escalation is available but OFF by default.
     """
 
     def __init__(
@@ -846,11 +895,11 @@ class AutoReasoningPipeline:
         prompt_engine: Optional[AdaptivePromptEngine] = None,
         min_depth: ReasoningDepth = ReasoningDepth.SHALLOW,
         max_depth: ReasoningDepth = ReasoningDepth.RECURSIVE,
-        auto_escalate: bool = True,
+        auto_escalate: bool = False,
         quality_evaluator: Optional[Callable[[str, str], float]] = None,
     ):
         """
-        Initialize the auto-reasoning pipeline.
+        Initialize the reasoning pipeline.
 
         Args:
             llm_client: LLM client for generation
@@ -858,7 +907,7 @@ class AutoReasoningPipeline:
             prompt_engine: Prompt engine (auto-created if None)
             min_depth: Minimum reasoning depth to use
             max_depth: Maximum reasoning depth to use
-            auto_escalate: Whether to auto-escalate depth based on complexity
+            auto_escalate: Whether to auto-escalate (default: False, progressive)
             quality_evaluator: Optional function(query, response) -> score [0, 1]
         """
         self.llm = llm_client
@@ -950,9 +999,40 @@ class AutoReasoningPipeline:
             reasoning_chain=completed_steps,
             depth_used=depth,
             was_auto_escalated=was_auto_escalated,
+            depth_available=complexity.recommended_depth,
+            max_depth=self.max_depth,
             complexity_analysis=complexity,
             total_duration_ms=total_duration,
             total_llm_calls=total_calls,
+            _query=query,
+            _context=context,
+        )
+
+    def deepen(self, result: AdaptivePromptResult) -> AdaptivePromptResult:
+        """
+        Deepen a previous result by one reasoning level.
+
+        This is the core of progressive disclosure. The user calls this
+        when THEY want more depth, at THEIR pace.
+
+        Each call goes exactly one level deeper:
+            SHALLOW -> MODERATE -> DEEP -> RECURSIVE
+
+        Args:
+            result: Previous AdaptivePromptResult to deepen
+
+        Returns:
+            New AdaptivePromptResult at the next depth level,
+            or the same result if already at max depth.
+        """
+        if not result.can_deepen:
+            return result
+
+        next_depth = ReasoningDepth(result.depth_used + 1)
+        return self.run(
+            result._query,
+            result._context,
+            forced_depth=next_depth,
         )
 
     def run_with_escalation(
@@ -1027,16 +1107,20 @@ class AutoReasoningPipeline:
 
 def create_adaptive_pipeline(
     llm_client: LLMClient,
-    auto_escalate: bool = True,
+    auto_escalate: bool = False,
     min_depth: ReasoningDepth = ReasoningDepth.SHALLOW,
     max_depth: ReasoningDepth = ReasoningDepth.RECURSIVE,
 ) -> AutoReasoningPipeline:
     """
     Create an adaptive reasoning pipeline with default configuration.
 
+    Default mode is progressive disclosure (auto_escalate=False):
+    - Starts SHALLOW, detects complexity, offers depth via depth_hint
+    - User calls pipeline.deepen(result) to go deeper at their pace
+
     Args:
         llm_client: LLM client
-        auto_escalate: Enable automatic depth escalation
+        auto_escalate: Enable automatic depth escalation (default: False)
         min_depth: Minimum reasoning depth
         max_depth: Maximum reasoning depth
 
@@ -1051,6 +1135,37 @@ def create_adaptive_pipeline(
     )
 
 
+def create_progressive_pipeline(
+    llm_client: LLMClient,
+    max_depth: ReasoningDepth = ReasoningDepth.RECURSIVE,
+) -> AutoReasoningPipeline:
+    """
+    Create pipeline with progressive disclosure (RECOMMENDED).
+
+    Always starts SHALLOW. User calls deepen() to go deeper.
+    Never pushes information faster than the user can assimilate.
+
+    Usage:
+        pipeline = create_progressive_pipeline(llm)
+        result = pipeline.run("complex question")     # -> SHALLOW
+        print(result.final_response)                   # Quick answer
+        print(result.depth_hint)                       # "Deeper available..."
+
+        if result.can_deepen:
+            result = pipeline.deepen(result)            # -> MODERATE
+            print(result.final_response)               # Richer answer
+
+            if result.can_deepen:
+                result = pipeline.deepen(result)        # -> DEEP
+    """
+    return AutoReasoningPipeline(
+        llm_client=llm_client,
+        auto_escalate=False,
+        min_depth=ReasoningDepth.SHALLOW,
+        max_depth=max_depth,
+    )
+
+
 def create_always_deep_pipeline(
     llm_client: LLMClient,
 ) -> AutoReasoningPipeline:
@@ -1058,6 +1173,7 @@ def create_always_deep_pipeline(
     Create a pipeline that always uses DEEP reasoning.
 
     Useful for applications that always want thorough analysis.
+    Skips progressive disclosure -- goes straight to DEEP.
     """
     return AutoReasoningPipeline(
         llm_client=llm_client,
@@ -1073,7 +1189,7 @@ def create_conservative_pipeline(
     """
     Create a pipeline with conservative escalation thresholds.
 
-    Only escalates for clearly complex queries, saving LLM calls.
+    Only auto-escalates for clearly complex queries, saving LLM calls.
     """
     detector = ComplexityDetector(
         shallow_threshold=0.35,
@@ -1110,6 +1226,7 @@ __all__ = [
     "AutoReasoningPipeline",
     # Factory functions
     "create_adaptive_pipeline",
+    "create_progressive_pipeline",
     "create_always_deep_pipeline",
     "create_conservative_pipeline",
 ]

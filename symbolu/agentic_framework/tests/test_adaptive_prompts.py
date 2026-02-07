@@ -24,6 +24,7 @@ from symbolu.agentic_framework.adaptive_prompts import (
     AutoReasoningPipeline,
     # Factories
     create_adaptive_pipeline,
+    create_progressive_pipeline,
     create_always_deep_pipeline,
     create_conservative_pipeline,
 )
@@ -498,7 +499,7 @@ class TestAutoReasoningPipeline:
         assert result.complexity_analysis.recommended_depth is not None
 
     def test_to_dict_serialization(self):
-        """Result should serialize to dict."""
+        """Result should serialize to dict with progressive disclosure fields."""
         llm = MockLLM("Response text for serialization test.")
         pipeline = AutoReasoningPipeline(llm_client=llm)
 
@@ -507,6 +508,9 @@ class TestAutoReasoningPipeline:
         assert "final_response" in d
         assert "reasoning_chain" in d
         assert "depth_used" in d
+        assert "depth_available" in d
+        assert "can_deepen" in d
+        assert "depth_hint" in d
         assert "was_auto_escalated" in d
         assert "complexity_analysis" in d
 
@@ -589,14 +593,27 @@ class TestFactoryFunctions:
     """Tests for factory functions."""
 
     def test_create_adaptive_pipeline(self):
-        """create_adaptive_pipeline should return working pipeline."""
+        """create_adaptive_pipeline should default to progressive (no auto-escalate)."""
         llm = MockLLM("Response.")
         pipeline = create_adaptive_pipeline(llm)
         assert isinstance(pipeline, AutoReasoningPipeline)
-        assert pipeline.auto_escalate is True
+        assert pipeline.auto_escalate is False
 
         result = pipeline.run("Test query")
         assert result.final_response
+
+    def test_create_progressive_pipeline(self):
+        """create_progressive_pipeline should start SHALLOW with depth hints."""
+        llm = MockLLM("Response for progressive pipeline test.")
+        pipeline = create_progressive_pipeline(llm)
+        assert pipeline.auto_escalate is False
+
+        result = pipeline.run(
+            "Why does X cause Y and what are the implications?"
+        )
+        assert result.depth_used == ReasoningDepth.SHALLOW
+        assert result.depth_available >= ReasoningDepth.MODERATE
+        assert result.can_deepen
 
     def test_create_always_deep_pipeline(self):
         """create_always_deep_pipeline should use DEEP minimum."""
@@ -733,7 +750,7 @@ class TestIntegration:
     """Integration tests combining all components."""
 
     def test_full_recursive_pipeline(self):
-        """Test complete 4-step reasoning chain."""
+        """Test complete 4-step reasoning chain with auto_escalate=True."""
         responses = [
             "DECOMPOSITION:\n1. Sub-problem A: Define the concept\n2. Sub-problem B: Analyze implications\n3. Sub-problem C: Compare with alternatives",
             "ANALYSIS:\nSub-problem A: The concept is rooted in X theory. Key insight: Y.\nSub-problem B: Implications include Z and W.\nSub-problem C: Alternative approaches include P and Q.",
@@ -741,7 +758,7 @@ class TestIntegration:
             "SYNTHESIS:\nBased on thorough decomposition, analysis, and self-critique, the answer is: The concept of X has implications Y and Z, with alternative approaches P, Q, and R worth considering. The main limitation is the lack of quantitative evidence for implication Z.",
         ]
         llm = SequentialMockLLM(responses)
-        pipeline = AutoReasoningPipeline(llm_client=llm)
+        pipeline = AutoReasoningPipeline(llm_client=llm, auto_escalate=True)
 
         result = pipeline.run(
             "How should I think about reasoning about the nature of consciousness "
@@ -822,7 +839,222 @@ class TestIntegration:
             ComplexityDetector,
             ReasoningDepth,
             create_adaptive_pipeline,
+            create_progressive_pipeline,
         )
         assert AutoReasoningPipeline is not None
         assert ComplexityDetector is not None
         assert ReasoningDepth.DEEP == 3
+
+
+# =============================================================================
+# PROGRESSIVE DISCLOSURE TESTS
+# =============================================================================
+
+
+class TestProgressiveDisclosure:
+    """Tests for progressive disclosure behavior (start shallow, user pulls deeper)."""
+
+    def test_default_starts_shallow(self):
+        """Default pipeline should always start at SHALLOW."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        # Even complex query starts SHALLOW by default
+        result = pipeline.run(
+            "Why does quantum entanglement imply non-locality, "
+            "and how does this compare to classical correlations?"
+        )
+        assert result.depth_used == ReasoningDepth.SHALLOW
+        assert result.total_llm_calls == 1
+
+    def test_depth_available_shows_potential(self):
+        """depth_available should reflect detected complexity."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run(
+            "Why does X cause Y and what are the consequences?"
+        )
+        # Detected as complex, but started shallow
+        assert result.depth_used == ReasoningDepth.SHALLOW
+        assert result.depth_available >= ReasoningDepth.MODERATE
+
+    def test_can_deepen_is_true_when_depth_available(self):
+        """can_deepen should be True when deeper reasoning is available."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run(
+            "Compare the philosophical implications of X and Y"
+        )
+        assert result.can_deepen is True
+
+    def test_can_deepen_is_false_at_max(self):
+        """can_deepen should be False when at max depth."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(
+            llm_client=llm,
+            max_depth=ReasoningDepth.SHALLOW,
+        )
+
+        result = pipeline.run("Anything")
+        assert result.can_deepen is False
+
+    def test_depth_hint_describes_next_level(self):
+        """depth_hint should tell user what's available."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run(
+            "Why does X cause Y and how does this compare to Z?"
+        )
+        if result.can_deepen:
+            assert "Deeper reasoning available" in result.depth_hint
+            assert "deepen()" in result.depth_hint
+
+    def test_depth_hint_empty_at_max(self):
+        """depth_hint should be empty when no deeper reasoning available."""
+        result = AdaptivePromptResult(
+            final_response="answer",
+            quality_score=0.8,
+            depth_used=ReasoningDepth.RECURSIVE,
+            depth_available=ReasoningDepth.RECURSIVE,
+        )
+        assert result.depth_hint == ""
+
+    def test_deepen_goes_one_level(self):
+        """deepen() should go exactly one level deeper."""
+        responses = [
+            "Shallow answer.",
+            "Decomposition of the problem into parts and sub-questions",
+            "Synthesized comprehensive answer from the decomposed parts",
+        ]
+        llm = SequentialMockLLM(responses)
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        # First run: SHALLOW
+        result = pipeline.run("Why does X cause Y?")
+        assert result.depth_used == ReasoningDepth.SHALLOW
+
+        # Deepen: MODERATE
+        deeper = pipeline.deepen(result)
+        assert deeper.depth_used == ReasoningDepth.MODERATE
+        assert deeper.total_llm_calls == 2  # decompose + synthesize
+
+    def test_deepen_twice_goes_to_deep(self):
+        """Two deepen() calls should reach DEEP."""
+        responses = [
+            "Shallow.",
+            "Decompose step response",
+            "Synthesize step response",
+            "Decompose again for deep",
+            "Analyze step response",
+            "Final deep synthesis",
+        ]
+        llm = SequentialMockLLM(responses)
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run(
+            "How should I think about reasoning about reasoning "
+            "in a meta-recursive system?"
+        )
+        assert result.depth_used == ReasoningDepth.SHALLOW
+
+        result = pipeline.deepen(result)
+        assert result.depth_used == ReasoningDepth.MODERATE
+
+        result = pipeline.deepen(result)
+        assert result.depth_used == ReasoningDepth.DEEP
+
+    def test_deepen_at_max_returns_same(self):
+        """deepen() at max depth should return same result."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(
+            llm_client=llm,
+            max_depth=ReasoningDepth.SHALLOW,
+        )
+
+        result = pipeline.run("Test")
+        original_calls = llm.call_count
+
+        same = pipeline.deepen(result)
+        assert same is result  # Same object, no new LLM calls
+        assert llm.call_count == original_calls
+
+    def test_deepen_preserves_query_and_context(self):
+        """deepen() should use same query and context as original."""
+        llm = MockLLM("Response about quantum physics from context.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run(
+            "Why is this important?",
+            context="We discussed quantum physics."
+        )
+
+        deeper = pipeline.deepen(result)
+
+        # Context should appear in deeper reasoning
+        found_context = any(
+            "quantum physics" in call for call in llm.call_history
+        )
+        assert found_context
+
+    def test_progressive_flow_end_to_end(self):
+        """Full progressive flow: run -> hint -> deepen -> hint -> deepen."""
+        responses = [
+            "Quick answer to the stock market question.",
+            "Decomposition: 1) Which market 2) What timeframe 3) What drivers",
+            "Synthesis: Check S&P futures, VIX, and bond yields for direction signals.",
+            "Decompose for deep analysis",
+            "Deep analysis of each market factor",
+            "Full synthesis with all factors considered and edge cases noted.",
+        ]
+        llm = SequentialMockLLM(responses)
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        # Step 1: User asks, gets quick answer
+        result = pipeline.run("Why is stock market volatile today?")
+        assert result.depth_used == ReasoningDepth.SHALLOW
+        assert result.total_llm_calls == 1
+
+        # User sees hint, decides they want more
+        if result.can_deepen:
+            # Step 2: User pulls MODERATE
+            result = pipeline.deepen(result)
+            assert result.depth_used == ReasoningDepth.MODERATE
+            assert result.total_llm_calls == 2
+
+        # User still wants more
+        if result.can_deepen:
+            # Step 3: User pulls DEEP
+            result = pipeline.deepen(result)
+            assert result.depth_used == ReasoningDepth.DEEP
+            assert result.total_llm_calls == 3
+
+    def test_reasoning_trace_shows_depth_hint(self):
+        """Reasoning trace should include depth hint when available."""
+        llm = MockLLM("Response.")
+        pipeline = AutoReasoningPipeline(llm_client=llm)
+
+        result = pipeline.run("Why does X cause Y?")
+        trace = result.get_reasoning_trace()
+
+        if result.can_deepen:
+            assert "Deeper reasoning available" in trace
+
+    def test_auto_escalate_still_works_when_enabled(self):
+        """auto_escalate=True should still work for push mode."""
+        responses = [
+            "Decomposition of complex problem",
+            "Full synthesis of the decomposed parts",
+        ]
+        llm = SequentialMockLLM(responses)
+        pipeline = AutoReasoningPipeline(llm_client=llm, auto_escalate=True)
+
+        result = pipeline.run(
+            "Compare the cause and effect of X versus Y "
+            "and what are the implications?"
+        )
+        # Should auto-escalate, not stay shallow
+        assert result.depth_used >= ReasoningDepth.MODERATE
+        assert result.was_auto_escalated is True
