@@ -2101,6 +2101,13 @@ bgcolor(bg)
 // ============================================================================
 // INFO DASHBOARD
 // ============================================================================
+
+// Helper: phase to display string and color
+phase_to_str(p) =>
+    p == 2 ? "S.BULL" : p == 1 ? "BULL" : p == -1 ? "BEAR" : p == -2 ? "S.BEAR" : "NEUT"
+phase_to_clr(p) =>
+    p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
+
 if show_table and barstate.islast
     var table dashboard = table.new(position.top_right, 2, 29,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
@@ -2283,12 +2290,6 @@ if show_table and barstate.islast
         table.cell(dashboard, 0, 20, "─── MTF (3 TFs) ───", text_color=color.new(color.white, 40),
             text_halign=text.align_left, text_size=size.tiny)
         table.merge_cells(dashboard, 0, 20, 1, 20)
-
-        // Helper: phase to display string and color
-        phase_to_str(p) =>
-            p == 2 ? "S.BULL" : p == 1 ? "BULL" : p == -1 ? "BEAR" : p == -2 ? "S.BEAR" : "NEUT"
-        phase_to_clr(p) =>
-            p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
 
         // Confluence summary
         confl_txt = mtf_strong_bull ? "ALL BULL (3/3)" :
