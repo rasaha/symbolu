@@ -1316,12 +1316,14 @@ var line[] fib_lines = array.new_line(0)
 var label[] fib_labels = array.new_label(0)
 
 if barstate.isconfirmed
-    for i = array.size(fib_lines) - 1 to 0
-        line.delete(array.get(fib_lines, i))
-    array.clear(fib_lines)
-    for i = array.size(fib_labels) - 1 to 0
-        label.delete(array.get(fib_labels, i))
-    array.clear(fib_labels)
+    if array.size(fib_lines) > 0
+        for i = array.size(fib_lines) - 1 to 0
+            line.delete(array.get(fib_lines, i))
+        array.clear(fib_lines)
+    if array.size(fib_labels) > 0
+        for i = array.size(fib_labels) - 1 to 0
+            label.delete(array.get(fib_labels, i))
+        array.clear(fib_labels)
 
 draw_fib_level(float price_level, int start_bar, string txt, color clr) =>
     if show_fib_levels and not na(price_level) and not na(start_bar)
@@ -1537,9 +1539,10 @@ var label[] wave_labels_arr = array.new_label(0)
 
 if show_wave_labels and barstate.isconfirmed
     // Clean up previous wave labels to prevent memory leak
-    for i = array.size(wave_labels_arr) - 1 to 0
-        label.delete(array.get(wave_labels_arr, i))
-    array.clear(wave_labels_arr)
+    if array.size(wave_labels_arr) > 0
+        for i = array.size(wave_labels_arr) - 1 to 0
+            label.delete(array.get(wave_labels_arr, i))
+        array.clear(wave_labels_arr)
 
 if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
     if pattern_type == "impulse" and piv_count >= 6
