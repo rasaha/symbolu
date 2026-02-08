@@ -2285,9 +2285,9 @@ if show_table and barstate.islast
         table.merge_cells(dashboard, 0, 20, 1, 20)
 
         // Helper: phase to display string and color
-        phase_to_str(int p) =>
+        phase_to_str(p) =>
             p == 2 ? "S.BULL" : p == 1 ? "BULL" : p == -1 ? "BEAR" : p == -2 ? "S.BEAR" : "NEUT"
-        phase_to_clr(int p) =>
+        phase_to_clr(p) =>
             p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
 
         // Confluence summary
