@@ -58,6 +58,15 @@ from symbolu.vision.diagnostics import (
     compute_phase_health,
     compute_ghost_metrics,
 )
+from symbolu.vision.adaptation import (
+    IA3Gate,
+    IA3BlockGates,
+    IA3Config,
+    LoRALinear,
+    LoRAConfig,
+    AdaptationConfig,
+    PhaseQuadAdaptationManager,
+)
 
 __all__ = [
     # Contracts
@@ -102,4 +111,12 @@ __all__ = [
     "compute_quad_utilization",
     "compute_phase_health",
     "compute_ghost_metrics",
+    # Adaptation (IA³ + Surgical LoRA)
+    "IA3Gate",
+    "IA3BlockGates",
+    "IA3Config",
+    "LoRALinear",
+    "LoRAConfig",
+    "AdaptationConfig",
+    "PhaseQuadAdaptationManager",
 ]

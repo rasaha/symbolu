@@ -229,6 +229,8 @@ def generate_synthetic_trace(
         "hotspot": _gen_hotspot,
         "temporal": _gen_temporal,
         "mixed": _gen_mixed,
+        "clustered": _gen_clustered,  # Tests cluster/group behavior
+        "correlated": _gen_correlated,  # Tests pairwise correlations
     }
 
     if pattern not in generators:
@@ -328,6 +330,122 @@ def _gen_temporal(num_events: int, num_pages: int, window: int = 100) -> List[Tr
 
         op_type = OpType.READ if random.random() < 0.8 else OpType.WRITE
         events.append(TraceEvent(timestamp=i, page_id=page_id, op_type=op_type))
+    return events
+
+
+def _gen_clustered(
+    num_events: int,
+    num_pages: int,
+    num_clusters: int = 50,
+    cluster_size: int = 20,
+    intra_cluster_prob: float = 0.8,
+    cluster_switch_prob: float = 0.02,
+) -> List[TraceEvent]:
+    """
+    Clustered workload: pages grouped into clusters that get hot together.
+
+    This tests CTM+'s ability to exploit correlated structure that LRU can't see.
+    When one page in a cluster is accessed, other pages in the same cluster
+    are likely to be accessed soon.
+
+    Args:
+        num_events: Number of events to generate
+        num_pages: Total number of unique pages
+        num_clusters: Number of clusters
+        cluster_size: Pages per cluster
+        intra_cluster_prob: Probability of staying in current cluster (0.8 = 80%)
+        cluster_switch_prob: Probability of switching active cluster
+
+    This workload challenges LRU because:
+    - LRU only sees recency, not cluster membership
+    - A cluster-aware algorithm can prefetch/protect related pages
+    """
+    # Create clusters (overlapping allowed)
+    clusters = []
+    for c in range(num_clusters):
+        # Each cluster is a set of related page IDs
+        base = (c * cluster_size) % num_pages
+        cluster = [(base + i) % num_pages for i in range(cluster_size)]
+        clusters.append(cluster)
+
+    events = []
+    active_cluster = 0
+    recent_in_cluster = []
+
+    for i in range(num_events):
+        # Maybe switch active cluster (scene change)
+        if random.random() < cluster_switch_prob:
+            active_cluster = random.randint(0, num_clusters - 1)
+            recent_in_cluster = []
+
+        # Decide: access within cluster or random
+        if random.random() < intra_cluster_prob:
+            # Access page from active cluster
+            cluster = clusters[active_cluster]
+
+            # Bias toward recently accessed pages within cluster
+            if recent_in_cluster and random.random() < 0.5:
+                page_id = random.choice(recent_in_cluster[-5:])
+            else:
+                page_id = random.choice(cluster)
+
+            recent_in_cluster.append(page_id)
+            if len(recent_in_cluster) > 20:
+                recent_in_cluster = recent_in_cluster[-10:]
+        else:
+            # Random access (noise)
+            page_id = random.randint(0, num_pages - 1)
+
+        op_type = OpType.READ if random.random() < 0.8 else OpType.WRITE
+        events.append(TraceEvent(timestamp=i, page_id=page_id, op_type=op_type))
+
+    return events
+
+
+def _gen_correlated(
+    num_events: int,
+    num_pages: int,
+    correlation_strength: float = 0.7,
+    group_size: int = 8,
+) -> List[TraceEvent]:
+    """
+    Correlated workload: accessing page A makes page B likely.
+
+    This creates explicit pairwise correlations that CTM+'s coherence
+    computation should be able to detect and exploit.
+
+    Args:
+        num_events: Number of events
+        num_pages: Total pages
+        correlation_strength: How strongly correlated accesses follow
+        group_size: Size of correlated groups
+    """
+    # Create correlation groups
+    num_groups = num_pages // group_size
+    groups = [list(range(g * group_size, (g + 1) * group_size)) for g in range(num_groups)]
+
+    # Build correlation map: page -> list of correlated pages
+    correlations = {}
+    for group in groups:
+        for page in group:
+            # Correlated with other pages in same group
+            correlations[page] = [p for p in group if p != page]
+
+    events = []
+    last_page = random.randint(0, num_pages - 1)
+
+    for i in range(num_events):
+        if random.random() < correlation_strength and last_page in correlations:
+            # Access correlated page
+            page_id = random.choice(correlations[last_page])
+        else:
+            # Random access
+            page_id = random.randint(0, num_pages - 1)
+
+        last_page = page_id
+        op_type = OpType.READ if random.random() < 0.8 else OpType.WRITE
+        events.append(TraceEvent(timestamp=i, page_id=page_id, op_type=op_type))
+
     return events
 
 

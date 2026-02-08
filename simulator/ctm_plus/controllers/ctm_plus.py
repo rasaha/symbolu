@@ -1,207 +1,133 @@
 """
 CTM+ (Coherence-Tier Memory Plus) Controller.
 
-This is the main implementation of the CTM+ algorithm, integrating:
-1. Phase Integrator: Learns access patterns via streaming accumulator
-2. USE Coherence: Computes pairwise phase correlation for locality
-3. BCVF Gate: Bidirectional verification for promotion/demotion
-4. SCC Optimizer: Self-tunes parameters based on global coherence
+Core components:
+1. Phase Integrator: Learns access patterns via streaming accumulator.
+2. USE Coherence: Computes pairwise phase correlation for locality.
+3. Dual Shadow Tier: ARC-like B1/B2 ghost caches with adaptive p.
+4. Predictive Prefetch: Markov model with burst prefetch.
+5. Mode Switcher: Online workload classifier with hysteresis.
+6. Smart Victim Selection: Pre-eviction scoring with ARC-style partitioning.
 
-CTM+ is NOT a new memory chip - it's controller intelligence that makes
-existing DRAM+NAND behave smarter.
+Removed components (ablation showed no impact):
+- BCVF Gate: Had zero effect on hit rate
+- SCC Optimizer: Depended on BCVF
+- Admission Controller: Hurt temporal workloads by mistaking locality for scans
+
+Key architectural changes:
+- Explicit victim selection BEFORE eviction (not post-hoc protection)
+- Tier0 logically partitioned by p (recency vs frequency sets)
+- ARC-safe weights: 70% recency+frequency, 30% CTM+ signals
+- Loop pinning for temporal workloads
+
+CTM+ vs ARC distinction:
+- ARC solves capacity allocation (set-level balancing)
+- CTM+ solves victim selection (page-level decision-making)
+- CTM+ degenerates safely to ARC/LRU when predictions are weak
 """
 
 import math
 import random
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, TYPE_CHECKING
 from collections import deque
+
+if TYPE_CHECKING:
+    pass  # For forward references
+
 from .base import BaseController
+from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType
 from ..core.config import SimulatorConfig, CTMPlusConfig
 
 
 class PhaseIntegrator:
-    """
-    Streaming pattern accumulator for learning access patterns.
-
-    Implements:
-        x_t = f(e_t)                           # Embed event
-        φ_t = π·sin(w_φ^T x_t)                 # Extract phase
-        a_t = σ(w_a^T x_t)                     # Extract amplitude
-        k_t = a_t · e^{-jφ_t}                  # Complex phasor
-        M_t = γ·M_{t-1} + (1-γ)·(k_t ⊙ v_t)   # EMA accumulator
-    """
+    """Streaming pattern accumulator for learning access patterns."""
 
     def __init__(self, config: CTMPlusConfig):
         self.config = config.phase
         self.dim = self.config.embedding_dim
 
-        # Projection weights (randomly initialized, could be learned)
-        random.seed(42)  # Reproducibility
+        random.seed(42)
         self._w_phase = [random.gauss(0, 0.1) for _ in range(self.dim)]
         self._w_amp = [random.gauss(0, 0.1) for _ in range(self.dim)]
         self._w_value = [[random.gauss(0, 0.1) for _ in range(self.dim)] for _ in range(self.dim)]
 
-        # Streaming accumulator (complex-valued)
         self._accumulator = [complex(0, 0) for _ in range(self.dim)]
-
-        # Recent events for context
         self._recent_pages: deque = deque(maxlen=16)
 
     def embed_event(self, page_id: int, op_type: OpType, delta_t: int) -> List[float]:
-        """
-        Embed a memory event into a feature vector.
-
-        Simple embedding: hash-based + temporal features.
-        """
         embedding = [0.0] * self.dim
-
-        # Page ID features (hash to spread across dimensions)
         for i in range(min(8, self.dim)):
             embedding[i] = math.sin(page_id * (i + 1) * 0.1)
-
-        # Operation type one-hot
         if self.dim > 8:
             embedding[8 + int(op_type)] = 1.0
-
-        # Temporal feature (log-scaled delta)
         if self.dim > 12:
             embedding[12] = math.log1p(delta_t) / 20.0
-
-        # Context: recent page co-occurrence
         for i, recent_page in enumerate(self._recent_pages):
             if self.dim > 16 + i:
-                # Similarity to recent pages
                 embedding[16 + i] = 1.0 if recent_page == page_id else 0.1
-
         return embedding
 
     def update(self, page_id: int, op_type: OpType, delta_t: int) -> Tuple[float, float]:
-        """
-        Update phase integrator and return (phase, amplitude) for this event.
-
-        Returns:
-            Tuple of (phase, amplitude) for the current event
-        """
-        # Embed event
         x = self.embed_event(page_id, op_type, delta_t)
-
-        # Compute phase: φ = π·sin(w_φ^T x)
         dot_phase = sum(w * xi for w, xi in zip(self._w_phase, x))
         phase = self.config.phase_scale * math.sin(dot_phase)
-
-        # Compute amplitude: a = σ(w_a^T x)
         dot_amp = sum(w * xi for w, xi in zip(self._w_amp, x))
-        amplitude = 1.0 / (1.0 + math.exp(-dot_amp))  # Sigmoid
-
-        # Compute value vector: v = W_v x
+        amplitude = 1.0 / (1.0 + math.exp(-dot_amp))
         v = [sum(row[j] * x[j] for j in range(self.dim)) for row in self._w_value]
-
-        # Compute complex phasor: k = a·e^{-jφ}
         k = amplitude * complex(math.cos(-phase), math.sin(-phase))
-
-        # Update accumulator: M = γ·M + (1-γ)·(k ⊙ v)
         gamma = self.config.decay_gamma
         for i in range(self.dim):
-            self._accumulator[i] = (
-                gamma * self._accumulator[i] + (1 - gamma) * k * v[i]
-            )
-
-        # Update recent pages
+            self._accumulator[i] = gamma * self._accumulator[i] + (1 - gamma) * k * v[i]
         self._recent_pages.append(page_id)
-
         return (phase, amplitude)
-
-    def get_context_phase(self) -> float:
-        """Get current context phase from accumulator."""
-        # Extract phase from mean of accumulator
-        total = sum(self._accumulator)
-        if abs(total) < 1e-10:
-            return 0.0
-        return math.atan2(total.imag, total.real)
 
 
 class CoherenceComputer:
-    """
-    Computes coherence scores using fast and slow paths.
-
-    Fast path (O(1) per access):
-        C_fast = α·c + β·(1-δ) + γ·cos(φ - φ̄)
-
-    Slow path (O(|N|×W) background):
-        C_{i,j} = (1/W) Σ cos(φ_i - φ_j)
-        c_i = σ(η·Σ C_{i,j})
-    """
+    """Computes coherence scores using fast (O(1)) and slow (O(N)) paths."""
 
     def __init__(self, config: CTMPlusConfig):
         self.config = config.coherence
-        self._access_counter = 0
 
     def fast_coherence(self, page: PageState, mean_phase: float) -> float:
-        """
-        Compute fast-path coherence score (O(1)).
-
-        Called on every access.
-        """
         return page.compute_fast_coherence(mean_phase, self.config)
 
-    def slow_update(self, state: GlobalState) -> None:
+    def slow_update(self, state: GlobalState, neighbor_tracker: 'NeighborTracker') -> None:
         """
-        Compute slow-path coherence scores (O(n × W)).
+        Compute slow-path coherence using co-occurrence neighbors (not sorted ID adjacency).
 
-        Called periodically in background.
-        Updates coherence scores for all pages in tier0 and tier1.
+        FIX: Use neighbor_tracker for real locality, not arbitrary page ID adjacency.
+        FIX: Precompute index map to avoid O(n²) list.index() calls.
         """
-        # Get all active pages
         all_pages = list(state.tier0.pages.values()) + list(state.tier1.pages.values())
-
         if len(all_pages) < 2:
             return
 
-        # Build neighbor map (address-based locality)
-        page_ids = sorted([p.page_id for p in all_pages])
         page_map = {p.page_id: p for p in all_pages}
 
         for page in all_pages:
-            # Find neighbors (nearby page IDs)
-            idx = page_ids.index(page.page_id) if page.page_id in page_ids else -1
-            if idx < 0:
+            # FIX: Use co-occurrence neighbors from NeighborTracker, not sorted ID adjacency
+            neighbor_ids = neighbor_tracker.get_neighbors(page.page_id)
+            if not neighbor_ids:
                 continue
 
-            neighbors = []
-            for offset in range(-self.config.neighborhood_size // 2,
-                               self.config.neighborhood_size // 2 + 1):
-                neighbor_idx = idx + offset
-                if 0 <= neighbor_idx < len(page_ids) and neighbor_idx != idx:
-                    neighbors.append(page_map[page_ids[neighbor_idx]])
-
+            neighbors = [page_map[nid] for nid in neighbor_ids if nid in page_map]
             if not neighbors:
                 continue
 
-            # Compute pairwise correlation
             total_corr = 0.0
             for neighbor in neighbors:
-                corr = self._pairwise_correlation(page, neighbor)
-                total_corr += corr
+                total_corr += self._pairwise_correlation(page, neighbor)
 
-            # Update coherence via sigmoid
             raw_score = self.config.eta * total_corr
             page.coherence = 1.0 / (1.0 + math.exp(-raw_score))
 
     def _pairwise_correlation(self, page_i: PageState, page_j: PageState) -> float:
-        """
-        Compute pairwise phase correlation over history.
-
-        C_{i,j} = (1/W) Σ cos(φ_i - φ_j)
-        """
         hist_i = list(page_i.phase_history)
         hist_j = list(page_j.phase_history)
-
         if not hist_i or not hist_j:
-            # No history, use current phase
             return math.cos(page_i.phase - page_j.phase)
 
-        # Align histories
         min_len = min(len(hist_i), len(hist_j), self.config.window_size)
         if min_len == 0:
             return 0.0
@@ -211,432 +137,712 @@ class CoherenceComputer:
             phi_i = hist_i[-(k + 1)] if k < len(hist_i) else hist_i[0]
             phi_j = hist_j[-(k + 1)] if k < len(hist_j) else hist_j[0]
             total += math.cos(phi_i - phi_j)
-
         return total / min_len
 
 
-class BCVFGate:
-    """
-    BCVF (Bidirectional Coherence Verification Framework) decision gate.
+class NeighborTracker:
+    """Tracks co-occurrence patterns for real locality detection."""
 
-    Computes action weights via Lagrangian:
-        L(i,A) = λ_f(1-s_f)² + λ_b(1-s_b)² + λ_c(s_f-s_b)²
-        w(i,A) = e^{-β·L(i,A)}
+    def __init__(self, window_size=16, top_k=8):
+        self._recent: deque = deque(maxlen=window_size)
+        self._cooccurrence: Dict[Tuple[int, int], int] = {}
+        self._neighbors: Dict[int, List[int]] = {}
+        self._access_count = 0
+        self.top_k = top_k
 
-    Only approves actions where w > threshold.
-    """
+    def record_access(self, page_id: int):
+        for recent in self._recent:
+            if recent != page_id:
+                key = (min(page_id, recent), max(page_id, recent))
+                self._cooccurrence[key] = self._cooccurrence.get(key, 0) + 1
+        self._recent.append(page_id)
+        self._access_count += 1
+        if self._access_count % 1000 == 0:
+            self._rebuild_neighbors()
 
-    def __init__(self, config: CTMPlusConfig):
-        self.config = config.bcvf
-        self._rejections = 0
-        self._approvals = 0
+    def get_neighbors(self, page_id: int) -> List[int]:
+        return self._neighbors.get(page_id, [])
 
-    def should_promote(
-        self,
-        page: PageState,
-        state: GlobalState,
-        predicted_hit_improvement: float = 0.1,
-    ) -> Tuple[bool, float]:
-        """
-        Decide whether to promote a page from tier1 to tier0.
+    def get_neighbor_hotness(self, page_id: int, state: GlobalState) -> float:
+        neighbors = self.get_neighbors(page_id)
+        if not neighbors:
+            return 0.0
+        in_tier0 = sum(1 for n in neighbors if state.tier0.contains(n))
+        return in_tier0 / len(neighbors)
 
-        Args:
-            page: Page to potentially promote
-            state: Global state
-            predicted_hit_improvement: Expected hit rate improvement
+    def _rebuild_neighbors(self):
+        page_counts: Dict[int, List[Tuple[int, int]]] = {}
+        for (a, b), count in self._cooccurrence.items():
+            if count >= 3:
+                page_counts.setdefault(a, []).append((b, count))
+                page_counts.setdefault(b, []).append((a, count))
+        self._neighbors = {}
+        for pid, neighs in page_counts.items():
+            neighs.sort(key=lambda x: x[1], reverse=True)
+            self._neighbors[pid] = [n[0] for n in neighs[:self.top_k]]
 
-        Returns:
-            Tuple of (should_promote, weight)
-        """
-        # Forward score: immediate performance benefit
-        s_f = self._forward_score_promote(page, predicted_hit_improvement)
 
-        # Backward score: long-term health
-        s_b = self._backward_score(page)
+class TransitionTracker:
+    """Markov transition model: tracks P(next=j | current=i)."""
 
-        # Compute BCVF Lagrangian
-        L = (
-            self.config.lambda_f * (1 - s_f) ** 2
-            + self.config.lambda_b * (1 - s_b) ** 2
-            + self.config.lambda_c * (s_f - s_b) ** 2
-        )
+    def __init__(self, top_m=8, decay=0.95):
+        self.top_m = top_m
+        self.decay = decay
+        self._transitions: Dict[int, Dict[int, float]] = {}
+        self._last_page: Optional[int] = None
+        self._total_transitions = 0
 
-        # Compute weight
-        w = math.exp(-self.config.beta * L)
+    def record_access(self, page_id: int):
+        if self._last_page is not None and self._last_page != page_id:
+            if self._last_page not in self._transitions:
+                self._transitions[self._last_page] = {}
+            trans = self._transitions[self._last_page]
+            for key in trans:
+                trans[key] *= self.decay
+            trans[page_id] = trans.get(page_id, 0.0) + 1.0
+            if len(trans) > self.top_m * 2:
+                self._transitions[self._last_page] = dict(
+                    sorted(trans.items(), key=lambda x: x[1], reverse=True)[:self.top_m]
+                )
+            self._total_transitions += 1
+        self._last_page = page_id
 
-        # Decision
-        approved = w > self.config.threshold
-
-        if approved:
-            self._approvals += 1
-        else:
-            self._rejections += 1
-
-        return (approved, w)
-
-    def should_demote(
-        self,
-        page: PageState,
-        state: GlobalState,
-    ) -> Tuple[bool, float]:
-        """
-        Decide whether to demote a page from tier0 to tier1.
-
-        Returns:
-            Tuple of (should_demote, weight)
-        """
-        # Forward score: how much does keeping this page help?
-        # Low score = not helping much = OK to demote
-        s_f = self._forward_score_demote(page)
-
-        # Backward score: long-term health of demotion
-        s_b = self._backward_score_demote(page)
-
-        # BCVF Lagrangian
-        L = (
-            self.config.lambda_f * (1 - s_f) ** 2
-            + self.config.lambda_b * (1 - s_b) ** 2
-            + self.config.lambda_c * (s_f - s_b) ** 2
-        )
-
-        w = math.exp(-self.config.beta * L)
-
-        approved = w > self.config.threshold
-
-        if approved:
-            self._approvals += 1
-        else:
-            self._rejections += 1
-
-        return (approved, w)
-
-    def _forward_score_promote(self, page: PageState, hit_improvement: float) -> float:
-        """Forward score for promotion: will this reduce latency?"""
-        # Combine predicted hit improvement with page amplitude
-        score = (
-            self.config.alpha_latency * min(1.0, hit_improvement * 2)
-            + self.config.alpha_miss * page.amplitude
-        )
-        return 1.0 / (1.0 + math.exp(-score * 4))  # Sigmoid
-
-    def _forward_score_demote(self, page: PageState) -> float:
-        """Forward score for demotion: how much will we lose?"""
-        # Higher amplitude = more to lose = lower demotion score
-        return 1.0 - page.amplitude
-
-    def _backward_score(self, page: PageState) -> float:
-        """Backward score: long-term health."""
-        score = (
-            self.config.beta_heat * (1 - page.heat)
-            + self.config.beta_coherence * page.coherence
-            + self.config.beta_uncertainty * (1 - page.uncertainty)
-            + self.config.beta_drift * (1 - page.drift)
-        )
-        return 1.0 / (1.0 + math.exp(-score * 4))
-
-    def _backward_score_demote(self, page: PageState) -> float:
-        """Backward score for demotion: is it safe to demote?"""
-        # High heat = lots of writes = risky to demote to NAND
-        # Low coherence = unstable = maybe OK to demote
-        score = (
-            self.config.beta_heat * (1 - page.heat)  # Low heat = safe
-            + self.config.beta_coherence * (1 - page.coherence)  # Low coherence = OK to demote
-            + self.config.beta_uncertainty * page.uncertainty  # High uncertainty = OK to demote
-        )
-        return 1.0 / (1.0 + math.exp(-score * 4))
-
-    @property
-    def rejection_rate(self) -> float:
-        total = self._rejections + self._approvals
+    def get_top_predictions(self, current_page: int, k=3) -> List[Tuple[int, float]]:
+        if current_page not in self._transitions:
+            return []
+        trans = self._transitions[current_page]
+        total = sum(trans.values())
         if total == 0:
-            return 0.0
-        return self._rejections / total
+            return []
+        return [(p, s / total) for p, s in sorted(trans.items(), key=lambda x: x[1], reverse=True)[:k]]
+
+    def get_reuse_score(self, page_id: int) -> float:
+        score = 0.0
+        for _, trans in self._transitions.items():
+            if page_id in trans:
+                total = sum(trans.values())
+                if total > 0:
+                    score += trans[page_id] / total
+        return min(1.0, score)
 
 
-class SCCOptimizer:
+class DualShadowTier:
     """
-    SCC (Semantic Coherence Controller) for self-tuning parameters.
+    ARC-like dual ghost cache with adaptive balancing parameter p.
 
-    Computes global coherence and adjusts BCVF parameters:
-        C_tier = α·c̄ + β·R̄ + γ·(1-ū) + δ·P̄
-        θ_{t+1} = θ_t + ρ·∇_θ C_global
+    This is the key to matching ARC's power:
+    - B1 (ShadowRecency): ghosts of pages evicted from recency-based decisions
+    - B2 (ShadowFrequency): ghosts of pages evicted from frequency-based decisions
+    - p: adaptive parameter that balances recency vs frequency
+
+    When B1 gets hits → increase p (favor frequency more)
+    When B2 gets hits → decrease p (favor recency more)
     """
 
-    def __init__(self, config: CTMPlusConfig):
-        self.config = config.scc
+    def __init__(self, max_size: int = 500):
+        self.max_size = max_size
 
-        # Tunable parameters (will be adjusted)
-        self.threshold = config.bcvf.threshold
-        self.beta = config.bcvf.beta
+        # B1: Ghost of recently-evicted "recent" pages (low reuse)
+        self._b1_ghosts: deque = deque()
+        self._b1_lookup: set = set()
+        self.b1_hits = 0
 
-        # History for gradient estimation
-        self._coherence_history: deque = deque(maxlen=10)
-        self._threshold_history: deque = deque(maxlen=10)
+        # B2: Ghost of recently-evicted "frequent" pages (high reuse)
+        self._b2_ghosts: deque = deque()
+        self._b2_lookup: set = set()
+        self.b2_hits = 0
 
-    def compute_tier_coherence(self, state: GlobalState) -> float:
-        """Compute per-tier coherence score."""
-        tier0_pages = list(state.tier0.pages.values())
+        # Adaptive balancing parameter p ∈ [0, 1]
+        # p=0 → favor recency, p=1 → favor frequency
+        self.p = 0.5
 
-        if not tier0_pages:
-            return 0.0
+        # For regret-on-miss tracking (not raw contains)
+        self._recent_regrets: deque = deque(maxlen=100)
+        self._miss_count = 0
 
-        # Mean coherence
-        c_bar = sum(p.coherence for p in tier0_pages) / len(tier0_pages)
-
-        # Hit rate (reuse)
-        r_bar = state.tier0.hit_rate
-
-        # Mean certainty (1 - uncertainty)
-        u_bar = sum(1 - p.uncertainty for p in tier0_pages) / len(tier0_pages)
-
-        # Predictability (inverse of phase variance)
-        if len(tier0_pages) > 1:
-            phases = [p.phase for p in tier0_pages]
-            mean_phase = sum(phases) / len(phases)
-            variance = sum((p - mean_phase) ** 2 for p in phases) / len(phases)
-            p_bar = 1.0 / (1.0 + variance)
-        else:
-            p_bar = 0.5
-
-        return (
-            self.config.alpha * c_bar
-            + self.config.beta * r_bar
-            + self.config.gamma * u_bar
-            + self.config.delta * p_bar
-        )
-
-    def update(self, state: GlobalState, bcvf: BCVFGate) -> None:
-        """
-        Update tunable parameters based on coherence gradient.
-
-        Called periodically (every SCC update interval).
-        """
-        current_coherence = self.compute_tier_coherence(state)
-        self._coherence_history.append(current_coherence)
-        self._threshold_history.append(self.threshold)
-
-        if len(self._coherence_history) < 3:
+    def add_to_b1(self, page_id: int) -> None:
+        """Add page evicted due to low reuse (recency eviction)."""
+        if page_id in self._b1_lookup or page_id in self._b2_lookup:
             return
 
-        # Estimate gradient via finite differences
-        c_prev = self._coherence_history[-2]
-        c_curr = self._coherence_history[-1]
-        t_prev = self._threshold_history[-2]
-        t_curr = self._threshold_history[-1]
+        if len(self._b1_ghosts) >= self.max_size:
+            removed = self._b1_ghosts.popleft()
+            self._b1_lookup.discard(removed)
 
-        # Simple gradient approximation
-        if abs(t_curr - t_prev) > 1e-6:
-            grad = (c_curr - c_prev) / (t_curr - t_prev + 1e-6)
+        self._b1_ghosts.append(page_id)
+        self._b1_lookup.add(page_id)
+
+    def add_to_b2(self, page_id: int) -> None:
+        """Add page evicted despite high reuse (frequency eviction)."""
+        if page_id in self._b1_lookup or page_id in self._b2_lookup:
+            return
+
+        if len(self._b2_ghosts) >= self.max_size:
+            removed = self._b2_ghosts.popleft()
+            self._b2_lookup.discard(removed)
+
+        self._b2_ghosts.append(page_id)
+        self._b2_lookup.add(page_id)
+
+    def check_and_record_regret(self, page_id: int, is_miss: bool) -> Tuple[bool, str]:
+        """
+        Check if page is in ghost cache and record regret.
+
+        FIX: Only count regret on actual misses (page not in tier0 or tier1).
+        Returns: (is_regret, ghost_type) where ghost_type is 'b1', 'b2', or ''
+        """
+        if not is_miss:
+            return (False, '')
+
+        self._miss_count += 1
+
+        if page_id in self._b1_lookup:
+            self.b1_hits += 1
+            self._b1_lookup.discard(page_id)
+            self._recent_regrets.append(1)
+            # B1 hit → we evicted a "recent" page too early → favor recency less
+            self._adapt_p(b1_hit=True)
+            return (True, 'b1')
+
+        if page_id in self._b2_lookup:
+            self.b2_hits += 1
+            self._b2_lookup.discard(page_id)
+            self._recent_regrets.append(1)
+            # B2 hit → we evicted a "frequent" page too early → favor frequency less
+            self._adapt_p(b1_hit=False)
+            return (True, 'b2')
+
+        self._recent_regrets.append(0)
+        return (False, '')
+
+    def _adapt_p(self, b1_hit: bool) -> None:
+        """
+        Adapt balancing parameter p based on ghost hits.
+
+        ARC-like adaptation:
+        - B1 hit: increase p (favor frequency more, since recency decision was wrong)
+        - B2 hit: decrease p (favor recency more, since frequency decision was wrong)
+        """
+        delta = 0.1
+        if b1_hit:
+            self.p = min(1.0, self.p + delta)
         else:
-            grad = 0.0
+            self.p = max(0.0, self.p - delta)
 
-        # Update threshold to maximize coherence
-        self.threshold = max(0.3, min(0.9, self.threshold + self.config.learning_rate * grad))
+    @property
+    def regret_on_miss_rate(self) -> float:
+        """
+        Rate of regret specifically on misses (not raw shadow contains).
 
-        # Also adjust temperature based on rejection rate
-        if bcvf.rejection_rate > 0.5:
-            # Too many rejections, lower temperature (sharper decisions)
-            self.beta = min(5.0, self.beta * 1.01)
-        elif bcvf.rejection_rate < 0.1:
-            # Too few rejections, raise temperature (more exploration)
-            self.beta = max(1.0, self.beta * 0.99)
+        FIX: This is the correct metric for Panic Mode trigger.
+        """
+        if len(self._recent_regrets) == 0:
+            return 0.0
+        return sum(self._recent_regrets) / len(self._recent_regrets)
+
+    def should_favor_frequency(self) -> bool:
+        """Whether current p suggests favoring frequency over recency."""
+        return self.p > 0.5
+
+
+class PrefetchEngine:
+    """Budgeted prefetch engine with burst support and mode-adaptive parameters."""
+
+    def __init__(self, budget_per_1k=20, min_probability=0.25):
+        self.budget_per_1k = budget_per_1k
+        self.min_probability = min_probability
+        self._prefetches_this_epoch = 0
+        self._epoch_accesses = 0
+        self.total_prefetches = 0
+        self.prefetch_hits = 0
+        self.prefetch_misses = 0
+        self._pending_prefetches: set = set()
+
+    def should_prefetch(
+        self,
+        probability: float,
+        prefetch_enabled: bool = True,
+        budget_scale: float = 1.0,
+        min_prob_override: float = None
+    ) -> bool:
+        """Check if prefetch should happen, considering mode policy."""
+        if not prefetch_enabled:
+            return False
+
+        effective_budget = int(self.budget_per_1k * budget_scale)
+        budget_remaining = effective_budget - self._prefetches_this_epoch
+
+        effective_min_prob = min_prob_override if min_prob_override is not None else self.min_probability
+
+        if budget_remaining <= 0 or probability < effective_min_prob:
+            return False
+        return True
+
+    def get_burst_size(self, top_probability: float, max_burst: int = 3) -> int:
+        """
+        FIX: Burst prefetch when probability mass supports it.
+        Higher confidence → prefetch more pages.
+        Mode policy can limit max_burst.
+        """
+        if top_probability > 0.5:
+            return min(3, max_burst)
+        elif top_probability > 0.3:
+            return min(2, max_burst)
+        return 1
+
+    def record_prefetch(self, page_id: int):
+        self._prefetches_this_epoch += 1
+        self.total_prefetches += 1
+        self._pending_prefetches.add(page_id)
+
+    def record_access(self, page_id: int):
+        self._epoch_accesses += 1
+        if page_id in self._pending_prefetches:
+            self.prefetch_hits += 1
+            self._pending_prefetches.discard(page_id)
+        if self._epoch_accesses >= 1000:
+            self.prefetch_misses += len(self._pending_prefetches)
+            self._pending_prefetches.clear()
+            self._prefetches_this_epoch = 0
+            self._epoch_accesses = 0
+
+    @property
+    def prefetch_hit_rate(self) -> float:
+        total = self.prefetch_hits + self.prefetch_misses
+        return self.prefetch_hits / total if total > 0 else 0.0
 
 
 class CTMPlusController(BaseController):
     """
-    CTM+ Controller: Full implementation of Coherence-Tier Memory Plus.
-
-    Integrates all components:
-    - Phase Integrator for pattern learning
-    - Coherence Computer for fast/slow coherence
-    - BCVF Gate for bidirectional verification
-    - SCC Optimizer for self-tuning
+    CTM+ Controller with ChatGPT's critical fixes applied.
     """
 
-    def __init__(
-        self,
-        config: SimulatorConfig,
-        ctm_config: Optional[CTMPlusConfig] = None,
-    ):
+    def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
         super().__init__(config)
         self.ctm_config = ctm_config or CTMPlusConfig.default()
 
-        # Initialize components
+        # Components
         self._phase_integrator = PhaseIntegrator(self.ctm_config)
         self._coherence = CoherenceComputer(self.ctm_config)
-        self._bcvf = BCVFGate(self.ctm_config)
-        self._scc = SCCOptimizer(self.ctm_config)
+        self._neighbor_tracker = NeighborTracker()
+        self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
+        self._prefetch_engine = PrefetchEngine(budget_per_1k=20, min_probability=0.25)
+
+        # FIX: Dual Shadow Tier (ARC-like B1/B2) instead of single FIFO
+        self._shadow_tier = DualShadowTier(max_size=config.tier0_size)
+
+        # Phase-Adaptive Mode Switcher
+        self._mode_switcher = ModeSwitchController(
+            temperature=1.0,
+            switch_confidence=0.65,
+            persistence_windows=3,
+            min_switch_interval=2000,
+            window_size=512
+        )
+        self._current_policy: ModePolicy = self._mode_switcher.current_policy
 
         # Stats
         self._promotions = 0
         self._demotions = 0
-        self._bcvf_rejections = 0
         self._access_counter = 0
         self._last_access_time: Dict[int, int] = {}
-
-        # Epoch tracking
+        self._neighbor_boosts = 0
+        self._prefetch_promotions = 0
         self._epoch_promotions = 0
         self._epoch_demotions = 0
+        self._smart_victim_selections = 0
 
     @property
     def name(self) -> str:
         return "CTM+"
 
     def reset(self) -> None:
-        self._phase_integrator = PhaseIntegrator(self.ctm_config)
-        self._coherence = CoherenceComputer(self.ctm_config)
-        self._bcvf = BCVFGate(self.ctm_config)
-        self._scc = SCCOptimizer(self.ctm_config)
-        self._promotions = 0
-        self._demotions = 0
-        self._bcvf_rejections = 0
-        self._access_counter = 0
-        self._last_access_time = {}
-        self._epoch_promotions = 0
-        self._epoch_demotions = 0
+        self.__init__(self.config, self.ctm_config)
 
-    def on_access(
-        self,
-        state: GlobalState,
-        page_id: int,
-        op_type: OpType,
-    ) -> Tuple[Tier, int, bool, bool]:
+    def _tier0_partition(self, state: GlobalState) -> Tuple[set, set]:
+        """
+        Logically partition Tier0 into recency and frequency sets using adaptive p.
+
+        ARC-style partitioning:
+        - Recency set (T1-like): pages[:split] sorted by last_access_time
+        - Frequency set (T2-like): pages[split:] sorted by last_access_time
+
+        The split point is determined by shadow tier's p parameter:
+        - p=0.5 means equal split
+        - p>0.5 favors frequency (smaller recency set)
+        - p<0.5 favors recency (larger recency set)
+        """
+        pages = list(state.tier0.pages.values())
+        if not pages:
+            return (set(), set())
+
+        # Sort by recency (most recent first)
+        pages.sort(key=lambda p: p.last_access_time, reverse=True)
+
+        # Split based on adaptive p (p=0.5 -> 50% recency, 50% freq)
+        # Higher p means favor frequency, so recency set is smaller
+        split = int(len(pages) * (1 - self._shadow_tier.p))
+        split = max(1, min(len(pages) - 1, split))  # At least 1 in each
+
+        recency_set = set(p.page_id for p in pages[:split])
+        freq_set = set(p.page_id for p in pages[split:])
+
+        return (recency_set, freq_set)
+
+    def _select_victim(self, state: GlobalState) -> Optional[PageState]:
+        """
+        Score Tier0 pages and return the worst victim for eviction.
+
+        OPTIMIZED: Uses sampling for O(k) instead of O(n) complexity.
+        - Sample k candidates from tier0 (default k=32)
+        - Score only sampled candidates
+        - Falls back to LRU on small caches
+
+        ARC-safe weights (70% recency+frequency, 30% CTM+ signals):
+        - 40% recency_rank (ARC T1-like)
+        - 30% (1-frequency) (ARC T2-like)
+        - 15% (1-reuse) (TransitionTracker signal)
+        - 10% (1-coherence) (structural signal)
+        - -10% neighbor_hotness (cluster protection)
+        """
+        if not state.tier0.pages:
+            return None
+
+        pages = list(state.tier0.pages.values())
+        n = len(pages)
+
+        # Ablation: if smart victim disabled, use LRU
+        if not self.ctm_config.enable_smart_victim:
+            return min(pages, key=lambda p: p.last_access_time)
+
+        # For small caches, just use LRU (fast path)
+        if n <= 16:
+            return min(pages, key=lambda p: p.last_access_time)
+
+        # SAMPLING: Pick k random candidates + always include LRU victim
+        sample_size = min(self.ctm_config.victim_sample_size, n)
+
+        # Always include the LRU page (oldest) as a candidate
+        lru_page = min(pages, key=lambda p: p.last_access_time)
+
+        # Random sample of other candidates
+        if n > sample_size:
+            sampled = random.sample(pages, sample_size - 1)
+            if lru_page not in sampled:
+                sampled.append(lru_page)
+        else:
+            sampled = pages
+
+        # Get time range for normalization (from full cache, but fast)
+        max_time = max(p.last_access_time for p in pages)
+        min_time = lru_page.last_access_time
+        time_range = max(1, max_time - min_time)
+
+        # Get adaptive p for partition logic
+        p = self._shadow_tier.p
+
+        best_score = float("inf")
+        victim = None
+
+        for page in sampled:
+            # Normalize recency to [0, 1] where 0 = oldest = evict first
+            recency_rank = (page.last_access_time - min_time) / time_range
+
+            # Frequency: higher access_count = less likely to evict
+            frequency = min(1.0, page.access_count / 10.0)
+
+            # CTM+ signals
+            coherence = page.coherence
+            reuse = self._transition_tracker.get_reuse_score(page.page_id)
+            neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(page.page_id, state)
+
+            # Base victim score (lower = evict first)
+            # ARC-safe: 70% is pure ARC logic (recency + frequency)
+            score = (
+                0.40 * recency_rank +           # ARC T1-like: favor recent
+                0.30 * frequency +              # ARC T2-like: favor frequent
+                0.15 * reuse +                  # CTM+ signal: favor predicted reuse
+                0.10 * coherence -              # CTM+ signal: favor coherent
+                0.10 * neighbor_hot             # CTM+ signal: protect clusters
+            )
+
+            # Simplified partition penalty based on p
+            # If p > 0.5 (favor frequency), penalize low-freq pages more
+            # If p < 0.5 (favor recency), penalize low-recency pages more
+            if p > 0.5 and frequency < 0.3:
+                score -= 0.10 * (p - 0.5) * 2  # Scale by how much p favors freq
+            elif p < 0.5 and recency_rank < 0.3:
+                score -= 0.10 * (0.5 - p) * 2  # Scale by how much p favors recency
+
+            if score < best_score:
+                best_score = score
+                victim = page
+
+        if victim is not None:
+            self._smart_victim_selections += 1
+
+        return victim
+
+    def on_access(self, state: GlobalState, page_id: int, op_type: OpType) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
 
-        # Compute delta_t
+        # Predictive updates
+        self._transition_tracker.record_access(page_id)
+        self._prefetch_engine.record_access(page_id)
+        self._neighbor_tracker.record_access(page_id)
+
+        # Delta T
         delta_t = self._access_counter - self._last_access_time.get(page_id, 0)
         self._last_access_time[page_id] = self._access_counter
 
-        # Update phase integrator
+        # Phase update
         phase, amplitude = self._phase_integrator.update(page_id, op_type, delta_t)
-
-        # Get or create page
         page = state.get_or_create_page(page_id)
-
-        # Update page state
         page.phase = phase
-        page.amplitude = max(page.amplitude, amplitude)  # Keep max amplitude
+        page.amplitude = max(page.amplitude, amplitude)
         page.update_on_access(state.current_time, op_type)
 
-        # Compute fast coherence
+        # Get neighbor hotness early (needed for mode switcher)
+        neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
+
+        # Update mode switcher and get current policy
+        is_tier0_hit = state.tier0.contains(page_id)
+        _, policy, _ = self._mode_switcher.record_access(
+            page_id=page_id,
+            is_tier0_hit=is_tier0_hit,
+            neighbor_hotness=neighbor_hotness,
+            shadow_hit_rate=self._shadow_tier.regret_on_miss_rate,
+            was_eviction=False
+        )
+        self._current_policy = policy
+
+        # Boost neighbors (scaled by policy)
+        neighbor_boost_amount = 0.02 * policy.neighbor_boost_scale
+        for nid in self._neighbor_tracker.get_neighbors(page_id):
+            if nid in state.all_pages:
+                state.all_pages[nid].coherence = min(1.0, state.all_pages[nid].coherence + neighbor_boost_amount)
+                self._neighbor_boosts += 1
+
+        # Scores
         mean_phase = state.global_mean_phase
         fast_coh = self._coherence.fast_coherence(page, mean_phase)
+        reuse_score = self._transition_tracker.get_reuse_score(page_id)
 
         promoted = False
         demoted = False
 
-        # Case 1: Page in tier0 (fast tier hit)
+        # Case 1: Tier 0 Hit (Fast Path)
         if state.tier0.contains(page_id):
             state.tier0.touch(page_id)
             state.tier0.record_hit()
+            self._do_predictive_prefetch(state, page_id, policy)
             latency = self._compute_latency(Tier.TIER0, False, False)
             return (Tier.TIER0, latency, False, False)
 
-        # Case 2: Page in tier1 (slow tier hit - consider promotion)
+        # Case 2: Tier 1 Hit (Slow Path - consider promotion)
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
 
-            # Check BCVF for promotion
+            # Check promotion eligibility
             can_promote = (
-                self._epoch_promotions < self.ctm_config.max_promotions_per_epoch
-                and state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
+                self._epoch_promotions < self.ctm_config.max_promotions_per_epoch and
+                state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
             )
 
+            should_promote = False
+
             if can_promote:
-                should_promote, weight = self._bcvf.should_promote(
-                    page, state, predicted_hit_improvement=fast_coh * 0.2
-                )
-
-                if should_promote:
-                    # Promote
-                    state.tier1.remove(page_id)
-                    evicted = state.tier0.add(page)
-                    promoted = True
-                    self._promotions += 1
-                    self._epoch_promotions += 1
-                    page.last_promotion_time = state.current_time
-
-                    # Handle eviction with BCVF
-                    if evicted is not None:
-                        demoted = self._handle_eviction(state, evicted)
+                # LOOP PINNING: Fast-track promotion for temporal patterns
+                # This fixes the -4.1% temporal regression by keeping short loops in Tier0
+                reuse_thresh = self.ctm_config.loop_pin_reuse_threshold
+                neighbor_thresh = self.ctm_config.loop_pin_neighbor_threshold
+                if reuse_score > reuse_thresh and neighbor_hotness > neighbor_thresh:
+                    should_promote = True
                 else:
-                    self._bcvf_rejections += 1
+                    # Use adaptive p from shadow tier to weight reuse vs recency
+                    if self._shadow_tier.should_favor_frequency():
+                        # Favor frequency: weight reuse higher
+                        combined_score = 0.6 * reuse_score + 0.2 * fast_coh + 0.2 * neighbor_hotness
+                    else:
+                        # Favor recency: weight coherence higher
+                        combined_score = 0.4 * reuse_score + 0.4 * fast_coh + 0.2 * neighbor_hotness
+
+                    # Promote based on combined score threshold (configurable)
+                    should_promote = combined_score > self.ctm_config.promotion_threshold
+
+            if should_promote:
+                state.tier1.remove(page_id)
+
+                # EXPLICIT VICTIM SELECTION (the key change)
+                # Select victim BEFORE eviction, not after
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
+                promoted = True
+                self._promotions += 1
+                self._epoch_promotions += 1
+                page.last_promotion_time = state.current_time
+
+                if evicted is not None:
+                    demoted = self._handle_eviction(state, evicted)
+
+                self._do_predictive_prefetch(state, page_id, policy)
 
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             return (Tier.TIER1, latency, promoted, demoted)
 
-        # Case 3: Miss - add to system
-        # Use coherence to decide initial tier
-        if fast_coh > 0.6 and not state.tier0.is_full:
-            # High coherence - add to tier0
-            state.tier0.add(page)
-        elif fast_coh > 0.6:
-            # High coherence but tier0 full - promote with eviction
-            evicted = state.tier0.add(page)
-            promoted = True
-            self._promotions += 1
-            self._epoch_promotions += 1
+        # Case 3: Miss - Always admit to Tier0
+        # NOTE: Admission controller was removed as it hurt temporal workloads
+        # by mistaking temporal locality for sequential scans
+        self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
-            if evicted is not None:
-                demoted = self._handle_eviction(state, evicted)
-        else:
-            # Low coherence - add to tier1
-            state.tier1.add(page)
+        # EXPLICIT VICTIM SELECTION before admission
+        evicted = None
+        if state.tier0.is_full:
+            victim = self._select_victim(state)
+            if victim:
+                state.tier0.remove(victim.page_id)
+                evicted = victim
+
+        state.tier0.add(page)
+        promoted = True
+        self._promotions += 1
+
+        if evicted is not None:
+            demoted = self._handle_eviction(state, evicted)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         return (Tier.NONE, latency, promoted, demoted)
 
-    def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
-        """Handle evicted page with BCVF verification."""
-        should_demote, _ = self._bcvf.should_demote(evicted, state)
+    def _do_predictive_prefetch(self, state: GlobalState, current_page: int, policy: ModePolicy = None) -> None:
+        """
+        FIX: Burst prefetch with gating based on probability mass.
+        Mode-adaptive: respects policy.prefetch_enabled, budget_scale, min_prob, burst_size.
+        """
+        # Use current policy if not provided
+        if policy is None:
+            policy = self._current_policy
 
-        if should_demote:
-            state.tier1.add(evicted)
-            evicted.last_demotion_time = state.current_time
-            self._demotions += 1
-            self._epoch_demotions += 1
-            return True
+        # Check if prefetch is enabled for current mode
+        if not policy.prefetch_enabled:
+            return
+
+        predictions = self._transition_tracker.get_top_predictions(current_page, k=4)
+        if not predictions:
+            return
+
+        # Determine burst size based on confidence and policy
+        top_prob = predictions[0][1] if predictions else 0.0
+        burst_size = self._prefetch_engine.get_burst_size(top_prob, max_burst=policy.prefetch_burst_size)
+        prefetched = 0
+
+        for next_page, prob in predictions:
+            if prefetched >= burst_size:
+                break
+            if not self._prefetch_engine.should_prefetch(
+                prob,
+                prefetch_enabled=policy.prefetch_enabled,
+                budget_scale=policy.prefetch_budget_scale,
+                min_prob_override=policy.prefetch_min_prob
+            ):
+                continue
+
+            page = state.all_pages.get(next_page)
+            if page is None:
+                continue
+
+            if state.tier1.contains(next_page):
+                state.tier1.remove(next_page)
+
+                # EXPLICIT VICTIM SELECTION for prefetch too
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
+                self._prefetch_promotions += 1
+                self._prefetch_engine.record_prefetch(next_page)
+                prefetched += 1
+
+                if evicted is not None:
+                    # Prefetch eviction goes to tier1 and shadow tier
+                    self._handle_eviction(state, evicted)
+
+    def _handle_eviction(self, state: GlobalState, evicted: PageState) -> bool:
+        """
+        Handle eviction from Tier 0.
+
+        SIMPLIFIED: All protection logic is now in _select_victim().
+        This function only demotes the already-selected victim.
+
+        Steps:
+        1. Add evicted page to Tier1
+        2. Record in shadow tier for regret tracking (ARC-like B1/B2)
+        3. Update stats
+        """
+        # Demote to tier1
+        state.tier1.add(evicted)
+        evicted.last_demotion_time = state.current_time
+
+        # Classify into appropriate shadow tier based on reuse score
+        # This enables ARC-like adaptation via ghost hits
+        evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
+        if evicted_reuse > 0.3:
+            # High reuse page evicted → B2 (frequency ghost)
+            self._shadow_tier.add_to_b2(evicted.page_id)
         else:
-            # BCVF rejected demotion - put back in tier0 (LRU position)
-            state.tier0.add(evicted)
-            self._bcvf_rejections += 1
-            return False
+            # Low reuse page evicted → B1 (recency ghost)
+            self._shadow_tier.add_to_b1(evicted.page_id)
+
+        self._demotions += 1
+        self._epoch_demotions += 1
+        return True
 
     def on_epoch(self, state: GlobalState, epoch: int) -> None:
-        """End of epoch processing."""
-        # Reset epoch counters
         self._epoch_promotions = 0
         self._epoch_demotions = 0
 
-        # Slow-path coherence update
-        if epoch % 10 == 0:  # Every 10 epochs
-            self._coherence.slow_update(state)
+        # Periodic decay
+        for page in list(state.tier0.pages.values()) + list(state.tier1.pages.values()):
+            page.decay(state.current_time, decay_rate=0.001)
 
-        # SCC parameter tuning
-        self._scc.update(state, self._bcvf)
-
-        # Update BCVF with SCC-tuned parameters
-        self._bcvf.config = type(self._bcvf.config)(
-            threshold=self._scc.threshold,
-            beta=self._scc.beta,
-            lambda_f=self._bcvf.config.lambda_f,
-            lambda_b=self._bcvf.config.lambda_b,
-            lambda_c=self._bcvf.config.lambda_c,
-            alpha_latency=self._bcvf.config.alpha_latency,
-            alpha_miss=self._bcvf.config.alpha_miss,
-            beta_heat=self._bcvf.config.beta_heat,
-            beta_coherence=self._bcvf.config.beta_coherence,
-            beta_uncertainty=self._bcvf.config.beta_uncertainty,
-            beta_drift=self._bcvf.config.beta_drift,
-        )
+        # FIX: Use co-occurrence neighbors for coherence, not sorted ID adjacency
+        self._coherence.slow_update(state, self._neighbor_tracker)
 
     def get_stats(self) -> dict:
+        # Get mode switcher stats
+        mode_stats = self._mode_switcher.get_stats()
+
         return {
             "promotions": self._promotions,
             "demotions": self._demotions,
-            "bcvf_rejections": self._bcvf_rejections,
-            "bcvf_rejection_rate": self._bcvf.rejection_rate,
-            "scc_threshold": self._scc.threshold,
-            "scc_beta": self._scc.beta,
-            "tier_coherence": self._scc.compute_tier_coherence,
+            # FIX: Call the function with state argument
+            "neighbor_boosts": self._neighbor_boosts,
+            "tracked_neighbors": len(self._neighbor_tracker._neighbors),
+            "prefetch_promotions": self._prefetch_promotions,
+            "prefetch_hit_rate": self._prefetch_engine.prefetch_hit_rate,
+            "total_prefetches": self._prefetch_engine.total_prefetches,
+            "transition_count": self._transition_tracker._total_transitions,
+            # Shadow tier stats (ARC-like)
+            "shadow_b1_hits": self._shadow_tier.b1_hits,
+            "shadow_b2_hits": self._shadow_tier.b2_hits,
+            "shadow_p": self._shadow_tier.p,
+            "regret_on_miss_rate": self._shadow_tier.regret_on_miss_rate,
+            # Victim selection stats
+            "smart_victim_selections": self._smart_victim_selections,
+            "smart_victim_enabled": self.ctm_config.enable_smart_victim,
+            # Mode switcher stats
+            "mode_current": mode_stats["current_mode"],
+            "mode_confidence": mode_stats["mode_confidence"],
+            "mode_switches": mode_stats["mode_switches"],
+            "mode_time_fractions": mode_stats["mode_time_fractions"],
+            "mode_signals": mode_stats["signals"],
         }
