@@ -77,6 +77,11 @@ deg3_mult       = input.int(8, "Degree 3 Multiplier", minval=4, maxval=21,
     group="Wave Degree",
     tooltip="Degree 3 pivot lookback = base × this. E.g., 5 × 8 = 40 bars.")
 
+// --- Performance ---
+calc_last_n     = input.int(0, "Calculate Last N Bars (0 = All)", minval=0, maxval=50000,
+    group="Performance",
+    tooltip="Limit heavy computation (detectors, signals, drawing) to the last N bars. Pivot detection still runs on all bars. 0 = no limit. Try 5000 if you hit timeouts on low timeframes.")
+
 // --- Display ---
 show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
 show_wave_labels = input.bool(true, "Show Wave Labels (1-5, A-B-C, W-X-Y-Z)", group="Display")
@@ -1142,23 +1147,26 @@ analyze_degree_context(float[] deg_prices, bool[] deg_highs, int deg_count) =>
     [dir, wave_pos, is_imp, is_corr, conf]
 
 // ============================================================================
+// Performance guard: skip heavy computation on old bars
+should_calc = calc_last_n == 0 or bar_index >= (last_bar_index - calc_last_n)
+
 // RUN ALL DETECTORS
 // ============================================================================
-[bull5_wnum, bull5_conf, bull5_valid] = detect_bullish_5wave()
-[bear5_wnum, bear5_conf, bear5_valid] = detect_bearish_5wave()
-[bull_partial_wnum, bull_partial_conf] = detect_partial_bullish()
-[bear_partial_wnum, bear_partial_conf] = detect_partial_bearish()
-[abc_type, abc_conf] = detect_abc_correction()
-[wxy_type, wxy_conf] = detect_wxy_double()
-[wxyz_type, wxyz_conf] = detect_wxyxz_triple()
-[diag_type, diag_conf, diag_is_leading] = detect_diagonal()
+[bull5_wnum, bull5_conf, bull5_valid] = should_calc ? detect_bullish_5wave() : [0, 0.0, false]
+[bear5_wnum, bear5_conf, bear5_valid] = should_calc ? detect_bearish_5wave() : [0, 0.0, false]
+[bull_partial_wnum, bull_partial_conf] = should_calc ? detect_partial_bullish() : [0, 0.0]
+[bear_partial_wnum, bear_partial_conf] = should_calc ? detect_partial_bearish() : [0, 0.0]
+[abc_type, abc_conf] = should_calc ? detect_abc_correction() : [0, 0.0]
+[wxy_type, wxy_conf] = should_calc ? detect_wxy_double() : [0, 0.0]
+[wxyz_type, wxyz_conf] = should_calc ? detect_wxyxz_triple() : [0, 0.0]
+[diag_type, diag_conf, diag_is_leading] = should_calc ? detect_diagonal() : [0, 0.0, false]
 
 // ── Multi-Degree Context Analysis ──
-[d2_dir, d2_wave, d2_is_imp, d2_is_corr, d2_conf] = deg_enabled ?
+[d2_dir, d2_wave, d2_is_imp, d2_is_corr, d2_conf] = should_calc and deg_enabled ?
     analyze_degree_context(piv_price_d2, piv_isHigh_d2, piv_count_d2) :
     [0, 0, false, false, 0.0]
 
-[d3_dir, d3_wave, d3_is_imp, d3_is_corr, d3_conf] = deg_enabled ?
+[d3_dir, d3_wave, d3_is_imp, d3_is_corr, d3_conf] = should_calc and deg_enabled ?
     analyze_degree_context(piv_price_d3, piv_isHigh_d3, piv_count_d3) :
     [0, 0, false, false, 0.0]
 
