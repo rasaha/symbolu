@@ -1,0 +1,3250 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © SymbolU - Comprehensive Elliott Wave Indicator v2 (Multi-Degree)
+// Advanced pattern recognition with Fibonacci validation, multi-degree wave counting,
+// fractal hierarchy via multi-degree pivots, complex corrections (WXY / WXYXZ),
+// diagonal patterns, and integrated trading signals.
+
+//@version=6
+indicator("SymbolU Elliott Wave v2", shorttitle="SymbolU EW v2", overlay=true,
+    max_lines_count=500, max_labels_count=500)
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+
+// --- ZigZag / Pivot Detection ---
+pivot_lookback  = input.int(5, "Pivot Lookback", minval=2, maxval=50,
+    group="Pivot Detection",
+    tooltip="Number of bars left/right to confirm a swing high or low. Higher = fewer, larger swings.")
+zigzag_mode     = input.string("ATR", "ZigZag Filter Mode", options=["ATR", "Percent"],
+    group="Pivot Detection",
+    tooltip="ATR: filter swings by ATR multiple. Percent: filter by minimum % move.")
+atr_length      = input.int(14, "ATR Length", minval=1, maxval=100, group="Pivot Detection")
+atr_multiplier  = input.float(1.0, "ATR Multiplier", minval=0.1, maxval=5.0, step=0.1,
+    group="Pivot Detection",
+    tooltip="Minimum swing size = ATR × this multiplier.")
+pct_threshold   = input.float(2.0, "Percent Threshold (%)", minval=0.1, maxval=20.0, step=0.1,
+    group="Pivot Detection",
+    tooltip="Minimum swing size as percentage of price.")
+
+// --- Elliott Wave Rules ---
+fib_tolerance   = input.float(0.10, "Fibonacci Tolerance", minval=0.01, maxval=0.30, step=0.01,
+    group="Wave Rules",
+    tooltip="Tolerance around Fibonacci ratios for wave validation.")
+strict_rules    = input.bool(true, "Strict Wave Rules",
+    group="Wave Rules",
+    tooltip="Enforce all three cardinal Elliott Wave rules strictly.")
+
+// --- Multi-Timeframe Analysis ---
+mtf_enabled     = input.bool(true, "Enable MTF Analysis", group="Multi-Timeframe",
+    tooltip="Analyze wave structure across 3 timeframes for confluence.")
+mtf_tf2         = input.timeframe("60", "Timeframe 2 (Higher)", group="Multi-Timeframe",
+    tooltip="Medium timeframe. E.g., 60 = 1H if your chart is 5m/15m.")
+mtf_tf3         = input.timeframe("240", "Timeframe 3 (Highest)", group="Multi-Timeframe",
+    tooltip="Highest timeframe. E.g., 240 = 4H or D = Daily.")
+mtf_filter      = input.bool(true, "MTF Confluence Filter", group="Multi-Timeframe",
+    tooltip="When enabled, buy/sell signals require at least 2 of 3 timeframes to agree on direction.")
+mtf_boost       = input.bool(true, "MTF Confidence Boost", group="Multi-Timeframe",
+    tooltip="Boost confidence when all 3 timeframes align.")
+
+// --- RSI Divergence Confirmation ---
+rsi_period      = input.int(14, "RSI Period", minval=2, maxval=50,
+    group="RSI Confirmation",
+    tooltip="RSI period for divergence detection. Standard: 14.")
+rsi_ob          = input.float(70.0, "RSI Overbought", minval=50, maxval=95, step=5,
+    group="RSI Confirmation",
+    tooltip="RSI overbought level. Helps confirm Wave 5 exhaustion.")
+rsi_os          = input.float(30.0, "RSI Oversold", minval=5, maxval=50, step=5,
+    group="RSI Confirmation",
+    tooltip="RSI oversold level. Helps confirm correction completion.")
+
+// --- Volume Confirmation ---
+vol_enabled     = input.bool(true, "Enable Volume Analysis",
+    group="Volume Confirmation",
+    tooltip="Analyze OBV divergence, wave volume patterns, and VWAP position.")
+vol_vwap        = input.bool(true, "Include VWAP",
+    group="Volume Confirmation",
+    tooltip="Factor VWAP premium/discount into volume score. Intraday only.")
+
+// --- Wave Degree (Fractal Hierarchy) ---
+deg_enabled     = input.bool(true, "Enable Multi-Degree Analysis",
+    group="Wave Degree",
+    tooltip="Analyze wave structure at 3 pivot scales to detect fractal hierarchy (W3-in-W3, false exhaustion filtering).")
+deg2_mult       = input.int(3, "Degree 2 Multiplier", minval=2, maxval=8,
+    group="Wave Degree",
+    tooltip="Degree 2 pivot lookback = base × this. E.g., 5 × 3 = 15 bars.")
+deg3_mult       = input.int(8, "Degree 3 Multiplier", minval=4, maxval=21,
+    group="Wave Degree",
+    tooltip="Degree 3 pivot lookback = base × this. E.g., 5 × 8 = 40 bars.")
+
+// --- Display ---
+show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
+show_wave_labels = input.bool(true, "Show Wave Labels (1-5, A-B-C, W-X-Y-Z)", group="Display")
+show_fib_levels  = input.bool(true, "Show Fibonacci Levels", group="Display")
+show_fib_tz      = input.bool(true, "Show Fibonacci Time Zones", group="Display",
+    tooltip="Draw vertical lines at Fibonacci time intervals from the wave pattern anchor point.")
+show_targets     = input.bool(true, "Show Wave Targets", group="Display")
+show_signals     = input.bool(true, "Show Trading Signals", group="Display")
+show_table       = input.bool(true, "Show Info Dashboard", group="Display")
+show_background  = input.bool(true, "Show Wave Background", group="Display")
+
+// --- Colors ---
+color_impulse_up   = input.color(color.new(color.teal, 0), "Bullish Impulse", group="Colors")
+color_impulse_down = input.color(color.new(color.red, 0), "Bearish Impulse", group="Colors")
+color_corrective   = input.color(color.new(color.orange, 0), "Simple Correction (ABC)", group="Colors")
+color_complex      = input.color(color.new(color.purple, 0), "Complex Correction (WXY/Z)", group="Colors")
+color_diagonal     = input.color(color.new(color.yellow, 20), "Diagonal Pattern", group="Colors")
+color_fib          = input.color(color.new(color.gray, 40), "Fibonacci Levels", group="Colors")
+
+// ============================================================================
+// CONSTANTS — Fibonacci Ratios
+// ============================================================================
+FIB_236 = 0.236
+FIB_382 = 0.382
+FIB_500 = 0.500
+FIB_618 = 0.618
+FIB_786 = 0.786
+FIB_1000 = 1.000
+FIB_1272 = 1.272
+FIB_1618 = 1.618
+FIB_2000 = 2.000
+FIB_2618 = 2.618
+
+// Fibonacci Time Zone sequence (bars from anchor)
+var int[] FIB_TZ = array.from(1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233)
+
+// ============================================================================
+// ZIG-ZAG PIVOT DETECTION
+// ============================================================================
+
+atr_val = ta.atr(atr_length)
+rsi_value = ta.rsi(close, rsi_period)
+
+// Volume computations
+var float obv_value = 0.0
+obv_value := close > close[1] ? obv_value[1] + volume :
+    close < close[1] ? obv_value[1] - volume : obv_value[1]
+cum_vol = ta.cum(volume)
+vwap_value = vol_vwap ? ta.vwap(hlc3) : float(na)
+
+// Minimum move size to qualify as a valid swing
+min_move = zigzag_mode == "ATR" ? atr_val * atr_multiplier : close * pct_threshold / 100.0
+
+// Built-in pivot detection
+ph = ta.pivothigh(high, pivot_lookback, pivot_lookback)
+pl = ta.pivotlow(low, pivot_lookback, pivot_lookback)
+
+// Storage: up to 14 pivots (enough for WXYXZ triple combination + context)
+var float[]  piv_price  = array.new_float(14, na)
+var int[]    piv_bar    = array.new_int(14, na)
+var bool[]   piv_isHigh = array.new_bool(14, false)
+var float[]  piv_rsi    = array.new_float(14, na)   // RSI at each pivot bar
+var float[]  piv_obv    = array.new_float(14, na)   // OBV at each pivot bar
+var float[]  piv_cumvol = array.new_float(14, na)   // Cumulative volume at each pivot bar
+var int      piv_count  = 0
+
+// Push a new pivot onto our arrays (index 0 = most recent)
+push_pivot(float price, int bar_idx, bool isHigh, float rsi_at_piv, float obv_at_piv, float cumvol_at_piv) =>
+    array.pop(piv_price)
+    array.unshift(piv_price, price)
+    array.pop(piv_bar)
+    array.unshift(piv_bar, bar_idx)
+    array.pop(piv_isHigh)
+    array.unshift(piv_isHigh, isHigh)
+    array.pop(piv_rsi)
+    array.unshift(piv_rsi, rsi_at_piv)
+    array.pop(piv_obv)
+    array.unshift(piv_obv, obv_at_piv)
+    array.pop(piv_cumvol)
+    array.unshift(piv_cumvol, cumvol_at_piv)
+
+// ── Degree 2 & 3 Pivot Arrays (price, bar, isHigh only — no RSI/OBV needed) ──
+var float[]  piv_price_d2  = array.new_float(14, na)
+var int[]    piv_bar_d2    = array.new_int(14, na)
+var bool[]   piv_isHigh_d2 = array.new_bool(14, false)
+var int      piv_count_d2  = 0
+
+var float[]  piv_price_d3  = array.new_float(14, na)
+var int[]    piv_bar_d3    = array.new_int(14, na)
+var bool[]   piv_isHigh_d3 = array.new_bool(14, false)
+var int      piv_count_d3  = 0
+
+// Parameterized push for higher-degree arrays (3 arrays, no RSI/OBV)
+push_piv(float[] prices, int[] bars, bool[] highs, float price, int bar_idx, bool isHigh) =>
+    array.pop(prices)
+    array.unshift(prices, price)
+    array.pop(bars)
+    array.unshift(bars, bar_idx)
+    array.pop(highs)
+    array.unshift(highs, isHigh)
+
+// Degree 2/3 lookback periods
+deg2_lookback = pivot_lookback * deg2_mult
+deg3_lookback = pivot_lookback * deg3_mult
+
+// Filter and store pivot highs
+if not na(ph)
+    piv_bar_idx = bar_index - pivot_lookback
+    rsi_at_pivot = rsi_value[pivot_lookback]  // RSI at the pivot bar
+    obv_at_pivot = obv_value[pivot_lookback]  // OBV at the pivot bar
+    cvol_at_pivot = cum_vol[pivot_lookback]   // Cumulative volume at pivot
+    last_isHigh = piv_count > 0 ? array.get(piv_isHigh, 0) : false
+    last_price  = piv_count > 0 ? array.get(piv_price, 0)  : na
+    if last_isHigh and not na(last_price)
+        if ph > last_price
+            array.set(piv_price, 0, ph)
+            array.set(piv_bar,   0, piv_bar_idx)
+            array.set(piv_rsi,   0, rsi_at_pivot)
+            array.set(piv_obv,   0, obv_at_pivot)
+            array.set(piv_cumvol, 0, cvol_at_pivot)
+    else
+        move_ok = na(last_price) ? true : math.abs(ph - last_price) >= min_move
+        if move_ok
+            push_pivot(ph, piv_bar_idx, true, rsi_at_pivot, obv_at_pivot, cvol_at_pivot)
+            piv_count := math.min(piv_count + 1, 14)
+
+if not na(pl)
+    piv_bar_idx = bar_index - pivot_lookback
+    rsi_at_pivot = rsi_value[pivot_lookback]
+    obv_at_pivot = obv_value[pivot_lookback]
+    cvol_at_pivot = cum_vol[pivot_lookback]
+    last_isHigh = piv_count > 0 ? array.get(piv_isHigh, 0) : false
+    last_price  = piv_count > 0 ? array.get(piv_price, 0)  : na
+    if not last_isHigh and not na(last_price)
+        if pl < last_price
+            array.set(piv_price, 0, pl)
+            array.set(piv_bar,   0, piv_bar_idx)
+            array.set(piv_rsi,   0, rsi_at_pivot)
+            array.set(piv_obv,   0, obv_at_pivot)
+            array.set(piv_cumvol, 0, cvol_at_pivot)
+    else
+        move_ok = na(last_price) ? true : math.abs(pl - last_price) >= min_move
+        if move_ok
+            push_pivot(pl, piv_bar_idx, false, rsi_at_pivot, obv_at_pivot, cvol_at_pivot)
+            piv_count := math.min(piv_count + 1, 14)
+
+// ── Degree 2 Pivot Detection ──
+if deg_enabled
+    ph_d2 = ta.pivothigh(high, deg2_lookback, deg2_lookback)
+    pl_d2 = ta.pivotlow(low, deg2_lookback, deg2_lookback)
+
+    if not na(ph_d2)
+        d2_bar = bar_index - deg2_lookback
+        d2_lastH = piv_count_d2 > 0 ? array.get(piv_isHigh_d2, 0) : false
+        d2_lastP = piv_count_d2 > 0 ? array.get(piv_price_d2, 0)  : na
+        if d2_lastH and not na(d2_lastP)
+            if ph_d2 > d2_lastP
+                array.set(piv_price_d2, 0, ph_d2)
+                array.set(piv_bar_d2,   0, d2_bar)
+        else
+            push_piv(piv_price_d2, piv_bar_d2, piv_isHigh_d2, ph_d2, d2_bar, true)
+            piv_count_d2 := math.min(piv_count_d2 + 1, 14)
+
+    if not na(pl_d2)
+        d2_bar = bar_index - deg2_lookback
+        d2_lastH = piv_count_d2 > 0 ? array.get(piv_isHigh_d2, 0) : false
+        d2_lastP = piv_count_d2 > 0 ? array.get(piv_price_d2, 0)  : na
+        if not d2_lastH and not na(d2_lastP)
+            if pl_d2 < d2_lastP
+                array.set(piv_price_d2, 0, pl_d2)
+                array.set(piv_bar_d2,   0, d2_bar)
+        else
+            push_piv(piv_price_d2, piv_bar_d2, piv_isHigh_d2, pl_d2, d2_bar, false)
+            piv_count_d2 := math.min(piv_count_d2 + 1, 14)
+
+// ── Degree 3 Pivot Detection ──
+    ph_d3 = ta.pivothigh(high, deg3_lookback, deg3_lookback)
+    pl_d3 = ta.pivotlow(low, deg3_lookback, deg3_lookback)
+
+    if not na(ph_d3)
+        d3_bar = bar_index - deg3_lookback
+        d3_lastH = piv_count_d3 > 0 ? array.get(piv_isHigh_d3, 0) : false
+        d3_lastP = piv_count_d3 > 0 ? array.get(piv_price_d3, 0)  : na
+        if d3_lastH and not na(d3_lastP)
+            if ph_d3 > d3_lastP
+                array.set(piv_price_d3, 0, ph_d3)
+                array.set(piv_bar_d3,   0, d3_bar)
+        else
+            push_piv(piv_price_d3, piv_bar_d3, piv_isHigh_d3, ph_d3, d3_bar, true)
+            piv_count_d3 := math.min(piv_count_d3 + 1, 14)
+
+    if not na(pl_d3)
+        d3_bar = bar_index - deg3_lookback
+        d3_lastH = piv_count_d3 > 0 ? array.get(piv_isHigh_d3, 0) : false
+        d3_lastP = piv_count_d3 > 0 ? array.get(piv_price_d3, 0)  : na
+        if not d3_lastH and not na(d3_lastP)
+            if pl_d3 < d3_lastP
+                array.set(piv_price_d3, 0, pl_d3)
+                array.set(piv_bar_d3,   0, d3_bar)
+        else
+            push_piv(piv_price_d3, piv_bar_d3, piv_isHigh_d3, pl_d3, d3_bar, false)
+            piv_count_d3 := math.min(piv_count_d3 + 1, 14)
+
+// Helper: get pivot data (0 = most recent)
+get_price(int idx) => array.get(piv_price, idx)
+get_bar(int idx)   => array.get(piv_bar, idx)
+get_high(int idx)  => array.get(piv_isHigh, idx)
+get_rsi(int idx)   => array.get(piv_rsi, idx)
+get_obv(int idx)   => array.get(piv_obv, idx)
+get_cvol(int idx)  => array.get(piv_cumvol, idx)
+
+// Wave volume: total cumulative volume between two pivots
+// Higher wave_vol means more participation during that wave
+wave_vol(int newer_idx, int older_idx) =>
+    cv_new = get_cvol(newer_idx)
+    cv_old = get_cvol(older_idx)
+    not na(cv_new) and not na(cv_old) ? math.abs(cv_new - cv_old) : float(na)
+
+// ============================================================================
+// FIBONACCI HELPERS
+// ============================================================================
+
+is_near_fib(float actual, float target) =>
+    math.abs(actual - target) <= fib_tolerance
+
+in_fib_range(float actual, float lo, float hi) =>
+    actual >= (lo - fib_tolerance) and actual <= (hi + fib_tolerance)
+
+retrace_ratio(float wave_prev_size, float wave_curr_size) =>
+    wave_prev_size != 0 ? math.abs(wave_curr_size) / math.abs(wave_prev_size) : 0.0
+
+// ============================================================================
+// PATTERN 1: 5-WAVE IMPULSE DETECTION
+// ============================================================================
+//
+// Cardinal Rules (strict mode):
+//   R1: Wave 2 must not retrace more than 100% of Wave 1
+//   R2: Wave 3 must not be the shortest impulse wave
+//   R3: Wave 4 must not enter the price territory of Wave 1
+//
+// Pivot layout for bullish: [5]=Low [4]=High [3]=Low [2]=High [1]=Low [0]=High
+//   Wave 1: [5]->[4], Wave 2: [4]->[3], Wave 3: [3]->[2],
+//   Wave 4: [2]->[1], Wave 5: [1]->[0]
+// ============================================================================
+
+detect_bullish_5wave() =>
+    float confidence = 0.0
+    int wave_num = 0
+    bool is_valid = false
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+    p4 = get_price(4)
+    p5 = get_price(5)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+    h4 = get_high(4)
+    h5 = get_high(5)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3) and not na(p4) and not na(p5)
+        if not h5 and h4 and not h3 and h2 and not h1 and h0
+            w1 = p4 - p5
+            w2 = p4 - p3
+            w3 = p2 - p3
+            w4 = p2 - p1
+            w5 = p0 - p1
+
+            if w1 > 0 and w3 > 0 and w5 > 0
+                w2_retrace = retrace_ratio(w1, w2)
+                w3_extend  = retrace_ratio(w1, w3)
+                w4_retrace = retrace_ratio(w3, w4)
+                w5_extend  = retrace_ratio(w1, w5)
+
+                r1_valid = p3 > p5
+                r2_valid = w3 >= w1 or w3 >= w5
+                r3_valid = p1 > p4
+
+                if strict_rules
+                    is_valid := r1_valid and r2_valid and r3_valid
+                else
+                    is_valid := r1_valid and r2_valid
+
+                if is_valid
+                    wave_num := 5
+
+                    if in_fib_range(w2_retrace, FIB_382, FIB_786)
+                        confidence += 0.10
+                    if in_fib_range(w2_retrace, FIB_500, FIB_618)
+                        confidence += 0.10
+                    if w3_extend >= FIB_1000 - fib_tolerance
+                        confidence += 0.10
+                    if in_fib_range(w3_extend, FIB_1618 - 0.2, FIB_1618 + 0.5)
+                        confidence += 0.15
+                    if w3_extend >= FIB_2618 - fib_tolerance
+                        confidence += 0.05
+                    if w3 >= w1 and w3 >= w5
+                        confidence += 0.15
+                    if in_fib_range(w4_retrace, FIB_236, FIB_500)
+                        confidence += 0.10
+                    if in_fib_range(w4_retrace, FIB_382 - 0.05, FIB_382 + 0.05)
+                        confidence += 0.05
+                    if in_fib_range(w5_extend, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(w5_extend, FIB_1000 - 0.1, FIB_1000 + 0.1)
+                        confidence += 0.05
+                    if r3_valid
+                        confidence += 0.05
+
+                    confidence := math.min(1.0, confidence)
+
+    [wave_num, confidence, is_valid]
+
+detect_bearish_5wave() =>
+    float confidence = 0.0
+    int wave_num = 0
+    bool is_valid = false
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+    p4 = get_price(4)
+    p5 = get_price(5)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+    h4 = get_high(4)
+    h5 = get_high(5)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3) and not na(p4) and not na(p5)
+        if h5 and not h4 and h3 and not h2 and h1 and not h0
+            w1 = p5 - p4
+            w2 = p3 - p4
+            w3 = p3 - p2
+            w4 = p1 - p2
+            w5 = p1 - p0
+
+            if w1 > 0 and w3 > 0 and w5 > 0
+                w2_retrace = retrace_ratio(w1, w2)
+                w3_extend  = retrace_ratio(w1, w3)
+                w4_retrace = retrace_ratio(w3, w4)
+                w5_extend  = retrace_ratio(w1, w5)
+
+                r1_valid = p3 < p5
+                r2_valid = w3 >= w1 or w3 >= w5
+                r3_valid = p1 < p4
+
+                if strict_rules
+                    is_valid := r1_valid and r2_valid and r3_valid
+                else
+                    is_valid := r1_valid and r2_valid
+
+                if is_valid
+                    wave_num := -5
+
+                    if in_fib_range(w2_retrace, FIB_382, FIB_786)
+                        confidence += 0.10
+                    if in_fib_range(w2_retrace, FIB_500, FIB_618)
+                        confidence += 0.10
+                    if w3_extend >= FIB_1000 - fib_tolerance
+                        confidence += 0.10
+                    if in_fib_range(w3_extend, FIB_1618 - 0.2, FIB_1618 + 0.5)
+                        confidence += 0.15
+                    if w3_extend >= FIB_2618 - fib_tolerance
+                        confidence += 0.05
+                    if w3 >= w1 and w3 >= w5
+                        confidence += 0.15
+                    if in_fib_range(w4_retrace, FIB_236, FIB_500)
+                        confidence += 0.10
+                    if in_fib_range(w4_retrace, FIB_382 - 0.05, FIB_382 + 0.05)
+                        confidence += 0.05
+                    if in_fib_range(w5_extend, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(w5_extend, FIB_1000 - 0.1, FIB_1000 + 0.1)
+                        confidence += 0.05
+                    if r3_valid
+                        confidence += 0.05
+
+                    confidence := math.min(1.0, confidence)
+
+    [wave_num, confidence, is_valid]
+
+// ============================================================================
+// PATTERN 2: PARTIAL IMPULSE (Waves 1-3 forming)
+// ============================================================================
+
+detect_partial_bullish() =>
+    float confidence = 0.0
+    int wave_num = 0
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3)
+        if not h3 and h2 and not h1 and h0
+            w1 = p2 - p3
+            w2 = p2 - p1
+            w3 = p0 - p1
+
+            if w1 > 0 and w3 > 0
+                w2_retrace = retrace_ratio(w1, w2)
+                w3_extend  = retrace_ratio(w1, w3)
+
+                r1_valid = p1 > p3
+                r2_valid = w3 >= w1
+
+                if r1_valid
+                    if r2_valid and w3_extend >= FIB_1000 - fib_tolerance
+                        wave_num := 3
+                        confidence += 0.20
+                        if in_fib_range(w2_retrace, FIB_382, FIB_618)
+                            confidence += 0.15
+                        if in_fib_range(w3_extend, FIB_1618 - 0.3, FIB_2618 + 0.3)
+                            confidence += 0.15
+                    else
+                        wave_num := 2
+                        confidence += 0.10
+                        if in_fib_range(w2_retrace, FIB_382, FIB_786)
+                            confidence += 0.10
+
+                    confidence := math.min(1.0, confidence)
+
+    [wave_num, confidence]
+
+detect_partial_bearish() =>
+    float confidence = 0.0
+    int wave_num = 0
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3)
+        if h3 and not h2 and h1 and not h0
+            w1 = p3 - p2
+            w2 = p1 - p2
+            w3 = p1 - p0
+
+            if w1 > 0 and w3 > 0
+                w2_retrace = retrace_ratio(w1, w2)
+                w3_extend  = retrace_ratio(w1, w3)
+
+                r1_valid = p1 < p3
+                r2_valid = w3 >= w1
+
+                if r1_valid
+                    if r2_valid and w3_extend >= FIB_1000 - fib_tolerance
+                        wave_num := -3
+                        confidence += 0.20
+                        if in_fib_range(w2_retrace, FIB_382, FIB_618)
+                            confidence += 0.15
+                        if in_fib_range(w3_extend, FIB_1618 - 0.3, FIB_2618 + 0.3)
+                            confidence += 0.15
+                    else
+                        wave_num := -2
+                        confidence += 0.10
+                        if in_fib_range(w2_retrace, FIB_382, FIB_786)
+                            confidence += 0.10
+
+                    confidence := math.min(1.0, confidence)
+
+    [wave_num, confidence]
+
+// ============================================================================
+// PATTERN 3: SIMPLE ABC CORRECTION
+// ============================================================================
+
+detect_abc_correction() =>
+    float confidence = 0.0
+    int abc_type = 0  // 1 = bearish ABC, -1 = bullish ABC
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+
+    if not na(p0) and not na(p1) and not na(p2)
+        // Bearish ABC: High->Low->High (A-B in progress, C wave down expected)
+        if h2 and not h1 and h0
+            wave_a = p2 - p1
+            wave_b = p0 - p1
+
+            if wave_a > 0 and wave_b > 0
+                b_retrace = retrace_ratio(wave_a, wave_b)
+                if in_fib_range(b_retrace, FIB_382, FIB_786)
+                    abc_type := 1
+                    confidence += 0.25
+                    if in_fib_range(b_retrace, FIB_500, FIB_618)
+                        confidence += 0.15
+                    if p0 < p2
+                        confidence += 0.10
+
+        // Bullish ABC: Low->High->Low (A-B in progress, C wave up expected)
+        if not h2 and h1 and not h0
+            wave_a = p1 - p2
+            wave_b = p1 - p0
+
+            if wave_a > 0 and wave_b > 0
+                b_retrace = retrace_ratio(wave_a, wave_b)
+                if in_fib_range(b_retrace, FIB_382, FIB_786)
+                    abc_type := -1
+                    confidence += 0.25
+                    if in_fib_range(b_retrace, FIB_500, FIB_618)
+                        confidence += 0.15
+                    if p0 > p2
+                        confidence += 0.10
+
+        confidence := math.min(1.0, confidence)
+
+    [abc_type, confidence]
+
+// ============================================================================
+// PATTERN 4: WXY DOUBLE COMBINATION (Double Three)
+// ============================================================================
+//
+// A complex corrective pattern consisting of two corrective structures
+// joined by a connecting wave X.
+//
+// Structure: W-X-Y where each of W, Y is a corrective pattern (zigzag/flat)
+// and X is a connecting retracement wave.
+//
+// Bearish WXY (after bullish impulse):
+//   Pivots: H[3] -> L[2] -> H[1] -> L[0]
+//   W = [3]->[2] (down), X = [2]->[1] (up retrace), Y = [1]->[0] (down)
+//
+// Bullish WXY (after bearish impulse):
+//   Pivots: L[3] -> H[2] -> L[1] -> H[0]
+//   W = [3]->[2] (up), X = [2]->[1] (down retrace), Y = [1]->[0] (up)
+//
+// Validation Rules:
+//   - X retraces 38.2%-78.6% of W
+//   - Y typically reaches 61.8%-100% of W in net distance
+//   - Overall pattern moves sideways to slightly counter-trend
+//   - X must not exceed W's starting point
+// ============================================================================
+
+detect_wxy_double() =>
+    float confidence = 0.0
+    int wxy_type = 0  // 1 = bearish WXY, -1 = bullish WXY
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3)
+
+        // Bearish WXY: H-L-H-L — correction moving down overall
+        if h3 and not h2 and h1 and not h0
+            w_size = p3 - p2   // W wave down (positive = size)
+            x_size = p1 - p2   // X wave up retracement (positive)
+            y_size = p1 - p0   // Y wave down (positive)
+
+            if w_size > 0 and x_size > 0 and y_size > 0
+                x_retrace = retrace_ratio(w_size, x_size)
+                y_ratio   = retrace_ratio(w_size, y_size)
+
+                // X must not exceed W start
+                x_valid = p1 < p3
+
+                // X retraces 38.2%-78.6% of W
+                x_fib_ok = in_fib_range(x_retrace, FIB_382, FIB_786)
+
+                // Y reaches 61.8%-161.8% of W
+                y_fib_ok = in_fib_range(y_ratio, FIB_618, FIB_1618)
+
+                // Overall pattern moves lower: Y end below W end (or close)
+                moves_lower = p0 <= p2 + math.abs(w_size) * 0.1
+
+                if x_valid and x_fib_ok
+                    wxy_type := 1
+                    confidence += 0.20
+
+                    if in_fib_range(x_retrace, FIB_500, FIB_618)
+                        confidence += 0.10
+                    if y_fib_ok
+                        confidence += 0.15
+                    if in_fib_range(y_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.10  // Y ≈ W (classic double three)
+                    if moves_lower
+                        confidence += 0.05
+
+        // Bullish WXY: L-H-L-H — correction moving up overall
+        if not h3 and h2 and not h1 and h0
+            w_size = p2 - p3   // W wave up (positive)
+            x_size = p2 - p1   // X wave down retracement (positive)
+            y_size = p0 - p1   // Y wave up (positive)
+
+            if w_size > 0 and x_size > 0 and y_size > 0
+                x_retrace = retrace_ratio(w_size, x_size)
+                y_ratio   = retrace_ratio(w_size, y_size)
+
+                x_valid = p1 > p3
+                x_fib_ok = in_fib_range(x_retrace, FIB_382, FIB_786)
+                y_fib_ok = in_fib_range(y_ratio, FIB_618, FIB_1618)
+                moves_higher = p0 >= p2 - math.abs(w_size) * 0.1
+
+                if x_valid and x_fib_ok
+                    wxy_type := -1
+                    confidence += 0.20
+
+                    if in_fib_range(x_retrace, FIB_500, FIB_618)
+                        confidence += 0.10
+                    if y_fib_ok
+                        confidence += 0.15
+                    if in_fib_range(y_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.10
+                    if moves_higher
+                        confidence += 0.05
+
+        confidence := math.min(1.0, confidence)
+
+    [wxy_type, confidence]
+
+// ============================================================================
+// PATTERN 5: WXYXZ TRIPLE COMBINATION (Triple Three)
+// ============================================================================
+//
+// Three corrective structures joined by two X waves.
+//
+// Bearish WXYXZ:
+//   Pivots: H[5] -> L[4] -> H[3] -> L[2] -> H[1] -> L[0]
+//   W=[5]->[4], X=[4]->[3], Y=[3]->[2], X'=[2]->[1], Z=[1]->[0]
+//
+// Bullish WXYXZ:
+//   Pivots: L[5] -> H[4] -> L[3] -> H[2] -> L[1] -> H[0]
+//   W=[5]->[4], X=[4]->[3], Y=[3]->[2], X'=[2]->[1], Z=[1]->[0]
+//
+// Validation:
+//   - X and X' each retrace 38.2%-78.6% of preceding wave
+//   - Y ≈ 61.8%-100% of W, Z ≈ 61.8%-100% of Y
+//   - Neither X exceeds preceding corrective pattern's start
+//   - Overall pattern forms a sideways/slightly-trending channel
+// ============================================================================
+
+detect_wxyxz_triple() =>
+    float confidence = 0.0
+    int wxyz_type = 0  // 1 = bearish, -1 = bullish
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+    p4 = get_price(4)
+    p5 = get_price(5)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+    h4 = get_high(4)
+    h5 = get_high(5)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3) and not na(p4) and not na(p5)
+
+        // Bearish WXYXZ: H-L-H-L-H-L
+        if h5 and not h4 and h3 and not h2 and h1 and not h0
+            w_sz  = p5 - p4   // W down
+            x1_sz = p3 - p4   // X1 up
+            y_sz  = p3 - p2   // Y down
+            x2_sz = p1 - p2   // X2 up
+            z_sz  = p1 - p0   // Z down
+
+            if w_sz > 0 and x1_sz > 0 and y_sz > 0 and x2_sz > 0 and z_sz > 0
+                x1_retrace = retrace_ratio(w_sz, x1_sz)
+                y_ratio    = retrace_ratio(w_sz, y_sz)
+                x2_retrace = retrace_ratio(y_sz, x2_sz)
+                z_ratio    = retrace_ratio(y_sz, z_sz)
+
+                // X1 does not exceed W start, X2 does not exceed Y start
+                x1_valid = p3 < p5
+                x2_valid = p1 < p3
+
+                x1_fib = in_fib_range(x1_retrace, FIB_382, FIB_786)
+                x2_fib = in_fib_range(x2_retrace, FIB_382, FIB_786)
+
+                if x1_valid and x2_valid and x1_fib and x2_fib
+                    wxyz_type := 1
+                    confidence += 0.20
+
+                    // Y ≈ W
+                    if in_fib_range(y_ratio, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(y_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.05
+
+                    // Z ≈ Y
+                    if in_fib_range(z_ratio, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(z_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.05
+
+                    // X waves near 50%-61.8%
+                    if in_fib_range(x1_retrace, FIB_500, FIB_618)
+                        confidence += 0.05
+                    if in_fib_range(x2_retrace, FIB_500, FIB_618)
+                        confidence += 0.05
+
+                    // Progressive decline: each corrective low is lower
+                    if p2 < p4 and p0 < p2
+                        confidence += 0.05
+
+        // Bullish WXYXZ: L-H-L-H-L-H
+        if not h5 and h4 and not h3 and h2 and not h1 and h0
+            w_sz  = p4 - p5   // W up
+            x1_sz = p4 - p3   // X1 down
+            y_sz  = p2 - p3   // Y up
+            x2_sz = p2 - p1   // X2 down
+            z_sz  = p0 - p1   // Z up
+
+            if w_sz > 0 and x1_sz > 0 and y_sz > 0 and x2_sz > 0 and z_sz > 0
+                x1_retrace = retrace_ratio(w_sz, x1_sz)
+                y_ratio    = retrace_ratio(w_sz, y_sz)
+                x2_retrace = retrace_ratio(y_sz, x2_sz)
+                z_ratio    = retrace_ratio(y_sz, z_sz)
+
+                x1_valid = p3 > p5
+                x2_valid = p1 > p3
+
+                x1_fib = in_fib_range(x1_retrace, FIB_382, FIB_786)
+                x2_fib = in_fib_range(x2_retrace, FIB_382, FIB_786)
+
+                if x1_valid and x2_valid and x1_fib and x2_fib
+                    wxyz_type := -1
+                    confidence += 0.20
+
+                    if in_fib_range(y_ratio, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(y_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.05
+                    if in_fib_range(z_ratio, FIB_618, FIB_1618)
+                        confidence += 0.10
+                    if in_fib_range(z_ratio, FIB_1000 - 0.15, FIB_1000 + 0.15)
+                        confidence += 0.05
+                    if in_fib_range(x1_retrace, FIB_500, FIB_618)
+                        confidence += 0.05
+                    if in_fib_range(x2_retrace, FIB_500, FIB_618)
+                        confidence += 0.05
+                    if p2 > p4 and p0 > p2
+                        confidence += 0.05
+
+        confidence := math.min(1.0, confidence)
+
+    [wxyz_type, confidence]
+
+// ============================================================================
+// PATTERN 6: DIAGONAL (Leading & Ending)
+// ============================================================================
+//
+// Diagonals are wedge-shaped 5-wave patterns where:
+//   - Wave 4 OVERLAPS Wave 1 territory (key difference from impulse)
+//   - Trendlines converge (contracting) or diverge (expanding)
+//   - Sub-waves are typically 3-wave structures (3-3-3-3-3)
+//
+// Leading Diagonal: Occurs in Wave 1 or Wave A position
+//   - Signals the start of a new trend
+//   - After completion, expect a sharp Wave 2 retracement
+//
+// Ending Diagonal: Occurs in Wave 5 or Wave C position
+//   - Signals exhaustion and imminent reversal
+//   - Often followed by a sharp reversal to at least the diagonal's origin
+//
+// Contracting Diagonal Rules:
+//   - |W1| > |W3| > |W5| (motive waves get smaller)
+//   - |W2| > |W4| (corrective waves get smaller)
+//   - Wave 4 overlaps Wave 1 territory
+//   - Wave 3 is not the shortest
+//   - Wave 2 does not retrace beyond Wave 1 start
+//
+// Same pivot layout as impulse: 6 pivots, L-H-L-H-L-H or H-L-H-L-H-L
+// ============================================================================
+
+// Returns: [diag_type, confidence, is_leading]
+// diag_type: 1 = bullish diagonal, -1 = bearish diagonal, 0 = none
+// is_leading: true if leading diagonal, false if ending diagonal
+detect_diagonal() =>
+    float confidence = 0.0
+    int diag_type = 0
+    bool is_leading = false
+
+    p0 = get_price(0)
+    p1 = get_price(1)
+    p2 = get_price(2)
+    p3 = get_price(3)
+    p4 = get_price(4)
+    p5 = get_price(5)
+
+    h0 = get_high(0)
+    h1 = get_high(1)
+    h2 = get_high(2)
+    h3 = get_high(3)
+    h4 = get_high(4)
+    h5 = get_high(5)
+
+    if not na(p0) and not na(p1) and not na(p2) and not na(p3) and not na(p4) and not na(p5)
+
+        // Bullish diagonal: L-H-L-H-L-H with Wave 4 overlapping Wave 1
+        if not h5 and h4 and not h3 and h2 and not h1 and h0
+            w1 = p4 - p5  // up
+            w2 = p4 - p3  // retrace down
+            w3 = p2 - p3  // up
+            w4 = p2 - p1  // retrace down
+            w5 = p0 - p1  // up
+
+            if w1 > 0 and w3 > 0 and w5 > 0
+                // KEY: Wave 4 overlaps Wave 1 territory
+                w4_overlaps_w1 = p1 < p4 and p1 > p5  // Wave 4 low below Wave 1 high but above Wave 1 start
+
+                // Wave 2 doesn't retrace beyond Wave 1 start
+                w2_valid = p3 > p5
+
+                // Wave 3 is not the shortest
+                w3_not_shortest = w3 >= w1 or w3 >= w5
+
+                if w4_overlaps_w1 and w2_valid and w3_not_shortest
+                    diag_type := 1
+                    confidence += 0.15
+
+                    // Check contracting: motive waves get smaller
+                    contracting_motive = w1 > w3 and w3 > w5
+                    contracting_corrective = w2 > w4
+
+                    if contracting_motive
+                        confidence += 0.15
+                    if contracting_corrective
+                        confidence += 0.10
+
+                    // Both contracting = strong diagonal
+                    if contracting_motive and contracting_corrective
+                        confidence += 0.10
+
+                    // Check expanding diagonal (less common): waves get larger
+                    expanding_motive = w1 < w3 and w3 < w5
+                    if expanding_motive
+                        confidence += 0.05  // Less common but valid
+
+                    // Wave 2 Fibonacci: 50%-78.6% retrace
+                    w2_retrace = retrace_ratio(w1, w2)
+                    if in_fib_range(w2_retrace, FIB_500, FIB_786)
+                        confidence += 0.10
+
+                    // Wave 4 Fibonacci: 50%-78.6% retrace of Wave 3
+                    w4_retrace = retrace_ratio(w3, w4)
+                    if in_fib_range(w4_retrace, FIB_500, FIB_786)
+                        confidence += 0.10
+
+                    // Determine leading vs ending:
+                    // Leading diagonal = first move of a new trend (price was previously moving opposite)
+                    // Ending diagonal = exhaustion move (Wave 5 gets weaker)
+                    // Heuristic: if Wave 5 is shortest and contracting, likely ending
+                    if contracting_motive and w5 < w3 and w5 < w1
+                        is_leading := false  // Ending diagonal — reversal imminent
+                        confidence += 0.05
+                    else
+                        is_leading := true   // Leading diagonal — trend starting
+
+                    confidence := math.min(1.0, confidence)
+
+        // Bearish diagonal: H-L-H-L-H-L with Wave 4 overlapping Wave 1
+        if h5 and not h4 and h3 and not h2 and h1 and not h0
+            w1 = p5 - p4  // down
+            w2 = p3 - p4  // retrace up
+            w3 = p3 - p2  // down
+            w4 = p1 - p2  // retrace up
+            w5 = p1 - p0  // down
+
+            if w1 > 0 and w3 > 0 and w5 > 0
+                w4_overlaps_w1 = p1 > p4 and p1 < p5  // Wave 4 high above Wave 1 low but below Wave 1 start
+                w2_valid = p3 < p5
+                w3_not_shortest = w3 >= w1 or w3 >= w5
+
+                if w4_overlaps_w1 and w2_valid and w3_not_shortest
+                    diag_type := -1
+                    confidence += 0.15
+
+                    contracting_motive = w1 > w3 and w3 > w5
+                    contracting_corrective = w2 > w4
+
+                    if contracting_motive
+                        confidence += 0.15
+                    if contracting_corrective
+                        confidence += 0.10
+                    if contracting_motive and contracting_corrective
+                        confidence += 0.10
+
+                    expanding_motive = w1 < w3 and w3 < w5
+                    if expanding_motive
+                        confidence += 0.05
+
+                    w2_retrace = retrace_ratio(w1, w2)
+                    if in_fib_range(w2_retrace, FIB_500, FIB_786)
+                        confidence += 0.10
+
+                    w4_retrace = retrace_ratio(w3, w4)
+                    if in_fib_range(w4_retrace, FIB_500, FIB_786)
+                        confidence += 0.10
+
+                    if contracting_motive and w5 < w3 and w5 < w1
+                        is_leading := false
+                        confidence += 0.05
+                    else
+                        is_leading := true
+
+                    confidence := math.min(1.0, confidence)
+
+    [diag_type, confidence, is_leading]
+
+// ============================================================================
+// MULTI-DEGREE CONTEXT ANALYZER (Parameterized)
+// ============================================================================
+//
+// Simplified wave detection for higher degrees. Takes pivot arrays as params
+// so ONE function serves both degree 2 and degree 3.
+//
+// Returns: [direction, wave_position, is_impulse, is_correction, confidence]
+//   direction:    +1 = bullish, -1 = bearish, 0 = unclear
+//   wave_position: ±2 = W2 done, ±3 = in W3, ±5 = W5 complete, 0 = unknown
+//   is_impulse:   true if impulse structure detected
+//   is_correction: true if ABC/correction detected
+//   confidence:   0.0 - 1.0
+// ============================================================================
+
+analyze_degree_context(float[] deg_prices, bool[] deg_highs, int deg_count) =>
+    int dir = 0
+    int wave_pos = 0
+    bool is_imp = false
+    bool is_corr = false
+    float conf = 0.0
+
+    // ── Full 5-wave impulse (highest priority) ──
+    if deg_count >= 6
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        p3 = array.get(deg_prices, 3)
+        p4 = array.get(deg_prices, 4)
+        p5 = array.get(deg_prices, 5)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+        h3 = array.get(deg_highs, 3)
+        h4 = array.get(deg_highs, 4)
+        h5 = array.get(deg_highs, 5)
+
+        if not na(p0) and not na(p5)
+            // Bullish 5-wave: L-H-L-H-L-H
+            if not h5 and h4 and not h3 and h2 and not h1 and h0
+                w1 = p4 - p5
+                w3 = p2 - p3
+                w5 = p0 - p1
+                if w1 > 0 and w3 > 0 and w5 > 0
+                    if p3 > p5 and (w3 >= w1 or w3 >= w5)  // R1 + R2
+                        dir := 1
+                        wave_pos := 5
+                        is_imp := true
+                        conf := 0.80
+            // Bearish 5-wave: H-L-H-L-H-L
+            if not is_imp and h5 and not h4 and h3 and not h2 and h1 and not h0
+                w1 = p5 - p4
+                w3 = p3 - p2
+                w5 = p1 - p0
+                if w1 > 0 and w3 > 0 and w5 > 0
+                    if p3 < p5 and (w3 >= w1 or w3 >= w5)
+                        dir := -1
+                        wave_pos := -5
+                        is_imp := true
+                        conf := 0.80
+
+    // ── Partial impulse (W2 done / In W3) ──
+    if not is_imp and deg_count >= 4
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        p3 = array.get(deg_prices, 3)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+        h3 = array.get(deg_highs, 3)
+
+        if not na(p0) and not na(p3)
+            // Bullish partial: L-H-L-H
+            if not h3 and h2 and not h1 and h0
+                w1 = p2 - p3
+                w3 = p0 - p1
+                if w1 > 0 and w3 > 0 and p1 > p3  // R1 valid
+                    dir := 1
+                    is_imp := true
+                    if w3 >= w1
+                        wave_pos := 3    // In W3 — strongest wave
+                        conf := 0.70
+                    else
+                        wave_pos := 2    // W2 done, W3 forming
+                        conf := 0.50
+            // Bearish partial: H-L-H-L
+            if dir == 0 and h3 and not h2 and h1 and not h0
+                w1 = p3 - p2
+                w3 = p1 - p0
+                if w1 > 0 and w3 > 0 and p1 < p3
+                    dir := -1
+                    is_imp := true
+                    if w3 >= w1
+                        wave_pos := -3
+                        conf := 0.70
+                    else
+                        wave_pos := -2
+                        conf := 0.50
+
+    // ── ABC Correction ──
+    if not is_imp and deg_count >= 3
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+
+        if not na(p0) and not na(p2)
+            // Bearish ABC: H-L-H → expect C down
+            if h2 and not h1 and h0
+                wave_a = p2 - p1
+                wave_b = p0 - p1
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a
+                    dir := -1
+                    is_corr := true
+                    conf := 0.50
+            // Bullish ABC: L-H-L → expect C up
+            if not is_corr and not h2 and h1 and not h0
+                wave_a = p1 - p2
+                wave_b = p1 - p0
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a
+                    dir := 1
+                    is_corr := true
+                    conf := 0.50
+
+    [dir, wave_pos, is_imp, is_corr, conf]
+
+// ============================================================================
+// RUN ALL DETECTORS
+// ============================================================================
+[bull5_wnum, bull5_conf, bull5_valid] = detect_bullish_5wave()
+[bear5_wnum, bear5_conf, bear5_valid] = detect_bearish_5wave()
+[bull_partial_wnum, bull_partial_conf] = detect_partial_bullish()
+[bear_partial_wnum, bear_partial_conf] = detect_partial_bearish()
+[abc_type, abc_conf] = detect_abc_correction()
+[wxy_type, wxy_conf] = detect_wxy_double()
+[wxyz_type, wxyz_conf] = detect_wxyxz_triple()
+[diag_type, diag_conf, diag_is_leading] = detect_diagonal()
+
+// ── Multi-Degree Context Analysis ──
+[d2_dir, d2_wave, d2_is_imp, d2_is_corr, d2_conf] = deg_enabled ?
+    analyze_degree_context(piv_price_d2, piv_isHigh_d2, piv_count_d2) :
+    [0, 0, false, false, 0.0]
+
+[d3_dir, d3_wave, d3_is_imp, d3_is_corr, d3_conf] = deg_enabled ?
+    analyze_degree_context(piv_price_d3, piv_isHigh_d3, piv_count_d3) :
+    [0, 0, false, false, 0.0]
+
+// ============================================================================
+// PATTERN PRIORITY & SELECTION
+// ============================================================================
+// Priority: impulse > diagonal > WXYXZ > WXY > partial > ABC
+// (more complex / higher-confidence patterns take precedence)
+
+var int    active_wave   = 0
+var float  active_conf   = 0.0
+var string active_label  = "---"
+var bool   active_bull   = true
+var string pattern_type  = "none"
+// pattern_type: "impulse" / "diagonal" / "wxyxz" / "wxy" / "partial" / "correction" / "none"
+
+if bull5_valid and bull5_conf >= bear5_conf and bull5_conf >= 0.3
+    active_wave  := bull5_wnum
+    active_conf  := bull5_conf
+    active_bull  := true
+    active_label := "W5 Complete"
+    pattern_type := "impulse"
+else if bear5_valid and bear5_conf >= 0.3
+    active_wave  := bear5_wnum
+    active_conf  := bear5_conf
+    active_bull  := false
+    active_label := "W5 Complete"
+    pattern_type := "impulse"
+else if diag_conf >= 0.3 and diag_conf >= wxy_conf and diag_conf >= wxyz_conf
+    active_wave  := diag_type
+    active_conf  := diag_conf
+    active_bull  := diag_type > 0
+    active_label := diag_is_leading ? "Leading Diag" : "Ending Diag"
+    pattern_type := "diagonal"
+else if wxyz_conf >= 0.3 and wxyz_conf >= wxy_conf
+    active_wave  := wxyz_type
+    active_conf  := wxyz_conf
+    active_bull  := wxyz_type < 0  // Bullish WXYXZ = bullish outlook after complex correction
+    active_label := wxyz_type > 0 ? "WXYXZ Bear" : "WXYXZ Bull"
+    pattern_type := "wxyxz"
+else if wxy_conf >= 0.25
+    active_wave  := wxy_type
+    active_conf  := wxy_conf
+    active_bull  := wxy_type < 0
+    active_label := wxy_type > 0 ? "WXY Bear" : "WXY Bull"
+    pattern_type := "wxy"
+else if bull_partial_conf >= bear_partial_conf and bull_partial_conf >= abc_conf and bull_partial_conf >= 0.2
+    active_wave  := bull_partial_wnum
+    active_conf  := bull_partial_conf
+    active_bull  := true
+    active_label := bull_partial_wnum == 3 ? "In W3" : "W2 Done"
+    pattern_type := "partial"
+else if bear_partial_conf >= abc_conf and bear_partial_conf >= 0.2
+    active_wave  := bear_partial_wnum
+    active_conf  := bear_partial_conf
+    active_bull  := false
+    active_label := bear_partial_wnum == -3 ? "In W3" : "W2 Done"
+    pattern_type := "partial"
+else if abc_conf >= 0.2
+    active_wave  := abc_type
+    active_conf  := abc_conf
+    active_bull  := abc_type < 0
+    active_label := abc_type > 0 ? "ABC Bear" : "ABC Bull"
+    pattern_type := "correction"
+else
+    active_wave  := 0
+    active_conf  := 0.0
+    active_label := "---"
+    pattern_type := "none"
+
+// ============================================================================
+// CROSS-DEGREE CONFLUENCE SCORING
+// ============================================================================
+//
+// Compares degree 1 (detail) with degrees 2 (medium) and 3 (major) to detect:
+//   - W3-in-W3: degree 1 in W3, degree 2 also in W3 → explosive move
+//   - False exhaustion: degree 1 calls W5 exhaustion but degree 2 is mid-W3
+//   - Direction alignment: all degrees agree on bull/bear
+//   - Degree mismatch: degree 1 signal fights higher-degree trend
+//
+// Output: deg_confluence (-1.0 to +1.0), applied as ±10% modifier to composite
+// ============================================================================
+
+deg_confluence   = 0.0   // -1.0 = strong contradiction, +1.0 = strong confirmation
+deg_context_label = "---"
+
+if deg_enabled and pattern_type != "none"
+    d1_dir_sign = active_bull ? 1 : -1
+
+    // ── W3-in-W3 detection (highest value) ──
+    d1_in_w3 = pattern_type == "partial" and (active_wave == 3 or active_wave == -3)
+    d2_in_w3 = d2_wave == 3 or d2_wave == -3
+    d3_in_w3 = d3_wave == 3 or d3_wave == -3
+
+    if d1_in_w3 and d2_in_w3
+        deg_confluence := 1.0
+        deg_context_label := "W3-in-W3"
+    else if d1_in_w3 and d2_is_imp and d2_dir == d1_dir_sign
+        deg_confluence := 0.75
+        deg_context_label := "W3 in IMP"
+
+    // ── False exhaustion filter ──
+    // D1 says W5 exhaustion but D2 is in the strongest wave (W3)
+    d1_exhaustion = pattern_type == "impulse" and (active_label == "W5 Complete")
+    if d1_exhaustion
+        if d2_in_w3 and d2_dir == d1_dir_sign
+            // Sub-wave exhaustion inside parent W3 → reduce confidence sharply
+            deg_confluence := -0.5
+            deg_context_label := "SUB-W5 in D2:W3"
+        else if d2_is_imp and d2_dir == d1_dir_sign and d2_wave != 5 and d2_wave != -5
+            // Parent impulse not yet exhausted → reduce confidence
+            deg_confluence := -0.3
+            deg_context_label := "SUB-W5 in D2:IMP"
+        else if d2_wave == 5 or d2_wave == -5
+            // Both degrees say exhaustion → strong confirmation
+            deg_confluence := 0.8
+            deg_context_label := "W5-in-W5"
+
+    // ── Direction alignment (if no special case already set) ──
+    if deg_confluence == 0.0
+        d2_agrees = d2_dir == d1_dir_sign
+        d3_agrees = d3_dir == d1_dir_sign
+        d2_opposes = d2_dir != 0 and d2_dir != d1_dir_sign
+        d3_opposes = d3_dir != 0 and d3_dir != d1_dir_sign
+
+        if d2_agrees and d3_agrees
+            deg_confluence := 0.5
+            deg_context_label := "ALL ALIGNED"
+        else if d2_agrees and d3_dir == 0
+            deg_confluence := 0.25
+            deg_context_label := "D2 ALIGNED"
+        else if d2_opposes and d3_opposes
+            deg_confluence := -0.5
+            deg_context_label := "FIGHTING TREND"
+        else if d2_opposes or d3_opposes
+            deg_confluence := -0.25
+            deg_context_label := "MIXED DEGREES"
+        else if d2_dir == 0 and d3_dir == 0
+            deg_context_label := "NO CONTEXT"
+
+// ============================================================================
+// FIBONACCI TIME ZONE ANCHOR & PROXIMITY
+// ============================================================================
+// Anchor bar = the starting pivot of the current wave structure.
+// Proximity = how close the current bar is to any Fibonacci time zone.
+// ============================================================================
+
+var int fib_tz_anchor = na
+if pattern_type == "impulse" or pattern_type == "diagonal" or pattern_type == "wxyxz"
+    fib_tz_anchor := piv_count >= 6 ? get_bar(5) : int(na)
+else if pattern_type == "partial" or pattern_type == "wxy"
+    fib_tz_anchor := piv_count >= 4 ? get_bar(3) : int(na)
+else if pattern_type == "correction"
+    fib_tz_anchor := piv_count >= 3 ? get_bar(2) : int(na)
+else
+    fib_tz_anchor := int(na)
+
+// Compute proximity to nearest Fibonacci time zone
+fib_tz_bars_to_next = 0
+fib_tz_nearest_dist = 999999
+fib_tz_nearest_num  = 0
+fib_tz_at_zone      = false
+
+if show_fib_tz and not na(fib_tz_anchor) and pattern_type != "none"
+    bars_from_anchor = bar_index - fib_tz_anchor
+    for i = 0 to array.size(FIB_TZ) - 1
+        tz = array.get(FIB_TZ, i)
+        dist = math.abs(bars_from_anchor - tz)
+        if dist < fib_tz_nearest_dist
+            fib_tz_nearest_dist := dist
+            fib_tz_nearest_num  := tz
+        if tz > bars_from_anchor and fib_tz_bars_to_next == 0
+            fib_tz_bars_to_next := tz - bars_from_anchor
+    fib_tz_at_zone := fib_tz_nearest_dist <= 1
+
+// ============================================================================
+// RSI DIVERGENCE DETECTION
+// ============================================================================
+//
+// Detects divergences between price and RSI at wave pivot points.
+// Divergence types and their Elliott Wave significance:
+//
+//   Regular Bearish: Price higher high, RSI lower high
+//     → Wave 5 exhaustion, ending diagonal completion
+//
+//   Regular Bullish: Price lower low, RSI higher low
+//     → Wave C/Y/Z completion, correction ending
+//
+//   Hidden Bullish: Price higher low, RSI lower low
+//     → Wave 2/4 correction ending, trend continuation
+//
+//   Hidden Bearish: Price lower high, RSI higher high
+//     → Bearish Wave 2/4 correction ending, downtrend continuation
+//
+// Each pattern type maps to specific divergence checks between
+// relevant pivot pairs (e.g., Wave 3 vs Wave 5 for impulses).
+// ============================================================================
+
+// Divergence detection between two pivot indices
+// Returns: 1 = regular bearish, 2 = hidden bearish,
+//         -1 = regular bullish, -2 = hidden bullish, 0 = none
+detect_divergence_at_highs(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    r_new = get_rsi(newer_idx)
+    r_old = get_rsi(older_idx)
+    if not na(p_new) and not na(p_old) and not na(r_new) and not na(r_old)
+        // Regular bearish: price higher high, RSI lower high
+        if p_new > p_old and r_new < r_old
+            result := 1
+        // Hidden bearish: price lower high, RSI higher high
+        else if p_new < p_old and r_new > r_old
+            result := 2
+    result
+
+detect_divergence_at_lows(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    r_new = get_rsi(newer_idx)
+    r_old = get_rsi(older_idx)
+    if not na(p_new) and not na(p_old) and not na(r_new) and not na(r_old)
+        // Regular bullish: price lower low, RSI higher low
+        if p_new < p_old and r_new > r_old
+            result := -1
+        // Hidden bullish: price higher low, RSI lower low
+        else if p_new > p_old and r_new < r_old
+            result := -2
+    result
+
+// ── Per-pattern RSI divergence analysis ──
+// Compute divergence score for the active pattern and direction.
+// Score: 1.0 = strong confirming divergence
+//        0.75 = confirming RSI extreme (overbought/oversold)
+//        0.5 = neutral
+//        0.25 = RSI contradicts
+//        0.0 = strong contradicting divergence
+
+rsi_div_type = 0       // Divergence type detected (for dashboard)
+rsi_div_score = 0.5    // Probability component (default neutral)
+rsi_at_signal = rsi_value  // Current RSI for display
+
+if pattern_type == "impulse" and piv_count >= 6
+    // Bullish impulse complete → expect exhaustion/reversal DOWN
+    // Check Wave 5 (pivot[0] = high) vs Wave 3 (pivot[2] = high) for bearish divergence
+    if active_bull
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Regular bearish divergence at W5 → confirms exhaustion
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if get_rsi(0) > rsi_ob  // RSI overbought at W5 peak
+            rsi_div_score := 0.75
+        else if get_rsi(0) < rsi_os  // RSI oversold contradicts (shouldn't be at a top)
+            rsi_div_score := 0.25
+    // Bearish impulse complete → expect reversal UP
+    else
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Regular bullish divergence at W5 → confirms exhaustion
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if get_rsi(0) < rsi_os  // RSI oversold at W5 bottom
+            rsi_div_score := 0.75
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.25
+
+else if pattern_type == "partial" and piv_count >= 4
+    // Wave 2 done → expect Wave 3 in trend direction
+    if active_bull and (active_wave == 2)
+        // Hidden bullish divergence at W2 low (pivot[1]) vs W0 low (pivot[3])
+        div = detect_divergence_at_lows(1, 3)
+        if div == -2  // Hidden bullish → confirms trend continuation
+            rsi_div_type := -2
+            rsi_div_score := 1.0
+        else if get_rsi(1) < rsi_os  // RSI oversold at W2 → good entry zone
+            rsi_div_score := 0.80
+        else if get_rsi(1) > rsi_ob  // RSI overbought at a low? Contradicts
+            rsi_div_score := 0.20
+        else
+            rsi_div_score := 0.5
+    else if not active_bull and (active_wave == -2)
+        // Hidden bearish divergence at W2 high (pivot[1]) vs W0 high (pivot[3])
+        div = detect_divergence_at_highs(1, 3)
+        if div == 2   // Hidden bearish → confirms downtrend continuation
+            rsi_div_type := 2
+            rsi_div_score := 1.0
+        else if get_rsi(1) > rsi_ob
+            rsi_div_score := 0.80
+        else if get_rsi(1) < rsi_os
+            rsi_div_score := 0.20
+        else
+            rsi_div_score := 0.5
+    // In Wave 3 → RSI should be at its strongest
+    else if active_wave == 3 or active_wave == -3
+        rsi_current = get_rsi(0)
+        rsi_w1_end  = get_rsi(2)
+        if not na(rsi_current) and not na(rsi_w1_end)
+            // Wave 3 RSI should exceed Wave 1 RSI (strongest wave)
+            if active_bull and rsi_current > rsi_w1_end
+                rsi_div_score := 0.85
+            else if not active_bull and rsi_current < rsi_w1_end
+                rsi_div_score := 0.85
+            else
+                rsi_div_score := 0.40  // W3 weaker than W1 → suspicious
+
+else if pattern_type == "correction" and piv_count >= 3
+    // ABC correction: check A-end vs B-end for weakening momentum
+    if abc_type > 0  // Bearish ABC (H-L-H): B high (pivot[0]) vs A start high (pivot[2])
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Bearish divergence → B wave bounce is weakening → confirms C down
+            rsi_div_type := 1
+            rsi_div_score := 0.90
+        else if get_rsi(0) > rsi_ob  // RSI still overbought at B → may push higher
+            rsi_div_score := 0.30
+        else
+            rsi_div_score := 0.5
+    else if abc_type < 0  // Bullish ABC (L-H-L): B low (pivot[0]) vs A start low (pivot[2])
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Bullish divergence → B wave decline weakening → confirms C up
+            rsi_div_type := -1
+            rsi_div_score := 0.90
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.30
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "wxy" and piv_count >= 4
+    // WXY: check Y-end vs W-end for divergence (correction exhaustion)
+    if wxy_type > 0  // Bearish WXY: Y low (pivot[0]) vs W low (pivot[2])
+        div = detect_divergence_at_lows(0, 2)
+        if div == -1  // Bullish divergence at Y vs W → correction exhausting → buy
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.75
+        else
+            rsi_div_score := 0.5
+    else if wxy_type < 0  // Bullish WXY: Y high (pivot[0]) vs W high (pivot[2])
+        div = detect_divergence_at_highs(0, 2)
+        if div == 1   // Bearish divergence at Y vs W → correction exhausting → sell
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.75
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "wxyxz" and piv_count >= 6
+    // WXYXZ: check Z-end vs W-end and Z vs Y for divergence
+    if wxyz_type > 0  // Bearish WXYXZ: Z low (pivot[0]) vs W low (pivot[4])
+        div_zw = detect_divergence_at_lows(0, 4)
+        div_zy = detect_divergence_at_lows(0, 2)
+        if div_zw == -1 and div_zy == -1  // Double bullish divergence Z<W and Z<Y
+            rsi_div_type := -1
+            rsi_div_score := 1.0
+        else if div_zw == -1 or div_zy == -1  // Single divergence
+            rsi_div_type := -1
+            rsi_div_score := 0.85
+        else if get_rsi(0) < rsi_os
+            rsi_div_score := 0.70
+        else
+            rsi_div_score := 0.5
+    else if wxyz_type < 0  // Bullish WXYXZ: Z high (pivot[0]) vs W high (pivot[4])
+        div_zw = detect_divergence_at_highs(0, 4)
+        div_zy = detect_divergence_at_highs(0, 2)
+        if div_zw == 1 and div_zy == 1
+            rsi_div_type := 1
+            rsi_div_score := 1.0
+        else if div_zw == 1 or div_zy == 1
+            rsi_div_type := 1
+            rsi_div_score := 0.85
+        else if get_rsi(0) > rsi_ob
+            rsi_div_score := 0.70
+        else
+            rsi_div_score := 0.5
+
+else if pattern_type == "diagonal" and piv_count >= 6
+    // Ending diagonal → expect sharp reversal (divergence confirms)
+    if not diag_is_leading
+        if diag_type > 0  // Bullish ending diagonal → sell signal
+            // Wave 5 high (pivot[0]) vs Wave 3 high (pivot[2])
+            div = detect_divergence_at_highs(0, 2)
+            if div == 1  // Bearish divergence confirms reversal
+                rsi_div_type := 1
+                rsi_div_score := 1.0
+            else if get_rsi(0) > rsi_ob
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.5
+        else  // Bearish ending diagonal → buy signal
+            div = detect_divergence_at_lows(0, 2)
+            if div == -1
+                rsi_div_type := -1
+                rsi_div_score := 1.0
+            else if get_rsi(0) < rsi_os
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.5
+    // Leading diagonal → new trend starting, check W3 strength
+    else
+        rsi_w3 = get_rsi(0)  // Most recent pivot
+        rsi_w1 = get_rsi(4)  // Wave 1 end
+        if not na(rsi_w3) and not na(rsi_w1)
+            if diag_type > 0 and rsi_w3 > rsi_w1  // Bullish: W3 RSI > W1 RSI
+                rsi_div_score := 0.80
+            else if diag_type < 0 and rsi_w3 < rsi_w1
+                rsi_div_score := 0.80
+            else
+                rsi_div_score := 0.40
+
+// RSI divergence label text for dashboard
+rsi_div_label = rsi_div_type == 1 ? "BEAR DIV" :
+    rsi_div_type == 2 ? "HID BEAR" :
+    rsi_div_type == -1 ? "BULL DIV" :
+    rsi_div_type == -2 ? "HID BULL" : "NONE"
+
+// ============================================================================
+// VOLUME CONFIRMATION ANALYSIS
+// ============================================================================
+//
+// Three volume sub-components combined into a single volume score:
+//
+//   1. OBV Divergence (40% of volume score)
+//      Same approach as RSI: compare OBV at wave pivots for divergence.
+//      OBV rising while price falls = accumulation (bullish).
+//      OBV falling while price rises = distribution (bearish).
+//
+//   2. Wave Volume Pattern (30% of volume score)
+//      In a valid impulse, Wave 3 should have the highest volume.
+//      Wave 5 with declining volume vs Wave 3 = exhaustion.
+//      Corrections should show declining volume.
+//
+//   3. VWAP Position (30% of volume score)
+//      Price above VWAP = bullish premium (buyers in control).
+//      Price below VWAP = bearish discount (sellers in control).
+//      For buy signals, being above VWAP confirms strength.
+// ============================================================================
+
+// --- OBV divergence detection (same pattern as RSI) ---
+detect_obv_div_at_highs(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    o_new = get_obv(newer_idx)
+    o_old = get_obv(older_idx)
+    if not na(p_new) and not na(p_old) and not na(o_new) and not na(o_old)
+        if p_new > p_old and o_new < o_old  // Price higher high, OBV lower high → distribution
+            result := 1
+        else if p_new < p_old and o_new > o_old  // Price lower high, OBV higher high
+            result := 2
+    result
+
+detect_obv_div_at_lows(int newer_idx, int older_idx) =>
+    int result = 0
+    p_new = get_price(newer_idx)
+    p_old = get_price(older_idx)
+    o_new = get_obv(newer_idx)
+    o_old = get_obv(older_idx)
+    if not na(p_new) and not na(p_old) and not na(o_new) and not na(o_old)
+        if p_new < p_old and o_new > o_old  // Price lower low, OBV higher low → accumulation
+            result := -1
+        else if p_new > p_old and o_new < o_old  // Price higher low, OBV lower low
+            result := -2
+    result
+
+// --- Per-pattern volume analysis ---
+vol_obv_div_type  = 0      // OBV divergence type (mirrors RSI div type codes)
+vol_obv_div_score = 0.5    // OBV divergence sub-score (0-1)
+vol_wave_score    = 0.5    // Wave volume pattern sub-score (0-1)
+vol_vwap_score    = 0.5    // VWAP position sub-score (0-1)
+vol_combined      = 0.5    // Final combined volume score
+
+if vol_enabled
+
+    // ── OBV Divergence Per Pattern ──
+    if pattern_type == "impulse" and piv_count >= 6
+        if active_bull
+            obv_div = detect_obv_div_at_highs(0, 2)  // W5 vs W3
+            if obv_div == 1   // Distribution at W5 → confirms exhaustion
+                vol_obv_div_type := 1
+                vol_obv_div_score := 1.0
+            else if get_obv(0) > get_obv(2)  // OBV still rising → strong trend
+                vol_obv_div_score := 0.20  // Contradicts exhaustion
+            else
+                vol_obv_div_score := 0.5
+        else
+            obv_div = detect_obv_div_at_lows(0, 2)
+            if obv_div == -1  // Accumulation at W5 → confirms exhaustion
+                vol_obv_div_type := -1
+                vol_obv_div_score := 1.0
+            else if get_obv(0) < get_obv(2)
+                vol_obv_div_score := 0.20
+            else
+                vol_obv_div_score := 0.5
+
+    else if pattern_type == "correction" and piv_count >= 3
+        if abc_type > 0  // Bearish ABC
+            obv_div = detect_obv_div_at_highs(0, 2)
+            if obv_div == 1
+                vol_obv_div_type := 1
+                vol_obv_div_score := 0.90
+            else
+                vol_obv_div_score := 0.5
+        else if abc_type < 0
+            obv_div = detect_obv_div_at_lows(0, 2)
+            if obv_div == -1
+                vol_obv_div_type := -1
+                vol_obv_div_score := 0.90
+            else
+                vol_obv_div_score := 0.5
+
+    else if pattern_type == "wxy" and piv_count >= 4
+        if wxy_type > 0
+            obv_div = detect_obv_div_at_lows(0, 2)
+            if obv_div == -1
+                vol_obv_div_type := -1
+                vol_obv_div_score := 1.0
+            else
+                vol_obv_div_score := 0.5
+        else if wxy_type < 0
+            obv_div = detect_obv_div_at_highs(0, 2)
+            if obv_div == 1
+                vol_obv_div_type := 1
+                vol_obv_div_score := 1.0
+            else
+                vol_obv_div_score := 0.5
+
+    else if pattern_type == "wxyxz" and piv_count >= 6
+        if wxyz_type > 0
+            dz_w = detect_obv_div_at_lows(0, 4)
+            dz_y = detect_obv_div_at_lows(0, 2)
+            if dz_w == -1 and dz_y == -1
+                vol_obv_div_type := -1
+                vol_obv_div_score := 1.0
+            else if dz_w == -1 or dz_y == -1
+                vol_obv_div_type := -1
+                vol_obv_div_score := 0.85
+            else
+                vol_obv_div_score := 0.5
+        else if wxyz_type < 0
+            dz_w = detect_obv_div_at_highs(0, 4)
+            dz_y = detect_obv_div_at_highs(0, 2)
+            if dz_w == 1 and dz_y == 1
+                vol_obv_div_type := 1
+                vol_obv_div_score := 1.0
+            else if dz_w == 1 or dz_y == 1
+                vol_obv_div_type := 1
+                vol_obv_div_score := 0.85
+            else
+                vol_obv_div_score := 0.5
+
+    else if pattern_type == "diagonal" and piv_count >= 6
+        if not diag_is_leading
+            if diag_type > 0
+                obv_div = detect_obv_div_at_highs(0, 2)
+                if obv_div == 1
+                    vol_obv_div_type := 1
+                    vol_obv_div_score := 1.0
+                else
+                    vol_obv_div_score := 0.5
+            else if diag_type < 0
+                obv_div = detect_obv_div_at_lows(0, 2)
+                if obv_div == -1
+                    vol_obv_div_type := -1
+                    vol_obv_div_score := 1.0
+                else
+                    vol_obv_div_score := 0.5
+
+    // ── Wave Volume Pattern ──
+    // For impulse: Wave 3 should have highest volume; Wave 5 declining = exhaustion
+    if pattern_type == "impulse" and piv_count >= 6
+        v_w1 = wave_vol(4, 5)  // Pivots: W1 end (idx 4) to W0 start (idx 5)
+        v_w3 = wave_vol(2, 3)  // Pivots: W3 end (idx 2) to W2 end (idx 3)
+        v_w5 = wave_vol(0, 1)  // Pivots: W5 end (idx 0) to W4 end (idx 1)
+        if not na(v_w1) and not na(v_w3) and not na(v_w5)
+            // W3 should have highest volume (ideal impulse)
+            if v_w3 > v_w1 and v_w3 > v_w5
+                vol_wave_score := 0.85   // Classic: W3 strongest volume
+                if v_w5 < v_w1           // W5 declining vs W1 too → strong exhaustion signal
+                    vol_wave_score := 1.0
+            else if v_w5 > v_w3          // W5 has MORE volume than W3 → extended 5th, NOT exhaustion
+                vol_wave_score := 0.15   // Contradicts exhaustion — trend still strong
+            else
+                vol_wave_score := 0.5
+
+    else if pattern_type == "correction" and piv_count >= 3
+        // Corrections should show declining volume
+        v_a = wave_vol(1, 2)   // A wave volume
+        v_b = wave_vol(0, 1)   // B wave volume (should be lower)
+        if not na(v_a) and not na(v_b)
+            if v_b < v_a
+                vol_wave_score := 0.80   // B volume < A → healthy correction
+            else
+                vol_wave_score := 0.35   // B volume > A → correction may have more legs
+
+    else if pattern_type == "diagonal" and piv_count >= 6
+        // Diagonals: contracting volume confirms pattern
+        v_w1 = wave_vol(4, 5)
+        v_w3 = wave_vol(2, 3)
+        v_w5 = wave_vol(0, 1)
+        if not na(v_w1) and not na(v_w3) and not na(v_w5)
+            if v_w1 > v_w3 and v_w3 > v_w5  // Contracting volume → confirms diagonal
+                vol_wave_score := 0.90
+            else
+                vol_wave_score := 0.45
+
+    // ── VWAP Position ──
+    if not na(vwap_value) and vol_vwap
+        vwap_pct = (close - vwap_value) / vwap_value * 100  // % above/below VWAP
+        if active_bull
+            // For bullish signals, being above VWAP = strong
+            if vwap_pct > 1.0           // >1% premium
+                vol_vwap_score := 1.0
+            else if vwap_pct > 0.0      // Above VWAP
+                vol_vwap_score := 0.75
+            else if vwap_pct > -1.0     // Slightly below VWAP
+                vol_vwap_score := 0.35
+            else                         // Deep below VWAP
+                vol_vwap_score := 0.15
+        else
+            // For bearish signals, being below VWAP = strong
+            if vwap_pct < -1.0
+                vol_vwap_score := 1.0
+            else if vwap_pct < 0.0
+                vol_vwap_score := 0.75
+            else if vwap_pct < 1.0
+                vol_vwap_score := 0.35
+            else
+                vol_vwap_score := 0.15
+
+    // ── Combined Volume Score ──
+    // 40% OBV divergence + 30% wave volume + 30% VWAP
+    vol_combined := vol_obv_div_score * 0.40 + vol_wave_score * 0.30 + vol_vwap_score * 0.30
+
+// Volume divergence label text for dashboard
+vol_div_label = vol_obv_div_type == 1 ? "OBV BEAR" :
+    vol_obv_div_type == 2 ? "OBV HID BEAR" :
+    vol_obv_div_type == -1 ? "OBV BULL" :
+    vol_obv_div_type == -2 ? "OBV HID BULL" : "NONE"
+
+// ============================================================================
+// ELLIOTT WAVE OSCILLATOR (5-34 SMA difference)
+// ============================================================================
+ewo_fast = ta.sma(close, 5)
+ewo_slow = ta.sma(close, 34)
+ewo_value = ewo_fast - ewo_slow
+
+// ============================================================================
+// MULTI-TIMEFRAME WAVE ANALYSIS (3 Timeframes)
+// ============================================================================
+//
+// Analyzes wave structure on 3 timeframes simultaneously:
+//   TF1 = Current chart timeframe (detailed pattern detection above)
+//   TF2 = Higher timeframe (e.g., 1H) — medium-term context
+//   TF3 = Highest timeframe (e.g., 4H/Daily) — macro trend
+//
+// For each higher TF, we compute:
+//   - Elliott Wave Oscillator (EWO = SMA5 - SMA34)
+//   - EWO momentum (rising vs falling)
+//   - Trend position (price vs SMA 50 and SMA 200)
+//   - Wave phase classification:
+//       +2 = Strong bullish (EWO+, rising, above both SMAs)
+//       +1 = Bullish (EWO+ or above SMA50)
+//        0 = Neutral / mixed
+//       -1 = Bearish (EWO- or below SMA50)
+//       -2 = Strong bearish (EWO-, falling, below both SMAs)
+//
+// Confluence Score: sum of phase signs across 3 TFs
+//   +3 = All bullish (strongest)
+//   +2 = 2 bullish, 1 neutral/bearish
+//    0 = Mixed
+//   -2 = 2 bearish
+//   -3 = All bearish (strongest)
+// ============================================================================
+
+// MTF wave phase function — can be called via request.security()
+// Returns: [ewo, ewo_rising, above_sma50, above_sma200, phase]
+mtf_wave_analysis() =>
+    mtf_ewo_f = ta.sma(close, 5)
+    mtf_ewo_s = ta.sma(close, 34)
+    mtf_ewo   = mtf_ewo_f - mtf_ewo_s
+    mtf_ewo_rising = mtf_ewo > mtf_ewo[1]
+
+    mtf_sma50  = ta.sma(close, 50)
+    mtf_sma200 = ta.sma(close, 200)
+    mtf_a50  = close > mtf_sma50
+    mtf_a200 = close > mtf_sma200
+
+    mtf_phase = 0
+    if mtf_ewo > 0 and mtf_ewo_rising and mtf_a50 and mtf_a200
+        mtf_phase := 2   // Strong bull
+    else if (mtf_ewo > 0 and mtf_a50) or (mtf_a50 and mtf_a200)
+        mtf_phase := 1   // Bull
+    else if mtf_ewo < 0 and not mtf_ewo_rising and not mtf_a50 and not mtf_a200
+        mtf_phase := -2  // Strong bear
+    else if (mtf_ewo < 0 and not mtf_a50) or (not mtf_a50 and not mtf_a200)
+        mtf_phase := -1  // Bear
+    // else 0 = neutral
+
+    [mtf_ewo, mtf_ewo_rising, mtf_a50, mtf_a200, mtf_phase]
+
+// --- TF1: Current chart (reuse EWO from above, only compute SMA50/200) ---
+tf1_ewo = ewo_value
+tf1_rising = ewo_value > ewo_value[1]
+tf1_sma50  = ta.sma(close, 50)
+tf1_sma200 = ta.sma(close, 200)
+tf1_above50  = close > tf1_sma50
+tf1_above200 = close > tf1_sma200
+tf1_phase = 0
+if tf1_ewo > 0 and tf1_rising and tf1_above50 and tf1_above200
+    tf1_phase := 2
+else if (tf1_ewo > 0 and tf1_above50) or (tf1_above50 and tf1_above200)
+    tf1_phase := 1
+else if tf1_ewo < 0 and not tf1_rising and not tf1_above50 and not tf1_above200
+    tf1_phase := -2
+else if (tf1_ewo < 0 and not tf1_above50) or (not tf1_above50 and not tf1_above200)
+    tf1_phase := -1
+
+// --- TF2: Higher timeframe ---
+[tf2_ewo, tf2_rising, tf2_above50, tf2_above200, tf2_phase] = request.security(
+    syminfo.tickerid, mtf_tf2, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- TF3: Highest timeframe ---
+[tf3_ewo, tf3_rising, tf3_above50, tf3_above200, tf3_phase] = request.security(
+    syminfo.tickerid, mtf_tf3, mtf_wave_analysis(), lookahead=barmerge.lookahead_off)
+
+// --- Confluence Scoring ---
+tf1_sign = tf1_phase > 0 ? 1 : tf1_phase < 0 ? -1 : 0
+tf2_sign = tf2_phase > 0 ? 1 : tf2_phase < 0 ? -1 : 0
+tf3_sign = tf3_phase > 0 ? 1 : tf3_phase < 0 ? -1 : 0
+
+mtf_score = tf1_sign + tf2_sign + tf3_sign  // Range: -3 to +3
+
+// Confluence flags
+mtf_bull_confluence   = mtf_score >= 2    // At least 2 TFs bullish
+mtf_bear_confluence   = mtf_score <= -2   // At least 2 TFs bearish
+mtf_strong_bull       = mtf_score == 3    // All 3 TFs bullish
+mtf_strong_bear       = mtf_score == -3   // All 3 TFs bearish
+mtf_conflicting       = mtf_score == 0    // Fully mixed
+
+// MTF allows signal (bypass if MTF disabled or filter disabled)
+mtf_allows_buy  = not mtf_enabled or not mtf_filter or mtf_bull_confluence
+mtf_allows_sell = not mtf_enabled or not mtf_filter or mtf_bear_confluence
+
+// Confidence boost from MTF alignment
+mtf_conf_boost = 0.0
+if mtf_enabled and mtf_boost
+    if mtf_strong_bull or mtf_strong_bear
+        mtf_conf_boost := 0.15  // All 3 TFs agree
+    else if mtf_bull_confluence or mtf_bear_confluence
+        mtf_conf_boost := 0.05  // 2 of 3 agree
+
+// ============================================================================
+// FIBONACCI LEVEL DRAWING
+// ============================================================================
+
+var line[] fib_lines = array.new_line(0)
+var label[] fib_labels = array.new_label(0)
+
+if barstate.isconfirmed
+    if array.size(fib_lines) > 0
+        for i = array.size(fib_lines) - 1 to 0
+            line.delete(array.get(fib_lines, i))
+        array.clear(fib_lines)
+    if array.size(fib_labels) > 0
+        for i = array.size(fib_labels) - 1 to 0
+            label.delete(array.get(fib_labels, i))
+        array.clear(fib_labels)
+
+draw_fib_level(float price_level, int start_bar, string txt, color clr) =>
+    if show_fib_levels and not na(price_level) and not na(start_bar)
+        ln = line.new(start_bar, price_level, bar_index + 10, price_level,
+            color=clr, style=line.style_dotted, width=1)
+        array.push(fib_lines, ln)
+        lbl = label.new(bar_index + 12, price_level, txt,
+            style=label.style_label_left, color=color.new(clr, 60),
+            textcolor=color.white, size=size.tiny)
+        array.push(fib_labels, lbl)
+
+if barstate.isconfirmed and show_fib_levels and pattern_type != "none"
+    if (pattern_type == "impulse" or pattern_type == "partial" or pattern_type == "diagonal") and piv_count >= 4
+        wave_start = na(get_price(5)) ? get_price(3) : get_price(5)
+        wave_end   = na(get_price(0)) ? close : get_price(0)
+        start_b    = na(get_bar(5)) ? get_bar(3) : get_bar(5)
+
+        if not na(wave_start) and not na(wave_end) and not na(start_b)
+            move = wave_end - wave_start
+            draw_fib_level(wave_end - move * FIB_236, start_b, "23.6%", color_fib)
+            draw_fib_level(wave_end - move * FIB_382, start_b, "38.2%", color_fib)
+            draw_fib_level(wave_end - move * FIB_500, start_b, "50.0%", color_fib)
+            draw_fib_level(wave_end - move * FIB_618, start_b, "61.8%", color_fib)
+            draw_fib_level(wave_end - move * FIB_786, start_b, "78.6%", color_fib)
+
+    if (pattern_type == "correction" or pattern_type == "wxy") and piv_count >= 3
+        p_a_start = get_price(2)
+        p_a_end   = get_price(1)
+        p_b_end   = get_price(0)
+        start_b   = get_bar(2)
+
+        if not na(p_a_start) and not na(p_a_end) and not na(p_b_end) and not na(start_b)
+            wave_a_size = math.abs(p_a_end - p_a_start)
+            fib_clr = pattern_type == "wxy" ? color_complex : color_corrective
+            is_bear = (pattern_type == "correction" and abc_type > 0) or
+                (pattern_type == "wxy" and wxy_type > 0)
+            if is_bear
+                draw_fib_level(p_b_end - wave_a_size * FIB_618, start_b, "C/Y 61.8%", fib_clr)
+                draw_fib_level(p_b_end - wave_a_size * FIB_1000, start_b, "C/Y 100%", fib_clr)
+                draw_fib_level(p_b_end - wave_a_size * FIB_1618, start_b, "C/Y 161.8%", fib_clr)
+            else
+                draw_fib_level(p_b_end + wave_a_size * FIB_618, start_b, "C/Y 61.8%", fib_clr)
+                draw_fib_level(p_b_end + wave_a_size * FIB_1000, start_b, "C/Y 100%", fib_clr)
+                draw_fib_level(p_b_end + wave_a_size * FIB_1618, start_b, "C/Y 161.8%", fib_clr)
+
+    if pattern_type == "wxyxz" and piv_count >= 5
+        // Draw Z target based on Y wave size
+        y_start = get_price(3)
+        y_end   = get_price(2)
+        x2_end  = get_price(1)
+        start_b = get_bar(3)
+
+        if not na(y_start) and not na(y_end) and not na(x2_end) and not na(start_b)
+            y_size = math.abs(y_end - y_start)
+            if wxyz_type > 0  // Bearish
+                draw_fib_level(x2_end - y_size * FIB_618, start_b, "Z 61.8%", color_complex)
+                draw_fib_level(x2_end - y_size * FIB_1000, start_b, "Z 100%", color_complex)
+            else
+                draw_fib_level(x2_end + y_size * FIB_618, start_b, "Z 61.8%", color_complex)
+                draw_fib_level(x2_end + y_size * FIB_1000, start_b, "Z 100%", color_complex)
+
+// ============================================================================
+// FIBONACCI TIME ZONES (Vertical Lines)
+// ============================================================================
+//
+// Draws vertical lines at Fibonacci number intervals from the pattern's
+// anchor bar (starting pivot). Fibonacci sequence: 1,2,3,5,8,13,21,34,55,89,144,233
+//
+// Past zones are dimmer; future zones are brighter; current zone highlighted.
+// ============================================================================
+
+var line[]  tz_lines  = array.new_line(0)
+var label[] tz_labels = array.new_label(0)
+
+if barstate.isconfirmed
+    if array.size(tz_lines) > 0
+        for i = array.size(tz_lines) - 1 to 0
+            line.delete(array.get(tz_lines, i))
+        array.clear(tz_lines)
+    if array.size(tz_labels) > 0
+        for i = array.size(tz_labels) - 1 to 0
+            label.delete(array.get(tz_labels, i))
+        array.clear(tz_labels)
+
+if barstate.isconfirmed and show_fib_tz and not na(fib_tz_anchor) and pattern_type != "none"
+    tz_label_price = ta.highest(high, 50)
+    for i = 0 to array.size(FIB_TZ) - 1
+        tz_num = array.get(FIB_TZ, i)
+        tz_bar = fib_tz_anchor + tz_num
+        // Only draw zones within visible range
+        if tz_bar >= bar_index - 300 and tz_bar <= bar_index + 100
+            is_future = tz_bar > bar_index
+            is_near   = math.abs(tz_bar - bar_index) <= 1
+            tz_clr = is_near ? color.new(color.aqua, 20) :
+                is_future ? color.new(color.aqua, 50) :
+                color.new(color.aqua, 75)
+            tz_w = is_near ? 2 : 1
+            ln = line.new(tz_bar, close * 0.995, tz_bar, close * 1.005,
+                color=tz_clr, style=line.style_dotted, width=tz_w,
+                extend=extend.both)
+            array.push(tz_lines, ln)
+            lbl = label.new(tz_bar, tz_label_price, str.tostring(tz_num),
+                style=label.style_label_down, color=color.new(color.aqua, 85),
+                textcolor=color.white, size=size.tiny)
+            array.push(tz_labels, lbl)
+
+// ============================================================================
+// WAVE TARGET PROJECTION
+// ============================================================================
+
+var line   target_line  = na
+var label  target_label = na
+
+if barstate.isconfirmed and show_targets and piv_count >= 4
+    line.delete(target_line)
+    label.delete(target_label)
+
+    if pattern_type == "partial"
+        if active_wave == 2 or active_wave == -2
+            w1_start = get_price(3)
+            w1_end   = get_price(2)
+            w2_end   = get_price(1)
+
+            if not na(w1_start) and not na(w1_end) and not na(w2_end)
+                w1_size = math.abs(w1_end - w1_start)
+                target_3 = active_bull ? w2_end + w1_size * FIB_1618 : w2_end - w1_size * FIB_1618
+                b_start  = get_bar(1)
+
+                if not na(b_start)
+                    target_line  := line.new(b_start, target_3, bar_index + 20, target_3,
+                        color=active_bull ? color_impulse_up : color_impulse_down,
+                        style=line.style_dashed, width=2)
+                    target_label := label.new(bar_index + 22, target_3,
+                        "W3 Target\n" + str.tostring(target_3, format.mintick),
+                        style=label.style_label_left,
+                        color=active_bull ? color_impulse_up : color_impulse_down,
+                        textcolor=color.white, size=size.small)
+
+        if active_wave == 3 or active_wave == -3
+            w1_start = get_price(3)
+            w1_end   = get_price(2)
+
+            if not na(w1_start) and not na(w1_end)
+                w1_size = math.abs(w1_end - w1_start)
+                target_5 = active_bull ? get_price(0) + w1_size : get_price(0) - w1_size
+                b_start  = get_bar(0)
+
+                if not na(b_start) and not na(target_5)
+                    target_line  := line.new(b_start, target_5, bar_index + 20, target_5,
+                        color=active_bull ? color.new(color_impulse_up, 40) : color.new(color_impulse_down, 40),
+                        style=line.style_dashed, width=1)
+                    target_label := label.new(bar_index + 22, target_5,
+                        "W5 Est\n" + str.tostring(target_5, format.mintick),
+                        style=label.style_label_left,
+                        color=color.new(color.gray, 40),
+                        textcolor=color.white, size=size.tiny)
+
+    // Diagonal reversal target: after ending diagonal, expect reversal to origin
+    if pattern_type == "diagonal" and not diag_is_leading
+        diag_origin = get_price(5)
+        b_start     = get_bar(0)
+        if not na(diag_origin) and not na(b_start)
+            target_line  := line.new(b_start, diag_origin, bar_index + 30, diag_origin,
+                color=color_diagonal,
+                style=line.style_dashed, width=2)
+            target_label := label.new(bar_index + 32, diag_origin,
+                "Diag Reversal\n" + str.tostring(diag_origin, format.mintick),
+                style=label.style_label_left,
+                color=color_diagonal,
+                textcolor=color.black, size=size.small)
+
+// ============================================================================
+// ZIGZAG VISUALIZATION
+// ============================================================================
+
+var line[] zz_lines = array.new_line(6, na)
+
+if show_zigzag and barstate.isconfirmed and piv_count >= 2
+    // How many segments to draw depends on the pattern
+    max_segs = pattern_type == "wxyxz" ? 5 : 4
+    max_segs := math.min(max_segs, piv_count - 1)
+
+    for i = 0 to max_segs
+        p_from = get_price(i + 1)
+        p_to   = get_price(i)
+        b_from = get_bar(i + 1)
+        b_to   = get_bar(i)
+
+        if not na(p_from) and not na(p_to) and not na(b_from) and not na(b_to)
+            is_up = p_to > p_from
+            zz_color = is_up ? color_impulse_up : color_impulse_down
+
+            if pattern_type == "correction"
+                zz_color := color_corrective
+            else if pattern_type == "wxy" or pattern_type == "wxyxz"
+                zz_color := color_complex
+            else if pattern_type == "diagonal"
+                zz_color := color_diagonal
+
+            zz_width = pattern_type == "diagonal" ? 3 : 2
+
+            line.delete(array.get(zz_lines, i))
+            array.set(zz_lines, i, line.new(b_from, p_from, b_to, p_to, color=zz_color, width=zz_width))
+
+// ============================================================================
+// DIAGONAL TRENDLINES (wedge)
+// ============================================================================
+// Draw converging/diverging trendlines for diagonal patterns
+
+var line diag_upper = na
+var line diag_lower = na
+
+if barstate.isconfirmed and show_zigzag and pattern_type == "diagonal" and piv_count >= 6
+    line.delete(diag_upper)
+    line.delete(diag_lower)
+
+    if diag_type > 0  // Bullish diagonal: lows at [5],[3],[1] highs at [4],[2],[0]
+        // Upper trendline through highs: [4] and [2] (or [0])
+        ub1 = get_bar(4)
+        up1 = get_price(4)
+        ub2 = get_bar(0)
+        up2 = get_price(0)
+        // Lower trendline through lows: [5] and [3] (or [1])
+        lb1 = get_bar(5)
+        lp1 = get_price(5)
+        lb2 = get_bar(1)
+        lp2 = get_price(1)
+
+        if not na(ub1) and not na(up1) and not na(ub2) and not na(up2)
+            diag_upper := line.new(ub1, up1, ub2 + 10, up2, color=color_diagonal,
+                style=line.style_dashed, width=1, extend=extend.right)
+        if not na(lb1) and not na(lp1) and not na(lb2) and not na(lp2)
+            diag_lower := line.new(lb1, lp1, lb2 + 10, lp2, color=color_diagonal,
+                style=line.style_dashed, width=1, extend=extend.right)
+
+    if diag_type < 0  // Bearish diagonal: highs at [5],[3],[1] lows at [4],[2],[0]
+        ub1 = get_bar(5)
+        up1 = get_price(5)
+        ub2 = get_bar(1)
+        up2 = get_price(1)
+        lb1 = get_bar(4)
+        lp1 = get_price(4)
+        lb2 = get_bar(0)
+        lp2 = get_price(0)
+
+        if not na(ub1) and not na(up1) and not na(ub2) and not na(up2)
+            diag_upper := line.new(ub1, up1, ub2 + 10, up2, color=color_diagonal,
+                style=line.style_dashed, width=1, extend=extend.right)
+        if not na(lb1) and not na(lp1) and not na(lb2) and not na(lp2)
+            diag_lower := line.new(lb1, lp1, lb2 + 10, lp2, color=color_diagonal,
+                style=line.style_dashed, width=1, extend=extend.right)
+
+// ============================================================================
+// WAVE LABELS ON CHART
+// ============================================================================
+
+var label[] wave_labels_arr = array.new_label(0)
+
+if show_wave_labels and barstate.isconfirmed
+    // Clean up previous wave labels to prevent memory leak
+    if array.size(wave_labels_arr) > 0
+        for i = array.size(wave_labels_arr) - 1 to 0
+            label.delete(array.get(wave_labels_arr, i))
+        array.clear(wave_labels_arr)
+
+if show_wave_labels and barstate.isconfirmed and pattern_type != "none"
+    if pattern_type == "impulse" and piv_count >= 6
+        wave_labels_str = array.from("0", "5", "4", "3", "2", "1")
+        for i = 0 to 5
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            if not na(piv_p) and not na(piv_b) and i > 0
+                lbl_txt = array.get(wave_labels_str, i)
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                lbl_color = active_bull ? color_impulse_up : color_impulse_down
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=lbl_color,
+                    textcolor=color.white, size=size.small))
+        origin_p = get_price(5)
+        origin_b = get_bar(5)
+        if not na(origin_p) and not na(origin_b)
+            array.push(wave_labels_arr, label.new(origin_b, origin_p, "0",
+                style=get_high(5) ? label.style_label_down : label.style_label_up,
+                color=color.gray, textcolor=color.white, size=size.tiny))
+
+    if pattern_type == "diagonal" and piv_count >= 6
+        // Same 5-wave labeling but with diagonal prefix
+        diag_prefix = diag_is_leading ? "LD" : "ED"
+        diag_labels = array.from("0", diag_prefix + "5", diag_prefix + "4",
+            diag_prefix + "3", diag_prefix + "2", diag_prefix + "1")
+        for i = 0 to 5
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            if not na(piv_p) and not na(piv_b) and i > 0
+                lbl_txt = array.get(diag_labels, i)
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=color_diagonal,
+                    textcolor=color.black, size=size.small))
+        origin_p = get_price(5)
+        origin_b = get_bar(5)
+        if not na(origin_p) and not na(origin_b)
+            array.push(wave_labels_arr, label.new(origin_b, origin_p, "0",
+                style=get_high(5) ? label.style_label_down : label.style_label_up,
+                color=color.gray, textcolor=color.white, size=size.tiny))
+
+    if pattern_type == "correction" and piv_count >= 3
+        abc_labels = array.from("C", "B", "A")
+        for i = 0 to 2
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            if not na(piv_p) and not na(piv_b)
+                lbl_txt = array.get(abc_labels, i)
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=color_corrective,
+                    textcolor=color.white, size=size.small))
+
+    if pattern_type == "wxy" and piv_count >= 4
+        wxy_labels = array.from("Y", "X", "W", "0")
+        for i = 0 to 3
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            if not na(piv_p) and not na(piv_b)
+                lbl_txt = array.get(wxy_labels, i)
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=color_complex,
+                    textcolor=color.white, size=size.small))
+
+    if pattern_type == "wxyxz" and piv_count >= 6
+        wxyz_labels = array.from("Z", "X'", "Y", "X", "W", "0")
+        for i = 0 to 5
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            if not na(piv_p) and not na(piv_b)
+                lbl_txt = array.get(wxyz_labels, i)
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=color_complex,
+                    textcolor=color.white, size=size.small))
+
+    if pattern_type == "partial" and piv_count >= 4
+        partial_labels = active_wave == 3 or active_wave == -3 ?
+            array.from("3", "2", "1", "0") : array.from("2", "1", "0", "-")
+        for i = 0 to 3
+            piv_p = get_price(i)
+            piv_b = get_bar(i)
+            piv_h = get_high(i)
+            lbl_txt = array.get(partial_labels, i)
+            if not na(piv_p) and not na(piv_b) and lbl_txt != "-"
+                lbl_style = piv_h ? label.style_label_down : label.style_label_up
+                lbl_color = active_bull ? color_impulse_up : color_impulse_down
+                array.push(wave_labels_arr, label.new(piv_b, piv_p, lbl_txt,
+                    style=lbl_style, color=lbl_color,
+                    textcolor=color.white, size=size.small))
+
+// ============================================================================
+// PRICE PROJECTION ENGINE
+// ============================================================================
+//
+// Computes price targets, stop-loss levels, and probability scores
+// for each signal, combining:
+//   1. Pattern-based Fibonacci targets (where the next wave should reach)
+//   2. Wave invalidation levels (where the pattern breaks = stop loss)
+//   3. Composite probability from pattern confidence + MTF alignment
+//   4. Per-timeframe directional probability
+//   5. Risk/Reward ratio from target vs stop
+//
+// The probability is NOT a statistical forecast — it's a composite score
+// reflecting how well the current structure matches ideal Elliott Wave
+// geometry across multiple timeframes.
+// ============================================================================
+
+// --- Compute price targets and stops based on wave position ---
+var float sig_target  = na   // Primary Fibonacci target price
+var float sig_stop    = na   // Invalidation / stop-loss level
+var float sig_entry   = na   // Entry price at signal
+var float sig_rr      = na   // Risk:Reward ratio
+
+// Projection for bullish partial (Wave 2 done → Wave 3 target)
+proj_bull_w3_target = float(na)
+proj_bull_w3_stop   = float(na)
+if pattern_type == "partial" and (active_wave == 2) and piv_count >= 4
+    w1s = get_price(3)
+    w1e = get_price(2)
+    w2e = get_price(1)
+    if not na(w1s) and not na(w1e) and not na(w2e)
+        w1_sz = math.abs(w1e - w1s)
+        proj_bull_w3_target := w2e + w1_sz * FIB_1618   // W3 = 161.8% of W1
+        proj_bull_w3_stop   := w1s                        // Below W1 start invalidates
+
+// Projection for bearish partial (Wave 2 done → Wave 3 target)
+proj_bear_w3_target = float(na)
+proj_bear_w3_stop   = float(na)
+if pattern_type == "partial" and (active_wave == -2) and piv_count >= 4
+    w1s = get_price(3)
+    w1e = get_price(2)
+    w2e = get_price(1)
+    if not na(w1s) and not na(w1e) and not na(w2e)
+        w1_sz = math.abs(w1e - w1s)
+        proj_bear_w3_target := w2e - w1_sz * FIB_1618
+        proj_bear_w3_stop   := w1s
+
+// Projection for impulse completion (Wave 5 done → correction target)
+proj_impulse_target = float(na)
+proj_impulse_stop   = float(na)
+if pattern_type == "impulse" and piv_count >= 6
+    imp_start = get_price(5)
+    imp_end   = get_price(0)
+    w4_level  = get_price(1)  // Wave 4 = first support/resistance
+    if not na(imp_start) and not na(imp_end) and not na(w4_level)
+        move = math.abs(imp_end - imp_start)
+        if active_bull
+            proj_impulse_target := imp_end - move * FIB_382  // Correction to 38.2%
+            proj_impulse_stop   := imp_end + move * 0.1      // Slightly above W5 end
+        else
+            proj_impulse_target := imp_end + move * FIB_382
+            proj_impulse_stop   := imp_end - move * 0.1
+
+// Projection for correction completion (ABC/WXY → trend resumption)
+proj_corr_target = float(na)
+proj_corr_stop   = float(na)
+if (pattern_type == "correction" or pattern_type == "wxy") and piv_count >= 3
+    corr_start = get_price(2)
+    corr_x     = get_price(1)
+    corr_end   = get_price(0)
+    if not na(corr_start) and not na(corr_x) and not na(corr_end)
+        a_sz = math.abs(corr_x - corr_start)
+        is_bear_corr = (pattern_type == "correction" and abc_type > 0) or
+            (pattern_type == "wxy" and wxy_type > 0)
+        if is_bear_corr  // Bearish correction done → buy
+            proj_corr_target := corr_end + a_sz * FIB_1618
+            proj_corr_stop   := corr_end - a_sz * 0.15
+        else  // Bullish correction done → sell
+            proj_corr_target := corr_end - a_sz * FIB_1618
+            proj_corr_stop   := corr_end + a_sz * 0.15
+
+// Projection for ending diagonal (sharp reversal to origin)
+proj_diag_target = float(na)
+proj_diag_stop   = float(na)
+if pattern_type == "diagonal" and not diag_is_leading and piv_count >= 6
+    diag_origin = get_price(5)
+    diag_end    = get_price(0)
+    if not na(diag_origin) and not na(diag_end)
+        proj_diag_target := diag_origin  // Full reversal to diagonal start
+        diag_move = math.abs(diag_end - diag_origin)
+        if diag_type > 0  // Bullish diagonal ending → sell
+            proj_diag_stop := diag_end + diag_move * 0.1
+        else  // Bearish diagonal ending → buy
+            proj_diag_stop := diag_end - diag_move * 0.1
+
+// WXYXZ projection (after triple combination, expect strong trend resumption)
+proj_wxyz_target = float(na)
+proj_wxyz_stop   = float(na)
+if pattern_type == "wxyxz" and piv_count >= 6
+    wxyz_start = get_price(5)
+    wxyz_end   = get_price(0)
+    if not na(wxyz_start) and not na(wxyz_end)
+        wxyz_range = math.abs(wxyz_end - wxyz_start)
+        if wxyz_type > 0  // Bearish WXYXZ done → buy
+            proj_wxyz_target := wxyz_end + wxyz_range * FIB_1618
+            proj_wxyz_stop   := wxyz_end - wxyz_range * 0.15
+        else
+            proj_wxyz_target := wxyz_end - wxyz_range * FIB_1618
+            proj_wxyz_stop   := wxyz_end + wxyz_range * 0.15
+
+// ============================================================================
+// COMPOSITE PROBABILITY SCORING
+// ============================================================================
+//
+// Combines six independent probability components:
+//   P_pattern   = Pattern confidence (0-100%) — Fibonacci rule alignment
+//   P_mtf       = MTF agreement (0-100%) — how many TFs agree
+//   P_trend     = Trend alignment (0-100%) — SMA position across TFs
+//   P_momentum  = Momentum alignment (0-100%) — EWO direction across TFs
+//   P_rsi       = RSI divergence confirmation (0-100%) — divergence at wave pivots
+//   P_vol       = Volume confirmation (0-100%) — OBV divergence + wave volume + VWAP
+//
+//   Composite = weighted average:
+//     25% pattern + 15% MTF + 10% trend + 10% momentum + 15% RSI + 25% volume
+//
+// Volume and pattern share the highest weight because volume is the
+// critical confirmation layer that prevents false exhaustion/continuation
+// calls. The composite represents "structural probability" — how well the
+// current price structure, volume, and multi-timeframe context match the
+// expected Elliott Wave geometry for the projected move.
+// ============================================================================
+
+// P_pattern: already have active_conf (0.0 - 1.0)
+p_pattern = active_conf
+
+// P_mtf: MTF directional agreement
+p_mtf = 0.0
+if mtf_enabled
+    // For buy signals, count bullish TFs; for sell, count bearish TFs
+    bull_tfs = (tf1_phase > 0 ? 1.0 : 0.0) + (tf2_phase > 0 ? 1.0 : 0.0) + (tf3_phase > 0 ? 1.0 : 0.0)
+    bear_tfs = (tf1_phase < 0 ? 1.0 : 0.0) + (tf2_phase < 0 ? 1.0 : 0.0) + (tf3_phase < 0 ? 1.0 : 0.0)
+    p_mtf := active_bull ? bull_tfs / 3.0 : bear_tfs / 3.0
+else
+    p_mtf := 0.5  // Neutral when disabled
+
+// P_trend: SMA alignment across TFs (price above both SMAs = full trend)
+p_trend = 0.0
+if mtf_enabled
+    if active_bull
+        t1 = (tf1_above50 ? 0.5 : 0.0) + (tf1_above200 ? 0.5 : 0.0)
+        t2 = (tf2_above50 ? 0.5 : 0.0) + (tf2_above200 ? 0.5 : 0.0)
+        t3 = (tf3_above50 ? 0.5 : 0.0) + (tf3_above200 ? 0.5 : 0.0)
+        p_trend := (t1 + t2 + t3) / 3.0
+    else
+        t1 = (not tf1_above50 ? 0.5 : 0.0) + (not tf1_above200 ? 0.5 : 0.0)
+        t2 = (not tf2_above50 ? 0.5 : 0.0) + (not tf2_above200 ? 0.5 : 0.0)
+        t3 = (not tf3_above50 ? 0.5 : 0.0) + (not tf3_above200 ? 0.5 : 0.0)
+        p_trend := (t1 + t2 + t3) / 3.0
+else
+    p_trend := 0.5
+
+// P_momentum: EWO direction agreement
+p_momentum = 0.0
+if mtf_enabled
+    if active_bull
+        m1 = tf1_ewo > 0 and tf1_rising ? 1.0 : tf1_ewo > 0 ? 0.5 : 0.0
+        m2 = tf2_ewo > 0 and tf2_rising ? 1.0 : tf2_ewo > 0 ? 0.5 : 0.0
+        m3 = tf3_ewo > 0 and tf3_rising ? 1.0 : tf3_ewo > 0 ? 0.5 : 0.0
+        p_momentum := (m1 + m2 + m3) / 3.0
+    else
+        m1 = tf1_ewo < 0 and not tf1_rising ? 1.0 : tf1_ewo < 0 ? 0.5 : 0.0
+        m2 = tf2_ewo < 0 and not tf2_rising ? 1.0 : tf2_ewo < 0 ? 0.5 : 0.0
+        m3 = tf3_ewo < 0 and not tf3_rising ? 1.0 : tf3_ewo < 0 ? 0.5 : 0.0
+        p_momentum := (m1 + m2 + m3) / 3.0
+else
+    p_momentum := 0.5
+
+// P_rsi: RSI divergence confirmation (already computed above)
+p_rsi = rsi_div_score
+
+// P_vol: Volume confirmation (OBV divergence + wave volume + VWAP)
+p_vol = vol_enabled ? vol_combined : 0.5
+
+// Composite probability (weighted average — 6 components)
+// 25% pattern + 15% MTF + 10% trend + 10% momentum + 15% RSI + 25% volume
+composite_prob = p_pattern * 0.25 + p_mtf * 0.15 + p_trend * 0.10 + p_momentum * 0.10 + p_rsi * 0.15 + p_vol * 0.25
+
+// Apply cross-degree confluence as ±10% modifier (preserves existing 6-component weights)
+if deg_enabled
+    composite_prob := math.max(0.0, math.min(1.0, composite_prob + deg_confluence * 0.10))
+
+// Per-TF directional probability (shown in signal panel)
+tf1_dir_prob = 0.0
+tf2_dir_prob = 0.0
+tf3_dir_prob = 0.0
+if active_bull
+    tf1_dir_prob := tf1_phase == 2 ? 0.9 : tf1_phase == 1 ? 0.7 : tf1_phase == 0 ? 0.5 : tf1_phase == -1 ? 0.3 : 0.1
+    tf2_dir_prob := tf2_phase == 2 ? 0.9 : tf2_phase == 1 ? 0.7 : tf2_phase == 0 ? 0.5 : tf2_phase == -1 ? 0.3 : 0.1
+    tf3_dir_prob := tf3_phase == 2 ? 0.9 : tf3_phase == 1 ? 0.7 : tf3_phase == 0 ? 0.5 : tf3_phase == -1 ? 0.3 : 0.1
+else
+    tf1_dir_prob := tf1_phase == -2 ? 0.9 : tf1_phase == -1 ? 0.7 : tf1_phase == 0 ? 0.5 : tf1_phase == 1 ? 0.3 : 0.1
+    tf2_dir_prob := tf2_phase == -2 ? 0.9 : tf2_phase == -1 ? 0.7 : tf2_phase == 0 ? 0.5 : tf2_phase == 1 ? 0.3 : 0.1
+    tf3_dir_prob := tf3_phase == -2 ? 0.9 : tf3_phase == -1 ? 0.7 : tf3_phase == 0 ? 0.5 : tf3_phase == 1 ? 0.3 : 0.1
+
+// ============================================================================
+// TRADING SIGNALS (with projections)
+// ============================================================================
+
+var int    last_signal   = 0
+var string signal_reason = ""
+
+// VWAP percentage for signal labels
+sig_vwap_pct = not na(vwap_value) ? (close - vwap_value) / vwap_value * 100 : float(na)
+
+// Wave 2 completion → Buy/Sell for Wave 3
+wave2_buy = pattern_type == "partial" and (active_wave == 2) and active_conf >= 0.25
+wave2_sell = pattern_type == "partial" and (active_wave == -2) and active_conf >= 0.25
+
+// Wave 5 completion → Exhaustion
+wave5_exhaustion_bull = pattern_type == "impulse" and bull5_valid and bull5_conf >= 0.4
+wave5_exhaustion_bear = pattern_type == "impulse" and bear5_valid and bear5_conf >= 0.4
+
+// ABC/WXY/WXYXZ completion → Counter-trend / trend resumption
+abc_buy  = pattern_type == "correction" and abc_type == -1 and abc_conf >= 0.3
+abc_sell = pattern_type == "correction" and abc_type == 1 and abc_conf >= 0.3
+wxy_buy  = pattern_type == "wxy" and wxy_type > 0 and wxy_conf >= 0.3
+wxy_sell = pattern_type == "wxy" and wxy_type < 0 and wxy_conf >= 0.3
+wxyz_buy  = pattern_type == "wxyxz" and wxyz_type > 0 and wxyz_conf >= 0.35
+wxyz_sell = pattern_type == "wxyxz" and wxyz_type < 0 and wxyz_conf >= 0.35
+
+// Diagonal signals
+ending_diag_bull_reversal = pattern_type == "diagonal" and not diag_is_leading and diag_type < 0 and diag_conf >= 0.35
+ending_diag_bear_reversal = pattern_type == "diagonal" and not diag_is_leading and diag_type > 0 and diag_conf >= 0.35
+leading_diag_bull = pattern_type == "diagonal" and diag_is_leading and diag_type > 0 and diag_conf >= 0.30
+leading_diag_bear = pattern_type == "diagonal" and diag_is_leading and diag_type < 0 and diag_conf >= 0.30
+
+// Aggregate signals — MTF confluence filters buy/sell
+buy_signal  = (wave2_buy or abc_buy or wxy_buy or wxyz_buy or ending_diag_bull_reversal) and last_signal != 1 and mtf_allows_buy
+sell_signal = (wave2_sell or abc_sell or wxy_sell or wxyz_sell or ending_diag_bear_reversal) and last_signal != -1 and mtf_allows_sell
+exhaustion_bull = (wave5_exhaustion_bull or leading_diag_bull) and last_signal != -1
+exhaustion_bear = (wave5_exhaustion_bear or leading_diag_bear) and last_signal != 1
+
+// Apply MTF confidence boost
+if mtf_enabled and mtf_boost
+    if (active_bull and mtf_bull_confluence) or (not active_bull and mtf_bear_confluence)
+        active_conf := math.min(1.0, active_conf + mtf_conf_boost)
+
+// Assign projections to active signal
+if buy_signal
+    last_signal   := 1
+    sig_entry     := close
+    if wave2_buy
+        signal_reason := "W2→W3 Entry"
+        sig_target    := proj_bull_w3_target
+        sig_stop      := proj_bull_w3_stop
+    else if abc_buy or wxy_buy
+        signal_reason := abc_buy ? "ABC Done" : "WXY Done"
+        sig_target    := proj_corr_target
+        sig_stop      := proj_corr_stop
+    else if wxyz_buy
+        signal_reason := "WXYXZ Done"
+        sig_target    := proj_wxyz_target
+        sig_stop      := proj_wxyz_stop
+    else if ending_diag_bull_reversal
+        signal_reason := "ED Reversal"
+        sig_target    := proj_diag_target
+        sig_stop      := proj_diag_stop
+    else
+        signal_reason := "Buy"
+    // Compute R:R
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
+if sell_signal
+    last_signal   := -1
+    sig_entry     := close
+    if wave2_sell
+        signal_reason := "W2→W3 Short"
+        sig_target    := proj_bear_w3_target
+        sig_stop      := proj_bear_w3_stop
+    else if abc_sell or wxy_sell
+        signal_reason := abc_sell ? "ABC Done" : "WXY Done"
+        sig_target    := proj_corr_target
+        sig_stop      := proj_corr_stop
+    else if wxyz_sell
+        signal_reason := "WXYXZ Done"
+        sig_target    := proj_wxyz_target
+        sig_stop      := proj_wxyz_stop
+    else if ending_diag_bear_reversal
+        signal_reason := "ED Reversal"
+        sig_target    := proj_diag_target
+        sig_stop      := proj_diag_stop
+    else
+        signal_reason := "Sell"
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
+if exhaustion_bull
+    last_signal   := -1
+    sig_entry     := close
+    signal_reason := leading_diag_bull ? "LD W2 Pull Expected" : "W5 Exhaustion"
+    sig_target    := proj_impulse_target
+    sig_stop      := proj_impulse_stop
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
+if exhaustion_bear
+    last_signal   := 1
+    sig_entry     := close
+    signal_reason := leading_diag_bear ? "LD W2 Pull Expected" : "W5 Exhaustion"
+    sig_target    := proj_impulse_target
+    sig_stop      := proj_impulse_stop
+    if not na(sig_target) and not na(sig_stop) and not na(sig_entry)
+        risk   = math.abs(sig_entry - sig_stop)
+        reward = math.abs(sig_target - sig_entry)
+        sig_rr := risk > 0 ? reward / risk : na
+
+// Plot signals
+plotshape(show_signals and buy_signal, "Buy Signal", shape.triangleup,
+    location.belowbar, color.new(color.lime, 0), size=size.normal)
+plotshape(show_signals and sell_signal, "Sell Signal", shape.triangledown,
+    location.abovebar, color.new(color.fuchsia, 0), size=size.normal)
+plotshape(show_signals and exhaustion_bull, "Bull Exhaustion", shape.xcross,
+    location.abovebar, color.new(color.orange, 0), size=size.small)
+plotshape(show_signals and exhaustion_bear, "Bear Exhaustion", shape.xcross,
+    location.belowbar, color.new(color.orange, 0), size=size.small)
+
+// ============================================================================
+// SIGNAL PROJECTION LABELS (Price Target + Probability + R:R)
+// ============================================================================
+//
+// Each signal label now shows:
+//   Line 1: Direction + reason
+//   Line 2: Composite probability (weighted: pattern + MTF + trend + momentum)
+//   Line 3: Target price (Fibonacci projection)
+//   Line 4: Stop price (wave invalidation)
+//   Line 5: Risk:Reward ratio
+//   Line 6: Per-TF directional probability
+// ============================================================================
+
+// Format probability bar: ████░░░░░░ 45%
+prob_bar(float prob) =>
+    p = nz(prob, 0.0)
+    filled = math.round(p * 10)
+    bar = ""
+    for i = 0 to 9
+        bar += i < filled ? "█" : "░"
+    bar + " " + str.tostring(p * 100, "#") + "%"
+
+// Build full signal text
+build_signal_text(string dir, string reason, float prob, float target,
+    float stop, float rr, float tf1p, float tf2p, float tf3p,
+    string div_lbl, float rsi_val, float rsi_score,
+    string vol_lbl, float vol_score, float vwap_pct,
+    bool deg_on, string deg_lbl, float deg_conf, int d2w, int d3w) =>
+    txt = dir + " | " + reason
+    txt += "\nProb: " + prob_bar(prob)
+    if not na(target)
+        txt += "\nTP: " + str.tostring(target, format.mintick)
+    if not na(stop)
+        txt += "\nSL: " + str.tostring(stop, format.mintick)
+    if not na(rr)
+        txt += "\nR:R  1:" + str.tostring(rr, "#.#")
+    txt += "\n── RSI ──"
+    txt += "\nRSI: " + str.tostring(nz(rsi_val, 0), "#.#") + " | " + div_lbl
+    txt += "\nRSI Conf: " + str.tostring(rsi_score * 100, "#") + "%"
+    if vol_enabled
+        txt += "\n── VOL ──"
+        txt += "\nOBV: " + vol_lbl
+        vwap_txt = na(vwap_pct) ? "N/A" : (vwap_pct >= 0 ? "+" : "") + str.tostring(vwap_pct, "#.#") + "%"
+        txt += "\nVWAP: " + vwap_txt
+        txt += "\nVol Conf: " + str.tostring(vol_score * 100, "#") + "%"
+    if mtf_enabled
+        txt += "\n── Per TF ──"
+        txt += "\n" + timeframe.period + ": " + str.tostring(tf1p * 100, "#") + "%"
+        txt += "\n" + mtf_tf2 + ": " + str.tostring(tf2p * 100, "#") + "%"
+        txt += "\n" + mtf_tf3 + ": " + str.tostring(tf3p * 100, "#") + "%"
+    if deg_on
+        txt += "\n── DEGREE ──"
+        d2_txt = d2w == 0 ? "---" : d2w > 0 ? "W" + str.tostring(d2w) + " Bull" : "W" + str.tostring(math.abs(d2w)) + " Bear"
+        d3_txt = d3w == 0 ? "---" : d3w > 0 ? "W" + str.tostring(d3w) + " Bull" : "W" + str.tostring(math.abs(d3w)) + " Bear"
+        txt += "\nD2: " + d2_txt
+        txt += "\nD3: " + d3_txt
+        txt += "\n" + deg_lbl + " (" + (deg_conf >= 0 ? "+" : "") + str.tostring(deg_conf * 100, "#") + "%)"
+    txt
+
+var label sig_proj_lbl = na
+
+if show_signals and buy_signal
+    lbl_txt = build_signal_text("BUY", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score,
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
+    lbl_clr = composite_prob >= 0.65 ? color.new(color.lime, 5) :
+        composite_prob >= 0.45 ? color.new(color.green, 10) :
+        color.new(color.olive, 15)
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, low, lbl_txt,
+        style=label.style_label_up, color=lbl_clr,
+        textcolor=color.white, size=size.small)
+
+if show_signals and sell_signal
+    lbl_txt = build_signal_text("SELL", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score,
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
+    lbl_clr = composite_prob >= 0.65 ? color.new(color.fuchsia, 5) :
+        composite_prob >= 0.45 ? color.new(color.purple, 10) :
+        color.new(color.maroon, 15)
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, high, lbl_txt,
+        style=label.style_label_down, color=lbl_clr,
+        textcolor=color.white, size=size.small)
+
+if show_signals and exhaustion_bull
+    lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score,
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, high, lbl_txt,
+        style=label.style_label_down, color=color.new(color.orange, 10),
+        textcolor=color.white, size=size.small)
+
+if show_signals and exhaustion_bear
+    lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
+        sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
+        rsi_div_label, rsi_at_signal, rsi_div_score,
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
+    label.delete(sig_proj_lbl)
+    sig_proj_lbl := label.new(bar_index, low, lbl_txt,
+        style=label.style_label_up, color=color.new(color.orange, 10),
+        textcolor=color.white, size=size.small)
+
+// ============================================================================
+// SIGNAL TARGET/STOP LINES (drawn on chart at signal)
+// ============================================================================
+var line sig_target_line = na
+var line sig_stop_line   = na
+var label sig_target_lbl = na
+var label sig_stop_lbl   = na
+
+if (buy_signal or sell_signal or exhaustion_bull or exhaustion_bear) and show_signals
+    line.delete(sig_target_line)
+    line.delete(sig_stop_line)
+    label.delete(sig_target_lbl)
+    label.delete(sig_stop_lbl)
+
+    if not na(sig_target)
+        sig_target_line := line.new(bar_index, sig_target, bar_index + 30, sig_target,
+            color=color.new(color.lime, 30), style=line.style_dashed, width=2)
+        sig_target_lbl  := label.new(bar_index + 32, sig_target,
+            "TP " + str.tostring(sig_target, format.mintick),
+            style=label.style_label_left, color=color.new(color.lime, 50),
+            textcolor=color.white, size=size.tiny)
+
+    if not na(sig_stop)
+        sig_stop_line := line.new(bar_index, sig_stop, bar_index + 30, sig_stop,
+            color=color.new(color.red, 30), style=line.style_dashed, width=2)
+        sig_stop_lbl  := label.new(bar_index + 32, sig_stop,
+            "SL " + str.tostring(sig_stop, format.mintick),
+            style=label.style_label_left, color=color.new(color.red, 50),
+            textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// BACKGROUND COLOR — Wave Phase
+// ============================================================================
+bg = color(na)
+if show_background and pattern_type != "none"
+    if pattern_type == "impulse"
+        bg := active_bull ? color.new(color.teal, 92) : color.new(color.red, 92)
+    else if pattern_type == "partial"
+        if active_wave == 3 or active_wave == -3
+            bg := active_bull ? color.new(color.green, 88) : color.new(color.maroon, 88)
+        else
+            bg := active_bull ? color.new(color.teal, 94) : color.new(color.red, 94)
+    else if pattern_type == "correction"
+        bg := color.new(color.orange, 92)
+    else if pattern_type == "wxy"
+        bg := color.new(color.purple, 92)
+    else if pattern_type == "wxyxz"
+        bg := color.new(color.purple, 88)
+    else if pattern_type == "diagonal"
+        bg := diag_is_leading ? color.new(color.yellow, 92) : color.new(color.yellow, 86)
+bgcolor(bg)
+
+
+// ============================================================================
+// INFO DASHBOARD
+// ============================================================================
+
+// Helper: phase to display string and color
+phase_to_str(p) =>
+    p == 2 ? "S.BULL" : p == 1 ? "BULL" : p == -1 ? "BEAR" : p == -2 ? "S.BEAR" : "NEUT"
+phase_to_clr(p) =>
+    p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
+
+if show_table and barstate.islast
+    var table dashboard = table.new(position.top_right, 2, 42,
+        bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
+
+    // Header
+    table.cell(dashboard, 0, 0, "SymbolU Elliott Wave", text_color=color.white,
+        text_halign=text.align_left, bgcolor=color.new(color.purple, 40), text_size=size.normal)
+    table.merge_cells(dashboard, 0, 0, 1, 0)
+
+    // Pattern Type
+    pat_color = pattern_type == "impulse" ? color.lime :
+        pattern_type == "partial" ? color.yellow :
+        pattern_type == "correction" ? color.orange :
+        pattern_type == "wxy" ? color.purple :
+        pattern_type == "wxyxz" ? color.fuchsia :
+        pattern_type == "diagonal" ? color.yellow : color.gray
+    pat_display = pattern_type == "wxy" ? "WXY DOUBLE" :
+        pattern_type == "wxyxz" ? "WXYXZ TRIPLE" :
+        pattern_type == "diagonal" ? (diag_is_leading ? "LEADING DIAG" : "ENDING DIAG") :
+        str.upper(pattern_type)
+    table.cell(dashboard, 0, 1, "Pattern", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 1, pat_display, text_color=pat_color, text_halign=text.align_right, text_size=size.small)
+
+    // Active Wave
+    wave_str = active_wave == 0 ? "---" :
+        active_wave > 0 ? "Bull" :
+        "Bear"
+    wave_color = active_bull ? color.green : color.red
+    if active_wave == 0
+        wave_color := color.gray
+    table.cell(dashboard, 0, 2, "Direction", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 2, wave_str, text_color=wave_color, text_halign=text.align_right, text_size=size.small)
+
+    // Status Label
+    table.cell(dashboard, 0, 3, "Status", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 3, active_label, text_color=wave_color, text_halign=text.align_right, text_size=size.small)
+
+    // Confidence (with MTF boost indicator)
+    conf_color = active_conf >= 0.6 ? color.lime :
+        active_conf >= 0.4 ? color.yellow :
+        active_conf >= 0.2 ? color.orange : color.gray
+    conf_suffix = mtf_enabled and mtf_conf_boost > 0 ? " +" : ""
+    table.cell(dashboard, 0, 4, "Confidence", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 4, str.tostring(active_conf * 100, "#.#") + "%" + conf_suffix,
+        text_color=conf_color, text_halign=text.align_right, text_size=size.small)
+
+    // Fibonacci ratios section header
+    table.cell(dashboard, 0, 5, "─── Fib Ratios ───", text_color=color.new(color.white, 40),
+        text_halign=text.align_left, text_size=size.tiny)
+    table.merge_cells(dashboard, 0, 5, 1, 5)
+
+    // Show Fibonacci ratios for detected pattern
+    if piv_count >= 4 and (pattern_type == "impulse" or pattern_type == "partial" or pattern_type == "diagonal")
+        w1_sz = math.abs(get_price(2) - get_price(3))
+        w2_sz = math.abs(get_price(1) - get_price(2))
+        w2_r  = w1_sz > 0 ? w2_sz / w1_sz : 0.0
+
+        table.cell(dashboard, 0, 6, "W2/W1", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        w2_r_color = in_fib_range(w2_r, FIB_382, FIB_618) ? color.lime :
+            in_fib_range(w2_r, FIB_236, FIB_786) ? color.yellow : color.red
+        table.cell(dashboard, 1, 6, str.tostring(w2_r * 100, "#.#") + "%",
+            text_color=w2_r_color, text_halign=text.align_right, text_size=size.small)
+
+        if piv_count >= 5
+            w3_sz = math.abs(get_price(0) - get_price(1))
+            w3_e  = w1_sz > 0 ? w3_sz / w1_sz : 0.0
+            table.cell(dashboard, 0, 7, "W3/W1", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+            w3_e_color = w3_e >= FIB_1618 - fib_tolerance ? color.lime :
+                w3_e >= FIB_1000 - fib_tolerance ? color.yellow : color.orange
+            table.cell(dashboard, 1, 7, str.tostring(w3_e * 100, "#.#") + "%",
+                text_color=w3_e_color, text_halign=text.align_right, text_size=size.small)
+        else
+            table.cell(dashboard, 0, 7, "W3/W1", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+            table.cell(dashboard, 1, 7, "---", text_color=color.gray, text_halign=text.align_right, text_size=size.small)
+    else if piv_count >= 4 and (pattern_type == "wxy" or pattern_type == "wxyxz")
+        // Show X/W and Y/W ratios
+        w_sz = math.abs(get_price(2) - get_price(3))
+        x_sz = math.abs(get_price(1) - get_price(2))
+        x_r  = w_sz > 0 ? x_sz / w_sz : 0.0
+        table.cell(dashboard, 0, 6, "X/W", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        x_r_color = in_fib_range(x_r, FIB_500, FIB_618) ? color.lime :
+            in_fib_range(x_r, FIB_382, FIB_786) ? color.yellow : color.red
+        table.cell(dashboard, 1, 6, str.tostring(x_r * 100, "#.#") + "%",
+            text_color=x_r_color, text_halign=text.align_right, text_size=size.small)
+
+        y_sz = math.abs(get_price(0) - get_price(1))
+        y_r  = w_sz > 0 ? y_sz / w_sz : 0.0
+        table.cell(dashboard, 0, 7, "Y/W", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        y_r_color = in_fib_range(y_r, FIB_1000 - 0.15, FIB_1000 + 0.15) ? color.lime :
+            in_fib_range(y_r, FIB_618, FIB_1618) ? color.yellow : color.orange
+        table.cell(dashboard, 1, 7, str.tostring(y_r * 100, "#.#") + "%",
+            text_color=y_r_color, text_halign=text.align_right, text_size=size.small)
+    else
+        table.cell(dashboard, 0, 6, "Ratio 1", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 6, "---", text_color=color.gray, text_halign=text.align_right, text_size=size.small)
+        table.cell(dashboard, 0, 7, "Ratio 2", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 7, "---", text_color=color.gray, text_halign=text.align_right, text_size=size.small)
+
+    // Row 8: Additional ratio or diagonal info
+    if pattern_type == "diagonal"
+        // Show contracting/expanding info
+        if piv_count >= 6
+            w1_d = math.abs(get_price(4) - get_price(5))
+            w3_d = math.abs(get_price(2) - get_price(3))
+            w5_d = math.abs(get_price(0) - get_price(1))
+            shape_txt = w1_d > w3_d and w3_d > w5_d ? "CONTRACTING" :
+                w1_d < w3_d and w3_d < w5_d ? "EXPANDING" : "IRREGULAR"
+            shape_clr = shape_txt == "CONTRACTING" ? color.lime :
+                shape_txt == "EXPANDING" ? color.yellow : color.orange
+            table.cell(dashboard, 0, 8, "Shape", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+            table.cell(dashboard, 1, 8, shape_txt, text_color=shape_clr, text_halign=text.align_right, text_size=size.small)
+        else
+            table.cell(dashboard, 0, 8, "Shape", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+            table.cell(dashboard, 1, 8, "---", text_color=color.gray, text_halign=text.align_right, text_size=size.small)
+    else if piv_count >= 6 and (pattern_type == "impulse" or pattern_type == "wxyxz")
+        w3_f = math.abs(get_price(4) - get_price(3))
+        w4_sz = math.abs(get_price(1) - get_price(2))
+        w4_r = w3_f > 0 ? w4_sz / w3_f : 0.0
+        row8_lbl = pattern_type == "wxyxz" ? "X'/Y" : "W4/W3"
+        table.cell(dashboard, 0, 8, row8_lbl, text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        w4_r_color = in_fib_range(w4_r, FIB_236, FIB_500) ? color.lime :
+            in_fib_range(w4_r, FIB_236 - 0.1, FIB_618) ? color.yellow : color.red
+        table.cell(dashboard, 1, 8, str.tostring(w4_r * 100, "#.#") + "%",
+            text_color=w4_r_color, text_halign=text.align_right, text_size=size.small)
+    else
+        table.cell(dashboard, 0, 8, "Ratio 3", text_color=color.gray, text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 8, "---", text_color=color.gray, text_halign=text.align_right, text_size=size.small)
+
+    // Detectors overview
+    table.cell(dashboard, 0, 9, "─── Detectors ───", text_color=color.new(color.white, 40),
+        text_halign=text.align_left, text_size=size.tiny)
+    table.merge_cells(dashboard, 0, 9, 1, 9)
+
+    // Show all detector confidences so user can see what's being detected
+    det_texts = array.from("Impulse", "Partial", "ABC", "WXY", "WXYXZ", "Diagonal")
+    det_confs = array.from(
+        math.max(bull5_conf, bear5_conf),
+        math.max(bull_partial_conf, bear_partial_conf),
+        abc_conf, wxy_conf, wxyz_conf, diag_conf)
+
+    for det_i = 0 to 5
+        det_c = array.get(det_confs, det_i)
+        det_clr = det_c >= 0.4 ? color.lime : det_c >= 0.2 ? color.yellow : color.new(color.gray, 50)
+        det_txt = det_c > 0 ? str.tostring(det_c * 100, "#") + "%" : "---"
+        table.cell(dashboard, 0, 10 + det_i, array.get(det_texts, det_i),
+            text_color=color.gray, text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 10 + det_i, det_txt,
+            text_color=det_clr, text_halign=text.align_right, text_size=size.tiny)
+
+    // ── RSI Divergence Section ──
+    table.cell(dashboard, 0, 16, "─── RSI Confirm ───", text_color=color.new(color.white, 40),
+        text_halign=text.align_left, text_size=size.tiny)
+    table.merge_cells(dashboard, 0, 16, 1, 16)
+
+    rsi_txt = str.tostring(rsi_at_signal, "#.#")
+    rsi_zone = rsi_at_signal >= rsi_ob ? " OB" : rsi_at_signal <= rsi_os ? " OS" : ""
+    rsi_clr = rsi_at_signal >= rsi_ob ? color.red : rsi_at_signal <= rsi_os ? color.lime : color.gray
+    table.cell(dashboard, 0, 17, "RSI(" + str.tostring(rsi_period) + ")", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 17, rsi_txt + rsi_zone,
+        text_color=rsi_clr, text_halign=text.align_right, text_size=size.small)
+
+    div_clr = rsi_div_type == 1 or rsi_div_type == 2 ? color.red :
+        rsi_div_type == -1 or rsi_div_type == -2 ? color.lime : color.gray
+    table.cell(dashboard, 0, 18, "Divergence", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 18, rsi_div_label,
+        text_color=div_clr, text_halign=text.align_right, text_size=size.small)
+
+    rsi_score_clr = rsi_div_score >= 0.75 ? color.lime :
+        rsi_div_score >= 0.5 ? color.yellow :
+        rsi_div_score >= 0.25 ? color.orange : color.red
+    table.cell(dashboard, 0, 19, "RSI Conf", text_color=color.gray,
+        text_halign=text.align_left, text_size=size.small)
+    table.cell(dashboard, 1, 19, str.tostring(rsi_div_score * 100, "#") + "%",
+        text_color=rsi_score_clr, text_halign=text.align_right, text_size=size.small)
+
+    // ── Volume Confirmation Section ──
+    if vol_enabled
+        table.cell(dashboard, 0, 20, "─── Volume ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 20, 1, 20)
+
+        obv_div_clr = vol_obv_div_type == 1 or vol_obv_div_type == 2 ? color.red :
+            vol_obv_div_type == -1 or vol_obv_div_type == -2 ? color.lime : color.gray
+        table.cell(dashboard, 0, 21, "OBV Div", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 21, vol_div_label,
+            text_color=obv_div_clr, text_halign=text.align_right, text_size=size.small)
+
+        vwap_disp = na(vwap_value) ? "N/A" : str.tostring(vwap_value, format.mintick)
+        vwap_pct_disp = na(vwap_value) ? "" : (sig_vwap_pct >= 0 ? " +" : " ") + str.tostring(sig_vwap_pct, "#.#") + "%"
+        vwap_clr = na(vwap_value) ? color.gray : sig_vwap_pct > 0.5 ? color.lime : sig_vwap_pct < -0.5 ? color.red : color.yellow
+        table.cell(dashboard, 0, 22, "VWAP", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 22, vwap_disp + vwap_pct_disp,
+            text_color=vwap_clr, text_halign=text.align_right, text_size=size.small)
+
+        vol_score_clr = vol_combined >= 0.75 ? color.lime :
+            vol_combined >= 0.5 ? color.yellow :
+            vol_combined >= 0.25 ? color.orange : color.red
+        table.cell(dashboard, 0, 23, "Vol Conf", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 23, str.tostring(vol_combined * 100, "#") + "%",
+            text_color=vol_score_clr, text_halign=text.align_right, text_size=size.small)
+
+    // ── Multi-Timeframe Section ──
+    if mtf_enabled
+        table.cell(dashboard, 0, 25, "─── MTF (3 TFs) ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 25, 1, 25)
+
+        // Confluence summary
+        confl_txt = mtf_strong_bull ? "ALL BULL (3/3)" :
+            mtf_strong_bear ? "ALL BEAR (3/3)" :
+            mtf_bull_confluence ? "BULL (2/3)" :
+            mtf_bear_confluence ? "BEAR (2/3)" :
+            mtf_conflicting ? "MIXED (0)" :
+            mtf_score > 0 ? "LEAN BULL" : "LEAN BEAR"
+        confl_clr = mtf_strong_bull ? color.lime :
+            mtf_strong_bear ? color.red :
+            mtf_bull_confluence ? color.green :
+            mtf_bear_confluence ? color.orange :
+            color.gray
+        table.cell(dashboard, 0, 26, "Confluence", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 26, confl_txt, text_color=confl_clr,
+            text_halign=text.align_right, text_size=size.small)
+
+        // TF1 (current chart): phase + EWO
+        tf1_name = timeframe.period
+        ewo1_dir = tf1_rising ? "+" : "-"
+        table.cell(dashboard, 0, 27, "TF1 " + tf1_name, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 27, phase_to_str(tf1_phase) + " " + str.tostring(tf1_ewo, "#.#") + ewo1_dir,
+            text_color=phase_to_clr(tf1_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // TF2 (higher): phase + EWO
+        ewo2_dir = tf2_rising ? "+" : "-"
+        table.cell(dashboard, 0, 28, "TF2 " + mtf_tf2, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 28, phase_to_str(tf2_phase) + " " + str.tostring(tf2_ewo, "#.#") + ewo2_dir,
+            text_color=phase_to_clr(tf2_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // TF3 (highest): phase + EWO
+        ewo3_dir = tf3_rising ? "+" : "-"
+        table.cell(dashboard, 0, 29, "TF3 " + mtf_tf3, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 29, phase_to_str(tf3_phase) + " " + str.tostring(tf3_ewo, "#.#") + ewo3_dir,
+            text_color=phase_to_clr(tf3_phase), text_halign=text.align_right, text_size=size.tiny)
+
+        // SMA alignment per TF
+        table.cell(dashboard, 0, 30, "─── Trend ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 30, 1, 30)
+
+        // TF1 trend
+        tf1_trend_txt = tf1_above50 and tf1_above200 ? ">50 >200" :
+            tf1_above50 ? ">50 <200" :
+            not tf1_above50 and not tf1_above200 ? "<50 <200" : "<50 >200"
+        tf1_trend_clr = tf1_above50 and tf1_above200 ? color.lime :
+            not tf1_above50 and not tf1_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 31, tf1_name, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 31, tf1_trend_txt,
+            text_color=tf1_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
+        // TF2 trend
+        tf2_trend_txt = tf2_above50 and tf2_above200 ? ">50 >200" :
+            tf2_above50 ? ">50 <200" :
+            not tf2_above50 and not tf2_above200 ? "<50 <200" : "<50 >200"
+        tf2_trend_clr = tf2_above50 and tf2_above200 ? color.lime :
+            not tf2_above50 and not tf2_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 32, mtf_tf2, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 32, tf2_trend_txt,
+            text_color=tf2_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
+        // TF3 trend
+        tf3_trend_txt = tf3_above50 and tf3_above200 ? ">50 >200" :
+            tf3_above50 ? ">50 <200" :
+            not tf3_above50 and not tf3_above200 ? "<50 <200" : "<50 >200"
+        tf3_trend_clr = tf3_above50 and tf3_above200 ? color.lime :
+            not tf3_above50 and not tf3_above200 ? color.red : color.yellow
+        table.cell(dashboard, 0, 33, mtf_tf3, text_color=color.gray,
+            text_halign=text.align_left, text_size=size.tiny)
+        table.cell(dashboard, 1, 33, tf3_trend_txt,
+            text_color=tf3_trend_clr, text_halign=text.align_right, text_size=size.tiny)
+
+    // ── Fibonacci Time Zones Section ──
+    if show_fib_tz
+        table.cell(dashboard, 0, 34, "─── Fib Time ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 34, 1, 34)
+
+        tz_next_txt = fib_tz_bars_to_next > 0 ? str.tostring(fib_tz_bars_to_next) + " bars" : "AT ZONE"
+        tz_next_clr = fib_tz_at_zone ? color.lime :
+            fib_tz_bars_to_next <= 3 ? color.yellow :
+            fib_tz_bars_to_next <= 8 ? color.orange : color.gray
+        table.cell(dashboard, 0, 35, "Next TZ", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 35, tz_next_txt,
+            text_color=tz_next_clr, text_halign=text.align_right, text_size=size.small)
+
+        tz_prox_txt = fib_tz_at_zone ? "AT ZONE (" + str.tostring(fib_tz_nearest_num) + ")" :
+            str.tostring(fib_tz_nearest_dist) + " bars away"
+        table.cell(dashboard, 0, 36, "Proximity", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 36, tz_prox_txt,
+            text_color=tz_next_clr, text_halign=text.align_right, text_size=size.small)
+
+    // ── Wave Degree Section ──
+    if deg_enabled
+        table.cell(dashboard, 0, 37, "─── Degree ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 37, 1, 37)
+
+        d2_wave_txt = d2_wave == 0 ? "---" : d2_wave > 0 ? "W" + str.tostring(d2_wave) + " Bull" : "W" + str.tostring(math.abs(d2_wave)) + " Bear"
+        d2_wave_clr = d2_wave == 0 ? color.gray : d2_is_imp ? color.lime : d2_is_corr ? color.orange : color.yellow
+        table.cell(dashboard, 0, 38, "Deg 2 (×" + str.tostring(deg2_mult) + ")", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 38, d2_wave_txt,
+            text_color=d2_wave_clr, text_halign=text.align_right, text_size=size.small)
+
+        d3_wave_txt = d3_wave == 0 ? "---" : d3_wave > 0 ? "W" + str.tostring(d3_wave) + " Bull" : "W" + str.tostring(math.abs(d3_wave)) + " Bear"
+        d3_wave_clr = d3_wave == 0 ? color.gray : d3_is_imp ? color.lime : d3_is_corr ? color.orange : color.yellow
+        table.cell(dashboard, 0, 39, "Deg 3 (×" + str.tostring(deg3_mult) + ")", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 39, d3_wave_txt,
+            text_color=d3_wave_clr, text_halign=text.align_right, text_size=size.small)
+
+        conf_clr = deg_confluence >= 0.5 ? color.lime :
+            deg_confluence >= 0.0 ? color.yellow :
+            deg_confluence >= -0.3 ? color.orange : color.red
+        table.cell(dashboard, 0, 40, "Confluence", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 40, deg_context_label,
+            text_color=conf_clr, text_halign=text.align_right, text_size=size.small)
+
+        deg_score_txt = (deg_confluence >= 0 ? "+" : "") + str.tostring(deg_confluence * 10, "#.#") + "%"
+        table.cell(dashboard, 0, 41, "Deg Impact", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 41, deg_score_txt,
+            text_color=conf_clr, text_halign=text.align_right, text_size=size.small)
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+alertcondition(buy_signal, "Elliott Wave Buy",
+    "EW Buy Signal: Wave pattern complete — long entry")
+alertcondition(sell_signal, "Elliott Wave Sell",
+    "EW Sell Signal: Wave pattern complete — short entry")
+alertcondition(exhaustion_bull, "Bullish Exhaustion",
+    "EW: Bullish exhaustion — potential reversal / take profit")
+alertcondition(exhaustion_bear, "Bearish Exhaustion",
+    "EW: Bearish exhaustion — potential reversal / cover shorts")
+alertcondition(active_conf >= 0.6 and active_conf[1] < 0.6, "High Confidence Pattern",
+    "EW: High confidence wave pattern detected (>60%)")
+alertcondition(pattern_type == "impulse" and pattern_type[1] != "impulse", "Impulse Detected",
+    "EW: Complete 5-wave impulse pattern identified")
+alertcondition(pattern_type == "correction" and pattern_type[1] != "correction", "ABC Correction",
+    "EW: ABC correction pattern identified")
+alertcondition(pattern_type == "wxy" and pattern_type[1] != "wxy", "WXY Double Detected",
+    "EW: WXY double combination (complex correction) identified")
+alertcondition(pattern_type == "wxyxz" and pattern_type[1] != "wxyxz", "WXYXZ Triple Detected",
+    "EW: WXYXZ triple combination (complex correction) identified")
+alertcondition(pattern_type == "diagonal" and pattern_type[1] != "diagonal", "Diagonal Detected",
+    "EW: Diagonal pattern identified")
+alertcondition(mtf_strong_bull and not mtf_strong_bull[1], "MTF All Bullish",
+    "EW MTF: All 3 timeframes now bullish — strong confluence")
+alertcondition(mtf_strong_bear and not mtf_strong_bear[1], "MTF All Bearish",
+    "EW MTF: All 3 timeframes now bearish — strong confluence")
+alertcondition(buy_signal and mtf_strong_bull, "MTF Confirmed Buy",
+    "EW: Buy signal with all 3 timeframes bullish — highest conviction")
+alertcondition(sell_signal and mtf_strong_bear, "MTF Confirmed Sell",
+    "EW: Sell signal with all 3 timeframes bearish — highest conviction")
+alertcondition(rsi_div_type == 1 and rsi_div_type[1] != 1, "RSI Bearish Divergence",
+    "EW RSI: Bearish divergence detected at wave pivot")
+alertcondition(rsi_div_type == -1 and rsi_div_type[1] != -1, "RSI Bullish Divergence",
+    "EW RSI: Bullish divergence detected at wave pivot")
+alertcondition(buy_signal and rsi_div_score >= 0.85, "RSI Confirmed Buy",
+    "EW: Buy signal with strong RSI divergence confirmation")
+alertcondition(sell_signal and rsi_div_score >= 0.85, "RSI Confirmed Sell",
+    "EW: Sell signal with strong RSI divergence confirmation")
+alertcondition(vol_obv_div_type == 1 and vol_obv_div_type[1] != 1, "OBV Bearish Divergence",
+    "EW VOL: OBV bearish divergence (distribution) at wave pivot")
+alertcondition(vol_obv_div_type == -1 and vol_obv_div_type[1] != -1, "OBV Bullish Divergence",
+    "EW VOL: OBV bullish divergence (accumulation) at wave pivot")
+alertcondition(buy_signal and vol_combined >= 0.75, "Volume Confirmed Buy",
+    "EW: Buy signal with strong volume confirmation (OBV + VWAP)")
+alertcondition(sell_signal and vol_combined >= 0.75, "Volume Confirmed Sell",
+    "EW: Sell signal with strong volume confirmation (OBV + VWAP)")
+alertcondition(show_fib_tz and fib_tz_at_zone and not fib_tz_at_zone[1], "Fibonacci Time Zone Hit",
+    "EW: Price entering Fibonacci time zone — potential turning point")
+alertcondition(show_fib_tz and fib_tz_bars_to_next <= 3 and fib_tz_bars_to_next > 0, "Fibonacci Time Zone Approaching",
+    "EW: Fibonacci time zone approaching within 3 bars")
+alertcondition(deg_enabled and deg_confluence >= 0.75, "Degree W3-in-W3 / Strong Confluence",
+    "EW DEGREE: Strong multi-degree confluence detected (W3-in-W3 or W3 in impulse)")
+alertcondition(deg_enabled and deg_confluence <= -0.3, "Degree Conflict Warning",
+    "EW DEGREE: Multi-degree conflict — higher degree opposes current wave direction")
+alertcondition(deg_enabled and deg_confluence >= 0.75 and buy_signal, "Degree Confirmed Buy",
+    "EW: Buy signal with strong multi-degree confluence — highest conviction")
+alertcondition(deg_enabled and deg_confluence >= 0.75 and sell_signal, "Degree Confirmed Sell",
+    "EW: Sell signal with strong multi-degree confluence — highest conviction")
+
+// ============================================================================
+// HIDDEN PLOTS (for data window and external indicators)
+// ============================================================================
+plot(active_conf, "Confidence", display=display.none)
+plot(active_wave, "Wave Number", display=display.none)
+plot(ewo_value, "EWO", display=display.none)
+plot(last_signal, "Signal Direction", display=display.none)
+plot(mtf_score, "MTF Score", display=display.none)
+plot(composite_prob, "Composite Probability", display=display.none)
+plot(rsi_value, "RSI Value", display=display.none)
+plot(rsi_div_score, "RSI Div Score", display=display.none)
+plot(rsi_div_type, "RSI Div Type", display=display.none)
+plot(obv_value, "OBV Value", display=display.none)
+plot(vol_combined, "Volume Score", display=display.none)
+plot(vol_obv_div_type, "OBV Div Type", display=display.none)
+plot(fib_tz_bars_to_next, "Fib TZ Next", display=display.none)
+plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone", display=display.none)
+plot(deg_enabled ? d2_wave : na, "D2 Wave", display=display.none)
+plot(deg_enabled ? d3_wave : na, "D3 Wave", display=display.none)
+plot(deg_enabled ? deg_confluence : na, "Deg Confluence", display=display.none)
+
+// Data window exports
+plot(active_conf * 100, "Pattern Confidence %", color=color.new(color.purple, 100), display=display.data_window)
+plot(composite_prob * 100, "Composite Probability %", color=color.new(color.lime, 100), display=display.data_window)
+plot(p_mtf * 100, "MTF Agreement %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_trend * 100, "Trend Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_momentum * 100, "Momentum Alignment %", color=color.new(color.aqua, 100), display=display.data_window)
+plot(p_rsi * 100, "RSI Confirmation %", color=color.new(color.orange, 100), display=display.data_window)
+plot(rsi_value, "RSI Value", color=color.new(color.orange, 100), display=display.data_window)
+plot(rsi_div_type, "RSI Divergence Type", color=color.new(color.orange, 100), display=display.data_window)
+plot(ewo_value, "EWO (Chart TF)", color=color.new(color.blue, 100), display=display.data_window)
+plot(mtf_score, "MTF Confluence Score", color=color.new(color.aqua, 100), display=display.data_window)
+plot(tf1_dir_prob * 100, "TF1 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(tf2_dir_prob * 100, "TF2 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(tf3_dir_prob * 100, "TF3 Dir Probability %", color=color.new(color.green, 100), display=display.data_window)
+plot(sig_rr, "Risk:Reward Ratio", color=color.new(color.yellow, 100), display=display.data_window)
+plot(p_vol * 100, "Volume Confirmation %", color=color.new(color.teal, 100), display=display.data_window)
+plot(obv_value, "OBV", color=color.new(color.teal, 100), display=display.data_window)
+plot(vol_obv_div_type, "OBV Divergence Type", color=color.new(color.teal, 100), display=display.data_window)
+plot(fib_tz_bars_to_next, "Fib TZ Bars to Next", color=color.new(color.aqua, 100), display=display.data_window)
+plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone (0/1)", color=color.new(color.aqua, 100), display=display.data_window)
+plot(fib_tz_nearest_num, "Fib TZ Nearest Number", color=color.new(color.aqua, 100), display=display.data_window)
+plot(deg_enabled ? d2_wave : na, "Deg 2 Wave Position", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d2_dir : na, "Deg 2 Direction", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d3_wave : na, "Deg 3 Wave Position", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d3_dir : na, "Deg 3 Direction", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? deg_confluence * 100 : na, "Deg Confluence %", color=color.new(color.silver, 100), display=display.data_window)
