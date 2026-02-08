@@ -397,11 +397,15 @@ def detect_diagonal(pivots, fib_tolerance=DEFAULT_FIB_TOLERANCE):
     return (diag_type, confidence, is_leading)
 
 
-def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum, p_rsi=None):
+def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum, p_rsi=None, p_vol=None):
     """Weighted composite probability.
-    Without RSI: 40% pattern + 25% MTF + 20% trend + 15% momentum (legacy).
-    With RSI:    35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI.
+    Without RSI/Vol: 40% pattern + 25% MTF + 20% trend + 15% momentum (legacy).
+    With RSI only:   35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI.
+    With RSI + Vol:  25% pattern + 15% MTF + 10% trend + 10% momentum + 15% RSI + 25% volume.
     """
+    if p_vol is not None and p_rsi is not None:
+        return (p_pattern * 0.25 + p_mtf * 0.15 + p_trend * 0.10 +
+                p_momentum * 0.10 + p_rsi * 0.15 + p_vol * 0.25)
     if p_rsi is not None:
         return p_pattern * 0.35 + p_mtf * 0.20 + p_trend * 0.15 + p_momentum * 0.15 + p_rsi * 0.15
     return p_pattern * 0.40 + p_mtf * 0.25 + p_trend * 0.20 + p_momentum * 0.15
@@ -598,6 +602,82 @@ def compute_diagonal_rsi_score(diag_type, is_leading, prices, rsi_values, rsi_ob
             else:
                 div_score = 0.40
     return (div_type, div_score)
+
+
+# ============================================================================
+# OBV DIVERGENCE DETECTION (translated from Pine Script)
+# ============================================================================
+
+def detect_obv_div_at_highs(prices, obv_values, newer_idx, older_idx):
+    """OBV divergence at highs. Returns: 1=regular bearish (distribution), 2=hidden, 0=none."""
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(obv_values) or older_idx >= len(obv_values)):
+        return 0
+    p_new, p_old = prices[newer_idx], prices[older_idx]
+    o_new, o_old = obv_values[newer_idx], obv_values[older_idx]
+    if p_new is None or p_old is None or o_new is None or o_old is None:
+        return 0
+    if p_new > p_old and o_new < o_old:
+        return 1
+    if p_new < p_old and o_new > o_old:
+        return 2
+    return 0
+
+
+def detect_obv_div_at_lows(prices, obv_values, newer_idx, older_idx):
+    """OBV divergence at lows. Returns: -1=regular bullish (accumulation), -2=hidden, 0=none."""
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(obv_values) or older_idx >= len(obv_values)):
+        return 0
+    p_new, p_old = prices[newer_idx], prices[older_idx]
+    o_new, o_old = obv_values[newer_idx], obv_values[older_idx]
+    if p_new is None or p_old is None or o_new is None or o_old is None:
+        return 0
+    if p_new < p_old and o_new > o_old:
+        return -1
+    if p_new > p_old and o_new < o_old:
+        return -2
+    return 0
+
+
+def compute_volume_score(obv_div_score, wave_vol_score, vwap_score):
+    """Combined volume score: 40% OBV divergence + 30% wave volume + 30% VWAP."""
+    return obv_div_score * 0.40 + wave_vol_score * 0.30 + vwap_score * 0.30
+
+
+def compute_impulse_wave_vol_score(v_w1, v_w3, v_w5):
+    """Wave volume pattern score for impulse: W3 should be highest volume."""
+    if v_w1 is None or v_w3 is None or v_w5 is None:
+        return 0.5
+    if v_w3 > v_w1 and v_w3 > v_w5:
+        if v_w5 < v_w1:
+            return 1.0    # W3 highest, W5 declining → strong exhaustion
+        return 0.85       # W3 highest → classic impulse
+    if v_w5 > v_w3:
+        return 0.15       # W5 more volume than W3 → extended 5th, NOT exhaustion
+    return 0.5
+
+
+def compute_vwap_score(vwap_pct, active_bull):
+    """VWAP position score. vwap_pct = (close - vwap) / vwap * 100."""
+    if vwap_pct is None:
+        return 0.5
+    if active_bull:
+        if vwap_pct > 1.0:
+            return 1.0
+        if vwap_pct > 0.0:
+            return 0.75
+        if vwap_pct > -1.0:
+            return 0.35
+        return 0.15
+    else:
+        if vwap_pct < -1.0:
+            return 1.0
+        if vwap_pct < 0.0:
+            return 0.75
+        if vwap_pct < 1.0:
+            return 0.35
+        return 0.15
 
 
 # ============================================================================
@@ -1255,6 +1335,144 @@ class TestDiagonalRSIDivergence(unittest.TestCase):
         div_type, div_score = compute_diagonal_rsi_score(1, False, prices, rsi)
         self.assertEqual(div_type, 0)
         self.assertAlmostEqual(div_score, 0.5)
+
+
+class TestOBVDivergenceDetection(unittest.TestCase):
+    """Test OBV divergence detection functions."""
+
+    def test_obv_regular_bearish_distribution(self):
+        """Price higher high + OBV lower high → distribution (bearish)."""
+        prices = [110, 90, 100]
+        obv =    [5000, 4000, 5500]
+        result = detect_obv_div_at_highs(prices, obv, 0, 2)
+        self.assertEqual(result, 1)
+
+    def test_obv_regular_bullish_accumulation(self):
+        """Price lower low + OBV higher low → accumulation (bullish)."""
+        prices = [85, 110, 90]
+        obv =    [5200, 5500, 5000]
+        result = detect_obv_div_at_lows(prices, obv, 0, 2)
+        self.assertEqual(result, -1)
+
+    def test_obv_no_divergence_concordant(self):
+        """Price and OBV both higher → no divergence."""
+        prices = [110, 90, 100]
+        obv =    [5800, 4000, 5500]
+        self.assertEqual(detect_obv_div_at_highs(prices, obv, 0, 2), 0)
+
+    def test_obv_hidden_bearish(self):
+        """Price lower high + OBV higher high → hidden bearish."""
+        prices = [95, 90, 100]
+        obv =    [5800, 4000, 5500]
+        result = detect_obv_div_at_highs(prices, obv, 0, 2)
+        self.assertEqual(result, 2)
+
+    def test_obv_hidden_bullish(self):
+        """Price higher low + OBV lower low → hidden bullish."""
+        prices = [95, 110, 90]
+        obv =    [4800, 5500, 5000]
+        result = detect_obv_div_at_lows(prices, obv, 0, 2)
+        self.assertEqual(result, -2)
+
+    def test_obv_none_values(self):
+        """None OBV values return 0."""
+        prices = [110, 90, 100]
+        obv =    [None, 4000, 5500]
+        self.assertEqual(detect_obv_div_at_highs(prices, obv, 0, 2), 0)
+
+
+class TestVolumeScoring(unittest.TestCase):
+    """Test volume sub-scores and combined score."""
+
+    def test_combined_volume_score_weights(self):
+        """Verify combined score weights: 40% OBV + 30% wave + 30% VWAP = 100%."""
+        result = compute_volume_score(1.0, 1.0, 1.0)
+        self.assertAlmostEqual(result, 1.0)
+        result = compute_volume_score(0.0, 0.0, 0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_impulse_w3_highest_volume(self):
+        """W3 highest, W5 declining → strong exhaustion (1.0)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 2000, 800), 1.0)
+
+    def test_impulse_w3_highest_w5_moderate(self):
+        """W3 highest but W5 not less than W1 → classic impulse (0.85)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 2000, 1200), 0.85)
+
+    def test_impulse_w5_exceeds_w3(self):
+        """W5 more volume than W3 → extended 5th, NOT exhaustion (0.15)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 1500, 2000), 0.15)
+
+    def test_impulse_equal_volume(self):
+        """Equal volumes → neutral (0.5)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 1000, 1000), 0.5)
+
+    def test_vwap_bullish_premium(self):
+        """Price >1% above VWAP for bullish → 1.0."""
+        self.assertAlmostEqual(compute_vwap_score(2.0, True), 1.0)
+
+    def test_vwap_bullish_above(self):
+        """Price just above VWAP for bullish → 0.75."""
+        self.assertAlmostEqual(compute_vwap_score(0.5, True), 0.75)
+
+    def test_vwap_bullish_below(self):
+        """Price slightly below VWAP for bullish → 0.35."""
+        self.assertAlmostEqual(compute_vwap_score(-0.5, True), 0.35)
+
+    def test_vwap_bullish_deep_below(self):
+        """Price deep below VWAP for bullish → 0.15."""
+        self.assertAlmostEqual(compute_vwap_score(-2.0, True), 0.15)
+
+    def test_vwap_bearish_deep_below(self):
+        """Price >1% below VWAP for bearish → 1.0 (confirms)."""
+        self.assertAlmostEqual(compute_vwap_score(-2.0, False), 1.0)
+
+    def test_vwap_bearish_above(self):
+        """Price above VWAP for bearish → 0.35 (contradicts)."""
+        self.assertAlmostEqual(compute_vwap_score(0.5, False), 0.35)
+
+    def test_vwap_none(self):
+        """None VWAP → neutral 0.5."""
+        self.assertAlmostEqual(compute_vwap_score(None, True), 0.5)
+
+
+class TestCompositeWithVolume(unittest.TestCase):
+    """Test composite probability with volume component."""
+
+    def test_six_component_weights_sum_to_1(self):
+        """25 + 15 + 10 + 10 + 15 + 25 = 100."""
+        self.assertAlmostEqual(0.25 + 0.15 + 0.10 + 0.10 + 0.15 + 0.25, 1.0)
+
+    def test_all_perfect_with_volume(self):
+        """All 6 components at 1.0 → 1.0."""
+        result = compute_composite_probability(1.0, 1.0, 1.0, 1.0, p_rsi=1.0, p_vol=1.0)
+        self.assertAlmostEqual(result, 1.0)
+
+    def test_all_zero_with_volume(self):
+        """All 6 components at 0.0 → 0.0."""
+        result = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_volume_and_pattern_equal_weight(self):
+        """Volume and pattern both at 25% — should be equal contributors."""
+        vol_only = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=1.0)
+        pat_only = compute_composite_probability(1.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=0.0)
+        self.assertAlmostEqual(vol_only, pat_only)
+        self.assertAlmostEqual(vol_only, 0.25)
+
+    def test_volume_overrides_weak_exhaustion(self):
+        """High volume score reduces exhaustion confidence.
+        Pattern says exhaustion (1.0) but volume contradicts (0.15)."""
+        with_vol = compute_composite_probability(1.0, 0.5, 0.5, 0.5, p_rsi=1.0, p_vol=0.15)
+        without_vol = compute_composite_probability(1.0, 0.5, 0.5, 0.5, p_rsi=1.0, p_vol=0.5)
+        self.assertLess(with_vol, without_vol, "Low volume score should lower composite")
+
+    def test_volume_boost_strong_trend(self):
+        """Volume confirming trend should boost composite."""
+        weak = compute_composite_probability(0.6, 0.5, 0.5, 0.5, p_rsi=0.5, p_vol=0.5)
+        strong = compute_composite_probability(0.6, 0.5, 0.5, 0.5, p_rsi=0.5, p_vol=1.0)
+        self.assertGreater(strong, weak)
+        self.assertAlmostEqual(strong - weak, 0.125)  # 0.5 * 0.25 = 0.125 difference
 
 
 class TestEdgeCases(unittest.TestCase):
