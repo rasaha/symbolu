@@ -1,8 +1,8 @@
-# Symbol-U (SOULPI) — Startup Summary for MATH Nuage Program
+# Cognade Labs — Startup Summary for MATH Nuage Program
 
 ## One-liner
 
-Symbol-U is a deterministic Augmented General Intelligence (AGI) engine that adds coherence, memory, safety, and governance layers on top of existing LLMs — making AI reliable, predictable, and enterprise-ready.
+Phase Quad LLM Model is a deterministic Augmented General Intelligence (AGI) engine that adds coherence, memory, safety, and governance layers on top of existing LLMs — making AI reliable, predictable, and enterprise-ready.
 
 ## Problem
 
@@ -10,7 +10,7 @@ Large Language Models are powerful but unreliable for enterprise use. They hallu
 
 ## Solution
 
-Symbol-U is a **cognitive middleware for AI systems**. Instead of retraining or fine-tuning language models, it wraps them with deterministic, rule-based intelligence layers that enforce:
+Phase Quad LLM is a **cognitive middleware for AI systems**. Instead of retraining or fine-tuning language models, it wraps them with deterministic, rule-based intelligence layers that enforce:
 
 - **Semantic Coherence** — Tracks 7 quality metrics (internal consistency, prediction reversals, volatility, goal alignment, factual accuracy, identity stability, drift) in real-time to detect when AI goes off the rails
 - **Persistent Memory** — "Master Chat" system organizes knowledge across 15 semantic categories, replacing fragile multi-session contexts
@@ -19,8 +19,8 @@ Symbol-U is a **cognitive middleware for AI systems**. Instead of retraining or 
 
 ## Key Differentiators
 
-| Aspect | Symbol-U | Typical AI Wrappers |
-|--------|----------|---------------------|
+| Aspect | Phase Quad LLM | Typical AI Wrappers |
+|--------|----------------|---------------------|
 | Behavior | Deterministic, formula-based | Probabilistic, learned |
 | Memory | Semantic bucketing, persistent | Session-scoped, fragile |
 | Safety | Pre-execution contracts | Post-hoc filtering |
@@ -58,7 +58,7 @@ Symbol-U is a **cognitive middleware for AI systems**. Instead of retraining or 
 3. **Funding Assistance** — Scale from current prototype to production deployment
 4. **Market Access** — Showcase to potential enterprise customers at Demo Day
 5. **LMS Resources** — Deepen team expertise in cutting-edge AI/ML techniques
-6. **AI/ML Alignment** — Symbol-U is core AI infrastructure that makes all AI more trustworthy
+6. **AI/ML Alignment** — Phase Quad frontier LLM model aligns directly with MATH's AI/ML focus — it's infrastructure that makes all AI more trustworthy
 
 ## Team
 
