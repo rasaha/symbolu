@@ -681,6 +681,55 @@ def compute_vwap_score(vwap_pct, active_bull):
 
 
 # ============================================================================
+# FIBONACCI TIME ZONE FUNCTIONS
+# ============================================================================
+
+FIB_TZ = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]
+
+
+def compute_fib_tz_proximity(bars_from_anchor):
+    """Compute Fibonacci time zone proximity info.
+
+    Returns dict with:
+        bars_to_next: bars until next future TZ (0 if past all zones)
+        nearest_dist: distance to nearest TZ (any direction)
+        nearest_num: the Fibonacci number of the nearest TZ
+        at_zone: True if within 1 bar of a TZ
+    """
+    nearest_dist = 999999
+    nearest_num = 0
+    bars_to_next = 0
+
+    for tz in FIB_TZ:
+        dist = abs(bars_from_anchor - tz)
+        if dist < nearest_dist:
+            nearest_dist = dist
+            nearest_num = tz
+        if tz > bars_from_anchor and bars_to_next == 0:
+            bars_to_next = tz - bars_from_anchor
+
+    at_zone = nearest_dist <= 1
+    return {
+        'bars_to_next': bars_to_next,
+        'nearest_dist': nearest_dist,
+        'nearest_num': nearest_num,
+        'at_zone': at_zone,
+    }
+
+
+def get_fib_tz_anchor_pivot_index(pattern_type):
+    """Return which pivot index is the anchor for Fibonacci time zones."""
+    if pattern_type in ("impulse", "diagonal", "wxyxz"):
+        return 5
+    elif pattern_type in ("partial", "wxy"):
+        return 3
+    elif pattern_type == "correction":
+        return 2
+    else:
+        return None
+
+
+# ============================================================================
 # TEST CASES
 # ============================================================================
 
@@ -1500,6 +1549,101 @@ class TestEdgeCases(unittest.TestCase):
     def test_division_by_zero_safe(self):
         """retrace_ratio with zero wave size returns 0."""
         self.assertEqual(retrace_ratio(0, 50), 0.0)
+
+
+class TestFibonacciTimeZones(unittest.TestCase):
+    """Tests for Fibonacci Time Zone proximity calculations."""
+
+    def test_exact_fib_zone(self):
+        """Exactly at Fib number 13 bars from anchor → at_zone."""
+        result = compute_fib_tz_proximity(13)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_dist'], 0)
+        self.assertEqual(result['nearest_num'], 13)
+
+    def test_one_bar_from_zone(self):
+        """1 bar from Fib number 13 → still at_zone (tolerance=1)."""
+        result = compute_fib_tz_proximity(12)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 13)
+
+    def test_two_bars_from_zone_not_at(self):
+        """2 bars from nearest zone → not at_zone."""
+        result = compute_fib_tz_proximity(10)
+        self.assertFalse(result['at_zone'])
+        # 10 is 2 away from 8 and 3 away from 13 → nearest is 8
+        self.assertEqual(result['nearest_num'], 8)
+
+    def test_bars_to_next_from_zero(self):
+        """From bar 0, next TZ is at bar 1."""
+        result = compute_fib_tz_proximity(0)
+        self.assertEqual(result['bars_to_next'], 1)
+
+    def test_bars_to_next_between_zones(self):
+        """Between 8 and 13 → next is 13."""
+        result = compute_fib_tz_proximity(9)
+        self.assertEqual(result['bars_to_next'], 4)  # 13 - 9
+
+    def test_bars_to_next_past_all(self):
+        """Past all zones → bars_to_next = 0."""
+        result = compute_fib_tz_proximity(300)
+        self.assertEqual(result['bars_to_next'], 0)
+
+    def test_at_first_zone(self):
+        """At the very first zone (bar 1)."""
+        result = compute_fib_tz_proximity(1)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 1)
+
+    def test_at_last_zone(self):
+        """At the last zone (bar 233)."""
+        result = compute_fib_tz_proximity(233)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 233)
+
+    def test_at_zone_boundary_tolerance(self):
+        """Bar 54 is 1 away from 55 → at_zone=True."""
+        result = compute_fib_tz_proximity(54)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 55)
+
+    def test_anchor_pivot_impulse(self):
+        """Impulse anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("impulse"), 5)
+
+    def test_anchor_pivot_diagonal(self):
+        """Diagonal anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("diagonal"), 5)
+
+    def test_anchor_pivot_correction(self):
+        """Correction anchor is pivot 2."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("correction"), 2)
+
+    def test_anchor_pivot_wxy(self):
+        """WXY anchor is pivot 3."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("wxy"), 3)
+
+    def test_anchor_pivot_partial(self):
+        """Partial anchor is pivot 3."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("partial"), 3)
+
+    def test_anchor_pivot_wxyxz(self):
+        """WXYXZ anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("wxyxz"), 5)
+
+    def test_anchor_pivot_none(self):
+        """No pattern → no anchor."""
+        self.assertIsNone(get_fib_tz_anchor_pivot_index("none"))
+
+    def test_bars_to_next_at_exact_zone(self):
+        """At bar 5 exactly → next TZ is 8, so 3 bars to next."""
+        result = compute_fib_tz_proximity(5)
+        self.assertEqual(result['bars_to_next'], 3)
+
+    def test_fib_tz_sequence_correct(self):
+        """Verify the FIB_TZ sequence is correct."""
+        expected = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]
+        self.assertEqual(FIB_TZ, expected)
 
 
 if __name__ == "__main__":

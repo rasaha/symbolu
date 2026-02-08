@@ -69,6 +69,8 @@ vol_vwap        = input.bool(true, "Include VWAP",
 show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
 show_wave_labels = input.bool(true, "Show Wave Labels (1-5, A-B-C, W-X-Y-Z)", group="Display")
 show_fib_levels  = input.bool(true, "Show Fibonacci Levels", group="Display")
+show_fib_tz      = input.bool(true, "Show Fibonacci Time Zones", group="Display",
+    tooltip="Draw vertical lines at Fibonacci time intervals from the wave pattern anchor point.")
 show_targets     = input.bool(true, "Show Wave Targets", group="Display")
 show_signals     = input.bool(true, "Show Trading Signals", group="Display")
 show_table       = input.bool(true, "Show Info Dashboard", group="Display")
@@ -95,6 +97,9 @@ FIB_1272 = 1.272
 FIB_1618 = 1.618
 FIB_2000 = 2.000
 FIB_2618 = 2.618
+
+// Fibonacci Time Zone sequence (bars from anchor)
+var int[] FIB_TZ = array.from(1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233)
 
 // ============================================================================
 // ZIG-ZAG PIVOT DETECTION
@@ -994,6 +999,41 @@ else
     pattern_type := "none"
 
 // ============================================================================
+// FIBONACCI TIME ZONE ANCHOR & PROXIMITY
+// ============================================================================
+// Anchor bar = the starting pivot of the current wave structure.
+// Proximity = how close the current bar is to any Fibonacci time zone.
+// ============================================================================
+
+var int fib_tz_anchor = na
+if pattern_type == "impulse" or pattern_type == "diagonal" or pattern_type == "wxyxz"
+    fib_tz_anchor := piv_count >= 6 ? get_bar(5) : int(na)
+else if pattern_type == "partial" or pattern_type == "wxy"
+    fib_tz_anchor := piv_count >= 4 ? get_bar(3) : int(na)
+else if pattern_type == "correction"
+    fib_tz_anchor := piv_count >= 3 ? get_bar(2) : int(na)
+else
+    fib_tz_anchor := int(na)
+
+// Compute proximity to nearest Fibonacci time zone
+fib_tz_bars_to_next = 0
+fib_tz_nearest_dist = 999999
+fib_tz_nearest_num  = 0
+fib_tz_at_zone      = false
+
+if show_fib_tz and not na(fib_tz_anchor) and pattern_type != "none"
+    bars_from_anchor = bar_index - fib_tz_anchor
+    for i = 0 to array.size(FIB_TZ) - 1
+        tz = array.get(FIB_TZ, i)
+        dist = math.abs(bars_from_anchor - tz)
+        if dist < fib_tz_nearest_dist
+            fib_tz_nearest_dist := dist
+            fib_tz_nearest_num  := tz
+        if tz > bars_from_anchor and fib_tz_bars_to_next == 0
+            fib_tz_bars_to_next := tz - bars_from_anchor
+    fib_tz_at_zone := fib_tz_nearest_dist <= 1
+
+// ============================================================================
 // RSI DIVERGENCE DETECTION
 // ============================================================================
 //
@@ -1646,6 +1686,51 @@ if barstate.isconfirmed and show_fib_levels and pattern_type != "none"
             else
                 draw_fib_level(x2_end + y_size * FIB_618, start_b, "Z 61.8%", color_complex)
                 draw_fib_level(x2_end + y_size * FIB_1000, start_b, "Z 100%", color_complex)
+
+// ============================================================================
+// FIBONACCI TIME ZONES (Vertical Lines)
+// ============================================================================
+//
+// Draws vertical lines at Fibonacci number intervals from the pattern's
+// anchor bar (starting pivot). Fibonacci sequence: 1,2,3,5,8,13,21,34,55,89,144,233
+//
+// Past zones are dimmer; future zones are brighter; current zone highlighted.
+// ============================================================================
+
+var line[]  tz_lines  = array.new_line(0)
+var label[] tz_labels = array.new_label(0)
+
+if barstate.isconfirmed
+    if array.size(tz_lines) > 0
+        for i = array.size(tz_lines) - 1 to 0
+            line.delete(array.get(tz_lines, i))
+        array.clear(tz_lines)
+    if array.size(tz_labels) > 0
+        for i = array.size(tz_labels) - 1 to 0
+            label.delete(array.get(tz_labels, i))
+        array.clear(tz_labels)
+
+if barstate.isconfirmed and show_fib_tz and not na(fib_tz_anchor) and pattern_type != "none"
+    tz_label_price = ta.highest(high, 50)
+    for i = 0 to array.size(FIB_TZ) - 1
+        tz_num = array.get(FIB_TZ, i)
+        tz_bar = fib_tz_anchor + tz_num
+        // Only draw zones within visible range
+        if tz_bar >= bar_index - 300 and tz_bar <= bar_index + 100
+            is_future = tz_bar > bar_index
+            is_near   = math.abs(tz_bar - bar_index) <= 1
+            tz_clr = is_near ? color.new(color.aqua, 20) :
+                is_future ? color.new(color.aqua, 50) :
+                color.new(color.aqua, 75)
+            tz_w = is_near ? 2 : 1
+            ln = line.new(tz_bar, close * 0.995, tz_bar, close * 1.005,
+                color=tz_clr, style=line.style_dotted, width=tz_w,
+                extend=extend.both)
+            array.push(tz_lines, ln)
+            lbl = label.new(tz_bar, tz_label_price, str.tostring(tz_num),
+                style=label.style_label_down, color=color.new(color.aqua, 85),
+                textcolor=color.white, size=size.tiny)
+            array.push(tz_labels, lbl)
 
 // ============================================================================
 // WAVE TARGET PROJECTION
@@ -2395,7 +2480,7 @@ phase_to_clr(p) =>
     p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
 
 if show_table and barstate.islast
-    var table dashboard = table.new(position.top_right, 2, 34,
+    var table dashboard = table.new(position.top_right, 2, 37,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 
     // Header
@@ -2683,6 +2768,28 @@ if show_table and barstate.islast
         table.cell(dashboard, 1, 33, tf3_trend_txt,
             text_color=tf3_trend_clr, text_halign=text.align_right, text_size=size.tiny)
 
+    // ── Fibonacci Time Zones Section ──
+    if show_fib_tz
+        table.cell(dashboard, 0, 34, "─── Fib Time ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 34, 1, 34)
+
+        tz_next_txt = fib_tz_bars_to_next > 0 ? str.tostring(fib_tz_bars_to_next) + " bars" : "AT ZONE"
+        tz_next_clr = fib_tz_at_zone ? color.lime :
+            fib_tz_bars_to_next <= 3 ? color.yellow :
+            fib_tz_bars_to_next <= 8 ? color.orange : color.gray
+        table.cell(dashboard, 0, 35, "Next TZ", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 35, tz_next_txt,
+            text_color=tz_next_clr, text_halign=text.align_right, text_size=size.small)
+
+        tz_prox_txt = fib_tz_at_zone ? "AT ZONE (" + str.tostring(fib_tz_nearest_num) + ")" :
+            str.tostring(fib_tz_nearest_dist) + " bars away"
+        table.cell(dashboard, 0, 36, "Proximity", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 36, tz_prox_txt,
+            text_color=tz_next_clr, text_halign=text.align_right, text_size=size.small)
+
 // ============================================================================
 // ALERTS
 // ============================================================================
@@ -2730,6 +2837,10 @@ alertcondition(buy_signal and vol_combined >= 0.75, "Volume Confirmed Buy",
     "EW: Buy signal with strong volume confirmation (OBV + VWAP)")
 alertcondition(sell_signal and vol_combined >= 0.75, "Volume Confirmed Sell",
     "EW: Sell signal with strong volume confirmation (OBV + VWAP)")
+alertcondition(show_fib_tz and fib_tz_at_zone and not fib_tz_at_zone[1], "Fibonacci Time Zone Hit",
+    "EW: Price entering Fibonacci time zone — potential turning point")
+alertcondition(show_fib_tz and fib_tz_bars_to_next <= 3 and fib_tz_bars_to_next > 0, "Fibonacci Time Zone Approaching",
+    "EW: Fibonacci time zone approaching within 3 bars")
 
 // ============================================================================
 // HIDDEN PLOTS (for data window and external indicators)
@@ -2746,6 +2857,8 @@ plot(rsi_div_type, "RSI Div Type", display=display.none)
 plot(obv_value, "OBV Value", display=display.none)
 plot(vol_combined, "Volume Score", display=display.none)
 plot(vol_obv_div_type, "OBV Div Type", display=display.none)
+plot(fib_tz_bars_to_next, "Fib TZ Next", display=display.none)
+plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone", display=display.none)
 
 // Data window exports
 plot(active_conf * 100, "Pattern Confidence %", color=color.new(color.purple, 100), display=display.data_window)
@@ -2765,3 +2878,6 @@ plot(sig_rr, "Risk:Reward Ratio", color=color.new(color.yellow, 100), display=di
 plot(p_vol * 100, "Volume Confirmation %", color=color.new(color.teal, 100), display=display.data_window)
 plot(obv_value, "OBV", color=color.new(color.teal, 100), display=display.data_window)
 plot(vol_obv_div_type, "OBV Divergence Type", color=color.new(color.teal, 100), display=display.data_window)
+plot(fib_tz_bars_to_next, "Fib TZ Bars to Next", color=color.new(color.aqua, 100), display=display.data_window)
+plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone (0/1)", color=color.new(color.aqua, 100), display=display.data_window)
+plot(fib_tz_nearest_num, "Fib TZ Nearest Number", color=color.new(color.aqua, 100), display=display.data_window)
