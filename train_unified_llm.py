@@ -112,6 +112,10 @@ from symbolu.phase_transformer import (
     OntologicalBindingCacheTransformer,  # V10.0: AGI Architecture (Binding Cache + 32D Sovereign State)
     # V9.8.0: 32D Sovereign State (replaces 124D CognitiveState)
     SOVEREIGN_STATE_DIM,
+    # V11.0.0: Separated state planes
+    PHASE_STATE_DIM,       # 12D Bhava-only (phase rotation input)
+    CONTROL_STATE_DIM,     # 16D Koshas+Vrittis+Gunas (control plane)
+    LEARNING_STATE_DIM,    # 4D Reserved/JEPA (learning plane)
     BHAVA_NAMES,
     KOSHA_NAMES,
     VRITTI_NAMES,
@@ -10717,10 +10721,13 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
         )
-        print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled")
-        print(f"    Sovereign State Dimension: {config.state_dim}D")
+        print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled (V11.0.0: Separated Planes)")
+        print(f"    Full Sovereign State: {config.state_dim}D (diagnostics/control/learning)")
+        print(f"    Phase Rotation Input: {PHASE_STATE_DIM}D (Bhava-only → ΔBhava → θ → attention)")
         if config.state_dim == SOVEREIGN_STATE_DIM:
-            print(f"      [0:12] 12 Bhavas | [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia | [28:32] Reserved")
+            print(f"      Phase:   [0:12]  12 Bhavas → phase rotation (identity)")
+            print(f"      Control: [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia")
+            print(f"      Learn:   [28:32] Reserved/JEPA (training-time only)")
         print(f"    Project Per Head Dim: {config.project_per_head_dim}")
         print(f"    Hybrid Cosine Mode: {config.cosine_mode}")
         print(f"    Hybrid Decay Gamma: {config.decay_gamma}")
@@ -10798,12 +10805,15 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             use_kosha_annotation=config.use_kosha_annotation,
             use_srk_annotation=config.use_srk_annotation,
         )
-        print(f"\n  [Ontological Binding Cache V10.0] AGI Architecture")
-        print(f"    Combines: Protected Phase + Top-K Query + 32D Sovereign State")
-        print(f"    Architecture: ΔS → Phase rotation → Memory binding → Query")
-        print(f"    Sovereign State Dimension: {config.state_dim}D")
+        print(f"\n  [Ontological Binding Cache V11.0.0] AGI Architecture (Separated Planes)")
+        print(f"    Combines: Protected Phase + Top-K Query + Separated Sovereign State")
+        print(f"    Architecture: ΔBhava[12D] → Phase rotation → Memory binding → Query")
+        print(f"    Full Sovereign State: {config.state_dim}D (diagnostics/control/learning)")
+        print(f"    Phase Rotation Input: {PHASE_STATE_DIM}D (Bhava-only → ΔBhava → θ → attention)")
         if config.state_dim == SOVEREIGN_STATE_DIM:
-            print(f"      [0:12] 12 Bhavas | [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia | [28:32] Reserved")
+            print(f"      Phase:   [0:12]  12 Bhavas → phase rotation (identity)")
+            print(f"      Control: [12:17] 5 Sheaths | [17:22] 5 States | [22:28] 6 Qualia → Annotator/CTM+")
+            print(f"      Learn:   [28:32] Reserved/JEPA (training-time only)")
         print(f"    Top-K cache size: {top_k} (use_cache: {use_cache})")
         print(f"    Bounded Phase: ENABLED (mandatory from probes)")
         print(f"    Decay Gamma: {config.decay_gamma}")
@@ -12721,11 +12731,13 @@ def format_sovereign_state_diagnostic(diag: Dict[str, Any]) -> str:
     bhava_str = f"{b1_name}({b1_val:.0%})>{b2_name}({b2_val:.0%})>{b3_name}({b3_val:.0%})"
     kosha_str = f"{kosha_short.get(k1_name, k1_name[:3])}({k1_val:.0%})>{kosha_short.get(k2_name, k2_name[:3])}({k2_val:.0%})"
 
-    # Two-line output for readability
+    # V11.0.0: Two-line output showing separated planes
+    # Phase plane (12D Bhava) is marked with → to show it feeds phase rotation
+    # Control plane (Kosha/Vritti/Guna) is marked with | to show it's separate
     return (
-        f"    🔱 [32D] Bhava:{bhava_str} {margin_icon(bhava_margin)} | "
-        f"Sheath:{kosha_str} {margin_icon(kosha_margin)} | Vritti:{vritti}\n"
-        f"           Qualia[L{lucidity:.0%}/A{activity:.0%}/S{stability:.0%}] Δ={delta:.2f}"
+        f"    🔱 [Phase:12D] Bhava→θ:{bhava_str} {margin_icon(bhava_margin)} | "
+        f"[Ctrl] Sheath:{kosha_str} {margin_icon(kosha_margin)} | Vritti:{vritti}\n"
+        f"           [Ctrl] Qualia[L{lucidity:.0%}/A{activity:.0%}/S{stability:.0%}] Δ={delta:.2f}"
     )
 
 

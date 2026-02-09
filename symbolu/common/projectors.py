@@ -212,11 +212,12 @@ if IntentPhaseProjector is None:
         """
         Fallback IntentPhaseProjector (simplified version).
 
-        Projects Sovereign State Delta to phase rotation offsets.
+        V11.0.0: Defaults to 12D Bhava-only input (was 32D).
+        Projects Bhava State Delta to phase rotation offsets.
         """
         def __init__(
             self,
-            state_dim: int = 32,
+            state_dim: int = 12,  # V11.0.0: 12D Bhava-only (was 32D)
             num_heads: int = 12,
             head_dim: int = 64,
             project_per_head_dim: bool = False,

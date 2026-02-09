@@ -35,6 +35,11 @@ class SovereignStateProjector(nn.Module):
     """
     Projects hidden states to 32D Sovereign State with MLP architecture.
 
+    V11.0.0: Still projects full 32D. Consumers separate into planes:
+      Phase Plane:    [0:12]  Bhavas → ΔBhava → phase rotation (12D)
+      Control Plane:  [12:28] Koshas + Vrittis + Gunas → CTM+/Sentinel (16D)
+      Learning Plane: [28:32] Reserved → training feedback (4D)
+
     Structure (32D):
         [0:12]  - 12 Bhavas (Ontological Aspects) - Softmax normalized
         [12:17] - 5 Koshas (Consciousness Sheaths) - Softmax OR Sigmoid (v2.2.5)
