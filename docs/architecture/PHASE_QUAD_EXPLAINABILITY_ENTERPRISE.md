@@ -844,6 +844,128 @@ The critical difference: Phase Quad's L2-L3 capabilities are **productized and a
 
 ---
 
+## Appendix B: Phase Quad vs Claude — Structured Reasoning (Verified Claims)
+
+### B.1 What ChatGPT Claimed (and What We Verified)
+
+An external analysis (ChatGPT) positioned Phase Quad as having "a strictly better value proposition for structured data" compared to Claude-class models. We subjected every specific claim to codebase verification. **Some hold up. Some do not.**
+
+This appendix is an honest assessment: what is architecturally true today, what is plausible-but-unbuilt, and what was over-claimed.
+
+### B.2 Verification Results
+
+| Claim | Verdict | Evidence |
+|-------|---------|----------|
+| "Local = row semantics, Quad = column semantics" | **Not supported** | `LocalWindowAttention` handles windowed causal attention (syntax). `BindingCacheQuadQuery` does Top-K retrieval from memory. Neither has row/column semantic specialization. The `row_idx`/`col_idx` variables in Local are mask construction helpers, not semantic roles. |
+| "Bhava-only phase rotation maps to header vs value vs index vs constraint" | **Not supported** | The 12 Bhavas (POT, IDN, EXE, STR, COG, AGY, RSN, PRP, WIT, UNI, INT, ABS) represent ontological aspects — modes of consciousness, not structured data types. No evidence they encode data-schema roles. |
+| "Binding Annotator (Kosha) maps cell→column, value→type, token→role" | **Not supported** | `OntologicalBindingAnnotator` (`phase_transformer.py:2494`) computes per-position binding salience modulated by sovereign state and kosha activations. It's a gating score for Top-K selection, not a structural type mapper. Its own docstring says: "CSR/Kosha/SRK act as BINDING SELECTORS, not live attention modifiers." |
+| "Vrittis track reliability (tables need correctness not eloquence)" | **True** (general, not table-specific) | Vrittis (FACT, ERROR, IMAGINATION, VOID, MEMORY) map to epistemic reliability. FACT→quality/correctness scores, ERROR→hallucination detection, and these feed into `ConfidenceGate` which gates execution. But this is general reliability, not table-specific. |
+| "Conservative degradation vs hallucination" | **True** | Strong evidence: `compute_confidence()` uses memory state variance. When confidence > 0.7, quad retrieval is skipped (cheaper, safer fallback). Below-threshold confidence → escalation to human. `ConfidenceGate` blocks execution at confidence < 0.35, requires confirmation at 0.35-0.55. This IS conservative degradation. |
+| "Phase Quad can represent structured patterns explicitly" | **Not supported** | No table/CSV/JSON training data, no schema-aware features, no header/value/type annotations, no structured data tests. The "structured representation" (32D Sovereign State) is a structured representation of *cognition*, not of *data*. |
+| "Phase Quad has separated attention (Local/Quad/Phase)" | **True** | Three paths are architecturally separate (`BindingCacheBlock:3249`), combine additively (`attn_out = local_out + mem_out` at line 3473), and each has independent instrumentation. |
+| "Explainability is native, not post-hoc" | **True** | Gates, phase drift, confidence, cache health are computed during inference. V11.1.0 telemetry surfaces them without extra cost. |
+| "Phase Quad is complementary, not adversarial to Claude" | **True** (architecturally sound framing) | Different optimisation targets. Phase Quad has O(n) attention with explicit state; Claude has O(n²) attention with massive scale and RLHF alignment. |
+
+### B.3 What IS Architecturally True (Defensible Claims)
+
+These claims are verified by code and can be stated with confidence:
+
+**1. Phase Quad degrades conservatively; standard LLMs hallucinate.**
+
+This is the strongest defensible claim. The evidence chain:
+- `compute_confidence()` → inverse variance of memory state (`phase_transformer.py:2745`)
+- Confidence > threshold → skip expensive quad retrieval (cheaper, safer mode)
+- Confidence < threshold → run full retrieval + proposals
+- `ConfidenceGate` → HALT at < 0.35, CONFIRM at 0.35-0.55 (`confidence_gate.py:420`)
+- `EnterprisePolicyEngine` → BLOCK on coherence < 0.3, VERIFY on reversal_risk > 0.6
+
+Standard LLMs have no equivalent. Claude's safety comes from RLHF training (static), not runtime confidence gating (dynamic). GPT-4 provides logprobs but doesn't act on them.
+
+**2. Explainability is structural, not reconstructed.**
+
+Three named paths (Local + Phase + Quad) compute independently and combine additively. Each path's contribution is separable by architecture, not by post-hoc decomposition. Standard transformers mix everything through shared QKV attention — you cannot separate syntax from retrieval without expensive attribution methods.
+
+**3. Vrittis provide epistemic reliability tracking.**
+
+The 5 Vrittis (FACT, ERROR, IMAGINATION, VOID, MEMORY) form an explicit reliability state that routes to the control plane. This is a native "do I trust this output?" signal, architecturally richer than prompting a model to self-assess its confidence.
+
+**4. Phase stability signals detect reasoning quality in real-time.**
+
+R_k (phase collapse), phase drift, head redundancy, and reversal risk are computed during inference. No standard LLM exposes equivalent signals. This enables enterprises to detect degrading reasoning quality before it produces a bad output.
+
+**5. The architecture IS complementary to standard LLMs.**
+
+Phase Quad's O(n) attention with explicit state and confidence gating addresses failure modes that O(n²) attention-based models have:
+- Consistency enforcement (via phase binding, not just attention)
+- Compute control (skip quad when confident, escalate when not)
+- Audit granularity (per-path attribution, not just per-token logprobs)
+
+This is a genuine architectural complement, not a replacement.
+
+### B.4 What Is Plausible But Unbuilt (Future Potential)
+
+These claims have architectural foundations but need engineering work:
+
+| Claim | Foundation | What's Missing |
+|-------|-----------|---------------|
+| "Local for row, Quad for column" in tables | Local IS short-range, Quad IS retrieval-based | No table-aware training, no row/column positional encoding, no evidence of specialization |
+| "Bhavas encode data roles" | Bhavas DO modulate phase rotation by token | No training signal connecting Bhavas to structured data types (header, value, key) |
+| "Binding Annotator for schema mapping" | Annotator DOES compute per-position salience | Salience is general-purpose, not type-aware. Would need schema-conditioned training. |
+| "Phase Quad for ETL / reconciliation" | Conservative degradation + reliability tracking are real advantages | No structured data pipeline, no table format handling, no schema validation features |
+
+The path from "architectural potential" to "verified capability" requires:
+1. Structured data training corpus (tables, JSON, CSV, schemas)
+2. Positional encoding for 2D structure (row/column awareness)
+3. Schema-conditioned binding annotations
+4. Evaluation benchmarks (table QA, schema migration, ETL verification)
+
+### B.5 What Was Over-Claimed (Corrections)
+
+These specific claims from the external analysis should not be repeated:
+
+| Over-Claim | Why It's Wrong | Corrected Statement |
+|-----------|---------------|-------------------|
+| "Phase Quad can represent structured patterns explicitly" | No structured data support exists in training, testing, or architecture | Phase Quad represents *cognitive structure* explicitly (32D state, separated planes). Structured *data* support is a future direction. |
+| "Binding Annotator maps cell→column, value→type" | Annotator computes scalar salience, not type mappings | Binding Annotator modulates Top-K retrieval salience. Schema-aware type mapping would require additional architecture. |
+| "Bhava rotation = header vs value vs index" | Bhavas encode ontological aspects, not data roles | Bhavas encode *modes of being* (identity, structure, cognition, etc.). Data-role encoding would require task-specific fine-tuning. |
+| "Strictly better for structured data" | No structured data capability exists today | Phase Quad has architectural properties (separated paths, confidence gating, reliability tracking) that are *promising foundations* for structured data work, but this capability has not been built or validated. |
+
+### B.6 The Honest Positioning
+
+**What we CAN say (verified):**
+
+> Phase Quad provides runtime explainability, conservative degradation, and epistemic reliability tracking that standard LLMs lack. Its three-path architecture produces separable, auditable computation paths. Its confidence gating prevents low-quality outputs from reaching users without human verification. These properties make it valuable for enterprise use cases where auditability, consistency, and controlled failure matter more than raw generative fluency.
+
+**What we CANNOT say (yet):**
+
+> ~~Phase Quad is strictly better for structured data.~~ Phase Quad has architectural foundations (separated attention, binding salience, confidence gating) that could be extended to structured data reasoning, but this capability has not been built, trained, or validated.
+
+**The correct framing:**
+
+| Dimension | Claude-class LLMs | Phase Quad |
+|-----------|-------------------|------------|
+| Primary strength | Generative fluency, unstructured reasoning, massive scale | Explainability, conservative degradation, reliability tracking |
+| Failure mode | Hallucination (confident but wrong) | Conservative refusal (uncertain, so escalates) |
+| Explainability | Post-hoc or self-reported (unfaithful) | Structural, per-response, auditable |
+| Structured data | Reconstructs structure from text (statistical) | Not yet supported (architectural potential) |
+| Consistency | Emergent (from training) | Partially enforced (confidence gating, phase binding) |
+| Enterprise audit | Request-level logging | Model-signal-level telemetry |
+| Complementary role | Narrative understanding, creative synthesis, dialogue | Auditability, controlled execution, reliability-sensitive tasks |
+
+### B.7 What Should Be Built Next
+
+To make the structured data claims real, the following engineering work is needed:
+
+1. **Structured positional encoding**: Row/column position embeddings for 2D data (tables, grids)
+2. **Schema-conditioned binding**: Train the Binding Annotator with schema labels (header, value, key, constraint)
+3. **Structured data training corpus**: Tables, JSON, CSV, config files with consistency/correctness labels
+4. **Table QA benchmark**: Evaluate on WikiTableQuestions, SQA, TabFact to measure actual structured reasoning capability
+5. **Schema validation output**: Leverage Vritti reliability signals to output per-cell confidence for structured outputs
+
+These are achievable extensions of the existing architecture. The foundations are real — the Local/Phase/Quad separation, confidence gating, and Vritti reliability tracking provide genuine advantages over monolithic attention. But they are foundations, not finished features.
+
+---
+
 *Document prepared for Phase Quad Architecture Team — V11.1.0 Enterprise Explanation Telemetry*
 *Symbolu AI Systems*
 *February 2026*
