@@ -1382,6 +1382,75 @@ def compute_phase_health_diagnostics(model: nn.Module) -> Dict[str, float]:
 
 
 # =============================================================================
+# V11.1.0: EXPLANATION TELEMETRY BRIDGE
+# =============================================================================
+# Convenience function that collects from the model's three diagnostic surfaces
+# and returns a unified ExplanationTelemetry record.  Import-safe: the
+# mechanical.logging package uses only stdlib + dataclasses (no torch).
+
+def collect_explanation_telemetry(
+    model: nn.Module,
+    response_id: str = "",
+    health_diagnostics: Optional[Dict[str, float]] = None,
+    ontological_state: Optional[Dict[str, float]] = None,
+    coherence_score: Optional[float] = None,
+    sequence_length: int = 0,
+):
+    """
+    Collect an ExplanationTelemetry record from model internals.
+
+    This is the primary integration point between phase_transformer
+    and the enterprise explainability system.  Call after a forward pass.
+
+    Args:
+        model: PhaseQuadTransformer (or any module with get_phase_health /
+               get_instrumentation / get_proposal_metrics).
+        response_id: Unique ID for this response.
+        health_diagnostics: Pre-computed result of
+            compute_phase_health_diagnostics(model).  If None, computed
+            automatically when health capture is enabled.
+        ontological_state: Optional dict with control plane signals.
+        coherence_score: Optional aggregate coherence.
+        sequence_length: Token count for metadata.
+
+    Returns:
+        ExplanationTelemetry (from symbolu.mechanical.logging.telemetry_schema)
+
+    Usage:
+        enable_health_diagnostics_capture(model, True)
+        logits = model(input_ids)
+        health = compute_phase_health_diagnostics(model)
+        telemetry = collect_explanation_telemetry(model, health_diagnostics=health)
+        enable_health_diagnostics_capture(model, False)
+        print(telemetry.summary())
+    """
+    from symbolu.mechanical.logging.phase_quad_explainer import PhaseQuadExplainer
+
+    explainer = PhaseQuadExplainer(enable_deep_diagnostics=False)
+
+    # Map health dict keys to the schema expected by explainer
+    mapped_health = None
+    if health_diagnostics is not None:
+        mapped_health = {
+            'r_k_mean': health_diagnostics.get('R_k', 0.0),
+            'r_q_mean': health_diagnostics.get('R_q', 0.0),
+            'amp_phase_corr': health_diagnostics.get('amp_phase_corr', 0.0),
+            'head_redundancy': health_diagnostics.get('head_redundancy', 0.0),
+            'phase_drift_mean': health_diagnostics.get('phase_drift_mean', 0.0),
+            'phase_drift_std': health_diagnostics.get('phase_drift_std', 0.0),
+        }
+
+    return explainer.explain(
+        model=model,
+        response_id=response_id,
+        health_diagnostics=mapped_health,
+        ontological_state=ontological_state,
+        coherence_score=coherence_score,
+        sequence_length=sequence_length,
+    )
+
+
+# =============================================================================
 # V9.9.12: ADAPTIVE PHASE DIVERSITY CONTROLLER (ChatGPT Universal Proposal)
 # =============================================================================
 
