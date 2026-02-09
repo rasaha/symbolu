@@ -51,9 +51,249 @@ The key insight: **we don't need a new architecture — we need to teach the exi
 
 ---
 
-## 2. Architecture Extensions
+## 2. How Rows and Columns Are Defined in Phase Quad
 
-### 2.1 Two-Dimensional Positional Encoding
+This section provides the concrete, token-level walkthrough of how 2D structure
+flows through the model — from input annotation through all three paths to the
+final additive combination. Code proposals follow in Section 3.
+
+### 2.1 The 1D Flattening Problem (Today)
+
+Currently, positional encoding is 1D (`phase_transformer.py` lines 3733-3734):
+
+```python
+pos = torch.arange(N, device=input_ids.device).unsqueeze(0)  # [0, 1, 2, ..., N-1]
+x = self.dropout(self.token_embed(input_ids) + self.pos_embed(pos))
+```
+
+A table like:
+
+```
+product,price,qty
+Widget,25.99,100
+Gadget,14.50,250
+```
+
+Gets flattened to a 1D token sequence:
+
+```
+pos:   0       1  2     3  4   5  6      7  8     9  10  11 12     13 14    15 16
+token: product ,  price ,  qty \n Widget ,  25.99 ,  100 \n Gadget ,  14.50 ,  250
+```
+
+The model sees "25.99" at position 8 and "14.50" at position 14. It has **no way
+to know** they're both in column 1 ("price"). It must figure this out from the
+pattern of commas — which works sometimes but is fragile and invisible to
+attention.
+
+### 2.2 Three IDs Per Token (Proposed)
+
+Instead of one position number, each token gets three structural annotations:
+
+```
+token:   product  ,  price  ,  qty  \n  Widget  ,  25.99  ,  100  \n  Gadget  ,  14.50  ,  250
+seq_pos: 0        1  2      3  4    5   6       7  8      9  10   11  12      13 14     15 16
+row_id:  0        0  0      0  0    0   1       1  1      1  1    1   2       2  2      2  2
+col_id:  0        -  1      -  2    -   0       -  1      -  2    -   0       -  1      -  2
+role:    HEADER   D  HEADER D  HEADER D VALUE   D  VALUE  D  VALUE D  VALUE   D  VALUE  D  VALUE
+```
+
+Where `D` = DELIM (structural delimiter). Key conventions:
+- **Row 0 = header row** — defines column semantics
+- **Col index** = which column this token belongs to (delimiter tokens inherit nearest cell's col)
+- **Role** = structural function (HEADER / VALUE / KEY / DELIM / META / TEXT)
+
+Non-table text (questions, instructions surrounding the table) gets `row=0, col=0, role=TEXT` — structurally neutral defaults.
+
+### 2.3 How Each Path Uses Row/Column
+
+The three-path architecture maps **naturally** to different structural operations:
+
+#### Path 1: LOCAL — Row Processing (`phase_transformer.py` lines 3162-3246)
+
+`LocalWindowAttention` with `window_size=128` processes tokens within a sliding window. For a table with ~10 columns and ~3 tokens per cell, one row is ~30 tokens — well within the window.
+
+With 2D positional encoding, same-row tokens share `row_embed(r)`:
+
+```
+Token "25.99" has row_embed(1) + col_embed(1)    # row 1, price column
+Token "Widget" has row_embed(1) + col_embed(0)    # row 1, product column
+Token "100" has row_embed(1) + col_embed(2)       # row 1, qty column
+Token "price" has row_embed(0) + col_embed(1)     # header row, price column
+```
+
+Since positional embeddings are part of the dot-product similarity:
+- **Same-row tokens** (Widget, 25.99, 100) share `row_embed(1)` → higher attention scores → strong mutual attention
+- **Same-col tokens** (price, 25.99, 14.50) share `col_embed(1)` → recognized even within local window
+
+**Effect:** Local path understands "25.99 is next to Widget in the same row" — within-row syntax.
+
+#### Path 2: PHASE — Column Memory (`phase_transformer.py` lines 2790-2804)
+
+This is where the deep mechanism lives. The existing phase phasor computation:
+
+```python
+# Line 2790: Key phasor with phase angle
+k_phasor = torch.polar(a_k, -phi_k)    # r * e^{-iφ}
+
+# Line 2750: Intent phase rotation (from Bhavas)
+phi_k = phi_k + intent_phase             # φ_total = φ_learned + θ_bhava
+```
+
+With column-aware phase, each column gets a **learned phase offset**:
+
+```
+For token "25.99" (col=1):    φ_total = φ_learned + θ_bhava + θ_col1
+For token "14.50" (col=1):    φ_total = φ_learned + θ_bhava + θ_col1   ← SAME column offset
+For token "100"   (col=2):    φ_total = φ_learned + θ_bhava + θ_col2   ← DIFFERENT column offset
+```
+
+When accumulated via cumsum (line 2795: `memory_state = torch.cumsum(kv, dim=1)`),
+values from the same column cluster at the same angle in the complex plane:
+
+```
+Complex memory plane (per attention head):
+
+         Im
+          |     * "100" (col=2, angle θ₂)
+          |    /
+          |   /
+          |  /
+          | /    * "250" (col=2, same angle θ₂ → same cluster)
+          |/_________________ Re
+          |\
+          | \
+          |  \   * "25.99" (col=1, angle θ₁)
+          |   \
+          |    * "14.50" (col=1, same angle θ₁ → same cluster)
+```
+
+**Column = a direction in the complex plane.** Tokens in the same column cluster
+together because they share the same phase offset. The O(n) cumsum accumulates
+them into the same "channel" — no per-column memory needed, no O(n²) cost.
+Column structure **emerges from phase separation**.
+
+**Effect:** Phase path knows "all prices form a series" — within-column persistent memory.
+
+#### Path 3: QUAD — Cross-Row Retrieval (`phase_transformer.py` lines 3005-3012)
+
+Top-K retrieval with structural binding salience:
+
+```python
+# Line 3009: Salience biases which positions enter the Top-K cache
+selection_scores = scores + salience_bias
+
+# Line 3012: Select K most relevant positions
+top_indices = selection_scores.topk(K)
+```
+
+With `StructuralBindingAnnotator`:
+- **HEADER tokens** ("product", "price", "qty") get **high salience** → always in Top-K cache → columns carry their schema forward through the sequence
+- **KEY column** values ("Widget", "Gadget") get **persistent salience** → stay retrievable for lookups
+- **DELIM tokens** (",", "\n") get **low salience** → don't waste Top-K slots
+
+For a query like "What is the price for Gadget?":
+1. "price" (header, col=1) → retrieved → defines what the column means
+2. "14.50" (value, col=1, row=2 = Gadget's row) → the answer
+3. "25.99" (value, col=1, row=1) → context for comparison
+
+**Effect:** Quad path can find "14.50 is Gadget's price" — cross-row retrieval.
+
+### 2.4 Architectural Flow Diagram
+
+```
+INPUT: "What is the price for Gadget?" + CSV table
+
+                    ┌─────────────────────────────────────────┐
+                    │  StructuralAnnotator (CPU, pre-GPU)      │
+                    │  Detects CSV format                      │
+                    │  Assigns row_ids, col_ids, role_ids      │
+                    └──────────────┬──────────────────────────-┘
+                                   │
+                    ┌──────────────▼──────────────────────────-┐
+                    │  Embedding Layer (line 3734)              │
+                    │  x = token_embed + pos_embed             │
+                    │    + gate * (row_embed + col_embed)       │
+                    │                                          │
+                    │  "25.99" now carries:                     │
+                    │    • What it is (token embedding)         │
+                    │    • Where in sequence (pos 8)            │
+                    │    • Which row (row 1)                    │
+                    │    • Which column (col 1 = "price")       │
+                    │    • What role (VALUE)                    │
+                    └──────────────┬───────────────────────────-┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                     │
+    ┌─────────▼──────────┐  ┌─────▼──────────┐  ┌──────▼─────────────┐
+    │ LOCAL (line 3428)   │  │ PHASE (L2718)  │  │ QUAD (line 3432+)  │
+    │ O(n*w) windowed     │  │ O(n) cumsum    │  │ O(nk) Top-K        │
+    │                     │  │                │  │                    │
+    │ ROW PROCESSING      │  │ COLUMN MEMORY  │  │ CROSS-ROW LOOKUP   │
+    │                     │  │                │  │                    │
+    │ Same-row tokens     │  │ Column phase   │  │ Header tokens get  │
+    │ share row_embed →   │  │ offsets →      │  │ high salience →    │
+    │ attend to each      │  │ same-col vals  │  │ always cached      │
+    │ other strongly      │  │ cluster at     │  │                    │
+    │                     │  │ same angle in  │  │ Cross-row query:   │
+    │ Learns:             │  │ complex plane  │  │ "price for row=2"  │
+    │ "25.99 is next to   │  │                │  │ retrieves col=1    │
+    │  Widget in row 1"   │  │ Learns:        │  │ values             │
+    │                     │  │ "all prices    │  │                    │
+    │                     │  │  form a series"│  │ Learns:            │
+    │                     │  │                │  │ "14.50 is Gadget's │
+    │                     │  │                │  │  price" cross-row  │
+    └─────────┬───────────┘  └──────┬─────────┘  └──────┬────────────┘
+              │                     │                    │
+              └─────────────────────┼────────────────────┘
+                                    │
+                    ┌───────────────▼──────────────────────────┐
+                    │  attn_out = local_out + mem_out           │
+                    │  (line 3473/3478)                         │
+                    │                                          │
+                    │  Three contributions are SEPARABLE:       │
+                    │  • Local: row-level syntax/relationships  │
+                    │  • Phase: column-level accumulation       │
+                    │  • Quad: cross-row retrieval              │
+                    │                                          │
+                    │  Each path's contribution can be          │
+                    │  measured independently for attribution   │
+                    └──────────────────────────────────────────-┘
+```
+
+### 2.5 Row/Column Definition Summary
+
+| Structural Concept | Where It Lives | Mechanism | Code Reference |
+|---|---|---|---|
+| **Row identity** | `row_embed` (additive positional) | Tokens in same row share embedding → higher dot-product similarity in Local path | `StructuralPositionEncoder` (proposed) |
+| **Column identity** | `col_embed` (additive positional) + `col_phase_offset` (phase angle) | Embedding similarity + phase clustering in complex plane | `StructuralPositionEncoder` + `ColumnAwarePhaseState` (proposed) |
+| **Header vs Value** | `role_embed` → binding salience | Headers get high salience → stay in Top-K cache → define column semantics for all downstream rows | `StructuralBindingAnnotator` (proposed) |
+| **Column channel** | Phase angle in complex memory | `φ_total = φ_learned + θ_bhava + θ_column` → same-column values cluster at same angle → column = direction in complex plane | Extension to `BindingCachePhaseState` L2750 |
+| **Cross-row retrieval** | Top-K selection with structural salience | Salience biases which positions are cached; column diversity bonus ensures all columns represented | Extension to `BindingCacheQuadQuery` L3005 |
+| **Within-row syntax** | LocalWindowAttention window | Window of 128 tokens covers multiple rows; row_embed ensures same-row tokens attend strongly | Existing `LocalWindowAttention` L3162 |
+
+### 2.6 Key Insight: Rows and Columns Are Not Hardcoded
+
+The model does **not** hardcode "row 3, column 2 = this cell." Instead:
+
+1. **StructuralAnnotator** (CPU-side, pre-GPU) detects format and assigns IDs
+2. **Row/column embeddings** are **learned** — the model discovers what row/column identity means through training
+3. **Column phase separation** is **learned** — initial angles are evenly spaced, but training adjusts them to meaningful separations
+4. **Salience roles** are **learned** — the model discovers that headers should have high salience, not because we hardcode it, but because the training signal rewards it
+
+This means:
+- For CSV: rows = newline-separated, columns = delimiter-separated
+- For JSON: rows = array elements, columns = object keys
+- For Markdown tables: rows = `|`-separated lines, columns = `|`-separated cells
+- For non-table text: all IDs are zero → structural components are inactive → no interference
+
+The same learned embeddings adapt to different structural formats because the **semantics** of row/column are consistent: a row groups co-occurring values, a column groups same-typed values.
+
+---
+
+## 3. Architecture Extensions
+
+### 3.1 Two-Dimensional Positional Encoding
 
 **Current state** (`phase_transformer.py` lines 3535-3538):
 ```python
@@ -118,7 +358,7 @@ if hasattr(self, 'struct_pos') and row_ids is not None:
     x = self.struct_pos(x, row_ids, col_ids)
 ```
 
-### 2.2 Schema-Conditioned Binding Annotator
+### 3.2 Schema-Conditioned Binding Annotator
 
 **Current state** (`phase_transformer.py` lines 2494-2598):
 
@@ -209,7 +449,7 @@ class StructuralBindingAnnotator(OntologicalBindingAnnotator):
 - Delimiters get **low salience** → structural punctuation doesn't waste Top-K slots
 - The cross-signal learns that "header × column-3" means "this is the revenue column name"
 
-### 2.3 Column-Persistent Phase State
+### 3.3 Column-Persistent Phase State
 
 **Current state** (`phase_transformer.py` lines 2601-2812):
 
@@ -285,7 +525,7 @@ class ColumnAwarePhaseState(BindingCachePhaseState):
 - **Natural retrieval** — when Quad queries for "values in column 3", the phase match naturally selects them (cosine similarity in complex plane favors same-angle entries)
 - **Header propagation** — header token for column 3 has the same col_phase as all values in column 3, so it stays retrievable
 
-### 2.4 Structure-Conditioned Phase Rotation (Bhava Extension)
+### 3.4 Structure-Conditioned Phase Rotation (Bhava Extension)
 
 **Current state** (`phase_transformer.py` lines 1674-1780):
 
@@ -365,7 +605,7 @@ class StructuralPhaseProjector(nn.Module):
 - Dims [10:14] — row position encoding (log-scaled row index)
 - Dims [14:16] — table/non-table indicator + nesting depth
 
-### 2.5 Cross-Row Quad Retrieval
+### 3.5 Cross-Row Quad Retrieval
 
 **Current state** (`phase_transformer.py` lines 2891-3159):
 
@@ -373,7 +613,7 @@ class StructuralPhaseProjector(nn.Module):
 
 **Extension: Structure-Biased Retrieval**
 
-The key insight: for structured data queries like "what is the revenue for region=West?", the model needs to retrieve across rows **within a column**. The existing Top-K mechanism already supports this through binding salience — we just need the salience to be structure-aware (Section 2.2).
+The key insight: for structured data queries like "what is the revenue for region=West?", the model needs to retrieve across rows **within a column**. The existing Top-K mechanism already supports this through binding salience — we just need the salience to be structure-aware (Section 3.2).
 
 But there's a deeper opportunity: **column-coherent retrieval**.
 
@@ -458,7 +698,7 @@ class StructuralQuadQuery(BindingCacheQuadQuery):
         return output.reshape(B, N, D)
 ```
 
-### 2.6 Vritti-Driven Schema Validation
+### 3.6 Vritti-Driven Schema Validation
 
 **Current state** (`phase_transformer.py` lines 145-152):
 
@@ -544,9 +784,9 @@ class StructuralVrittiValidator(nn.Module):
 
 ---
 
-## 3. Input Pipeline: Structural Tokenization
+## 4. Input Pipeline: Structural Tokenization
 
-### 3.1 The Structure Annotation Problem
+### 4.1 The Structure Annotation Problem
 
 Standard tokenizers destroy structure. Given a CSV row:
 ```
@@ -557,7 +797,7 @@ A BPE tokenizer produces: `["West", ",", "42", "000", "00", ",", "Q", "3", "-", 
 
 The token "42" doesn't know it's in column 2 (revenue), row 15, and that it's a numeric prefix.
 
-### 3.2 Structural Annotation Layer
+### 4.2 Structural Annotation Layer
 
 We don't modify the tokenizer — we add a **post-tokenization annotation layer** that provides `row_ids`, `col_ids`, and `role_ids` alongside the token IDs:
 
@@ -691,7 +931,7 @@ class StructuralAnnotator:
         return {'row_ids': row_ids, 'col_ids': col_ids, 'role_ids': role_ids}
 ```
 
-### 3.3 Mixed-Content Handling
+### 4.3 Mixed-Content Handling
 
 Real inputs contain both structured and unstructured regions:
 
@@ -710,9 +950,9 @@ The annotator marks only the CSV block as structured (rows 1-4). The surrounding
 
 ---
 
-## 4. Training Curriculum
+## 5. Training Curriculum
 
-### 4.1 Phase 1: Structure Recognition (Pre-training Extension)
+### 5.1 Phase 1: Structure Recognition (Pre-training Extension)
 
 **Objective:** Learn 2D positional encoding and role embeddings.
 
@@ -767,7 +1007,7 @@ def column_consistency_loss(hidden, col_ids):
     return F.mse_loss(sim_matrix, target)
 ```
 
-### 4.2 Phase 2: Structural Reasoning (Fine-tuning)
+### 5.2 Phase 2: Structural Reasoning (Fine-tuning)
 
 **Objective:** Learn to use structural awareness for downstream tasks.
 
@@ -784,7 +1024,7 @@ def column_consistency_loss(hidden, col_ids):
 - **Vritti supervision** (auxiliary): when the model generates a wrong cell value, the Vritti ERROR signal should be high — supervised from training labels
 - **Schema validation loss** (auxiliary): when generating structured output, the constraint head should predict type/range violations that exist in the ground truth
 
-### 4.3 Phase 3: Schema Validation (Specialization)
+### 5.3 Phase 3: Schema Validation (Specialization)
 
 **Objective:** Per-cell confidence and constraint satisfaction.
 
@@ -799,9 +1039,9 @@ def column_consistency_loss(hidden, col_ids):
 
 ---
 
-## 5. Inference Flow: End-to-End Example
+## 6. Inference Flow: End-to-End Example
 
-### 5.1 Query
+### 6.1 Query
 
 ```
 Given this data:
@@ -813,7 +1053,7 @@ Widget C,42.00,75,3150.50
 Find the row where total doesn't match price × quantity.
 ```
 
-### 5.2 Processing Steps
+### 6.2 Processing Steps
 
 ```
 STEP 1: TOKENIZATION + ANNOTATION
@@ -902,7 +1142,7 @@ STEP 8: OUTPUT GENERATION
   + structural attribution (from path separation)
 ```
 
-### 5.3 What's Different from Code-Mediated
+### 6.3 What's Different from Code-Mediated
 
 | Aspect | Claude (Code-Mediated) | Phase Quad (Model-Internal) |
 |---|---|---|
@@ -916,9 +1156,9 @@ STEP 8: OUTPUT GENERATION
 
 ---
 
-## 6. Integration Points with Existing Architecture
+## 7. Integration Points with Existing Architecture
 
-### 6.1 Files to Modify
+### 7.1 Files to Modify
 
 | File | Change | Scope |
 |---|---|---|
@@ -933,7 +1173,7 @@ STEP 8: OUTPUT GENERATION
 | New: `symbolu/structural/validator.py` | `StructuralVrittiValidator` | ~80 lines |
 | `train_unified_llm.py` | Structural training curriculum | Auxiliary losses + data pipeline |
 
-### 6.2 Backward Compatibility
+### 7.2 Backward Compatibility
 
 Every extension is designed with **gated entry**:
 
@@ -942,7 +1182,7 @@ Every extension is designed with **gated entry**:
 - Subclasses preserve parent class contracts (salience is still `[B, N]`, etc.)
 - Non-table text is unaffected — structural embeddings default to neutral values
 
-### 6.3 Computational Cost
+### 7.3 Computational Cost
 
 | Component | Cost | Notes |
 |---|---|---|
@@ -956,9 +1196,9 @@ Every extension is designed with **gated entry**:
 
 ---
 
-## 7. Evaluation Plan
+## 8. Evaluation Plan
 
-### 7.1 Benchmarks
+### 8.1 Benchmarks
 
 | Benchmark | Task | Metric | Target |
 |---|---|---|---|
@@ -970,7 +1210,7 @@ Every extension is designed with **gated entry**:
 | Custom: Cell Confidence | Per-cell reliability | AUROC | > 0.85 |
 | Custom: Schema Validation | Constraint detection | F1 | > 0.80 |
 
-### 7.2 Ablation Studies
+### 8.2 Ablation Studies
 
 | Ablation | Tests |
 |---|---|
@@ -980,7 +1220,7 @@ Every extension is designed with **gated entry**:
 | Remove Vritti validation | Does cell-level confidence degrade? |
 | Standard LM (no structure) | Baseline: what does the pre-trained model achieve without extensions? |
 
-### 7.3 Explainability Metrics (Phase Quad Advantage)
+### 8.3 Explainability Metrics (Phase Quad Advantage)
 
 These metrics are **unique to Phase Quad** — no standard LLM can produce them:
 
@@ -996,7 +1236,7 @@ These metrics are **unique to Phase Quad** — no standard LLM can produce them:
 
 ---
 
-## 8. Comparison: Three Approaches to Structured Data
+## 9. Comparison: Three Approaches to Structured Data
 
 | Dimension | Code-Mediated (Claude) | Post-hoc (TAPAS/TableFormer) | Model-Internal (Phase Quad) |
 |---|---|---|---|
@@ -1012,7 +1252,7 @@ These metrics are **unique to Phase Quad** — no standard LLM can produce them:
 
 ---
 
-## 9. Open Questions
+## 10. Open Questions
 
 1. **Phase separation capacity** — Can the complex plane sustain separation for tables with > 50 columns? Phase angles may crowd.
    - Mitigation: Per-head column assignment (different heads specialize on different column groups)
@@ -1034,7 +1274,7 @@ These metrics are **unique to Phase Quad** — no standard LLM can produce them:
 
 ---
 
-## 10. Implementation Priority
+## 11. Implementation Priority
 
 | Priority | Component | Effort | Impact | Dependencies |
 |---|---|---|---|---|
@@ -1053,7 +1293,7 @@ These metrics are **unique to Phase Quad** — no standard LLM can produce them:
 
 ---
 
-## 11. Summary
+## 12. Summary
 
 Phase Quad's three-path architecture provides genuine architectural foundations for model-internal structural awareness:
 
