@@ -710,6 +710,140 @@ python -m pytest tests/explainability/test_telemetry_schema.py -v
 
 ---
 
+## Appendix A: Phase Quad Explainability vs Standard Transformer LLMs (Including Claude)
+
+### A.1 The Fundamental Architectural Difference
+
+Standard transformer LLMs (GPT-4, Claude, Gemini, Llama) use a **single monolithic attention mechanism** per layer. All computation — syntax, semantics, retrieval, reasoning — flows through the same QKV attention matrices and residual stream. This makes post-hoc attribution inherently ambiguous: you cannot separate "what came from recent context" vs "what came from earlier retrieval" because the model doesn't separate these computations structurally.
+
+Phase Quad uses **three explicitly named, separable computation paths** (Local + Phase + Quad) combined additively. This is not a post-hoc decomposition — it is the architecture itself. Attribution is structural, not reconstructed.
+
+```
+Standard Transformer (Claude, GPT-4, etc.):
+  x → [QKV Attention → FFN] × N → logits
+       └─ Everything mixed in one attention operation
+       └─ Post-hoc methods needed to disentangle contributions
+       └─ Attention maps ≠ contribution (Jain & Wallace 2019)
+
+Phase Quad:
+  x → [Local Attn + Phase Accum + Quad Retrieval → FFN] × N → logits
+       └─ Three paths compute independently
+       └─ Combine additively (attn_out = local_out + mem_out)
+       └─ Each path's contribution is structurally attributable
+```
+
+### A.2 Capability Comparison Table
+
+| Explainability Capability | Phase Quad (V11.1.0) | Claude (Anthropic) | GPT-4 (OpenAI) |
+|--------------------------|---------------------|-------------------|----------------|
+| **Per-request path attribution** | Native — Local/Phase/Quad ratios from architecture | Not available | Not available |
+| **Per-request stability metrics** | Native — R_k, drift, reversal risk, head redundancy | Not available | Not available |
+| **Confidence scores** | Native — variance-based from memory state (`compute_confidence()`) | Prompt-based workaround only (self-reported, uncalibrated) | Logprobs available (token-level, not semantic) |
+| **Token-level log probabilities** | Available (standard LM head) | Not available in API | Available in API |
+| **Attention map export** | Available + decomposed by path (Local vs Phase vs Quad) | Not available in API | Not available in API |
+| **Gate strength telemetry** | Native — amplitude gates, proposal gates, alignment modulator per layer | Not available | Not available |
+| **Phase drift / temporal stability** | Native — \|Δφ(t)\| with circular wrapping, per-layer | Not available | Not available |
+| **Retrieval provenance** | Native — Quad cache instrumentation (hit rate, key similarity, block IDs) | Not available (RAG provenance is external, not model-internal) | Not available |
+| **Concept bottleneck** | 32D Sovereign State with named dimensions (Bhavas, Koshas, Vrittis, Gunas) | Not available (features from SAE research not productized) | Not available |
+| **Behavioral confidence gating** | ConfidenceGate controls tool execution, escalation, memory retention | Not available (safety via RLHF/Constitutional AI, not runtime gating) | Not available |
+| **Enterprise policy engine** | 11 built-in rules, custom lambda conditions, domain-aware | Audit logging (SOC 2), but no model-signal-driven policy rules | Usage policies only |
+| **Adversarial drift detection** | Native — gate volatility spike detection | Not available in API (research only via persona vectors) | Not available |
+| **Audit trail (compliance)** | Append-only, monotonic sequence, JSONL export, action-typed | SOC 2 audit logs (request-level, not model-signal-level) | SOC 2 audit logs |
+| **Chain-of-thought reasoning** | Available (standard generation) | Available (extended thinking) | Available |
+| **Sparse autoencoder features** | Proposed (PA-SAE in interpretability roadmap) | Research demonstrated on Claude 3.5 Haiku (not in API) | Not published |
+| **Circuit tracing** | Proposed (Sovereign State circuit discovery) | Research on Claude 3.5 Haiku — open-source tools, ~25% success rate | Not published |
+
+### A.3 Why Standard Transformer Explainability Methods Fall Short
+
+Standard LLMs rely on post-hoc explainability methods that have well-documented limitations:
+
+**Attention maps are misleading.** Extensive research has shown that attention weights do not reliably explain model decisions. They ignore value computations, non-attention components, and residual connections. As Hugging Face's analysis summarizes: *"Claiming attention weights 'explain' model decisions is like saying a recipe explains the flavor of a cake."* Phase Quad doesn't need attention maps for attribution because its three paths are architecturally separate.
+
+**Chain-of-thought is not faithful.** Anthropic's own circuit tracing research (March 2025) demonstrated that Claude can produce fabricated reasoning chains that don't correspond to actual internal computation. The "bluffing" finding showed the model generating plausible but unfaithful rationales. Phase Quad's telemetry bypasses this entirely — it reads gate strengths and stability signals that are computed as part of inference, not generated as text.
+
+**Self-reported confidence is uncalibrated.** Without native confidence signals, standard LLMs rely on prompting the model to self-assess (e.g., "rate your confidence 1-10"). This is generated text, not a calibrated probability. Phase Quad computes confidence from memory state variance (`sigmoid(-var + 1.0)`), which is a principled signal tied to the model's actual internal state.
+
+**SHAP/LIME are computationally prohibitive and model-agnostic.** Shapley-value methods provide theoretically justified attribution but are too expensive for production use on large transformers. More importantly, they treat the model as a black box, describing input-output correlations without revealing internal mechanisms. Phase Quad's attribution is free — the paths already compute separately during inference.
+
+**Logprobs are token-level, not semantic.** OpenAI provides logprobs (Claude does not), which give per-token confidence. But token-level probability doesn't answer "did this answer come from retrieval or recent context?" or "is the reasoning trajectory stable?" These are semantic, architectural questions that require structural explainability.
+
+### A.4 What Anthropic's Research Reveals (But Doesn't Productize)
+
+Anthropic has the most advanced interpretability research program among frontier labs:
+
+- **Sparse autoencoders** demonstrated on Claude 3.5 Haiku — decomposing neurons into monosemantic features (multilingual, multimodal, safety-relevant concepts)
+- **Circuit tracing** with attribution graphs — tracing feature-to-feature interactions across layers
+- **Persona vectors** — extracting activation vectors for traits (sycophancy, hallucination tendency)
+- **Signs of introspection** — early evidence of limited self-reporting on internal states
+
+However, Anthropic themselves document critical limitations:
+
+| Limitation | Source | Implication |
+|-----------|--------|-------------|
+| Circuit tracing studies a *replacement model* (CLT), not production Claude | Neel Nanda, Anthropic researcher | "We are in fact only learning about clone models" |
+| ~25% success rate on attribution graphs | Anthropic's own paper | Published examples are cherry-picked success cases |
+| Missing attention circuits — QK formation not explained | Methods paper | How the model decides what to attend to is still opaque |
+| ~50% reconstruction accuracy of replacement model | Methods paper | Significant unexplained computation remains |
+| Superposition problem — non-orthogonal features give misleading linear attribution | Methods paper | Shapley values or integrated Hessians needed but scale poorly |
+| Jailbreak analysis returns error nodes instead of circuits | Biology paper | Safety-critical behaviors are hardest to explain |
+| No theoretical framework for validity of attribution graphs | Methods paper | Empirical checks only, no formal guarantees |
+
+**None of this research is available in the Claude API.** The gap between Anthropic's research capabilities and what enterprises can actually use is large.
+
+Phase Quad's advantage: the explainability signals are **computed during inference and returned with every response**, not locked in a research lab.
+
+### A.5 The Enterprise Gap
+
+For enterprise buyers evaluating explainability, the question is not "which model has the best research papers?" but **"what can I audit, log, and act on in production?"**
+
+| Enterprise Need | Standard LLMs (Claude/GPT-4) | Phase Quad |
+|----------------|------------------------------|------------|
+| "Show me what the model relied on" | Ask it to explain (unfaithful) or run expensive post-hoc attribution | Path ratios + provenance blocks returned with every response |
+| "How confident is the model?" | Prompt-based self-assessment or logprobs (token-level) | `confidence_mean` from memory state variance (semantic-level) |
+| "Is the reasoning stable?" | No signal available | `stability_badge` (GREEN/YELLOW/RED), `reversal_risk`, `phase_drift` |
+| "Should we let it execute tools?" | External safety rules only | ConfidenceGate: `ExecutionPermission` from internal signals |
+| "Why did it refuse/escalate?" | Read the generated text | `PolicyDecision` with `escalation_level`, `verification_reason`, `coherence_score` |
+| "Is this answer grounded in retrieved context?" | RAG source citations (external, not model-internal) | `quad_ratio` measures how much internal retrieval contributed |
+| "Detect adversarial/injection attempts" | External prompt classifiers | Native `gate_volatility` spike detection + routing shift anomaly |
+| "Audit trail for compliance" | Request-level logging (SOC 2) | Model-signal-level audit with `AuditTrail` (action-typed, timestamped, exportable) |
+| "Policy enforcement from model signals" | Not available (policies are external rules on input/output text) | `EnterprisePolicyEngine` evaluates telemetry → ALLOW/WARN/VERIFY/BLOCK |
+
+### A.6 What Phase Quad Does NOT Yet Have (Honest Assessment)
+
+Phase Quad's explainability system is powerful but has areas where frontier labs are ahead:
+
+| Capability | Status | What Standard LLMs Have |
+|-----------|--------|------------------------|
+| **Sparse autoencoder features** | Proposed (PA-SAE in roadmap) | Anthropic has demonstrated on Claude 3.5 Haiku (research only) |
+| **Mechanistic circuit discovery** | Proposed (L4 in maturity model) | Anthropic published circuit tracing with open-source tools |
+| **Constitutional / alignment transparency** | Not applicable (different paradigm) | Anthropic published 23K-word constitution (CC0 license) |
+| **Scale validation** | Not yet proven at 70B+ scale | Claude Opus runs at frontier scale |
+| **Independent audit** | Not yet conducted | Anthropic has SOC 2 Type II certification |
+| **Formal verification of explanations** | Not yet (L5 in maturity model) | No frontier lab has this either |
+
+Phase Quad's position on the interpretability maturity model:
+
+```
+Phase Quad:  L1 ✅  L2 ✅  L3 ✅  L4 ⚠️  L5 ❌
+Claude:      L1 ✅  L2 ⚠️  L3 ⚠️  L4 ⚠️  L5 ❌
+
+L1 = Behavioral (probes, ablation)
+L2 = Structural (named paths, concept bottleneck)
+L3 = Representational (health metrics surfaced as API)
+L4 = Mechanistic (circuit discovery, causal tracing)
+L5 = Symbolic (formal rules, provable guarantees)
+
+Key: ✅ = productized/available  ⚠️ = research-only or partial  ❌ = not available
+```
+
+The critical difference: Phase Quad's L2-L3 capabilities are **productized and available in every API response**. Claude's L3-L4 capabilities exist as **research artifacts not available through the API**.
+
+### A.7 Positioning Statement
+
+> Phase Quad offers **runtime, per-response, structural explainability** that no standard transformer LLM provides today. While Anthropic leads in interpretability research (sparse autoencoders, circuit tracing), none of that research is available in production. Phase Quad's three-path architecture, explicit gating signals, and 32D concept bottleneck produce a verifiable audit trail that enterprises can log, query, and act on — without post-hoc methods, without prompting the model to explain itself, and without the known unfaithfulness of chain-of-thought rationales.
+
+---
+
 *Document prepared for Phase Quad Architecture Team — V11.1.0 Enterprise Explanation Telemetry*
 *Symbolu AI Systems*
 *February 2026*
