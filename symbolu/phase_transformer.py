@@ -83,12 +83,17 @@ except ImportError:
 # V9.8.0: Replaces arbitrary 124D (44 phonemes + 64 topics + 12 bhava + 4 dynamics)
 # with principled 32D grounded in consciousness physics.
 #
-# The 32D Sovereign State mapping:
-#   [0:12]  - 12 Bhavas (Ontological Aspects)
-#   [12:17] - 5 Koshas (Consciousness Sheaths)
-#   [17:22] - 5 Vrittis (Mental Modifications)
-#   [22:28] - 6 Gunas/Dynamics (Energy States)
-#   [28:32] - 4 Reserved (Void/Toroidal Feedback)
+# V11.0.0: Separated into three planes. Only Bhavas touch phase rotation.
+#
+# The 32D Sovereign State mapping (3 separated planes):
+#   PHASE PLANE (12D → phase rotation):
+#     [0:12]  - 12 Bhavas (Ontological Aspects) — WHAT mode of being
+#   CONTROL PLANE (16D → CTM+/Sentinel/Governor):
+#     [12:17] - 5 Koshas (Consciousness Sheaths) — HOW DEEP to process
+#     [17:22] - 5 Vrittis (Mental Modifications) — HOW RELIABLE is this
+#     [22:28] - 6 Gunas/Dynamics (Energy States) — WHAT ENERGY dynamics
+#   LEARNING PLANE (4D → training-time feedback):
+#     [28:32] - 4 Reserved (Void/Toroidal Feedback) — scratch/JEPA
 #
 # Why this matters:
 #   - Old 124D: "Labeling the World" (arbitrary topics, premature phonemes)
@@ -96,6 +101,18 @@ except ImportError:
 #   - CSR/Phonemes remain at Layer 7 where semantic word-level context exists
 
 SOVEREIGN_STATE_DIM = 32
+
+# V11.0.0: Phase-Critical State Dimension (Bhava-only)
+# Only Bhavas participate in phase rotation (ΔS → θ → attention).
+# Koshas/Vrittis/Gunas/Reserved are control/learning signals, not phase-critical.
+# Rationale: Phase rotation should encode WHAT the system IS (ontological identity),
+# not how nervous/deep/energetic/uncertain it feels. This eliminates:
+#   - Over-coupling between identity and control signals
+#   - Phase noise from Guna dynamics and Vritti epistemic states
+#   - Hard-to-debug entanglement in the attention modulation path
+PHASE_STATE_DIM = 12   # Bhava-only: the runtime phase rotation input
+CONTROL_STATE_DIM = 16  # Koshas(5) + Vrittis(5) + Gunas(6): routed to control plane
+LEARNING_STATE_DIM = 4  # Reserved/JEPA(4): training-time feedback, not live attention
 
 # Bhava indices [0:12] - Ontological Aspects
 BHAVA_NAMES = [
@@ -1365,6 +1382,75 @@ def compute_phase_health_diagnostics(model: nn.Module) -> Dict[str, float]:
 
 
 # =============================================================================
+# V11.1.0: EXPLANATION TELEMETRY BRIDGE
+# =============================================================================
+# Convenience function that collects from the model's three diagnostic surfaces
+# and returns a unified ExplanationTelemetry record.  Import-safe: the
+# mechanical.logging package uses only stdlib + dataclasses (no torch).
+
+def collect_explanation_telemetry(
+    model: nn.Module,
+    response_id: str = "",
+    health_diagnostics: Optional[Dict[str, float]] = None,
+    ontological_state: Optional[Dict[str, float]] = None,
+    coherence_score: Optional[float] = None,
+    sequence_length: int = 0,
+):
+    """
+    Collect an ExplanationTelemetry record from model internals.
+
+    This is the primary integration point between phase_transformer
+    and the enterprise explainability system.  Call after a forward pass.
+
+    Args:
+        model: PhaseQuadTransformer (or any module with get_phase_health /
+               get_instrumentation / get_proposal_metrics).
+        response_id: Unique ID for this response.
+        health_diagnostics: Pre-computed result of
+            compute_phase_health_diagnostics(model).  If None, computed
+            automatically when health capture is enabled.
+        ontological_state: Optional dict with control plane signals.
+        coherence_score: Optional aggregate coherence.
+        sequence_length: Token count for metadata.
+
+    Returns:
+        ExplanationTelemetry (from symbolu.mechanical.logging.telemetry_schema)
+
+    Usage:
+        enable_health_diagnostics_capture(model, True)
+        logits = model(input_ids)
+        health = compute_phase_health_diagnostics(model)
+        telemetry = collect_explanation_telemetry(model, health_diagnostics=health)
+        enable_health_diagnostics_capture(model, False)
+        print(telemetry.summary())
+    """
+    from symbolu.mechanical.logging.phase_quad_explainer import PhaseQuadExplainer
+
+    explainer = PhaseQuadExplainer(enable_deep_diagnostics=False)
+
+    # Map health dict keys to the schema expected by explainer
+    mapped_health = None
+    if health_diagnostics is not None:
+        mapped_health = {
+            'r_k_mean': health_diagnostics.get('R_k', 0.0),
+            'r_q_mean': health_diagnostics.get('R_q', 0.0),
+            'amp_phase_corr': health_diagnostics.get('amp_phase_corr', 0.0),
+            'head_redundancy': health_diagnostics.get('head_redundancy', 0.0),
+            'phase_drift_mean': health_diagnostics.get('phase_drift_mean', 0.0),
+            'phase_drift_std': health_diagnostics.get('phase_drift_std', 0.0),
+        }
+
+    return explainer.explain(
+        model=model,
+        response_id=response_id,
+        health_diagnostics=mapped_health,
+        ontological_state=ontological_state,
+        coherence_score=coherence_score,
+        sequence_length=sequence_length,
+    )
+
+
+# =============================================================================
 # V9.9.12: ADAPTIVE PHASE DIVERSITY CONTROLLER (ChatGPT Universal Proposal)
 # =============================================================================
 
@@ -1587,21 +1673,26 @@ class TransformerConfig:
 
 class IntentPhaseProjector(nn.Module):
     """
-    Projects Sovereign State Delta (ΔS) to phase rotation offsets.
+    Projects Bhava State Delta (ΔBhava) to phase rotation offsets.
 
-    V9.8.0: Updated for 32D Sovereign State (was 124D CognitiveState).
+    V11.0.0: Downsized from 32D → 12D (Bhava-only) for phase rotation.
+    Phase rotation should encode WHAT the system IS (ontological identity),
+    not control signals (Koshas/Vrittis/Gunas) which belong in the control plane.
 
-    This is the bridge between Ontological understanding and Phase attention.
-    The Ontological model outputs a 32-dim Sovereign State delta representing
-    how "understanding" changed. This projector converts that to phase offsets
-    that rotate the Query phasors in Phase attention.
+    V9.8.0: Originally used full 32D Sovereign State.
 
-    32D Sovereign State Structure:
-        [0:12]  - 12 Bhavas (Ontological Aspects)
-        [12:17] - 5 Koshas (Consciousness Sheaths)
-        [17:22] - 5 Vrittis (Mental Modifications)
-        [22:28] - 6 Gunas/Dynamics (Energy States)
-        [28:32] - 4 Reserved (Void/Toroidal Feedback)
+    This is the bridge between Ontological identity and Phase attention.
+    Only the 12D Bhava delta (how "mode of being" changed) feeds into phase
+    rotation. Control signals (depth, reliability, energy) are routed elsewhere.
+
+    12D Bhava State (Phase-Critical):
+        [0:12]  - 12 Bhavas (Ontological Aspects) - softmax normalized
+
+    Non-Phase Signals (routed to Control/Learning planes):
+        Koshas (5D)  → CTM+ / Sentinel / Budget Controller
+        Vrittis (5D) → ConfidenceGate / Sentinel
+        Gunas (6D)   → Runtime Governor / PCAM decay
+        Reserved (4D)→ Training-time feedback / diagnostics
 
     Theory (from ONTOLOGICAL_STATE_DELTA_DESIGN.md):
         z_lower' = z_lower × e^{iθ_higher}
@@ -1609,17 +1700,18 @@ class IntentPhaseProjector(nn.Module):
     In practice:
         φ_q' = φ_q + θ_intent
 
-    This means: Same tokens, but their RELATIONSHIPS change based on intent.
+    This means: Same tokens, but their RELATIONSHIPS change based on
+    ontological identity (Bhava), not energy/depth/reliability state.
 
     Example:
         "The door is open"
-        - Intent = "enter building" → θ ≈ 0° → tokens relate as "opportunity"
-        - Intent = "secure building" → θ ≈ π → tokens relate as "problem"
+        - Bhava = EXE (Execution mode) → θ ≈ 0° → tokens relate as "opportunity"
+        - Bhava = WIT (Witness mode) → θ ≈ π → tokens relate as "observation"
     """
 
     def __init__(
         self,
-        state_dim: int = SOVEREIGN_STATE_DIM,  # V9.8.0: 32D Sovereign State (was 124D)
+        state_dim: int = PHASE_STATE_DIM,  # V11.0.0: 12D Bhava-only (was 32D)
         num_heads: int = 12,       # Number of attention heads
         head_dim: int = 64,        # Dimension per head
         project_per_head_dim: bool = False,  # If True, project to [H, D_h], else [H]
@@ -1655,29 +1747,31 @@ class IntentPhaseProjector(nn.Module):
             self.phase_proj[-1].weight.fill_(0.01)
             self.phase_proj[-1].bias.fill_(0.0)
 
-    def forward(self, delta_S: torch.Tensor) -> torch.Tensor:
+    def forward(self, delta_bhava: torch.Tensor) -> torch.Tensor:
         """
-        Convert state delta to phase offsets.
+        Convert Bhava state delta to phase offsets.
+
+        V11.0.0: Input is now 12D Bhava-only delta (was 32D full state delta).
 
         Args:
-            delta_S: [B, 32] or [B, T, 32] - Sovereign State delta
+            delta_bhava: [B, 12] or [B, T, 12] - Bhava state delta (phase-critical only)
 
         Returns:
             theta_intent: [B, H] or [B, H, D_h] or [B, T, H, D_h] - phase offsets
         """
-        theta = self.phase_proj(delta_S)  # [B, H] or [B, H*D_h]
+        theta = self.phase_proj(delta_bhava)  # [B, H] or [B, H*D_h]
 
         if self.project_per_head_dim:
             # Reshape to [B, H, D_h] or [B, T, H, D_h]
             # Use actual output_dim to compute head_dim for consistent reshaping
             actual_head_dim = self.output_dim // self.num_heads
-            if delta_S.dim() == 2:
-                B = delta_S.shape[0]
+            if delta_bhava.dim() == 2:
+                B = delta_bhava.shape[0]
                 theta = theta.view(B, self.num_heads, actual_head_dim)
             else:
                 # Use -1 to dynamically infer sequence length from tensor elements
                 # This handles cases where the sequence length changes during generation
-                B = delta_S.shape[0]
+                B = delta_bhava.shape[0]
                 theta = theta.view(B, -1, self.num_heads, actual_head_dim)
 
         # Scale to reasonable phase range (tanh → [-1, 1] → [-π, π])
@@ -3759,24 +3853,30 @@ class BindingCacheTransformer(nn.Module):
 
 class OntologicalBindingCacheTransformer(nn.Module):
     """
-    AGI Architecture: Binding Cache + 32D Sovereign State.
+    AGI Architecture: Binding Cache + Separated Sovereign State Planes.
+
+    V11.0.0: Phase rotation uses Bhava-only delta (12D), not full 32D.
 
     Combines:
     1. Binding Cache (validated by probes): Protected Phase + Top-K Query
        - Phase ablation drop: -50% to -54% (Phase is ESSENTIAL)
        - No gradient competition between Phase and Quad
 
-    2. 32D Sovereign State (ontological reasoning):
-       - [0:12]  12 Bhavas (Ontological Aspects)
-       - [12:17] 5 Koshas (Consciousness Sheaths)
-       - [17:22] 5 Vrittis (Mental Modifications)
-       - [22:28] 6 Gunas (Energy States)
-       - [28:32] 4 Reserved (Toroidal Feedback)
+    2. Separated Sovereign State planes:
+       Phase Plane (12D Bhava-only → phase rotation):
+         [0:12]  12 Bhavas (Ontological Aspects) — WHAT mode of being
+       Control Plane (16D → CTM+/Sentinel/Governor):
+         [12:17] 5 Koshas (Consciousness Sheaths) — HOW DEEP to process
+         [17:22] 5 Vrittis (Mental Modifications) — HOW RELIABLE is this
+         [22:28] 6 Gunas (Energy States) — WHAT ENERGY dynamics
+       Learning Plane (4D → training-time only):
+         [28:32] 4 Reserved (Toroidal Feedback) — scratch/JEPA channels
 
     Theory:
-        - System 2 (Ontological): Slow, deliberate semantic reasoning → ΔS
-        - System 1 (Binding Cache): Fast pattern completion with intent modulation
-        - ΔS → Phase Rotation: Intent changes HOW bindings are stored/retrieved
+        - System 2 (Ontological): Slow, deliberate semantic reasoning → ΔBhava
+        - System 1 (Binding Cache): Fast pattern completion with identity modulation
+        - ΔBhava → Phase Rotation: Identity changes HOW bindings are stored/retrieved
+        - Control signals (Koshas/Vrittis/Gunas) → Binding Annotator / CTM+ / Sentinel
 
     From diagnostic probes:
         - When Phase has protected role: -50% ablation drop (ESSENTIAL)
@@ -3784,7 +3884,7 @@ class OntologicalBindingCacheTransformer(nn.Module):
 
     Usage:
         model = OntologicalBindingCacheTransformer(...)
-        output = model(input_ids)  # Computes ΔS and applies to Protected Phase
+        output = model(input_ids)  # Computes ΔBhava and applies to Protected Phase
     """
 
     def __init__(
@@ -3855,10 +3955,12 @@ class OntologicalBindingCacheTransformer(nn.Module):
             )
             self._init_absolute_potential_bias()
 
-        # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
+        # V11.0.0: Intent phase projector uses Bhava-only delta (12D)
+        # Only ontological identity feeds phase rotation, not control signals
+        # ΔBhava[12] → θ[H] or θ[H, D_h]
         head_dim = embed_dim // num_heads
         self.intent_projector = IntentPhaseProjector(
-            state_dim=state_dim,
+            state_dim=PHASE_STATE_DIM,  # V11.0.0: 12D Bhava-only (was state_dim=32D)
             num_heads=num_heads,
             head_dim=head_dim,
             project_per_head_dim=project_per_head_dim,
@@ -3872,10 +3974,11 @@ class OntologicalBindingCacheTransformer(nn.Module):
         # Ontological Binding Annotator (CSR/Kosha/SRK as SELECTORS, not attention modifiers)
         # This computes binding salience that biases Top-K selection
         # Clean separation: Attention = physics, Annotator = semantics
+        # Note: Annotator still receives full 32D state for semantic selection
         if use_binding_annotator:
             self.binding_annotator = OntologicalBindingAnnotator(
                 embed_dim=embed_dim,
-                state_dim=state_dim,
+                state_dim=state_dim,  # Full 32D for semantic annotation (not phase rotation)
                 num_heads=num_heads,
                 use_csr=use_csr_annotation,
                 use_kosha=use_kosha_annotation,
@@ -3885,7 +3988,9 @@ class OntologicalBindingCacheTransformer(nn.Module):
             self.binding_annotator = None
 
         # Previous state for delta computation
+        # V11.0.0: prev_bhava tracks Bhava-only (12D) for phase delta
         self.register_buffer('prev_state', None, persistent=False)
+        self.register_buffer('prev_bhava', None, persistent=False)
 
     def _init_absolute_potential_bias(self):
         """Initialize state projector to bias toward 'Absolute Potential' state."""
@@ -3930,25 +4035,34 @@ class OntologicalBindingCacheTransformer(nn.Module):
         self,
         hidden: torch.Tensor,
         reset_state: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Compute 32D Sovereign State and its delta from hidden states.
+        Compute 32D Sovereign State, full delta, and Bhava-only delta.
+
+        V11.0.0: Returns separated outputs:
+        - Full 32D state for diagnostics/control plane
+        - Full 32D delta for logging
+        - 12D Bhava-only delta for phase rotation (the only dim that touches attention)
 
         Args:
             hidden: [B, N, embed_dim] - hidden states from binding cache
             reset_state: Reset prev_state (use at start of new sequence)
 
         Returns:
-            state: [B, 32] - current Sovereign State (pooled)
-            delta_S: [B, 32] - change from previous state
+            state: [B, 32] - current Sovereign State (full, for diagnostics/control)
+            delta_S: [B, 32] - full state delta (for logging/learning)
+            delta_bhava: [B, 12] - Bhava-only delta (for phase rotation)
         """
         # Pool hidden states
         pooled = hidden.mean(dim=1)  # [B, embed_dim]
 
-        # Project to Sovereign State
+        # Project to full 32D Sovereign State
         state = self.state_projector(pooled)  # [B, state_dim]
 
-        # Compute delta
+        # Extract Bhava slice (phase-critical)
+        bhava = state[:, BHAVA_SLICE]  # [B, 12]
+
+        # Compute full delta (for logging/learning plane)
         batch_size_changed = (
             self.prev_state is not None and
             self.prev_state.shape[0] != state.shape[0]
@@ -3958,10 +4072,21 @@ class OntologicalBindingCacheTransformer(nn.Module):
         else:
             delta_S = state - self.prev_state
 
-        # Update prev_state
-        self.prev_state = state.detach()
+        # Compute Bhava-only delta (for phase rotation)
+        bhava_batch_changed = (
+            self.prev_bhava is not None and
+            self.prev_bhava.shape[0] != bhava.shape[0]
+        )
+        if reset_state or self.prev_bhava is None or bhava_batch_changed:
+            delta_bhava = torch.zeros_like(bhava)
+        else:
+            delta_bhava = bhava - self.prev_bhava
 
-        return state, delta_S
+        # Update previous states
+        self.prev_state = state.detach()
+        self.prev_bhava = bhava.detach()
+
+        return state, delta_S, delta_bhava
 
     def forward(
         self,
@@ -3977,15 +4102,19 @@ class OntologicalBindingCacheTransformer(nn.Module):
         """
         Forward pass with Ontological → Binding Cache integration.
 
+        V11.0.0: Phase rotation uses Bhava-only delta (12D), not full 32D.
+
         Two-pass architecture:
         1. First pass: Get hidden states WITHOUT intent phase
-        2. Compute state delta from hidden states
-        3. Compute binding salience from OntologicalBindingAnnotator
-        4. Second pass: Full forward WITH intent phase AND binding salience
+        2. Compute state delta from hidden states (returns full + Bhava-only)
+        3. Compute binding salience from OntologicalBindingAnnotator (uses full 32D)
+        4. Second pass: Full forward WITH intent phase (from 12D Bhava delta)
 
         Clean separation:
-        - Attention = physics (pure, domain-agnostic)
-        - Binding Annotator = semantics (CSR/Kosha/SRK as selectors)
+        - Phase rotation = Bhava identity only (12D)
+        - Binding Annotator = full semantics (32D: CSR/Kosha/SRK as selectors)
+        - Control plane = Koshas/Vrittis/Gunas (routed to CTM+/Sentinel/Governor)
+        - Learning plane = Reserved/JEPA (training-time only)
 
         Args:
             input_ids: [B, N] token indices
@@ -3994,14 +4123,15 @@ class OntologicalBindingCacheTransformer(nn.Module):
             return_hidden: Return all hidden states
             return_last_hidden: Return final hidden state
             reset_state: Reset Ontological state (new sequence)
-            external_delta_S: [B, state_dim] external state delta
+            external_delta_S: [B, state_dim] external state delta (legacy 32D or 12D Bhava)
             csr_mask: [B, N] optional CSR content word mask for binding annotation
 
         Returns:
             Dict with:
             - 'logits': [B, N, V] output logits
-            - 'state': [B, 32] current Sovereign State
-            - 'delta_S': [B, 32] state delta
+            - 'state': [B, 32] current Sovereign State (full, for diagnostics)
+            - 'delta_S': [B, 32] full state delta (for logging/learning)
+            - 'delta_bhava': [B, 12] Bhava-only delta (phase-critical)
             - 'intent_phase': [B, H] or [B, H, D_h] phase rotation
             - 'loss': Optional, if labels provided
         """
@@ -4011,30 +4141,36 @@ class OntologicalBindingCacheTransformer(nn.Module):
 
         # Compute state delta (or use external)
         if external_delta_S is not None:
-            delta_S = external_delta_S
+            # Legacy path: external delta may be 32D or 12D
             state = self.state_projector(hidden.mean(dim=1))
+            delta_S = external_delta_S
+            if external_delta_S.shape[-1] <= PHASE_STATE_DIM:
+                delta_bhava = external_delta_S
+            else:
+                delta_bhava = external_delta_S[:, BHAVA_SLICE]
         else:
-            state, delta_S = self.compute_state_delta(hidden, reset_state)
+            state, delta_S, delta_bhava = self.compute_state_delta(hidden, reset_state)
 
-        # Convert delta_S to intent phase rotation
-        intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
+        # V11.0.0: Convert Bhava-only delta to intent phase rotation
+        # Only ontological identity (12D) modulates attention
+        intent_phase = self.intent_projector(delta_bhava)  # [B, H] or [B, H, D_h]
 
         # Compute binding salience using OntologicalBindingAnnotator
-        # This is where CSR/Kosha/SRK act as SELECTORS (semantics), not attention modifiers
-        # Salience biases Top-K selection without changing attention math
+        # Annotator still uses full 32D state — Kosha/SRK are SELECTORS, not phase rotators
+        # This is the correct home for Koshas: they select what's important for binding,
+        # without entangling with the phase rotation math
         binding_salience = None
         if self.binding_annotator is not None:
-            # Extract Kosha activations from state if available
+            # Extract Kosha activations from full state (control plane signal)
             kosha_activations = None
             if self.state_dim >= 17:
-                # Kosha is in positions [12:17] of Sovereign State
-                kosha_activations = state[:, 12:17]  # [B, 5]
+                kosha_activations = state[:, KOSHA_SLICE]  # [B, 5]
 
             binding_salience = self.binding_annotator(
                 hidden_states=hidden,
-                sovereign_state=state,
+                sovereign_state=state,  # Full 32D for semantic selection
                 kosha_activations=kosha_activations,
-                csr_mask=csr_mask,  # CSR content word mask for phonological grounding
+                csr_mask=csr_mask,
             )
 
         # Second pass: Full forward WITH intent phase AND binding salience
@@ -4058,8 +4194,9 @@ class OntologicalBindingCacheTransformer(nn.Module):
             output = {'logits': result}
 
         # Add ontological outputs
-        output['state'] = state
-        output['delta_S'] = delta_S
+        output['state'] = state           # Full 32D for diagnostics/control
+        output['delta_S'] = delta_S       # Full 32D delta for logging/learning
+        output['delta_bhava'] = delta_bhava  # V11.0.0: 12D Bhava delta (phase-critical)
         output['intent_phase'] = intent_phase
         if binding_salience is not None:
             output['binding_salience'] = binding_salience
@@ -4075,6 +4212,7 @@ class OntologicalBindingCacheTransformer(nn.Module):
     ) -> torch.Tensor:
         """Generation with Ontological state tracking."""
         self.prev_state = None
+        self.prev_bhava = None  # V11.0.0: Reset Bhava tracking too
 
         for _ in range(max_new_tokens):
             result = self(input_ids, reset_state=(self.prev_state is None))
@@ -6555,23 +6693,27 @@ class OntologicalHybridTransformer(nn.Module):
     """
     Two-Tier AGI Architecture: Ontological (slow/semantic) + Hybrid (fast/generation).
 
-    V9.8.0: Uses 32D Sovereign State (was 124D CognitiveState).
+    V11.0.0: Phase rotation uses Bhava-only delta (12D), not full 32D.
 
-    32D Sovereign State Structure:
-        [0:12]  - 12 Bhavas (Ontological Aspects)
-        [12:17] - 5 Koshas (Consciousness Sheaths)
-        [17:22] - 5 Vrittis (Mental Modifications)
-        [22:28] - 6 Gunas/Dynamics (Energy States)
-        [28:32] - 4 Reserved (Void/Toroidal Feedback)
+    Separated Sovereign State planes:
+      Phase Plane (12D Bhava-only → phase rotation):
+        [0:12]  12 Bhavas (Ontological Aspects) — WHAT mode of being
+      Control Plane (16D → CTM+/Sentinel/Governor):
+        [12:17] 5 Koshas (Consciousness Sheaths) — HOW DEEP to process
+        [17:22] 5 Vrittis (Mental Modifications) — HOW RELIABLE is this
+        [22:28] 6 Gunas (Energy States) — WHAT ENERGY dynamics
+      Learning Plane (4D → training-time only):
+        [28:32] 4 Reserved (Toroidal Feedback) — scratch/JEPA channels
 
     This combines:
-    1. Ontological Layer: Tracks 32D Sovereign State, outputs ΔS (understanding change)
-    2. Hybrid Layer: Local + Phase attention, conditioned on ΔS via phase rotation
+    1. Ontological Layer: Projects full 32D Sovereign State, extracts 12D Bhava delta
+    2. Hybrid Layer: Local + Phase attention, conditioned on ΔBhava via phase rotation
 
     Theory:
         - System 2 (Ontological): Slow, deliberate semantic reasoning
         - System 1 (Hybrid): Fast, automatic pattern completion
-        - ΔS → Phase Rotation: Intent changes HOW tokens relate, not WHAT they are
+        - ΔBhava → Phase Rotation: Identity changes HOW tokens relate, not WHAT they are
+        - Control signals (Koshas/Vrittis/Gunas) → separate control plane, not attention
 
     Initialization:
         - State projector biased toward O12_ABS (Absolute) and Material (Physicality)
@@ -6582,12 +6724,13 @@ class OntologicalHybridTransformer(nn.Module):
 
     Usage:
         model = OntologicalHybridTransformer(...)
-        output = model(input_ids)  # Automatically computes ΔS and applies phase rotation
+        output = model(input_ids)  # Computes ΔBhava and applies phase rotation
 
     Memory (at 10M context):
         - Token-centric: 2TB (impossible)
         - State-Delta (Tier 2): 30GB
-        - Ontological (Tier 3): 5GB
+        - Ontological (Tier 3): 5GB (full 32D state retained for control/diagnostics)
+        - Phase-critical: 12D Bhava only → even smaller footprint
     """
 
     def __init__(
@@ -6667,10 +6810,12 @@ class OntologicalHybridTransformer(nn.Module):
             )
             self._init_absolute_potential_bias()
 
-        # Intent phase projector: ΔS[32] → θ[H] or θ[H, D_h]
+        # V11.0.0: Intent phase projector uses Bhava-only delta (12D)
+        # Only ontological identity feeds phase rotation, not control signals
+        # ΔBhava[12] → θ[H] or θ[H, D_h]
         head_dim = embed_dim // num_heads
         self.intent_projector = IntentPhaseProjector(
-            state_dim=state_dim,
+            state_dim=PHASE_STATE_DIM,  # V11.0.0: 12D Bhava-only (was state_dim=32D)
             num_heads=num_heads,
             head_dim=head_dim,
             project_per_head_dim=project_per_head_dim,
@@ -6683,6 +6828,8 @@ class OntologicalHybridTransformer(nn.Module):
         # Previous state for delta computation (will be set during forward)
         # persistent=False excludes from state_dict (runtime state, not trained weights)
         self.register_buffer('prev_state', None, persistent=False)
+        # V11.0.0: Track Bhava-only previous state for phase delta
+        self.register_buffer('prev_bhava', None, persistent=False)
 
     def _init_absolute_potential_bias(self):
         """
@@ -6714,27 +6861,34 @@ class OntologicalHybridTransformer(nn.Module):
         self,
         hidden: torch.Tensor,
         reset_state: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Compute 32D Sovereign State and its delta from hidden states.
+        Compute 32D Sovereign State, full delta, and Bhava-only delta.
 
-        V9.8.0: Updated for 32D Sovereign State.
+        V11.0.0: Returns separated outputs:
+        - Full 32D state for diagnostics/control plane
+        - Full 32D delta for logging
+        - 12D Bhava-only delta for phase rotation (the only dim that touches attention)
 
         Args:
             hidden: [B, N, embed_dim] - hidden states from hybrid model
             reset_state: Reset prev_state (use at start of new sequence)
 
         Returns:
-            state: [B, 32] - current Sovereign State (pooled)
-            delta_S: [B, 32] - change from previous state
+            state: [B, 32] - current Sovereign State (full, for diagnostics/control)
+            delta_S: [B, 32] - full state delta (for logging/learning)
+            delta_bhava: [B, 12] - Bhava-only delta (for phase rotation)
         """
         # Pool hidden states (mean over sequence)
         pooled = hidden.mean(dim=1)  # [B, embed_dim]
 
-        # Project to Sovereign State
+        # Project to full 32D Sovereign State
         state = self.state_projector(pooled)  # [B, state_dim]
 
-        # Compute delta
+        # Extract Bhava slice (phase-critical)
+        bhava = state[:, BHAVA_SLICE]  # [B, 12]
+
+        # Compute full delta (for logging/learning plane)
         # Also reset if batch size changed (e.g., VRAM governor resize)
         batch_size_changed = (
             self.prev_state is not None and
@@ -6745,10 +6899,21 @@ class OntologicalHybridTransformer(nn.Module):
         else:
             delta_S = state - self.prev_state
 
-        # Update prev_state for next call
-        self.prev_state = state.detach()
+        # Compute Bhava-only delta (for phase rotation)
+        bhava_batch_changed = (
+            self.prev_bhava is not None and
+            self.prev_bhava.shape[0] != bhava.shape[0]
+        )
+        if reset_state or self.prev_bhava is None or bhava_batch_changed:
+            delta_bhava = torch.zeros_like(bhava)
+        else:
+            delta_bhava = bhava - self.prev_bhava
 
-        return state, delta_S
+        # Update previous states
+        self.prev_state = state.detach()
+        self.prev_bhava = bhava.detach()
+
+        return state, delta_S, delta_bhava
 
     def forward(
         self,
@@ -6764,9 +6929,11 @@ class OntologicalHybridTransformer(nn.Module):
         """
         Forward pass with Ontological → Hybrid integration.
 
+        V11.0.0: Phase rotation uses Bhava-only delta (12D), not full 32D.
+
         Two modes:
-        1. Auto mode (default): Compute ΔS from hidden states automatically
-        2. External mode: Use provided external_delta_S (from separate Ontological model)
+        1. Auto mode (default): Compute ΔBhava from hidden states automatically
+        2. External mode: Use provided external_delta_S (legacy 32D or 12D Bhava)
 
         Args:
             input_ids: [B, N] token indices
@@ -6775,13 +6942,14 @@ class OntologicalHybridTransformer(nn.Module):
             extract_layers: Specific layers to extract
             return_last_hidden: Return final hidden state
             reset_state: Reset Ontological state (new sequence)
-            external_delta_S: [B, state_dim] external state delta (bypasses auto computation)
+            external_delta_S: [B, state_dim] external state delta (legacy 32D or 12D Bhava)
 
         Returns:
             Dict with:
             - 'logits': [B, N, V] output logits
-            - 'state': [B, 32] current Sovereign State
-            - 'delta_S': [B, 32] state delta
+            - 'state': [B, 32] current Sovereign State (full, for diagnostics)
+            - 'delta_S': [B, 32] full state delta (for logging/learning)
+            - 'delta_bhava': [B, 12] Bhava-only delta (phase-critical)
             - 'intent_phase': [B, H] or [B, H, D_h] phase rotation applied
             - Plus any requested hidden states
         """
@@ -6792,13 +6960,19 @@ class OntologicalHybridTransformer(nn.Module):
 
         # Compute state delta (or use external)
         if external_delta_S is not None:
-            delta_S = external_delta_S
+            # Legacy path: external delta may be 32D or 12D
             state = self.state_projector(hidden.mean(dim=1))
+            delta_S = external_delta_S
+            if external_delta_S.shape[-1] <= PHASE_STATE_DIM:
+                delta_bhava = external_delta_S
+            else:
+                delta_bhava = external_delta_S[:, BHAVA_SLICE]
         else:
-            state, delta_S = self.compute_state_delta(hidden, reset_state)
+            state, delta_S, delta_bhava = self.compute_state_delta(hidden, reset_state)
 
-        # Convert delta_S to intent phase rotation
-        intent_phase = self.intent_projector(delta_S)  # [B, H] or [B, H, D_h]
+        # V11.0.0: Convert Bhava-only delta to intent phase rotation
+        # Only ontological identity (12D) modulates attention
+        intent_phase = self.intent_projector(delta_bhava)  # [B, H] or [B, H, D_h]
 
         # Second pass: Full forward WITH intent phase
         result = self.hybrid(
@@ -6811,8 +6985,9 @@ class OntologicalHybridTransformer(nn.Module):
         )
 
         # Add ontological outputs
-        result['state'] = state
-        result['delta_S'] = delta_S
+        result['state'] = state           # Full 32D for diagnostics/control
+        result['delta_S'] = delta_S       # Full 32D delta for logging/learning
+        result['delta_bhava'] = delta_bhava  # V11.0.0: 12D Bhava delta (phase-critical)
         result['intent_phase'] = intent_phase
 
         return result
@@ -6827,6 +7002,7 @@ class OntologicalHybridTransformer(nn.Module):
         """Generation with Ontological state tracking."""
         # Reset state at start of generation
         self.prev_state = None
+        self.prev_bhava = None  # V11.0.0: Reset Bhava tracking too
 
         for _ in range(max_new_tokens):
             result = self(input_ids, reset_state=(self.prev_state is None))

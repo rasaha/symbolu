@@ -9,24 +9,26 @@ A paradigm shift from token-centric to meaning-centric training, enabling theore
 
 ---
 
-## Implementation Status (V9.8.0)
+## Implementation Status (V11.0.0)
 
 > **STATUS: ✅ FULLY IMPLEMENTED**
 >
-> All design components have been implemented and tested. This section provides quick references to implementations.
+> All design components have been implemented and tested. V11.0.0 adds three-plane dimensional separation and Sovereign Bridge (tensor → agentic wiring).
 
 ### Quick Reference
 
 | Component | Implementation | Location |
 |-----------|----------------|----------|
 | 32D Sovereign State | `SovereignReasoningKernel` | `symbolu/sovereign/reasoning_kernel.py` |
-| Phase Rotation (ΔS→θ) | `IntentPhaseProjector` | `symbolu/phase_transformer.py:228` |
-| Two-Tier AGI Wrapper | `OntologicalHybridTransformer` | `symbolu/phase_transformer.py:2458` |
+| Phase Rotation (ΔBhava→θ) | `IntentPhaseProjector` (12D input) | `symbolu/phase_transformer.py` |
+| Two-Tier AGI Wrapper | `OntologicalHybridTransformer` | `symbolu/phase_transformer.py` |
 | Layer Interventions | `DNABridge`, `PhaseHook`, `WitnessLayer` | `symbolu/sovereign/reasoning_kernel.py` |
 | Loss Functions (B1/U2/S8) | `SRKLoss` | `symbolu/sovereign/sovereign_loss.py` |
 | OPB Dimension Locking | `OPBDimensionLock` | `symbolu/sovereign/reasoning_kernel.py` |
 | User-Ontological Mirror | `UserOntologicalMirror` | `symbolu/sovereign/reasoning_kernel.py` |
-| Unit Tests | `test_srk.py` | `symbolu/sovereign/tests/test_srk.py` |
+| **Sovereign Bridge** | `sovereign_bridge.py` | `symbolu/agentic_framework/sovereign_bridge.py` |
+| Unit Tests (SRK) | `test_srk.py` | `symbolu/sovereign/tests/test_srk.py` |
+| Unit Tests (Bridge) | `test_sovereign_bridge.py` | `symbolu/agentic_framework/tests/test_sovereign_bridge.py` |
 
 ### Validate Implementation
 
@@ -260,12 +262,14 @@ This is how consciousness works: same signal, context-dependent meaning.
 │                                                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  TIER 3: Ontological State-Delta (V9.8.0: 32D Sovereign State)          │
+│  TIER 3: Ontological State-Delta (V11.0.0: 32D Sovereign State)         │
 │  ══════════════════════════════════════════════════════════════         │
 │  Training:  hidden → projector → SovereignState[32] → onto_delta_loss   │
 │  Predicts:  ΔS = S_{t+1} - S_t (meaning space)                          │
+│  Phase:     ΔBhava[12D] → IntentPhaseProjector → θ → attention rotation │
+│  Control:   Kosha[5]+Vritti[5]+Guna[6] → Sovereign Bridge → Agentic     │
 │  Memory:    O(B·T·s) = 130MB at 1M context (1500x reduction)            │
-│  Status:    PRODUCTION (V9.8.0)                                         │
+│  Status:    PRODUCTION (V11.0.0)                                        │
 │  Location:  symbolu/phase_transformer.py::OntologicalHybridTransformer  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -286,17 +290,23 @@ This is how consciousness works: same signal, context-dependent meaning.
 
 ---
 
-## Sovereign State Structure (V9.8.0)
+## Sovereign State Structure (V11.0.0)
 
 **V9.8.0 BREAKING CHANGE:** Replaced arbitrary 124D CognitiveState with principled 32D Sovereign State.
+
+**V11.0.0 BREAKING CHANGE:** Separated 32D into three functional planes — Phase (12D), Control (16D), Learning (4D). IntentPhaseProjector now receives only 12D Bhava deltas. Control plane dimensions (Kosha/Vritti/Guna) wired into agentic framework via Sovereign Bridge.
 
 > **📁 IMPLEMENTATION NOTES**
 >
 > **Primary Implementation:** `symbolu/sovereign/reasoning_kernel.py`
 >
-> **Constants defined:**
+> **Constants defined (V11.0.0):**
 > ```python
-> SOVEREIGN_STATE_DIM = 32
+> SOVEREIGN_STATE_DIM = 32   # Full state, still projected and persisted
+> PHASE_STATE_DIM = 12       # Bhava-only: runtime phase rotation input
+> CONTROL_STATE_DIM = 16     # Koshas(5) + Vrittis(5) + Gunas(6): control plane
+> LEARNING_STATE_DIM = 4     # Reserved/JEPA(4): training-time feedback
+>
 > BHAVA_NAMES = ['POT', 'IDN', 'EXE', 'STR', 'COG', 'AGY', 'RSN', 'PRP', 'WIT', 'UNI', 'INT', 'ABS']
 > KOSHA_NAMES = ['ANNA', 'PRANA', 'MANO', 'VIJNANA', 'ANANDA']
 > VRITTI_NAMES = ['PRAMANA', 'VIPARYAYA', 'VIKALPA', 'NIDRA', 'SMRITI']
@@ -306,6 +316,7 @@ This is how consciousness works: same signal, context-dependent meaning.
 > **Usage:**
 > ```python
 > from symbolu.sovereign import SOVEREIGN_STATE_DIM, BHAVA_NAMES, KOSHA_NAMES
+> from symbolu.phase_transformer import PHASE_STATE_DIM, CONTROL_STATE_DIM, LEARNING_STATE_DIM
 > from symbolu.phase_transformer import get_sovereign_state_summary
 > ```
 >
@@ -392,6 +403,125 @@ At step 0, the model initializes to:
 - **Annamaya**: Physical/grounded reality
 
 This represents **grounded awareness** - consciousness rooted in physical existence but open to all possibilities.
+
+### V11.0.0: Three-Plane Dimensional Separation
+
+V11.0.0 recognizes that the 32 dimensions serve **three distinct purposes** at runtime and should not all feed into the same pipeline:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  32D SOVEREIGN STATE                                                    │
+│  ═══════════════════                                                   │
+│                                                                         │
+│  ┌─── PHASE PLANE (12D) ──── Bhava[0:12] ───────────────────────────┐ │
+│  │  Purpose: Runtime phase rotation for attention modulation          │ │
+│  │  Consumer: IntentPhaseProjector (12D input, was 32D before V11)   │ │
+│  │  Formula: z' = z × e^{iθ}  where θ = Proj(ΔBhava)               │ │
+│  │  This is the ONLY slice that directly modulates attention.        │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│  ┌─── CONTROL PLANE (16D) ── Kosha[12:17]+Vritti[17:22]+Guna[22:28]┐ │
+│  │  Purpose: Metacognitive signals for reasoning governance           │ │
+│  │  Consumers (tensor-level): SRK, PIDGovernor, KoshaShiftController│ │
+│  │  Consumers (agentic): Sovereign Bridge → ConfidenceGate,          │ │
+│  │                        SafetyContractEvaluator                    │ │
+│  │  These dimensions describe HOW the model is thinking, not WHAT.   │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+│  ┌─── LEARNING PLANE (4D) ── Reserved[28:32] ───────────────────────┐ │
+│  │  Purpose: Training-time feedback (JEPA, toroidal carryover)       │ │
+│  │  Consumer: JEPA loss, backward pass only                          │ │
+│  │  NOT consumed at inference time.                                   │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key changes from V9.8.0:**
+
+| Aspect | V9.8.0 | V11.0.0 |
+|--------|--------|---------|
+| IntentPhaseProjector input | Full 32D `delta_S` | 12D `delta_bhava` only |
+| `compute_state_delta()` return | `(state, delta_S)` | `(state[32], delta_S[32], delta_bhava[12])` |
+| Control dims role | Logged but not separately routed | Routed to agentic framework via bridge |
+| Reserved dims role | Undefined | Explicitly labeled as training-time JEPA |
+| Agentic framework wiring | Disconnected from tensor state | Connected via `sovereign_bridge.py` |
+
+### V11.0.0: Sovereign Bridge (Tensor → Agentic Wiring)
+
+The Sovereign Bridge connects the tensor-level 32D Sovereign State to the pure-Python agentic framework (ConfidenceGate, SafetyContract). This closes the gap between the model's internal state and its behavioral governance:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SOVEREIGN BRIDGE DATA FLOW                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Model Forward Pass                                                     │
+│    │                                                                    │
+│    ├─→ state[32D]          ──→ SovereignBridge                          │
+│    │                              │                                     │
+│    │                              ├─→ Vritti[5D] → ConfidenceSignals    │
+│    │                              │     ├─ PRAMANA  → quality_score     │
+│    │                              │     ├─ VIPARYAYA→ reversal_risk     │
+│    │                              │     ├─ VIKALPA  → (discounted)      │
+│    │                              │     ├─ NIDRA    → coherence_score   │
+│    │                              │     └─ SMRITI   → correctness       │
+│    │                              │                                     │
+│    │                              ├─→ Kosha[5D] → BudgetSignals         │
+│    │                              │     ├─ ANNA     → low complexity    │
+│    │                              │     ├─ VIJNANA  → high complexity   │
+│    │                              │     └─ ANANDA   → completeness      │
+│    │                              │                                     │
+│    │                              └─→ Guna[6D] → StabilitySignals       │
+│    │                                    ├─ SATTVA   → session_stability │
+│    │                                    ├─ RAJAS    → volatility_index  │
+│    │                                    ├─ STABLE   → identity_stability│
+│    │                                    └─ Δnorm    → trajectory_conf   │
+│    │                                                                    │
+│    │                       ┌────────────────────────────────────┐       │
+│    │                       │ ConfidenceGate.evaluate(signals)   │       │
+│    │                       │   → EscalationDecision             │       │
+│    │                       │   → BudgetAllocation               │       │
+│    │                       │   → ExecutionPermission             │       │
+│    │                       └────────────────────────────────────┘       │
+│    │                       ┌────────────────────────────────────┐       │
+│    │                       │ SafetyContractEvaluator(coherence) │       │
+│    │                       │   → SafetyContract(eligible=T/F)   │       │
+│    │                       └────────────────────────────────────┘       │
+│    │                                                                    │
+│    └─→ delta_bhava[12D]   ──→ IntentPhaseProjector → θ → attention     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Usage:**
+```python
+from symbolu.agentic_framework.sovereign_bridge import (
+    signals_from_sovereign_state,
+    coherence_from_sovereign_state,
+)
+from symbolu.agentic_framework.confidence_gate import create_confidence_gate
+from symbolu.agentic_framework.safety_contract import SafetyContractEvaluator
+
+# After model forward pass
+outputs = model(input_ids)
+state = outputs['state']       # [B, 32]
+delta_S = outputs['delta_S']   # [B, 32]
+
+# Convert tensor state → agentic signals
+signals = signals_from_sovereign_state(state, delta_S)
+coherence = coherence_from_sovereign_state(state, delta_S)
+
+# Feed into behavioral governance
+gate = create_confidence_gate()
+decision = gate.evaluate(signals)              # Should we proceed?
+contract = SafetyContractEvaluator().evaluate(coherence)  # Is it safe?
+```
+
+**Unit Tests:** `pytest symbolu/agentic_framework/tests/test_sovereign_bridge.py -v`
+
+---
 
 ### CSR/Phonemes: Layer 7, Not Embedding
 
@@ -592,11 +722,14 @@ python train.py \
     --model_type hybrid
 ```
 
-### Tier 3 (V9.8.0 - 32D Sovereign State)
+### Tier 3 (V11.0.0 - 32D Sovereign State with Three-Plane Separation)
 ```python
 from symbolu.phase_transformer import (
     OntologicalHybridTransformer,
-    SOVEREIGN_STATE_DIM,  # 32
+    SOVEREIGN_STATE_DIM,   # 32 (full state)
+    PHASE_STATE_DIM,       # 12 (Bhava-only, phase rotation input)
+    CONTROL_STATE_DIM,     # 16 (Kosha+Vritti+Guna, control plane)
+    LEARNING_STATE_DIM,    # 4  (Reserved/JEPA, training-time)
     get_sovereign_state_summary,
 )
 
@@ -606,19 +739,26 @@ model = OntologicalHybridTransformer(
     embed_dim=768,
     num_layers=12,
     num_heads=12,
-    state_dim=SOVEREIGN_STATE_DIM,  # 32D
+    state_dim=SOVEREIGN_STATE_DIM,  # 32D full state
 )
 
-# Forward pass
+# Forward pass — compute_state_delta returns 3-tuple in V11.0.0
 output = model(input_ids)
-state = output['state']       # [B, 32] Sovereign State
-delta_S = output['delta_S']   # [B, 32] State delta
+state = output['state']           # [B, 32] Full Sovereign State
+delta_S = output['delta_S']       # [B, 32] Full state delta
+delta_bhava = output['delta_bhava']  # [B, 12] Bhava-only delta (→ phase rotation)
 
 # Get human-readable summary
 summary = get_sovereign_state_summary(state)
 print(f"Dominant Bhava: {summary['dominant_bhava']}")  # e.g., "ABS"
 print(f"Active Kosha: {summary['active_kosha']}")      # e.g., "ANNA"
 print(f"Vritti State: {summary['vritti_state']}")      # e.g., "PRAMANA"
+
+# Wire into agentic framework (V11.0.0 Sovereign Bridge)
+from symbolu.agentic_framework.sovereign_bridge import signals_from_sovereign_state
+signals = signals_from_sovereign_state(state)
+print(f"Quality: {signals.quality_score:.2f}")
+print(f"Reversal Risk: {signals.prediction_reversal_risk:.2f}")
 ```
 
 ---

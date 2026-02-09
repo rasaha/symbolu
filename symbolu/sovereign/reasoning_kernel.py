@@ -150,7 +150,10 @@ class SRKConfig:
 
     def __post_init__(self):
         """Validate configuration."""
-        assert self.state_dim == 32, "SRK requires 32D Sovereign State"
+        # V11.0.0: SRK operates on the full 32D Sovereign State (control plane).
+        # Phase rotation is handled separately by IntentPhaseProjector (12D Bhava-only).
+        # SRK needs all 32D for: DNA Bridge, Witness, Synthesis, IMR, Karma.
+        assert self.state_dim == 32, "SRK requires full 32D Sovereign State (control plane)"
         assert 0 < self.isomorphism_threshold <= 1.0
         assert 0 < self.karma_decay <= 1.0
 

@@ -92,6 +92,11 @@ from symbolu.agentic_framework.confidence_gate import (
     signals_from_policy_decision,
     merge_signals,
 )
+from symbolu.agentic_framework.sovereign_bridge import (
+    signals_from_sovereign_state,
+    coherence_from_sovereign_state,
+    SovereignCoherenceState,
+)
 from symbolu.agentic_framework.mcp_gateway import (
     SafeMCPGateway,
     MCPToolCall,
@@ -194,6 +199,10 @@ __all__ = [
     "signals_from_coherence_metrics",
     "signals_from_policy_decision",
     "merge_signals",
+    # Sovereign State Bridge (V11.0.0: tensor → agentic wiring)
+    "signals_from_sovereign_state",
+    "coherence_from_sovereign_state",
+    "SovereignCoherenceState",
     # MCP Gateway (safe tool integration)
     "SafeMCPGateway",
     "MCPToolCall",
@@ -231,4 +240,4 @@ __all__ = [
     "create_conservative_pipeline",
 ]
 
-__version__ = "1.6.0"  # Added Adaptive Prompts (automated AI reasoning)
+__version__ = "1.7.0"  # V11.0.0: Sovereign State Bridge (tensor → agentic wiring)
