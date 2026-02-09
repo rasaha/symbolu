@@ -659,6 +659,11 @@ class InferenceManager:
                 'final_metrics': engine_meta.get('final_metrics'),
                 'reliability': engine_meta.get('avg_reliability'),
                 'warnings': engine_meta.get('warnings', []),
+                # V11.0.0 Sovereign Bridge signals
+                'bridge_signals': engine_meta.get('final_bridge_signals'),
+                'coherence': engine_meta.get('final_coherence'),
+                'vritti_gate_count': engine_meta.get('vritti_gate_count', 0),
+                'kosha_depth_adjustments': engine_meta.get('kosha_depth_adjustments', 0),
             }
 
         elif arch == ArchitectureMode.BINDING_CACHE and self.binding_cache_engine is not None:

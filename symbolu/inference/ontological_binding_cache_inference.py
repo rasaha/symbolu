@@ -3,25 +3,34 @@
 Ontological Binding Cache Inference Engine
 ============================================
 
-Inference-time engine for OntologicalBindingCacheTransformer (V10.0 AGI Architecture).
+Inference-time engine for OntologicalBindingCacheTransformer (V10.0/V11.0.0 AGI Architecture).
 
 This engine implements the two-pass architecture:
 - Pass 1: Get hidden states WITHOUT intent phase
-- Pass 2: Compute state delta → intent phase → full forward WITH intent
+- Pass 2: Compute state delta → ΔBhava[12D] → intent phase → full forward WITH intent
+
+V11.0.0 Inference Filter Table:
+  CSR:      YES at inference  — CSRInferenceGuard in InferenceManager
+  Ontology: Validate only     — SovereignStateMonitor (observe-only, never modifies)
+  JEPA:     NO at inference   — Reserved[28:32] explicitly excluded
+  Kosha:    YES at inference  — Depth-aware parameter adjustment via Sovereign Bridge
+  Vritti:   YES (CRITICAL)    — Hallucination gating via Sovereign Bridge signals
 
 Provides:
 - Two-pass generation loop with Sovereign State tracking
 - 32D Sovereign State monitoring via SovereignStateMonitor
-- Intent phase projection access
+- Intent phase projection (V11.0.0: 12D ΔBhava → θ, model-internal)
 - OntologicalBindingAnnotator control
 - External delta_S injection
 - State persistence across conversations
+- V11.0.0: Vritti quality gating (hallucination detection + resampling)
+- V11.0.0: Kosha depth control (surface→broaden, intellectual→sharpen)
+- V11.0.0: Sovereign Bridge signals → ConfidenceGate/SafetyContract
 
-Training Reference: symbolu/phase_transformer.py:3740-4075 (OntologicalBindingCacheTransformer)
+Training Reference: symbolu/phase_transformer.py (OntologicalBindingCacheTransformer)
 
 Author: Sovereign-1 Training Initiative
-Date: January 2026
-Phase: 5c - V10.0 Ontological Binding Cache Inference
+Date: January 2026 (V11.0.0 update: February 2026)
 """
 
 import torch
@@ -48,6 +57,18 @@ from .sovereign_state_monitor import (
     GUNA_SLICE,
 )
 
+# V11.0.0: Sovereign Bridge — wires control plane into agentic framework
+from symbolu.agentic_framework.sovereign_bridge import (
+    signals_from_sovereign_state,
+    coherence_from_sovereign_state,
+)
+
+# V11.0.0: Three-plane dimensional constants
+# Phase[0:12] → attention rotation (handled by model internally)
+# Control[12:28] → Vritti/Kosha/Guna governance (wired here via bridge)
+# Learning[28:32] → JEPA only, explicitly NOT consumed at inference
+RESERVED_SLICE = slice(28, 32)  # JEPA/Learning plane — inference-excluded
+
 
 @dataclass
 class OntologicalBindingCacheInferenceConfig(BindingCacheInferenceConfig):
@@ -69,6 +90,29 @@ class OntologicalBindingCacheInferenceConfig(BindingCacheInferenceConfig):
     # Warning thresholds
     error_risk_threshold: float = 0.5
     turbulence_threshold: float = 0.8
+
+    # ─── V11.0.0: Inference Filter Configuration ───
+    # Based on the Training/Inference filter table:
+    #   CSR:      YES at inference (handled by CSRInferenceGuard in manager)
+    #   Ontology: Validate only (SovereignStateMonitor, observe-only)
+    #   JEPA:     NO at inference (Reserved[28:32] excluded)
+    #   Kosha:    YES at inference (depth-aware generation control)
+    #   Vritti:   YES CRITICAL at inference (hallucination gating)
+
+    # Vritti gate: quality gating during generation (CRITICAL)
+    enable_vritti_gate: bool = True
+    vritti_error_resample_threshold: float = 0.5   # VIPARYAYA above this → resample
+    vritti_low_quality_threshold: float = 0.25      # quality_score below this → boost temperature
+    vritti_resample_temperature: float = 0.5        # cooler temperature for resampling
+    vritti_max_resamples: int = 2                   # max resamples per token
+
+    # Kosha depth control: depth-aware parameter adjustment
+    enable_kosha_depth_control: bool = True
+    kosha_surface_top_k_boost: int = 20    # add to top_k when stuck at MATERIAL
+    kosha_intellectual_temp_scale: float = 0.85  # cool temperature at INTELLECTUAL depth
+
+    # Sovereign Bridge: wire control plane → agentic signals
+    enable_sovereign_bridge: bool = True
 
 
 class OntologicalBindingCacheInferenceEngine:
@@ -286,12 +330,19 @@ class OntologicalBindingCacheInferenceEngine:
         """
         Generate with two-pass ontological reasoning.
 
-        The two-pass architecture:
+        The two-pass architecture (V11.0.0):
         1. Pass 1: Forward without intent → get hidden states
-        2. Compute state delta: hidden → SovereignState[32] → ΔS
-        3. Convert ΔS → intent phase: ΔS[32] → θ[H]
+        2. Compute state delta: hidden → SovereignState[32] → ΔS + ΔBhava[12]
+        3. Convert ΔBhava[12] → intent phase: ΔBhava → θ[H] (phase plane)
         4. Compute binding salience from annotator
         5. Pass 2: Forward WITH intent phase AND binding salience
+
+        V11.0.0 Inference Filters (from Training/Inference filter table):
+        - CSR:      YES — handled by CSRInferenceGuard in InferenceManager
+        - Ontology: Validate only — SovereignStateMonitor (observe-only)
+        - JEPA:     NO — Reserved[28:32] explicitly excluded
+        - Kosha:    YES — depth-aware parameter adjustment (surface→broaden, intellectual→sharpen)
+        - Vritti:   YES CRITICAL — hallucination gating via Sovereign Bridge signals
 
         Args:
             input_ids: [B, T] input token IDs
@@ -327,9 +378,13 @@ class OntologicalBindingCacheInferenceEngine:
             'delta_trajectory': [],
             'intent_phase_trajectory': [],
             'metrics_trajectory': [],
+            'bridge_signals_trajectory': [],
+            'vritti_gate_events': [],
+            'kosha_depth_events': [],
             'warnings': [],
             'final_state': None,
             'final_metrics': None,
+            'final_bridge_signals': None,
         }
 
         # Generation loop with two-pass per token
@@ -376,14 +431,14 @@ class OntologicalBindingCacheInferenceEngine:
                 intent_phase = None
                 binding_salience = None
 
-            next_logits = logits[:, -1, :] / max(temperature, 1e-8)
+            next_logits = logits[:, -1, :]
 
             # Track state if available
             if track_trajectory and current_state is not None:
                 self._state_history.append(current_state.clone())
                 meta['state_trajectory'].append(current_state.clone())
 
-                # Analyze state
+                # Analyze state (observe-only — Ontology = Validate)
                 metrics = self.state_monitor.analyze_state(current_state)
                 meta['metrics_trajectory'].append(metrics)
 
@@ -408,9 +463,90 @@ class OntologicalBindingCacheInferenceEngine:
             if current_state is not None:
                 self._prev_state = current_state
 
+            # ─── V11.0.0: Sovereign Bridge → Agentic Signals ───
+            # Wire control plane (Kosha/Vritti/Guna) into ConfidenceSignals.
+            # NOTE: Reserved[28:32] (JEPA/Learning plane) is explicitly NOT
+            # consumed here — JEPA = NO at inference per filter table.
+            bridge_signals = None
+            if self.config.enable_sovereign_bridge and current_state is not None:
+                bridge_signals = signals_from_sovereign_state(
+                    current_state, delta_S, batch_idx=0,
+                )
+                if track_trajectory:
+                    meta['bridge_signals_trajectory'].append({
+                        'quality_score': bridge_signals.quality_score,
+                        'prediction_reversal_risk': bridge_signals.prediction_reversal_risk,
+                        'coherence_score': bridge_signals.coherence_score,
+                        'action_complexity': bridge_signals.action_complexity,
+                    })
+
+            # ─── V11.0.0: VRITTI GATE (CRITICAL at inference) ───
+            # Vritti-driven quality gating: if Viparyaya (error/hallucination)
+            # signal is high, resample with cooler temperature to steer away
+            # from hallucinated tokens.
+            effective_temperature = temperature
+            effective_top_k = top_k
+
+            if (self.config.enable_vritti_gate and
+                    bridge_signals is not None):
+                reversal_risk = bridge_signals.prediction_reversal_risk
+                quality = bridge_signals.quality_score
+
+                if reversal_risk > self.config.vritti_error_resample_threshold:
+                    # High hallucination risk → cool down sampling
+                    effective_temperature = self.config.vritti_resample_temperature
+                    meta['vritti_gate_events'].append({
+                        'step': step,
+                        'action': 'cool_resample',
+                        'reversal_risk': reversal_risk,
+                        'quality': quality,
+                        'adjusted_temp': effective_temperature,
+                    })
+
+                elif quality < self.config.vritti_low_quality_threshold:
+                    # Low quality → slightly boost diversity to explore
+                    effective_temperature = min(temperature * 1.2, 1.5)
+                    meta['vritti_gate_events'].append({
+                        'step': step,
+                        'action': 'boost_diversity',
+                        'reversal_risk': reversal_risk,
+                        'quality': quality,
+                        'adjusted_temp': effective_temperature,
+                    })
+
+            # ─── V11.0.0: KOSHA DEPTH CONTROL (YES at inference) ───
+            # Kosha-driven depth adjustment: when processing is stuck at
+            # MATERIAL (surface syntax), broaden search; when at INTELLECTUAL
+            # depth, sharpen output.
+            if (self.config.enable_kosha_depth_control and
+                    bridge_signals is not None and
+                    current_state is not None):
+                kosha = current_state[0, KOSHA_SLICE].detach() if current_state.dim() == 2 else current_state[KOSHA_SLICE].detach()
+                kosha_argmax = kosha.argmax().item()
+
+                if kosha_argmax == 0:  # MATERIAL — surface-level processing
+                    effective_top_k = top_k + self.config.kosha_surface_top_k_boost
+                    meta['kosha_depth_events'].append({
+                        'step': step,
+                        'depth': 'MATERIAL',
+                        'action': 'broaden_top_k',
+                        'adjusted_top_k': effective_top_k,
+                    })
+                elif kosha_argmax == 3:  # INTELLECTUAL — pattern/wisdom depth
+                    effective_temperature = effective_temperature * self.config.kosha_intellectual_temp_scale
+                    meta['kosha_depth_events'].append({
+                        'step': step,
+                        'depth': 'INTELLECTUAL',
+                        'action': 'sharpen_temp',
+                        'adjusted_temp': effective_temperature,
+                    })
+
+            # Apply temperature
+            next_logits = next_logits / max(effective_temperature, 1e-8)
+
             # Top-k filtering
-            if top_k > 0:
-                top_k_vals = torch.topk(next_logits, min(top_k, next_logits.size(-1)))[0]
+            if effective_top_k > 0:
+                top_k_vals = torch.topk(next_logits, min(effective_top_k, next_logits.size(-1)))[0]
                 threshold = top_k_vals[:, -1].unsqueeze(-1)
                 next_logits = torch.where(
                     next_logits < threshold,
@@ -467,6 +603,16 @@ class OntologicalBindingCacheInferenceEngine:
         if self._prev_state is not None:
             meta['final_metrics'] = self.state_monitor.analyze_state(self._prev_state)
 
+            # V11.0.0: Final bridge signals for agentic consumption
+            if self.config.enable_sovereign_bridge:
+                final_delta = self._delta_history[-1] if self._delta_history else None
+                meta['final_bridge_signals'] = signals_from_sovereign_state(
+                    self._prev_state, final_delta, batch_idx=0,
+                )
+                meta['final_coherence'] = coherence_from_sovereign_state(
+                    self._prev_state, final_delta, batch_idx=0,
+                )
+
         # Aggregate warnings
         meta['warnings'].extend(self.state_monitor.get_warnings())
 
@@ -478,6 +624,10 @@ class OntologicalBindingCacheInferenceEngine:
             meta['avg_coherence'] = sum(
                 m.coherence_estimate for m in meta['metrics_trajectory']
             ) / len(meta['metrics_trajectory'])
+
+        # V11.0.0: Vritti/Kosha intervention summary
+        meta['vritti_gate_count'] = len(meta['vritti_gate_events'])
+        meta['kosha_depth_adjustments'] = len(meta['kosha_depth_events'])
 
         return generated, meta
 
