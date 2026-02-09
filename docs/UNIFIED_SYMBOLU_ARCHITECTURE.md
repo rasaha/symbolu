@@ -39,7 +39,7 @@ Traditional LLM:  P(token_{t+1} | context)      → "What word next?"
 SymbolU:          P(ΔS_{t+1} | S_t, context)    → "How should understanding change?"
 ```
 
-### System Diagram
+### System Diagram (V11.0.0)
 
 ```
                          ┌─────────────────────────────────────┐
@@ -48,72 +48,51 @@ SymbolU:          P(ΔS_{t+1} | S_t, context)    → "How should understanding c
                                         │
                                         ▼
                          ┌─────────────────────────────────────┐
-                         │     Phase Attention Transformer     │
-                         │         (O(n) memory)               │
-                         │                                     │
-                         │  ┌─────────────────────────────┐   │
-                         │  │  Vritti-Modulated Attention  │   │
-                         │  │  (Cognitive Mode Shapes      │   │
-                         │  │   Attention Patterns)        │   │
-                         │  └─────────────────────────────┘   │
+                         │   OntologicalHybridTransformer      │
+                         │     Phase Attention (O(n) memory)   │
+                         │   + SovereignStateProjector (32D)   │
                          └──────────────┬──────────────────────┘
                                         │
                                         ▼
                          ┌─────────────────────────────────────┐
-                         │        Hidden States [B, T, d]      │
+                         │    compute_state_delta() → 3-tuple  │
+                         │  ┌────────────────────────────────┐ │
+                         │  │ state[32D]  delta_S[32D]       │ │
+                         │  │ delta_bhava[12D]               │ │
+                         │  └────────────────────────────────┘ │
                          └──────────────┬──────────────────────┘
                                         │
-              ┌─────────────────────────┼─────────────────────────┐
-              │                         │                         │
-              ▼                         ▼                         ▼
-    ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-    │   LM Head       │     │   StateProjector    │     │  Guna Mapper    │
-    │   (Tokens)      │     │   (Cognitive)       │     │  (Bidirectional)│
-    └────────┬────────┘     └─────────┬───────────┘     └────────┬────────┘
-             │                        │                          │
-             │                        ▼                          │
-             │              ┌─────────────────────┐              │
-             │              │  CognitiveState     │◄─────────────┘
-             │              │  [B, T, 124]        │
-             │              │                     │
-             │              │  ┌───────────────┐  │
-             │              │  │ Phoneme [44]  │  │
-             │              │  │ Topic [64]    │  │
-             │              │  │ Ontology [12] │  │
-             │              │  │ Dynamics [4]  │  │
-             │              │  └───────────────┘  │
-             │              └─────────┬───────────┘
+              ┌─────────────────────────┼──────────────────────────┐
+              │                         │                          │
+              ▼                         ▼                          ▼
+    ┌──────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+    │ PHASE PLANE      │   │ CONTROL PLANE        │   │ LEARNING PLANE       │
+    │ Bhava[0:12]      │   │ Kosha[12:17]         │   │ Reserved[28:32]      │
+    │                  │   │ Vritti[17:22]        │   │                      │
+    │ ΔBhava → θ       │   │ Guna[22:28]          │   │ JEPA feedback        │
+    │ (12D → phase     │   │                      │   │ (training-time only) │
+    │  rotation)       │   │ (metacognitive       │   └──────────────────────┘
+    └────────┬─────────┘   │  governance)         │
+             │             └──────────┬───────────┘
              │                        │
-             │                        ▼
-             │              ┌─────────────────────┐
-             │              │  Chitta-Vritti      │
-             │              │  (5 Cognitive Modes)│
-             │              │                     │
-             │              │  Pramāṇa (valid)    │
-             │              │  Viparyaya (error)  │
-             │              │  Vikalpa (branch)   │
-             │              │  Smṛti (memory)     │
-             │              │  Nidrā (absent)     │
-             │              └─────────┬───────────┘
-             │                        │
-             │                        ▼
-             │              ┌─────────────────────┐
-             │              │  State-Delta Loss   │
-             │              │  L_state = ||ΔS_pred│
-             │              │           - ΔS_true||
-             │              └─────────────────────┘
-             │
-             ▼
-    ┌─────────────────┐
-    │  Token Loss     │
-    │  L_token = CE   │
-    └─────────────────┘
-             │
-             ▼
-    ┌─────────────────────────────────────────────┐
-    │  Combined Loss                               │
-    │  L = λ₁·L_token + λ₂·L_state + λ₃·L_coherence│
-    └─────────────────────────────────────────────┘
+             ▼                        ▼
+    ┌──────────────────┐   ┌──────────────────────┐
+    │IntentPhaseProj   │   │ Sovereign Bridge     │
+    │ θ = Proj(ΔBhava) │   │ (sovereign_bridge.py)│
+    │ z' = z × e^{iθ}  │   │                      │
+    │ → attention mod   │   │ Vritti → Confidence  │
+    └──────────────────┘   │ Kosha  → Budget      │
+                           │ Guna   → Stability   │
+                           └──────────┬───────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                                    ▼
+          ┌──────────────────┐              ┌──────────────────────┐
+          │ ConfidenceGate   │              │ SafetyContract       │
+          │  → Escalation    │              │  → eligible=T/F      │
+          │  → Budget        │              │  → preconditions     │
+          │  → Execution     │              │  → fail-closed       │
+          └──────────────────┘              └──────────────────────┘
 ```
 
 ---
@@ -135,13 +114,23 @@ Interpretability: Medium (hidden dynamics, but opaque)
 Reduction: 65x from Tier 1
 ```
 
-### Tier 3: Ontological State-Delta (Meaning Space)
+### Tier 3: Ontological State-Delta (V11.0.0 — 32D Sovereign State)
 ```
-Loss: Structured loss on CognitiveState deltas
-Memory: O(B·T·s) → 600MB at 1M context (s=124)
-Interpretability: HIGH (phonemes, topics, Bhava states)
-Reduction: 300x from Tier 1
+Loss: Structured loss on SovereignState deltas (SRKLoss: B1+U2+S8)
+Memory: O(B·T·s) → 130MB at 1M context (s=32)
+Interpretability: HIGH (Bhava aspects, Kosha sheaths, Vritti modes, Guna dynamics)
+Reduction: 1500x from Tier 1
+
+V11.0.0 Three-Plane Separation:
+  Phase Plane:    Bhava[0:12]  → ΔBhava → IntentPhaseProjector → θ → attention
+  Control Plane:  Kosha[12:17] + Vritti[17:22] + Guna[22:28] → Sovereign Bridge → Agentic
+  Learning Plane: Reserved[28:32] → JEPA training-time feedback only
 ```
+
+> **NOTE:** The 124D CognitiveState (phoneme[44]+topic[64]+ontology[12]+dynamics[4]) described
+> in Section 3 below is the **legacy V2.x architecture**. It was replaced by the 32D Sovereign
+> State in V9.8.0 and further refined in V11.0.0. Section 3 is retained for historical context
+> only. See `docs/ONTOLOGICAL_STATE_DELTA_DESIGN.md` for the current architecture.
 
 ### Memory Comparison at Scale
 
