@@ -201,6 +201,7 @@ try:
 except ImportError as e:
     SRK_AVAILABLE = False
     SOVEREIGN_STATE_DIM = 32  # Fallback: 12 Bhava + 5 Kosha + 5 Vritti + 6 Guna + 4 Reserved
+    PHASE_STATE_DIM = 12     # V11.0.0: Bhava-only for phase rotation
     print(f"Note: SRK modules not available for import: {e}")
     print("      SRK phase learning will use local implementations.")
 

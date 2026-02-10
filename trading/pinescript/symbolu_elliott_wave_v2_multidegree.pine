@@ -1,10 +1,11 @@
 // This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © SymbolU - Comprehensive Elliott Wave Indicator
+// © SymbolU - Comprehensive Elliott Wave Indicator v2 (Multi-Degree)
 // Advanced pattern recognition with Fibonacci validation, multi-degree wave counting,
-// complex corrections (WXY / WXYXZ), diagonal patterns, and integrated trading signals.
+// fractal hierarchy via multi-degree pivots, complex corrections (WXY / WXYXZ),
+// diagonal patterns, and integrated trading signals.
 
 //@version=6
-indicator("SymbolU Elliott Wave", shorttitle="SymbolU EW", overlay=true,
+indicator("SymbolU Elliott Wave v2", shorttitle="SymbolU EW v2", overlay=true,
     max_lines_count=500, max_labels_count=500)
 
 // ============================================================================
@@ -64,6 +65,22 @@ vol_enabled     = input.bool(true, "Enable Volume Analysis",
 vol_vwap        = input.bool(true, "Include VWAP",
     group="Volume Confirmation",
     tooltip="Factor VWAP premium/discount into volume score. Intraday only.")
+
+// --- Wave Degree (Fractal Hierarchy) ---
+deg_enabled     = input.bool(true, "Enable Multi-Degree Analysis",
+    group="Wave Degree",
+    tooltip="Analyze wave structure at 3 pivot scales to detect fractal hierarchy (W3-in-W3, false exhaustion filtering).")
+deg2_mult       = input.int(3, "Degree 2 Multiplier", minval=2, maxval=8,
+    group="Wave Degree",
+    tooltip="Degree 2 pivot lookback = base × this. E.g., 5 × 3 = 15 bars.")
+deg3_mult       = input.int(8, "Degree 3 Multiplier", minval=4, maxval=21,
+    group="Wave Degree",
+    tooltip="Degree 3 pivot lookback = base × this. E.g., 5 × 8 = 40 bars.")
+
+// --- Performance ---
+calc_last_n     = input.int(0, "Calculate Last N Bars (0 = All)", minval=0, maxval=50000,
+    group="Performance",
+    tooltip="Limit heavy computation (detectors, signals, drawing) to the last N bars. Pivot detection still runs on all bars. 0 = no limit. Try 5000 if you hit timeouts on low timeframes.")
 
 // --- Display ---
 show_zigzag      = input.bool(true, "Show ZigZag Lines", group="Display")
@@ -146,6 +163,30 @@ push_pivot(float price, int bar_idx, bool isHigh, float rsi_at_piv, float obv_at
     array.pop(piv_cumvol)
     array.unshift(piv_cumvol, cumvol_at_piv)
 
+// ── Degree 2 & 3 Pivot Arrays (price, bar, isHigh only — no RSI/OBV needed) ──
+var float[]  piv_price_d2  = array.new_float(14, na)
+var int[]    piv_bar_d2    = array.new_int(14, na)
+var bool[]   piv_isHigh_d2 = array.new_bool(14, false)
+var int      piv_count_d2  = 0
+
+var float[]  piv_price_d3  = array.new_float(14, na)
+var int[]    piv_bar_d3    = array.new_int(14, na)
+var bool[]   piv_isHigh_d3 = array.new_bool(14, false)
+var int      piv_count_d3  = 0
+
+// Parameterized push for higher-degree arrays (3 arrays, no RSI/OBV)
+push_piv(float[] prices, int[] bars, bool[] highs, float price, int bar_idx, bool isHigh) =>
+    array.pop(prices)
+    array.unshift(prices, price)
+    array.pop(bars)
+    array.unshift(bars, bar_idx)
+    array.pop(highs)
+    array.unshift(highs, isHigh)
+
+// Degree 2/3 lookback periods
+deg2_lookback = pivot_lookback * deg2_mult
+deg3_lookback = pivot_lookback * deg3_mult
+
 // Filter and store pivot highs
 if not na(ph)
     piv_bar_idx = bar_index - pivot_lookback
@@ -186,6 +227,63 @@ if not na(pl)
         if move_ok
             push_pivot(pl, piv_bar_idx, false, rsi_at_pivot, obv_at_pivot, cvol_at_pivot)
             piv_count := math.min(piv_count + 1, 14)
+
+// ── Degree 2 Pivot Detection ──
+if deg_enabled
+    ph_d2 = ta.pivothigh(high, deg2_lookback, deg2_lookback)
+    pl_d2 = ta.pivotlow(low, deg2_lookback, deg2_lookback)
+
+    if not na(ph_d2)
+        d2_bar = bar_index - deg2_lookback
+        d2_lastH = piv_count_d2 > 0 ? array.get(piv_isHigh_d2, 0) : false
+        d2_lastP = piv_count_d2 > 0 ? array.get(piv_price_d2, 0)  : na
+        if d2_lastH and not na(d2_lastP)
+            if ph_d2 > d2_lastP
+                array.set(piv_price_d2, 0, ph_d2)
+                array.set(piv_bar_d2,   0, d2_bar)
+        else
+            push_piv(piv_price_d2, piv_bar_d2, piv_isHigh_d2, ph_d2, d2_bar, true)
+            piv_count_d2 := math.min(piv_count_d2 + 1, 14)
+
+    if not na(pl_d2)
+        d2_bar = bar_index - deg2_lookback
+        d2_lastH = piv_count_d2 > 0 ? array.get(piv_isHigh_d2, 0) : false
+        d2_lastP = piv_count_d2 > 0 ? array.get(piv_price_d2, 0)  : na
+        if not d2_lastH and not na(d2_lastP)
+            if pl_d2 < d2_lastP
+                array.set(piv_price_d2, 0, pl_d2)
+                array.set(piv_bar_d2,   0, d2_bar)
+        else
+            push_piv(piv_price_d2, piv_bar_d2, piv_isHigh_d2, pl_d2, d2_bar, false)
+            piv_count_d2 := math.min(piv_count_d2 + 1, 14)
+
+// ── Degree 3 Pivot Detection ──
+    ph_d3 = ta.pivothigh(high, deg3_lookback, deg3_lookback)
+    pl_d3 = ta.pivotlow(low, deg3_lookback, deg3_lookback)
+
+    if not na(ph_d3)
+        d3_bar = bar_index - deg3_lookback
+        d3_lastH = piv_count_d3 > 0 ? array.get(piv_isHigh_d3, 0) : false
+        d3_lastP = piv_count_d3 > 0 ? array.get(piv_price_d3, 0)  : na
+        if d3_lastH and not na(d3_lastP)
+            if ph_d3 > d3_lastP
+                array.set(piv_price_d3, 0, ph_d3)
+                array.set(piv_bar_d3,   0, d3_bar)
+        else
+            push_piv(piv_price_d3, piv_bar_d3, piv_isHigh_d3, ph_d3, d3_bar, true)
+            piv_count_d3 := math.min(piv_count_d3 + 1, 14)
+
+    if not na(pl_d3)
+        d3_bar = bar_index - deg3_lookback
+        d3_lastH = piv_count_d3 > 0 ? array.get(piv_isHigh_d3, 0) : false
+        d3_lastP = piv_count_d3 > 0 ? array.get(piv_price_d3, 0)  : na
+        if not d3_lastH and not na(d3_lastP)
+            if pl_d3 < d3_lastP
+                array.set(piv_price_d3, 0, pl_d3)
+                array.set(piv_bar_d3,   0, d3_bar)
+        else
+            push_piv(piv_price_d3, piv_bar_d3, piv_isHigh_d3, pl_d3, d3_bar, false)
+            piv_count_d3 := math.min(piv_count_d3 + 1, 14)
 
 // Helper: get pivot data (0 = most recent)
 get_price(int idx) => array.get(piv_price, idx)
@@ -920,16 +1018,157 @@ detect_diagonal() =>
     [diag_type, confidence, is_leading]
 
 // ============================================================================
+// MULTI-DEGREE CONTEXT ANALYZER (Parameterized)
+// ============================================================================
+//
+// Simplified wave detection for higher degrees. Takes pivot arrays as params
+// so ONE function serves both degree 2 and degree 3.
+//
+// Returns: [direction, wave_position, is_impulse, is_correction, confidence]
+//   direction:    +1 = bullish, -1 = bearish, 0 = unclear
+//   wave_position: ±2 = W2 done, ±3 = in W3, ±5 = W5 complete, 0 = unknown
+//   is_impulse:   true if impulse structure detected
+//   is_correction: true if ABC/correction detected
+//   confidence:   0.0 - 1.0
+// ============================================================================
+
+analyze_degree_context(float[] deg_prices, bool[] deg_highs, int deg_count) =>
+    int dir = 0
+    int wave_pos = 0
+    bool is_imp = false
+    bool is_corr = false
+    float conf = 0.0
+
+    // ── Full 5-wave impulse (highest priority) ──
+    if deg_count >= 6
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        p3 = array.get(deg_prices, 3)
+        p4 = array.get(deg_prices, 4)
+        p5 = array.get(deg_prices, 5)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+        h3 = array.get(deg_highs, 3)
+        h4 = array.get(deg_highs, 4)
+        h5 = array.get(deg_highs, 5)
+
+        if not na(p0) and not na(p5)
+            // Bullish 5-wave: L-H-L-H-L-H
+            if not h5 and h4 and not h3 and h2 and not h1 and h0
+                w1 = p4 - p5
+                w3 = p2 - p3
+                w5 = p0 - p1
+                if w1 > 0 and w3 > 0 and w5 > 0
+                    if p3 > p5 and (w3 >= w1 or w3 >= w5)  // R1 + R2
+                        dir := 1
+                        wave_pos := 5
+                        is_imp := true
+                        conf := 0.80
+            // Bearish 5-wave: H-L-H-L-H-L
+            if not is_imp and h5 and not h4 and h3 and not h2 and h1 and not h0
+                w1 = p5 - p4
+                w3 = p3 - p2
+                w5 = p1 - p0
+                if w1 > 0 and w3 > 0 and w5 > 0
+                    if p3 < p5 and (w3 >= w1 or w3 >= w5)
+                        dir := -1
+                        wave_pos := -5
+                        is_imp := true
+                        conf := 0.80
+
+    // ── Partial impulse (W2 done / In W3) ──
+    if not is_imp and deg_count >= 4
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        p3 = array.get(deg_prices, 3)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+        h3 = array.get(deg_highs, 3)
+
+        if not na(p0) and not na(p3)
+            // Bullish partial: L-H-L-H
+            if not h3 and h2 and not h1 and h0
+                w1 = p2 - p3
+                w3 = p0 - p1
+                if w1 > 0 and w3 > 0 and p1 > p3  // R1 valid
+                    dir := 1
+                    is_imp := true
+                    if w3 >= w1
+                        wave_pos := 3    // In W3 — strongest wave
+                        conf := 0.70
+                    else
+                        wave_pos := 2    // W2 done, W3 forming
+                        conf := 0.50
+            // Bearish partial: H-L-H-L
+            if dir == 0 and h3 and not h2 and h1 and not h0
+                w1 = p3 - p2
+                w3 = p1 - p0
+                if w1 > 0 and w3 > 0 and p1 < p3
+                    dir := -1
+                    is_imp := true
+                    if w3 >= w1
+                        wave_pos := -3
+                        conf := 0.70
+                    else
+                        wave_pos := -2
+                        conf := 0.50
+
+    // ── ABC Correction ──
+    if not is_imp and deg_count >= 3
+        p0 = array.get(deg_prices, 0)
+        p1 = array.get(deg_prices, 1)
+        p2 = array.get(deg_prices, 2)
+        h0 = array.get(deg_highs, 0)
+        h1 = array.get(deg_highs, 1)
+        h2 = array.get(deg_highs, 2)
+
+        if not na(p0) and not na(p2)
+            // Bearish ABC: H-L-H → expect C down
+            if h2 and not h1 and h0
+                wave_a = p2 - p1
+                wave_b = p0 - p1
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a
+                    dir := -1
+                    is_corr := true
+                    conf := 0.50
+            // Bullish ABC: L-H-L → expect C up
+            if not is_corr and not h2 and h1 and not h0
+                wave_a = p1 - p2
+                wave_b = p1 - p0
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a
+                    dir := 1
+                    is_corr := true
+                    conf := 0.50
+
+    [dir, wave_pos, is_imp, is_corr, conf]
+
+// ============================================================================
+// Performance guard: skip heavy computation on old bars
+should_calc = calc_last_n == 0 or bar_index >= (last_bar_index - calc_last_n)
+
 // RUN ALL DETECTORS
 // ============================================================================
-[bull5_wnum, bull5_conf, bull5_valid] = detect_bullish_5wave()
-[bear5_wnum, bear5_conf, bear5_valid] = detect_bearish_5wave()
-[bull_partial_wnum, bull_partial_conf] = detect_partial_bullish()
-[bear_partial_wnum, bear_partial_conf] = detect_partial_bearish()
-[abc_type, abc_conf] = detect_abc_correction()
-[wxy_type, wxy_conf] = detect_wxy_double()
-[wxyz_type, wxyz_conf] = detect_wxyxz_triple()
-[diag_type, diag_conf, diag_is_leading] = detect_diagonal()
+[bull5_wnum, bull5_conf, bull5_valid] = should_calc ? detect_bullish_5wave() : [0, 0.0, false]
+[bear5_wnum, bear5_conf, bear5_valid] = should_calc ? detect_bearish_5wave() : [0, 0.0, false]
+[bull_partial_wnum, bull_partial_conf] = should_calc ? detect_partial_bullish() : [0, 0.0]
+[bear_partial_wnum, bear_partial_conf] = should_calc ? detect_partial_bearish() : [0, 0.0]
+[abc_type, abc_conf] = should_calc ? detect_abc_correction() : [0, 0.0]
+[wxy_type, wxy_conf] = should_calc ? detect_wxy_double() : [0, 0.0]
+[wxyz_type, wxyz_conf] = should_calc ? detect_wxyxz_triple() : [0, 0.0]
+[diag_type, diag_conf, diag_is_leading] = should_calc ? detect_diagonal() : [0, 0.0, false]
+
+// ── Multi-Degree Context Analysis ──
+[d2_dir, d2_wave, d2_is_imp, d2_is_corr, d2_conf] = should_calc and deg_enabled ?
+    analyze_degree_context(piv_price_d2, piv_isHigh_d2, piv_count_d2) :
+    [0, 0, false, false, 0.0]
+
+[d3_dir, d3_wave, d3_is_imp, d3_is_corr, d3_conf] = should_calc and deg_enabled ?
+    analyze_degree_context(piv_price_d3, piv_isHigh_d3, piv_count_d3) :
+    [0, 0, false, false, 0.0]
 
 // ============================================================================
 // PATTERN PRIORITY & SELECTION
@@ -997,6 +1236,76 @@ else
     active_conf  := 0.0
     active_label := "---"
     pattern_type := "none"
+
+// ============================================================================
+// CROSS-DEGREE CONFLUENCE SCORING
+// ============================================================================
+//
+// Compares degree 1 (detail) with degrees 2 (medium) and 3 (major) to detect:
+//   - W3-in-W3: degree 1 in W3, degree 2 also in W3 → explosive move
+//   - False exhaustion: degree 1 calls W5 exhaustion but degree 2 is mid-W3
+//   - Direction alignment: all degrees agree on bull/bear
+//   - Degree mismatch: degree 1 signal fights higher-degree trend
+//
+// Output: deg_confluence (-1.0 to +1.0), applied as ±10% modifier to composite
+// ============================================================================
+
+deg_confluence   = 0.0   // -1.0 = strong contradiction, +1.0 = strong confirmation
+deg_context_label = "---"
+
+if deg_enabled and pattern_type != "none"
+    d1_dir_sign = active_bull ? 1 : -1
+
+    // ── W3-in-W3 detection (highest value) ──
+    d1_in_w3 = pattern_type == "partial" and (active_wave == 3 or active_wave == -3)
+    d2_in_w3 = d2_wave == 3 or d2_wave == -3
+    d3_in_w3 = d3_wave == 3 or d3_wave == -3
+
+    if d1_in_w3 and d2_in_w3
+        deg_confluence := 1.0
+        deg_context_label := "W3-in-W3"
+    else if d1_in_w3 and d2_is_imp and d2_dir == d1_dir_sign
+        deg_confluence := 0.75
+        deg_context_label := "W3 in IMP"
+
+    // ── False exhaustion filter ──
+    // D1 says W5 exhaustion but D2 is in the strongest wave (W3)
+    d1_exhaustion = pattern_type == "impulse" and (active_label == "W5 Complete")
+    if d1_exhaustion
+        if d2_in_w3 and d2_dir == d1_dir_sign
+            // Sub-wave exhaustion inside parent W3 → reduce confidence sharply
+            deg_confluence := -0.5
+            deg_context_label := "SUB-W5 in D2:W3"
+        else if d2_is_imp and d2_dir == d1_dir_sign and d2_wave != 5 and d2_wave != -5
+            // Parent impulse not yet exhausted → reduce confidence
+            deg_confluence := -0.3
+            deg_context_label := "SUB-W5 in D2:IMP"
+        else if d2_wave == 5 or d2_wave == -5
+            // Both degrees say exhaustion → strong confirmation
+            deg_confluence := 0.8
+            deg_context_label := "W5-in-W5"
+
+    // ── Direction alignment (if no special case already set) ──
+    if deg_confluence == 0.0
+        d2_agrees = d2_dir == d1_dir_sign
+        d3_agrees = d3_dir == d1_dir_sign
+        d2_opposes = d2_dir != 0 and d2_dir != d1_dir_sign
+        d3_opposes = d3_dir != 0 and d3_dir != d1_dir_sign
+
+        if d2_agrees and d3_agrees
+            deg_confluence := 0.5
+            deg_context_label := "ALL ALIGNED"
+        else if d2_agrees and d3_dir == 0
+            deg_confluence := 0.25
+            deg_context_label := "D2 ALIGNED"
+        else if d2_opposes and d3_opposes
+            deg_confluence := -0.5
+            deg_context_label := "FIGHTING TREND"
+        else if d2_opposes or d3_opposes
+            deg_confluence := -0.25
+            deg_context_label := "MIXED DEGREES"
+        else if d2_dir == 0 and d3_dir == 0
+            deg_context_label := "NO CONTEXT"
 
 // ============================================================================
 // FIBONACCI TIME ZONE ANCHOR & PROXIMITY
@@ -2175,6 +2484,10 @@ p_vol = vol_enabled ? vol_combined : 0.5
 // 25% pattern + 15% MTF + 10% trend + 10% momentum + 15% RSI + 25% volume
 composite_prob = p_pattern * 0.25 + p_mtf * 0.15 + p_trend * 0.10 + p_momentum * 0.10 + p_rsi * 0.15 + p_vol * 0.25
 
+// Apply cross-degree confluence as ±10% modifier (preserves existing 6-component weights)
+if deg_enabled
+    composite_prob := math.max(0.0, math.min(1.0, composite_prob + deg_confluence * 0.10))
+
 // Per-TF directional probability (shown in signal panel)
 tf1_dir_prob = 0.0
 tf2_dir_prob = 0.0
@@ -2343,7 +2656,8 @@ prob_bar(float prob) =>
 build_signal_text(string dir, string reason, float prob, float target,
     float stop, float rr, float tf1p, float tf2p, float tf3p,
     string div_lbl, float rsi_val, float rsi_score,
-    string vol_lbl, float vol_score, float vwap_pct) =>
+    string vol_lbl, float vol_score, float vwap_pct,
+    bool deg_on, string deg_lbl, float deg_conf, int d2w, int d3w) =>
     txt = dir + " | " + reason
     txt += "\nProb: " + prob_bar(prob)
     if not na(target)
@@ -2366,6 +2680,13 @@ build_signal_text(string dir, string reason, float prob, float target,
         txt += "\n" + timeframe.period + ": " + str.tostring(tf1p * 100, "#") + "%"
         txt += "\n" + mtf_tf2 + ": " + str.tostring(tf2p * 100, "#") + "%"
         txt += "\n" + mtf_tf3 + ": " + str.tostring(tf3p * 100, "#") + "%"
+    if deg_on
+        txt += "\n── DEGREE ──"
+        d2_txt = d2w == 0 ? "---" : d2w > 0 ? "W" + str.tostring(d2w) + " Bull" : "W" + str.tostring(math.abs(d2w)) + " Bear"
+        d3_txt = d3w == 0 ? "---" : d3w > 0 ? "W" + str.tostring(d3w) + " Bull" : "W" + str.tostring(math.abs(d3w)) + " Bear"
+        txt += "\nD2: " + d2_txt
+        txt += "\nD3: " + d3_txt
+        txt += "\n" + deg_lbl + " (" + (deg_conf >= 0 ? "+" : "") + str.tostring(deg_conf * 100, "#") + "%)"
     txt
 
 var label sig_proj_lbl = na
@@ -2374,7 +2695,8 @@ if show_signals and buy_signal
     lbl_txt = build_signal_text("BUY", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
         rsi_div_label, rsi_at_signal, rsi_div_score,
-        vol_div_label, vol_combined, sig_vwap_pct)
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
     lbl_clr = composite_prob >= 0.65 ? color.new(color.lime, 5) :
         composite_prob >= 0.45 ? color.new(color.green, 10) :
         color.new(color.olive, 15)
@@ -2387,7 +2709,8 @@ if show_signals and sell_signal
     lbl_txt = build_signal_text("SELL", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
         rsi_div_label, rsi_at_signal, rsi_div_score,
-        vol_div_label, vol_combined, sig_vwap_pct)
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
     lbl_clr = composite_prob >= 0.65 ? color.new(color.fuchsia, 5) :
         composite_prob >= 0.45 ? color.new(color.purple, 10) :
         color.new(color.maroon, 15)
@@ -2400,7 +2723,8 @@ if show_signals and exhaustion_bull
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
         rsi_div_label, rsi_at_signal, rsi_div_score,
-        vol_div_label, vol_combined, sig_vwap_pct)
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
     label.delete(sig_proj_lbl)
     sig_proj_lbl := label.new(bar_index, high, lbl_txt,
         style=label.style_label_down, color=color.new(color.orange, 10),
@@ -2410,7 +2734,8 @@ if show_signals and exhaustion_bear
     lbl_txt = build_signal_text("EXHAUSTION", signal_reason, composite_prob,
         sig_target, sig_stop, sig_rr, tf1_dir_prob, tf2_dir_prob, tf3_dir_prob,
         rsi_div_label, rsi_at_signal, rsi_div_score,
-        vol_div_label, vol_combined, sig_vwap_pct)
+        vol_div_label, vol_combined, sig_vwap_pct,
+        deg_enabled, deg_context_label, deg_confluence, d2_wave, d3_wave)
     label.delete(sig_proj_lbl)
     sig_proj_lbl := label.new(bar_index, low, lbl_txt,
         style=label.style_label_up, color=color.new(color.orange, 10),
@@ -2480,7 +2805,7 @@ phase_to_clr(p) =>
     p >= 2 ? color.lime : p == 1 ? color.green : p == -1 ? color.orange : p <= -2 ? color.red : color.gray
 
 if show_table and barstate.islast
-    var table dashboard = table.new(position.top_right, 2, 37,
+    var table dashboard = table.new(position.top_right, 2, 42,
         bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 
     // Header
@@ -2790,6 +3115,40 @@ if show_table and barstate.islast
         table.cell(dashboard, 1, 36, tz_prox_txt,
             text_color=tz_next_clr, text_halign=text.align_right, text_size=size.small)
 
+    // ── Wave Degree Section ──
+    if deg_enabled
+        table.cell(dashboard, 0, 37, "─── Degree ───", text_color=color.new(color.white, 40),
+            text_halign=text.align_left, text_size=size.tiny)
+        table.merge_cells(dashboard, 0, 37, 1, 37)
+
+        d2_wave_txt = d2_wave == 0 ? "---" : d2_wave > 0 ? "W" + str.tostring(d2_wave) + " Bull" : "W" + str.tostring(math.abs(d2_wave)) + " Bear"
+        d2_wave_clr = d2_wave == 0 ? color.gray : d2_is_imp ? color.lime : d2_is_corr ? color.orange : color.yellow
+        table.cell(dashboard, 0, 38, "Deg 2 (×" + str.tostring(deg2_mult) + ")", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 38, d2_wave_txt,
+            text_color=d2_wave_clr, text_halign=text.align_right, text_size=size.small)
+
+        d3_wave_txt = d3_wave == 0 ? "---" : d3_wave > 0 ? "W" + str.tostring(d3_wave) + " Bull" : "W" + str.tostring(math.abs(d3_wave)) + " Bear"
+        d3_wave_clr = d3_wave == 0 ? color.gray : d3_is_imp ? color.lime : d3_is_corr ? color.orange : color.yellow
+        table.cell(dashboard, 0, 39, "Deg 3 (×" + str.tostring(deg3_mult) + ")", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 39, d3_wave_txt,
+            text_color=d3_wave_clr, text_halign=text.align_right, text_size=size.small)
+
+        conf_clr = deg_confluence >= 0.5 ? color.lime :
+            deg_confluence >= 0.0 ? color.yellow :
+            deg_confluence >= -0.3 ? color.orange : color.red
+        table.cell(dashboard, 0, 40, "Confluence", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 40, deg_context_label,
+            text_color=conf_clr, text_halign=text.align_right, text_size=size.small)
+
+        deg_score_txt = (deg_confluence >= 0 ? "+" : "") + str.tostring(deg_confluence * 10, "#.#") + "%"
+        table.cell(dashboard, 0, 41, "Deg Impact", text_color=color.gray,
+            text_halign=text.align_left, text_size=size.small)
+        table.cell(dashboard, 1, 41, deg_score_txt,
+            text_color=conf_clr, text_halign=text.align_right, text_size=size.small)
+
 // ============================================================================
 // ALERTS
 // ============================================================================
@@ -2841,6 +3200,14 @@ alertcondition(show_fib_tz and fib_tz_at_zone and not fib_tz_at_zone[1], "Fibona
     "EW: Price entering Fibonacci time zone — potential turning point")
 alertcondition(show_fib_tz and fib_tz_bars_to_next <= 3 and fib_tz_bars_to_next > 0, "Fibonacci Time Zone Approaching",
     "EW: Fibonacci time zone approaching within 3 bars")
+alertcondition(deg_enabled and deg_confluence >= 0.75, "Degree W3-in-W3 / Strong Confluence",
+    "EW DEGREE: Strong multi-degree confluence detected (W3-in-W3 or W3 in impulse)")
+alertcondition(deg_enabled and deg_confluence <= -0.3, "Degree Conflict Warning",
+    "EW DEGREE: Multi-degree conflict — higher degree opposes current wave direction")
+alertcondition(deg_enabled and deg_confluence >= 0.75 and buy_signal, "Degree Confirmed Buy",
+    "EW: Buy signal with strong multi-degree confluence — highest conviction")
+alertcondition(deg_enabled and deg_confluence >= 0.75 and sell_signal, "Degree Confirmed Sell",
+    "EW: Sell signal with strong multi-degree confluence — highest conviction")
 
 // ============================================================================
 // HIDDEN PLOTS (for data window and external indicators)
@@ -2859,6 +3226,9 @@ plot(vol_combined, "Volume Score", display=display.none)
 plot(vol_obv_div_type, "OBV Div Type", display=display.none)
 plot(fib_tz_bars_to_next, "Fib TZ Next", display=display.none)
 plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone", display=display.none)
+plot(deg_enabled ? d2_wave : na, "D2 Wave", display=display.none)
+plot(deg_enabled ? d3_wave : na, "D3 Wave", display=display.none)
+plot(deg_enabled ? deg_confluence : na, "Deg Confluence", display=display.none)
 
 // Data window exports
 plot(active_conf * 100, "Pattern Confidence %", color=color.new(color.purple, 100), display=display.data_window)
@@ -2881,3 +3251,8 @@ plot(vol_obv_div_type, "OBV Divergence Type", color=color.new(color.teal, 100), 
 plot(fib_tz_bars_to_next, "Fib TZ Bars to Next", color=color.new(color.aqua, 100), display=display.data_window)
 plot(fib_tz_at_zone ? 1 : 0, "Fib TZ At Zone (0/1)", color=color.new(color.aqua, 100), display=display.data_window)
 plot(fib_tz_nearest_num, "Fib TZ Nearest Number", color=color.new(color.aqua, 100), display=display.data_window)
+plot(deg_enabled ? d2_wave : na, "Deg 2 Wave Position", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d2_dir : na, "Deg 2 Direction", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d3_wave : na, "Deg 3 Wave Position", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? d3_dir : na, "Deg 3 Direction", color=color.new(color.silver, 100), display=display.data_window)
+plot(deg_enabled ? deg_confluence * 100 : na, "Deg Confluence %", color=color.new(color.silver, 100), display=display.data_window)

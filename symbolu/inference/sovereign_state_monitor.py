@@ -14,18 +14,24 @@ CRITICAL DESIGN INVARIANT:
     - NEVER used to modify logits, sampling, or token selection
     - NEVER used to abort generation (warnings are informational only)
 
-The 32D Sovereign State structure:
-- [0:12]  - 12 Bhavas (Ontological Aspects of being/becoming)
-- [12:17] - 5 Koshas (Consciousness Sheaths)
-- [17:22] - 5 Vrittis (Mental Modifications/reliability)
-- [22:28] - 6 Gunas (Energy States/dynamics)
-- [28:32] - 4 Reserved (Toroidal Feedback)
+The 32D Sovereign State structure (V11.0.0 Three-Plane Separation):
+- [0:12]  - 12 Bhavas (Phase Plane → ΔBhava → IntentPhaseProjector → θ)
+- [12:17] - 5 Koshas (Control Plane → Sovereign Bridge → depth control)
+- [17:22] - 5 Vrittis (Control Plane → Sovereign Bridge → quality gating)
+- [22:28] - 6 Gunas (Control Plane → Sovereign Bridge → stability signals)
+- [28:32] - 4 Reserved (Learning Plane → JEPA only, NOT consumed at inference)
 
-Training Reference: symbolu/phase_transformer.py:3740-4075 (OntologicalBindingCacheTransformer)
+V11.0.0 Inference Filter Table:
+  CSR:      YES — CSRInferenceGuard in InferenceManager
+  Ontology: Validate only — THIS monitor (observe-only, never modifies generation)
+  JEPA:     NO — Reserved[28:32] excluded from inference decisions
+  Kosha:    YES — Active depth control in OntologicalBindingCacheInferenceEngine
+  Vritti:   YES (CRITICAL) — Active hallucination gating via Sovereign Bridge
+
+Training Reference: symbolu/phase_transformer.py (OntologicalBindingCacheTransformer)
 
 Author: Sovereign-1 Training Initiative
-Date: January 2026
-Phase: 5c - V10.0 Sovereign State Monitoring
+Date: January 2026 (V11.0.0 update: February 2026)
 """
 
 import torch

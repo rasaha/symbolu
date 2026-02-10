@@ -1,8 +1,8 @@
 # Sovereign Reasoning Kernel (SRK) Design Document
 
-**Version:** 1.0.0
+**Version:** 1.1.0 (updated for V11.0.0 dimensional separation)
 **Status:** Architecture Specification
-**Date:** 2026-01-09
+**Date:** 2026-01-09 (updated 2026-02-09)
 **Origin:** Google Gemini Proposal + SymbolU Integration
 **Purpose:** State-Persistent Reasoning Architecture for AGI
 
@@ -197,15 +197,21 @@ if sovereign_state.bhava[6] > 0.7:  # O7 Reasoning dominant
 # Model doesn't just "talk" about finance—it REASONS with locked rigor
 ```
 
-**32D Partition in OPB:**
+**32D Partition in OPB (V11.0.0 Three-Plane Separation):**
 
-| Dims | Component | OPB Role |
-|------|-----------|----------|
-| [0:12] | Bhavas | Lock dominant ontological aspect |
-| [12:17] | Koshas | Maintain consciousness depth |
-| [17:22] | Vrittis | Preserve cognitive mode |
-| [22:28] | Gunas | Track energy state |
-| [28:32] | Reserved | Toroidal feedback (karma carryover) |
+| Dims | Component | Plane | OPB Role |
+|------|-----------|-------|----------|
+| [0:12] | Bhavas | **Phase** (12D) | Lock dominant ontological aspect; ΔBhava → θ → attention |
+| [12:17] | Koshas | **Control** (16D) | Maintain consciousness depth; → Sovereign Bridge |
+| [17:22] | Vrittis | **Control** (16D) | Preserve cognitive mode; → Sovereign Bridge |
+| [22:28] | Gunas | **Control** (16D) | Track energy state; → Sovereign Bridge |
+| [28:32] | Reserved | **Learning** (4D) | Toroidal feedback / JEPA (training-time only) |
+
+> **V11.0.0 Note:** The OPB continues to operate on the full 32D state (`state_dim == 32`).
+> The three-plane separation applies to how downstream consumers route the dimensions:
+> - Phase plane (Bhava deltas) → `IntentPhaseProjector` (12D input)
+> - Control plane (Kosha/Vritti/Guna) → `sovereign_bridge.py` → ConfidenceGate / SafetyContract
+> - Learning plane (Reserved) → JEPA loss only, not consumed at inference
 
 ### 3.2 Isomorphic Mapping Router (IMR)
 
@@ -450,11 +456,15 @@ VRITTI_PID_TABLE = {
 
 ### 4.3 Existing IntentPhaseProjector Alignment
 
-The `IntentPhaseProjector` (in `symbolu/phase_transformer.py`) already converts state deltas to attention rotation:
+The `IntentPhaseProjector` (in `symbolu/phase_transformer.py`) converts state deltas to attention rotation:
 
 ```python
-# Existing: ΔS → θ (phase rotation)
-# Maps directly to: IMR detection → attention bias injection
+# V11.0.0: ΔBhava[12D] → θ (phase rotation)
+# Only the Bhava plane (dims [0:12]) feeds phase rotation.
+# Control plane dims are consumed by Sovereign Bridge, not by phase rotation.
+#
+# V9.8.0 (legacy): Full ΔS[32D] → θ
+# V11.0.0 (current): ΔBhava[12D] → θ (backward compatible: auto-slices 32D → [0:12])
 ```
 
 **Enhancement Needed:** The IMR extends this by:
@@ -543,6 +553,30 @@ Thought N+1:
 
 This creates CONTINUITY OF REASONING across thoughts.
 ```
+
+### 5.3 V11.0.0: Sovereign Bridge — Control Plane → Agentic Framework
+
+In V11.0.0, the control plane dimensions (Kosha/Vritti/Guna) that the SRK governs are now also consumed by the **agentic framework** via the Sovereign Bridge (`symbolu/agentic_framework/sovereign_bridge.py`). This closes the loop between the SRK's internal governance and the agentic system's behavioral decisions:
+
+```
+SRK Internal Loop                    Agentic External Loop
+═══════════════                       ═════════════════════
+
+OPB locks Bhava ──→ Phase Rotation    Vritti state ──→ ConfidenceSignals
+Kosha Shift     ──→ Depth Control     Kosha state  ──→ BudgetAllocation
+Vritti Gate     ──→ Token Rejection   Guna state   ──→ SafetyContract
+                                           ↑
+                                    Sovereign Bridge
+                                    (sovereign_bridge.py)
+```
+
+**Key SRK-Bridge Interactions:**
+
+| SRK Component | Control Dims | Bridge Consumer | Effect |
+|---------------|-------------|-----------------|--------|
+| Vritti Gate | Vritti[17:22] | `ConfidenceGate` | VIPARYAYA spike → low quality_score → escalation |
+| Kosha Shift | Kosha[12:17] | `BudgetController` | VIJNANA dominant → high action_complexity → deeper compute |
+| Guna Tracking | Guna[22:28] | `SafetyContract` | Low SATTVA + high RAJAS → unstable → contract denied |
 
 ---
 

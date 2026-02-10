@@ -1,8 +1,8 @@
 # Inference vs Training Gaps: Hybrid Transformer Logic
 
-**Document Version:** 4.0
-**Date:** January 2026
-**Status:** ✅ ALL PHASES COMPLETE (Including V10.0 Binding Cache Models)
+**Document Version:** 5.0
+**Date:** February 2026
+**Status:** ✅ ALL PHASES COMPLETE (Including V11.0.0 Inference Filter Wiring)
 **Related File:** `train_unified_llm.py` (V10.6.6)
 **Implementation:** `symbolu/inference/` module, `generate_sovereign.py`
 
@@ -10,11 +10,17 @@
 
 ## Executive Summary
 
-This document catalogs the gaps between training-time logic in `train_unified_llm.py` and inference-time behavior. **All phases (1-5) are now complete**, including full support for V10.0 Binding Cache architectures.
+This document catalogs the gaps between training-time logic in `train_unified_llm.py` and inference-time behavior. **All phases (1-6) are now complete**, including full support for V10.0 Binding Cache architectures and V11.0.0 three-plane inference filter wiring.
 
 **V10.0 Update:** Both V10.0 model architectures now have full inference support:
 - **`BindingCacheTransformer`** (V10.0): Protected Phase + Top-K Query with proposal_mode ✅
 - **`OntologicalBindingCacheTransformer`** (V10.0): AGI Architecture combining Binding Cache + 32D Sovereign State ✅
+
+**V11.0.0 Update:** Inference filters wired per Training/Inference filter table:
+- **Vritti Gate (CRITICAL)**: Hallucination gating — reversal_risk → cool_resample, low quality → boost diversity ✅
+- **Kosha Depth Control**: MATERIAL → broaden top_k, INTELLECTUAL → sharpen temperature ✅
+- **Sovereign Bridge**: Control plane [12:28] → ConfidenceGate / SafetyContract signals ✅
+- **JEPA Exclusion**: Reserved[28:32] explicitly not consumed at inference ✅
 
 ### Implementation Summary
 
@@ -24,7 +30,8 @@ This document catalogs the gaps between training-time logic in `train_unified_ll
 | Phase 2 (Important) | ✅ Complete | `InferenceMetacognition`, `InferenceGunas`, `CSRInferenceGuard`, `SovereignInferenceScorer` |
 | Phase 3 (Orchestration) | ✅ Complete | `InferenceManager` with Fast/Standard/Sovereign modes |
 | Phase 4 (Deployment) | ✅ Complete | `generate_sovereign.py` CLI script, `generate_full_sequence()` method |
-| **Phase 5 (V10.0 Models)** | ✅ **Complete** | `BindingCacheInferenceEngine`, `OntologicalBindingCacheInferenceEngine`, `SovereignStateMonitor` |
+| Phase 5 (V10.0 Models) | ✅ Complete | `BindingCacheInferenceEngine`, `OntologicalBindingCacheInferenceEngine`, `SovereignStateMonitor` |
+| **Phase 6 (V11.0.0 Filters)** | ✅ **Complete** | Vritti gate, Kosha depth, Sovereign Bridge, JEPA exclusion |
 
 ### Quick Start
 
@@ -62,6 +69,7 @@ print(f"Interventions: {metrics['interventions']}")
 8. [Phase 5: BindingCacheTransformer](#8-phase-5-bindingcachetransformer-gaps) - ✅ IMPLEMENTED
 9. [Phase 5: OntologicalBindingCacheTransformer](#9-phase-5-ontologicalbindingcachetransformer-gaps) - ✅ IMPLEMENTED
 10. [Phase 5: Implementation Roadmap](#10-phase-5-implementation-roadmap) - ✅ COMPLETE
+11. [Phase 6: V11.0.0 Inference Filter Wiring](#11-phase-6-v1100-inference-filter-wiring) - ✅ IMPLEMENTED
 
 ---
 
@@ -1653,13 +1661,13 @@ The `OntologicalBindingCacheTransformer` (V10.0) is the AGI Architecture combini
 │  ▼                                                                          │
 │  Pass 2: Full forward WITH intent phase AND binding salience               │
 │                                                                             │
-│  32D Sovereign State Structure:                                             │
-│  ─────────────────────────────                                              │
-│  [0:12]  - 12 Bhavas (Ontological Aspects)                                 │
-│  [12:17] - 5 Koshas (Consciousness Sheaths)                                 │
-│  [17:22] - 5 Vrittis (Mental Modifications)                                 │
-│  [22:28] - 6 Gunas (Energy States)                                          │
-│  [28:32] - 4 Reserved (Toroidal Feedback)                                   │
+│  32D Sovereign State Structure (V11.0.0 Three-Plane):                      │
+│  ─────────────────────────────────────────────────────                      │
+│  PHASE PLANE    [0:12]  - 12 Bhavas → ΔBhava → θ → attention rotation     │
+│  CONTROL PLANE  [12:17] - 5 Koshas (Consciousness Sheaths)                  │
+│                 [17:22] - 5 Vrittis (Mental Modifications) → Vritti Gate    │
+│                 [22:28] - 6 Gunas (Energy States)                           │
+│  LEARNING PLANE [28:32] - 4 Reserved (JEPA, training-only)                  │
 │                                                                             │
 │  Theory: System 2 (Ontological) → ΔS → System 1 (Binding Cache)            │
 │          Slow deliberate reasoning → Phase rotation → Fast completion       │
@@ -1689,11 +1697,11 @@ def forward(self, input_ids, ...):
     with torch.no_grad():
         hidden = self.binding_cache.forward_hidden(input_ids, intent_phase=None)
 
-    # Compute state delta
-    state, delta_S = self.compute_state_delta(hidden, reset_state)
+    # Compute state delta (V11.0.0: returns 3-tuple)
+    state, delta_S, delta_bhava = self.compute_state_delta(hidden, reset_state)
 
-    # Convert to intent phase
-    intent_phase = self.intent_projector(delta_S)
+    # Convert to intent phase (V11.0.0: uses 12D delta_bhava, not 32D delta_S)
+    intent_phase = self.intent_projector(delta_bhava)
 
     # Compute binding salience
     binding_salience = self.binding_annotator(hidden, state, ...)
@@ -1731,15 +1739,19 @@ for warning in meta['warnings']:
     print(f"Warning: {warning['type']} at step {warning['step']}")
 ```
 
-**The Two-Pass Loop:**
+**The Two-Pass Loop (V11.0.0):**
 ```
 FOR each token:
     1. Forward WITHOUT intent → hidden states
-    2. Compute state delta: hidden → SovereignState[32] → ΔS
-    3. Convert ΔS → intent phase: ΔS[32] → θ[H]
+    2. Compute state delta: hidden → SovereignState[32] → (state, ΔS, ΔBhava[12D])
+    3. Convert ΔBhava → intent phase: ΔBhava[12D] → θ[H]
     4. Compute binding salience from annotator
     5. Forward WITH intent phase AND binding salience → logits
-    6. Sample next token, update state
+    6. Sovereign Bridge: state → ConfidenceSignals (Vritti/Kosha/Guna)
+    7. Vritti Gate: reversal_risk → cool_resample, low quality → boost diversity
+    8. Kosha Depth: MATERIAL → broaden top_k, INTELLECTUAL → sharpen temp
+    9. Sample next token with effective_temperature, effective_top_k
+    10. Update state
 ```
 
 **Files Created:**
@@ -1822,17 +1834,18 @@ for warning in monitor.get_warnings():
 
 #### 9.2.4 Intent Phase Projection ✅ IMPLEMENTED
 
-**Training Behavior:**
+**Training Behavior (V11.0.0: 12D input):**
 ```python
-# IntentPhaseProjector: ΔS[32] → θ[H] or θ[H, D_h]
+# IntentPhaseProjector: ΔBhava[12D] → θ[H] or θ[H, D_h]
+# V11.0.0: defaults to PHASE_STATE_DIM=12 (Bhava-only), not full 32D
 self.intent_projector = IntentPhaseProjector(
-    state_dim=32,
+    state_dim=12,  # V11.0.0: PHASE_STATE_DIM
     num_heads=num_heads,
     head_dim=head_dim,
     project_per_head_dim=project_per_head_dim,
 )
 
-intent_phase = self.intent_projector(delta_S)
+intent_phase = self.intent_projector(delta_bhava)  # 12D → θ
 ```
 
 **✅ Implementation:**
@@ -2113,22 +2126,32 @@ engine.load_state(state_dict)  # Restore later
 | Phase Role | Mixed | Protected (validated) | Protected + Intent modulated |
 | Memory Query | Full attention | Top-K cache | Top-K cache + Salience |
 | Local Attention | No | Yes (syntax) | Yes (syntax) |
-| Ontological State | No | No | 32D Sovereign State |
+| Ontological State | No | No | 32D Sovereign State (V11.0.0: 3 planes) |
 | Proposal Mode | No | Optional | No (uses delta_S instead) |
 | Binding Salience | No | Optional | Required (CSR/Kosha/SRK) |
 | Two-Pass | No | No | Yes (hidden → delta → intent) |
-| Inference Support | ✅ Complete | ✅ Complete | ✅ Complete |
+| Vritti Gate | No | No | ✅ V11.0.0 (hallucination gating) |
+| Kosha Depth Control | No | No | ✅ V11.0.0 (depth-aware sampling) |
+| Sovereign Bridge | No | No | ✅ V11.0.0 (tensor → agentic) |
+| Inference Support | ✅ Complete | ✅ Complete | ✅ Complete (V11.0.0) |
 
 ---
 
-## Appendix D: 32D Sovereign State Reference
+## Appendix D: 32D Sovereign State Reference (V11.0.0)
 
 ```python
 # From symbolu/phase_transformer.py
+# V11.0.0 Three-Plane Separation:
+#   Phase Plane:    [0:12]  → ΔBhava → IntentPhaseProjector → θ → attention rotation
+#   Control Plane:  [12:28] → Kosha + Vritti + Guna → Sovereign Bridge → Agentic
+#   Learning Plane: [28:32] → JEPA training-time feedback only (NOT consumed at inference)
 
 SOVEREIGN_STATE_DIM = 32
+PHASE_STATE_DIM = 12      # Bhava-only, feeds phase rotation
+CONTROL_STATE_DIM = 16    # Kosha + Vritti + Guna, governance
+LEARNING_STATE_DIM = 4    # JEPA, training-time only
 
-# Bhava indices [0:12] - Ontological Aspects
+# Bhava indices [0:12] - PHASE PLANE: Ontological Aspects
 BHAVA_NAMES = [
     'POT',  # 0: Potential - latent possibility
     'IDN',  # 1: Identity - self-recognition
@@ -2144,7 +2167,7 @@ BHAVA_NAMES = [
     'ABS',  # 11: Absolute - transcendent ground
 ]
 
-# Sheath indices [12:17] - Depth Mapping
+# Sheath indices [12:17] - CONTROL PLANE: Depth Mapping
 KOSHA_NAMES = [
     'MATERIAL',     # 12: Physicality/Syntax
     'VITAL',        # 13: Flow/Energy
@@ -2153,7 +2176,7 @@ KOSHA_NAMES = [
     'BLISSFUL',     # 16: Unity/Integration
 ]
 
-# State indices [17:22] - Reliability Mapping
+# State indices [17:22] - CONTROL PLANE: Reliability Mapping
 VRITTI_NAMES = [
     'FACT',        # 17: Verified Truth
     'ERROR',       # 18: Hallucination
@@ -2162,7 +2185,7 @@ VRITTI_NAMES = [
     'MEMORY',      # 21: Recall/Weights
 ]
 
-# Qualia/Dynamics indices [22:28] - System Dynamics
+# Qualia/Dynamics indices [22:28] - CONTROL PLANE: System Dynamics
 GUNA_NAMES = [
     'LUCIDITY',  # 22: Clarity/Precision
     'ACTIVITY',  # 23: Dynamism/Turbulence
@@ -2172,8 +2195,212 @@ GUNA_NAMES = [
     'STABLE',    # 27: Stability measure
 ]
 
-# Reserved indices [28:32] - Toroidal Feedback
+# Reserved indices [28:32] - LEARNING PLANE: JEPA Feedback (training-only)
 RESERVED_NAMES = ['VOID_0', 'VOID_1', 'VOID_2', 'VOID_3']
+# V11.0.0: NOT consumed at inference — RESERVED_SLICE = slice(28, 32)
+```
+
+---
+
+## 11. Phase 6: V11.0.0 Inference Filter Wiring (✅ IMPLEMENTED)
+
+### 11.1 Overview: Training/Inference Filter Table
+
+V11.0.0 separates the 32D Sovereign State into three planes and defines which filters are active at inference:
+
+| Filter | Training | Inference | Implementation |
+|--------|----------|-----------|----------------|
+| **CSR** | Optional (soft) | **YES** | `CSRInferenceGuard` in `InferenceManager` (Phase 2, unchanged) |
+| **Ontology** | YES | **Validate only** | `SovereignStateMonitor` observe-only invariant (Phase 5c, unchanged) |
+| **JEPA** | YES (core) | **NO** | `RESERVED_SLICE = slice(28, 32)` explicitly excluded |
+| **Kosha** | Optional | **YES** | Depth-aware top_k / temperature via Sovereign Bridge |
+| **Vritti** | NO | **YES (CRITICAL)** | Hallucination gating via Sovereign Bridge signals |
+
+### 11.2 Three-Plane Dimensional Separation
+
+```
+32D Sovereign State
+├── Phase Plane    [0:12]   12D Bhava → ΔBhava → IntentPhaseProjector → θ → attention
+├── Control Plane  [12:28]  16D Kosha[5] + Vritti[5] + Guna[6] → Sovereign Bridge → Agentic
+└── Learning Plane [28:32]   4D Reserved/JEPA → training-time only (inference-excluded)
+```
+
+**Key principle:** The Phase Plane feeds attention rotation (model-internal). The Control Plane feeds governance signals via Sovereign Bridge (inference-active). The Learning Plane is explicitly NOT consumed at inference.
+
+### 11.3 Sovereign Bridge (`sovereign_bridge.py`) ✅ IMPLEMENTED
+
+The Sovereign Bridge converts tensor-level Control Plane signals into agentic framework signals:
+
+```
+Control Plane [12:28]
+├── Vritti [17:22] → ConfidenceSignals (quality_score, prediction_reversal_risk, emptiness_index)
+├── Kosha  [12:17] → BudgetSignals (depth_complexity, processing_completeness)
+└── Guna   [22:28] → StabilitySignals (state_volatility, directional_confidence)
+```
+
+**File:** `symbolu/agentic_framework/sovereign_bridge.py`
+
+**Key functions:**
+- `signals_from_sovereign_state(state, delta_S, batch_idx)` → `ConfidenceSignals`
+- `coherence_from_sovereign_state(state, delta_S, batch_idx)` → `CoherenceState`
+
+**Usage in inference engine:**
+```python
+# After state tracking, before token sampling
+bridge_signals = signals_from_sovereign_state(
+    current_state, delta_S, batch_idx=0,
+)
+# bridge_signals.quality_score        → [0, 1] factual confidence
+# bridge_signals.prediction_reversal_risk → [0, 1] hallucination risk
+# bridge_signals.emptiness_index       → [0, 1] void/disengagement
+```
+
+**Tests:** 19 tests in `symbolu/agentic_framework/tests/test_sovereign_bridge.py`
+
+### 11.4 Vritti Gate (CRITICAL) ✅ IMPLEMENTED
+
+The Vritti gate is the hallucination-detection mechanism at inference. It monitors `prediction_reversal_risk` (derived from VIPARYAYA activation) and `quality_score` (derived from PRAMANA activation) to intervene during token sampling.
+
+**Logic:**
+```
+IF reversal_risk > vritti_error_resample_threshold (default 0.5):
+    → cool_resample: set effective_temperature = vritti_resample_temperature (0.5)
+    → This sharpens the distribution to reduce hallucination risk
+
+ELIF quality_score < vritti_low_quality_threshold (default 0.25):
+    → boost_diversity: set effective_temperature = min(temperature * 1.2, 1.5)
+    → This broadens the distribution to escape low-quality modes
+```
+
+**Configuration:**
+```python
+OntologicalBindingCacheInferenceConfig(
+    enable_vritti_gate=True,                    # Master switch
+    vritti_error_resample_threshold=0.5,         # VIPARYAYA above this → resample
+    vritti_low_quality_threshold=0.25,           # quality below this → boost diversity
+    vritti_resample_temperature=0.5,             # cooler temperature for resampling
+    vritti_max_resamples=2,                      # max resamples per token
+)
+```
+
+**Metadata exposed:**
+- `meta['vritti_gate_events']`: List of `{step, type, reversal_risk, quality, new_temp}`
+- `meta['vritti_gate_count']`: Total interventions
+
+### 11.5 Kosha Depth Control ✅ IMPLEMENTED
+
+Kosha depth control adjusts sampling parameters based on which consciousness sheath is dominant, allowing the model to adapt its generation strategy to the depth of processing.
+
+**Logic:**
+```
+MATERIAL (kosha_argmax == 0):
+    → Surface processing: broaden top_k by kosha_surface_top_k_boost (default +20)
+    → Encourages exploring more tokens for surface-level content
+
+INTELLECTUAL (kosha_argmax == 3):
+    → Deep reasoning: sharpen temperature by kosha_intellectual_temp_scale (default 0.85x)
+    → Focuses the distribution for precise analytical output
+```
+
+**Configuration:**
+```python
+OntologicalBindingCacheInferenceConfig(
+    enable_kosha_depth_control=True,             # Master switch
+    kosha_surface_top_k_boost=20,                # Extra top_k at MATERIAL depth
+    kosha_intellectual_temp_scale=0.85,           # Temperature scale at INTELLECTUAL depth
+)
+```
+
+**Metadata exposed:**
+- `meta['kosha_depth_events']`: List of `{step, dominant_kosha, adjustment_type, value}`
+- `meta['kosha_depth_adjustments']`: Total adjustments
+
+### 11.6 JEPA Exclusion ✅ IMPLEMENTED
+
+The Learning Plane `[28:32]` is explicitly excluded from inference consumption:
+
+```python
+RESERVED_SLICE = slice(28, 32)  # JEPA/Learning plane — inference-excluded
+```
+
+This is documented in both the engine module docstring and the `SovereignStateMonitor` docstring. The `SovereignStateMonitor` tracks these dimensions for observability but they do not influence token generation.
+
+### 11.7 InferenceManager Return Dict Updates ✅ IMPLEMENTED
+
+The `InferenceManager.generate_v10()` return dict now includes V11.0.0 signals:
+
+```python
+{
+    # ... existing fields ...
+    # V11.0.0 Sovereign Bridge signals
+    'bridge_signals': engine_meta.get('final_bridge_signals'),   # ConfidenceSignals
+    'coherence': engine_meta.get('final_coherence'),             # CoherenceState
+    'vritti_gate_count': engine_meta.get('vritti_gate_count', 0),
+    'kosha_depth_adjustments': engine_meta.get('kosha_depth_adjustments', 0),
+}
+```
+
+### 11.8 Implementation Roadmap
+
+| Task | Priority | Status | Files |
+|------|----------|--------|-------|
+| Create Sovereign Bridge | P0 | ✅ Done | `symbolu/agentic_framework/sovereign_bridge.py` |
+| Wire Vritti gate into inference engine | P0 | ✅ Done | `ontological_binding_cache_inference.py` |
+| Wire Kosha depth control into inference engine | P1 | ✅ Done | `ontological_binding_cache_inference.py` |
+| Exclude JEPA at inference | P1 | ✅ Done | `ontological_binding_cache_inference.py` |
+| Update SovereignStateMonitor docstrings | P2 | ✅ Done | `sovereign_state_monitor.py` |
+| Expose bridge signals in InferenceManager | P2 | ✅ Done | `manager.py` |
+| Write bridge tests | P1 | ✅ Done | `test_sovereign_bridge.py` (19 tests) |
+
+**Deliverables:**
+- ✅ `symbolu/agentic_framework/sovereign_bridge.py` — Bridge: tensor → agentic signals
+- ✅ `symbolu/agentic_framework/tests/test_sovereign_bridge.py` — 19 tests
+- ✅ Modified `symbolu/inference/ontological_binding_cache_inference.py` — Vritti gate + Kosha depth + Bridge
+- ✅ Modified `symbolu/inference/sovereign_state_monitor.py` — V11.0.0 docstrings
+- ✅ Modified `symbolu/inference/manager.py` — Bridge signal pass-through in return dict
+
+### 11.9 Data Flow Diagram
+
+```
+                    OntologicalBindingCacheInferenceEngine
+                    ──────────────────────────────────────
+                    FOR each token step:
+
+                    ┌─────────────────────────────────────────┐
+                    │  Two-Pass Forward                        │
+                    │  Pass 1: hidden (no intent)              │
+                    │  → compute_state_delta() → 3-tuple       │
+                    │    state[32D], delta_S[32D], delta_bhava  │
+                    │  → IntentPhaseProjector(delta_bhava[12D]) │
+                    │  Pass 2: logits (with intent + salience) │
+                    └──────────────┬──────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────────────────┐
+                    │  Sovereign Bridge                        │
+                    │  signals_from_sovereign_state(           │
+                    │      state, delta_S, batch_idx=0)        │
+                    │  → ConfidenceSignals                     │
+                    └──────────────┬──────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────────────────┐
+                    │  VRITTI GATE (CRITICAL)                   │
+                    │  reversal_risk > 0.5 → cool_resample     │
+                    │  quality < 0.25     → boost_diversity    │
+                    │  → effective_temperature                 │
+                    └──────────────┬──────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────────────────┐
+                    │  KOSHA DEPTH CONTROL                     │
+                    │  MATERIAL    → broaden top_k (+20)       │
+                    │  INTELLECTUAL → sharpen temp (×0.85)     │
+                    │  → effective_top_k, effective_temperature │
+                    └──────────────┬──────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────────────────┐
+                    │  Token Sampling                           │
+                    │  top_k → top_p → temperature → softmax   │
+                    │  → next_token                            │
+                    └─────────────────────────────────────────┘
 ```
 
 ---
@@ -2182,6 +2409,7 @@ RESERVED_NAMES = ['VOID_0', 'VOID_1', 'VOID_2', 'VOID_3']
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 5.0 | 2026-02-09 | Claude | **Phase 6 COMPLETE**: V11.0.0 inference filter wiring — Vritti gate (CRITICAL), Kosha depth control, Sovereign Bridge integration, JEPA exclusion. Three-plane dimensional separation documented. Updated Appendix D with plane labels. |
 | 4.0 | 2026-01-20 | Claude | **Phase 5 COMPLETE**: Implemented `BindingCacheInferenceEngine`, `OntologicalBindingCacheInferenceEngine`, `SovereignStateMonitor`. Full V10.0 model support in `generate_sovereign.py` and `InferenceManager`. ~2,245 lines of production code added. |
 | 3.0 | 2026-01-20 | Claude | **V10.0 Gap Analysis**: Added Phase 5 for BindingCacheTransformer and OntologicalBindingCacheTransformer, new sections 8-10, implementation roadmap |
 | 2.3 | 2026-01-06 | Claude | Phase 4 COMPLETE: `generate_sovereign.py` CLI, `generate_full_sequence()` implemented |

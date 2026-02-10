@@ -397,11 +397,15 @@ def detect_diagonal(pivots, fib_tolerance=DEFAULT_FIB_TOLERANCE):
     return (diag_type, confidence, is_leading)
 
 
-def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum, p_rsi=None):
+def compute_composite_probability(p_pattern, p_mtf, p_trend, p_momentum, p_rsi=None, p_vol=None):
     """Weighted composite probability.
-    Without RSI: 40% pattern + 25% MTF + 20% trend + 15% momentum (legacy).
-    With RSI:    35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI.
+    Without RSI/Vol: 40% pattern + 25% MTF + 20% trend + 15% momentum (legacy).
+    With RSI only:   35% pattern + 20% MTF + 15% trend + 15% momentum + 15% RSI.
+    With RSI + Vol:  25% pattern + 15% MTF + 10% trend + 10% momentum + 15% RSI + 25% volume.
     """
+    if p_vol is not None and p_rsi is not None:
+        return (p_pattern * 0.25 + p_mtf * 0.15 + p_trend * 0.10 +
+                p_momentum * 0.10 + p_rsi * 0.15 + p_vol * 0.25)
     if p_rsi is not None:
         return p_pattern * 0.35 + p_mtf * 0.20 + p_trend * 0.15 + p_momentum * 0.15 + p_rsi * 0.15
     return p_pattern * 0.40 + p_mtf * 0.25 + p_trend * 0.20 + p_momentum * 0.15
@@ -598,6 +602,131 @@ def compute_diagonal_rsi_score(diag_type, is_leading, prices, rsi_values, rsi_ob
             else:
                 div_score = 0.40
     return (div_type, div_score)
+
+
+# ============================================================================
+# OBV DIVERGENCE DETECTION (translated from Pine Script)
+# ============================================================================
+
+def detect_obv_div_at_highs(prices, obv_values, newer_idx, older_idx):
+    """OBV divergence at highs. Returns: 1=regular bearish (distribution), 2=hidden, 0=none."""
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(obv_values) or older_idx >= len(obv_values)):
+        return 0
+    p_new, p_old = prices[newer_idx], prices[older_idx]
+    o_new, o_old = obv_values[newer_idx], obv_values[older_idx]
+    if p_new is None or p_old is None or o_new is None or o_old is None:
+        return 0
+    if p_new > p_old and o_new < o_old:
+        return 1
+    if p_new < p_old and o_new > o_old:
+        return 2
+    return 0
+
+
+def detect_obv_div_at_lows(prices, obv_values, newer_idx, older_idx):
+    """OBV divergence at lows. Returns: -1=regular bullish (accumulation), -2=hidden, 0=none."""
+    if (newer_idx >= len(prices) or older_idx >= len(prices) or
+        newer_idx >= len(obv_values) or older_idx >= len(obv_values)):
+        return 0
+    p_new, p_old = prices[newer_idx], prices[older_idx]
+    o_new, o_old = obv_values[newer_idx], obv_values[older_idx]
+    if p_new is None or p_old is None or o_new is None or o_old is None:
+        return 0
+    if p_new < p_old and o_new > o_old:
+        return -1
+    if p_new > p_old and o_new < o_old:
+        return -2
+    return 0
+
+
+def compute_volume_score(obv_div_score, wave_vol_score, vwap_score):
+    """Combined volume score: 40% OBV divergence + 30% wave volume + 30% VWAP."""
+    return obv_div_score * 0.40 + wave_vol_score * 0.30 + vwap_score * 0.30
+
+
+def compute_impulse_wave_vol_score(v_w1, v_w3, v_w5):
+    """Wave volume pattern score for impulse: W3 should be highest volume."""
+    if v_w1 is None or v_w3 is None or v_w5 is None:
+        return 0.5
+    if v_w3 > v_w1 and v_w3 > v_w5:
+        if v_w5 < v_w1:
+            return 1.0    # W3 highest, W5 declining → strong exhaustion
+        return 0.85       # W3 highest → classic impulse
+    if v_w5 > v_w3:
+        return 0.15       # W5 more volume than W3 → extended 5th, NOT exhaustion
+    return 0.5
+
+
+def compute_vwap_score(vwap_pct, active_bull):
+    """VWAP position score. vwap_pct = (close - vwap) / vwap * 100."""
+    if vwap_pct is None:
+        return 0.5
+    if active_bull:
+        if vwap_pct > 1.0:
+            return 1.0
+        if vwap_pct > 0.0:
+            return 0.75
+        if vwap_pct > -1.0:
+            return 0.35
+        return 0.15
+    else:
+        if vwap_pct < -1.0:
+            return 1.0
+        if vwap_pct < 0.0:
+            return 0.75
+        if vwap_pct < 1.0:
+            return 0.35
+        return 0.15
+
+
+# ============================================================================
+# FIBONACCI TIME ZONE FUNCTIONS
+# ============================================================================
+
+FIB_TZ = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]
+
+
+def compute_fib_tz_proximity(bars_from_anchor):
+    """Compute Fibonacci time zone proximity info.
+
+    Returns dict with:
+        bars_to_next: bars until next future TZ (0 if past all zones)
+        nearest_dist: distance to nearest TZ (any direction)
+        nearest_num: the Fibonacci number of the nearest TZ
+        at_zone: True if within 1 bar of a TZ
+    """
+    nearest_dist = 999999
+    nearest_num = 0
+    bars_to_next = 0
+
+    for tz in FIB_TZ:
+        dist = abs(bars_from_anchor - tz)
+        if dist < nearest_dist:
+            nearest_dist = dist
+            nearest_num = tz
+        if tz > bars_from_anchor and bars_to_next == 0:
+            bars_to_next = tz - bars_from_anchor
+
+    at_zone = nearest_dist <= 1
+    return {
+        'bars_to_next': bars_to_next,
+        'nearest_dist': nearest_dist,
+        'nearest_num': nearest_num,
+        'at_zone': at_zone,
+    }
+
+
+def get_fib_tz_anchor_pivot_index(pattern_type):
+    """Return which pivot index is the anchor for Fibonacci time zones."""
+    if pattern_type in ("impulse", "diagonal", "wxyxz"):
+        return 5
+    elif pattern_type in ("partial", "wxy"):
+        return 3
+    elif pattern_type == "correction":
+        return 2
+    else:
+        return None
 
 
 # ============================================================================
@@ -1257,6 +1386,144 @@ class TestDiagonalRSIDivergence(unittest.TestCase):
         self.assertAlmostEqual(div_score, 0.5)
 
 
+class TestOBVDivergenceDetection(unittest.TestCase):
+    """Test OBV divergence detection functions."""
+
+    def test_obv_regular_bearish_distribution(self):
+        """Price higher high + OBV lower high → distribution (bearish)."""
+        prices = [110, 90, 100]
+        obv =    [5000, 4000, 5500]
+        result = detect_obv_div_at_highs(prices, obv, 0, 2)
+        self.assertEqual(result, 1)
+
+    def test_obv_regular_bullish_accumulation(self):
+        """Price lower low + OBV higher low → accumulation (bullish)."""
+        prices = [85, 110, 90]
+        obv =    [5200, 5500, 5000]
+        result = detect_obv_div_at_lows(prices, obv, 0, 2)
+        self.assertEqual(result, -1)
+
+    def test_obv_no_divergence_concordant(self):
+        """Price and OBV both higher → no divergence."""
+        prices = [110, 90, 100]
+        obv =    [5800, 4000, 5500]
+        self.assertEqual(detect_obv_div_at_highs(prices, obv, 0, 2), 0)
+
+    def test_obv_hidden_bearish(self):
+        """Price lower high + OBV higher high → hidden bearish."""
+        prices = [95, 90, 100]
+        obv =    [5800, 4000, 5500]
+        result = detect_obv_div_at_highs(prices, obv, 0, 2)
+        self.assertEqual(result, 2)
+
+    def test_obv_hidden_bullish(self):
+        """Price higher low + OBV lower low → hidden bullish."""
+        prices = [95, 110, 90]
+        obv =    [4800, 5500, 5000]
+        result = detect_obv_div_at_lows(prices, obv, 0, 2)
+        self.assertEqual(result, -2)
+
+    def test_obv_none_values(self):
+        """None OBV values return 0."""
+        prices = [110, 90, 100]
+        obv =    [None, 4000, 5500]
+        self.assertEqual(detect_obv_div_at_highs(prices, obv, 0, 2), 0)
+
+
+class TestVolumeScoring(unittest.TestCase):
+    """Test volume sub-scores and combined score."""
+
+    def test_combined_volume_score_weights(self):
+        """Verify combined score weights: 40% OBV + 30% wave + 30% VWAP = 100%."""
+        result = compute_volume_score(1.0, 1.0, 1.0)
+        self.assertAlmostEqual(result, 1.0)
+        result = compute_volume_score(0.0, 0.0, 0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_impulse_w3_highest_volume(self):
+        """W3 highest, W5 declining → strong exhaustion (1.0)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 2000, 800), 1.0)
+
+    def test_impulse_w3_highest_w5_moderate(self):
+        """W3 highest but W5 not less than W1 → classic impulse (0.85)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 2000, 1200), 0.85)
+
+    def test_impulse_w5_exceeds_w3(self):
+        """W5 more volume than W3 → extended 5th, NOT exhaustion (0.15)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 1500, 2000), 0.15)
+
+    def test_impulse_equal_volume(self):
+        """Equal volumes → neutral (0.5)."""
+        self.assertAlmostEqual(compute_impulse_wave_vol_score(1000, 1000, 1000), 0.5)
+
+    def test_vwap_bullish_premium(self):
+        """Price >1% above VWAP for bullish → 1.0."""
+        self.assertAlmostEqual(compute_vwap_score(2.0, True), 1.0)
+
+    def test_vwap_bullish_above(self):
+        """Price just above VWAP for bullish → 0.75."""
+        self.assertAlmostEqual(compute_vwap_score(0.5, True), 0.75)
+
+    def test_vwap_bullish_below(self):
+        """Price slightly below VWAP for bullish → 0.35."""
+        self.assertAlmostEqual(compute_vwap_score(-0.5, True), 0.35)
+
+    def test_vwap_bullish_deep_below(self):
+        """Price deep below VWAP for bullish → 0.15."""
+        self.assertAlmostEqual(compute_vwap_score(-2.0, True), 0.15)
+
+    def test_vwap_bearish_deep_below(self):
+        """Price >1% below VWAP for bearish → 1.0 (confirms)."""
+        self.assertAlmostEqual(compute_vwap_score(-2.0, False), 1.0)
+
+    def test_vwap_bearish_above(self):
+        """Price above VWAP for bearish → 0.35 (contradicts)."""
+        self.assertAlmostEqual(compute_vwap_score(0.5, False), 0.35)
+
+    def test_vwap_none(self):
+        """None VWAP → neutral 0.5."""
+        self.assertAlmostEqual(compute_vwap_score(None, True), 0.5)
+
+
+class TestCompositeWithVolume(unittest.TestCase):
+    """Test composite probability with volume component."""
+
+    def test_six_component_weights_sum_to_1(self):
+        """25 + 15 + 10 + 10 + 15 + 25 = 100."""
+        self.assertAlmostEqual(0.25 + 0.15 + 0.10 + 0.10 + 0.15 + 0.25, 1.0)
+
+    def test_all_perfect_with_volume(self):
+        """All 6 components at 1.0 → 1.0."""
+        result = compute_composite_probability(1.0, 1.0, 1.0, 1.0, p_rsi=1.0, p_vol=1.0)
+        self.assertAlmostEqual(result, 1.0)
+
+    def test_all_zero_with_volume(self):
+        """All 6 components at 0.0 → 0.0."""
+        result = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=0.0)
+        self.assertAlmostEqual(result, 0.0)
+
+    def test_volume_and_pattern_equal_weight(self):
+        """Volume and pattern both at 25% — should be equal contributors."""
+        vol_only = compute_composite_probability(0.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=1.0)
+        pat_only = compute_composite_probability(1.0, 0.0, 0.0, 0.0, p_rsi=0.0, p_vol=0.0)
+        self.assertAlmostEqual(vol_only, pat_only)
+        self.assertAlmostEqual(vol_only, 0.25)
+
+    def test_volume_overrides_weak_exhaustion(self):
+        """High volume score reduces exhaustion confidence.
+        Pattern says exhaustion (1.0) but volume contradicts (0.15)."""
+        with_vol = compute_composite_probability(1.0, 0.5, 0.5, 0.5, p_rsi=1.0, p_vol=0.15)
+        without_vol = compute_composite_probability(1.0, 0.5, 0.5, 0.5, p_rsi=1.0, p_vol=0.5)
+        self.assertLess(with_vol, without_vol, "Low volume score should lower composite")
+
+    def test_volume_boost_strong_trend(self):
+        """Volume confirming trend should boost composite."""
+        weak = compute_composite_probability(0.6, 0.5, 0.5, 0.5, p_rsi=0.5, p_vol=0.5)
+        strong = compute_composite_probability(0.6, 0.5, 0.5, 0.5, p_rsi=0.5, p_vol=1.0)
+        self.assertGreater(strong, weak)
+        self.assertAlmostEqual(strong - weak, 0.125)  # 0.5 * 0.25 = 0.125 difference
+
+
 class TestEdgeCases(unittest.TestCase):
     """Test edge cases and boundary conditions."""
 
@@ -1282,6 +1549,549 @@ class TestEdgeCases(unittest.TestCase):
     def test_division_by_zero_safe(self):
         """retrace_ratio with zero wave size returns 0."""
         self.assertEqual(retrace_ratio(0, 50), 0.0)
+
+
+class TestFibonacciTimeZones(unittest.TestCase):
+    """Tests for Fibonacci Time Zone proximity calculations."""
+
+    def test_exact_fib_zone(self):
+        """Exactly at Fib number 13 bars from anchor → at_zone."""
+        result = compute_fib_tz_proximity(13)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_dist'], 0)
+        self.assertEqual(result['nearest_num'], 13)
+
+    def test_one_bar_from_zone(self):
+        """1 bar from Fib number 13 → still at_zone (tolerance=1)."""
+        result = compute_fib_tz_proximity(12)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 13)
+
+    def test_two_bars_from_zone_not_at(self):
+        """2 bars from nearest zone → not at_zone."""
+        result = compute_fib_tz_proximity(10)
+        self.assertFalse(result['at_zone'])
+        # 10 is 2 away from 8 and 3 away from 13 → nearest is 8
+        self.assertEqual(result['nearest_num'], 8)
+
+    def test_bars_to_next_from_zero(self):
+        """From bar 0, next TZ is at bar 1."""
+        result = compute_fib_tz_proximity(0)
+        self.assertEqual(result['bars_to_next'], 1)
+
+    def test_bars_to_next_between_zones(self):
+        """Between 8 and 13 → next is 13."""
+        result = compute_fib_tz_proximity(9)
+        self.assertEqual(result['bars_to_next'], 4)  # 13 - 9
+
+    def test_bars_to_next_past_all(self):
+        """Past all zones → bars_to_next = 0."""
+        result = compute_fib_tz_proximity(300)
+        self.assertEqual(result['bars_to_next'], 0)
+
+    def test_at_first_zone(self):
+        """At the very first zone (bar 1)."""
+        result = compute_fib_tz_proximity(1)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 1)
+
+    def test_at_last_zone(self):
+        """At the last zone (bar 233)."""
+        result = compute_fib_tz_proximity(233)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 233)
+
+    def test_at_zone_boundary_tolerance(self):
+        """Bar 54 is 1 away from 55 → at_zone=True."""
+        result = compute_fib_tz_proximity(54)
+        self.assertTrue(result['at_zone'])
+        self.assertEqual(result['nearest_num'], 55)
+
+    def test_anchor_pivot_impulse(self):
+        """Impulse anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("impulse"), 5)
+
+    def test_anchor_pivot_diagonal(self):
+        """Diagonal anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("diagonal"), 5)
+
+    def test_anchor_pivot_correction(self):
+        """Correction anchor is pivot 2."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("correction"), 2)
+
+    def test_anchor_pivot_wxy(self):
+        """WXY anchor is pivot 3."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("wxy"), 3)
+
+    def test_anchor_pivot_partial(self):
+        """Partial anchor is pivot 3."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("partial"), 3)
+
+    def test_anchor_pivot_wxyxz(self):
+        """WXYXZ anchor is pivot 5."""
+        self.assertEqual(get_fib_tz_anchor_pivot_index("wxyxz"), 5)
+
+    def test_anchor_pivot_none(self):
+        """No pattern → no anchor."""
+        self.assertIsNone(get_fib_tz_anchor_pivot_index("none"))
+
+    def test_bars_to_next_at_exact_zone(self):
+        """At bar 5 exactly → next TZ is 8, so 3 bars to next."""
+        result = compute_fib_tz_proximity(5)
+        self.assertEqual(result['bars_to_next'], 3)
+
+    def test_fib_tz_sequence_correct(self):
+        """Verify the FIB_TZ sequence is correct."""
+        expected = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]
+        self.assertEqual(FIB_TZ, expected)
+
+
+# ============================================================================
+# MULTI-DEGREE CONTEXT ANALYSIS (match Pine Script analyze_degree_context)
+# ============================================================================
+
+def analyze_degree_context(prices, highs, count):
+    """
+    Analyze wave structure at a given degree.
+    prices: list of pivot prices (newest first, index 0 = most recent)
+    highs: list of booleans (True = pivot high, False = pivot low)
+    count: number of valid pivots
+
+    Returns: dict with keys: dir, wave_pos, is_imp, is_corr, conf
+    """
+    d = 0
+    wave_pos = 0
+    is_imp = False
+    is_corr = False
+    conf = 0.0
+
+    # Full 5-wave impulse (6 pivots needed)
+    if count >= 6:
+        p = [prices[i] for i in range(6)]
+        h = [highs[i] for i in range(6)]
+
+        if p[0] is not None and p[5] is not None:
+            # Bullish 5-wave: L-H-L-H-L-H (h5=F, h4=T, h3=F, h2=T, h1=F, h0=T)
+            if not h[5] and h[4] and not h[3] and h[2] and not h[1] and h[0]:
+                w1 = p[4] - p[5]
+                w3 = p[2] - p[3]
+                w5 = p[0] - p[1]
+                if w1 > 0 and w3 > 0 and w5 > 0:
+                    if p[3] > p[5] and (w3 >= w1 or w3 >= w5):  # R1 + R2
+                        d = 1
+                        wave_pos = 5
+                        is_imp = True
+                        conf = 0.80
+
+            # Bearish 5-wave: H-L-H-L-H-L (h5=T, h4=F, h3=T, h2=F, h1=T, h0=F)
+            if not is_imp and h[5] and not h[4] and h[3] and not h[2] and h[1] and not h[0]:
+                w1 = p[5] - p[4]
+                w3 = p[3] - p[2]
+                w5 = p[1] - p[0]
+                if w1 > 0 and w3 > 0 and w5 > 0:
+                    if p[3] < p[5] and (w3 >= w1 or w3 >= w5):
+                        d = -1
+                        wave_pos = -5
+                        is_imp = True
+                        conf = 0.80
+
+    # Partial impulse (W2 done / In W3) — 4 pivots needed
+    if not is_imp and count >= 4:
+        p = [prices[i] for i in range(4)]
+        h = [highs[i] for i in range(4)]
+
+        if p[0] is not None and p[3] is not None:
+            # Bullish partial: L-H-L-H (h3=F, h2=T, h1=F, h0=T)
+            if not h[3] and h[2] and not h[1] and h[0]:
+                w1 = p[2] - p[3]
+                w3 = p[0] - p[1]
+                if w1 > 0 and w3 > 0 and p[1] > p[3]:  # R1 valid
+                    d = 1
+                    is_imp = True
+                    if w3 >= w1:
+                        wave_pos = 3    # In W3
+                        conf = 0.70
+                    else:
+                        wave_pos = 2    # W2 done, W3 forming
+                        conf = 0.50
+
+            # Bearish partial: H-L-H-L (h3=T, h2=F, h1=T, h0=F)
+            if d == 0 and h[3] and not h[2] and h[1] and not h[0]:
+                w1 = p[3] - p[2]
+                w3 = p[1] - p[0]
+                if w1 > 0 and w3 > 0 and p[1] < p[3]:
+                    d = -1
+                    is_imp = True
+                    if w3 >= w1:
+                        wave_pos = -3
+                        conf = 0.70
+                    else:
+                        wave_pos = -2
+                        conf = 0.50
+
+    # ABC Correction — 3 pivots needed
+    if not is_imp and count >= 3:
+        p = [prices[i] for i in range(3)]
+        h = [highs[i] for i in range(3)]
+
+        if p[0] is not None and p[2] is not None:
+            # Bearish ABC: H-L-H → expect C down
+            if h[2] and not h[1] and h[0]:
+                wave_a = p[2] - p[1]
+                wave_b = p[0] - p[1]
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a:
+                    d = -1
+                    is_corr = True
+                    conf = 0.50
+
+            # Bullish ABC: L-H-L → expect C up
+            if not is_corr and not h[2] and h[1] and not h[0]:
+                wave_a = p[1] - p[2]
+                wave_b = p[1] - p[0]
+                if wave_a > 0 and wave_b > 0 and wave_b < wave_a:
+                    d = 1
+                    is_corr = True
+                    conf = 0.50
+
+    return {
+        'dir': d,
+        'wave_pos': wave_pos,
+        'is_imp': is_imp,
+        'is_corr': is_corr,
+        'conf': conf
+    }
+
+
+def compute_degree_confluence(pattern_type, active_wave, active_label, active_bull,
+                               d2_dir, d2_wave, d2_is_imp, d2_is_corr,
+                               d3_dir, d3_wave, d3_is_imp, d3_is_corr):
+    """
+    Compute cross-degree confluence scoring.
+    Returns: (deg_confluence, deg_context_label)
+    """
+    deg_confluence = 0.0
+    deg_context_label = "---"
+
+    if pattern_type == "none":
+        return (deg_confluence, deg_context_label)
+
+    d1_dir_sign = 1 if active_bull else -1
+
+    # W3-in-W3 detection
+    d1_in_w3 = pattern_type == "partial" and (active_wave == 3 or active_wave == -3)
+    d2_in_w3 = d2_wave == 3 or d2_wave == -3
+
+    if d1_in_w3 and d2_in_w3:
+        deg_confluence = 1.0
+        deg_context_label = "W3-in-W3"
+    elif d1_in_w3 and d2_is_imp and d2_dir == d1_dir_sign:
+        deg_confluence = 0.75
+        deg_context_label = "W3 in IMP"
+
+    # False exhaustion filter
+    d1_exhaustion = pattern_type == "impulse" and active_label == "W5 Complete"
+    if d1_exhaustion:
+        if d2_in_w3 and d2_dir == d1_dir_sign:
+            deg_confluence = -0.5
+            deg_context_label = "SUB-W5 in D2:W3"
+        elif d2_is_imp and d2_dir == d1_dir_sign and d2_wave != 5 and d2_wave != -5:
+            deg_confluence = -0.3
+            deg_context_label = "SUB-W5 in D2:IMP"
+        elif d2_wave == 5 or d2_wave == -5:
+            deg_confluence = 0.8
+            deg_context_label = "W5-in-W5"
+
+    # Direction alignment (if no special case)
+    if deg_confluence == 0.0:
+        d2_agrees = d2_dir == d1_dir_sign
+        d3_agrees = d3_dir == d1_dir_sign
+        d2_opposes = d2_dir != 0 and d2_dir != d1_dir_sign
+        d3_opposes = d3_dir != 0 and d3_dir != d1_dir_sign
+
+        if d2_agrees and d3_agrees:
+            deg_confluence = 0.5
+            deg_context_label = "ALL ALIGNED"
+        elif d2_agrees and d3_dir == 0:
+            deg_confluence = 0.25
+            deg_context_label = "D2 ALIGNED"
+        elif d2_opposes and d3_opposes:
+            deg_confluence = -0.5
+            deg_context_label = "FIGHTING TREND"
+        elif d2_opposes or d3_opposes:
+            deg_confluence = -0.25
+            deg_context_label = "MIXED DEGREES"
+        elif d2_dir == 0 and d3_dir == 0:
+            deg_context_label = "NO CONTEXT"
+
+    return (deg_confluence, deg_context_label)
+
+
+# ============================================================================
+# TEST: Multi-Degree Context Analysis
+# ============================================================================
+
+class TestMultiDegreeAnalysis(unittest.TestCase):
+    """Tests for analyze_degree_context and cross-degree confluence scoring."""
+
+    # ── analyze_degree_context tests ──
+
+    def test_bullish_5wave_impulse(self):
+        """6 pivots forming bullish 5-wave: L100-H120-L108-H140-L125-H145."""
+        prices = [145, 125, 140, 108, 120, 100]  # newest first
+        highs  = [True, False, True, False, True, False]
+        result = analyze_degree_context(prices, highs, 6)
+        self.assertEqual(result['dir'], 1)
+        self.assertEqual(result['wave_pos'], 5)
+        self.assertTrue(result['is_imp'])
+        self.assertFalse(result['is_corr'])
+        self.assertAlmostEqual(result['conf'], 0.80)
+
+    def test_bearish_5wave_impulse(self):
+        """6 pivots forming bearish 5-wave: H100-L80-H88-L60-H75-L55."""
+        prices = [55, 75, 60, 88, 80, 100]  # newest first
+        highs  = [False, True, False, True, False, True]
+        result = analyze_degree_context(prices, highs, 6)
+        self.assertEqual(result['dir'], -1)
+        self.assertEqual(result['wave_pos'], -5)
+        self.assertTrue(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.80)
+
+    def test_bullish_partial_w3(self):
+        """4 pivots forming bullish W3: L100-H120-L108-H135 (w3 > w1)."""
+        prices = [135, 108, 120, 100]
+        highs  = [True, False, True, False]
+        result = analyze_degree_context(prices, highs, 4)
+        self.assertEqual(result['dir'], 1)
+        self.assertEqual(result['wave_pos'], 3)
+        self.assertTrue(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.70)
+
+    def test_bullish_partial_w2(self):
+        """4 pivots forming bullish W2: L100-H120-L108-H115 (w3 < w1)."""
+        prices = [115, 108, 120, 100]
+        highs  = [True, False, True, False]
+        result = analyze_degree_context(prices, highs, 4)
+        self.assertEqual(result['dir'], 1)
+        self.assertEqual(result['wave_pos'], 2)
+        self.assertTrue(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.50)
+
+    def test_bearish_partial_w3(self):
+        """4 pivots forming bearish W3: H100-L80-H88-L65 (w3 > w1)."""
+        prices = [65, 88, 80, 100]
+        highs  = [False, True, False, True]
+        result = analyze_degree_context(prices, highs, 4)
+        self.assertEqual(result['dir'], -1)
+        self.assertEqual(result['wave_pos'], -3)
+        self.assertTrue(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.70)
+
+    def test_bearish_partial_w2(self):
+        """4 pivots forming bearish W2: H100-L80-H88-L85 (w3 < w1)."""
+        prices = [85, 88, 80, 100]
+        highs  = [False, True, False, True]
+        result = analyze_degree_context(prices, highs, 4)
+        self.assertEqual(result['dir'], -1)
+        self.assertEqual(result['wave_pos'], -2)
+        self.assertTrue(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.50)
+
+    def test_bearish_abc_correction(self):
+        """3 pivots: H-L-H (H100, L80, H90) → bearish ABC."""
+        prices = [90, 80, 100]
+        highs  = [True, False, True]
+        result = analyze_degree_context(prices, highs, 3)
+        self.assertEqual(result['dir'], -1)
+        self.assertTrue(result['is_corr'])
+        self.assertFalse(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.50)
+
+    def test_bullish_abc_correction(self):
+        """3 pivots: L-H-L (L100, H120, L108) → bullish ABC."""
+        prices = [108, 120, 100]
+        highs  = [False, True, False]
+        result = analyze_degree_context(prices, highs, 3)
+        self.assertEqual(result['dir'], 1)
+        self.assertTrue(result['is_corr'])
+        self.assertFalse(result['is_imp'])
+        self.assertAlmostEqual(result['conf'], 0.50)
+
+    def test_insufficient_pivots(self):
+        """Only 2 pivots → no detection."""
+        prices = [100, 90]
+        highs  = [True, False]
+        result = analyze_degree_context(prices, highs, 2)
+        self.assertEqual(result['dir'], 0)
+        self.assertEqual(result['wave_pos'], 0)
+        self.assertFalse(result['is_imp'])
+        self.assertFalse(result['is_corr'])
+
+    def test_5wave_takes_priority_over_partial(self):
+        """With 6 valid pivots forming full impulse, should NOT fall to partial."""
+        prices = [145, 125, 140, 108, 120, 100]
+        highs  = [True, False, True, False, True, False]
+        result = analyze_degree_context(prices, highs, 6)
+        self.assertEqual(result['wave_pos'], 5)  # full, not partial
+        self.assertAlmostEqual(result['conf'], 0.80)
+
+    def test_invalid_bullish_r1_fails(self):
+        """Bullish 5-wave where R1 fails (W2 below start of W1)."""
+        # p3 (W2 low) must be > p5 (start). Here p3=95 < p5=100 → R1 fails
+        prices = [130, 110, 125, 95, 120, 100]
+        highs  = [True, False, True, False, True, False]
+        result = analyze_degree_context(prices, highs, 6)
+        # Should NOT detect as 5-wave impulse (R1 fails)
+        self.assertNotEqual(result['wave_pos'], 5)
+
+    def test_abc_wave_b_exceeds_a_fails(self):
+        """ABC where B retracement exceeds A → not valid ABC."""
+        # H100, L80, H110 → wave_b = 30 > wave_a = 20 → fails
+        prices = [110, 80, 100]
+        highs  = [True, False, True]
+        result = analyze_degree_context(prices, highs, 3)
+        self.assertFalse(result['is_corr'])
+
+    # ── Cross-degree confluence tests ──
+
+    def test_w3_in_w3(self):
+        """D1 in W3 partial + D2 in W3 → W3-in-W3."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=3, active_label="W3 In Progress",
+            active_bull=True,
+            d2_dir=1, d2_wave=3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=1, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 1.0)
+        self.assertEqual(label, "W3-in-W3")
+
+    def test_w3_in_impulse(self):
+        """D1 in W3 + D2 impulse same dir (but not in W3) → W3 in IMP."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=3, active_label="W3 In Progress",
+            active_bull=True,
+            d2_dir=1, d2_wave=5, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.75)
+        self.assertEqual(label, "W3 in IMP")
+
+    def test_false_exhaustion_d2_w3(self):
+        """D1 W5 complete but D2 in W3 same dir → SUB-W5 in D2:W3."""
+        confl, label = compute_degree_confluence(
+            pattern_type="impulse", active_wave=5, active_label="W5 Complete",
+            active_bull=True,
+            d2_dir=1, d2_wave=3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, -0.5)
+        self.assertEqual(label, "SUB-W5 in D2:W3")
+
+    def test_false_exhaustion_d2_impulse(self):
+        """D1 W5 complete, D2 in impulse (not W3/W5) same dir → SUB-W5 in D2:IMP."""
+        confl, label = compute_degree_confluence(
+            pattern_type="impulse", active_wave=5, active_label="W5 Complete",
+            active_bull=True,
+            d2_dir=1, d2_wave=2, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, -0.3)
+        self.assertEqual(label, "SUB-W5 in D2:IMP")
+
+    def test_w5_in_w5(self):
+        """Both D1 and D2 in W5 → strong confirmation."""
+        confl, label = compute_degree_confluence(
+            pattern_type="impulse", active_wave=5, active_label="W5 Complete",
+            active_bull=True,
+            d2_dir=1, d2_wave=5, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.8)
+        self.assertEqual(label, "W5-in-W5")
+
+    def test_all_aligned(self):
+        """D2 and D3 both agree with D1 → ALL ALIGNED."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=2, active_label="W2",
+            active_bull=True,
+            d2_dir=1, d2_wave=2, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=1, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.5)
+        self.assertEqual(label, "ALL ALIGNED")
+
+    def test_d2_aligned_d3_neutral(self):
+        """D2 agrees, D3 no context → D2 ALIGNED."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=2, active_label="W2",
+            active_bull=True,
+            d2_dir=1, d2_wave=2, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.25)
+        self.assertEqual(label, "D2 ALIGNED")
+
+    def test_fighting_trend(self):
+        """D2 and D3 both oppose D1 → FIGHTING TREND."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=2, active_label="W2",
+            active_bull=True,
+            d2_dir=-1, d2_wave=-3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=-1, d3_wave=-5, d3_is_imp=True, d3_is_corr=False)
+        self.assertAlmostEqual(confl, -0.5)
+        self.assertEqual(label, "FIGHTING TREND")
+
+    def test_mixed_degrees(self):
+        """D2 opposes, D3 agrees → MIXED DEGREES."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=2, active_label="W2",
+            active_bull=True,
+            d2_dir=-1, d2_wave=-3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=1, d3_wave=3, d3_is_imp=True, d3_is_corr=False)
+        self.assertAlmostEqual(confl, -0.25)
+        self.assertEqual(label, "MIXED DEGREES")
+
+    def test_no_context(self):
+        """Both D2 and D3 have no direction → NO CONTEXT."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=2, active_label="W2",
+            active_bull=True,
+            d2_dir=0, d2_wave=0, d2_is_imp=False, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.0)
+        self.assertEqual(label, "NO CONTEXT")
+
+    def test_no_pattern_returns_default(self):
+        """pattern_type='none' → no scoring."""
+        confl, label = compute_degree_confluence(
+            pattern_type="none", active_wave=0, active_label="---",
+            active_bull=True,
+            d2_dir=1, d2_wave=3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=1, d3_wave=3, d3_is_imp=True, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 0.0)
+        self.assertEqual(label, "---")
+
+    def test_composite_prob_modifier(self):
+        """Degree confluence modifies composite by ±10%."""
+        base_prob = 0.50
+        confl = 1.0  # W3-in-W3
+        modified = max(0.0, min(1.0, base_prob + confl * 0.10))
+        self.assertAlmostEqual(modified, 0.60)
+
+        confl_neg = -0.5  # FIGHTING TREND
+        modified_neg = max(0.0, min(1.0, base_prob + confl_neg * 0.10))
+        self.assertAlmostEqual(modified_neg, 0.45)
+
+    def test_composite_prob_clamped(self):
+        """Composite probability stays within [0, 1]."""
+        # High base + positive confluence
+        prob = max(0.0, min(1.0, 0.98 + 1.0 * 0.10))
+        self.assertAlmostEqual(prob, 1.0)
+        # Low base + negative confluence
+        prob_low = max(0.0, min(1.0, 0.02 + (-1.0) * 0.10))
+        self.assertAlmostEqual(prob_low, 0.0)
+
+    def test_bearish_w3_in_w3(self):
+        """Bearish D1 W3 + Bearish D2 W3 → W3-in-W3."""
+        confl, label = compute_degree_confluence(
+            pattern_type="partial", active_wave=-3, active_label="W3 Bear",
+            active_bull=False,
+            d2_dir=-1, d2_wave=-3, d2_is_imp=True, d2_is_corr=False,
+            d3_dir=0, d3_wave=0, d3_is_imp=False, d3_is_corr=False)
+        self.assertAlmostEqual(confl, 1.0)
+        self.assertEqual(label, "W3-in-W3")
 
 
 if __name__ == "__main__":
