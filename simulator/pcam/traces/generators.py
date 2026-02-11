@@ -448,20 +448,24 @@ class SyntheticTraceGenerator:
             # Medium attention to definitions FROM THIS SECTION'S DEPENDENCIES
             # This is the key structural link: not random definitions,
             # but the specific groups this code section depends on.
-            dep_block_ids = []
+            #
+            # Within each group, the first block is the "signature" (function
+            # def, class header) — always referenced with high attention.
+            # Remaining blocks are "body" — referenced with lower probability
+            # and lower attention.  This creates intra-scope variance.
+            def_refs = []
             for gi in query_section["dep_groups"]:
-                dep_block_ids.extend(def_groups[gi])
+                group = def_groups[gi]
+                # Signature block: always included, high attention
+                def_refs.append((group[0], self.rng.uniform(0.06, 0.12)))
+                # Body blocks: included with 40% probability, lower attention
+                for b in group[1:]:
+                    if self.rng.random() < 0.4:
+                        def_refs.append((b, self.rng.uniform(0.01, 0.04)))
 
-            # Sample a subset of the dependent definitions (3-8 blocks)
-            num_def_refs = self.rng.randint(3, min(8, len(dep_block_ids)))
-            if dep_block_ids:
-                def_refs = self.rng.sample(
-                    dep_block_ids,
-                    min(num_def_refs, len(dep_block_ids))
-                )
-                for block_id in def_refs:
-                    scores[block_id] = self.rng.uniform(0.03, 0.08)
-                    structural_hints[block_id] = def_block_to_scope[block_id]
+            for block_id, attn in def_refs:
+                scores[block_id] = attn
+                structural_hints[block_id] = def_block_to_scope[block_id]
 
             # Also annotate all blocks in the dependent groups
             # (even ones not sampled for this query — they're still structurally linked)

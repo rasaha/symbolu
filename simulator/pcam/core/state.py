@@ -101,6 +101,8 @@ class BlockScore:
     unique_query_sources: Set[int] = field(default_factory=set)
     # Cumulative attention weight
     cumulative_weight: float = 0.0
+    # Sum of squared weights for online variance (E[X^2])
+    sum_squared_weight: float = 0.0
     # Structural scope_id for code workloads (-1 = unset)
     scope_id: int = -1
 
@@ -612,44 +614,66 @@ class SequenceState:
                         structural_boost = score_anchor * weight_signal * 0.8
                         candidates[bs.block_id] = candidates.get(bs.block_id, 0) + structural_boost
 
-            # Signal 3: Structural scope matching (requires structural hints)
-            # When per-step structural hints are available, boost blocks whose
-            # scope_id matches a DEFINITION group that this query depends on.
-            # This is the targeted signal: not all 200 definitions, but the
-            # specific 2-4 groups (= 6-15 blocks) this code section uses.
-            #
-            # Uses the persistent _block_scope_map to also boost blocks that
-            # haven't been seen yet (cold start), ensuring structural links
-            # are effective from the first query.
-            if structural_hints and query_block_id in structural_hints:
-                query_scope = structural_hints[query_block_id]
-                dep_scopes = set(structural_hints.values()) - {0, query_scope}
+        # Signal 3: Structural scope matching (independent of workload detection)
+        # When per-step structural hints are available, boost blocks whose
+        # scope_id matches a DEFINITION group that this query depends on.
+        # This fires even at step 0 (before workload detection converges),
+        # using the persistent _block_scope_map for cold-start injection.
+        if structural_hints and query_block_id is not None and query_block_id in structural_hints:
+            query_scope = structural_hints[query_block_id]
+            # Include scope 0 (imports) — always needed for code queries.
+            # Exclude only the query's own scope (recent context, already boosted).
+            dep_scopes = set(structural_hints.values()) - {query_scope}
+            # Use CODE recency_strength as baseline for scope boost magnitude
+            scope_recency = 0.4
 
-                if dep_scopes:
-                    # Boost from block_scores (warm blocks)
-                    for bs in self.block_scores.values():
-                        if bs.block_id in exclude:
-                            continue
-                        if bs.scope_id < 0:
-                            continue
-                        distance = abs(bs.block_id - query_block_id)
-                        if distance <= 8:
-                            continue
-                        if bs.scope_id in dep_scopes:
-                            scope_boost = recency_strength * 2.5
-                            candidates[bs.block_id] = candidates.get(bs.block_id, 0) + scope_boost
+            if dep_scopes:
+                # Intra-scope salience prior: compute mean attention per
+                # block within each dependent scope. Blocks with higher
+                # historical mean attention are more likely to be the
+                # specific definitions this query needs.
+                scope_blocks: Dict[int, List] = {}  # scope_id -> [BlockScore]
+                for bs in self.block_scores.values():
+                    if bs.scope_id in dep_scopes and bs.access_count >= 1:
+                        scope_blocks.setdefault(bs.scope_id, []).append(bs)
 
-                    # Also inject blocks from the scope map that aren't in
-                    # block_scores yet (cold start). These blocks are known
-                    # to be structurally linked but haven't been observed.
-                    # Use a weaker boost since they have no attention history.
-                    for block_id, scope_id in self._block_scope_map.items():
-                        if block_id in exclude or block_id in candidates:
-                            continue
-                        if scope_id in dep_scopes:
-                            distance = abs(block_id - query_block_id)
-                            if distance > 8:
-                                candidates[block_id] = recency_strength * 0.5
+                # Compute per-scope median mean_attention for normalization
+                scope_medians: Dict[int, float] = {}
+                for sid, blocks in scope_blocks.items():
+                    means = sorted(
+                        bs.cumulative_weight / bs.access_count for bs in blocks
+                    )
+                    scope_medians[sid] = means[len(means) // 2] if means else 0.01
+
+                # Salience-weighted scope boost for warm blocks
+                for bs in self.block_scores.values():
+                    if bs.block_id in exclude:
+                        continue
+                    if bs.scope_id < 0 or bs.scope_id not in dep_scopes:
+                        continue
+                    distance = abs(bs.block_id - query_block_id)
+                    if distance <= 8:
+                        continue
+
+                    # Salience factor: how much above/below the scope median
+                    if bs.access_count >= 1:
+                        mean_attn = bs.cumulative_weight / bs.access_count
+                        median = scope_medians.get(bs.scope_id, 0.01)
+                        salience = min(4.0, mean_attn / max(median, 1e-6))
+                    else:
+                        salience = 1.0
+
+                    scope_boost = scope_recency * 2.0 * salience
+                    candidates[bs.block_id] = candidates.get(bs.block_id, 0) + scope_boost
+
+                # Cold-start injection for unseen blocks in dep scopes
+                for block_id, scope_id in self._block_scope_map.items():
+                    if block_id in exclude or block_id in candidates:
+                        continue
+                    if scope_id in dep_scopes:
+                        distance = abs(block_id - query_block_id)
+                        if distance > 8:
+                            candidates[block_id] = scope_recency * 0.9
 
         # Global importance boost for RAG workloads
         # Helps identify consistently important blocks across queries
@@ -731,6 +755,7 @@ class SequenceState:
                 access_count=1,
                 unique_query_sources={query_block},
                 cumulative_weight=weight,
+                sum_squared_weight=weight * weight,
                 scope_id=self._block_scope_map.get(key_block, -1),
             )
         else:
@@ -738,6 +763,7 @@ class SequenceState:
             # Track query sources for global importance
             bs.unique_query_sources.add(query_block)
             bs.cumulative_weight += weight
+            bs.sum_squared_weight += weight * weight
 
             # Adaptive EMA: more weight to new observations for infrequent blocks
             # This helps sparse patterns (long-context, RAG, code) learn faster
