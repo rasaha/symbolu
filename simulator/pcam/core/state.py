@@ -520,7 +520,7 @@ class SequenceState:
             global_importance_enabled = False
         elif pattern == WorkloadPattern.LONG_CONTEXT:
             recency_window = 48
-            recency_strength = 0.5
+            recency_strength = 0.75
             query_window = 20
             diversity_boost_enabled = False
             global_importance_enabled = False
@@ -567,9 +567,21 @@ class SequenceState:
 
         # Add recency bonus for recent blocks (adaptive strength)
         if query_block_id is not None:
+            # For LONG_CONTEXT, scale recency so near blocks compete with
+            # edge-accumulated scores.  Compute the k-th score in the current
+            # candidate pool (before recency) and use it as a floor for
+            # recency_strength.  This makes recency auto-scale with score
+            # inflation over long sequences.
+            effective_recency = recency_strength
+            if pattern == WorkloadPattern.LONG_CONTEXT and candidates:
+                score_vals = sorted(candidates.values())
+                idx = max(0, len(score_vals) - k)
+                score_at_k = score_vals[idx] if idx < len(score_vals) else 0
+                effective_recency = max(recency_strength, score_at_k * 1.5)
+
             for block_id in range(max(0, query_block_id - recency_window), query_block_id + 1):
                 if block_id not in exclude:
-                    recency_boost = recency_strength * (1.0 - (query_block_id - block_id) / recency_window)
+                    recency_boost = effective_recency * (1.0 - (query_block_id - block_id) / recency_window)
                     candidates[block_id] = candidates.get(block_id, 0) + recency_boost
 
         # Structural boost for CODE workloads
@@ -685,11 +697,9 @@ class SequenceState:
                 if bs.global_importance > 0.1:
                     candidates[bs.block_id] = candidates.get(bs.block_id, 0) + bs.global_importance * 0.3
 
-        # Soft Hierarchical Prior: section boost for Long-Context and RAG
+        # Soft Hierarchical Prior: section boost for RAG (unchanged)
         # CRITICAL: This is ADDITIVE (prior), not SUBSTITUTIVE (filter)
-        # Blocks in high-attention sections get a small boost
-        # Blocks elsewhere are NOT excluded - they can still be selected
-        if pattern in (WorkloadPattern.LONG_CONTEXT, WorkloadPattern.RAG) and self._sections:
+        if pattern == WorkloadPattern.RAG and self._sections:
             for block_id in candidates:
                 section_boost = self._get_section_boost(block_id)
                 if section_boost > 0:
@@ -714,11 +724,89 @@ class SequenceState:
                             if block_id in candidates:
                                 candidates[block_id] += cluster_boost
 
+        # Section Centroid Distance Ranking for LONG_CONTEXT
+        #
+        # Applied AFTER all other boosts (edges, clusters, recency) so the
+        # target_score reflects the actual competition level.  This ensures
+        # blocks in the query's section and adjacent sections can compete
+        # with edge-accumulated scores from the "trailing hot zone."
+        #
+        # Two signals:
+        #   (a) Section-distance proximity: blocks near the query's section
+        #       get a boost proportional to the current top-K cutoff.
+        #   (b) Historical section importance: consistently important distant
+        #       sections (anchors) get a scaled boost based on their score.
+        if pattern == WorkloadPattern.LONG_CONTEXT and query_block_id is not None:
+            if len(candidates) > k:
+                score_vals = sorted(candidates.values(), reverse=True)
+                target_score = score_vals[min(k - 1, len(score_vals) - 1)]
+            else:
+                target_score = 0.1
+
+            query_section = query_block_id // self._section_size
+            near_section_range = 3  # sections ±3 from query
+
+            # (a) Section-distance proximity boost
+            for block_id in list(candidates.keys()):
+                block_section = block_id // self._section_size
+                section_dist = abs(block_section - query_section)
+                if section_dist <= near_section_range:
+                    proximity = 1.0 - section_dist / (near_section_range + 1)
+                    centroid_boost = target_score * 0.6 * proximity
+                    candidates[block_id] += centroid_boost
+
+            # Inject unseen nearby blocks not yet in block_scores
+            for bid in range(max(0, query_block_id - self._section_size), query_block_id + 1):
+                if bid not in exclude and bid not in candidates:
+                    dist = abs(query_block_id - bid)
+                    proximity = 1.0 - dist / self._section_size
+                    candidates[bid] = target_score * 0.7 * proximity
+
+            # (b) reserved — handled in post-selection below
+
         # Standard selection: use heapq for efficient top-K
         scored = [(score, block_id) for block_id, score in candidates.items()]
         top_k = heapq.nlargest(k, scored)
 
-        return [(block_id, score) for score, block_id in top_k]
+        result = [(block_id, score) for score, block_id in top_k]
+
+        # Slot reservation for LONG_CONTEXT: guarantee that globally
+        # important blocks (structural anchors) appear in the result.
+        # Without this, edge-accumulated scores from the trailing hot
+        # zone crowd out consistently-important distant blocks.
+        #
+        # Reserve ~20% of K slots for blocks with high global importance
+        # that didn't make the cut.  Replace the lowest-scoring standard
+        # candidates with these anchor blocks.
+        if pattern == WorkloadPattern.LONG_CONTEXT and query_block_id is not None:
+            result_set = set(bid for bid, _ in result)
+            reserved_slots = int(k * 0.2)  # ~13 slots
+
+            # Find globally important blocks not in result
+            gi_candidates = []
+            for bs in self.block_scores.values():
+                if bs.block_id in exclude or bs.block_id in result_set:
+                    continue
+                distance = abs(bs.block_id - query_block_id)
+                if distance <= recency_window:
+                    continue  # Near blocks handled by recency
+                gi = bs.global_importance
+                if gi > 0.03:
+                    gi_candidates.append((gi, bs.block_id))
+
+            gi_candidates.sort(reverse=True)
+            gi_to_add = gi_candidates[:reserved_slots]
+
+            if gi_to_add:
+                # Replace lowest-scoring standard candidates
+                # Sort result by score ascending for easy replacement
+                result.sort(key=lambda x: x[1])
+                for i, (gi_score, gi_bid) in enumerate(gi_to_add):
+                    if i < len(result):
+                        result[i] = (gi_bid, gi_score)
+                result.sort(key=lambda x: -x[1])
+
+        return result
 
     def update_edge(
         self,

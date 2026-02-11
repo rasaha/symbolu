@@ -192,6 +192,12 @@ class SyntheticTraceGenerator:
         """
         Long document with distributed attention.
 
+        Simulates long-document comprehension where:
+        - Most attention is local (recent context)
+        - Consistent anchor sections are referenced by nearby query regions
+          (e.g., a table of contents, key definitions, recurring themes)
+        - Some random sparse attention to model noise
+
         Args:
             context_length: Total context length in tokens
             num_queries: Number of query positions to generate
@@ -200,6 +206,43 @@ class SyntheticTraceGenerator:
             top_k: Number of top-K blocks for ground truth
         """
         steps: List[TraceStep] = []
+
+        total_blocks = (context_length + block_size - 1) // block_size
+
+        # --- Build anchor sections ---
+        # Divide the first half of the document into sections (~16 blocks each).
+        # Pick 4-6 anchor sections that are consistently referenced.
+        section_size = 16
+        num_early_sections = max(1, (total_blocks // 2) // section_size)
+        num_anchors = min(6, max(2, num_early_sections // 3))
+        anchor_section_ids = sorted(
+            self.rng.sample(range(num_early_sections), num_anchors)
+        )
+
+        # Each anchor section has 3-5 "key blocks" that carry most attention
+        anchor_key_blocks: Dict[int, List[int]] = {}
+        for sec_id in anchor_section_ids:
+            sec_start = sec_id * section_size
+            sec_end = min(sec_start + section_size, total_blocks)
+            num_keys = self.rng.randint(3, min(5, sec_end - sec_start))
+            anchor_key_blocks[sec_id] = sorted(
+                self.rng.sample(range(sec_start, sec_end), num_keys)
+            )
+
+        # Divide the query region (second half) into zones.
+        # Each zone references 2-3 specific anchor sections consistently.
+        query_start_block = total_blocks // 2
+        zone_size = 30  # blocks per zone
+        zones: List[Dict] = []
+        for z_start in range(query_start_block, total_blocks, zone_size):
+            z_end = min(z_start + zone_size, total_blocks)
+            num_refs = self.rng.randint(2, min(3, num_anchors))
+            ref_anchors = self.rng.sample(anchor_section_ids, num_refs)
+            zones.append({
+                "start": z_start,
+                "end": z_end,
+                "anchors": ref_anchors,
+            })
 
         # Query positions spread through the document
         query_positions = sorted(
@@ -218,11 +261,34 @@ class SyntheticTraceGenerator:
                 query_pos, query_pos + 1, pattern, block_size
             )
 
-            # Add some long-range dependencies
-            num_long_range = int((1 - attention_locality) * 20)
-            for _ in range(num_long_range):
-                far_block = self.rng.randint(0, query_pos // block_size)
-                scores[far_block] = scores.get(far_block, 0) + 0.02
+            current_block = query_pos // block_size
+
+            # Find this query's zone
+            query_zone = None
+            for zone in zones:
+                if zone["start"] <= current_block < zone["end"]:
+                    query_zone = zone
+                    break
+            if query_zone is None:
+                query_zone = zones[-1] if zones else {"anchors": anchor_section_ids[:2]}
+
+            # Consistent anchor attention: reference this zone's anchor sections
+            for sec_id in query_zone["anchors"]:
+                key_blocks = anchor_key_blocks[sec_id]
+                for kb in key_blocks:
+                    # Key blocks in anchors get moderate attention
+                    scores[kb] = scores.get(kb, 0) + self.rng.uniform(0.02, 0.06)
+
+            # Small amount of random sparse attention (noise)
+            num_random_sparse = max(1, int((1 - attention_locality) * 6))
+            for _ in range(num_random_sparse):
+                far_block = self.rng.randint(0, max(1, current_block))
+                scores[far_block] = scores.get(far_block, 0) + 0.01
+
+            # Normalize
+            total = sum(scores.values())
+            if total > 0:
+                scores = {k: v / total for k, v in scores.items()}
 
             blocks_accessed = list(scores.keys())
             true_top_k = self._get_top_k_blocks(scores, top_k)
@@ -232,7 +298,7 @@ class SyntheticTraceGenerator:
                 blocks_accessed=blocks_accessed,
                 attention_scores=scores,
                 true_top_k=true_top_k,
-                query_block_id=query_pos // block_size,
+                query_block_id=current_block,
             ))
 
         metadata = TraceMetadata(
