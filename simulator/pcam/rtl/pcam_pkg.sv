@@ -27,9 +27,9 @@ package pcam_pkg;
     parameter int SEQ_ID_WIDTH = 6;
 
     // Top-K Configuration
-    parameter int K_MAX = 128;
-    parameter int K_DEFAULT = 64;
-    parameter int K_WIDTH = 7;                 // log2(128) + 1
+    parameter int K_MAX = 256;
+    parameter int K_DEFAULT = 256;
+    parameter int K_WIDTH = 9;                 // log2(256) + 1
 
     // Score Configuration (Q8.8 Fixed Point)
     parameter int SCORE_WIDTH = 16;

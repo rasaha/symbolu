@@ -413,7 +413,7 @@ class RAGPipelineSimulator:
                 context=context,
                 query_position=query_position,
                 ground_truth_blocks=ground_truth_blocks,
-                k=64,
+                k=256,
             )
             generation_results.append(result)
 

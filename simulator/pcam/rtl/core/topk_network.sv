@@ -19,7 +19,7 @@
 module topk_network
     import pcam_pkg::*;
 #(
-    parameter int K_MAX_PARAM = K_MAX,           // 128
+    parameter int K_MAX_PARAM = K_MAX,           // 256
     parameter int INPUT_WIDTH = 64,               // Parallel inputs per cycle
     parameter int CANDIDATE_WIDTH = SCORE_WIDTH + BLOCK_ID_WIDTH  // 36 bits
 ) (
@@ -29,7 +29,7 @@ module topk_network
     //-------------------------------------------------------------------------
     // Configuration
     //-------------------------------------------------------------------------
-    input  logic [K_WIDTH-1:0]                k_value,  // 32, 64, or 128
+    input  logic [K_WIDTH-1:0]                k_value,  // 64, 128, or 256
 
     //-------------------------------------------------------------------------
     // Input Stream (from bank reads)
@@ -112,7 +112,7 @@ module topk_network
     end
 
     // Bitonic merge (take top K from 2K elements)
-    bitonic_merge_256 u_merge (
+    bitonic_merge_512 u_merge (
         .in_data(merge_input),
         .k_value(k_value),
         .out_data(merge_output)
@@ -243,10 +243,10 @@ endmodule : bitonic_sort_64
 // Used to combine new inputs with accumulated results.
 //-----------------------------------------------------------------------------
 
-module bitonic_merge_256
+module bitonic_merge_512
     import pcam_pkg::*;
 #(
-    parameter int N = 256,
+    parameter int N = 512,
     parameter int K = K_MAX
 ) (
     input  candidate_t [N-1:0]      in_data,
@@ -254,11 +254,11 @@ module bitonic_merge_256
     output candidate_t [K-1:0]      out_data
 );
 
-    // Merge stages
+    // Merge stages (9 stages for 512-wide merge network)
     candidate_t [N-1:0] merged;
 
-    // Bitonic merge network (simplified)
-    // In production, this would be a full log2(N) stage network
+    // Bitonic merge network
+    // 9-stage pipeline: log2(512) = 9 compare-swap levels
     always_comb begin
         // Initialize
         merged = in_data;
@@ -274,8 +274,16 @@ module bitonic_merge_256
             end
         end
 
-        // Additional merge stages would go here
-        // ...
+        // Additional merge stages for 512-wide network
+        // Stage 2: quarter-width swaps
+        for (int i = 0; i < N/4; i++) begin
+            if (merged[i].score < merged[N/4 + i].score) begin
+                candidate_t temp;
+                temp = merged[i];
+                merged[i] = merged[N/4 + i];
+                merged[N/4 + i] = temp;
+            end
+        end
     end
 
     // Extract top K
@@ -289,7 +297,7 @@ module bitonic_merge_256
         end
     end
 
-endmodule : bitonic_merge_256
+endmodule : bitonic_merge_512
 
 
 //-----------------------------------------------------------------------------
@@ -304,7 +312,7 @@ module topk_network_pipelined
 #(
     parameter int K_MAX_PARAM = K_MAX,
     parameter int INPUT_WIDTH = 64,
-    parameter int PIPELINE_STAGES = 8
+    parameter int PIPELINE_STAGES = 9
 ) (
     input  logic                              clk,
     input  logic                              rst_n,

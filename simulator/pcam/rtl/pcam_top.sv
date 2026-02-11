@@ -102,6 +102,10 @@ module pcam_top
     logic                         topk_out_valid;
     logic                         topk_out_ready;
 
+    // Multi-beat response state
+    logic [K_WIDTH-1:0]           rsp_beat_idx;     // Current candidate index
+    logic                         rsp_in_progress;  // Multi-beat transfer active
+
     // Performance counters
     logic [31:0]                  attend_count;
     logic [31:0]                  update_count;
@@ -187,8 +191,8 @@ module pcam_top
             end
 
             ATTEND_RESPONSE: begin
-                // Wait for response to be accepted
-                if (m_axis_rsp_tvalid && m_axis_rsp_tready) begin
+                // Wait for all response beats to be accepted
+                if (m_axis_rsp_tvalid && m_axis_rsp_tready && m_axis_rsp_tlast) begin
                     next_state = IDLE;
                 end
             end
@@ -292,24 +296,40 @@ module pcam_top
     assign bank_wr_en       = (state == UPDATE_RMW);
 
     //=========================================================================
-    // Response Generation
+    // Response Generation (Multi-Beat for K=256)
     //=========================================================================
+    //
+    // Response format:
+    //   Beat 0:  [count(9) | reserved(7) | candidate[0..5](36×6=216) | pad(24)]
+    //   Beat N:  [candidate[6N..6N+5](36×6=216) | pad(40)]
+    //   Last beat: tlast=1
+    //
+    // At K=256, need ceil(256/6) = 43 beats max.
+    // Candidates per beat: floor((256-0)/36) = 6 (after first beat header)
+    //
+    localparam int CANDIDATES_PER_BEAT = 6;
+    localparam int TOTAL_BEATS_MAX = (K_MAX_PARAM + CANDIDATES_PER_BEAT - 1) / CANDIDATES_PER_BEAT;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             m_axis_rsp_tdata  <= '0;
             m_axis_rsp_tvalid <= 1'b0;
             m_axis_rsp_tlast  <= 1'b0;
+            rsp_beat_idx      <= '0;
+            rsp_in_progress   <= 1'b0;
         end else begin
-            if (state == ATTEND_RESPONSE && !m_axis_rsp_tvalid) begin
-                // Pack Top-K results into response
-                // Format: [count(8) | candidates(36*K)]
-                m_axis_rsp_tdata[7:0]   <= topk_out_count;
-                m_axis_rsp_tdata[255:8] <= '0;  // Pack candidates (simplified)
+            // Start multi-beat response when entering ATTEND_RESPONSE
+            if (state == ATTEND_RESPONSE && !rsp_in_progress && !m_axis_rsp_tvalid) begin
+                rsp_in_progress <= 1'b1;
+                rsp_beat_idx    <= '0;
 
-                for (int i = 0; i < 6; i++) begin  // Fit 6 candidates in 256 bits
+                // First beat: header + first 6 candidates
+                m_axis_rsp_tdata <= '0;
+                m_axis_rsp_tdata[K_WIDTH-1:0] <= topk_out_count;
+
+                for (int i = 0; i < CANDIDATES_PER_BEAT; i++) begin
                     if (i < topk_out_count) begin
-                        m_axis_rsp_tdata[8 + i*36 +: 36] <= {
+                        m_axis_rsp_tdata[16 + i*36 +: 36] <= {
                             topk_out[i].score,
                             topk_out[i].block_id
                         };
@@ -317,10 +337,36 @@ module pcam_top
                 end
 
                 m_axis_rsp_tvalid <= 1'b1;
-                m_axis_rsp_tlast  <= 1'b1;
-            end else if (m_axis_rsp_tvalid && m_axis_rsp_tready) begin
-                m_axis_rsp_tvalid <= 1'b0;
-                m_axis_rsp_tlast  <= 1'b0;
+                // Single beat if K_eff <= 6
+                m_axis_rsp_tlast  <= (topk_out_count <= CANDIDATES_PER_BEAT);
+                rsp_beat_idx      <= CANDIDATES_PER_BEAT[K_WIDTH-1:0];
+
+            end else if (rsp_in_progress && m_axis_rsp_tvalid && m_axis_rsp_tready) begin
+                // Current beat accepted — send next or finish
+                if (m_axis_rsp_tlast) begin
+                    // Transfer complete
+                    m_axis_rsp_tvalid <= 1'b0;
+                    m_axis_rsp_tlast  <= 1'b0;
+                    rsp_in_progress   <= 1'b0;
+                end else begin
+                    // Pack next 6 candidates
+                    m_axis_rsp_tdata <= '0;
+
+                    for (int i = 0; i < CANDIDATES_PER_BEAT; i++) begin
+                        if ((rsp_beat_idx + i[K_WIDTH-1:0]) < topk_out_count) begin
+                            m_axis_rsp_tdata[i*36 +: 36] <= {
+                                topk_out[rsp_beat_idx + i[K_WIDTH-1:0]].score,
+                                topk_out[rsp_beat_idx + i[K_WIDTH-1:0]].block_id
+                            };
+                        end
+                    end
+
+                    rsp_beat_idx <= rsp_beat_idx + CANDIDATES_PER_BEAT[K_WIDTH-1:0];
+                    m_axis_rsp_tvalid <= 1'b1;
+
+                    // Check if next beat is the last
+                    m_axis_rsp_tlast <= ((rsp_beat_idx + CANDIDATES_PER_BEAT[K_WIDTH-1:0]) >= topk_out_count);
+                end
             end
         end
     end
