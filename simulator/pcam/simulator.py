@@ -119,6 +119,7 @@ class PCAMSimulator:
                 candidates=candidate_ids,
                 true_top_k=step.true_top_k,
                 bank_conflicts=bank_conflicts,
+                attention_scores=step.attention_scores,
             )
 
             # UPDATE operations for observed attention
@@ -224,6 +225,7 @@ class PCAMSimulator:
                 candidates=candidate_ids,
                 true_top_k=step.true_top_k,
                 bank_conflicts=0,
+                attention_scores=step.attention_scores,
             )
 
             # Record access with actual attention scores
