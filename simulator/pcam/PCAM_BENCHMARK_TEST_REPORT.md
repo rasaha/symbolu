@@ -592,3 +592,155 @@ KV cache bytes:
 Weight bytes:
   70B * 2 = 140 GB (FP16)
 ```
+
+## Appendix D: Simulator Evolution vs Chip Redesign — Hardware/Firmware Boundary Analysis
+
+A critical question for any pre-tapeout project: **do simulator benchmark improvements require physical chip changes?**
+
+### The Three-Layer Model
+
+The simulator mixes three distinct layers. Only Layer 3 maps directly to silicon.
+
+```
+Layer 1: Algorithm (Controller Policy)          ← Changes frequently
+  - K selection / ranking logic
+  - Structural boosts, scope matching
+  - Salience priors, recency tuning
+  - Workload detection and gating
+  - Coverage / mass recall metrics
+
+Layer 2: Architecture (Timing Model)            ← Changes occasionally
+  - ATTEND latency model (209ns on CXL 2.0)
+  - Roofline throughput projections
+  - Memory bandwidth assumptions
+  - FLOPs reduction arithmetic
+
+Layer 3: Hardware (Silicon Frozen at Tapeout)   ← Changes are expensive
+  - PCAM array size and banking
+  - Per-entry memory cell bit width
+  - Block address format
+  - K parallelism / comparator structure
+  - Memory technology (MRAM/PCM)
+  - Interconnect physical layer
+  - In-array compute primitives
+```
+
+### What Recent Changes Touched
+
+All v0.3.0 through v0.7.0 improvements were **Layer 1 (controller policy)**:
+
+| Change | Layer | Silicon Impact |
+|--------|:-----:|:--------------:|
+| Adaptive recency (0.5 -> 0.75) | 1 | None — firmware tunable |
+| Section centroid distance boost | 1 | None — firmware scoring logic |
+| Slot reservation (20% of K) | 1 | None (if firmware); Low (if on-chip pipeline stage) |
+| Workload pattern detection | 1 | None — host-side classification |
+| Scope matching with salience | 1 | None — firmware scoring logic |
+| Diversity boost for imports | 1 | None — firmware scoring logic |
+| Cold-start injection | 1 | None — firmware initialization |
+| Phase cluster tracking | 1 | Low — SRAM metadata table, not in main array |
+
+### Where the Simulator Informs Hardware Design
+
+While the controller logic is firmware, the simulator **does** discover hardware requirements that must be frozen at tapeout:
+
+#### 1. Per-Entry Bit Budget
+
+The `BlockScore` structure currently stores 7 fields per block:
+
+```
+block_id: int             — 20 bits (up to 1M blocks)
+score: float              — 16 bits (FP16 sufficient)
+last_access_step: int     — 16 bits (relative step counter)
+access_count: int         — 12 bits (saturating counter)
+cumulative_weight: float  — 16 bits
+sum_squared_weight: float — 16 bits (for variance estimation)
+scope_id: int             — 8 bits
+```
+
+Total: ~104 bits (~13 bytes) per entry for the fixed-width fields.
+
+The `unique_query_sources: Set[int]` field is **unbounded** — impossible to store in a fixed-width cell. Hardware alternatives:
+
+| Approximation | Bits | Accuracy | Complexity |
+|--------------|:----:|:--------:|:----------:|
+| Saturating counter | 8 | Low (no uniqueness) | Trivial |
+| Small bloom filter (64-bit) | 64 | Medium (~5% FP rate) | Low |
+| HyperLogLog (4-bit registers x 16) | 64 | High (~26% SE) | Medium |
+| Exact count + probabilistic dedup | 16 | High for common cases | Low |
+
+**Recommendation**: A saturating counter (8 bits) combined with `cumulative_weight / access_count` provides a sufficient proxy for global importance. The full `Set[int]` is a simulator convenience, not a hardware requirement.
+
+**Estimated per-entry budget**: 112 bits (14 bytes) for all fields including an 8-bit diversity counter. At 1M entries, the PCAM array requires ~14 MB — well within on-chip SRAM capacity.
+
+#### 2. Post-Selection Pipeline Stage
+
+Slot reservation replaces the lowest-scoring 20% of top-K candidates with high-GI distant blocks. This requires access to the full candidate list **after** initial top-K selection.
+
+Three implementation options:
+
+| Option | Latency Impact | Silicon Impact |
+|--------|:-------------:|:--------------:|
+| **On-chip pipeline stage** | +20-50ns | Adds comparator + mux stage after top-K |
+| **Firmware post-processing** | +100-200ns | RISC core on PCAM die processes result buffer |
+| **Host-side post-processing** | +500-1000ns | GPU driver modifies candidates before use |
+
+The current ATTEND latency model (337ns on CXL 2.0) does not include reservation overhead. If reservation is done on-chip, actual ATTEND latency would be ~360-390ns. If done in firmware or on-host, the ATTEND primitive remains unchanged.
+
+**Recommendation**: Firmware post-processing. The 100-200ns overhead is negligible relative to the ~2.7ms per-token generation time, and it avoids freezing the reservation policy in silicon.
+
+#### 3. Structural Hints Sideband
+
+The `attend()` call now accepts `structural_hints: Dict[int, int]` — a mapping from block_id to scope_id passed from the host per query. This is a sideband data channel.
+
+| Option | Command Packet Size | Silicon Impact |
+|--------|:------------------:|:--------------:|
+| Embedded in ATTEND command | +64-256 bytes | Wider command decoder |
+| Pre-loaded via CONFIGURE | Separate command | Firmware manages hint register file |
+| Host-side pre-filtering | No change to ATTEND | Hint application before ATTEND call |
+
+**Recommendation**: Pre-loaded via CONFIGURE commands. Scope maps change infrequently (once per code file, not per query), so a small hint register file (256 entries x 12 bits = 384 bytes) updated via separate commands avoids widening the ATTEND datapath.
+
+### The Hardware Primitive Remains Stable
+
+Across all v0.3.0-v0.7.0 changes, the core primitive is unchanged:
+
+```
+ATTEND(query_block_id, K, sequence_id) → [(block_id, score) x K]
+UPDATE(query_block_id, key_block_id, weight, sequence_id) → success
+DECAY(rate) → void
+```
+
+This is the correct separation. The hardware exposes a **top-K associative memory primitive**. How blocks are scored, boosted, reserved, and filtered is **controller policy** — firmware that can be updated without re-spinning silicon.
+
+### When Chip Redesign WOULD Be Required
+
+The current architecture assumes **history-based predictive selection**. Chip redesign would be triggered by:
+
+| Scenario | Why It Changes Silicon |
+|----------|----------------------|
+| K scaling from 64 to 512+ | Wider top-K comparator tree, more output bandwidth |
+| Multi-stage in-array reduction | Pipeline depth changes, new intermediate buffers |
+| Dynamic block sizes | Address decoder and banking logic redesign |
+| Embedding similarity scoring | Requires vector dot-product units in memory array |
+| Cross-sequence attention | Breaks per-sequence state isolation model |
+
+None of these are implied by the current simulator evolution. The trajectory of improvements (better scoring heuristics, smarter candidate selection) is **firmware refinement**, which is the expected and healthy state for a pre-tapeout project.
+
+### Summary
+
+```
+Simulator evolving ≠ Chip redesign
+
+Simulator evolving = Discovering optimal controller policy
+                   + Informing per-entry bit budget
+                   + Validating that the primitive is sufficient
+
+Silicon frozen at tapeout:           Firmware updated post-tapeout:
+  - Memory cell layout (14 bytes)      - Scoring heuristics
+  - Bank count and width               - Recency/decay parameters
+  - Top-K comparator tree              - Slot reservation policy
+  - Interconnect PHY                   - Workload detection
+  - Address hash function              - Structural hint processing
+  - Command packet format              - Global importance thresholds
+```
