@@ -22,6 +22,9 @@ Usage:
     # Run mock harness (simulator-backed, no GPU needed):
     python -m benchmarks.pcam_vllm_harness --mock
 
+    # Run mock harness targeting H100:
+    python -m benchmarks.pcam_vllm_harness --mock --gpu h100
+
     # Run real harness (requires vLLM + GPU):
     python -m benchmarks.pcam_vllm_harness --real --model meta-llama/Llama-2-7b-hf
 
@@ -223,6 +226,7 @@ def run_mock_harness(
     batch_size: int = 32,
     top_k: int = 64,
     verbose: bool = True,
+    gpu_profile=None,
 ) -> MockHarnessResult:
     """
     Run the mock measurement harness backed by the PCAM simulator.
@@ -236,7 +240,7 @@ def run_mock_harness(
     from simulator.pcam.traces.generators import SyntheticTraceGenerator
     from simulator.pcam.baselines import H2OController
     from simulator.pcam.baselines.base import ControllerConfig
-    from benchmarks.pcam_flops_to_roi import InferenceModel
+    from benchmarks.pcam_flops_to_roi import InferenceModel, GPUProfile
 
     # Run simulation
     gen = SyntheticTraceGenerator(seed=42)
@@ -259,7 +263,11 @@ def run_mock_harness(
     baseline_result = sim.run_baseline(trace, H2OController(ctrl_config), "chat")
 
     # Build roofline model
-    model = InferenceModel(context_length=context_length, batch_size=batch_size)
+    if gpu_profile is not None:
+        model = InferenceModel.with_gpu(gpu_profile, context_length=context_length, batch_size=batch_size)
+    else:
+        model = InferenceModel(context_length=context_length, batch_size=batch_size)
+    gpu_name = gpu_profile.name if gpu_profile is not None else "A100 80GB"
     context_blocks = context_length // 16
     flops_reduction = 1.0 - (top_k / context_blocks) if context_blocks > top_k else 0.0
 
@@ -347,7 +355,7 @@ def run_mock_harness(
     ))
 
     result = MockHarnessResult(
-        model_name="llama-70b (simulated)",
+        model_name=f"llama-70b on {gpu_name} (simulated)",
         context_length=context_length,
         batch_size=batch_size,
         measurements=measurements,
@@ -369,6 +377,8 @@ def run_mock_harness(
 # ---------------------------------------------------------------------------
 
 def main():
+    from benchmarks.pcam_flops_to_roi import GPU_PROFILES, DEFAULT_GPU, get_gpu_profile
+
     parser = argparse.ArgumentParser(
         description="PCAM vLLM Integration Harness"
     )
@@ -388,29 +398,39 @@ def main():
         "--batch-size", type=int, default=32,
         help="Batch size"
     )
+    parser.add_argument(
+        "--gpu", default=DEFAULT_GPU,
+        choices=list(GPU_PROFILES.keys()),
+        help=f"GPU profile (default: {DEFAULT_GPU}). Available: {', '.join(GPU_PROFILES.keys())}"
+    )
 
     args = parser.parse_args()
+    gpu = get_gpu_profile(args.gpu)
 
     if args.protocol:
         print(MEASUREMENT_PROTOCOL)
     elif args.mock:
+        print(f"\n  GPU: {gpu.summary()}\n")
         run_mock_harness(
             context_length=args.context,
             batch_size=args.batch_size,
+            gpu_profile=gpu,
         )
     else:
         print("Use --protocol to see what to measure, or --mock to run simulator-backed harness")
         print()
+        print(f"  GPU: {gpu.summary()}\n")
         # Run both by default
         print(MEASUREMENT_PROTOCOL)
         print("\n" + "="*80)
-        print("  MOCK HARNESS RESULTS (simulator-backed)")
+        print(f"  MOCK HARNESS RESULTS (simulator-backed) — {gpu.name}")
         print("="*80)
         for bs in [1, 8, 32, 64]:
             run_mock_harness(
                 context_length=args.context,
                 batch_size=bs,
                 verbose=True,
+                gpu_profile=gpu,
             )
 
 

@@ -107,6 +107,78 @@ class ChainResult:
 
 
 # ---------------------------------------------------------------------------
+# GPU hardware profiles
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class GPUProfile:
+    """Hardware specs for a specific GPU."""
+    name: str
+    gpu_tflops: float          # FP16 peak TFLOPS
+    hbm_bandwidth_tb_s: float  # HBM bandwidth in TB/s
+    gpu_cost_per_hour: float   # On-demand cloud cost ($/hr)
+    vram_gb: float             # GPU memory in GB
+
+    def summary(self) -> str:
+        return (
+            f"{self.name}: {self.gpu_tflops} TFLOPS FP16, "
+            f"{self.hbm_bandwidth_tb_s} TB/s HBM, "
+            f"{self.vram_gb}GB VRAM, ${self.gpu_cost_per_hour:.2f}/hr"
+        )
+
+
+# Pre-defined GPU profiles
+GPU_PROFILES: Dict[str, GPUProfile] = {
+    "a100": GPUProfile(
+        name="A100 80GB",
+        gpu_tflops=312.0,
+        hbm_bandwidth_tb_s=2.0,
+        gpu_cost_per_hour=3.50,
+        vram_gb=80,
+    ),
+    "h100": GPUProfile(
+        name="H100 80GB",
+        gpu_tflops=990.0,
+        hbm_bandwidth_tb_s=3.35,
+        gpu_cost_per_hour=4.50,
+        vram_gb=80,
+    ),
+    "l40": GPUProfile(
+        name="L40 48GB",
+        gpu_tflops=181.0,
+        hbm_bandwidth_tb_s=0.864,
+        gpu_cost_per_hour=1.50,
+        vram_gb=48,
+    ),
+    "l40s": GPUProfile(
+        name="L40S 48GB",
+        gpu_tflops=366.0,
+        hbm_bandwidth_tb_s=0.864,
+        gpu_cost_per_hour=1.80,
+        vram_gb=48,
+    ),
+    "a10g": GPUProfile(
+        name="A10G 24GB",
+        gpu_tflops=125.0,
+        hbm_bandwidth_tb_s=0.6,
+        gpu_cost_per_hour=1.10,
+        vram_gb=24,
+    ),
+}
+
+DEFAULT_GPU = "a100"
+
+
+def get_gpu_profile(name: str) -> GPUProfile:
+    """Look up a GPU profile by name (case-insensitive)."""
+    key = name.lower().replace("-", "").replace("_", "").replace(" ", "")
+    if key not in GPU_PROFILES:
+        available = ", ".join(sorted(GPU_PROFILES.keys()))
+        raise ValueError(f"Unknown GPU '{name}'. Available: {available}")
+    return GPU_PROFILES[key]
+
+
+# ---------------------------------------------------------------------------
 # Inference cost model (roofline-style)
 # ---------------------------------------------------------------------------
 
@@ -142,10 +214,28 @@ class InferenceModel:
     # Serving parameters
     batch_size: int = 1
 
-    # Hardware (A100 80GB)
+    # Hardware — defaults to A100 80GB, override via gpu_profile
     gpu_tflops: float = 312.0     # FP16 peak
     hbm_bandwidth_tb_s: float = 2.0
     gpu_cost_per_hour: float = 3.50
+
+    @classmethod
+    def with_gpu(
+        cls,
+        gpu: GPUProfile,
+        context_length: int = 4096,
+        batch_size: int = 1,
+        **kwargs,
+    ) -> "InferenceModel":
+        """Create an InferenceModel pre-configured for a specific GPU."""
+        return cls(
+            context_length=context_length,
+            batch_size=batch_size,
+            gpu_tflops=gpu.gpu_tflops,
+            hbm_bandwidth_tb_s=gpu.hbm_bandwidth_tb_s,
+            gpu_cost_per_hour=gpu.gpu_cost_per_hour,
+            **kwargs,
+        )
 
     # --- Compute model ---
 
@@ -531,6 +621,7 @@ def run_chain(
     seed: int = 42,
     top_k: int = 64,
     verbose: bool = True,
+    gpu_profile: Optional[GPUProfile] = None,
 ) -> ChainResult:
     """Run the full FLOPs-to-ROI chain for one configuration."""
 
@@ -600,7 +691,10 @@ def run_chain(
     )
 
     # ---- Build inference model (with batch size!) ----
-    model = InferenceModel(context_length=context_length, batch_size=batch_size)
+    if gpu_profile is not None:
+        model = InferenceModel.with_gpu(gpu_profile, context_length=context_length, batch_size=batch_size)
+    else:
+        model = InferenceModel(context_length=context_length, batch_size=batch_size)
 
     # ---- Stage 1 ----
     s1 = stage1_flops_reduction(
@@ -664,6 +758,7 @@ def run_context_sweep(
     interconnect: InterconnectType = InterconnectType.CXL_2_0,
     batch_size: int = 32,
     verbose: bool = True,
+    gpu_profile: Optional[GPUProfile] = None,
 ) -> List[ChainResult]:
     """
     Run the chain at multiple context lengths to find where each link
@@ -687,6 +782,7 @@ def run_context_sweep(
             interconnect=interconnect,
             batch_size=batch_size,
             verbose=verbose,
+            gpu_profile=gpu_profile,
         )
         results.append(result)
 
@@ -724,6 +820,7 @@ def run_batch_sweep(
     context_length: int = 8192,
     interconnect: InterconnectType = InterconnectType.CXL_2_0,
     verbose: bool = True,
+    gpu_profile: Optional[GPUProfile] = None,
 ) -> List[ChainResult]:
     """
     Run the chain at multiple batch sizes.
@@ -747,6 +844,7 @@ def run_batch_sweep(
             interconnect=interconnect,
             batch_size=bs,
             verbose=verbose,
+            gpu_profile=gpu_profile,
         )
         results.append(result)
 
@@ -784,6 +882,7 @@ def run_workload_matrix(
     context_length: int = 8192,
     batch_size: int = 32,
     verbose: bool = True,
+    gpu_profile: Optional[GPUProfile] = None,
 ) -> List[ChainResult]:
     """
     Run all workloads at a fixed context length to see which
@@ -804,6 +903,7 @@ def run_workload_matrix(
             interconnect=interconnect,
             batch_size=batch_size,
             verbose=verbose,
+            gpu_profile=gpu_profile,
         )
         results.append(result)
 
@@ -838,6 +938,7 @@ def run_interconnect_comparison(
     context_length: int = 8192,
     batch_size: int = 32,
     verbose: bool = True,
+    gpu_profile: Optional[GPUProfile] = None,
 ) -> List[ChainResult]:
     """
     Run the same workload across different interconnects to see
@@ -863,6 +964,7 @@ def run_interconnect_comparison(
             interconnect=ic,
             batch_size=batch_size,
             verbose=verbose,
+            gpu_profile=gpu_profile,
         )
         results.append(result)
 
@@ -916,6 +1018,11 @@ def main():
         help="Interconnect type"
     )
     parser.add_argument(
+        "--gpu", default=DEFAULT_GPU,
+        choices=list(GPU_PROFILES.keys()),
+        help=f"GPU profile (default: {DEFAULT_GPU}). Available: {', '.join(GPU_PROFILES.keys())}"
+    )
+    parser.add_argument(
         "--full", action="store_true",
         help="Run full suite: context sweep + batch sweep + workload matrix + interconnect"
     )
@@ -927,16 +1034,19 @@ def main():
     args = parser.parse_args()
     ic = InterconnectType(args.interconnect)
     bs = args.batch_size
+    gpu = get_gpu_profile(args.gpu)
+
+    print(f"\n  GPU: {gpu.summary()}\n")
 
     all_results = []
 
     if args.full:
         # The batch sweep is the most important test
-        all_results.extend(run_batch_sweep("chat", args.context, ic))
-        all_results.extend(run_context_sweep("chat", ic, bs))
-        all_results.extend(run_context_sweep("code", ic, bs))
-        all_results.extend(run_workload_matrix(ic, args.context, bs))
-        all_results.extend(run_interconnect_comparison("chat", args.context, bs))
+        all_results.extend(run_batch_sweep("chat", args.context, ic, gpu_profile=gpu))
+        all_results.extend(run_context_sweep("chat", ic, bs, gpu_profile=gpu))
+        all_results.extend(run_context_sweep("code", ic, bs, gpu_profile=gpu))
+        all_results.extend(run_workload_matrix(ic, args.context, bs, gpu_profile=gpu))
+        all_results.extend(run_interconnect_comparison("chat", args.context, bs, gpu_profile=gpu))
     else:
         # Single run
         result = run_chain(
@@ -944,6 +1054,7 @@ def main():
             context_length=args.context,
             interconnect=ic,
             batch_size=bs,
+            gpu_profile=gpu,
         )
         all_results.append(result)
 
