@@ -554,18 +554,47 @@ class SequenceState:
                     recency_boost = recency_strength * (1.0 - (query_block_id - block_id) / recency_window)
                     candidates[block_id] = candidates.get(block_id, 0) + recency_boost
 
-        # Diversity boost for CODE workloads (imports attended by many queries)
+        # Structural boost for CODE workloads
+        # Two signals: (1) import-like blocks attended by many queries (diversity),
+        # (2) definition-like blocks with high attention weight per access.
+        #
+        # The core problem: EMA scoring accumulates over time, so frequently-accessed
+        # recent blocks have scores 10-20x higher than structurally important but
+        # infrequently-accessed definition blocks. We scale the boost relative to
+        # the current candidate score distribution so it's competitive.
         if diversity_boost_enabled and query_block_id is not None:
+            # Compute score baseline for scaling structural boosts.
+            # Q25 of the current candidate pool — structural blocks need additive
+            # boosts proportional to this to become competitive with recency/edge scores.
+            if candidates:
+                score_vals = sorted(candidates.values())
+                score_anchor = score_vals[len(score_vals) // 4] if len(score_vals) > 4 else score_vals[0]
+            else:
+                score_anchor = 0.1
+
             for bs in self.block_scores.values():
                 if bs.block_id in exclude:
                     continue
-                # Only boost distant blocks with high query diversity
                 distance = abs(bs.block_id - query_block_id)
+
+                # Signal 1: Diversity boost (imports — many unique query sources)
                 if distance > 50:
                     query_diversity = len(bs.unique_query_sources)
                     if query_diversity >= 3:
-                        diversity_boost = math.log1p(query_diversity) * 0.2
+                        diversity_boost = score_anchor * math.log1p(query_diversity) * 0.5
                         candidates[bs.block_id] = candidates.get(bs.block_id, 0) + diversity_boost
+
+                # Signal 2: Structural weight boost (definitions)
+                # Blocks that carry substantial attention per access are
+                # structurally important (function defs, class defs, type
+                # annotations, scope headers). Boost proportional to their
+                # avg_weight relative to the candidate score distribution.
+                if distance > 8 and bs.access_count >= 2:
+                    avg_weight = bs.cumulative_weight / bs.access_count
+                    if avg_weight > 0.02:
+                        weight_signal = min(avg_weight / 0.05, 2.0)
+                        structural_boost = score_anchor * weight_signal * 0.8
+                        candidates[bs.block_id] = candidates.get(bs.block_id, 0) + structural_boost
 
         # Global importance boost for RAG workloads
         # Helps identify consistently important blocks across queries

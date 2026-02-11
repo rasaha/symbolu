@@ -627,7 +627,7 @@ def stage4_cost_roi(
 
 WORKLOAD_TOP_K: Dict[str, int] = {
     "chat": 80,          # Bumped from 64 → 80 to push coverage above quality gate
-    "code": 64,          # Already passes at 82% coverage
+    "code": 64,           # Structural boost handles definitions; K=64 preserves FLOPs
     "long_context": 64,  # Semantic unpredictability; K increase has diminishing returns
     "rag": 64,           # Retrieval-driven; same rationale
     "multitenant": 64,   # Already at 100% coverage
