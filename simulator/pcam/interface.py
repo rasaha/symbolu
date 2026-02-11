@@ -207,12 +207,14 @@ class SoftwarePCAMInterface(PCAMInterface):
         query_block_id: int,
         k: int = 64,
         sequence_id: int = 0,
+        structural_hints: Optional[Dict[int, int]] = None,
     ) -> Tuple[List[Tuple[int, float]], float, int]:
         """Perform ATTEND operation with latency modeling."""
         candidates, bank_conflicts = self.state.attend(
             sequence_id=sequence_id,
             query_block_id=query_block_id,
             k=k,
+            structural_hints=structural_hints,
         )
 
         # Calculate latency

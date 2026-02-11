@@ -351,6 +351,11 @@ class SyntheticTraceGenerator:
         Simulates code completion where imports/definitions at the
         top of file are referenced when completing code at the bottom.
 
+        Structural metadata: each block gets a scope_id indicating its
+        structural group (import group, function/class definition, or
+        code body section). Queries reference specific definition groups,
+        creating symbolic linkage that PCAM can exploit.
+
         Args:
             file_length: Total file length in tokens
             import_distance: Distance to import/definition section
@@ -364,35 +369,112 @@ class SyntheticTraceGenerator:
         import_section_end = file_length // 10  # First 10%
         definition_section_end = file_length // 2  # 10-50%
 
+        import_blocks = import_section_end // block_size
+        def_blocks_start = import_section_end // block_size
+        def_blocks_end = definition_section_end // block_size
+        total_def_blocks = def_blocks_end - def_blocks_start
+        code_blocks_start = definition_section_end // block_size
+        total_blocks = file_length // block_size
+
+        # --- Build structural scope map ---
+        # Scope 0: imports (all import blocks share scope 0)
+        SCOPE_IMPORTS = 0
+
+        # Scopes 1..N: definition groups (simulating functions/classes)
+        # Each group is a cluster of 2-5 adjacent definition blocks
+        def_groups: List[List[int]] = []  # list of [block_ids] per group
+        def_block_to_scope: Dict[int, int] = {}
+        scope_id = 1
+        pos = def_blocks_start
+        while pos < def_blocks_end:
+            group_size = self.rng.randint(2, 5)
+            group_blocks = list(range(pos, min(pos + group_size, def_blocks_end)))
+            def_groups.append(group_blocks)
+            for b in group_blocks:
+                def_block_to_scope[b] = scope_id
+            scope_id += 1
+            pos += group_size
+
+        num_def_groups = len(def_groups)
+
+        # Scopes for code body: divide into sections of ~20 blocks each
+        # Each code section depends on 2-4 specific definition groups
+        code_section_size = 20
+        code_sections: List[Dict] = []
+        for sec_start in range(code_blocks_start, total_blocks, code_section_size):
+            sec_end = min(sec_start + code_section_size, total_blocks)
+            # This code section depends on 2-4 definition groups
+            num_deps = self.rng.randint(2, min(4, num_def_groups))
+            dep_groups = self.rng.sample(range(num_def_groups), num_deps)
+            code_sections.append({
+                "start": sec_start,
+                "end": sec_end,
+                "scope_id": scope_id,
+                "dep_groups": dep_groups,
+            })
+            scope_id += 1
+
         query_positions = sorted(
             self.rng.sample(range(definition_section_end, file_length), num_queries)
         )
 
         for query_pos in query_positions:
             scores: Dict[int, float] = {}
+            structural_hints: Dict[int, int] = {}
 
-            # Strong attention to imports
-            import_blocks = import_section_end // block_size
+            current_block = query_pos // block_size
+
+            # Find which code section this query belongs to
+            query_section = None
+            for sec in code_sections:
+                if sec["start"] <= current_block < sec["end"]:
+                    query_section = sec
+                    break
+            if query_section is None:
+                # Default to last section
+                query_section = code_sections[-1] if code_sections else {
+                    "scope_id": scope_id,
+                    "dep_groups": list(range(min(3, num_def_groups))),
+                }
+
+            # Assign query block's scope
+            structural_hints[current_block] = query_section["scope_id"]
+
+            # Strong attention to imports (all share SCOPE_IMPORTS)
             for i in range(import_blocks):
                 scores[i] = self.rng.uniform(0.02, 0.05)
+                structural_hints[i] = SCOPE_IMPORTS
 
-            # Medium attention to some definitions
-            def_blocks_start = import_section_end // block_size
-            def_blocks_end = definition_section_end // block_size
-            num_def_refs = self.rng.randint(3, 8)
-            if def_blocks_end > def_blocks_start:
+            # Medium attention to definitions FROM THIS SECTION'S DEPENDENCIES
+            # This is the key structural link: not random definitions,
+            # but the specific groups this code section depends on.
+            dep_block_ids = []
+            for gi in query_section["dep_groups"]:
+                dep_block_ids.extend(def_groups[gi])
+
+            # Sample a subset of the dependent definitions (3-8 blocks)
+            num_def_refs = self.rng.randint(3, min(8, len(dep_block_ids)))
+            if dep_block_ids:
                 def_refs = self.rng.sample(
-                    range(def_blocks_start, def_blocks_end),
-                    min(num_def_refs, def_blocks_end - def_blocks_start)
+                    dep_block_ids,
+                    min(num_def_refs, len(dep_block_ids))
                 )
                 for block_id in def_refs:
                     scores[block_id] = self.rng.uniform(0.03, 0.08)
+                    structural_hints[block_id] = def_block_to_scope[block_id]
 
-            # Strong attention to recent context
-            current_block = query_pos // block_size
+            # Also annotate all blocks in the dependent groups
+            # (even ones not sampled for this query — they're still structurally linked)
+            for gi in query_section["dep_groups"]:
+                for b in def_groups[gi]:
+                    if b not in structural_hints:
+                        structural_hints[b] = def_block_to_scope[b]
+
+            # Strong attention to recent context (shares query's scope)
             for i in range(max(0, current_block - 8), current_block + 1):
                 distance = current_block - i
                 scores[i] = scores.get(i, 0) + 0.1 * math.exp(-distance / 4)
+                structural_hints[i] = query_section["scope_id"]
 
             # Normalize
             total = sum(scores.values())
@@ -408,6 +490,7 @@ class SyntheticTraceGenerator:
                 attention_scores=scores,
                 true_top_k=true_top_k,
                 query_block_id=current_block,
+                block_structural_hints=structural_hints,
             ))
 
         metadata = TraceMetadata(

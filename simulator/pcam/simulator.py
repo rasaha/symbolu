@@ -101,6 +101,20 @@ class PCAMSimulator:
         for seq_id in trace.sequence_ids:
             pcam.allocate_sequence(seq_id, self.config.max_blocks_per_sequence)
 
+        # Pre-register structural hints from all steps (if present).
+        # This allows the controller to know block scope_ids before
+        # the first attend, eliminating cold-start quality loss.
+        if trace.metadata.workload_type == "code":
+            all_hints: Dict[int, int] = {}
+            for step in trace.steps:
+                if step.block_structural_hints:
+                    all_hints.update(step.block_structural_hints)
+            if all_hints:
+                for seq_id in trace.sequence_ids:
+                    seq = pcam.state.get_sequence(seq_id)
+                    if seq:
+                        seq.register_structural_hints(all_hints)
+
         start_time = time.time()
 
         # Replay trace
@@ -110,6 +124,7 @@ class PCAMSimulator:
                 query_block_id=step.query_block_id,
                 k=self.config.topk.default_k,
                 sequence_id=step.sequence_id,
+                structural_hints=step.block_structural_hints or None,
             )
 
             # Record ATTEND metrics

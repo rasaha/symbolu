@@ -101,6 +101,8 @@ class BlockScore:
     unique_query_sources: Set[int] = field(default_factory=set)
     # Cumulative attention weight
     cumulative_weight: float = 0.0
+    # Structural scope_id for code workloads (-1 = unset)
+    scope_id: int = -1
 
     def __lt__(self, other: "BlockScore") -> bool:
         """For heap operations - lower score = eviction candidate."""
@@ -176,6 +178,19 @@ class SequenceState:
     _sections: Dict[int, Section] = field(default_factory=dict)  # section_id -> Section
     _section_size: int = 16  # Blocks per section
     _section_boost_alpha: float = 0.15  # Section boost coefficient (α < 1.0)
+
+    # Structural scope map: block_id -> scope_id (persistent, accumulates over steps)
+    _block_scope_map: Dict[int, int] = field(default_factory=dict)
+
+    def register_structural_hints(self, hints: Dict[int, int]) -> None:
+        """Register structural scope_ids for blocks.
+
+        Updates the persistent scope map and applies to any existing BlockScores.
+        """
+        for block_id, scope_id in hints.items():
+            self._block_scope_map[block_id] = scope_id
+            if block_id in self.block_scores:
+                self.block_scores[block_id].scope_id = scope_id
 
     def _get_or_create_section(self, block_id: int) -> Section:
         """Get or create section for a block."""
@@ -466,6 +481,7 @@ class SequenceState:
         k: int,
         query_block_id: Optional[int] = None,
         exclude: Optional[Set[int]] = None,
+        structural_hints: Optional[Dict[int, int]] = None,
     ) -> List[Tuple[int, float]]:
         """
         Get top-K blocks by score with workload-adaptive strategies.
@@ -596,6 +612,45 @@ class SequenceState:
                         structural_boost = score_anchor * weight_signal * 0.8
                         candidates[bs.block_id] = candidates.get(bs.block_id, 0) + structural_boost
 
+            # Signal 3: Structural scope matching (requires structural hints)
+            # When per-step structural hints are available, boost blocks whose
+            # scope_id matches a DEFINITION group that this query depends on.
+            # This is the targeted signal: not all 200 definitions, but the
+            # specific 2-4 groups (= 6-15 blocks) this code section uses.
+            #
+            # Uses the persistent _block_scope_map to also boost blocks that
+            # haven't been seen yet (cold start), ensuring structural links
+            # are effective from the first query.
+            if structural_hints and query_block_id in structural_hints:
+                query_scope = structural_hints[query_block_id]
+                dep_scopes = set(structural_hints.values()) - {0, query_scope}
+
+                if dep_scopes:
+                    # Boost from block_scores (warm blocks)
+                    for bs in self.block_scores.values():
+                        if bs.block_id in exclude:
+                            continue
+                        if bs.scope_id < 0:
+                            continue
+                        distance = abs(bs.block_id - query_block_id)
+                        if distance <= 8:
+                            continue
+                        if bs.scope_id in dep_scopes:
+                            scope_boost = recency_strength * 2.5
+                            candidates[bs.block_id] = candidates.get(bs.block_id, 0) + scope_boost
+
+                    # Also inject blocks from the scope map that aren't in
+                    # block_scores yet (cold start). These blocks are known
+                    # to be structurally linked but haven't been observed.
+                    # Use a weaker boost since they have no attention history.
+                    for block_id, scope_id in self._block_scope_map.items():
+                        if block_id in exclude or block_id in candidates:
+                            continue
+                        if scope_id in dep_scopes:
+                            distance = abs(block_id - query_block_id)
+                            if distance > 8:
+                                candidates[block_id] = recency_strength * 0.5
+
         # Global importance boost for RAG workloads
         # Helps identify consistently important blocks across queries
         if global_importance_enabled:
@@ -676,6 +731,7 @@ class SequenceState:
                 access_count=1,
                 unique_query_sources={query_block},
                 cumulative_weight=weight,
+                scope_id=self._block_scope_map.get(key_block, -1),
             )
         else:
             bs = self.block_scores[key_block]
@@ -781,6 +837,7 @@ class AttentionState:
         sequence_id: int,
         query_block_id: int,
         k: int = 64,
+        structural_hints: Optional[Dict[int, int]] = None,
     ) -> Tuple[List[Tuple[int, float]], int]:
         """
         Perform ATTEND operation.
@@ -789,6 +846,8 @@ class AttentionState:
             sequence_id: Sequence to query
             query_block_id: Current query block
             k: Number of candidates to return
+            structural_hints: Optional block_id -> scope_id mapping for
+                structural scoring (code workloads)
 
         Returns:
             Tuple of (candidates, bank_conflicts)
@@ -800,11 +859,18 @@ class AttentionState:
 
         seq.total_attends += 1
 
+        # Register structural hints: store in persistent map AND apply to existing blocks
+        if structural_hints:
+            seq.register_structural_hints(structural_hints)
+
         # Calculate bank conflicts
         bank_conflicts = self._calculate_bank_conflicts(sequence_id, k)
 
         # Get top-K candidates, conditioned on query block
-        candidates = seq.get_top_k(k, query_block_id=query_block_id)
+        candidates = seq.get_top_k(
+            k, query_block_id=query_block_id,
+            structural_hints=structural_hints,
+        )
 
         return candidates, bank_conflicts
 
