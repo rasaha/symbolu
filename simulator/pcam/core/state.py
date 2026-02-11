@@ -950,7 +950,7 @@ class AttentionState:
         self,
         sequence_id: int,
         query_block_id: int,
-        k: int = 64,
+        k: int = 256,
         structural_hints: Optional[Dict[int, int]] = None,
     ) -> Tuple[List[Tuple[int, float]], int]:
         """

@@ -109,7 +109,7 @@ class SyntheticTraceGenerator:
         tokens_per_turn: Tuple[int, int] = (50, 200),
         revisit_probability: float = 0.3,
         block_size: int = 16,
-        top_k: int = 64,
+        top_k: int = 256,
     ) -> PCAMTrace:
         """
         Multi-turn chat with context revisitation.
@@ -187,7 +187,7 @@ class SyntheticTraceGenerator:
         num_queries: int = 100,
         attention_locality: float = 0.7,
         block_size: int = 16,
-        top_k: int = 64,
+        top_k: int = 256,
     ) -> PCAMTrace:
         """
         Long document with distributed attention.
@@ -317,7 +317,7 @@ class SyntheticTraceGenerator:
         relevant_docs: int = 2,
         query_length: int = 100,
         block_size: int = 16,
-        top_k: int = 64,
+        top_k: int = 256,
     ) -> PCAMTrace:
         """
         RAG with sparse relevant spans.
@@ -409,7 +409,7 @@ class SyntheticTraceGenerator:
         import_distance: int = 1000,
         num_queries: int = 200,
         block_size: int = 16,
-        top_k: int = 64,
+        top_k: int = 256,
     ) -> PCAMTrace:
         """
         Code with structured dependencies.
@@ -578,7 +578,7 @@ class SyntheticTraceGenerator:
         length_distribution: str = "mixed",
         total_steps: int = 1000,
         block_size: int = 16,
-        top_k: int = 64,
+        top_k: int = 256,
     ) -> PCAMTrace:
         """
         Concurrent sequences for batched inference.

@@ -32,7 +32,7 @@ class PCAMInterface(ABC):
     def attend(
         self,
         query_block_id: int,
-        k: int = 64,
+        k: int = 256,
         sequence_id: int = 0,
     ) -> Tuple[List[Tuple[int, float]], float, int]:
         """
@@ -40,7 +40,7 @@ class PCAMInterface(ABC):
 
         Args:
             query_block_id: Current query block ID
-            k: Number of candidates to return
+            k: Number of candidates to return (K_max=256)
             sequence_id: Sequence ID for multi-tenant
 
         Returns:
@@ -205,7 +205,7 @@ class SoftwarePCAMInterface(PCAMInterface):
     def attend(
         self,
         query_block_id: int,
-        k: int = 64,
+        k: int = 256,
         sequence_id: int = 0,
         structural_hints: Optional[Dict[int, int]] = None,
     ) -> Tuple[List[Tuple[int, float]], float, int]:

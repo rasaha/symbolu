@@ -22,7 +22,7 @@ class ControllerConfig:
     recent_window: int = 32
 
     # Top-K candidates to return
-    top_k: int = 64
+    top_k: int = 256
 
 
 @dataclass
