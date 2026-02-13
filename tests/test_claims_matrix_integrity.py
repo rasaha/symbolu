@@ -29,6 +29,7 @@ REFERENCED_TEST_FILES = [
     "tests/integration/test_sovereign_integration.py",
     # D. Hallucination Detection
     "symbolu/agentic_framework/tests/test_confidence_gate.py",
+    "symbolu/agentic_framework/tests/test_sovereign_bridge.py",
     # E. Confidence-Gated Compute
     # (same as D — test_confidence_gate.py)
     # F. Context & Retrieval
@@ -42,8 +43,12 @@ REFERENCED_TEST_FILES = [
     # K. Security
     "symbolu/mechanical/pipeline/integration_tests/test_adversarial_po1_p9.py",
     "tests/unit/service/test_api_security.py",
+    # H. Accuracy & Routing
+    "tests/training/test_trainers.py",
     # L. Production Readiness
     # (covered by CI workflows, not individual test files)
+    # Claims validation (covers CS-2, CS-3, DA-3, DA-5, HD-1, CR-1, CR-2, AR-1, AR-2, PR-4)
+    "tests/test_claims_validation.py",
 ]
 
 REFERENCED_CI_WORKFLOWS = [
