@@ -49,6 +49,8 @@ REFERENCED_TEST_FILES = [
     # (covered by CI workflows, not individual test files)
     # Claims validation (covers CS-2, CS-3, DA-3, DA-5, HD-1, CR-1, CR-2, AR-1, AR-2, PR-4)
     "tests/test_claims_validation.py",
+    # Unvalidated claims (covers HD-2, CR-3, CE-1, CE-2, CE-3, CE-4, AR-3)
+    "tests/test_unvalidated_claims.py",
 ]
 
 REFERENCED_CI_WORKFLOWS = [
