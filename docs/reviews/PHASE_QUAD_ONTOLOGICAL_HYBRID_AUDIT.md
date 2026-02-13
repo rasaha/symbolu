@@ -15,6 +15,7 @@ Validate whether current implementation behavior is consistent with the stated "
 - Core transformer implementation for Ontological Hybrid and confidence-gated compute behavior.
 - Ontology access governance contract and deterministic routing layer.
 - Focused ontology-router enforcement tests.
+- Phase-level invariance audit suites (trajectory convergence, cognitive consistency, temporal entropy, MTSF invariance).
 
 ## 3) High-Confidence Findings
 
@@ -58,7 +59,12 @@ This audit did not execute full training/evaluation pipelines or all phase suite
 
 ## 6) Recommended Next Actions
 
-1. Add a recurring "claims-to-tests" matrix mapping major product claims to concrete test suites and pass/fail status.
-2. Add CI checks that archive confidence/skip telemetry summaries for reproducibility audits.
-3. Publish an explicit "validated scope" section in external-facing docs to separate implemented guarantees from roadmap intent.
+1. **Add a recurring "claims-to-tests" matrix** mapping major product claims to concrete test suites and pass/fail status.
+   - *Status (2026-02-13):* **Not yet implemented.** No mapping document correlating investor pitch claims (e.g., `docs/INVESTOR_PITCH.md`) to specific test suites exists. A patent formula coverage matrix (`docs/patent/patent_formula_coverage_matrix.md`) exists but does not cover product-level claims.
+
+2. **Add CI checks that archive confidence/skip telemetry summaries** for reproducibility audits.
+   - *Status (2026-02-13):* **Not yet implemented.** Telemetry schema is defined (`symbolu/mechanical/logging/telemetry_schema.py` — `confidence_mean`, `quad_skip_rate`, `per_layer_skip_rate`) and the Phase Quad Explainer collects metrics at inference time, but no CI workflow step archives these summaries, computes drift, or enforces skip-rate bounds.
+
+3. **Publish an explicit "validated scope" section** in external-facing docs to separate implemented guarantees from roadmap intent.
+   - *Status (2026-02-13):* **Not yet implemented.** External-facing docs (e.g., `docs/INVESTOR_PITCH.md`) contain broad claims ("provable reasoning", "100% auditable", "infinite context") without distinguishing what is test-validated (ontology governance, router determinism) from what is roadmap intent (full pipeline validation, production hardening).
 
