@@ -10,6 +10,111 @@
 
 ---
 
+## 0. Why This Is the Path to General Intelligence
+
+### The Cognitive Science Foundation
+
+An estimated 90-95% of human cognition is pattern matching. When a doctor diagnoses a patient, they are matching the presented symptoms against patterns from thousands of prior cases. When a financial analyst reads a market chart, they are matching the curve shape against patterns they have seen resolve before. When a parent reads their child's body language, they are matching micro-expressions against emotional patterns accumulated over years. When a chess grandmaster glances at a board, they are not computing moves -- they are matching the position against ~100,000 stored patterns and recognizing which one applies.
+
+This is not a simplification. This is the actual mechanism. Kahneman's System 1 (fast, automatic, effortless) is pattern matching. System 2 (slow, deliberate, effortful) is what happens when pattern matching fails and conscious reasoning must compensate. Expertise in any domain is the accumulation of patterns that are increasingly fine-grained, increasingly context-sensitive, and increasingly transferable across situations.
+
+**The critical insight**: What separates a general intelligence from a narrow one is not the number of patterns, but the ability to **transfer patterns across domains** and to **recognize patterns as they form, before they fully manifest**.
+
+A narrow system recognizes "this patient has pneumonia" from symptoms. A general intelligence recognizes "this organizational structure is showing the same decay pattern I've seen in biological ecosystems and in financial markets" -- and recognizes it while the pattern is still forming, early enough to intervene.
+
+### How Humans Do It: Three Layers of Pattern Cognition
+
+Human pattern matching operates at three distinct temporal layers, each building on the one below:
+
+**Layer 1 -- Recognition (System 1, instant)**: "I've seen this before." The doctor glances at a rash and immediately knows it's shingles. The trader sees a candlestick formation and immediately feels "reversal." This is CDI's current capability -- snapshot classification against a known library.
+
+**Layer 2 -- Tracking (System 1.5, seconds to minutes)**: "This is evolving." The doctor watches the patient's vitals trending over the last hour and recognizes a sepsis trajectory. The trader watches the order book thinning and recognizes liquidity withdrawal forming. This requires temporal memory -- not just "what pattern is active now" but "how is the pattern landscape changing over time." This is what P38 Capabilities 1-3 provide: lifecycle events, boundary trajectories, persistence and volatility.
+
+**Layer 3 -- Anticipation (System 2 informed by System 1, minutes to hours)**: "I know what's coming next." The experienced ER nurse sees the combination of rising heart rate + falling blood pressure + patient anxiety and says "get the crash cart ready" -- the cardiac arrest hasn't happened yet, but the *pattern of patterns* (a sequence) is recognizable and the next step is predictable. The veteran diplomat watches the sequence of diplomatic recalls + trade sanctions + military exercises and says "this is the 1914 pattern, war is 2 steps away." This requires compositional pattern recognition -- sequences, partial matches, and trajectory-to-completion estimation. This is what P38 Capabilities 4-5 provide: sequence grammar with partial matching and boundary proximity estimation.
+
+**The 90-95% claim is structural**: Most human decisions are made at Layer 1 (instant recognition) or Layer 2 (pattern tracking). Only the remaining 5-10% require genuine Layer 3+ reasoning (novel problems, first-principles thinking, creative synthesis). A system that implements Layers 1-3 faithfully is capturing the operational core of human intelligence -- not the exotic frontier (creative genius, philosophical reasoning) but the massive, reliable base that makes everyday expertise possible.
+
+### Why Current LLMs Are Stuck at Layer 1
+
+Standard LLMs have absorbed enormous quantities of patterns from training data. GPT-4, Claude, and Gemini can all recognize that "market crash" and "empire collapse" share structural features -- but only because they've seen humans make that analogy in training text. Their pattern matching is:
+
+- **Implicit**: Encoded in billions of opaque parameters, not in named, inspectable structures
+- **Statistical**: Based on co-occurrence frequency, not structural similarity
+- **Post-hoc**: They can describe a pattern after it's fully formed, but cannot track partial formation
+- **Non-temporal**: They process one prompt at a time with no sliding window over evolving signals
+- **Ungrounded**: When they say "this is similar to X," there is no structural basis to verify the claim
+- **Non-compositional**: They cannot report "step 2 of a 3-step escalation sequence, next step approaching"
+
+A human expert's pattern matching is different. When a veteran trader says "this feels like 2008," they are matching against a structural pattern (ENTROPY rising + AGENCY falling + FEEDBACK loops forming) that they can partially articulate and that evolves over time. They recognized it before the crash because they were tracking the pattern's *formation*, not waiting for its *completion*.
+
+LLMs are trapped at Layer 1 because they are stateless per-request: each prompt is a fresh snapshot with no temporal accumulation. Even with conversation history in context, they have no sliding window, no signal regression, no lifecycle tracking, no sequence matching. They process text, not signal trajectories.
+
+### Why Cross-Domain Pattern Transfer Is the AGI Core
+
+Symbol-U's `AGI_CAPABILITIES.md` already articulates this vision:
+
+> "Knowledge is stored not as raw content, but as **transferable reasoning patterns**"
+> -- Section 6, Experiential Reasoning Objects
+
+> "Don't extract patterns from content. Discover patterns from usage."
+> -- Section 4, Persona Query Tracking
+
+The 12D ontological backbone with 5 mirror pairs is designed precisely for this: encoding events in a domain-agnostic structural space where "market crash" and "empire collapse" share the same 10D fingerprint not because of statistical co-occurrence but because they share structural properties (high Acting, high destruction event type, low Absolving, low meaning-resolution).
+
+The cross-domain bridge discovery mechanism in `AGI_CAPABILITIES.md` Section 5 already describes the end goal:
+
+```
+BRIDGE DISCOVERED:
+  finance ↔ history
+  Bridge count: 2
+  Shared events: ['destruction', 'collapse']
+
+FUTURE QUERY: "Why did my startup fail?"
+  System suggests: Search finance AND history
+  Because: User thinks in collapse patterns across both
+```
+
+**But the current CDI implementation has not yet realized this vision for real-time and predictive operation.** It can classify a snapshot ("this matches risk_hiding") but cannot track a pattern forming ("risk_hiding is emerging, 2 turns from onset"). It can match a single pattern but cannot recognize a meaningful sequence ("anxiety → masking → chronic stress is a suppression escalation"). It can interpret a pattern in a domain ("risk_hiding in finance means...") but cannot transfer a pattern trajectory ("the ENTROPY-AGENCY aspect trajectory in this finance conversation matches a known medical deterioration pattern").
+
+### What P38 Enables: Layer 2 and Layer 3 for Machines
+
+P38 bridges the gap between the AGI vision (domain-agnostic pattern transfer) and the current implementation (stateless snapshot classification). It implements the three layers of human pattern cognition:
+
+| Human Cognitive Layer | Current CDI (Layer 1 Only) | P38 (Layers 1 + 2 + 3) |
+|---|---|---|
+| **"I've seen this before"** -- instant recognition | 13 pattern classifications per turn | Same, plus lifecycle events (onset/sustain/exit/recurrence) |
+| **"This is starting to look like..."** -- tracking a forming pattern | Not possible (stateless) | Boundary proximity + trajectory ETA: "approaching risk_hiding, ~2 turns" |
+| **"This is getting worse"** -- tracking intensity evolution | Not possible (no memory) | Pattern persistence + volatility + stability band over sliding window |
+| **"First X, then Y, now Z is coming"** -- sequence anticipation | Not possible (no composition) | Pattern sequence grammar with partial matching + anticipation |
+| **"This reminds me of something from a completely different field"** -- cross-domain transfer | Domain interpretation strings (static, manual) | Aspect-mediated trajectory matching: same ENTROPY-AGENCY-BALANCE fingerprint across domains |
+| **"Something feels off"** -- pre-conscious pattern signal | Not possible (observer has no output channel) | Soft steering hints: non-binding DHA tone adjustment from anticipated patterns |
+
+### The 90-95% Argument for Prioritization
+
+If 90-95% of human intelligence is pattern matching, then the fastest path to general intelligence is not building better reasoning (the 5-10%) but building better pattern recognition and transfer (the 90-95%). This has direct implications for engineering priority:
+
+1. **Pattern library expansion** (more patterns = more expertise domains) should be prioritized over reasoning chain improvements
+2. **Temporal pattern tracking** (Layers 2-3) is more valuable than better single-turn classification (Layer 1), because Layer 1 without Layers 2-3 is like having a doctor who can read a lab result but cannot track a patient's trajectory
+3. **Cross-domain pattern transfer** is the multiplier: every pattern that transfers across N domains provides N times the value of a domain-specific pattern
+4. **Sequence grammar** is the composition mechanism: M patterns that can form K sequences represent M*K effective capabilities, not M+K
+
+The scaling path is clear: curate patterns, compose them into sequences, track them temporally, transfer them across domains. Each axis multiplies the others. This is how human expertise scales -- not by learning new facts, but by recognizing deeper patterns in what you already know and transferring them to new situations faster than anyone else.
+
+### The Structural Advantage Phase Quad Has
+
+Standard LLMs cannot take this path because patterns are dissolved into weight matrices. You cannot name a pattern in GPT-4, track its lifecycle, compose it with other patterns, or transfer it to a new domain with an audit trail. The pattern exists implicitly as activation patterns across billions of parameters, inaccessible to inspection, composition, or governance.
+
+Phase Quad's structural advantage is that patterns are **first-class objects** -- named, configured, thresholded, domain-interpreted, and governable. This means they can be:
+- **Composed**: Pattern A + Pattern B in sequence = Pattern Sequence AB
+- **Tracked**: Pattern A entered at turn 3, sustained for 4 turns, exited at turn 7
+- **Transferred**: Pattern A in finance has the same aspect fingerprint as Pattern B in medicine
+- **Governed**: Pattern A requires confidence >= 0.65, is blocked in fiction→medicine transfers, and is logged with full provenance
+- **Anticipated**: Pattern A boundary distance is shrinking at 0.06/turn, ETA 2 turns
+
+This is the architectural moat. It is not easy to retrofit onto a standard LLM, because it requires patterns to exist as inspectable entities rather than as latent statistical regularities. The P38 evolution makes this moat deeper by extending first-class pattern objects from single-turn classification into temporal trajectories, compositional sequences, and cross-domain aspect fingerprints -- the three capabilities that constitute Layers 2 and 3 of the human pattern cognition stack.
+
+---
+
 ## 1. Problem Statement
 
 The Cross-Domain Intelligence module (`temporal/cross_domain_intelligence.py`) currently performs **stateless, point-in-time pattern classification**. It answers: "Given these signals right now, which of the 13 patterns match?"
