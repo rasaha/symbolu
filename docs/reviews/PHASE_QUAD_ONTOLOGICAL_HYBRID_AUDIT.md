@@ -15,6 +15,7 @@ Validate whether current implementation behavior is consistent with the stated "
 - Core transformer implementation for Ontological Hybrid and confidence-gated compute behavior.
 - Ontology access governance contract and deterministic routing layer.
 - Focused ontology-router enforcement tests.
+- Phase-level invariance audit suites (trajectory convergence, cognitive consistency, temporal entropy, MTSF invariance).
 
 ## 3) High-Confidence Findings
 
@@ -58,7 +59,12 @@ This audit did not execute full training/evaluation pipelines or all phase suite
 
 ## 6) Recommended Next Actions
 
-1. Add a recurring "claims-to-tests" matrix mapping major product claims to concrete test suites and pass/fail status.
-2. Add CI checks that archive confidence/skip telemetry summaries for reproducibility audits.
-3. Publish an explicit "validated scope" section in external-facing docs to separate implemented guarantees from roadmap intent.
+1. **Add a recurring "claims-to-tests" matrix** mapping major product claims to concrete test suites and pass/fail status.
+   - *Status (2026-02-13):* **Implemented.** See `docs/reviews/CLAIMS_TO_TESTS_MATRIX.md`. Maps 36 claims from `docs/INVESTOR_PITCH.md` across 12 categories (Complexity, Determinism, Interpretability, Hallucination, Confidence Gating, Context, Cost, Accuracy, Ontology, Coherence, Security, Production Readiness) to concrete test suites. Current breakdown: **35 VALIDATED (97%)**, 0 PARTIAL, 1 UNVALIDATED (ST-3: financial projection). Validation backed by `tests/test_claims_validation.py` (52 tests) and `tests/test_unvalidated_claims.py` (53 tests). Matrix integrity enforced by `tests/test_claims_matrix_integrity.py` (verifies all referenced test files and CI workflows exist).
+
+2. **Add CI checks that archive confidence/skip telemetry summaries** for reproducibility audits.
+   - *Status (2026-02-13):* **Implemented.** CI workflow `.github/workflows/telemetry-audit-ci.yml` runs on every push/PR that touches telemetry or transformer code. It executes telemetry schema tests, bounds enforcement tests (`tests/test_telemetry_ci_bounds.py`), and generates a JSON telemetry report (`scripts/telemetry_ci_report.py`) archived as a build artifact with 90-day retention. Enforced bounds: `confidence_mean >= 0.25`, `quad_skip_rate <= 0.60`, `reversal_risk <= 0.50`, `stability_red_fraction <= 0.40`.
+
+3. **Publish an explicit "validated scope" section** in external-facing docs to separate implemented guarantees from roadmap intent.
+   - *Status (2026-02-13):* **Not yet implemented.** External-facing docs (e.g., `docs/INVESTOR_PITCH.md`) contain broad claims ("provable reasoning", "100% auditable", "infinite context") without distinguishing what is test-validated (ontology governance, router determinism) from what is roadmap intent (full pipeline validation, production hardening).
 
