@@ -1198,5 +1198,280 @@ The consistent differentiator: P38 optimizes for **governed explainability** ove
 
 ---
 
+## 11. Phase F Governance Approval Checklist
+
+Phase F is the **only P38 capability that crosses the observer-only boundary**. Phases A-E observe and report; Phase F emits a non-binding delivery hint that reaches the DHA engine. This section documents every decision that requires governance sign-off before implementation can proceed.
+
+**Status**: AWAITING APPROVAL
+**Prerequisite**: Phases A-E implemented and validated (44 tests passing, zero regression)
+**Invariants at stake**: INV-P38-5, INV-P38-6, INV-P38-7
+
+---
+
+### 11.1 Decision 1: Scope — What the Hint Can and Cannot Touch
+
+Phase F emits a `SoftSteeringHint` dataclass. Governance must confirm the exact boundary of what the hint is permitted to influence.
+
+**Proposed ALLOWED scope:**
+
+| Parameter | Adjustment Range | Rationale |
+|-----------|-----------------|-----------|
+| Warmth | ±0.20 | Emotional tone — more/less supportive |
+| Directness | ±0.20 | Communication style — more/less direct |
+
+**Proposed BLOCKED scope (hard invariant — INV-P38-5):**
+
+| Blocked Target | Why Blocked |
+|----------------|-------------|
+| Factual content or reasoning chain | Content must be pattern-independent |
+| Persona selection or persona parameters | Persona is identity, not delivery |
+| TTOR routing or mapper activation | Routing is architectural, not tonal |
+| Confidence gates or escalation decisions | Safety gates must not be influenced by pattern hints |
+| Any P35/P36/P37 gating decision | Existing governance boundaries must remain intact |
+| DHA `enabled` flag | Hint cannot self-activate DHA if DHA is disabled |
+
+**Open questions for governance:**
+- [ ] **Confirm scope as proposed**, or specify additions/removals
+- [ ] **Formality**: Should `formality` (±0.20) also be hintable, or is it out of scope?
+- [ ] **Kosha depth guidance**: The design guide (Section 4.2) mentions suggesting deeper/shallower processing. Include or defer?
+- [ ] **Response framing** (acknowledge vs. challenge): Include as style-only, or defer as too close to content?
+
+---
+
+### 11.2 Decision 2: DHA Integration Target
+
+The codebase has **two DHA layers**. Governance must decide which layer consumes the hint.
+
+**Option A — Formula DHA (`symbolu/dha/`)**
+
+The config-driven formula engine computes `D = T × I × R` where T is a softmax over tone logit coefficients (k1-k6). The hint would adjust tone logits before softmax:
+
+```
+l_sweet_adjusted = l_sweet + hint.suggested_warmth_delta × k_hint_scale
+l_jolt_adjusted  = l_jolt  - hint.suggested_directness_delta × k_hint_scale
+```
+
+- Pro: Clean mathematical integration, deterministic, auditable
+- Pro: Preserves the formula-only DHA contract (hint is just another input signal)
+- Con: Formula DHA is `enabled: False` by default — hint has no effect until DHA is activated
+
+**Option B — Mechanical DHA (`symbolu/mechanical/dha/`)**
+
+The V3.0 pipeline engine selects delivery profiles (SWEET_RESONANCE, INVERSE_JOLT, SYMBOLIC_METAPHOR) based on readiness and resistance scores. The hint would nudge profile selection:
+
+```
+readiness_adjusted = readiness_score + hint.suggested_warmth_delta
+resistance_adjusted = resistance_score - hint.suggested_directness_delta
+```
+
+- Pro: Direct effect on delivered text (modulator applies to actual response)
+- Pro: Already active in the pipeline
+- Con: Hint influence is less transparent (changes discrete profile selection, not continuous formula)
+
+**Option C — Both (shared dataclass, independent consumption)**
+
+`SoftSteeringHint` is emitted once by P38. Both DHA layers independently decide whether to consume it. Each layer applies its own bounded interpretation.
+
+- Pro: Maximum flexibility, no coupling between DHA layers
+- Pro: Works regardless of which DHA layer is active
+- Con: More surface area to test and audit
+
+**Open question for governance:**
+- [ ] **Select Option A, B, or C**
+
+---
+
+### 11.3 Decision 3: Audit Trail Wiring
+
+INV-P38-6 requires every hint to be logged with full provenance. The codebase provides three audit targets.
+
+**Target A — Existing `AuditTrail` (`symbolu/mechanical/logging/audit_trail.py`)**
+
+Add a new action type `ACTION_SOFT_STEERING = "soft_steering_hint"`. Each hint produces an `AuditEntry` with:
+
+```python
+{
+    "action": "soft_steering_hint",
+    "data": {
+        "reason": "suppression_escalation sequence 2/3 steps matched",
+        "suggested_warmth_delta": 0.10,
+        "suggested_directness_delta": -0.05,
+        "source_pattern": "suppression_escalation",
+        "source_confidence": 0.72,
+        "is_anticipatory": True,
+        "turn": 7,
+        "consumed_by_dha": True,  # or False if DHA ignored it
+        "p38_version": "1.0.0"
+    }
+}
+```
+
+- Pro: Existing infrastructure, queryable, JSON-lines export
+- Pro: Consistent with how other system events are already logged
+
+**Target B — P54 Compliance Audit (`symbolu/mechanical/pipeline/p54_audit_trace/`)**
+
+Add P38 to the `AUTHORITATIVE_PHASES` list so soft steering hints appear in the determinism hash and compliance record.
+
+- Pro: Hints that influence output are captured in the compliance trail
+- Con: P38 is not a pipeline phase in the traditional sense — adding it to P54 may conflate observer signals with authoritative decisions
+
+**Target C — Dedicated soft steering log**
+
+Separate log file (`soft_steering_audit.jsonl`) with its own retention policy.
+
+- Pro: Isolation — soft steering audit can be reviewed independently
+- Con: Yet another log to monitor; duplicates infrastructure
+
+**Open questions for governance:**
+- [ ] **Select primary audit target**: A, B, or C
+- [ ] **P54 inclusion**: Should soft steering hints appear in the compliance determinism hash? (Yes/No)
+- [ ] **Retention**: Same retention as general `AuditTrail` (10,000 entries ring buffer), or different?
+
+---
+
+### 11.4 Decision 4: Enable/Disable Mechanism
+
+INV-P38-7 requires a global disable flag. Governance must decide the default state and granularity.
+
+**Default state:**
+
+| Option | Behavior | Rationale |
+|--------|----------|-----------|
+| `False` (ship dormant) | Code is deployed but inactive until explicitly enabled | Conservative — matches observer-only-by-default principle |
+| `True` (ship active) | Soft steering is active immediately upon deployment | Aggressive — only if governance is confident in the safeguards |
+
+**Granularity:**
+
+| Option | Scope | Use Case |
+|--------|-------|----------|
+| Global on/off | Single `soft_steering_enabled` flag on `CrossDomainConfig` | Simplest; all-or-nothing |
+| Per-domain | `soft_steering_domains: Set[str]` — only enabled for specified target domains | Allows progressive rollout (e.g., enable for psychology first, then finance) |
+| Per-domain-pair | Extends `DomainPairPolicy` with a `STEER` option alongside ALLOW/BLOCK/REQUIRE_HIGH/MONITOR | Most granular; aligns with existing pair-level governance |
+
+**Runtime toggle:**
+
+| Option | Mechanism | Tradeoff |
+|--------|-----------|----------|
+| Config-only | Requires code deployment to change | Safest — change goes through CI/CD |
+| Runtime API | `CrossDomainConfig.set_soft_steering_enabled(True/False)` | Faster response for incidents, but risk of accidental toggle |
+
+**Open questions for governance:**
+- [ ] **Default**: Ship dormant (`False`) or ship active (`True`)?
+- [ ] **Granularity**: Global, per-domain, or per-domain-pair?
+- [ ] **Runtime toggle**: Config-only or runtime API?
+
+---
+
+### 11.5 Decision 5: Trigger Rules and Safety Thresholds
+
+Governance must approve the conditions under which a hint fires. These become locked constants (consistent with P38 formula-locking principle).
+
+**Proposed trigger rules:**
+
+| Parameter | Proposed Value | Rationale |
+|-----------|---------------|-----------|
+| `MIN_SEQUENCE_PROGRESS` | 2/3 steps matched (≥ 66%) | Partial match must be more likely to complete than not |
+| `MIN_SOURCE_CONFIDENCE` | 0.65 | Matches CDI's own confidence floor for reliable detection |
+| `MAX_HINT_PER_N_TURNS` (cooldown) | 1 hint per 3 turns | Prevents hint flooding; gives DHA time to settle |
+| `MAX_WARMTH_DELTA` | ±0.20 | Perceptible but not dramatic shift in tone |
+| `MAX_DIRECTNESS_DELTA` | ±0.20 | Same rationale |
+| `ANTICIPATORY_HINTS_ENABLED` | True/False | Whether hints can fire from partial sequence matches (anticipatory) or only from fully confirmed sequences |
+
+**Proposed hint mapping for known sequences:**
+
+| Sequence | Category | Warmth Delta | Directness Delta | Rationale |
+|----------|----------|-------------|-----------------|-----------|
+| suppression_escalation | escalation | +0.15 | -0.10 | Create space for self-disclosure |
+| risk_concealment_deepening | escalation | +0.10 | +0.05 | Gentle direct acknowledgment |
+| stress_to_avoidance | escalation | +0.10 | -0.15 | Reduce pressure, increase safety |
+| entrenchment_spiral | entrenchment | +0.05 | +0.10 | Slight directness to break loop |
+| chronic_avoidance | entrenchment | +0.10 | +0.10 | Warm but direct engagement |
+| productive_resolution | resolution | +0.05 | 0.00 | Reinforce positive trajectory |
+| recovery_arc | resolution | +0.10 | -0.05 | Support without pressure |
+| authentic_breakthrough | resolution | +0.15 | -0.10 | Maximum warmth for vulnerability |
+
+**Open questions for governance:**
+- [ ] **Confirm or adjust** each threshold value
+- [ ] **Anticipatory hints**: Allow hints from partial matches, or require full sequence confirmation?
+- [ ] **Confirm or adjust** the per-sequence hint mapping
+- [ ] **New sequences**: Should new sequence rules added in future automatically get hint mappings, or must each new mapping go through governance?
+
+---
+
+### 11.6 Decision 6: Rollback and Circuit Breaker
+
+If soft steering produces unintended behavior in production, what is the rollback plan?
+
+**Proposed safeguards (defense in depth):**
+
+| Layer | Mechanism | Response Time |
+|-------|-----------|---------------|
+| Layer 1: Global disable | Set `soft_steering_enabled = False` | Immediate (if runtime toggle) or next deploy (if config-only) |
+| Layer 2: DHA ignores hint | DHA engine's consumption is MAY, not MUST — it can be patched to drop all hints | Next deploy |
+| Layer 3: Threshold floor | `MAX_WARMTH_DELTA` and `MAX_DIRECTNESS_DELTA` cap the maximum influence at ±0.20 regardless of any bug | Always active (locked constant) |
+| Layer 4: Cooldown | Max 1 hint per 3 turns prevents rapid-fire influence | Always active (locked constant) |
+| Layer 5: Remove P38 instability from P35 | Set `pattern_instability = None` in SignalSnapshot to break the feedback loop | Next deploy |
+
+**Open questions for governance:**
+- [ ] **Confirm** the 5-layer rollback plan is sufficient
+- [ ] **Incident threshold**: After how many anomalous hints should automatic disable trigger? (Or: manual-only disable?)
+- [ ] **Monitoring**: Who receives alerts when soft steering fires? (Existing monitoring, new dashboard, or none?)
+
+---
+
+### 11.7 Approval Sign-Off Template
+
+Once all decisions above are resolved, the following sign-off record should be completed and stored with this document:
+
+```
+PHASE F GOVERNANCE APPROVAL RECORD
+====================================
+Date:           _______________
+Approved by:    _______________
+Role:           _______________
+
+Decision 1 (Scope):
+  Warmth hintable:          [YES / NO]
+  Directness hintable:      [YES / NO]
+  Formality hintable:       [YES / NO]
+  Kosha depth guidance:     [YES / NO / DEFERRED]
+  Response framing:         [YES / NO / DEFERRED]
+
+Decision 2 (DHA Target):
+  Integration target:       [A: Formula DHA / B: Mechanical DHA / C: Both]
+
+Decision 3 (Audit):
+  Primary audit target:     [A: AuditTrail / B: P54 / C: Dedicated]
+  P54 compliance hash:      [YES / NO]
+  Retention policy:         _______________
+
+Decision 4 (Enable Flag):
+  Default state:            [DORMANT / ACTIVE]
+  Granularity:              [GLOBAL / PER-DOMAIN / PER-DOMAIN-PAIR]
+  Runtime toggle:           [CONFIG-ONLY / RUNTIME API]
+
+Decision 5 (Triggers):
+  MIN_SEQUENCE_PROGRESS:    _______________
+  MIN_SOURCE_CONFIDENCE:    _______________
+  MAX_HINT_PER_N_TURNS:     _______________
+  MAX_WARMTH_DELTA:         _______________
+  MAX_DIRECTNESS_DELTA:     _______________
+  Anticipatory hints:       [ENABLED / DISABLED]
+  Per-sequence mapping:     [APPROVED / MODIFIED — see attached]
+  New sequence governance:  [AUTO / REQUIRES APPROVAL]
+
+Decision 6 (Rollback):
+  5-layer plan:             [APPROVED / MODIFIED]
+  Auto-disable threshold:   [MANUAL ONLY / AFTER ___ ANOMALIES]
+  Monitoring:               _______________
+
+SIGNATURE: _______________
+```
+
+**Implementation may not begin until all fields above are completed.**
+
+---
+
 *Design document for Symbol-U Architecture Team*
 *February 2026*
