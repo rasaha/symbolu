@@ -60,7 +60,7 @@ This audit did not execute full training/evaluation pipelines or all phase suite
 ## 6) Recommended Next Actions
 
 1. **Add a recurring "claims-to-tests" matrix** mapping major product claims to concrete test suites and pass/fail status.
-   - *Status (2026-02-13):* **Not yet implemented.** No mapping document correlating investor pitch claims (e.g., `docs/INVESTOR_PITCH.md`) to specific test suites exists. A patent formula coverage matrix (`docs/patent/patent_formula_coverage_matrix.md`) exists but does not cover product-level claims.
+   - *Status (2026-02-13):* **Implemented.** See `docs/reviews/CLAIMS_TO_TESTS_MATRIX.md`. Maps 36 claims from `docs/INVESTOR_PITCH.md` across 12 categories (Complexity, Determinism, Interpretability, Hallucination, Confidence Gating, Context, Cost, Accuracy, Ontology, Coherence, Security, Production Readiness) to concrete test suites. Current breakdown: 19 VALIDATED (53%), 10 PARTIAL (28%), 7 UNVALIDATED (19%). Matrix integrity enforced by `tests/test_claims_matrix_integrity.py` (verifies all referenced test files and CI workflows exist).
 
 2. **Add CI checks that archive confidence/skip telemetry summaries** for reproducibility audits.
    - *Status (2026-02-13):* **Implemented.** CI workflow `.github/workflows/telemetry-audit-ci.yml` runs on every push/PR that touches telemetry or transformer code. It executes telemetry schema tests, bounds enforcement tests (`tests/test_telemetry_ci_bounds.py`), and generates a JSON telemetry report (`scripts/telemetry_ci_report.py`) archived as a build artifact with 90-day retention. Enforced bounds: `confidence_mean >= 0.25`, `quad_skip_rate <= 0.60`, `reversal_risk <= 0.50`, `stability_red_fraction <= 0.40`.
