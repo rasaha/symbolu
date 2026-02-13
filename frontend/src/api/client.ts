@@ -236,6 +236,74 @@ export const api = {
     const response = await fetch(`${API_BASE}/health`);
     return handleResponse(response);
   },
+
+  // ----------------------------------------
+  // Video Generation (Remotion + Phase Quad LLM)
+  // ----------------------------------------
+
+  /**
+   * Generate a video from natural language description.
+   * Uses Phase Quad LLM to generate Remotion TSX code.
+   */
+  async generateVideo(request: {
+    description: string;
+    template?: string | null;
+    style?: Record<string, unknown> | null;
+    duration_seconds?: number;
+    fps?: number;
+    output_format?: string;
+    render?: boolean;
+  }): Promise<{
+    video_id: string;
+    status: string;
+    tsx_code: string;
+    video_path: string | null;
+    generation_time_ms: number;
+    render_time_ms: number;
+    total_time_ms: number;
+    error: string | null;
+    metadata: Record<string, unknown>;
+  }> {
+    const response = await fetch(`${API_BASE}/video/generate`, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify(request),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Generate a coherence metrics visualization video
+   */
+  async generateCoherenceVideo(request: {
+    session_id?: string | null;
+    metrics?: Record<string, number> | null;
+  }): Promise<{
+    video_id: string;
+    status: string;
+    tsx_code: string;
+    video_path: string | null;
+    generation_time_ms: number;
+    render_time_ms: number;
+    total_time_ms: number;
+    error: string | null;
+    metadata: Record<string, unknown>;
+  }> {
+    const response = await fetch(`${API_BASE}/video/coherence`, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify(request),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Get available video templates
+   */
+  async getVideoTemplates(): Promise<{ templates: Record<string, string> }> {
+    const response = await fetch(`${API_BASE}/video/templates`);
+    return handleResponse(response);
+  },
 };
 
 export { ApiClientError };

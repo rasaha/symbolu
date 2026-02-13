@@ -1,0 +1,23 @@
+{
+  "name": "symbolu-remotion-video",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Symbol-U AI Video Generation via Remotion",
+  "scripts": {
+    "dev": "npx remotion studio src/index.ts",
+    "render": "npx remotion render src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/player": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "typescript": "^5.3.3"
+  }
+}
