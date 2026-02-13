@@ -45,6 +45,10 @@ class SignalSnapshot:
     coherence_v3_quality: Optional[float] = None
     ucf_score: Optional[float] = None
     identity_harmonics_score: Optional[float] = None
+    # P38: Optional cross-domain pattern instability signal.
+    # Additive-only -- existing code that does not provide this field
+    # continues to work identically (defaults to None, excluded from deltas).
+    pattern_instability: Optional[float] = None
 
     def to_tuple(self) -> Tuple[Optional[float], ...]:
         """Convert to tuple for comparison."""
@@ -55,6 +59,7 @@ class SignalSnapshot:
             self.coherence_v3_quality,
             self.ucf_score,
             self.identity_harmonics_score,
+            self.pattern_instability,
         )
 
 
@@ -99,6 +104,10 @@ def compute_signal_deltas(
     if current.identity_harmonics_score is not None and previous.identity_harmonics_score is not None:
         # Inverted: decrease in harmonics = positive delta (worsening)
         deltas.append(previous.identity_harmonics_score - current.identity_harmonics_score)
+
+    # P38: Pattern instability (increase = worsening, same direction as drift signals)
+    if current.pattern_instability is not None and previous.pattern_instability is not None:
+        deltas.append(current.pattern_instability - previous.pattern_instability)
 
     return deltas
 
