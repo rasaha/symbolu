@@ -228,23 +228,100 @@ DOMAIN_INTERPRETATIONS = {
 }
 ```
 
-#### VTable 5: Weight VTable
+#### VTable 5: Weight VTable — Per-Pattern Scoring Weights
 
-The scoring weights used in `_compute_pattern_confidence()`:
+Today, weights are **global constants** — every pattern uses the same scoring formula:
 
 ```python
-# Current (cross_domain_intelligence.py)
+# Current: ONE weight vector for ALL 13 patterns (cross_domain_intelligence.py)
 W_BHAVA_RANGE  = 0.30
 W_DIRECTION    = 0.25
 W_SMI_RANGE    = 0.25
 W_KOSHA        = 0.10
 W_ONTOLOGY     = 0.10
 
-# Training may discover that drug discovery patterns need different weights:
-# W_BHAVA_RANGE = 0.20  (bhava less discriminative for molecular patterns)
-# W_SMI_RANGE   = 0.35  (SMI more discriminative for molecular patterns)
-# W_MOLECULAR   = 0.15  (new weight for molecular fingerprint match)
+# confidence = W_BHAVA * bhava_score + W_DIR * dir_score + W_SMI * smi_score
+#            + W_KOSHA * kosha_score + W_ONTO * onto_score
 ```
+
+This is a design limitation. `risk_hiding` (protective, defined by SMI range and downward direction) and `breakthrough_insight` (growth, defined by bhava range and upward direction) are scored by the same weight vector. The dimensions that matter most for recognizing each pattern are different, but the weights cannot express that.
+
+**The vtable architecture promotes weights from global constants to per-row fields:**
+
+```python
+@dataclass(frozen=True)
+class PatternConfig:
+    name: str
+    min_confidence: float
+    category: str
+    smi_range: Tuple[float, float]
+    bhava_range: Tuple[int, int]
+    directions: List[str]
+    temporal_trends: List[str]
+    kosha_weights: Dict[int, float]
+    ontology_weights: Dict[int, float]
+
+    # NEW: per-pattern scoring weights (vtable v2.0.0+)
+    scoring_weights: ScoringWeights    # ← each row carries its own weight vector
+
+@dataclass(frozen=True)
+class ScoringWeights:
+    """How much each signal dimension contributes to this pattern's confidence."""
+    w_bhava_range: float    # importance of bhava_id being in range
+    w_direction: float      # importance of bhava_direction matching
+    w_smi_range: float      # importance of SMI being in range
+    w_kosha: float          # importance of kosha signature match
+    w_ontology: float       # importance of ontology signature match
+    # Constraint: all weights sum to 1.0
+
+# Hand-curated pattern: weights chosen by expert intuition
+PatternConfig(
+    name="risk_hiding",
+    scoring_weights=ScoringWeights(
+        w_bhava_range=0.30, w_direction=0.25, w_smi_range=0.25,
+        w_kosha=0.10, w_ontology=0.10,   # sum = 1.0
+    ),   # expert: "SMI and direction matter equally for this pattern"
+    ...
+)
+
+# Training-discovered pattern: weights derived from data
+PatternConfig(
+    name="drug_resistance_emergence",
+    scoring_weights=ScoringWeights(
+        w_bhava_range=0.15, w_direction=0.10, w_smi_range=0.40,
+        w_kosha=0.20, w_ontology=0.15,   # sum = 1.0
+    ),   # training: "SMI is 4x more discriminative than direction for this pattern"
+    ...
+)
+```
+
+**The inference scoring function changes from global dispatch to per-row dispatch:**
+
+```python
+# BEFORE (global weights):
+def _compute_pattern_confidence(self, signals, pattern_config):
+    bhava_score  = self._score_bhava(signals, pattern_config)
+    dir_score    = self._score_direction(signals, pattern_config)
+    smi_score    = self._score_smi(signals, pattern_config)
+    kosha_score  = self._score_kosha(signals, pattern_config)
+    onto_score   = self._score_ontology(signals, pattern_config)
+    return (W_BHAVA * bhava_score + W_DIR * dir_score + W_SMI * smi_score
+            + W_KOSHA * kosha_score + W_ONTO * onto_score)
+
+# AFTER (per-row weights — vtable dispatch):
+def _compute_pattern_confidence(self, signals, pattern_config):
+    bhava_score  = self._score_bhava(signals, pattern_config)
+    dir_score    = self._score_direction(signals, pattern_config)
+    smi_score    = self._score_smi(signals, pattern_config)
+    kosha_score  = self._score_kosha(signals, pattern_config)
+    onto_score   = self._score_ontology(signals, pattern_config)
+    w = pattern_config.scoring_weights   # ← dispatch through the vtable row
+    return (w.w_bhava_range * bhava_score + w.w_direction * dir_score
+            + w.w_smi_range * smi_score + w.w_kosha * kosha_score
+            + w.w_ontology * onto_score)
+```
+
+**This is the vtable dispatch.** The scoring function does not use global constants. It reads the weight vector from the vtable row. Each pattern "knows" which signal dimensions matter most for its own recognition. The function is the same for all patterns — only the weights differ. This is virtual dispatch: one call site, N implementations selected by the vtable row.
 
 ---
 
@@ -373,7 +450,181 @@ Output: Set of candidate PatternConfig entries
 
 **What this IS**: Automating the expert's process. When a domain expert creates a pattern like `risk_hiding`, they implicitly perform this same analysis — "when SMI is in this range and bhava is in that range and the direction is downward, something protective is happening." The expert does it from clinical intuition; the algorithm does it from labeled data. The output is identical: a PatternConfig.
 
-### 3.5 Stage 4: Candidate Proposal
+### 3.5 Stage 3b: Weight Discovery — How Training Learns Per-Pattern Weights
+
+This is the critical substage that binds discovered weights to vtable entries. Ranges (Stage 3) answer *where* a pattern lives in signal space. Weights answer *which dimensions matter most* for recognizing it.
+
+#### The Problem with Global Weights
+
+Under global weights (W_BHAVA=0.30, W_SMI=0.25, ...), every pattern is scored by the same formula. This works when all 13 patterns are in the same domain and were designed by the same expert. It breaks when patterns span domains:
+
+```
+risk_hiding (protective):
+    Expert intuition: "direction matters a lot — downward is the key signal"
+    Ideal weights:  w_direction=0.35, w_smi=0.25, w_bhava=0.20, w_kosha=0.10, w_onto=0.10
+
+drug_resistance_emergence (pharmacological):
+    Data shows:     "SMI range is highly discriminative — resistance lives in 0.55-0.80"
+    Ideal weights:  w_smi=0.40, w_kosha=0.20, w_onto=0.15, w_bhava=0.15, w_direction=0.10
+```
+
+With global weights, both patterns use 0.30/0.25/0.25/0.10/0.10. The pharmaceutical pattern is penalized — its most discriminative dimension (SMI) gets only 0.25 weight, while a less useful dimension (bhava) gets 0.30.
+
+#### How Training Discovers Weights
+
+For each candidate cluster from Stage 3, training computes a **discriminative weight profile** — the weight vector that maximizes separation between this cluster and all other clusters/patterns:
+
+```
+Algorithm: Per-Pattern Weight Discovery
+
+Input:  Candidate cluster C (signal vectors labeled as this pattern)
+        Background B (all signal vectors NOT in this cluster)
+Output: ScoringWeights for this vtable entry
+
+1. For each signal dimension d ∈ {bhava_range, direction, smi_range, kosha, ontology}:
+
+   a. Compute within-cluster variance:
+      var_within[d] = variance of dimension d across all vectors in C
+
+   b. Compute between-cluster distance:
+      dist_between[d] = |mean(C[d]) - mean(B[d])|
+
+   c. Compute discriminative power:
+      fisher[d] = dist_between[d] / (var_within[d] + epsilon)
+
+      High fisher[d] = this dimension separates C from B well
+      Low fisher[d]  = this dimension does not help distinguish C
+
+2. Normalize to weight vector:
+   raw_weights = {d: fisher[d] for d in dimensions}
+   total = sum(raw_weights.values())
+   scoring_weights = {d: raw_weights[d] / total for d in dimensions}
+
+3. Clamp minimum weight:
+   # No dimension gets less than 0.05 (prevents zero-weight blind spots)
+   for d in dimensions:
+       scoring_weights[d] = max(scoring_weights[d], 0.05)
+   # Re-normalize to sum to 1.0
+   total = sum(scoring_weights.values())
+   scoring_weights = {d: scoring_weights[d] / total for d in dimensions}
+```
+
+This is **Fisher's Linear Discriminant** applied per-dimension — a classical statistical method, not neural network training. It asks: "for this specific pattern, which signal dimensions carry the most information?"
+
+#### Worked Example: Weight Discovery for `drug_resistance_emergence`
+
+```
+Training data:
+    Cluster C: 3,960 signal vectors where resistance was observed
+    Background B: 8,040 signal vectors where resistance was NOT observed
+
+Step 1 — Compute per-dimension discriminative power:
+
+    Dimension        var_within    dist_between    fisher_score
+    ─────────────    ──────────    ────────────    ────────────
+    smi_range           0.008         0.18           22.5   ← highly discriminative
+    kosha               0.012         0.11            9.2
+    ontology            0.015         0.09            6.0
+    bhava_range         0.020         0.07            3.5
+    direction           0.025         0.04            1.6   ← least discriminative
+
+Step 2 — Normalize:
+    total = 22.5 + 9.2 + 6.0 + 3.5 + 1.6 = 42.8
+
+    w_smi_range   = 22.5 / 42.8 = 0.526 → after min-clamp + renorm → 0.40
+    w_kosha       =  9.2 / 42.8 = 0.215 → after min-clamp + renorm → 0.20
+    w_ontology    =  6.0 / 42.8 = 0.140 → after min-clamp + renorm → 0.15
+    w_bhava_range =  3.5 / 42.8 = 0.082 → after min-clamp + renorm → 0.15
+    w_direction   =  1.6 / 42.8 = 0.037 → after min-clamp + renorm → 0.10
+                                                              total = 1.00  ✓
+
+Result: ScoringWeights(
+    w_smi_range=0.40,    # SMI is the dominant discriminator
+    w_kosha=0.20,        # kosha depth matters (deeper layers = more structural)
+    w_ontology=0.15,     # ontology state provides moderate signal
+    w_bhava_range=0.15,  # bhava range is weakly useful
+    w_direction=0.10,    # direction is least informative for this pattern
+)
+```
+
+**Interpretation**: For drug resistance emergence, SMI (semantic mismatch) carries 4x more discriminative power than bhava direction. This makes pharmacological sense — resistance manifests as a specific type of semantic divergence (the treatment is "mismatching" the pathogen), while the directional component (upward/downward) is noisy because resistance can emerge in multiple clinical contexts.
+
+A hand-curating expert might have guessed this. Training *proves* it from 3,960 examples.
+
+#### How Weights Bind to VTable Rows
+
+The binding is structural — weights are a **field of PatternConfig**, not a separate lookup:
+
+```
+VTable Row #14: drug_resistance_emergence
+┌────────────────────────────────────────────────────────────────────┐
+│ name: "drug_resistance_emergence"                                  │
+│ smi_range: (0.55, 0.80)               ← WHERE in signal space     │
+│ bhava_range: (4, 8)                                                │
+│ directions: ["upward", "neutral"]                                  │
+│ scoring_weights:                       ← HOW MUCH each dim matters │
+│   w_smi_range:   0.40  ─────────────────→ smi_score × 0.40        │
+│   w_kosha:       0.20  ─────────────────→ kosha_score × 0.20      │
+│   w_ontology:    0.15  ─────────────────→ onto_score × 0.15       │
+│   w_bhava_range: 0.15  ─────────────────→ bhava_score × 0.15      │
+│   w_direction:   0.10  ─────────────────→ dir_score × 0.10        │
+│                                                                     │
+│ confidence = Σ (w_i × score_i)         ← DISPATCH through weights  │
+└────────────────────────────────────────────────────────────────────┘
+
+VTable Row #1: risk_hiding (original, hand-curated)
+┌────────────────────────────────────────────────────────────────────┐
+│ name: "risk_hiding"                                                │
+│ smi_range: (0.50, 0.75)                                            │
+│ bhava_range: (3, 7)                                                │
+│ directions: ["downward", "neutral"]                                │
+│ scoring_weights:                       ← original global weights   │
+│   w_bhava_range: 0.30  ─────────────────→ bhava_score × 0.30      │
+│   w_direction:   0.25  ─────────────────→ dir_score × 0.25        │
+│   w_smi_range:   0.25  ─────────────────→ smi_score × 0.25        │
+│   w_kosha:       0.10  ─────────────────→ kosha_score × 0.10      │
+│   w_ontology:    0.10  ─────────────────→ onto_score × 0.10       │
+│                                                                     │
+│ confidence = Σ (w_i × score_i)         ← SAME function, DIFF wts  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+The scoring function is **identical** for both rows. The only difference is which weight vector it reads from the vtable row. This is the virtual dispatch — the "method" (confidence computation) is the same, but the "implementation" (which dimensions to emphasize) varies per vtable entry.
+
+#### Backward Compatibility: Original 13 Patterns Keep Global Weights
+
+The original 13 hand-curated patterns are migrated to per-row weights by copying the current global constants into each row:
+
+```python
+# Migration: vtable_v1.0.0 → vtable_v2.0.0
+LEGACY_GLOBAL_WEIGHTS = ScoringWeights(
+    w_bhava_range=0.30, w_direction=0.25, w_smi_range=0.25,
+    w_kosha=0.10, w_ontology=0.10,
+)
+
+for pattern in ORIGINAL_13_PATTERNS:
+    pattern.scoring_weights = LEGACY_GLOBAL_WEIGHTS  # exact same behavior
+```
+
+This guarantees that vtable_v2.0.0 produces **identical** confidence scores for all 13 original patterns. The per-row weight mechanism is active, but the values are the same as the old global constants. Existing invariants preserved.
+
+Training can **optionally** re-optimize weights for the original 13 patterns too — but only if governance approves the new weights after reviewing the impact on existing confidence scores. This is a governance decision, not an automatic migration.
+
+#### Weight Discovery vs. Weight Guessing
+
+| Approach | Method | Risk | Governance Burden |
+|----------|--------|------|-------------------|
+| **Hand-curated** (current) | Expert picks 0.30/0.25/0.25/0.10/0.10 | Suboptimal for non-obvious patterns | Low (expert self-validates) |
+| **Training-discovered** (vtable) | Fisher discriminant from labeled data | Overfitting to training corpus | Medium (review weight profile + held-out validation) |
+| **Neural-learned** (rejected) | Gradient descent on weight vector | Black-box, non-interpretable | High (cannot inspect reasoning) |
+
+The vtable architecture uses Fisher discriminant because it is:
+1. **Interpretable** — "SMI got weight 0.40 because its fisher score was 22.5" is a reviewable statement
+2. **Deterministic** — same data always produces same weights
+3. **Auditable** — the per-dimension statistics (var_within, dist_between) are logged
+4. **Non-parametric** — no hyperparameters to tune beyond the min-weight clamp (0.05)
+
+### 3.6 Stage 4: Candidate Proposal
 
 Each discovered cluster becomes a **candidate vtable entry** — a fully specified PatternConfig that has not yet been approved:
 
