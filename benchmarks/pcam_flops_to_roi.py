@@ -860,7 +860,7 @@ def run_batch_sweep(
     compute-bound (batch=1, weights dominate) or bandwidth-bound
     (batch>=8, KV dominates). PCAM's value scales with batch size.
     """
-    batch_sizes = [1, 4, 8, 16, 32, 64]
+    batch_sizes = [1, 4, 8, 16, 32, 64, 128, 256]
     results = []
 
     if verbose:
