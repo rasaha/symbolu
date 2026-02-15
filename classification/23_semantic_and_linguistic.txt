@@ -1,0 +1,109 @@
+================================================================================
+FEATURE: Semantic & Linguistic Systems
+================================================================================
+Name resonance analysis, Chitta Vritti (mind states), resonance engine,
+and causal world modeling.
+================================================================================
+
+--- Name Resonance ---
+symbolu/name_resonance/__init__.py
+symbolu/name_resonance/api.py                  # API endpoint
+symbolu/name_resonance/canonical_matcher.py    # Name matching
+symbolu/name_resonance/domain_semantic_profiles.py  # Domain profiles
+symbolu/name_resonance/extractor.py            # Feature extraction
+symbolu/name_resonance/matcher.py              # Matching logic
+symbolu/name_resonance/ontological_bridge.py   # Ontology bridge
+symbolu/name_resonance/projector.py            # Projection
+symbolu/name_resonance/referent_classes.py     # Referent classification
+symbolu/name_resonance/rich_resonance.py       # Rich semantic analysis
+symbolu/name_resonance/types.py                # Types
+symbolu/name_resonance/domains/__init__.py
+symbolu/name_resonance/domains/patterns.py     # Domain patterns
+
+--- Chitta Vritti (Mind State) ---
+symbolu/chitta_vritti/__init__.py
+symbolu/chitta_vritti/coherence.py             # Coherence computation
+symbolu/chitta_vritti/coupling.py              # State coupling
+symbolu/chitta_vritti/engine.py                # Vritti engine
+symbolu/chitta_vritti/explain.py               # Explanation generation
+symbolu/chitta_vritti/projector.py             # State projection
+symbolu/chitta_vritti/score.py                 # Scoring system
+symbolu/chitta_vritti/types.py                 # Types
+symbolu/chitta_vritti/vritti.py                # Vritti definitions
+
+--- Chitta Vritti Evaluation ---
+symbolu/chitta_vritti/evaluation/__init__.py
+symbolu/chitta_vritti/evaluation/collector.py
+symbolu/chitta_vritti/evaluation/harness.py
+symbolu/chitta_vritti/evaluation/metrics.py
+symbolu/chitta_vritti/evaluation/types.py
+
+--- Resonance Engine ---
+symbolu/resonance/__init__.py
+symbolu/resonance/analyzer.py                  # Resonance analysis
+symbolu/resonance/controller.py                # Resonance control
+symbolu/resonance/engine.py                    # Resonance engine
+symbolu/resonance/mirror_pairs_12d.py          # 12D mirror pairs
+symbolu/resonance/phoneme_map.py               # Phoneme mapping
+symbolu/resonance/sgp.py                       # SGP (Sound-Guna Profile)
+symbolu/resonance/types.py
+symbolu/resonance/varna_bridge.py              # Varna bridge
+
+--- Causal Modeling ---
+symbolu/causal_world_model.py                  # Causal world model
+symbolu/causal_datasets.py                     # Causal datasets
+symbolu/spatial_causal_module.py               # Spatial reasoning
+
+--- Temporal ---
+symbolu/temporal/__init__.py
+symbolu/temporal/cross_domain_intelligence.py
+symbolu/temporal/cross_domain_pattern_tracker.py
+symbolu/temporal/pattern_aspect_derivation.py
+symbolu/temporal/pattern_sequence_rules.py
+symbolu/temporal/temporal_bhava_tracker.py
+
+--- Identity ---
+symbolu/identity/__init__.py
+symbolu/identity/identity_signature_engine.py
+
+--- Intent ---
+symbolu/intent/__init__.py
+symbolu/intent/arc_types.py
+symbolu/intent/intent_arc_engine.py
+
+--- Motivation ---
+symbolu/motivation/__init__.py
+symbolu/motivation/motivation_engine.py
+
+--- Phoneme Provider ---
+csr_phoneme_provider.py                        # Root-level CSR phoneme provider
+
+--- Text Interference ---
+symbolu/text_interference.py
+
+--- Tests ---
+tests/unit/chitta_vritti/__init__.py
+tests/unit/chitta_vritti/evaluation/__init__.py
+tests/unit/chitta_vritti/evaluation/test_collector.py
+tests/unit/chitta_vritti/evaluation/test_harness.py
+tests/unit/chitta_vritti/evaluation/test_metrics.py
+tests/unit/chitta_vritti/test_coherence.py
+tests/unit/chitta_vritti/test_invariants.py
+tests/unit/chitta_vritti/test_score.py
+tests/unit/chitta_vritti/test_vritti_nidra.py
+tests/unit/chitta_vritti/test_vritti_pramana.py
+tests/unit/chitta_vritti/test_vritti_smrti.py
+tests/unit/chitta_vritti/test_vritti_vikalpa.py
+tests/unit/chitta_vritti/test_vritti_viparyaya.py
+tests/resonance/__init__.py
+tests/resonance/test_resonance_engine.py
+tests/unit/identity/__init__.py
+tests/unit/identity/test_identity_signature_engine.py
+tests/unit/intent/__init__.py
+tests/unit/intent/test_intent_arc_engine.py
+tests/unit/motivation/__init__.py
+tests/unit/motivation/test_motivation_engine.py
+tests/unit/temporal/__init__.py
+tests/unit/temporal/test_cross_domain_intelligence.py
+tests/unit/temporal/test_cross_domain_pattern_tracker.py
+tests/unit/temporal/test_temporal_bhava_tracker.py

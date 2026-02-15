@@ -1,0 +1,70 @@
+================================================================================
+FEATURE: Training Infrastructure (Model Training)
+================================================================================
+End-to-end training pipelines for LLM, sovereign, ontological, retrieval,
+and vision models. Includes data generation, trainers, and curricula.
+================================================================================
+
+--- Root-Level Training Scripts ---
+train.py                                       # Main LLM training pipeline
+train_7b.py                                    # 7B parameter model training
+train_hybrid_7b.py                             # Hybrid 7B training
+train_lra.py                                   # Long Range Arena training
+train_pid.py                                   # PID governor integration training
+train_retrieval.py                             # RAG/retrieval training
+train_unified_llm.py                           # Unified LLM training
+optimize_training.py                           # Training optimization utilities
+
+--- Training Module ---
+symbolu/training/__init__.py
+symbolu/training/schemas.py                    # Training data schemas
+symbolu/training/text_utils.py                 # Text processing utilities
+symbolu/training/data/.gitignore
+symbolu/training/data/processed/.gitkeep
+symbolu/training/data/raw/.gitkeep
+
+--- Data Generators ---
+symbolu/training/generators/__init__.py
+symbolu/training/generators/intent_generator.py
+symbolu/training/generators/paraphrase_generator.py
+
+--- Trainers ---
+symbolu/training/trainers/__init__.py
+symbolu/training/trainers/embedding_trainer.py
+symbolu/training/trainers/gradient_throttle.py
+symbolu/training/trainers/router_trainer.py
+
+--- Training Scripts ---
+symbolu/training/scripts/__init__.py
+symbolu/training/scripts/generate_data.py
+symbolu/training/scripts/train.py
+symbolu/training/scripts/validate.py
+
+--- Training Shell Scripts ---
+scripts/run_master_training.sh
+scripts/run_phase2_tests.sh
+scripts/train_minimal_fixed.sh
+scripts/train_staged_fixed.sh
+runpod_7b_setup.sh                             # RunPod GPU setup
+
+--- Training Test Scripts ---
+scripts/test_inverted_curriculum.py
+scripts/test_trainer.py
+
+--- Data Loaders ---
+hybrid_dataloader.py                           # Hybrid data loading
+
+--- Datasets ---
+symbolu/causal_datasets.py                     # Causal dataset generation
+retrieval_dataset.py                           # Retrieval dataset
+
+--- Losses ---
+symbolu/losses/__init__.py
+symbolu/losses/kosha_gyroscope.py              # Kosha gyroscope loss
+
+--- Tests ---
+tests/training/__init__.py
+tests/training/test_generators.py
+tests/training/test_schemas.py
+tests/training/test_trainers.py
+tests/training/test_validator.py

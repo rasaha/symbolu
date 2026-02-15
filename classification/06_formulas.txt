@@ -1,0 +1,152 @@
+================================================================================
+FEATURE: Formulas Module (Mathematical Framework)
+================================================================================
+51+ symbolic computation formulas covering semantic mismatch, coherence,
+resonance, temporal forecasting, consciousness, trajectory stability,
+and more. Patent-aligned mathematical foundations.
+================================================================================
+
+--- Core Formulas ---
+symbolu/formulas/__init__.py
+symbolu/formulas/resonance_formulas.py         # Core resonance computations
+symbolu/formulas/resonance_weighting.py        # Resonance weight distribution
+symbolu/formulas/enhanced_smi.py               # Enhanced Semantic Mismatch Index
+symbolu/formulas/acoustic_unit_mapper.py       # Acoustic unit mapping
+symbolu/formulas/varna_acoustic_mapper.py      # Varna-acoustic bridge
+symbolu/formulas/varna_bridge_loader.py        # Varna bridge data loader
+symbolu/formulas/vritti_mapper.py              # Vritti state mapping
+symbolu/formulas/vritti_momentum.py            # Vritti momentum tracking
+symbolu/formulas/patent_tags.py                # Patent alignment tags
+symbolu/formulas/phase1_snapshot.py            # Phase 1 snapshot state
+
+--- Coherence & Stability ---
+symbolu/formulas/coherence_regime_scenario_mapper.py
+symbolu/formulas/coherence_scenario_alignment.py
+symbolu/formulas/cognitive_consistency_regression.py
+symbolu/formulas/rag_coherence_validation.py
+symbolu/formulas/semantic_integrity.py
+symbolu/formulas/symbolic_harmonization.py
+
+--- Temporal Forecasting ---
+symbolu/formulas/temporal_coherence_forecasting.py
+symbolu/formulas/temporal_entropy_differential.py
+symbolu/formulas/multi_horizon_temporal_forecasting.py
+symbolu/formulas/unified_temporal_stability.py
+
+--- Identity & Persona ---
+symbolu/formulas/identity_harmonics.py
+symbolu/formulas/identity_resonance_memory.py
+symbolu/formulas/predictive_persona_drift.py
+symbolu/formulas/adaptive_continuity_engine.py
+
+--- Trajectory & Scenario ---
+symbolu/formulas/multi_trajectory_stability_field.py
+symbolu/formulas/trajectory_field_convergence.py
+symbolu/formulas/unified_trajectory_scenario_synthesis.py
+symbolu/formulas/scenario_fusion_engine.py
+symbolu/formulas/cross_horizon_resonance_alignment.py
+
+--- Stability & Regulation ---
+symbolu/formulas/macro_stability_regulator.py
+symbolu/formulas/formula_fusion_stabilizer.py
+symbolu/formulas/drift_fusion.py
+symbolu/formulas/arc_tension_harmonizer.py
+
+--- Consciousness & Causality ---
+symbolu/formulas/unified_consciousness.py
+symbolu/formulas/cause_effect_inversion.py
+symbolu/formulas/mirror_time_cycle.py
+symbolu/formulas/mirror_time_loop.py
+
+--- Reality Modeling ---
+symbolu/formulas/internal_external_reality_cve.py
+symbolu/formulas/external_reality_trust_calibration.py
+symbolu/formulas/action_eligibility_boundary.py
+
+--- Guna-Kosha ---
+symbolu/formulas/guna_kosha_resonance.py       # Guna-Kosha resonance mapping
+
+--- Formula Data ---
+symbolu/formulas/data/ontological_layers_v1.json
+symbolu/formulas/data/varna_bridge_map_v1.json
+symbolu/formulas/data/varna_distortion_map_v1.json
+symbolu/formulas/data/varna_layer_interaction_v1.json
+symbolu/formulas/data/varna_polarity_map_v1.json
+
+--- Formula Drift Tests ---
+symbolu/core/formula_drift_tests/__init__.py
+symbolu/core/formula_drift_tests/phase1_resonance_fixtures.json
+symbolu/core/formula_drift_tests/test_patent_alignment_tags.py
+symbolu/core/formula_drift_tests/test_phase13_enhanced_smi.py
+symbolu/core/formula_drift_tests/test_phase14_vritti_and_ath.py
+symbolu/core/formula_drift_tests/test_phase16_formula_fusion_stabilizer.py
+symbolu/core/formula_drift_tests/test_phase17_semantic_integrity_and_drift.py
+symbolu/core/formula_drift_tests/test_phase18_temporal_entropy_differential.py
+symbolu/core/formula_drift_tests/test_phase19_drift_fusion.py
+symbolu/core/formula_drift_tests/test_phase1_resonance_formulas.py
+symbolu/core/formula_drift_tests/test_phase8_guna_kosha_resonance_drift.py
+
+--- Formula Fixture Generation ---
+symbolu/tools/formula_fixtures/generate_phase1_resonance_fixtures.py
+
+--- Migration ---
+scripts/migrate_12d_formulas.py
+
+--- Tests (phase formula invariance audits) ---
+tests/test_phase10_formula_fusion_invariance_audit.py
+tests/test_phase13_enhanced_smi_invariance_audit.py
+tests/test_phase14_vritti_ath_invariance_audit.py
+tests/test_phase16_formula_fusion_stabilizer_invariance_audit.py
+tests/test_phase17_semantic_integrity_invariance_audit.py
+tests/test_phase18_temporal_entropy_invariance_audit.py
+tests/test_phase19_drift_fusion_invariance_audit.py
+tests/test_phase21_mirror_time_loop.py
+tests/test_phase21_mirror_time_loop_invariance_audit.py
+tests/test_phase22_mirror_time_cycle.py
+tests/test_phase22_mirror_time_cycle_invariance_audit.py
+tests/test_phase23_cause_effect_invariance_audit.py
+tests/test_phase23_cause_effect_inversion.py
+tests/test_phase24_resonance_weighting.py
+tests/test_phase26_unified_consciousness.py
+tests/test_phase26_unified_consciousness_invariance_audit.py
+tests/test_phase27_invariance_audit.py
+tests/test_phase27_symbolic_harmonization.py
+tests/test_phase29_persona_resonance.py
+tests/test_phase30_cross_layer_resonance_mapping.py
+tests/test_phase34_identity_harmonics.py
+tests/test_phase35_predictive_persona_drift.py
+tests/test_phase36_identity_resonance_memory.py
+tests/test_phase38_tcfm_invariance_audit.py
+tests/test_phase38_temporal_coherence_forecasting.py
+tests/test_phase40_chrae_invariance_audit.py
+tests/test_phase40_cross_horizon_resonance_alignment.py
+tests/test_phase41_coherence_regime_scenario_mapper.py
+tests/test_phase42_scenario_fusion_engine.py
+tests/test_phase44_coherence_scenario_alignment.py
+tests/test_phase45_mtsf_invariance_audit.py
+tests/test_phase45_multi_trajectory_stability_field.py
+tests/test_phase46_trajectory_convergence_invariance_audit.py
+tests/test_phase46_trajectory_field_convergence.py
+tests/test_phase47_unified_trajectory_scenario_synthesis.py
+tests/test_phase47_utsse_invariance_audit.py
+tests/test_phase48_macro_stability_invariance_audit.py
+tests/test_phase48_macro_stability_regulator.py
+tests/test_phase49_unified_temporal_stability.py
+tests/test_phase49_unified_temporal_stability_invariance_audit.py
+tests/test_phase50_cognitive_consistency_invariance_audit.py
+tests/test_phase50_cognitive_consistency_regression.py
+tests/test_phase51_cra_invariance_audit.py
+tests/test_phase51_rag_coherence_validation.py
+tests/test_phase51_rag_cra_integration.py
+tests/test_phase52_ier_cve_invariance_audit.py
+tests/test_phase52_internal_external_reality_cve.py
+tests/test_phase52_internal_external_reality_invariance_audit.py
+tests/test_phase53_ertce_invariance_audit.py
+tests/test_phase53_external_reality_trust_invariance_audit.py
+tests/test_phase54_action_eligibility_boundary.py
+tests/test_phase54_action_eligibility_invariance_audit.py
+tests/test_phase55_agent_handoff_safety_invariance_audit.py
+tests/unit/formulas/__init__.py
+tests/unit/formulas/test_guna_kosha_resonance.py
+tests/unit/formulas/test_phase37_adaptive_continuity.py
+tests/unit/formulas/test_phase39_multi_horizon_temporal_forecasting.py

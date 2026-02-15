@@ -1,0 +1,68 @@
+================================================================================
+FEATURE: Trading System (Financial Analysis)
+================================================================================
+Two generations of trading engines with Elliott Wave analysis, tick processing,
+QuantConnect integration, TradingView PineScript indicators, and Bayesian
+model selection.
+================================================================================
+
+--- Trading v1 ---
+trading/__init__.py
+trading/analysis/__init__.py
+trading/analysis/elliott_wave.py               # Elliott Wave analysis
+trading/analysis/fibonacci.py                  # Fibonacci retracements
+trading/core/__init__.py
+trading/core/config.py                         # Trading config
+trading/core/evolution_engine.py               # State evolution
+trading/core/observables.py                    # Observable signals
+trading/core/signals.py                        # Signal definitions
+trading/core/state_register.py                 # State register
+trading/core/utility.py                        # Utilities
+trading/tick_processor/__init__.py
+trading/tick_processor/aggregator.py           # Tick aggregation
+trading/tick_processor/imbalance.py            # Tick imbalance detection
+trading/tick_processor/volatility.py           # Volatility modeling
+
+--- Trading v1 PineScript ---
+trading/pinescript/symbolu_elliott_wave.pine
+trading/pinescript/symbolu_elliott_wave_v2_multidegree.pine
+trading/pinescript/symbolu_oscillator.pine
+trading/pinescript/symbolu_state_evolution.pine
+trading/pinescript/test_elliott_wave_logic.py
+
+--- Trading v1 QuantConnect ---
+trading/quantconnect/__init__.py
+trading/quantconnect/algorithm.py
+trading/quantconnect/indicator.py
+
+--- Trading v2 ---
+trading2/__init__.py
+trading2/analysis/__init__.py
+trading2/analysis/elliott_wave.py              # Elliott Wave v2
+trading2/analysis/indicators.py                # Technical indicators
+trading2/analysis/model_selector.py            # Bayesian model selection
+trading2/analysis/volume_profile.py            # Volume profile analysis
+trading2/core/__init__.py
+trading2/core/config.py
+trading2/core/evolution_engine.py
+trading2/core/hybrid_engine.py                 # Hybrid engine
+trading2/core/observables.py
+trading2/core/recursive_self_improvement.py    # Self-improving engine
+trading2/core/self_improving_engine.py
+trading2/core/state_register.py
+trading2/core/utility.py
+trading2/tick_processor/__init__.py
+
+--- Trading v2 PineScript ---
+trading2/pinescript/bayesian_adx_indicator.pine
+
+--- Trading v2 QuantConnect ---
+trading2/quantconnect/__init__.py
+trading2/quantconnect/algorithm.py
+trading2/quantconnect/indicator.py
+
+--- Benchmarks ---
+benchmarks/trading_model_comparison.py
+
+--- Tests ---
+tests/unit/trading2/test_model_selector.py

@@ -1,0 +1,168 @@
+================================================================================
+SYMBOLU CODEBASE FILE CLASSIFICATION INDEX
+================================================================================
+Generated: 2026-02-15
+Total files classified: ~2200 (excluding .md and .git)
+================================================================================
+
+This classification organizes every non-markdown file in the Symbolu codebase
+by the feature or product it belongs to. Each file in the classification
+directory covers one major feature/product area.
+
+================================================================================
+CLASSIFICATION FILES
+================================================================================
+
+01_phase_transformer.txt
+    Phase Transformer (O(n) LLM Core)
+    Patent U1-U4 phase-synchronization attention replacing O(n^2) softmax.
+    Model sizes: 10M to 7B parameters.
+
+02_sovereign_model.txt
+    Sovereign Model (Intelligent Agent Backbone)
+    Transformer with PID Governor, multi-objective loss, reasoning kernel.
+
+03_ontological_engine.txt
+    Ontological Engine (12D Consciousness Modeling)
+    Learnable 12D vector engine with Bhava states and multiple variants.
+
+04_mechanical_pipeline.txt
+    Mechanical Pipeline (v3.0 Linear Orchestrator)
+    55+ phase pipeline: Persona -> MLCR -> Fusion -> DHA -> Renderer.
+
+05_rag_system.txt
+    RAG System (Retrieval-Augmented Generation)
+    Hash-based embeddings, vector store, retrieval, stitching, episodic memory.
+
+06_formulas.txt
+    Formulas Module (Mathematical Framework)
+    51+ formulas for coherence, resonance, temporal forecasting, consciousness.
+
+07_guna_modulation.txt
+    Guna Modulation (State Evolution Engine)
+    Dynamic energy states with entropy modulation and causal layers.
+
+08_core_systems.txt
+    Core Systems (Foundational Infrastructure)
+    CoreInterface, SMI, stitching, entropy, coherence, bhava, energy, regulators.
+
+09_vision.txt
+    Vision System (Multimodal Image/Video Processing)
+    Phase-quad generation, DiT blocks, Flux integration, video generation.
+
+10_voice_and_presentation.txt
+    Voice & Presentation (Speech + Response Generation)
+    Multi-provider TTS, prosody, barge-in, presentation engine.
+
+11_agentic_framework.txt
+    Agentic Framework (Agent Intelligence)
+    Goal decomposition, reflective loops, MCP gateway, safety contracts.
+
+12_service_layer.txt
+    Service Layer (API & Web Service)
+    FastAPI endpoints, chat, sessions, preferences, security, video gen.
+
+13_engine_layer.txt
+    Engine Layer (Business Logic & Tier System)
+    Consumer/Enterprise engine factory, query classification, AGI context.
+
+14_safety_and_governance.txt
+    Safety & Governance (Control Systems)
+    GCC contracts, runtime guards, policy engine, licensing, ledger audit.
+
+15_inference.txt
+    Inference System (Model Execution)
+    KV cache, CSR, evolutionary search, guna inference, metacognition.
+
+16_training.txt
+    Training Infrastructure (Model Training)
+    LLM/sovereign/ontological training pipelines, data generation, curricula.
+
+17_robotics.txt
+    Robotics Subsystem (symbolu_robotics)
+    Multi-tier control, encoders/decoders, planning, safety, coordination.
+
+18_trading.txt
+    Trading System (Financial Analysis)
+    Elliott Wave, tick processing, QuantConnect, PineScript, Bayesian selection.
+
+19_ctm_plus.txt
+    CTM+ (Advanced Optimization Layer)
+    CUDA kernels, database layer, DeepSpeed, vLLM serving.
+
+20_simulators.txt
+    Simulators (CTM+, PCAM, 6G)
+    Cache management sim, PCAM with RTL, 6G MIMO with SystemVerilog.
+
+21_frontend.txt
+    Frontend (Web Interface)
+    React/TypeScript with Vite, Tailwind, Remotion video, tiered views.
+
+22_sdk_cohera.txt
+    Cohera SDK (Hardware Abstraction SDK)
+    Python bindings and example kernels for custom TCU hardware.
+
+23_semantic_and_linguistic.txt
+    Semantic & Linguistic Systems
+    Name resonance, Chitta Vritti, resonance engine, causal modeling, temporal.
+
+24_experimental.txt
+    Experimental & Research
+    JEPA, adversarial hardening, cognitive loss, CUDA experiments, sandboxes.
+
+25_llm_providers.txt
+    LLM Providers & Hybrid Routing
+    Provider abstraction (Claude, Gemini), enterprise/consumer implementations.
+
+26_restoration_and_history.txt
+    Restoration & Version History
+    Deprecated phases, sandbox experiments, acoustic mapper versions.
+
+27_tools_and_dashboards.txt
+    Tools & Dashboards (Developer Utilities)
+    Coherence/drift dashboards, heatmaps, resonance/scenario simulators.
+
+28_benchmarks_and_stress_tests.txt
+    Benchmarks & Stress Tests
+    HellaSwag, LAMBADA, passkey, memory benchmarks, stress tests.
+
+29_remaining_modules.txt
+    Remaining Modules & Shared Infrastructure
+    Orchestration, DHA, posture, PPV, dynamics, adapter, renderer, diagnostics.
+
+30_project_config_and_ci.txt
+    Project Configuration, CI/CD & Data
+    Build config, CI workflows, data files, patches, miscellaneous tests.
+
+================================================================================
+FEATURE DISTRIBUTION SUMMARY
+================================================================================
+
+Major Products:
+  - Phase Transformer LLM (O(n) attention)      -- Core ML product
+  - Sovereign Model                              -- Agent backbone
+  - Ontological Engine (12D)                     -- Consciousness modeling
+  - Mechanical Pipeline (55 phases)              -- Processing pipeline
+  - RAG System                                   -- Knowledge retrieval
+  - Vision System                                -- Image/video generation
+  - Voice System                                 -- Speech interface
+  - Robotics Subsystem                           -- Physical robotics
+  - Trading System                               -- Financial analysis
+  - Frontend (React)                             -- Web interface
+
+Supporting Infrastructure:
+  - Formulas (51+ math formulas)
+  - Guna Modulation (state evolution)
+  - Core Systems (shared foundation)
+  - Agentic Framework (agent AI)
+  - Service Layer (FastAPI)
+  - Engine Layer (tier system)
+  - Safety & Governance
+  - Inference System
+  - Training Infrastructure
+  - CTM+ Optimization
+  - Simulators (PCAM, 6G)
+  - Cohera SDK (hardware)
+  - LLM Providers
+  - Tools & Dashboards
+  - Benchmarks & Tests
