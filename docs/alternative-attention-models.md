@@ -7,28 +7,34 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [The Core Insight: Normalization as Cognitive Lens](#2-the-core-insight-normalization-as-cognitive-lens)
-3. [Normalization Variants — Complete Reference](#3-normalization-variants--complete-reference)
-   - 3.1 [Softmax (Dense Baseline)](#31-softmax-dense-baseline)
-   - 3.2 [Sparsemax (Euclidean Projection)](#32-sparsemax-euclidean-projection)
-   - 3.3 [Entmax (Tsallis Regularization)](#33-entmax-tsallis-regularization)
-   - 3.4 [Top-M Softmax (Production Variant)](#34-top-m-softmax-production-variant)
-   - 3.5 [Kernel Attention — ELU](#35-kernel-attention--elu)
-   - 3.6 [Kernel Attention — RBF](#36-kernel-attention--rbf)
-4. [Cognitive Reasoning Modes](#4-cognitive-reasoning-modes)
-   - 4.1 [Generation (Forward Construction)](#41-generation-forward-construction)
-   - 4.2 [Critique (Verification / Auditing)](#42-critique-verification--auditing)
-   - 4.3 [Summarization (Compression)](#43-summarization-compression)
-5. [Task-Normalization Mapping](#5-task-normalization-mapping)
-6. [Learned Temperature Control](#6-learned-temperature-control)
-7. [Phase-Quad Integration Architecture](#7-phase-quad-integration-architecture)
-   - 7.1 [Integration Paths](#71-integration-paths)
-   - 7.2 [BCVF Hybrid Mode](#72-bcvf-hybrid-mode)
-   - 7.3 [The Full Pipeline](#73-the-full-pipeline)
-8. [Per-Head Normalization Mixing (Future)](#8-per-head-normalization-mixing-future)
-9. [Configuration Reference](#9-configuration-reference)
-10. [Evaluation and Diagnostics](#10-evaluation-and-diagnostics)
-11. [Production Recommendations](#11-production-recommendations)
+2. [The Three Layers of "Attention"](#2-the-three-layers-of-attention)
+3. [The Core Insight: Normalization as Cognitive Lens](#3-the-core-insight-normalization-as-cognitive-lens)
+4. [Normalization Variants — Complete Reference](#4-normalization-variants--complete-reference)
+   - 4.1 [Softmax (Dense Baseline)](#41-softmax-dense-baseline)
+   - 4.2 [Sparsemax (Euclidean Projection)](#42-sparsemax-euclidean-projection)
+   - 4.3 [Entmax (Tsallis Regularization)](#43-entmax-tsallis-regularization)
+   - 4.4 [Top-M Softmax (Production Variant)](#44-top-m-softmax-production-variant)
+   - 4.5 [Kernel Attention — ELU](#45-kernel-attention--elu)
+   - 4.6 [Kernel Attention — RBF](#46-kernel-attention--rbf)
+5. [Hardware-Level Attention: FlashAttention and PagedAttention](#5-hardware-level-attention-flashattention-and-pagedattention)
+   - 5.1 [FlashAttention (Compute Optimization)](#51-flashattention-compute-optimization)
+   - 5.2 [PagedAttention (Memory Management)](#52-pagedattention-memory-management)
+   - 5.3 [How All Three Layers Compose](#53-how-all-three-layers-compose)
+   - 5.4 [Compatibility Matrix](#54-compatibility-matrix)
+6. [Cognitive Reasoning Modes](#6-cognitive-reasoning-modes)
+   - 6.1 [Generation (Forward Construction)](#61-generation-forward-construction)
+   - 6.2 [Critique (Verification / Auditing)](#62-critique-verification--auditing)
+   - 6.3 [Summarization (Compression)](#63-summarization-compression)
+7. [Task-Normalization Mapping](#7-task-normalization-mapping)
+8. [Learned Temperature Control](#8-learned-temperature-control)
+9. [Phase-Quad Integration Architecture](#9-phase-quad-integration-architecture)
+   - 9.1 [Integration Paths](#91-integration-paths)
+   - 9.2 [BCVF Hybrid Mode](#92-bcvf-hybrid-mode)
+   - 9.3 [The Full Pipeline](#93-the-full-pipeline)
+10. [Per-Head Normalization Mixing (Future)](#10-per-head-normalization-mixing-future)
+11. [Configuration Reference](#11-configuration-reference)
+12. [Evaluation and Diagnostics](#12-evaluation-and-diagnostics)
+13. [Production Recommendations](#13-production-recommendations)
 
 ---
 
@@ -47,7 +53,42 @@ The key architectural insight: **different reasoning tasks demand different gove
 
 ---
 
-## 2. The Core Insight: Normalization as Cognitive Lens
+## 2. The Three Layers of "Attention"
+
+The word "attention" is overloaded in modern ML. There are three distinct layers, each solving a different problem:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3: WHAT to compute (Mathematical Function)              │
+│  softmax, entmax, sparsemax, top-M softmax, kernel             │
+│  "Which normalization produces the best weight distribution?"   │
+│  → This document's primary focus                               │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 2: HOW to compute it (Execution Strategy)               │
+│  FlashAttention, standard matmul, xformers                     │
+│  "How do we execute the same math faster on GPU hardware?"      │
+│  → Tiling, IO-awareness, kernel fusion                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 1: WHERE to store KV cache (Memory Management)          │
+│  PagedAttention, contiguous buffers, ring buffers               │
+│  "How do we manage KV cache memory during serving?"             │
+│  → Virtual memory, paging, copy-on-write                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**These layers are orthogonal.** You can combine any normalization function (Layer 3) with any execution strategy (Layer 2) and any memory manager (Layer 1). They do not compete — they compose.
+
+| Layer | Changes the math? | Changes quality? | Changes speed? |
+|-------|-------------------|-----------------|----------------|
+| Normalization (softmax/entmax/top-M) | Yes | Yes | Slightly |
+| FlashAttention | No (exact) | No | 2-4x faster |
+| PagedAttention | No | No | Higher throughput |
+
+Understanding this taxonomy is essential: our normalization variants change **what the model learns**. FlashAttention and PagedAttention change **how efficiently it runs**. Both matter for production, but they are independent engineering decisions.
+
+---
+
+## 3. The Core Insight: Normalization as Cognitive Lens
 
 Standard transformer attention uses softmax normalization, which distributes nonzero weight to every key. This is a **dense** attention pattern — no proposal is fully ignored.
 
@@ -69,9 +110,9 @@ This matters for Phase-Quad because the QuadRetriever returns K=64 proposals per
 
 ---
 
-## 3. Normalization Variants — Complete Reference
+## 4. Normalization Variants — Complete Reference
 
-### 3.1 Softmax (Dense Baseline)
+### 4.1 Softmax (Dense Baseline)
 
 ```
 AttentionNormType.SOFTMAX → "softmax"
@@ -108,7 +149,7 @@ AlternativeAttentionConfig(enabled=True, norm_type="softmax")
 
 ---
 
-### 3.2 Sparsemax (Euclidean Projection)
+### 4.2 Sparsemax (Euclidean Projection)
 
 ```
 AttentionNormType.SPARSEMAX → "sparsemax"
@@ -147,7 +188,7 @@ w = sparsemax(scores, dim=-1)
 
 ---
 
-### 3.3 Entmax (Tsallis Regularization)
+### 4.3 Entmax (Tsallis Regularization)
 
 ```
 AttentionNormType.ENTMAX15 → "entmax15"     (alpha=1.5, fixed)
@@ -214,7 +255,7 @@ AlternativeAttentionConfig(enabled=True, norm_type="entmax", entmax_alpha=1.3)
 
 ---
 
-### 3.4 Top-M Softmax (Production Variant)
+### 4.4 Top-M Softmax (Production Variant)
 
 ```
 AttentionNormType.TOP_M_SOFTMAX → "top_m_softmax"
@@ -281,7 +322,7 @@ AlternativeAttentionConfig(
 
 ---
 
-### 3.5 Kernel Attention — ELU
+### 4.5 Kernel Attention — ELU
 
 ```
 AttentionNormType.KERNEL_ELU → "kernel_elu"
@@ -320,7 +361,7 @@ AlternativeAttentionConfig(enabled=True, norm_type="kernel_elu")
 
 ---
 
-### 3.6 Kernel Attention — RBF
+### 4.6 Kernel Attention — RBF
 
 ```
 AttentionNormType.KERNEL_RBF → "kernel_rbf"
@@ -360,11 +401,229 @@ AlternativeAttentionConfig(enabled=True, norm_type="kernel_rbf")
 
 ---
 
-## 4. Cognitive Reasoning Modes
+## 5. Hardware-Level Attention: FlashAttention and PagedAttention
+
+FlashAttention and PagedAttention are frequently mentioned alongside normalization variants, but they solve **completely different problems**. Understanding where each sits in the stack prevents conflation and enables correct composition.
+
+### 5.1 FlashAttention (Compute Optimization)
+
+**Problem:** Standard attention computes QK^T (an N x N matrix), writes it to GPU HBM (high-bandwidth memory), reads it back for softmax, writes the result, reads it again for the V multiply. This memory traffic dominates runtime for modern GPUs where compute is fast but memory bandwidth is the bottleneck.
+
+**Solution:** FlashAttention (Dao et al., 2022) reorders the attention computation using **tiling** — loading blocks of Q, K, V from slow HBM into fast on-chip SRAM (192KB per streaming multiprocessor on A100), computing attention for that block in SRAM, and writing only the final output back to HBM. The intermediate N x N attention matrix is never materialized in HBM.
+
+**Key innovation:** The **online softmax trick** makes softmax associative, allowing block-by-block computation without needing the full row of logits simultaneously.
+
+```
+Standard Attention:
+  Q, K → HBM         (write N×d)
+  QK^T → HBM         (write N×N)  ← THIS IS THE BOTTLENECK
+  softmax(QK^T) → HBM (write N×N)
+  attn × V → HBM     (write N×d)
+  Total HBM I/O: O(N² + Nd)
+
+FlashAttention:
+  Load Q_block, K_block, V_block → SRAM  (small blocks)
+  Compute block attention in SRAM          (no HBM writes)
+  Update running output in HBM             (only final result)
+  Total HBM I/O: O(Nd)  ← N² term eliminated
+```
+
+**Performance:**
+- 2-4x wall-clock speedup over standard attention
+- 10-20x memory reduction (no N x N matrix stored)
+- Exact computation — produces bit-identical results to standard attention
+- Backward pass: recomputes attention from Q, K, V (already in SRAM) rather than reading the stored N x N matrix
+
+**FlashAttention versions:**
+
+| Version | GPU Target | Key Improvement |
+|---------|-----------|-----------------|
+| FlashAttention-1 | Ampere (A100) | IO-aware tiling, online softmax |
+| FlashAttention-2 | Ampere/Ada | Better parallelism, work partitioning, ~70% theoretical FLOPS |
+| FlashAttention-3 | Hopper (H100) | Async memory transfers, FP8 support, CUTLASS integration |
+
+**Critical point: FlashAttention does NOT change the normalization.**
+It computes exact softmax attention faster. The mathematical output is identical. It is a **hardware optimization**, not a model change.
+
+**References:**
+- [FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness](https://arxiv.org/abs/2205.14135) (Dao et al., NeurIPS 2022)
+- [FlashAttention-2](https://tridao.me/publications/flash2/flash2.pdf) (Dao, 2023)
+- [FlashAttention-3](https://tridao.me/blog/2024/flash3/) (Dao, 2024)
+- [GitHub: Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
+
+---
+
+### 5.2 PagedAttention (Memory Management)
+
+**Problem:** During autoregressive LLM serving, each request maintains a KV cache that grows with each generated token. Standard systems pre-allocate contiguous memory for the maximum possible sequence length, wasting 60-80% of GPU memory due to:
+- **Internal fragmentation:** sequences shorter than max length waste allocated space
+- **External fragmentation:** freed memory creates unusable gaps between allocations
+- **Redundant duplication:** parallel samples from the same prompt duplicate the shared prefix
+
+**Solution:** PagedAttention (Kwon et al., SOSP 2023) applies operating system virtual memory concepts to KV cache management:
+
+```
+Operating System          PagedAttention
+─────────────────         ─────────────────
+Pages (4KB)          →    KV Blocks (16 tokens)
+Virtual addresses    →    Logical block IDs
+Physical frames      →    Physical GPU memory blocks
+Page table           →    Block table
+Copy-on-Write        →    Shared prefix blocks
+```
+
+**How it works:**
+
+```
+┌────────────────────────────────────────────────┐
+│ Block Table (per request)                      │
+│                                                │
+│  Logical Block 0 → Physical Block 7            │
+│  Logical Block 1 → Physical Block 2            │
+│  Logical Block 2 → Physical Block 15           │
+│  Logical Block 3 → (not yet allocated)         │
+│                                                │
+│ Blocks are allocated on demand from free pool. │
+│ Non-contiguous physical layout is fine.         │
+│ Freed blocks return to pool immediately.        │
+└────────────────────────────────────────────────┘
+```
+
+**Performance impact:**
+- Near-zero memory waste (under 4% vs 60-80%)
+- 2-4x throughput improvement through higher batch sizes
+- Copy-on-Write for shared prefixes: up to 55% memory savings for beam search / parallel sampling
+- Per-kernel latency increases ~20-26% (block lookup overhead), but end-to-end throughput improves dramatically because more requests fit simultaneously
+
+**Critical point: PagedAttention does NOT change the attention computation.**
+It changes how KV cache memory is managed during inference serving. The attention math, normalization, and outputs are identical. It is a **memory management optimization**, not a model change.
+
+**References:**
+- [Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180) (Kwon et al., SOSP 2023)
+- [vLLM: Easy, Fast, and Cheap LLM Serving with PagedAttention](https://blog.vllm.ai/2023/06/20/vllm.html)
+- [vLLM PagedAttention Documentation](https://docs.vllm.ai/en/stable/design/paged_attention/)
+
+---
+
+### 5.3 How All Three Layers Compose
+
+In a production Phase-Quad deployment, all three layers work together:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ SERVING LAYER: PagedAttention (vLLM)                         │
+│ "Where do KV pairs live in GPU memory?"                      │
+│                                                               │
+│   Request A: blocks [7, 2, 15, ...]                          │
+│   Request B: blocks [3, 8, 15, ...]  ← shared block 15      │
+│                                                               │
+│   ┌───────────────────────────────────────────────────────┐   │
+│   │ COMPUTE LAYER: FlashAttention-2                       │   │
+│   │ "How do we execute the matmul + norm efficiently?"    │   │
+│   │                                                       │   │
+│   │   Load Q_block → SRAM                                │   │
+│   │   Load K_block, V_block → SRAM (via block table)     │   │
+│   │   Compute in SRAM, write only output to HBM          │   │
+│   │                                                       │   │
+│   │   ┌───────────────────────────────────────────────┐   │   │
+│   │   │ MATH LAYER: Normalization Function            │   │   │
+│   │   │ "What attention distribution do we compute?"  │   │   │
+│   │   │                                               │   │   │
+│   │   │   Top-M Softmax: keep top 24, softmax rest   │   │   │
+│   │   │   + Learned Temperature: scale by 1/T        │   │   │
+│   │   │                                               │   │   │
+│   │   │   This is what changes model behavior.        │   │   │
+│   │   └───────────────────────────────────────────────┘   │   │
+│   └───────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Each layer is independently swappable:
+- Change normalization without touching FlashAttention or PagedAttention
+- Upgrade FlashAttention-2 to FlashAttention-3 without changing model behavior
+- Switch from vLLM to TensorRT-LLM without retraining
+
+---
+
+### 5.4 Compatibility Matrix
+
+| Normalization | FlashAttention Compatible? | PagedAttention Compatible? | Notes |
+|---------------|---------------------------|---------------------------|-------|
+| **Softmax** | Native support | Yes | FlashAttention was built for softmax |
+| **Top-M Softmax** | Custom kernel needed | Yes | Top-k selection before FlashAttention softmax |
+| **Entmax** | Custom kernel needed | Yes | Bisection solver replaces softmax in tiling loop |
+| **Sparsemax** | Custom kernel needed | Yes | Sort-based projection replaces softmax |
+| **Kernel ELU** | Not applicable | Yes | Different compute pattern (no softmax to accelerate) |
+| **Kernel RBF** | Not applicable | Yes | Different compute pattern |
+
+**FlashAttention compatibility detail:**
+
+FlashAttention's tiling assumes the normalization is softmax (the online softmax trick is specific to the softmax function). Using entmax or top-M with FlashAttention requires one of:
+
+1. **Custom CUDA kernel**: Replace the softmax step inside the FlashAttention tiling loop with the alternative normalization. This is engineering work but does not change the tiling strategy.
+
+2. **Two-pass approach**: Run FlashAttention for the QK^T computation (fast), then apply the alternative normalization separately. This loses some of FlashAttention's IO benefit but is simpler to implement.
+
+3. **For top-M specifically**: Run standard FlashAttention softmax, then zero out the bottom (K-M) weights. This is an approximation (the softmax is computed over all K elements, not just the top M), but may be sufficient in practice.
+
+For Phase-Quad proposal attention (K=64 proposals, not sequence-length attention), the sequence dimension is small enough that FlashAttention's IO benefit is minimal. FlashAttention matters more for the self-attention and cross-attention layers operating over spatial tokens (N=256-4096).
+
+---
+
+### 5.5 PCAM: Progressively Compressed Attention Mechanism
+
+For completeness, PCAM (Progressively Compressed Attention Mechanism) is another hardware-efficiency technique that reduces GPU memory load by progressively compressing KV cache entries as they age:
+
+```
+Recent tokens:    full precision, full detail
+Older tokens:     compressed, merged, lower precision
+Very old tokens:  highly compressed summaries
+```
+
+**Relationship to our stack:**
+- PCAM is a Layer 1 technique (memory management), similar to PagedAttention
+- It trades off precision of older context for reduced memory footprint
+- Compatible with any normalization function (Layer 3)
+- Particularly useful for very long context windows where even PagedAttention runs out of memory
+
+**When to prefer PCAM over PagedAttention:**
+
+| Scenario | PagedAttention | PCAM |
+|----------|---------------|------|
+| High-throughput serving (many short requests) | Better | Neutral |
+| Very long context (100K+ tokens) | Memory-limited | Better |
+| Quality-critical applications | Better (lossless) | Worse (lossy compression) |
+| Memory-constrained hardware | Limited help | Significant savings |
+
+---
+
+### 5.6 Complete Taxonomy: What Actually Matters
+
+| Goal | Solution | Layer | Changes Model Quality? |
+|------|----------|-------|----------------------|
+| **Better reasoning quality** | Entmax / Top-M / Sparsemax | Math (Layer 3) | Yes — different inductive bias |
+| **Faster inference** | FlashAttention | Compute (Layer 2) | No — exact same math |
+| **Longer context** | PagedAttention, PCAM | Memory (Layer 1) | No (Paged) / Slightly (PCAM) |
+| **Reduced GPU memory** | PCAM, Kernel Attention | Memory + Math | Kernel: No loss. PCAM: Lossy |
+| **Higher serving throughput** | PagedAttention + FlashAttention | Memory + Compute | No |
+| **Task-adaptive reasoning** | Per-head mixed normalization | Math (Layer 3) | Yes — richer inductive bias |
+
+**The production stack for Phase-Quad:**
+
+```
+Training:   Top-M Softmax (normalization) + standard PyTorch (compute)
+Inference:  Top-M Softmax (normalization) + FlashAttention (self-attn) + vLLM/PagedAttention (serving)
+```
+
+Normalization choice affects what the model learns. Compute and memory optimizations affect how fast it runs. Both are essential for production, but they are independent decisions.
+
+---
+
+## 6. Cognitive Reasoning Modes
 
 The choice of normalization is fundamentally a choice about **how the model reasons**. Different tasks require different reasoning modes.
 
-### 4.1 Generation (Forward Construction)
+### 6.1 Generation (Forward Construction)
 
 **What the model needs:**
 - Broad context integration across many proposals
@@ -403,7 +662,7 @@ AlternativeAttentionConfig(
 
 ---
 
-### 4.2 Critique (Verification / Auditing)
+### 6.2 Critique (Verification / Auditing)
 
 **What the model needs:**
 - Sharp focus on inconsistencies
@@ -448,7 +707,7 @@ AlternativeAttentionConfig(
 
 ---
 
-### 4.3 Summarization (Compression)
+### 6.3 Summarization (Compression)
 
 **What the model needs:**
 - Identify key signal-carrying proposals
@@ -495,7 +754,7 @@ AlternativeAttentionConfig(
 
 ---
 
-## 5. Task-Normalization Mapping
+## 7. Task-Normalization Mapping
 
 ### Decision Matrix
 
@@ -541,7 +800,7 @@ AlternativeAttentionConfig(
 
 ---
 
-## 6. Learned Temperature Control
+## 8. Learned Temperature Control
 
 ### The Problem
 
@@ -606,9 +865,9 @@ This means `top_m_softmax + learned_temperature` gives you **two orthogonal cont
 
 ---
 
-## 7. Phase-Quad Integration Architecture
+## 9. Phase-Quad Integration Architecture
 
-### 7.1 Integration Paths
+### 9.1 Integration Paths
 
 The block supports four mutually exclusive proposal integration paths:
 
@@ -642,7 +901,7 @@ Selection priority (in `_build_proposal_mixer`):
 3. `use_bcvf` → Path 3
 4. Default → Path 4
 
-### 7.2 BCVF Hybrid Mode
+### 9.2 BCVF Hybrid Mode
 
 The recommended production path combines BCVF consistency filtering with alternative attention via a **learned mixing ratio**:
 
@@ -657,7 +916,7 @@ where `mix_ratio` is a learned scalar parameter (initialized at 0.5).
 - Alternative attention captures **relevance** (which proposals are most useful?)
 - These are complementary signals — consistency ≠ relevance
 
-### 7.3 The Full Pipeline
+### 9.3 The Full Pipeline
 
 For the production configuration (`top_m_softmax + BCVF`), the proposal integration pipeline is:
 
@@ -694,7 +953,7 @@ QuadRetriever (K=64 proposals)
 
 ---
 
-## 8. Per-Head Normalization Mixing (Future)
+## 10. Per-Head Normalization Mixing (Future)
 
 The most architecturally powerful extension: allow each attention head to use a **different normalization strategy**.
 
@@ -749,7 +1008,7 @@ This requires a task-mode signal (could be a special token, a conditioning embed
 
 ---
 
-## 9. Configuration Reference
+## 11. Configuration Reference
 
 ### AlternativeAttentionConfig
 
@@ -825,7 +1084,7 @@ AlternativeAttentionConfig(
 
 ---
 
-## 10. Evaluation and Diagnostics
+## 12. Evaluation and Diagnostics
 
 ### AttentionNormEvaluator
 
@@ -886,7 +1145,7 @@ results = compare_normalizations_on_scores(scores, dim=-1)
 
 ---
 
-## 11. Production Recommendations
+## 13. Production Recommendations
 
 ### For Phase-Quad Image Generation
 
