@@ -166,6 +166,12 @@ class AlternativeAttentionConfig:
     - "entmax": Entmax with configurable alpha (recommended: alpha=1.3)
     - "kernel_elu": Linear attention with ELU+1 kernel
     - "kernel_rbf": Linear attention with random RBF features
+
+    Logit temperature control:
+    - Entmax sparsity is controlled by logit scale, not just alpha.
+    - Without temperature control, Q/K weight growth during training causes
+      logit variance to drift, changing effective sparsity unpredictably.
+    - A learned temperature stabilizes the entmax operating point.
     """
     enabled: bool = False  # Off by default, enable to study alternatives
     norm_type: str = "entmax"  # Default: entmax with alpha=1.3 for Phase-Quad
@@ -173,6 +179,9 @@ class AlternativeAttentionConfig:
     score_bias_scale: float = 0.5  # Scale for retrieval score bias
     mix_with_bcvf: bool = True  # Combine with BCVF consistency filtering
     bcvf_mix_ratio: float = 0.5  # BCVF vs alternative attention mix
+    # Logit temperature control (stabilizes entmax sparsity during training)
+    logit_temperature_init: float = 1.0  # Initial temperature value
+    learn_temperature: bool = True  # If True, temperature is a learned parameter
 
 
 @dataclass
