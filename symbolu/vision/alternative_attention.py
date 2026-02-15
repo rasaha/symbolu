@@ -33,6 +33,7 @@ from symbolu.vision.attention_normalizations import (
     sparsemax,
     entmax,
     entmax15,
+    top_m_softmax,
     KernelAttention,
     attention_sparsity_metrics,
     logit_sharpness_metrics,
@@ -69,6 +70,7 @@ class AlternativeAttentionToProposals(nn.Module):
         score_bias_scale: Scale factor for retrieval score bias (default 0.5).
         temperature_init: Initial logit temperature value (default 1.0).
         learn_temperature: If True, temperature is a learned parameter (default True).
+        top_m: Number of top elements to keep for TOP_M_SOFTMAX (default 8).
     """
 
     # Clamp bounds for temperature to prevent degenerate regimes:
@@ -88,6 +90,7 @@ class AlternativeAttentionToProposals(nn.Module):
         score_bias_scale: float = 0.5,
         temperature_init: float = 1.0,
         learn_temperature: bool = True,
+        top_m: int = 8,
     ):
         super().__init__()
 
@@ -98,6 +101,7 @@ class AlternativeAttentionToProposals(nn.Module):
         self.norm_type = norm_type
         self.entmax_alpha = entmax_alpha
         self.score_bias_scale = score_bias_scale
+        self.top_m = top_m
 
         assert embed_dim % num_heads == 0, (
             f"embed_dim {embed_dim} not divisible by num_heads {num_heads}"
@@ -158,6 +162,8 @@ class AlternativeAttentionToProposals(nn.Module):
             return entmax15(attn, dim=-1)
         elif self.norm_type == AttentionNormType.ENTMAX_ALPHA:
             return entmax(attn, alpha=self.entmax_alpha, dim=-1)
+        elif self.norm_type == AttentionNormType.TOP_M_SOFTMAX:
+            return top_m_softmax(attn, m=self.top_m, dim=-1)
         else:
             # Kernel attention handled separately in forward()
             raise ValueError(
@@ -331,6 +337,7 @@ class PhaseQuadAttentionVariant(nn.Module):
         mix_ratio: Initial BCVF vs attention mix (0=pure attn, 1=pure BCVF).
         temperature_init: Initial logit temperature (default 1.0).
         learn_temperature: Whether temperature is trainable (default True).
+        top_m: Number of top elements for TOP_M_SOFTMAX (default 8).
     """
 
     def __init__(
@@ -343,6 +350,7 @@ class PhaseQuadAttentionVariant(nn.Module):
         mix_ratio: float = 0.5,
         temperature_init: float = 1.0,
         learn_temperature: bool = True,
+        top_m: int = 8,
     ):
         super().__init__()
 
@@ -358,6 +366,7 @@ class PhaseQuadAttentionVariant(nn.Module):
             entmax_alpha=entmax_alpha,
             temperature_init=temperature_init,
             learn_temperature=learn_temperature,
+            top_m=top_m,
         )
 
         self.mix_ratio = nn.Parameter(torch.tensor(mix_ratio))

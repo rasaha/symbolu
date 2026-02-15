@@ -166,12 +166,21 @@ class AlternativeAttentionConfig:
     - "entmax": Entmax with configurable alpha (recommended: alpha=1.3)
     - "kernel_elu": Linear attention with ELU+1 kernel
     - "kernel_rbf": Linear attention with random RBF features
+    - "top_m_softmax": Top-M mask + softmax (production variant)
+
+    Top-M softmax (production recommendation):
+    - Keep only the top M logits, mask the rest to -inf, then softmax.
+    - Deterministic sparsity: exactly M non-zero weights, always.
+    - Smooth softmax gradients over survivors — no exotic solvers.
+    - Hardware-friendly, debuggable, predictable.
+    - Phase-Quad already has QuadRetriever ranking + BCVF filtering,
+      so automatic sparsity discovery (entmax) is less critical.
 
     Logit temperature control:
-    - Entmax sparsity is controlled by logit scale, not just alpha.
+    - Logit scale determines normalization sharpness ("pressure").
     - Without temperature control, Q/K weight growth during training causes
       logit variance to drift, changing effective sparsity unpredictably.
-    - A learned temperature stabilizes the entmax operating point.
+    - A learned temperature stabilizes the operating point.
     """
     enabled: bool = False  # Off by default, enable to study alternatives
     norm_type: str = "entmax"  # Default: entmax with alpha=1.3 for Phase-Quad
@@ -179,9 +188,11 @@ class AlternativeAttentionConfig:
     score_bias_scale: float = 0.5  # Scale for retrieval score bias
     mix_with_bcvf: bool = True  # Combine with BCVF consistency filtering
     bcvf_mix_ratio: float = 0.5  # BCVF vs alternative attention mix
-    # Logit temperature control (stabilizes entmax sparsity during training)
+    # Logit temperature control (stabilizes sparsity during training)
     logit_temperature_init: float = 1.0  # Initial temperature value
     learn_temperature: bool = True  # If True, temperature is a learned parameter
+    # Top-M softmax: keep only top M logits before softmax
+    top_m: int = 24  # Number of proposals to keep (from K=64, keep top 24)
 
 
 @dataclass

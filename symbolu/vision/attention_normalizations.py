@@ -49,6 +49,7 @@ class AttentionNormType(Enum):
     ENTMAX_ALPHA = "entmax"     # entmax with configurable alpha
     KERNEL_ELU = "kernel_elu"   # Linear attention with ELU+1 kernel
     KERNEL_RBF = "kernel_rbf"   # Linear attention with random RBF features
+    TOP_M_SOFTMAX = "top_m_softmax"  # Top-M mask + softmax (production variant)
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +265,58 @@ class Entmax(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# Top-M Softmax: deterministic sparse attention (production variant)
+# ---------------------------------------------------------------------------
+
+def top_m_softmax(z: Tensor, m: int, dim: int = -1) -> Tensor:
+    """
+    Top-M mask + softmax: keep only the top-M logits, softmax over them.
+
+    Production-grade sparse attention that provides:
+    - Deterministic sparsity: exactly M non-zero weights, always
+    - Stable gradients: softmax over M elements (well-understood)
+    - Predictable compute: fixed sparsity ratio regardless of input
+    - Compatible with learned temperature for sharpness control
+
+    Equivalent to top-k sampling applied to attention weights.
+    For Phase-Quad with K proposals, M << K concentrates attention
+    on the most relevant proposals while maintaining softmax's smooth
+    gradient landscape.
+
+    Args:
+        z: Input scores (logits) of any shape.
+        m: Number of top elements to keep (rest are masked to -inf).
+        dim: Dimension to normalize over (default: -1).
+
+    Returns:
+        p: Attention weights with exactly (n - M) zeros per row.
+    """
+    n = z.size(dim)
+    m = min(m, n)  # Can't keep more than we have
+
+    # Find the top-M values and their indices
+    topk_vals, topk_idx = z.topk(m, dim=dim)
+
+    # Create mask: -inf everywhere, then scatter top-M values back
+    mask = torch.full_like(z, float("-inf"))
+    mask.scatter_(dim, topk_idx, topk_vals)
+
+    return F.softmax(mask, dim=dim)
+
+
+class TopMSoftmax(nn.Module):
+    """Module wrapper for top-M softmax."""
+
+    def __init__(self, m: int, dim: int = -1):
+        super().__init__()
+        self.m = m
+        self.dim = dim
+
+    def forward(self, z: Tensor) -> Tensor:
+        return top_m_softmax(z, m=self.m, dim=self.dim)
+
+
+# ---------------------------------------------------------------------------
 # Kernel (Linear) Attention: softmax-free via positive feature maps
 # ---------------------------------------------------------------------------
 
@@ -421,6 +474,7 @@ def get_attention_normalizer(
     dim: int = -1,
     head_dim: int = 64,
     num_features: int = 256,
+    top_m: int = 8,
 ) -> nn.Module:
     """
     Factory function to create an attention normalizer module.
@@ -431,6 +485,7 @@ def get_attention_normalizer(
         dim: Dimension to normalize over (ignored for kernel attention).
         head_dim: Head dimension (for kernel attention RBF features).
         num_features: Number of random features (for RBF kernel).
+        top_m: Number of top elements for top-M softmax.
 
     Returns:
         Module that normalizes attention scores to weights.
@@ -443,6 +498,8 @@ def get_attention_normalizer(
         return Entmax(alpha=1.5, dim=dim)
     elif norm_type == AttentionNormType.ENTMAX_ALPHA:
         return Entmax(alpha=alpha, dim=dim)
+    elif norm_type == AttentionNormType.TOP_M_SOFTMAX:
+        return TopMSoftmax(m=top_m, dim=dim)
     elif norm_type in (AttentionNormType.KERNEL_ELU, AttentionNormType.KERNEL_RBF):
         feature_map = "elu" if norm_type == AttentionNormType.KERNEL_ELU else "rbf"
         return KernelAttention(

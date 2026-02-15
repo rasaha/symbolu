@@ -37,6 +37,7 @@ from symbolu.vision.attention_normalizations import (
     sparsemax,
     entmax,
     entmax15,
+    top_m_softmax,
     attention_sparsity_metrics,
 )
 from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
@@ -103,7 +104,8 @@ class AttentionNormEvaluator(nn.Module):
                 AttentionNormType.SOFTMAX,
                 AttentionNormType.SPARSEMAX,
                 AttentionNormType.ENTMAX15,
-                AttentionNormType.ENTMAX_ALPHA,  # entmax(1.3) — recommended
+                AttentionNormType.ENTMAX_ALPHA,  # entmax(1.3)
+                AttentionNormType.TOP_M_SOFTMAX,  # production variant
                 AttentionNormType.KERNEL_ELU,
             ]
 
@@ -425,6 +427,12 @@ def compare_normalizations_on_scores(
         # Entmax 1.75 (harder)
         w_entmax175 = entmax(scores, alpha=1.75, dim=dim)
         results["entmax175"] = attention_sparsity_metrics(w_entmax175, dim=dim)
+
+        # Top-M softmax (production variant, M=24)
+        n = scores.size(dim)
+        m = min(24, n)
+        w_topm = top_m_softmax(scores, m=m, dim=dim)
+        results["top_m_softmax"] = attention_sparsity_metrics(w_topm, dim=dim)
 
     return results
 

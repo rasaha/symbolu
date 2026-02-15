@@ -261,6 +261,7 @@ class PhaseQuadDiTBlock(nn.Module):
                     mix_ratio=alt_attention.bcvf_mix_ratio,
                     temperature_init=alt_attention.logit_temperature_init,
                     learn_temperature=alt_attention.learn_temperature,
+                    top_m=alt_attention.top_m,
                 )
             else:
                 # Pure alternative attention (no BCVF)
@@ -275,6 +276,7 @@ class PhaseQuadDiTBlock(nn.Module):
                     score_bias_scale=alt_attention.score_bias_scale,
                     temperature_init=alt_attention.logit_temperature_init,
                     learn_temperature=alt_attention.learn_temperature,
+                    top_m=alt_attention.top_m,
                 )
         elif use_bcvf:
             # Original: BCVF + softmax cross-attention hybrid (Appendix I)

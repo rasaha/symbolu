@@ -1282,3 +1282,257 @@ class TestTemperatureConfigIntegration:
         # Should be a buffer, not a parameter
         param_names = [n for n, _ in block.alt_proposal_mixer.named_parameters()]
         assert "log_temperature" not in param_names
+
+
+# ===========================================================================
+# Test 15: Top-M softmax (production variant)
+# ===========================================================================
+
+class TestTopMSoftmax:
+    """Test top-M mask + softmax normalization."""
+
+    def test_sums_to_one(self, sample_scores):
+        """Top-M softmax output should sum to 1."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        result = top_m_softmax(sample_scores, m=5, dim=-1)
+        sums = result.sum(dim=-1)
+        assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5), (
+            f"Top-M softmax should sum to 1, got {sums}"
+        )
+
+    def test_exact_sparsity(self, device):
+        """Top-M softmax should produce exactly (n - M) zeros per row."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        n = 20
+        m = 8
+        scores = torch.randn(4, n, device=device)
+        result = top_m_softmax(scores, m=m, dim=-1)
+
+        nonzero_counts = (result > 0).sum(dim=-1)
+        assert (nonzero_counts == m).all(), (
+            f"Should have exactly {m} non-zero entries, got {nonzero_counts}"
+        )
+
+    def test_non_negative(self, sample_scores):
+        """Top-M softmax output should be non-negative."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        result = top_m_softmax(sample_scores, m=5, dim=-1)
+        assert (result >= 0).all(), "Top-M softmax should produce non-negative values"
+
+    def test_gradient_flows(self, device):
+        """Top-M softmax should allow gradient flow."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        scores = torch.randn(4, 10, device=device, requires_grad=True)
+        result = top_m_softmax(scores, m=5, dim=-1)
+        loss = result.sum()
+        loss.backward()
+        assert scores.grad is not None, "Gradients should flow through top-M softmax"
+
+    def test_m_equals_n_is_softmax(self, device):
+        """Top-M with M=n should equal standard softmax."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        n = 10
+        scores = torch.randn(4, n, device=device)
+        result = top_m_softmax(scores, m=n, dim=-1)
+        expected = F.softmax(scores, dim=-1)
+        assert torch.allclose(result, expected, atol=1e-5), (
+            "Top-M with M=n should equal softmax"
+        )
+
+    def test_m_greater_than_n_clamps(self, device):
+        """Top-M with M > n should clamp to n (no crash)."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        n = 5
+        scores = torch.randn(2, n, device=device)
+        result = top_m_softmax(scores, m=100, dim=-1)
+        sums = result.sum(dim=-1)
+        assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
+
+    def test_sparsity_increases_with_smaller_m(self, device):
+        """Smaller M should produce more sparse outputs."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        n = 20
+        scores = torch.randn(8, n, device=device)
+
+        result_m16 = top_m_softmax(scores, m=16, dim=-1)
+        result_m4 = top_m_softmax(scores, m=4, dim=-1)
+
+        sparsity_m16 = (result_m16 == 0).float().mean().item()
+        sparsity_m4 = (result_m4 == 0).float().mean().item()
+
+        assert sparsity_m4 > sparsity_m16, (
+            f"Smaller M should be sparser: M=4 ({sparsity_m4:.3f}) vs M=16 ({sparsity_m16:.3f})"
+        )
+
+    def test_batched(self, device):
+        """Top-M softmax should work with batched inputs."""
+        from symbolu.vision.attention_normalizations import top_m_softmax
+
+        scores = torch.randn(3, 4, 8, device=device)
+        result = top_m_softmax(scores, m=3, dim=-1)
+        assert result.shape == scores.shape
+        sums = result.sum(dim=-1)
+        assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
+
+
+class TestTopMSoftmaxIntegration:
+    """Test top-M softmax wired into AlternativeAttentionToProposals."""
+
+    def test_output_shape(self, sample_inputs, batch_config):
+        """TOP_M_SOFTMAX should produce correct output shape."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.TOP_M_SOFTMAX,
+            top_m=4,
+        )
+
+        out = module(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+        )
+        assert out.shape == sample_inputs["x"].shape
+
+    def test_sparsity_metrics(self, sample_inputs, batch_config):
+        """TOP_M_SOFTMAX should report sparsity metrics including logit stats."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.TOP_M_SOFTMAX,
+            top_m=4,
+        )
+
+        module(sample_inputs["x"], sample_inputs["proposals"], sample_inputs["scores"])
+        metrics = module.get_sparsity_metrics()
+
+        assert "attn/sparsity" in metrics
+        assert metrics["attn/sparsity"] > 0.0, (
+            "Top-M with M < K should have nonzero sparsity"
+        )
+        assert "attn/temperature" in metrics
+
+    def test_gradient_flow(self, sample_inputs, batch_config):
+        """Gradients should flow through top-M softmax attention."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.TOP_M_SOFTMAX,
+            top_m=4,
+            learn_temperature=True,
+        )
+
+        x = sample_inputs["x"].detach().requires_grad_(True)
+        out = module(x, sample_inputs["proposals"], sample_inputs["scores"])
+        loss = out.sum()
+        loss.backward()
+
+        assert x.grad is not None, "Gradients should flow through top-M attention"
+        assert module.log_temperature.grad is not None, (
+            "Temperature should receive gradients with top-M softmax"
+        )
+
+    def test_with_bcvf_variant(self, sample_inputs, batch_config, device):
+        """TOP_M_SOFTMAX should work in PhaseQuadAttentionVariant."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import PhaseQuadAttentionVariant
+
+        module = PhaseQuadAttentionVariant(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.TOP_M_SOFTMAX,
+            top_m=4,
+        )
+
+        phase_state = torch.randn(
+            batch_config["B"], batch_config["N"], batch_config["D"], device=device
+        )
+
+        out = module(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+            phase_state,
+        )
+        assert out.shape == sample_inputs["x"].shape
+
+    def test_block_with_top_m_softmax(self, device):
+        """PhaseQuadDiTBlock should work with top_m_softmax config."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 2, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="top_m_softmax",
+            top_m=4,
+            mix_with_bcvf=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        x = torch.randn(B, N, D, device=device)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        out = block(x, meta, time_embed)
+        assert out.shape == (B, N, D)
+
+    def test_config_top_m_default(self):
+        """Config should have top_m default."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+
+        config = AlternativeAttentionConfig()
+        assert config.top_m == 24
+
+    def test_evaluator_includes_top_m(self, sample_inputs, batch_config):
+        """AttentionNormEvaluator should include top_m_softmax variant."""
+        from symbolu.vision.attention_eval import AttentionNormEvaluator
+
+        evaluator = AttentionNormEvaluator(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            topk=batch_config["K"],
+        )
+
+        report = evaluator.compare_all(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+        )
+
+        variant_names = [v.name for v in report.variants]
+        assert "top_m_softmax" in variant_names, (
+            f"Evaluator should include top_m_softmax, got: {variant_names}"
+        )
