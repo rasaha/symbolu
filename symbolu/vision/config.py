@@ -150,6 +150,32 @@ class InterferenceConfig:
 
 
 @dataclass
+class AlternativeAttentionConfig:
+    """
+    Configuration for alternative attention normalization study.
+
+    Controls which attention normalization variant to evaluate
+    in the proposal cross-attention path. Does NOT replace the
+    original softmax-based CrossAttentionToProposals — instead,
+    creates a parallel AlternativeAttentionToProposals for A/B comparison.
+
+    Supported norm types:
+    - "softmax": Standard softmax (baseline control)
+    - "sparsemax": Euclidean projection onto simplex (exact zeros)
+    - "entmax15": Entmax with alpha=1.5 (recommended: tunable sparsity)
+    - "entmax": Entmax with configurable alpha
+    - "kernel_elu": Linear attention with ELU+1 kernel
+    - "kernel_rbf": Linear attention with random RBF features
+    """
+    enabled: bool = False  # Off by default, enable to study alternatives
+    norm_type: str = "entmax15"  # Default recommendation for Phase-Quad
+    entmax_alpha: float = 1.5  # Alpha for entmax (only when norm_type="entmax")
+    score_bias_scale: float = 0.5  # Scale for retrieval score bias
+    mix_with_bcvf: bool = True  # Combine with BCVF consistency filtering
+    bcvf_mix_ratio: float = 0.5  # BCVF vs alternative attention mix
+
+
+@dataclass
 class BlockConfig:
     """Configuration for CognadeVisionBlock or PhaseQuadDiTBlock."""
     embed_dim: int = 768  # Model width D
@@ -163,6 +189,7 @@ class BlockConfig:
     dit_style: DiTStyleConfig = field(default_factory=DiTStyleConfig)
     bcvf: BCVFConfig = field(default_factory=BCVFConfig)
     interference: InterferenceConfig = field(default_factory=InterferenceConfig)
+    alt_attention: AlternativeAttentionConfig = field(default_factory=AlternativeAttentionConfig)
 
 
 @dataclass
