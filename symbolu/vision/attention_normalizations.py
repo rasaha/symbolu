@@ -528,3 +528,38 @@ def attention_sparsity_metrics(weights: Tensor, dim: int = -1) -> dict:
             "top5_mass": top5,
             "gini": gini,
         }
+
+
+def logit_sharpness_metrics(logits: Tensor, dim: int = -1) -> dict:
+    """
+    Compute logit sharpness diagnostics BEFORE normalization.
+
+    Logit scale determines how entmax/sparsemax behave — high variance
+    logits produce sparser outputs regardless of alpha. Tracking this
+    during training reveals whether sparsity drift is caused by alpha
+    choice or by Q/K weight growth.
+
+    Reports:
+    - logit_std: Standard deviation of logits (primary sharpness indicator)
+    - logit_range: Max - min across the normalization dimension
+    - logit_mean: Mean logit value (shift indicator)
+
+    Args:
+        logits: Raw attention scores before normalization [..., n].
+        dim: Dimension that will be normalized.
+
+    Returns:
+        Dictionary of logit sharpness metrics.
+    """
+    with torch.no_grad():
+        logit_std = logits.std(dim=dim).mean().item()
+        logit_range = (
+            logits.max(dim=dim).values - logits.min(dim=dim).values
+        ).mean().item()
+        logit_mean = logits.mean().item()
+
+        return {
+            "logit_std": logit_std,
+            "logit_range": logit_range,
+            "logit_mean": logit_mean,
+        }

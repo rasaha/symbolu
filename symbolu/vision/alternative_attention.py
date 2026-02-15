@@ -21,6 +21,7 @@ where sparsity directly improves TopK proposal selection quality.
 """
 
 from typing import Optional, Dict, Literal
+import math
 
 import torch
 import torch.nn as nn
@@ -34,6 +35,7 @@ from symbolu.vision.attention_normalizations import (
     entmax15,
     KernelAttention,
     attention_sparsity_metrics,
+    logit_sharpness_metrics,
 )
 
 
@@ -65,7 +67,15 @@ class AlternativeAttentionToProposals(nn.Module):
         norm_type: Attention normalization type.
         entmax_alpha: Alpha parameter for entmax (only used if norm_type is entmax).
         score_bias_scale: Scale factor for retrieval score bias (default 0.5).
+        temperature_init: Initial logit temperature value (default 1.0).
+        learn_temperature: If True, temperature is a learned parameter (default True).
     """
+
+    # Clamp bounds for temperature to prevent degenerate regimes:
+    #   < 0.05 -> near-argmax (gradient vanishes)
+    #   > 10.0 -> near-uniform (no selectivity)
+    TEMPERATURE_MIN = 0.05
+    TEMPERATURE_MAX = 10.0
 
     def __init__(
         self,
@@ -76,6 +86,8 @@ class AlternativeAttentionToProposals(nn.Module):
         norm_type: AttentionNormType = AttentionNormType.ENTMAX_ALPHA,
         entmax_alpha: float = 1.3,
         score_bias_scale: float = 0.5,
+        temperature_init: float = 1.0,
+        learn_temperature: bool = True,
     ):
         super().__init__()
 
@@ -99,6 +111,15 @@ class AlternativeAttentionToProposals(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
+        # Logit temperature: controls "pressure" on entmax/sparsemax.
+        # Stored in log-space so exp() is always positive.
+        # Clamped to [TEMPERATURE_MIN, TEMPERATURE_MAX] in forward.
+        log_temp = torch.tensor(math.log(temperature_init))
+        if learn_temperature:
+            self.log_temperature = nn.Parameter(log_temp)
+        else:
+            self.register_buffer("log_temperature", log_temp)
+
         # Dropout
         self.attn_dropout = nn.Dropout(dropout)
 
@@ -117,6 +138,7 @@ class AlternativeAttentionToProposals(nn.Module):
 
         # Instrumentation
         self._last_sparsity_metrics: Dict[str, float] = {}
+        self._last_logit_metrics: Dict[str, float] = {}
 
     def _normalize_scores(self, attn: Tensor) -> Tensor:
         """
@@ -191,10 +213,24 @@ class AlternativeAttentionToProposals(nn.Module):
             score_bias = scores.unsqueeze(2).unsqueeze(3)  # [B, N, 1, 1, K]
             attn = attn + score_bias * self.score_bias_scale
 
+        # Apply temperature: controls logit sharpness ("pressure") before
+        # entmax/sparsemax normalization. Without this, Q/K weight drift
+        # during training changes effective sparsity unpredictably.
+        temperature = self.log_temperature.exp()
+        temperature = torch.clamp(
+            temperature, self.TEMPERATURE_MIN, self.TEMPERATURE_MAX
+        )
+        attn = attn / temperature
+
+        # Track logit sharpness BEFORE normalization
+        with torch.no_grad():
+            self._last_logit_metrics = logit_sharpness_metrics(attn, dim=-1)
+            self._last_logit_metrics["temperature"] = temperature.item()
+
         # Apply configured normalization
         attn_weights = self._normalize_scores(attn)
 
-        # Track sparsity metrics
+        # Track sparsity metrics AFTER normalization
         with torch.no_grad():
             self._last_sparsity_metrics = attention_sparsity_metrics(
                 attn_weights.squeeze(3), dim=-1
@@ -263,10 +299,13 @@ class AlternativeAttentionToProposals(nn.Module):
         return self.out_proj(out)
 
     def get_sparsity_metrics(self) -> Dict[str, float]:
-        """Get sparsity diagnostics from the last forward pass."""
-        return {
+        """Get sparsity and logit sharpness diagnostics from the last forward pass."""
+        metrics = {
             f"attn/{k}": v for k, v in self._last_sparsity_metrics.items()
         }
+        for k, v in self._last_logit_metrics.items():
+            metrics[f"attn/{k}"] = v
+        return metrics
 
 
 class PhaseQuadAttentionVariant(nn.Module):
@@ -290,6 +329,8 @@ class PhaseQuadAttentionVariant(nn.Module):
         entmax_alpha: Alpha for entmax (if applicable).
         bcvf_config: BCVF configuration dict.
         mix_ratio: Initial BCVF vs attention mix (0=pure attn, 1=pure BCVF).
+        temperature_init: Initial logit temperature (default 1.0).
+        learn_temperature: Whether temperature is trainable (default True).
     """
 
     def __init__(
@@ -300,6 +341,8 @@ class PhaseQuadAttentionVariant(nn.Module):
         entmax_alpha: float = 1.3,
         bcvf_config: Optional[Dict] = None,
         mix_ratio: float = 0.5,
+        temperature_init: float = 1.0,
+        learn_temperature: bool = True,
     ):
         super().__init__()
 
@@ -313,6 +356,8 @@ class PhaseQuadAttentionVariant(nn.Module):
             num_heads=num_heads,
             norm_type=norm_type,
             entmax_alpha=entmax_alpha,
+            temperature_init=temperature_init,
+            learn_temperature=learn_temperature,
         )
 
         self.mix_ratio = nn.Parameter(torch.tensor(mix_ratio))

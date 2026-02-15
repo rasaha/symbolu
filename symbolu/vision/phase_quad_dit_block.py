@@ -259,6 +259,8 @@ class PhaseQuadDiTBlock(nn.Module):
                     entmax_alpha=alt_attention.entmax_alpha,
                     bcvf_config=bcvf_config,
                     mix_ratio=alt_attention.bcvf_mix_ratio,
+                    temperature_init=alt_attention.logit_temperature_init,
+                    learn_temperature=alt_attention.learn_temperature,
                 )
             else:
                 # Pure alternative attention (no BCVF)
@@ -271,6 +273,8 @@ class PhaseQuadDiTBlock(nn.Module):
                     norm_type=norm_type,
                     entmax_alpha=alt_attention.entmax_alpha,
                     score_bias_scale=alt_attention.score_bias_scale,
+                    temperature_init=alt_attention.logit_temperature_init,
+                    learn_temperature=alt_attention.learn_temperature,
                 )
         elif use_bcvf:
             # Original: BCVF + softmax cross-attention hybrid (Appendix I)

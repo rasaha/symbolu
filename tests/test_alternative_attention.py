@@ -11,6 +11,7 @@ Tests cover:
 
 import pytest
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
@@ -902,3 +903,382 @@ class TestPhaseQuadDiTBlockEntmaxIntegration:
 
         assert x.grad is not None, "Gradients should flow through entmax block"
         assert x.grad.norm() > 0, "Gradient norm should be nonzero"
+
+
+# ===========================================================================
+# Test 12: Logit temperature control
+# ===========================================================================
+
+class TestLogitTemperature:
+    """Test learned temperature on proposal cross-attention logits."""
+
+    def test_temperature_parameter_exists(self, batch_config):
+        """AlternativeAttentionToProposals should have a log_temperature parameter."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+        )
+
+        assert hasattr(module, "log_temperature")
+        # Default temperature_init=1.0, so log(1.0) = 0.0
+        assert torch.allclose(
+            module.log_temperature.exp(),
+            torch.tensor(1.0),
+            atol=1e-5,
+        )
+
+    def test_temperature_is_learned_by_default(self, batch_config):
+        """log_temperature should be an nn.Parameter by default."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            learn_temperature=True,
+        )
+
+        assert isinstance(module.log_temperature, nn.Parameter)
+        param_names = [n for n, _ in module.named_parameters()]
+        assert "log_temperature" in param_names
+
+    def test_temperature_can_be_fixed(self, batch_config):
+        """learn_temperature=False should register as buffer, not parameter."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            learn_temperature=False,
+        )
+
+        param_names = [n for n, _ in module.named_parameters()]
+        assert "log_temperature" not in param_names
+        # Should still be accessible as buffer
+        assert hasattr(module, "log_temperature")
+
+    def test_temperature_1_backward_compatible(self, sample_inputs, batch_config):
+        """Temperature=1.0 should not change output vs pre-temperature behavior."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        torch.manual_seed(42)
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            temperature_init=1.0,
+        )
+
+        out = module(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+        )
+        assert out.shape == sample_inputs["x"].shape
+
+    def test_high_temperature_reduces_sparsity(self, sample_inputs, batch_config):
+        """Temperature > 1 flattens logits -> less sparse entmax output."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        # Low temperature (sharp)
+        torch.manual_seed(42)
+        module_sharp = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            entmax_alpha=1.5,
+            temperature_init=0.5,
+            learn_temperature=False,
+        )
+
+        # High temperature (flat)
+        torch.manual_seed(42)
+        module_flat = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            entmax_alpha=1.5,
+            temperature_init=5.0,
+            learn_temperature=False,
+        )
+        # Copy weights so only temperature differs
+        module_flat.load_state_dict(module_sharp.state_dict(), strict=False)
+
+        module_sharp(sample_inputs["x"], sample_inputs["proposals"], sample_inputs["scores"])
+        module_flat(sample_inputs["x"], sample_inputs["proposals"], sample_inputs["scores"])
+
+        sharp_sparsity = module_sharp.get_sparsity_metrics()["attn/sparsity"]
+        flat_sparsity = module_flat.get_sparsity_metrics()["attn/sparsity"]
+
+        assert sharp_sparsity >= flat_sparsity, (
+            f"Higher temperature should reduce sparsity: "
+            f"sharp={sharp_sparsity:.3f} vs flat={flat_sparsity:.3f}"
+        )
+
+    def test_temperature_gradient_flows(self, sample_inputs, batch_config):
+        """Learned temperature should receive gradients."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            learn_temperature=True,
+        )
+
+        out = module(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+        )
+        loss = out.sum()
+        loss.backward()
+
+        assert module.log_temperature.grad is not None, (
+            "Temperature should receive gradients"
+        )
+
+    def test_temperature_clamped(self, batch_config):
+        """Temperature should be clamped to [0.05, 10.0]."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+        import math
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+            learn_temperature=True,
+        )
+
+        # Force log_temperature to extreme values
+        with torch.no_grad():
+            module.log_temperature.fill_(math.log(0.001))  # Way below min
+
+        # Forward should still work (clamp prevents explosion)
+        x = torch.randn(1, 4, batch_config["D"])
+        proposals = torch.randn(1, 4, batch_config["K"], batch_config["D"])
+        scores = torch.randn(1, 4, batch_config["K"])
+        out = module(x, proposals, scores)
+        assert torch.isfinite(out).all(), "Output should be finite with clamped temperature"
+
+        # Check that reported temperature is clamped
+        metrics = module.get_sparsity_metrics()
+        assert metrics["attn/temperature"] >= AlternativeAttentionToProposals.TEMPERATURE_MIN
+        assert metrics["attn/temperature"] <= AlternativeAttentionToProposals.TEMPERATURE_MAX
+
+
+# ===========================================================================
+# Test 13: Logit sharpness diagnostics
+# ===========================================================================
+
+class TestLogitSharpnessDiagnostics:
+    """Test logit sharpness metrics are tracked correctly."""
+
+    def test_logit_metrics_in_sparsity_report(self, sample_inputs, batch_config):
+        """get_sparsity_metrics should include logit sharpness metrics."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+        )
+
+        module(sample_inputs["x"], sample_inputs["proposals"], sample_inputs["scores"])
+        metrics = module.get_sparsity_metrics()
+
+        assert "attn/logit_std" in metrics, "Should report logit std"
+        assert "attn/logit_range" in metrics, "Should report logit range"
+        assert "attn/logit_mean" in metrics, "Should report logit mean"
+        assert "attn/temperature" in metrics, "Should report effective temperature"
+
+    def test_logit_std_positive(self, sample_inputs, batch_config):
+        """Logit std should be positive for random inputs."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+
+        module = AlternativeAttentionToProposals(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+        )
+
+        module(sample_inputs["x"], sample_inputs["proposals"], sample_inputs["scores"])
+        metrics = module.get_sparsity_metrics()
+
+        assert metrics["attn/logit_std"] > 0.0, (
+            "Logit std should be positive for random inputs"
+        )
+        assert metrics["attn/logit_range"] > 0.0, (
+            "Logit range should be positive for random inputs"
+        )
+
+    def test_logit_sharpness_standalone(self, device):
+        """logit_sharpness_metrics should work on raw tensors."""
+        from symbolu.vision.attention_normalizations import logit_sharpness_metrics
+
+        logits = torch.randn(4, 10, device=device)
+        metrics = logit_sharpness_metrics(logits, dim=-1)
+
+        assert "logit_std" in metrics
+        assert "logit_range" in metrics
+        assert "logit_mean" in metrics
+        assert metrics["logit_std"] > 0.0
+        assert metrics["logit_range"] > 0.0
+
+    def test_logit_metrics_in_variant_diagnostics(self, sample_inputs, batch_config, device):
+        """PhaseQuadAttentionVariant diagnostics should include logit metrics."""
+        from symbolu.vision.attention_normalizations import AttentionNormType
+        from symbolu.vision.alternative_attention import PhaseQuadAttentionVariant
+
+        module = PhaseQuadAttentionVariant(
+            embed_dim=batch_config["D"],
+            num_heads=batch_config["H"],
+            norm_type=AttentionNormType.ENTMAX_ALPHA,
+        )
+
+        phase_state = torch.randn(
+            batch_config["B"], batch_config["N"], batch_config["D"], device=device
+        )
+
+        module(
+            sample_inputs["x"],
+            sample_inputs["proposals"],
+            sample_inputs["scores"],
+            phase_state,
+        )
+
+        diag = module.get_diagnostics()
+        assert "attn/temperature" in diag, "Diagnostics should include temperature"
+        assert "attn/logit_std" in diag, "Diagnostics should include logit_std"
+
+    def test_block_diagnostics_include_temperature(self, device):
+        """PhaseQuadDiTBlock diagnostics should surface temperature."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 2, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        x = torch.randn(B, N, D, device=device)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        block(x, meta, time_embed)
+        diag = block.get_diagnostics()
+
+        temp_keys = [k for k in diag if "temperature" in k]
+        assert len(temp_keys) > 0, (
+            f"Block diagnostics should include temperature, got keys: {list(diag.keys())}"
+        )
+
+
+# ===========================================================================
+# Test 14: Temperature config integration
+# ===========================================================================
+
+class TestTemperatureConfigIntegration:
+    """Test temperature config wires through to modules."""
+
+    def test_config_defaults(self):
+        """Config should have temperature defaults."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+
+        config = AlternativeAttentionConfig()
+        assert config.logit_temperature_init == 1.0
+        assert config.learn_temperature is True
+
+    def test_config_propagates_to_block(self, device):
+        """Temperature config should propagate through PhaseQuadDiTBlock."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.alternative_attention import PhaseQuadAttentionVariant
+        import math
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=True,
+            logit_temperature_init=2.0,
+            learn_temperature=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        assert isinstance(block.alt_proposal_mixer, PhaseQuadAttentionVariant)
+        temp = block.alt_proposal_mixer.alt_attn.log_temperature.exp().item()
+        assert abs(temp - 2.0) < 1e-5, f"Temperature should be 2.0, got {temp}"
+
+    def test_config_propagates_pure_entmax(self, device):
+        """Temperature config should propagate for pure entmax (no BCVF)."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+        import math
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=False,
+            logit_temperature_init=3.0,
+            learn_temperature=False,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        assert isinstance(block.alt_proposal_mixer, AlternativeAttentionToProposals)
+        temp = block.alt_proposal_mixer.log_temperature.exp().item()
+        assert abs(temp - 3.0) < 1e-5, f"Temperature should be 3.0, got {temp}"
+        # Should be a buffer, not a parameter
+        param_names = [n for n, _ in block.alt_proposal_mixer.named_parameters()]
+        assert "log_temperature" not in param_names
