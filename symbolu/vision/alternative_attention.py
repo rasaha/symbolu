@@ -45,11 +45,11 @@ class AlternativeAttentionToProposals(nn.Module):
     Drop-in replacement for CrossAttentionToProposals that supports
     softmax, sparsemax, entmax(alpha), and kernel attention.
 
-    For Phase-Quad, the recommended configuration is entmax(1.5) because:
-    - Natural sparsity aligns with TopK proposal selection
-    - Smooth gradients (unlike sparsemax hard zeros)
+    For Phase-Quad, the recommended configuration is entmax(1.3) because:
+    - Moderate sparsity aligns with TopK proposal selection
+    - Smoother gradients than entmax(1.5) or sparsemax
     - Compatible with BCVF consistency filtering
-    - Reduces noise from irrelevant proposals
+    - Reduces noise from irrelevant proposals while keeping gradient signal strong
 
     Architecture:
         Query: Current position representation [B, N, D]
@@ -73,8 +73,8 @@ class AlternativeAttentionToProposals(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         use_score_bias: bool = True,
-        norm_type: AttentionNormType = AttentionNormType.ENTMAX15,
-        entmax_alpha: float = 1.5,
+        norm_type: AttentionNormType = AttentionNormType.ENTMAX_ALPHA,
+        entmax_alpha: float = 1.3,
         score_bias_scale: float = 0.5,
     ):
         super().__init__()
@@ -296,8 +296,8 @@ class PhaseQuadAttentionVariant(nn.Module):
         self,
         embed_dim: int,
         num_heads: int,
-        norm_type: AttentionNormType = AttentionNormType.ENTMAX15,
-        entmax_alpha: float = 1.5,
+        norm_type: AttentionNormType = AttentionNormType.ENTMAX_ALPHA,
+        entmax_alpha: float = 1.3,
         bcvf_config: Optional[Dict] = None,
         mix_ratio: float = 0.5,
     ):

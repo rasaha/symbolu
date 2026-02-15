@@ -571,7 +571,8 @@ class TestConfigIntegration:
 
         config = AlternativeAttentionConfig()
         assert config.enabled is False, "Should be disabled by default"
-        assert config.norm_type == "entmax15", "Default should be entmax15"
+        assert config.norm_type == "entmax", "Default should be entmax"
+        assert config.entmax_alpha == 1.3, "Default alpha should be 1.3"
 
     def test_existing_config_unchanged(self):
         """Original config fields should be completely unchanged."""
@@ -639,3 +640,265 @@ class TestOriginalModulesUnchanged:
             phase_state,
         )
         assert out.shape == sample_inputs["x"].shape
+
+
+# ===========================================================================
+# Test 11: Live PhaseQuadDiTBlock integration with entmax(1.3)
+# ===========================================================================
+
+class TestPhaseQuadDiTBlockEntmaxIntegration:
+    """Test entmax(1.3) wired into the live PhaseQuadDiTBlock."""
+
+    def test_block_with_alt_attention_enabled(self, device):
+        """PhaseQuadDiTBlock should use entmax(1.3) when config is enabled."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        assert block.use_alt_attention is True
+        assert block.alt_proposal_mixer is not None
+        # Original softmax mixers should be None
+        assert block.proposal_mixer is None
+
+    def test_block_forward_with_entmax(self, device):
+        """Forward pass should work with entmax(1.3) active."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 2, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        x = torch.randn(B, N, D, device=device)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        out = block(x, meta, time_embed)
+        assert out.shape == (B, N, D), f"Expected ({B},{N},{D}), got {out.shape}"
+
+    def test_block_diagnostics_with_entmax(self, device):
+        """Diagnostics should include alt_attn sparsity metrics."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 2, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=True,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        x = torch.randn(B, N, D, device=device)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        block(x, meta, time_embed)
+        diag = block.get_diagnostics()
+
+        # Should have alt attention metrics
+        alt_keys = [k for k in diag if k.startswith("alt_attn/")]
+        assert len(alt_keys) > 0, (
+            f"Diagnostics should include alt_attn/ metrics, got keys: {list(diag.keys())}"
+        )
+
+    def test_block_without_alt_attention_unchanged(self, device):
+        """Block without alt_attention should use original softmax path."""
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+        )
+
+        assert block.use_alt_attention is False
+        assert block.alt_proposal_mixer is None
+        # Original BCVF+softmax mixer should be active
+        assert block.proposal_mixer is not None
+
+    def test_block_with_disabled_alt_attention(self, device):
+        """Disabled alt_attention config should use original path."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+
+        alt_config = AlternativeAttentionConfig(enabled=False)
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        assert block.use_alt_attention is False
+        assert block.alt_proposal_mixer is None
+        assert block.proposal_mixer is not None
+
+    def test_block_pure_entmax_without_bcvf(self, device):
+        """Should support pure entmax without BCVF mixing."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 2, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+            mix_with_bcvf=False,  # No BCVF
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        assert isinstance(block.alt_proposal_mixer, AlternativeAttentionToProposals)
+
+        x = torch.randn(B, N, D, device=device)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        out = block(x, meta, time_embed)
+        assert out.shape == (B, N, D)
+
+    def test_block_stack_with_alt_attention(self, device):
+        """PhaseQuadDiTBlockStack should propagate alt_attention to all blocks."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlockStack
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+        )
+
+        stack = PhaseQuadDiTBlockStack(
+            num_blocks=3,
+            embed_dim=64,
+            num_heads=4,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        # All blocks should have alt attention enabled
+        for i, block in enumerate(stack.blocks):
+            assert block.use_alt_attention is True, (
+                f"Block {i} should have alt attention enabled"
+            )
+            assert block.alt_proposal_mixer is not None, (
+                f"Block {i} should have alt_proposal_mixer"
+            )
+
+    def test_gradient_flow_through_entmax_block(self, device):
+        """Gradients should flow through the full block with entmax active."""
+        from symbolu.vision.config import AlternativeAttentionConfig
+        from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+        from symbolu.vision.controls import PatchMeta
+
+        torch.manual_seed(42)
+        B, D, H = 1, 64, 4
+        H_p, W_p = 4, 4
+        N = H_p * W_p
+
+        alt_config = AlternativeAttentionConfig(
+            enabled=True,
+            norm_type="entmax",
+            entmax_alpha=1.3,
+        )
+
+        block = PhaseQuadDiTBlock(
+            embed_dim=D,
+            num_heads=H,
+            topk=8,
+            window_size=4,
+            use_cross_attn=False,
+            alt_attention=alt_config,
+        )
+
+        x = torch.randn(B, N, D, device=device, requires_grad=True)
+        time_embed = torch.randn(B, D, device=device)
+        coords = torch.stack(torch.meshgrid(
+            torch.arange(H_p), torch.arange(W_p), indexing="ij"
+        ), dim=-1).reshape(-1, 2)
+        meta = PatchMeta(H_p=H_p, W_p=W_p, coords=coords)
+
+        out = block(x, meta, time_embed)
+        loss = out.sum()
+        loss.backward()
+
+        assert x.grad is not None, "Gradients should flow through entmax block"
+        assert x.grad.norm() > 0, "Gradient norm should be nonzero"

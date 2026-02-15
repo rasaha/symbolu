@@ -103,6 +103,7 @@ class AttentionNormEvaluator(nn.Module):
                 AttentionNormType.SOFTMAX,
                 AttentionNormType.SPARSEMAX,
                 AttentionNormType.ENTMAX15,
+                AttentionNormType.ENTMAX_ALPHA,  # entmax(1.3) — recommended
                 AttentionNormType.KERNEL_ELU,
             ]
 
@@ -111,11 +112,14 @@ class AttentionNormEvaluator(nn.Module):
         # Create independent modules for each variant
         self.variant_modules = nn.ModuleDict()
         for vtype in variants:
+            # Use alpha=1.3 for the configurable entmax variant
+            alpha = 1.3 if vtype == AttentionNormType.ENTMAX_ALPHA else 1.5
             self.variant_modules[vtype.value] = AlternativeAttentionToProposals(
                 embed_dim=embed_dim,
                 num_heads=num_heads,
                 dropout=dropout,
                 norm_type=vtype,
+                entmax_alpha=alpha,
             )
 
     @torch.no_grad()
@@ -406,9 +410,13 @@ def compare_normalizations_on_scores(
         w_sparse = sparsemax(scores, dim=dim)
         results["sparsemax"] = attention_sparsity_metrics(w_sparse, dim=dim)
 
-        # Entmax 1.5
-        w_entmax = entmax15(scores, dim=dim)
-        results["entmax15"] = attention_sparsity_metrics(w_entmax, dim=dim)
+        # Entmax 1.3 (recommended for Phase-Quad)
+        w_entmax13 = entmax(scores, alpha=1.3, dim=dim)
+        results["entmax13"] = attention_sparsity_metrics(w_entmax13, dim=dim)
+
+        # Entmax 1.5 (standard literature variant)
+        w_entmax15 = entmax15(scores, dim=dim)
+        results["entmax15"] = attention_sparsity_metrics(w_entmax15, dim=dim)
 
         # Entmax 1.25 (softer)
         w_entmax125 = entmax(scores, alpha=1.25, dim=dim)

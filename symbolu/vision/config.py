@@ -162,14 +162,14 @@ class AlternativeAttentionConfig:
     Supported norm types:
     - "softmax": Standard softmax (baseline control)
     - "sparsemax": Euclidean projection onto simplex (exact zeros)
-    - "entmax15": Entmax with alpha=1.5 (recommended: tunable sparsity)
-    - "entmax": Entmax with configurable alpha
+    - "entmax15": Entmax with alpha=1.5 (standard literature variant)
+    - "entmax": Entmax with configurable alpha (recommended: alpha=1.3)
     - "kernel_elu": Linear attention with ELU+1 kernel
     - "kernel_rbf": Linear attention with random RBF features
     """
     enabled: bool = False  # Off by default, enable to study alternatives
-    norm_type: str = "entmax15"  # Default recommendation for Phase-Quad
-    entmax_alpha: float = 1.5  # Alpha for entmax (only when norm_type="entmax")
+    norm_type: str = "entmax"  # Default: entmax with alpha=1.3 for Phase-Quad
+    entmax_alpha: float = 1.3  # Alpha for entmax — 1.3 balances sparsity + gradient flow
     score_bias_scale: float = 0.5  # Scale for retrieval score bias
     mix_with_bcvf: bool = True  # Combine with BCVF consistency filtering
     bcvf_mix_ratio: float = 0.5  # BCVF vs alternative attention mix
