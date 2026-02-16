@@ -1,0 +1,54 @@
+================================================================================
+FEATURE: CTM+ (Advanced Optimization Layer)
+================================================================================
+Hardware acceleration and optimization modules: CUDA kernels, database
+layer (Postgres, Redis), DeepSpeed integration, and vLLM serving.
+================================================================================
+
+--- CUDA Kernels ---
+CTM_plus/CUDA/ctm_plus/CMakeLists.txt
+CTM_plus/CUDA/ctm_plus/Makefile
+CTM_plus/CUDA/ctm_plus/benchmark.cu
+CTM_plus/CUDA/ctm_plus/ctm_plus.cu            # CUDA kernel implementation
+CTM_plus/CUDA/ctm_plus/ctm_plus.cuh           # CUDA header
+CTM_plus/CUDA/ctm_plus/example.cu             # CUDA example
+
+--- Linux Kernel Module ---
+CTM_plus/Kernel/ctm_plus/Makefile
+CTM_plus/Kernel/ctm_plus/ctm_plus.h
+CTM_plus/Kernel/ctm_plus/ctm_plus_core.c
+CTM_plus/Kernel/ctm_plus/ctm_plus_module.c
+
+--- Database Layer ---
+CTM_plus/Database/ctm_plus_db/__init__.py
+CTM_plus/Database/ctm_plus_db/buffer_pool.py   # Buffer pool management
+CTM_plus/Database/ctm_plus_db/config.py        # Database config
+CTM_plus/Database/ctm_plus_db/example.py       # Usage example
+CTM_plus/Database/ctm_plus_db/generic.py       # Generic DB interface
+CTM_plus/Database/ctm_plus_db/page_cache.py    # Page cache
+CTM_plus/Database/ctm_plus_db/postgres.py      # PostgreSQL adapter
+CTM_plus/Database/ctm_plus_db/redis_cache.py   # Redis cache adapter
+CTM_plus/Database/setup.py
+
+--- DeepSpeed Integration ---
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/__init__.py
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/config.py
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/example.py
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/inference.py
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/offload_manager.py
+CTM_plus/DeepSpeed/ctm_plus_deepspeed/zero_integration.py  # ZeRO optimizer
+CTM_plus/DeepSpeed/setup.py
+
+--- vLLM Serving ---
+CTM_plus/vLLM/ctm_plus_vllm/__init__.py
+CTM_plus/vLLM/ctm_plus_vllm/benchmark_cli.py
+CTM_plus/vLLM/ctm_plus_vllm/block_manager.py
+CTM_plus/vLLM/ctm_plus_vllm/config.py
+CTM_plus/vLLM/ctm_plus_vllm/enterprise_benchmark.py
+CTM_plus/vLLM/ctm_plus_vllm/enterprise_cli.py
+CTM_plus/vLLM/ctm_plus_vllm/evictor.py
+CTM_plus/vLLM/ctm_plus_vllm/example.py
+CTM_plus/vLLM/ctm_plus_vllm/kv_cache_simulator.py
+CTM_plus/vLLM/ctm_plus_vllm/production.py
+CTM_plus/vLLM/ctm_plus_vllm/production_cli.py
+CTM_plus/vLLM/setup.py

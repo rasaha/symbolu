@@ -1,0 +1,29 @@
+================================================================================
+FEATURE: Inference System (Model Execution)
+================================================================================
+Model inference with KV cache, phoneme-based CSR, evolutionary search,
+guna-state inference, metacognitive monitoring, and checkpoint management.
+================================================================================
+
+--- Core Inference ---
+symbolu/inference/__init__.py
+symbolu/inference/manager.py                        # Inference manager
+symbolu/inference/layer_config.py                   # Layer configuration
+symbolu/inference/checkpoint_utils.py               # Checkpoint management
+
+--- Specialized Inference Modes ---
+symbolu/inference/binding_cache_inference.py         # KV cache optimized inference
+symbolu/inference/ontological_binding_cache_inference.py  # Ontological binding cache
+symbolu/inference/csr_inference.py                   # Phoneme-based CSR inference
+symbolu/inference/evolutionary_inference.py          # Evolutionary search inference
+symbolu/inference/guna_inference.py                  # Energy-state inference
+
+--- Monitoring ---
+symbolu/inference/sovereign_state_monitor.py         # Sovereign state tracking
+symbolu/inference/sovereign_scorer.py                # Sovereign scoring
+symbolu/inference/metacognitive_monitor.py           # Self-monitoring
+
+--- Tests ---
+tests/test_inference_integration.py
+tests/test_inference_manager.py
+tests/test_evolutionary_inference.py

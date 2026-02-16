@@ -48,8 +48,13 @@ class TraceStep:
     # Optional: query block for this step
     query_block_id: int = 0
 
+    # Structural hints for code workloads (block_id -> scope_id).
+    # Blocks sharing a scope_id are structurally linked (same function,
+    # same import group, same class definition).
+    block_structural_hints: Dict[int, int] = field(default_factory=dict)
+
     def to_dict(self) -> Dict:
-        return {
+        d = {
             "step_id": self.step_id,
             "timestamp_ns": self.timestamp_ns,
             "blocks_accessed": self.blocks_accessed,
@@ -59,6 +64,9 @@ class TraceStep:
             "batch_position": self.batch_position,
             "query_block_id": self.query_block_id,
         }
+        if self.block_structural_hints:
+            d["block_structural_hints"] = self.block_structural_hints
+        return d
 
     @classmethod
     def from_dict(cls, d: Dict) -> "TraceStep":
@@ -71,6 +79,9 @@ class TraceStep:
             sequence_id=d.get("sequence_id", 0),
             batch_position=d.get("batch_position", 0),
             query_block_id=d.get("query_block_id", 0),
+            block_structural_hints={
+                int(k): v for k, v in d.get("block_structural_hints", {}).items()
+            },
         )
 
 

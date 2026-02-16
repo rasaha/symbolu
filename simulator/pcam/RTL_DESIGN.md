@@ -1,7 +1,7 @@
 # PCAM FPGA RTL Design Specification
 
-**Version**: 2.0
-**Date**: 2026-02-01
+**Version**: 3.0 (K=256 silicon sizing)
+**Date**: 2026-02-11
 **Status**: Implementation Complete
 **Target**: Xilinx Alveo U280 / AMD Versal / Intel Agilex
 
@@ -18,7 +18,7 @@ This document specifies the RTL design for PCAM (Predictive Context Attention Me
 | ATTEND Latency | <100ns | Host round-trip budget |
 | UPDATE Throughput | 100M ops/sec | Match attention computation rate |
 | Clock Frequency | 250-500 MHz | FPGA achievable |
-| Power | <15W (FPGA), <5W (ASIC) | PCIe slot budget |
+| Power | <15W (FPGA), <5W (ASIC) | CXL card thermal budget |
 
 ---
 
@@ -171,7 +171,7 @@ module cmd_decoder (
     output reg  [19:0] query_block,
     output reg  [19:0] key_block,
     output reg  [15:0] weight,        // Q8.8 fixed
-    output reg  [6:0]  k_value,       // 32, 64, or 128
+    output reg  [8:0]  k_value,       // 64, 128, or 256 (K_WIDTH=9)
     output reg         op_valid,
     input  wire        op_ready
 );
@@ -224,7 +224,7 @@ Implements a parallel bitonic sorting network for deterministic latency:
 
 ```verilog
 module topk_network #(
-    parameter K_MAX = 128,
+    parameter K_MAX = 256,
     parameter INPUT_WIDTH = 256,    // Max parallel inputs per cycle
     parameter SCORE_WIDTH = 16,
     parameter BLOCK_ID_WIDTH = 20
@@ -233,7 +233,7 @@ module topk_network #(
     input  wire        rst_n,
 
     // Configuration
-    input  wire [6:0]  k_value,      // 32, 64, or 128
+    input  wire [8:0]  k_value,      // 64, 128, or 256 (K_WIDTH=9)
 
     // Input stream (from bank reads)
     input  wire [INPUT_WIDTH-1:0][SCORE_WIDTH-1:0] in_scores,
@@ -245,18 +245,18 @@ module topk_network #(
     // Output (sorted top-K)
     output wire [K_MAX-1:0][SCORE_WIDTH-1:0] out_scores,
     output wire [K_MAX-1:0][BLOCK_ID_WIDTH-1:0] out_block_ids,
-    output wire [6:0]  out_count,     // Actual count (may be < K)
+    output wire [8:0]  out_count,     // Actual count (may be < K)
     output wire        out_valid,
     input  wire        out_ready
 );
 ```
 
 **Implementation Strategy**:
-1. **Stage 1**: Parallel comparators reduce 256 inputs to 128
-2. **Stage 2-8**: Bitonic merge network (log2(128) = 7 stages)
+1. **Stage 1**: Parallel comparators reduce 256 inputs to 64 (bitonic_sort_64)
+2. **Stage 2-10**: Bitonic merge network (512-wide: log2(512) = 9 stages)
 3. **Output Register**: Hold top-K until consumed
 
-**Latency**: 8 cycles @ 250MHz = 32ns
+**Latency**: 9 cycles @ 250MHz = 36ns (internal), 44ns with pipeline overhead
 
 #### 4.2.4 Update Coalescer (`update_coalescer`)
 
@@ -311,18 +311,18 @@ The Top-K network is the performance-critical component of ATTEND operations. It
                     Input Candidates (64 per cycle)
                               │
                     ┌─────────▼─────────┐
-                    │  Bitonic Sort 64  │  ◄── Combinational
-                    │   (6 stages)      │
+                    │  Bitonic Sort 64  │  ◄── Combinational (6 stages)
+                    │   (unchanged)     │
                     └─────────┬─────────┘
                               │
                     ┌─────────▼─────────┐
                     │  Bitonic Merge    │  ◄── Merge with accumulator
-                    │   256 → K         │
+                    │   512 → K         │      (9 stages for 512-wide)
                     └─────────┬─────────┘
                               │
                     ┌─────────▼─────────┐
                     │   Accumulator     │  ◄── Running top-K
-                    │   (128 entries)   │
+                    │   (256 entries)   │
                     └─────────┬─────────┘
                               │
                          Top-K Output
@@ -333,9 +333,9 @@ The Top-K network is the performance-critical component of ATTEND operations. It
 | Module | Latency | Throughput | Use Case |
 |--------|---------|------------|----------|
 | `topk_network` | Variable | 1 result/batch | Area-optimized |
-| `topk_network_pipelined` | 8 cycles | 1 result/cycle | Throughput-optimized |
-| `bitonic_sort_64` | Combinational | N/A | Sub-module |
-| `bitonic_merge_256` | Combinational | N/A | Sub-module |
+| `topk_network_pipelined` | 9 cycles | 1 result/cycle | Throughput-optimized |
+| `bitonic_sort_64` | Combinational | N/A | Sub-module (sorts input batch) |
+| `bitonic_merge_512` | Combinational | N/A | Sub-module (merges K=256 accum + 64 input) |
 
 #### 5.1.3 Bitonic Sort Algorithm
 
@@ -363,25 +363,26 @@ assign out_lo = swap ? in_a : in_b;
 The `topk_network_pipelined` module adds registers between stages for timing closure:
 
 ```
-Parameter: PIPELINE_STAGES = 8
+Parameter: PIPELINE_STAGES = 9
 
 Stage 0: Input registration
-Stage 1-7: Bitonic compare-swap with registers
-Stage 8: Output formatting
+Stage 1-8: Bitonic compare-swap with registers (512-wide merge)
+Stage 9: Output formatting
 
-Total Latency: 8 cycles @ 250MHz = 32ns
+Total Latency: 9 cycles @ 250MHz = 36ns (internal selection)
+              +8ns pipeline overhead = 44ns total
 ```
 
 #### 5.1.5 Interface Signals
 
 | Signal | Width | Direction | Description |
 |--------|-------|-----------|-------------|
-| `k_value` | 7 | Input | K selection (32, 64, 128) |
+| `k_value` | 9 | Input | K selection (64, 128, 256) — K_WIDTH=9 |
 | `in_candidates` | 64×36 | Input | Candidates from banks |
 | `in_valid` | 64 | Input | Per-candidate valid |
 | `in_last` | 1 | Input | Last batch indicator |
-| `out_candidates` | 128×36 | Output | Sorted top-K |
-| `out_count` | 7 | Output | Actual result count |
+| `out_candidates` | 256×36 | Output | Sorted top-K (K_MAX=256) |
+| `out_count` | 9 | Output | Actual result count |
 | `out_valid` | 1 | Output | Result ready |
 
 ---
@@ -882,7 +883,7 @@ log_lut[15] = 7;   // log1p(15) ≈ 2.77
 
 ## 6. Pipeline Design
 
-### 6.1 ATTEND Pipeline (8 stages)
+### 6.1 ATTEND Pipeline (9 stages)
 
 ```
 ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
@@ -892,10 +893,11 @@ log_lut[15] = 7;   // log1p(15) ≈ 2.77
 └─────────┘  └─────────┘  └─────────┘  └─────────┘
                                             │
 ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌────▼────┐
-│ Stage 7 │◄─│ Stage 6 │◄─│ Stage 5 │◄─│ Stage 4 │
-│ Response│  │ Output  │  │ Merge   │  │ Compare │
-│ Format  │  │ Select  │  │ Sort    │  │ Stage 1 │
-└─────────┘  └─────────┘  └─────────┘  └─────────┘
+│ Stage 8 │◄─│ Stage 7 │◄─│ Stage 5 │◄─│ Stage 4 │
+│ Response│  │ Output  │  │  -6     │  │ Compare │
+│ Format  │  │ Select  │  │ Merge   │  │ Stage 1 │
+└─────────┘  └─────────┘  │ Sort    │  └─────────┘
+                           └─────────┘
 ```
 
 **Latency Breakdown @ 250MHz (4ns/cycle)**:
@@ -906,11 +908,14 @@ log_lut[15] = 7;   // log1p(15) ≈ 2.77
 | 1 | 1 | 4 | Block ID hash |
 | 2 | 1 | 4 | Bank arbitration |
 | 3 | 2 | 8 | BRAM read (registered) |
-| 4-6 | 4 | 16 | Bitonic sort network |
-| 7 | 1 | 4 | Response formatting |
-| **Total** | **10** | **40** | Internal latency |
+| 4-7 | 5 | 20 | Bitonic sort + 512-wide merge (9 stages, +1 vs K=128) |
+| 8 | 1 | 4 | Response formatting (first beat) |
+| **Total** | **11** | **44** | Internal latency |
 
-With CXL 2.0 interconnect (80ns round-trip), total ATTEND latency = 40 + 80 = **120ns**.
+With CXL 2.0 interconnect (80ns round-trip), total ATTEND latency = 44 + 2×80 = **204ns**.
+(+4ns vs K=128 design due to wider merge network)
+
+**Note**: Response formatting outputs first beat at stage 8. For K=256, the host receives 43 beats over ~172ns (43 × 4ns). Total ATTEND including response drain: ~216ns on CXL 2.0. Since response drain overlaps with next command decode, effective pipeline throughput is unchanged.
 
 ### 5.2 UPDATE Pipeline (4 stages)
 
@@ -1037,25 +1042,27 @@ wire [23:0] section_score = avg_attention * log_factor;  // Q8.8 × Q3.5 = Q11.1
 |----------|------|-----------|-------------|
 | BRAM36K | 128 | 2016 | 6.3% |
 | URAM | 0 | 960 | 0% |
-| LUTs | ~45,000 | 1,304,000 | 3.5% |
-| FFs | ~35,000 | 2,608,000 | 1.3% |
+| LUTs | ~65,000 | 1,304,000 | 5.0% |
+| FFs | ~50,000 | 2,608,000 | 1.9% |
 | DSPs | 128 | 9024 | 1.4% |
 
-**Note**: Very low utilization leaves room for multiple PCAM instances or additional features.
+**Note**: K=256 increases Top-K network from ~25K to ~45K LUTs (+80%). Overall utilization remains under 5% — still room for multiple PCAM instances.
 
 ### 7.2 Breakdown by Module
 
-| Module | LUTs | FFs | BRAM | DSPs |
-|--------|------|-----|------|------|
-| Host Interface | 8,000 | 6,000 | 4 | 0 |
-| Command Decoder | 500 | 300 | 0 | 0 |
-| Bank Controller | 2,000 | 1,500 | 0 | 0 |
-| Bank Array (64) | 4,000 | 2,000 | 128 | 0 |
-| Top-K Network | 25,000 | 20,000 | 0 | 0 |
-| Update Coalescer | 3,000 | 2,500 | 2 | 0 |
-| Decay Engine | 500 | 400 | 0 | 2 |
-| Section Cache | 2,000 | 2,000 | 0 | 0 |
-| **Total** | **45,000** | **34,700** | **134** | **2** |
+| Module | LUTs | FFs | BRAM | DSPs | K=128 → K=256 Change |
+|--------|------|-----|------|------|---------------------|
+| Host Interface | 8,000 | 6,000 | 4 | 0 | Unchanged |
+| Command Decoder | 600 | 400 | 0 | 0 | +100 LUTs (wider k_value) |
+| Bank Controller | 2,000 | 1,500 | 0 | 0 | Unchanged |
+| Bank Array (64) | 4,000 | 2,000 | 128 | 0 | Unchanged |
+| Top-K Network | **45,000** | **35,000** | 0 | 0 | **+80%** (512-wide merge) |
+| Update Coalescer | 3,000 | 2,500 | 2 | 0 | Unchanged |
+| Decay Engine | 500 | 400 | 0 | 2 | Unchanged |
+| Section Cache | 2,000 | 2,000 | 0 | 0 | Unchanged |
+| **Total** | **65,100** | **49,800** | **134** | **2** | **+20K LUTs, +15K FFs** |
+
+**Top-K scaling detail**: The 512-wide bitonic merge network contains ~4,600 compare-swap units (vs ~1,800 for 256-wide). Each compare-swap is 36-bit (score + block_id) requiring ~10 LUTs. The accumulator register file doubles from 128×36 to 256×36 bits.
 
 ### 7.3 Power Estimation
 
@@ -1063,12 +1070,14 @@ wire [23:0] section_score = avg_attention * log_factor;  // Q8.8 × Q3.5 = Q11.1
 Static Power:  ~2W (FPGA baseline)
 Dynamic Power:
   - BRAM:      ~3W (64 banks active)
-  - Logic:     ~2W (250MHz)
-  - I/O:       ~1W (PCIe Gen4)
+  - Logic:     ~3W (250MHz, wider merge network)
+  - I/O:       ~1W (PCIe Gen4 / CXL)
 
-Total:         ~8W (FPGA)
-ASIC Target:   ~3W (14nm)
+Total:         ~9W (FPGA)
+ASIC Target:   ~4.3W (14nm)    ← within 5W TDP for CXL card
 ```
+
+**ASIC area**: ~10.3 mm² at 14nm (vs 8.0 mm² at K=128). See Appendix E of benchmark report for full cost analysis.
 
 ---
 
@@ -1076,9 +1085,10 @@ ASIC Target:   ~3W (14nm)
 
 ### 8.1 Critical Paths
 
-1. **Top-K Comparator Chain**: Bitonic network depth
+1. **Top-K Comparator Chain**: 512-wide bitonic merge network (9 stages, ~4,600 comparators)
 2. **Bank Arbitration**: 64-way multiplexing
 3. **Score Accumulation**: Multi-operand addition
+4. **Accumulator Register File**: 256×36-bit accumulator update path
 
 ### 8.2 Mitigation Techniques
 
@@ -1161,7 +1171,7 @@ Depth: 16 entries (handles burst tolerance)
 ### 9.3 Coverage Targets
 
 - **Code Coverage**: >95% line, >90% branch
-- **Functional Coverage**: All K values, all bank patterns
+- **Functional Coverage**: All K values (64, 128, 256), all bank patterns, multi-beat response
 - **Toggle Coverage**: >90% for data paths
 
 ---
@@ -1299,7 +1309,7 @@ Key constraints in `timing.xdc`:
 module pcam_top #(
     parameter NUM_BANKS = 64,
     parameter BANK_DEPTH = 16384,
-    parameter K_MAX = 128,
+    parameter K_MAX = 256,
     parameter MAX_SEQUENCES = 64
 ) (
     // Clock and reset
@@ -1403,10 +1413,10 @@ endmodule
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `rtl/pcam_pkg.sv` | ~180 | Package with types and constants |
-| `rtl/pcam_top.sv` | ~350 | Top-level module with FSM |
+| `rtl/pcam_pkg.sv` | ~180 | Package with types and constants (K_MAX=256, K_WIDTH=9) |
+| `rtl/pcam_top.sv` | ~500 | Top-level module with FSM + multi-beat response |
 | `rtl/core/bank_mem.sv` | ~200 | BRAM bank with RMW support |
-| `rtl/core/topk_network.sv` | ~450 | Bitonic Top-K selection |
+| `rtl/core/topk_network.sv` | ~450 | Bitonic Top-K selection (512-wide merge, 9-stage pipeline) |
 | `rtl/core/update_coalescer.sv` | ~350 | Write combining buffer |
 | `rtl/core/decay_engine.sv` | ~300 | Background score decay |
 | `rtl/host_if/pcie_endpoint.sv` | ~350 | PCIe Gen4 interface |

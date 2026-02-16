@@ -544,3 +544,127 @@ class ChatResponse(BaseModel if PYDANTIC_AVAILABLE else object):
             default=None,
             description="Optional Symbol-U semantic analysis"
         )
+
+
+# ============================================================================
+# VIDEO GENERATION MODELS
+# ============================================================================
+
+class VideoGenerateRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request for AI video generation via Remotion + Phase Quad LLM.
+
+    The LLM generates TSX code from the description, and Remotion
+    renders it to MP4 video.
+
+    Attributes:
+        description: Natural language description of the video to create
+        template: Optional template category (title_card, data_visualization, etc.)
+        style: Optional style overrides (colors, fonts)
+        duration_seconds: Video duration (default 5)
+        resolution: Video resolution (default 1920x1080)
+        fps: Frames per second (default 30)
+        output_format: Output format (default mp4)
+        render: Whether to render to video or just return TSX code
+    """
+    if PYDANTIC_AVAILABLE:
+        description: str = Field(
+            ...,
+            description="Natural language description of the video"
+        )
+        template: Optional[str] = Field(
+            default=None,
+            description="Template category: title_card, data_visualization, logo_reveal, "
+                        "text_animation, countdown, metrics_dashboard, explainer, coherence_viz"
+        )
+        style: Optional[Dict[str, Any]] = Field(
+            default=None,
+            description="Style overrides: background_color, primary_color, font_family"
+        )
+        duration_seconds: int = Field(
+            default=5,
+            description="Video duration in seconds (1-30)"
+        )
+        resolution: Optional[Dict[str, int]] = Field(
+            default=None,
+            description="Video resolution: {width: 1920, height: 1080}"
+        )
+        fps: int = Field(
+            default=30,
+            description="Frames per second"
+        )
+        output_format: str = Field(
+            default="mp4",
+            description="Output format: mp4, gif, webm"
+        )
+        render: bool = Field(
+            default=True,
+            description="Whether to render to video file or just return TSX code"
+        )
+
+
+class VideoCoherenceRequest(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Request for coherence metrics visualization video.
+
+    Attributes:
+        session_id: Session to visualize metrics for
+        metrics: Optional explicit metrics dict (overrides session lookup)
+    """
+    if PYDANTIC_AVAILABLE:
+        session_id: Optional[str] = Field(
+            default=None,
+            description="Session ID to fetch metrics from"
+        )
+        metrics: Optional[Dict[str, float]] = Field(
+            default=None,
+            description="Explicit metrics dict (overrides session lookup)"
+        )
+
+
+class VideoGenerateResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """
+    Response from video generation.
+
+    Attributes:
+        video_id: Unique identifier for this video
+        status: Generation status (success, tsx_generated, render_failed)
+        tsx_code: The generated TSX source code
+        video_path: Path to rendered video file (if rendered)
+        generation_time_ms: Time to generate TSX code
+        render_time_ms: Time to render video
+        total_time_ms: Total pipeline time
+        error: Error message if generation/render failed
+        metadata: Additional metadata
+    """
+    if PYDANTIC_AVAILABLE:
+        video_id: str = Field(..., description="Unique video identifier")
+        status: str = Field(..., description="Generation status")
+        tsx_code: str = Field(..., description="Generated TSX code")
+        video_path: Optional[str] = Field(
+            default=None,
+            description="Path to rendered video file"
+        )
+        generation_time_ms: float = Field(
+            default=0, description="TSX generation time in ms"
+        )
+        render_time_ms: float = Field(
+            default=0, description="Video render time in ms"
+        )
+        total_time_ms: float = Field(
+            default=0, description="Total pipeline time in ms"
+        )
+        error: Optional[str] = Field(
+            default=None, description="Error message if failed"
+        )
+        metadata: Optional[Dict[str, Any]] = Field(
+            default=None, description="Additional metadata"
+        )
+
+
+class VideoTemplatesResponse(BaseModel if PYDANTIC_AVAILABLE else object):
+    """Response with available video templates."""
+    if PYDANTIC_AVAILABLE:
+        templates: Dict[str, str] = Field(
+            ..., description="Available template categories"
+        )

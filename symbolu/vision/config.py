@@ -150,6 +150,52 @@ class InterferenceConfig:
 
 
 @dataclass
+class AlternativeAttentionConfig:
+    """
+    Configuration for alternative attention normalization study.
+
+    Controls which attention normalization variant to evaluate
+    in the proposal cross-attention path. Does NOT replace the
+    original softmax-based CrossAttentionToProposals — instead,
+    creates a parallel AlternativeAttentionToProposals for A/B comparison.
+
+    Supported norm types:
+    - "softmax": Standard softmax (baseline control)
+    - "sparsemax": Euclidean projection onto simplex (exact zeros)
+    - "entmax15": Entmax with alpha=1.5 (standard literature variant)
+    - "entmax": Entmax with configurable alpha (recommended: alpha=1.3)
+    - "kernel_elu": Linear attention with ELU+1 kernel
+    - "kernel_rbf": Linear attention with random RBF features
+    - "top_m_softmax": Top-M mask + softmax (production variant)
+
+    Top-M softmax (production recommendation):
+    - Keep only the top M logits, mask the rest to -inf, then softmax.
+    - Deterministic sparsity: exactly M non-zero weights, always.
+    - Smooth softmax gradients over survivors — no exotic solvers.
+    - Hardware-friendly, debuggable, predictable.
+    - Phase-Quad already has QuadRetriever ranking + BCVF filtering,
+      so automatic sparsity discovery (entmax) is less critical.
+
+    Logit temperature control:
+    - Logit scale determines normalization sharpness ("pressure").
+    - Without temperature control, Q/K weight growth during training causes
+      logit variance to drift, changing effective sparsity unpredictably.
+    - A learned temperature stabilizes the operating point.
+    """
+    enabled: bool = False  # Off by default, enable to study alternatives
+    norm_type: str = "entmax"  # Default: entmax with alpha=1.3 for Phase-Quad
+    entmax_alpha: float = 1.3  # Alpha for entmax — 1.3 balances sparsity + gradient flow
+    score_bias_scale: float = 0.5  # Scale for retrieval score bias
+    mix_with_bcvf: bool = True  # Combine with BCVF consistency filtering
+    bcvf_mix_ratio: float = 0.5  # BCVF vs alternative attention mix
+    # Logit temperature control (stabilizes sparsity during training)
+    logit_temperature_init: float = 1.0  # Initial temperature value
+    learn_temperature: bool = True  # If True, temperature is a learned parameter
+    # Top-M softmax: keep only top M logits before softmax
+    top_m: int = 24  # Number of proposals to keep (from K=64, keep top 24)
+
+
+@dataclass
 class BlockConfig:
     """Configuration for CognadeVisionBlock or PhaseQuadDiTBlock."""
     embed_dim: int = 768  # Model width D
@@ -163,6 +209,7 @@ class BlockConfig:
     dit_style: DiTStyleConfig = field(default_factory=DiTStyleConfig)
     bcvf: BCVFConfig = field(default_factory=BCVFConfig)
     interference: InterferenceConfig = field(default_factory=InterferenceConfig)
+    alt_attention: AlternativeAttentionConfig = field(default_factory=AlternativeAttentionConfig)
 
 
 @dataclass

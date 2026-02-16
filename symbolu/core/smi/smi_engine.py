@@ -8,6 +8,16 @@ The Semantic Mismatch Index (SMI) measures the distance between:
 
 SMI = |inner_kosha - outer_ontology_normalized| / max_distance
 
+Where:
+    inner_kosha ∈ [1, 5]  (from consonant-to-kosha mapping)
+    outer_ontology_normalized = 1.0 + (ontology_level - 1) * (4/9)  ∈ [1.0, 5.0]
+    max_distance = 4.0  (= 5.0 - 1.0, the shared axis span)
+
+This ensures:
+    - Both axes are aligned to [1, 5]
+    - SMI spans the full [0.0, 1.0] range
+    - The distance metric is symmetric
+
 Design Principle:
     Sound carries inner meaning (kosha).
     Context carries outer meaning (ontology).
@@ -42,8 +52,14 @@ from symbolu.core.constants import (
 # SMI COMPUTATION PARAMETERS
 # =============================================================================
 
-# Normalization factor: maps 10-layer ontology to 5-layer kosha scale
-ONTOLOGY_TO_KOSHA_SCALE = 5.0 / 10.0
+# Normalization: linear map from ontology [1,10] → kosha-aligned [1.0, 5.0]
+# Formula: normalized = 1.0 + (ontology - 1) * (4.0 / 9.0)
+# This ensures Ontology 1 → 1.0 (= Kosha min) and Ontology 10 → 5.0 (= Kosha max)
+ONTOLOGY_NORM_OFFSET = 1.0
+ONTOLOGY_NORM_SCALE = 4.0 / 9.0  # (kosha_max - kosha_min) / (ontology_max - ontology_min)
+
+# Maximum possible distance between kosha [1,5] and normalized ontology [1,5]
+MAX_KOSHA_ONTOLOGY_DISTANCE = 4.0
 
 # Default kosha level when consonant not found (middle ground)
 DEFAULT_KOSHA_LEVEL = 3
@@ -543,9 +559,9 @@ class SMIEngine:
             # Get outer ontology level
             ontology_level = get_ontology_level(word, context)
 
-            # Normalize ontology to kosha scale and compute SMI
-            normalized_ontology = ontology_level * ONTOLOGY_TO_KOSHA_SCALE
-            smi = abs(avg_kosha - normalized_ontology) / 5.0  # Normalize to 0-1
+            # Normalize ontology [1,10] to kosha-aligned [1.0, 5.0] and compute SMI
+            normalized_ontology = ONTOLOGY_NORM_OFFSET + (ontology_level - 1) * ONTOLOGY_NORM_SCALE
+            smi = abs(avg_kosha - normalized_ontology) / MAX_KOSHA_ONTOLOGY_DISTANCE
 
             results.append(WordAnalysis(
                 word=word,

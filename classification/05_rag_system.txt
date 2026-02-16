@@ -1,0 +1,67 @@
+================================================================================
+FEATURE: RAG System (Retrieval-Augmented Generation)
+================================================================================
+Deterministic hash-based RAG pipeline with embeddings, vector store,
+retrieval, stitching, episodic memory (ChromaDB), and document ingestion.
+================================================================================
+
+--- Core RAG Modules ---
+symbolu/rag/__init__.py
+symbolu/rag/embeddings/__init__.py
+symbolu/rag/embeddings/encoder.py              # Hash-based & semantic embeddings
+symbolu/rag/vectorstore/__init__.py
+symbolu/rag/vectorstore/memory_store.py        # In-memory vector store (cosine similarity)
+symbolu/rag/retrieval/__init__.py
+symbolu/rag/retrieval/retriever.py             # Document retrieval pipeline
+symbolu/rag/stitching/__init__.py
+symbolu/rag/stitching/pipeline.py              # Candidate ranking & fusion
+symbolu/rag/ingestion/__init__.py
+symbolu/rag/ingestion/loader.py                # Document loading (.txt, .md)
+symbolu/rag/indexing/__init__.py
+symbolu/rag/indexing/indexer.py                # Corpus indexing
+symbolu/rag/episodic_store.py                  # Episodic memory (ChromaDB)
+symbolu/rag/utils/__init__.py
+symbolu/rag/utils/types.py                     # RAG type definitions
+
+--- RAG Fixtures (Domain Builders) ---
+symbolu/rag/fixtures/builders/__init__.py
+symbolu/rag/fixtures/builders/base.py
+symbolu/rag/fixtures/builders/biology_builder.py
+symbolu/rag/fixtures/builders/finance_builder.py
+symbolu/rag/fixtures/builders/history_builder.py
+symbolu/rag/fixtures/builders/literature_builder.py
+symbolu/rag/fixtures/builders/news_builder.py
+symbolu/rag/fixtures/builders/science_builder.py
+
+--- RAG Inference ---
+symbolu/inference_rag.py                       # RAG-augmented inference
+
+--- RAG Data ---
+data/rag/ai-governance/ai-audit-procedures.json
+data/rag/ai-governance/ai-transparency-requirements.json
+data/rag/ai-governance/data-governance-ai.json
+data/rag/ai-governance/model-risk-management.json
+data/rag/ai-governance/responsible-ai-framework.json
+data/rag/enterprise-faq/getting-started.json
+data/rag/enterprise-faq/integrations.json
+data/rag/enterprise-faq/pricing-tiers.json
+data/rag/enterprise-faq/security-compliance.json
+data/rag/enterprise-faq/troubleshooting.json
+data/rag/technical/api-reference.json
+data/rag/technical/coherence-metrics.json
+data/rag/technical/deployment-guide.json
+data/rag/technical/ontological-layers.json
+data/rag/technical/semantic-renderers.json
+
+--- Training ---
+train_retrieval.py                             # RAG/retrieval training
+retrieval_dataset.py                           # Retrieval dataset utilities
+
+--- Tests ---
+tests/unit/rag/__init__.py
+tests/unit/rag/test_rag_basic.py
+tests/unit/rag/test_rag_engine.py
+tests/unit/rag/test_rag_stitching_pipeline.py
+tests/integration/stl_rag/__init__.py
+tests/integration/stl_rag/test_stl_rag_integration.py
+simulator/pcam/tests/test_rag_pipeline.py

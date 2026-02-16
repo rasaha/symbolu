@@ -14,7 +14,7 @@ BCVF improves image quality by:
 Reference: Appendix I of PHASE_QUAD_IMAGE_GENERATOR_DESIGN.md
 """
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 
 import torch
 import torch.nn as nn

@@ -110,14 +110,14 @@ module tb_pcam_top;
     function automatic logic [63:0] build_attend_cmd(
         input logic [5:0]  seq_id,
         input logic [19:0] query_block,
-        input logic [6:0]  k_value
+        input logic [K_WIDTH-1:0] k_value     // 9-bit: supports K up to 256
     );
         logic [63:0] cmd;
         cmd[63:61] = OP_ATTEND;
         cmd[60:55] = seq_id;
         cmd[54:35] = query_block;
         cmd[34:15] = 20'b0;  // Not used for ATTEND
-        cmd[14:0]  = {8'b0, k_value};
+        cmd[14:0]  = {6'b0, k_value};
         return cmd;
     endfunction
 
@@ -165,17 +165,51 @@ module tb_pcam_top;
     endtask
 
     //-------------------------------------------------------------------------
-    // Wait for Response Task
+    // Wait for Response Task (Multi-Beat for K=256)
     //-------------------------------------------------------------------------
 
     task automatic wait_response(output logic [255:0] rsp);
         m_axis_rsp_tready <= 1'b1;
 
-        // Wait for valid response
-        while (!m_axis_rsp_tvalid) @(posedge clk);
+        // Consume all beats until tlast
+        forever begin
+            @(posedge clk);
+            if (m_axis_rsp_tvalid) begin
+                rsp = m_axis_rsp_tdata;  // Capture (overwritten each beat)
+                if (m_axis_rsp_tlast) begin
+                    @(posedge clk);
+                    m_axis_rsp_tready <= 1'b0;
+                    return;
+                end
+            end
+        end
+    endtask
 
-        rsp = m_axis_rsp_tdata;
-        @(posedge clk);
+    // Extended version: captures first beat header
+    task automatic wait_response_header(
+        output logic [K_WIDTH-1:0] count,
+        output logic [255:0]       first_beat
+    );
+        m_axis_rsp_tready <= 1'b1;
+        count = '0;
+
+        // Wait for first beat
+        while (!m_axis_rsp_tvalid) @(posedge clk);
+        first_beat = m_axis_rsp_tdata;
+        count = m_axis_rsp_tdata[K_WIDTH-1:0];
+
+        // Drain remaining beats
+        if (!m_axis_rsp_tlast) begin
+            forever begin
+                @(posedge clk);
+                if (m_axis_rsp_tvalid && m_axis_rsp_tlast) begin
+                    @(posedge clk);
+                    break;
+                end
+            end
+        end else begin
+            @(posedge clk);
+        end
 
         m_axis_rsp_tready <= 1'b0;
     endtask
@@ -283,22 +317,26 @@ module tb_pcam_top;
         //---------------------------------------------------------------------
         // Test 3: Basic ATTEND
         //---------------------------------------------------------------------
-        $display("\n[Test 3] Basic ATTEND Operation");
+        $display("\n[Test 3] Basic ATTEND Operation (K=256)");
 
         send_command(build_attend_cmd(
             6'd0,           // seq_id
             20'd100,        // query_block
-            7'd64           // k_value
+            K_DEFAULT[K_WIDTH-1:0]  // k_value (256)
         ));
 
-        wait_response(response);
+        begin
+            logic [K_WIDTH-1:0] rsp_count;
+            logic [255:0] first_beat;
+            wait_response_header(rsp_count, first_beat);
 
-        $display("  Response received:");
-        $display("    Count: %0d", response[7:0]);
-        $display("    First candidate: block=%0d, score=0x%04x",
-            response[8+19:8],
-            response[8+35:8+20]
-        );
+            $display("  Response received (multi-beat):");
+            $display("    Count: %0d", rsp_count);
+            $display("    First candidate: block=%0d, score=0x%04x",
+                first_beat[16+19:16],
+                first_beat[16+35:16+20]
+            );
+        end
 
         // Read attend count CSR
         read_csr(32'h00, csr_data);

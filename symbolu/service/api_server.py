@@ -111,6 +111,11 @@ from symbolu.service.request_models import (
     ChatRequest,
     ChatResponse as ChatAPIResponse,
     ChatMessageModel,
+    # Video generation models
+    VideoGenerateRequest,
+    VideoCoherenceRequest,
+    VideoGenerateResponse,
+    VideoTemplatesResponse,
     PYDANTIC_AVAILABLE
 )
 
@@ -1821,6 +1826,190 @@ def create_app() -> "FastAPI":
                 },
             },
         }
+
+    # ========================================================================
+    # VIDEO GENERATION ENDPOINTS - AI Video via Remotion + Phase Quad LLM
+    # ========================================================================
+
+    @app.post("/video/generate", response_model=VideoGenerateResponse)
+    async def generate_video(req: VideoGenerateRequest, request: Request) -> Dict[str, Any]:
+        """
+        Generate a video from a natural language description.
+
+        Uses the Phase Quad LLM to generate Remotion TSX code, then
+        optionally renders it to MP4 via the Remotion CLI.
+
+        This approach is complementary to the PhaseQuadVideoPipeline:
+        - PhaseQuadVideoPipeline: Neural diffusion (photorealistic video)
+        - This endpoint: Code-based rendering (motion graphics, data viz)
+
+        Args:
+            req: VideoGenerateRequest with description and options
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            VideoGenerateResponse with TSX code and optional video path
+
+        Example:
+            POST /video/generate
+            {
+                "description": "An animated bar chart showing Q1-Q4 revenue growth",
+                "template": "data_visualization",
+                "duration_seconds": 5
+            }
+        """
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            from symbolu.service.video_gen import RemotionVideoService
+            from symbolu.service.video_gen.service import VideoGenerationRequest
+
+            service = RemotionVideoService()
+
+            gen_request = VideoGenerationRequest(
+                description=req.description,
+                template=req.template,
+                style=req.style,
+                duration_seconds=req.duration_seconds,
+                resolution=req.resolution,
+                fps=req.fps,
+                output_format=req.output_format,
+            )
+
+            result = await service.generate(gen_request)
+
+            return {
+                "video_id": result.video_id,
+                "status": result.status,
+                "tsx_code": result.tsx_code,
+                "video_path": result.video_path,
+                "generation_time_ms": result.generation_time_ms,
+                "render_time_ms": result.render_time_ms,
+                "total_time_ms": result.total_time_ms,
+                "error": result.error,
+                "metadata": result.metadata,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in /video/generate: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Video generation failed: {str(e)}"
+            )
+
+    @app.post("/video/coherence", response_model=VideoGenerateResponse)
+    async def generate_coherence_video(
+        req: VideoCoherenceRequest, request: Request
+    ) -> Dict[str, Any]:
+        """
+        Generate a coherence metrics visualization video.
+
+        Creates an animated dashboard showing Symbol-U coherence metrics
+        as circular gauges with staggered animations and color coding.
+
+        Args:
+            req: VideoCoherenceRequest with session_id or explicit metrics
+            request: FastAPI Request object (for security checks)
+
+        Returns:
+            VideoGenerateResponse with visualization video
+
+        Example:
+            POST /video/coherence
+            {
+                "metrics": {
+                    "coherence_quality": 0.87,
+                    "drift_fusion": 0.72,
+                    "entropy_volatility": 0.45
+                }
+            }
+        """
+        verify_api_key(request)
+        enforce_rate_limit(request)
+
+        try:
+            from symbolu.service.video_gen import RemotionVideoService
+
+            service = RemotionVideoService()
+
+            # Get metrics from session or use provided ones
+            metrics = req.metrics
+            if not metrics and req.session_id:
+                # Fetch from session store
+                session = session_store.get(req.session_id)
+                if session is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Session {req.session_id} not found"
+                    )
+                # Extract coherence metrics from latest turn
+                if session.turns:
+                    latest = session.turns[-1]
+                    metrics = {
+                        "coherence": latest.get("coherence", {}).get("stability", 0.5),
+                        "drift": latest.get("coherence", {}).get("drift", 0.3),
+                    }
+
+            if not metrics:
+                # Use demo metrics
+                metrics = {
+                    "coherence_quality": 0.87,
+                    "drift_fusion": 0.72,
+                    "entropy_volatility": 0.45,
+                    "schema_stability": 0.91,
+                    "identity_harmonics": 0.68,
+                    "ucf_score": 0.83,
+                    "insight_depth": 0.56,
+                }
+
+            result = await service.generate_coherence_video(
+                metrics=metrics,
+                session_id=req.session_id,
+            )
+
+            return {
+                "video_id": result.video_id,
+                "status": result.status,
+                "tsx_code": result.tsx_code,
+                "video_path": result.video_path,
+                "generation_time_ms": result.generation_time_ms,
+                "render_time_ms": result.render_time_ms,
+                "total_time_ms": result.total_time_ms,
+                "error": result.error,
+                "metadata": result.metadata,
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in /video/coherence: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Coherence video generation failed: {str(e)}"
+            )
+
+    @app.get("/video/templates", response_model=VideoTemplatesResponse)
+    def get_video_templates() -> Dict[str, Any]:
+        """
+        Get available video template categories.
+
+        Returns:
+            Dict with template names and descriptions
+
+        Example:
+            GET /video/templates
+            -> {
+                "templates": {
+                    "title_card": "A professional title card with animated text",
+                    "data_visualization": "An animated chart/graph...",
+                    ...
+                }
+            }
+        """
+        from symbolu.service.video_gen.prompt_builder import RemotionPromptBuilder
+
+        return {"templates": RemotionPromptBuilder.get_available_templates()}
 
     return app
 

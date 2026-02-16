@@ -268,7 +268,7 @@ class TestQueueingBehavior:
 
     def test_concurrent_sequences_queueing(self):
         """Test queueing with multiple concurrent sequences."""
-        concurrent_counts = [1, 4, 8, 16, 32, 64]
+        concurrent_counts = [1, 4, 8, 16, 32, 64, 128, 256]
 
         print("\n" + "=" * 70)
         print("QUEUEING VS CONCURRENT SEQUENCES")

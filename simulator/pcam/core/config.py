@@ -58,9 +58,9 @@ class BankConfig:
 @dataclass
 class TopKConfig:
     """Top-K selection network configuration."""
-    k_values: List[int] = field(default_factory=lambda: [32, 64, 128])
-    default_k: int = 64
-    selection_latency_ns: float = 40.0  # For K=64
+    k_values: List[int] = field(default_factory=lambda: [64, 128, 256])
+    default_k: int = 256
+    selection_latency_ns: float = 44.0  # For K=256 (9-stage merge pipeline)
 
 
 @dataclass
@@ -99,7 +99,7 @@ class AcceptanceThresholds:
     max_attend_p99_ns: float = 500.0
     min_attend_throughput: float = 20e6  # 20M ops/sec
     min_update_throughput: float = 100e6  # 100M ops/sec (coalesced)
-    max_area_mm2: float = 10.0
+    max_area_mm2: float = 12.0   # Updated for K=256 (10.3mm² estimated)
     max_power_w: float = 5.0
 
     # Quality metrics

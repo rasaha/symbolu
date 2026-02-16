@@ -1,0 +1,161 @@
+name: Telemetry Audit CI
+
+on:
+  push:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "symbolu/mechanical/logging/**"
+      - "symbolu/agentic_framework/confidence_gate.py"
+      - "symbolu/phase_transformer.py"
+      - "tests/explainability/**"
+      - "tests/test_telemetry_ci_bounds.py"
+      - "scripts/telemetry_ci_report.py"
+      - ".github/workflows/telemetry-audit-ci.yml"
+  pull_request:
+    branches: ["main", "master", "dev", "claude/**"]
+    paths:
+      - "symbolu/mechanical/logging/**"
+      - "symbolu/agentic_framework/confidence_gate.py"
+      - "symbolu/phase_transformer.py"
+      - "tests/explainability/**"
+      - "tests/test_telemetry_ci_bounds.py"
+      - "scripts/telemetry_ci_report.py"
+      - ".github/workflows/telemetry-audit-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  telemetry-audit:
+    runs-on: ubuntu-latest
+    name: Telemetry Schema & Bounds Audit
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Load cached dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-telemetry-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-telemetry-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+          pip install pytest
+
+      # ==================================================================
+      # Step 1: Run telemetry schema + explainer unit tests
+      # ==================================================================
+      - name: Run Telemetry Schema Tests
+        run: |
+          pytest tests/explainability/test_telemetry_schema.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee telemetry-schema-pytest.log
+
+      # ==================================================================
+      # Step 2: Run telemetry CI bounds tests
+      # ==================================================================
+      - name: Run Telemetry Bounds Tests
+        run: |
+          pytest tests/test_telemetry_ci_bounds.py \
+            -v \
+            --tb=short \
+            --disable-warnings \
+            2>&1 | tee telemetry-bounds-pytest.log
+
+      # ==================================================================
+      # Step 3: Generate telemetry CI report with bounds enforcement
+      # ==================================================================
+      - name: Generate Telemetry CI Report
+        run: |
+          python scripts/telemetry_ci_report.py \
+            --enforce-bounds \
+            -o telemetry-ci-report.json \
+            2>&1 | tee telemetry-ci-report.log
+
+      # ==================================================================
+      # Step 4: Archive telemetry artifacts
+      # ==================================================================
+      - name: Upload Telemetry CI Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-ci-report
+          path: |
+            telemetry-ci-report.json
+            telemetry-ci-report.log
+          retention-days: 90
+
+      - name: Upload Telemetry Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-test-logs
+          path: |
+            telemetry-schema-pytest.log
+            telemetry-bounds-pytest.log
+          retention-days: 90
+
+      # ==================================================================
+      # Step 5: Summary
+      # ==================================================================
+      - name: Telemetry Audit Success
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "TELEMETRY AUDIT: PASSED"
+          echo "=========================================="
+          echo ""
+          echo "All checks verified:"
+          echo "  [PASS] Telemetry schema contracts valid"
+          echo "  [PASS] Explainer produces correct output"
+          echo "  [PASS] Bounds enforcement: all metrics within limits"
+          echo "  [PASS] Telemetry report archived as CI artifact"
+          echo ""
+          echo "Archived artifacts:"
+          echo "  - telemetry-ci-report.json (summary + per-scenario data)"
+          echo "  - telemetry-ci-report.log (human-readable summary)"
+          echo ""
+          echo "Bounds enforced:"
+          echo "  - confidence_mean.mean >= 0.25"
+          echo "  - quad_skip_rate.mean  <= 0.60"
+          echo "  - quad_skip_rate.max   <= 0.80"
+          echo "  - reversal_risk.mean   <= 0.50"
+          echo "  - stability_red_fraction <= 0.40"
+          echo "=========================================="
+
+      - name: Telemetry Audit Failure
+        if: failure()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "TELEMETRY AUDIT: FAILED"
+          echo "=========================================="
+          echo ""
+          echo "One or more telemetry checks failed."
+          echo ""
+          echo "POSSIBLE CAUSES:"
+          echo "  1. Telemetry schema contract broken"
+          echo "  2. Explainer output no longer matches schema"
+          echo "  3. Confidence/skip rate bounds violated"
+          echo "  4. Stability metrics outside safe range"
+          echo ""
+          echo "TO FIX:"
+          echo "  - Review telemetry-ci-report.json artifact"
+          echo "  - Check bounds_violations in the report"
+          echo "  - See scripts/telemetry_ci_report.py for bound definitions"
+          echo "=========================================="
+          exit 1

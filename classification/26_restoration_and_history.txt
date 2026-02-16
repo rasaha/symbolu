@@ -1,0 +1,103 @@
+================================================================================
+FEATURE: Restoration & Version History
+================================================================================
+Archived deprecated phases, sandbox experiments, acoustic mapper versions,
+and historical engine versions for reference and restoration.
+================================================================================
+
+--- Validation ---
+restoration/docs/validation/test_phase39_validation.py
+
+--- Determinism Verification ---
+restoration/scripts/determinism_verification.py
+
+--- Acoustic Mapper Versions ---
+restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta.py
+restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta_v2.py
+restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta_v3.py
+restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta_v3_1.py
+
+--- Deprecated Phases ---
+restoration/experiments/deprecated_phases/p11_controller/__init__.py
+restoration/experiments/deprecated_phases/p11_controller/p11_controller.py
+restoration/experiments/deprecated_phases/p11_controller/p11_ledger.py
+restoration/experiments/deprecated_phases/p11_controller/p11_schema.py
+restoration/experiments/deprecated_phases/p11_controller/p11_templates.py
+restoration/experiments/deprecated_phases/p11_controller/p11_verifier.py
+restoration/experiments/deprecated_phases/p11_prosodic/__init__.py
+restoration/experiments/deprecated_phases/p11_prosodic/p11_integration.py
+restoration/experiments/deprecated_phases/p11_prosodic/p11_prosodic_resolver.py
+restoration/experiments/deprecated_phases/p11_prosodic/p11_prosodic_schema.py
+restoration/experiments/deprecated_phases/p15_interaction/__init__.py
+restoration/experiments/deprecated_phases/p15_interaction/p15_integration.py
+restoration/experiments/deprecated_phases/p15_interaction/p15_interaction_resolver.py
+restoration/experiments/deprecated_phases/p15_interaction/p15_interaction_schema.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/p10_p11/__init__.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/p10_p11/test_p10_p11_invariants.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/p11_prosodic/__init__.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/p11_prosodic/test_p11_prosodic_evidence.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/test_p11_controller_switch.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/test_phase11_coherence_v3_activation.py
+restoration/experiments/deprecated_phases/tests/p11_deprecated_tests/test_phase11_light_invariance.py
+
+--- Phase Sandboxes ---
+restoration/experiments/sandboxes/experiment_pack_v1/__init__.py
+restoration/experiments/sandboxes/experiment_pack_v1/phoneme_only_router.py
+restoration/experiments/sandboxes/experiment_pack_v1/run_experiment_pack_v1.py
+
+restoration/experiments/sandboxes/phase11_sandbox/ceiling_deep_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11a_evaluation_harness.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b1_deep_collapse_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b1_routing.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b1_structural_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b2_canonicalization.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b2_structural_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b3_canonicalization.py
+restoration/experiments/sandboxes/phase11_sandbox/phase11b_evaluation_harness.py
+restoration/experiments/sandboxes/phase11_sandbox/structural_ceiling_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/test_phase11a_evaluation.py
+restoration/experiments/sandboxes/phase11_sandbox/variation_depth_analysis.py
+restoration/experiments/sandboxes/phase11_sandbox/tests/__init__.py
+restoration/experiments/sandboxes/phase11_sandbox/tests/test_phase11b1_routing.py
+restoration/experiments/sandboxes/phase11_sandbox/tests/test_phase11b2_canonicalization.py
+restoration/experiments/sandboxes/phase11_sandbox/tests/test_phase11b3_canonicalization.py
+
+restoration/experiments/sandboxes/phase12_sandbox/phase12_poc.py
+restoration/experiments/sandboxes/phase12_sandbox/phase12_ppv_encoder.py
+restoration/experiments/sandboxes/phase12_sandbox/phase12_retriever.py
+restoration/experiments/sandboxes/phase12_sandbox/phase12_schema.py
+restoration/experiments/sandboxes/phase12_sandbox/phase12_verifier.py
+restoration/experiments/sandboxes/phase12_sandbox/tests/__init__.py
+restoration/experiments/sandboxes/phase12_sandbox/tests/test_phase12_poc.py
+restoration/experiments/sandboxes/phase12_sandbox/tests/test_phase12_ppv_encoder.py
+restoration/experiments/sandboxes/phase12_sandbox/tests/test_phase12_retriever.py
+restoration/experiments/sandboxes/phase12_sandbox/tests/test_phase12_verifier.py
+
+restoration/experiments/sandboxes/phase13_sandbox/k1_schema.py
+restoration/experiments/sandboxes/phase13_sandbox/k1_store.py
+restoration/experiments/sandboxes/phase13_sandbox/tests/__init__.py
+restoration/experiments/sandboxes/phase13_sandbox/tests/test_k1_schema.py
+restoration/experiments/sandboxes/phase13_sandbox/tests/test_k1_store.py
+
+restoration/experiments/sandboxes/phase14_sandbox/accumulator.py
+restoration/experiments/sandboxes/phase14_sandbox/character_deriver.py
+restoration/experiments/sandboxes/phase14_sandbox/layer_assigner.py
+restoration/experiments/sandboxes/phase14_sandbox/phoneme_extractor.py
+restoration/experiments/sandboxes/phase14_sandbox/phoneme_only_experiment.py
+restoration/experiments/sandboxes/phase14_sandbox/rag_k1_pipeline.py
+restoration/experiments/sandboxes/phase14_sandbox/tests/__init__.py
+restoration/experiments/sandboxes/phase14_sandbox/tests/test_accumulator.py
+restoration/experiments/sandboxes/phase14_sandbox/tests/test_layer_assigner.py
+restoration/experiments/sandboxes/phase14_sandbox/tests/test_phoneme_extractor.py
+restoration/experiments/sandboxes/phase14_sandbox/tests/test_pipeline.py
+
+--- Version History ---
+restoration/experiments/version_history/phase2_modifier_engine_v3_2.py
+restoration/experiments/version_history/phase3_rule_engine_v3_0.py
+restoration/experiments/version_history/phase4_transform_engine_v4_0.py
+restoration/experiments/version_history/phase5_synthesis_engine_v5_0.py
+restoration/experiments/version_history/phase6_generative_boundary_engine_v6_0.py
+restoration/experiments/version_history/phase7_structural_folding_engine_v7_0.py
+restoration/experiments/version_history/phase9_rewrite_engine_v0.py
+restoration/experiments/version_history/test_phase9_rewrite_engine_v0.py
+restoration/experiments/version_history/verbalization_contract_renderer_v1_0.py
