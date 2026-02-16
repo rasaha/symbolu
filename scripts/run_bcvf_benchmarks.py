@@ -102,6 +102,18 @@ from symbolu.ontological.bcvf_benchmarks import (
     print_extended_summary,
 )
 from symbolu.ontological.bcvf_goal_embeddings import GoalEmbeddingFactory
+from symbolu.ontological.goal_dirnet import (
+    GoalDirNetConfig,
+    GoalDirFeatureBuilder,
+    GoalDirNet,
+    collect_from_dataset_adapter,
+    train_goal_dirnet,
+    evaluate_goal_dirnet,
+    run_alpha_sweep,
+    run_goal_dirnet_pipeline,
+    print_goal_dirnet_report,
+    GoalDirEvalResult,
+)
 
 
 # =========================================================================
@@ -1191,6 +1203,17 @@ def build_parser() -> argparse.ArgumentParser:
             "--model phi3 --samples 500",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--goal-strategy lookahead prompt_mean random",
+            "",
+            "GoalDirNet examples:",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--train-goal-dirnet",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --train-goal-dirnet --goal-features ht",
+            "  python scripts/run_bcvf_benchmarks.py --mode all "
+            "--model gpt2 --train-goal-dirnet "
+            "--train-goal-samples 5000 --eval-goal-samples 1000",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --train-goal-dirnet --alpha-sweep 0.05 0.1 0.2",
         ]),
     )
 
@@ -1295,6 +1318,51 @@ def build_parser() -> argparse.ArgumentParser:
         help="List recommended models and exit",
     )
 
+    # --- GoalDirNet flags ---
+    parser.add_argument(
+        "--train-goal-dirnet", action="store_true",
+        help=(
+            "Train GoalDirNet to predict future hidden-state direction, "
+            "then evaluate its trust score vs logit-derived baselines."
+        ),
+    )
+    parser.add_argument(
+        "--goal-features", type=str, default="ht",
+        choices=["ht", "ht_mean", "ht_mean_logits"],
+        help=(
+            "GoalDirNet feature mode: ht (h_t only), ht_mean "
+            "(h_t + mean pool), ht_mean_logits (+ logit features). "
+            "Default: ht"
+        ),
+    )
+    parser.add_argument(
+        "--train-goal-samples", type=int, default=50000,
+        help="Number of training positions for GoalDirNet (default: 50000)",
+    )
+    parser.add_argument(
+        "--eval-goal-samples", type=int, default=5000,
+        help="Number of eval positions for GoalDirNet (default: 5000)",
+    )
+    parser.add_argument(
+        "--goal-hidden-dim", type=int, default=512,
+        help="GoalDirNet MLP hidden dimension (default: 512)",
+    )
+    parser.add_argument(
+        "--goal-epochs", type=int, default=3,
+        help="GoalDirNet training epochs (default: 3)",
+    )
+    parser.add_argument(
+        "--goal-lr", type=float, default=1e-3,
+        help="GoalDirNet learning rate (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--alpha-sweep", type=float, nargs="*", default=None,
+        help=(
+            "Run logit modulation alpha sweep (gated by GoalDirNet win). "
+            "Pass alpha values, e.g. --alpha-sweep 0.05 0.1 0.2"
+        ),
+    )
+
     return parser
 
 
@@ -1376,6 +1444,28 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         print(f"  Strategies: {args.goal_strategy}")
     print(f"{'='*70}")
 
+    # --- GoalDirNet config ---
+    goal_config = None
+    if args.train_goal_dirnet:
+        goal_train = args.train_goal_samples
+        goal_eval = args.eval_goal_samples
+        if args.dry_run:
+            goal_train = min(goal_train, 500)
+            goal_eval = min(goal_eval, 100)
+        goal_config = GoalDirNetConfig(
+            feature_mode=args.goal_features,
+            hidden_dim=args.goal_hidden_dim,
+            train_samples=goal_train,
+            eval_samples=goal_eval,
+            epochs=args.goal_epochs,
+            lr=args.goal_lr,
+            alpha_values=args.alpha_sweep or [0.05, 0.1, 0.2],
+        )
+        print(f"  GoalDirNet: features={goal_config.feature_mode}, "
+              f"hidden={goal_config.hidden_dim}, "
+              f"train={goal_config.train_samples}, "
+              f"eval={goal_config.eval_samples}")
+
     # --- Determine modes to run ---
     if args.mode == "all":
         modes = ["wikitext", "humaneval", "instruction", "retrieval"]
@@ -1384,6 +1474,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
 
     # --- Run benchmarks ---
     all_results: List[BenchmarkResult] = []
+    goal_datasets: Dict[str, List[Dict[str, Any]]] = {}
     t0 = time.time()
 
     for mode in modes:
@@ -1409,6 +1500,74 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         )
         all_results.extend(mode_results)
 
+        # Collect datasets for GoalDirNet if requested
+        if args.train_goal_dirnet:
+            goal_n = goal_config.train_samples + goal_config.eval_samples
+            if mode == "wikitext":
+                # Use first goal strategy for GoalDirNet data
+                strategy = args.goal_strategy[0]
+                if args.dry_run:
+                    gd_data = DatasetAdapter.from_dry_run(
+                        n_samples=goal_n,
+                        strategy=strategy,
+                    )
+                else:
+                    texts = _load_evaluation_texts(
+                        args.dataset, max_texts=100,
+                    )
+                    if not texts:
+                        texts = _builtin_fallback_texts()
+                    gd_data = DatasetAdapter.from_wikitext(
+                        model, tokenizer, texts, strategy,
+                        goal_n, effective_device, args.max_seq_len,
+                    )
+                goal_datasets[f"WikiText/{strategy}"] = gd_data
+            elif mode == "humaneval":
+                if args.dry_run:
+                    gd_data = DatasetAdapter.from_dry_run(
+                        n_samples=goal_n, strategy="lookahead",
+                    )
+                else:
+                    gd_data = DatasetAdapter.from_humaneval(
+                        model, tokenizer, goal_n, effective_device,
+                        args.max_seq_len, args.humaneval_path,
+                    )
+                goal_datasets["HumanEval"] = gd_data
+            elif mode == "instruction":
+                if args.dry_run:
+                    gd_data = DatasetAdapter.from_dry_run(
+                        n_samples=goal_n, strategy="lookahead",
+                    )
+                else:
+                    pairs = _load_instruction_pairs(
+                        args.instruction_path, max_pairs=500,
+                    )
+                    if pairs:
+                        gd_data = DatasetAdapter.from_instruction(
+                            model, tokenizer, pairs, goal_n,
+                            effective_device, args.max_seq_len,
+                        )
+                    else:
+                        gd_data = []
+                goal_datasets["Instruction"] = gd_data
+            elif mode == "retrieval":
+                if args.dry_run:
+                    gd_data = DatasetAdapter.from_dry_run(
+                        n_samples=goal_n, strategy="lookahead",
+                    )
+                else:
+                    queries, corpus = _load_retrieval_data(
+                        args.retrieval_path, max_queries=200,
+                    )
+                    if queries and corpus:
+                        gd_data = DatasetAdapter.from_retrieval(
+                            model, tokenizer, queries, corpus,
+                            goal_n, effective_device, args.max_seq_len,
+                        )
+                    else:
+                        gd_data = []
+                goal_datasets["Retrieval"] = gd_data
+
     elapsed = time.time() - t0
 
     # --- Build report ---
@@ -1427,6 +1586,30 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     if all_results:
         print()
         print_extended_summary(all_results)
+
+    # --- GoalDirNet training + evaluation ---
+    if args.train_goal_dirnet and goal_datasets:
+        print(f"\n{'='*70}")
+        print("GoalDirNet Training & Evaluation")
+        print(f"{'='*70}")
+
+        t1 = time.time()
+        run_sweep = args.alpha_sweep is not None
+        goal_eval_results, alpha_sweep_results = run_goal_dirnet_pipeline(
+            model=model,
+            tokenizer=tokenizer,
+            datasets=goal_datasets,
+            config=goal_config,
+            device=effective_device,
+            run_alpha_sweep_flag=run_sweep,
+        )
+
+        goal_elapsed = time.time() - t1
+        print(f"\nGoalDirNet time: {goal_elapsed:.1f}s")
+
+        # Print report
+        if goal_eval_results:
+            print_goal_dirnet_report(goal_eval_results, alpha_sweep_results)
 
     # --- Save if requested ---
     if args.output:
