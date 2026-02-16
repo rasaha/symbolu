@@ -112,6 +112,11 @@ class StepRecord:
     sf_selected: float = 0.0
     sb_selected: float = 0.0
     lagrangian_selected: float = 0.0
+    # BCVF scores for the *baseline* top-1 token (Risk A diagnostic)
+    sf_baseline: float = 0.0
+    sb_baseline: float = 0.0
+    delta_sf: float = 0.0  # sf_selected − sf_baseline
+    delta_sb: float = 0.0  # sb_selected − sb_baseline
     # Rerank diagnostics
     rerank_changed: bool = False
     original_top_token: Optional[int] = None
@@ -120,6 +125,9 @@ class StepRecord:
     confidence: float = 0.0
     margin: float = 0.0
     confidence_level: str = ""
+    # Logit modulation sanity (Option A)
+    kl_base_mod: float = 0.0
+    entropy_delta: float = 0.0
 
 
 class StepLogger:
@@ -147,16 +155,25 @@ class StepLogger:
         Build a :class:`StepRecord` from the ``log_data`` dict returned
         by :meth:`BCVFDecoder.decode_step`.
         """
-        # Extract sf/sb for the selected token
+        def _scalar(tensor_or_val, idx: int = 0) -> float:
+            """Extract a scalar from a possibly-batched tensor."""
+            if PYTORCH_AVAILABLE and hasattr(tensor_or_val, "dim"):
+                if tensor_or_val.dim() == 0:
+                    return float(tensor_or_val.item())
+                return float(tensor_or_val[idx].item())
+            if hasattr(tensor_or_val, "__getitem__"):
+                return float(tensor_or_val[idx])
+            return float(tensor_or_val)
+
+        # --- sf/sb for the selected token ---
         sf_sel = 0.0
         sb_sel = 0.0
         L_sel = 0.0
         if PYTORCH_AVAILABLE and "sf" in log_data and "topM_indices" in log_data:
-            topM_indices = log_data["topM_indices"]  # [B, M]
-            sf_all = log_data["sf"]  # [B, M]
+            topM_indices = log_data["topM_indices"]
+            sf_all = log_data["sf"]
             sb_all = log_data["sb"]
             L_all = log_data["L"]
-            # Find the relative index of the predicted token in topM
             match = (topM_indices[0] == predicted_token).nonzero(as_tuple=True)
             if len(match[0]) > 0:
                 rel = match[0][0].item()
@@ -164,28 +181,49 @@ class StepLogger:
                 sb_sel = float(sb_all[0, rel].item())
                 L_sel = float(L_all[0, rel].item())
 
+        # --- sf/sb for the *baseline* top-1 token ---
+        sf_base = 0.0
+        sb_base = 0.0
+        if "baseline_sf" in log_data:
+            sf_base = _scalar(log_data["baseline_sf"])
+        if "baseline_sb" in log_data:
+            sb_base = _scalar(log_data["baseline_sb"])
+
+        # --- sf/sb deltas (selected vs baseline) ---
+        delta_sf = 0.0
+        delta_sb = 0.0
+        if "delta_sf" in log_data:
+            delta_sf = _scalar(log_data["delta_sf"])
+        if "delta_sb" in log_data:
+            delta_sb = _scalar(log_data["delta_sb"])
+
+        # --- Rerank ---
         rerank_changed = False
         original_top = None
-        delta = 0.0
         if "rerank_changed" in log_data:
-            rc = log_data["rerank_changed"]
-            rerank_changed = bool(rc.item()) if PYTORCH_AVAILABLE else bool(rc)
+            rerank_changed = bool(_scalar(log_data["rerank_changed"]))
         if "original_top_token" in log_data:
-            ot = log_data["original_top_token"]
-            original_top = int(ot.item()) if PYTORCH_AVAILABLE else int(ot)
+            original_top = int(_scalar(log_data["original_top_token"]))
 
+        # --- Calibration ---
         conf = 0.0
         margin = 0.0
         level = ""
         if "confidence" in log_data:
-            c = log_data["confidence"]
-            conf = float(c[0].item()) if PYTORCH_AVAILABLE else float(c)
+            conf = _scalar(log_data["confidence"])
         if "margin" in log_data:
-            m = log_data["margin"]
-            margin = float(m[0].item()) if PYTORCH_AVAILABLE else float(m)
+            margin = _scalar(log_data["margin"])
         if "confidence_level" in log_data:
             levels = log_data["confidence_level"]
             level = levels[0] if isinstance(levels, list) else str(levels)
+
+        # --- Logit modulation sanity ---
+        kl_bm = 0.0
+        ent_delta = 0.0
+        if "kl_base_mod" in log_data:
+            kl_bm = _scalar(log_data["kl_base_mod"])
+        if "entropy_delta" in log_data:
+            ent_delta = _scalar(log_data["entropy_delta"])
 
         correct = None
         if ground_truth_token is not None:
@@ -199,12 +237,18 @@ class StepLogger:
             sf_selected=sf_sel,
             sb_selected=sb_sel,
             lagrangian_selected=L_sel,
+            sf_baseline=sf_base,
+            sb_baseline=sb_base,
+            delta_sf=delta_sf,
+            delta_sb=delta_sb,
             rerank_changed=rerank_changed,
             original_top_token=original_top,
-            delta_score=delta,
+            delta_score=0.0,
             confidence=conf,
             margin=margin,
             confidence_level=level,
+            kl_base_mod=kl_bm,
+            entropy_delta=ent_delta,
         )
 
     # ------------------------------------------------------------------
@@ -247,14 +291,61 @@ class StepLogger:
             return 0.0
         return float(np.mean([r.sb_selected for r in self.records]))
 
+    def rerank_worsened_rate(self) -> float:
+        """
+        Among steps where rerank changed the token *and* ground truth
+        is available, fraction where the new token was wrong.
+        """
+        changed = [
+            r for r in self.records
+            if r.rerank_changed and r.correct is not None
+        ]
+        if not changed:
+            return 0.0
+        return sum(1 for r in changed if not r.correct) / len(changed)
+
+    def rerank_net_benefit(self) -> float:
+        """Improved rate minus worsened rate among changed tokens."""
+        return self.rerank_improvement_rate() - self.rerank_worsened_rate()
+
+    def mean_delta_sf(self) -> float:
+        """Mean sf(selected) − sf(baseline) across rerank-changed steps."""
+        changed = [r for r in self.records if r.rerank_changed]
+        if not changed:
+            return 0.0
+        return float(np.mean([r.delta_sf for r in changed]))
+
+    def mean_delta_sb(self) -> float:
+        """Mean sb(selected) − sb(baseline) across rerank-changed steps."""
+        changed = [r for r in self.records if r.rerank_changed]
+        if not changed:
+            return 0.0
+        return float(np.mean([r.delta_sb for r in changed]))
+
+    def mean_kl_base_mod(self) -> float:
+        """Mean KL(base || modulated) — only meaningful when logit mod is on."""
+        vals = [r.kl_base_mod for r in self.records if r.kl_base_mod > 0.0]
+        return float(np.mean(vals)) if vals else 0.0
+
+    def mean_entropy_delta(self) -> float:
+        """Mean entropy(modulated) − entropy(base)."""
+        vals = [r.entropy_delta for r in self.records if r.entropy_delta != 0.0]
+        return float(np.mean(vals)) if vals else 0.0
+
     def summary(self) -> Dict[str, float]:
         return {
             "n_steps": len(self.records),
             "accuracy": self.accuracy(),
             "rerank_change_rate": self.rerank_change_rate(),
             "rerank_improvement_rate": self.rerank_improvement_rate(),
+            "rerank_worsened_rate": self.rerank_worsened_rate(),
+            "rerank_net_benefit": self.rerank_net_benefit(),
             "mean_sf": self.mean_sf(),
             "mean_sb": self.mean_sb(),
+            "mean_delta_sf": self.mean_delta_sf(),
+            "mean_delta_sb": self.mean_delta_sb(),
+            "mean_kl_base_mod": self.mean_kl_base_mod(),
+            "mean_entropy_delta": self.mean_entropy_delta(),
         }
 
 
@@ -339,22 +430,63 @@ def load_humaneval(path: Optional[str] = None) -> List[HumanEvalSample]:
     return samples
 
 
-def run_unit_tests(code: str, test_code: str, entry_point: str) -> bool:
+def run_unit_tests(
+    code: str,
+    test_code: str,
+    entry_point: str,
+    timeout_seconds: float = 10.0,
+    use_subprocess: bool = True,
+) -> bool:
     """
-    Execute generated code + test harness in a sandboxed ``exec``.
+    Execute generated code + test harness.
 
-    Returns True if all tests pass, False otherwise.
+    When ``use_subprocess=True`` (default), runs the code in an isolated
+    subprocess with a hard timeout and restricted capabilities.  This
+    prevents infinite loops, filesystem access, and network calls from
+    affecting the evaluation process.
 
-    WARNING: This uses ``exec()`` and should only be run on trusted /
-    generated code in an isolated environment.
+    Args:
+        code: The generated solution code.
+        test_code: The test harness (defines ``check(fn)``).
+        entry_point: Name of the function to test.
+        timeout_seconds: Maximum execution time before the subprocess
+                         is killed.
+        use_subprocess: If True, run in subprocess for safety.  If
+                        False, fall back to in-process ``exec`` (faster
+                        but less safe — only for trusted code).
+
+    Returns:
+        True if all tests pass, False otherwise.
     """
     full_code = code + "\n" + test_code + f"\ncheck({entry_point})\n"
-    try:
-        exec_globals: Dict[str, Any] = {}
-        exec(full_code, exec_globals)  # noqa: S102
-        return True
-    except Exception:
-        return False
+
+    if use_subprocess:
+        import subprocess
+        import sys
+        import tempfile
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=True
+            ) as tmp:
+                tmp.write(full_code)
+                tmp.flush()
+                result = subprocess.run(
+                    [sys.executable, tmp.name],
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                    env={"PATH": ""},  # minimal env
+                )
+                return result.returncode == 0
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+    else:
+        try:
+            exec_globals: Dict[str, Any] = {}
+            exec(full_code, exec_globals)  # noqa: S102
+            return True
+        except Exception:
+            return False
 
 
 # =========================================================================
@@ -378,15 +510,28 @@ class ExperimentResult:
     # Rerank diagnostics
     rerank_change_pct: float = 0.0
     rerank_improved_pct: float = 0.0
+    rerank_worsened_pct: float = 0.0
+    rerank_net_benefit: float = 0.0
     # BCVF signal
     mean_sf: float = 0.0
     mean_sb: float = 0.0
+    # Risk A: goal-embedding effectiveness
+    mean_delta_sf: float = 0.0
+    mean_delta_sb: float = 0.0
+    # Option A: logit mod sanity
+    mean_kl_base_mod: float = 0.0
+    mean_entropy_delta: float = 0.0
     # Confidence tiers
     tier_accuracy: Dict[str, float] = field(default_factory=dict)
     tier_distribution: Dict[str, float] = field(default_factory=dict)
+    # Tier confusion table: tier → {correct: N, wrong: N}
+    tier_confusion: Dict[str, Dict[str, int]] = field(default_factory=dict)
     # Low-confidence abstention stats
     low_conf_pct: float = 0.0
     low_conf_accuracy: float = 0.0
+    # Conditional ECE
+    ece_on_wrong_baseline: float = 0.0
+    ece_on_low_margin: float = 0.0
     # Raw
     per_sample: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -552,6 +697,50 @@ class ExperimentRunner:
         cal_report = tracker.report()
         step_summary = step_logger.summary()
 
+        # Tier confusion table
+        tier_confusion: Dict[str, Dict[str, int]] = {
+            "HIGH": {"correct": 0, "wrong": 0},
+            "MEDIUM": {"correct": 0, "wrong": 0},
+            "LOW": {"correct": 0, "wrong": 0},
+        }
+        for rec in step_logger.records:
+            if rec.confidence_level and rec.correct is not None:
+                tier = rec.confidence_level.upper()
+                if tier in tier_confusion:
+                    if rec.correct:
+                        tier_confusion[tier]["correct"] += 1
+                    else:
+                        tier_confusion[tier]["wrong"] += 1
+
+        # Conditional ECE: on wrong-baseline samples and low-margin samples
+        ece_wrong = 0.0
+        ece_low_margin = 0.0
+        wrong_confs = []
+        wrong_corr = []
+        low_margin_confs = []
+        low_margin_corr = []
+        for rec in step_logger.records:
+            if rec.correct is not None:
+                # "Wrong baseline" = baseline would have been wrong
+                if rec.original_top_token is not None and rec.ground_truth_token is not None:
+                    baseline_correct = rec.original_top_token == rec.ground_truth_token
+                    if not baseline_correct:
+                        wrong_confs.append(rec.confidence)
+                        wrong_corr.append(float(rec.correct))
+                # Low margin
+                if rec.margin < cfg.margin_low:
+                    low_margin_confs.append(rec.confidence)
+                    low_margin_corr.append(float(rec.correct))
+
+        if wrong_confs:
+            ece_wrong = compute_ece(
+                np.array(wrong_confs), np.array(wrong_corr)
+            )
+        if low_margin_confs:
+            ece_low_margin = compute_ece(
+                np.array(low_margin_confs), np.array(low_margin_corr)
+            )
+
         return ExperimentResult(
             label=label,
             flags=flags,
@@ -562,12 +751,21 @@ class ExperimentRunner:
             brier=cal_report["brier"],
             rerank_change_pct=step_summary["rerank_change_rate"],
             rerank_improved_pct=step_summary["rerank_improvement_rate"],
+            rerank_worsened_pct=step_summary["rerank_worsened_rate"],
+            rerank_net_benefit=step_summary["rerank_net_benefit"],
             mean_sf=step_summary["mean_sf"],
             mean_sb=step_summary["mean_sb"],
+            mean_delta_sf=step_summary["mean_delta_sf"],
+            mean_delta_sb=step_summary["mean_delta_sb"],
+            mean_kl_base_mod=step_summary["mean_kl_base_mod"],
+            mean_entropy_delta=step_summary["mean_entropy_delta"],
             tier_accuracy=cal_report["tier_accuracy"],
             tier_distribution=cal_report["tier_distribution"],
+            tier_confusion=tier_confusion,
             low_conf_pct=cal_report["tier_distribution"].get("LOW", 0.0),
             low_conf_accuracy=cal_report["tier_accuracy"].get("LOW", 0.0),
+            ece_on_wrong_baseline=ece_wrong,
+            ece_on_low_margin=ece_low_margin,
             per_sample=per_sample,
         )
 
@@ -721,7 +919,8 @@ class ExperimentRunner:
         """
         header = (
             f"{'Config':<12} {'pass@1':>7} {'ECE':>7} {'Brier':>7} "
-            f"{'Rerank%':>8} {'sf':>6} {'sb':>6} "
+            f"{'Rerank%':>8} {'Impr%':>6} {'Wrsd%':>6} {'Net':>6} "
+            f"{'sf':>6} {'sb':>6} "
             f"{'H-acc':>6} {'M-acc':>6} {'L-acc':>6}"
         )
         sep = "-" * len(header)
@@ -734,12 +933,37 @@ class ExperimentRunner:
             line = (
                 f"{r.label:<12} {r.pass_at_1:>7.3f} {r.ece:>7.4f} "
                 f"{r.brier:>7.4f} {r.rerank_change_pct:>7.1%} "
+                f"{r.rerank_improved_pct:>5.1%} "
+                f"{r.rerank_worsened_pct:>5.1%} "
+                f"{r.rerank_net_benefit:>+5.1%} "
                 f"{r.mean_sf:>6.3f} {r.mean_sb:>6.3f} "
                 f"{h_acc:>6.3f} {m_acc:>6.3f} {l_acc:>6.3f}"
             )
             lines.append(line)
 
         lines.append(sep)
+
+        # Signal diagnostics section
+        lines.append("")
+        lines.append("Signal diagnostics:")
+        for r in results:
+            parts = [f"  {r.label:<12}"]
+            if r.mean_delta_sf != 0.0 or r.mean_delta_sb != 0.0:
+                parts.append(
+                    f"Δsf={r.mean_delta_sf:+.4f} Δsb={r.mean_delta_sb:+.4f}"
+                )
+            if r.mean_kl_base_mod > 0.0:
+                parts.append(
+                    f"KL={r.mean_kl_base_mod:.4f} "
+                    f"ΔH={r.mean_entropy_delta:+.4f}"
+                )
+            if r.ece_on_wrong_baseline > 0.0:
+                parts.append(f"ECE(wrong)={r.ece_on_wrong_baseline:.4f}")
+            if r.ece_on_low_margin > 0.0:
+                parts.append(f"ECE(low-margin)={r.ece_on_low_margin:.4f}")
+            if len(parts) > 1:
+                lines.append("  ".join(parts))
+
         table = "\n".join(lines)
         print(table)
         return table
@@ -773,6 +997,282 @@ class ExperimentRunner:
 
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
+
+
+# =========================================================================
+# Multi-Token Generation Loop (for HumanEval)
+# =========================================================================
+
+
+def generate_with_bcvf(
+    model: Any,
+    tokenizer: Any,
+    prompt: str,
+    decoder: "BCVFDecoder",
+    goal_embedding: Any,
+    max_tokens: int = 512,
+    stop_tokens: Optional[List[int]] = None,
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Autoregressive multi-token generation with BCVF decoding.
+
+    Unlike single-step evaluation, this produces a full code completion
+    by running the model in a loop, applying the BCVFDecoder at each
+    step.
+
+    Args:
+        model: Transformer model with ``.get_input_embeddings()`` and
+               a forward method returning logits and hidden states.
+        tokenizer: Tokenizer with ``.encode()`` and ``.decode()``.
+        prompt: The prompt string.
+        decoder: Configured :class:`BCVFDecoder` instance.
+        goal_embedding: [1, D] goal embedding tensor.
+        max_tokens: Maximum number of tokens to generate.
+        stop_tokens: List of token ids that signal end of generation
+                     (e.g. EOS, newline after function body).
+
+    Returns:
+        (generated_code_str, list_of_per_step_log_dicts)
+    """
+    if not PYTORCH_AVAILABLE:
+        raise ImportError("PyTorch is required")
+
+    input_ids = tokenizer.encode(prompt, return_tensors="pt")
+    vocab_emb = model.get_input_embeddings().weight.detach()
+    stop_set = set(stop_tokens or [])
+    generated_ids: List[int] = []
+    step_logs: List[Dict[str, Any]] = []
+
+    for step in range(max_tokens):
+        with torch.no_grad():
+            outputs = model(input_ids, output_hidden_states=True)
+            last_logits = outputs.logits[:, -1, :]  # [1, V]
+            last_hidden = outputs.hidden_states[-1][:, -1, :]  # [1, D]
+
+        best_idx, probs, log_data = decoder.decode_step(
+            last_hidden, vocab_emb, goal_embedding, last_logits
+        )
+
+        token_id = int(best_idx[0].item())
+        generated_ids.append(token_id)
+
+        # Build a lightweight log dict for aggregation
+        step_log: Dict[str, Any] = {
+            "token_id": token_id,
+            "confidence": float(
+                log_data["confidence"][0].item()
+            ) if "confidence" in log_data else 0.0,
+            "confidence_level": (
+                log_data["confidence_level"][0]
+                if "confidence_level" in log_data
+                else ""
+            ),
+            "rerank_changed": bool(
+                log_data["rerank_changed"].item()
+            ) if "rerank_changed" in log_data else False,
+            "sf": float(
+                log_data.get("selected_sf", torch.tensor(0.0))[0].item()
+            ) if "selected_sf" in log_data else 0.0,
+            "sb": float(
+                log_data.get("selected_sb", torch.tensor(0.0))[0].item()
+            ) if "selected_sb" in log_data else 0.0,
+        }
+        step_logs.append(step_log)
+
+        if token_id in stop_set:
+            break
+
+        # Append to input for next step
+        input_ids = torch.cat(
+            [input_ids, best_idx.unsqueeze(0)], dim=-1
+        )
+
+    generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+    return generated_text, step_logs
+
+
+# =========================================================================
+# Top-M Recall Check (Risk B diagnostic)
+# =========================================================================
+
+
+def check_topM_recall(
+    hidden_state: Any,
+    vocab_embeddings: Any,
+    goal_embedding: Any,
+    M_values: Optional[List[int]] = None,
+    larger_pool: int = 5000,
+    config: Optional[DecodingConfig] = None,
+) -> Dict[str, Any]:
+    """
+    Check whether the BCVF-optimal token falls within the top-M pool.
+
+    Computes the BCVF Lagrangian for a large pool (top-``larger_pool``)
+    and checks at which M the best-by-BCVF token first appears.
+
+    This answers Risk B: "If the 'true better token' isn't in top-M,
+    BCVF cannot help."
+
+    Args:
+        hidden_state: [1, D] tensor.
+        vocab_embeddings: [V, D] tensor.
+        goal_embedding: [1, D] tensor.
+        M_values: List of M values to check recall for.
+                  Defaults to [100, 200, 500, 1000, 2000].
+        larger_pool: Size of the full BCVF evaluation pool.
+        config: DecodingConfig for BCVF parameters.
+
+    Returns:
+        Dict with:
+            bcvf_best_rank: rank of the BCVF-best token in base logits.
+            recall_at_M: dict mapping M → bool (is best in top-M?).
+            min_required_M: smallest M that captures the BCVF-best.
+    """
+    if not PYTORCH_AVAILABLE:
+        raise ImportError("PyTorch is required")
+
+    cfg = config or DecodingConfig()
+    M_values = M_values or [100, 200, 500, 1000, 2000]
+
+    from symbolu.ontological.bcvf_decoding import BCVFScoringModule
+
+    scorer = BCVFScoringModule(cfg)
+    logits = hidden_state @ vocab_embeddings.T  # [1, V]
+    V = logits.shape[-1]
+    pool_size = min(larger_pool, V)
+
+    topK_scores, topK_indices = torch.topk(logits, pool_size, dim=-1)
+    candidates = vocab_embeddings[topK_indices]  # [1, K, D]
+    sf = scorer.forward_score(hidden_state, candidates)
+    sb = scorer.backward_score(candidates, goal_embedding)
+    L = scorer.lagrangian(sf, sb)
+
+    adjusted = topK_scores - cfg.beta * L
+    bcvf_best_rel = torch.argmax(adjusted, dim=-1).item()
+    bcvf_best_token = topK_indices[0, bcvf_best_rel].item()
+
+    # What rank does this token have in the original logit ordering?
+    sorted_indices = torch.argsort(logits[0], descending=True)
+    bcvf_rank = int((sorted_indices == bcvf_best_token).nonzero()[0].item())
+
+    recall_at_M = {}
+    min_required_M = pool_size
+    for M in sorted(M_values):
+        in_topM = bcvf_rank < M
+        recall_at_M[M] = in_topM
+        if in_topM and M < min_required_M:
+            min_required_M = M
+
+    return {
+        "bcvf_best_rank": bcvf_rank,
+        "bcvf_best_token": bcvf_best_token,
+        "recall_at_M": recall_at_M,
+        "min_required_M": min_required_M,
+    }
+
+
+# =========================================================================
+# Parameter Sweep Infrastructure
+# =========================================================================
+
+
+@dataclass
+class SweepResult:
+    """Result of one parameter sweep."""
+
+    parameter_name: str
+    parameter_values: List[float]
+    results: List[ExperimentResult]
+
+
+class ParameterSweepRunner:
+    """
+    Runs parameter sweeps over beta, top_m, and lambda_c.
+
+    Usage::
+
+        sweep = ParameterSweepRunner(runner)
+        beta_results = sweep.sweep_beta(dataset, [0.0, 0.05, 0.1, 0.2, 0.3])
+        m_results = sweep.sweep_top_m(dataset, [200, 500, 1000])
+        lc_results = sweep.sweep_lambda_c(dataset, [0.0, 0.1, 0.25, 0.5])
+    """
+
+    def __init__(self, runner: ExperimentRunner):
+        self.runner = runner
+
+    def sweep_beta(
+        self,
+        dataset: Sequence[Dict[str, Any]],
+        values: Optional[List[float]] = None,
+        flags: Optional[Dict[str, bool]] = None,
+    ) -> SweepResult:
+        """Sweep over β values."""
+        values = values or [0.0, 0.05, 0.1, 0.2, 0.3]
+        flags = flags or {
+            "use_rerank": True,
+            "use_logit_mod": False,
+            "use_calibration": True,
+        }
+        results = []
+        for beta in values:
+            orig_beta = self.runner.base_config.beta
+            self.runner.base_config.beta = beta
+            result = self.runner.run_single_experiment(flags, dataset)
+            result.label = f"β={beta}"
+            results.append(result)
+            self.runner.base_config.beta = orig_beta
+        return SweepResult("beta", values, results)
+
+    def sweep_top_m(
+        self,
+        dataset: Sequence[Dict[str, Any]],
+        values: Optional[List[int]] = None,
+        flags: Optional[Dict[str, bool]] = None,
+    ) -> SweepResult:
+        """Sweep over top-M values."""
+        values = values or [200, 500, 1000]
+        flags = flags or {
+            "use_rerank": True,
+            "use_logit_mod": False,
+            "use_calibration": True,
+        }
+        results = []
+        for m in values:
+            orig_m = self.runner.base_config.top_m
+            self.runner.base_config.top_m = m
+            result = self.runner.run_single_experiment(flags, dataset)
+            result.label = f"M={m}"
+            results.append(result)
+            self.runner.base_config.top_m = orig_m
+        return SweepResult("top_m", [float(v) for v in values], results)
+
+    def sweep_lambda_c(
+        self,
+        dataset: Sequence[Dict[str, Any]],
+        values: Optional[List[float]] = None,
+        flags: Optional[Dict[str, bool]] = None,
+    ) -> SweepResult:
+        """Sweep over λc (consistency penalty weight)."""
+        values = values or [0.0, 0.1, 0.25, 0.5]
+        flags = flags or {
+            "use_rerank": True,
+            "use_logit_mod": False,
+            "use_calibration": True,
+        }
+        results = []
+        for lc in values:
+            orig_lc = self.runner.base_config.lambda_c
+            self.runner.base_config.lambda_c = lc
+            result = self.runner.run_single_experiment(flags, dataset)
+            result.label = f"λc={lc}"
+            results.append(result)
+            self.runner.base_config.lambda_c = orig_lc
+        return SweepResult("lambda_c", values, results)
+
+    @staticmethod
+    def print_sweep(sweep: SweepResult) -> str:
+        """Print a sweep result table."""
+        return ExperimentRunner.print_summary(sweep.results)
 
 
 # =========================================================================

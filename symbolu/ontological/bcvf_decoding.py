@@ -335,8 +335,19 @@ if PYTORCH_AVAILABLE:
             log_data["sb"] = sb
             log_data["L"] = L
 
-            # ---- Option C: Reranking ------------------------------------
+            # ---- Baseline sf/sb for the original top-1 (Risk A diagnostic) --
             original_best = torch.argmax(logits, dim=-1)  # [B]
+            # Find where original_best sits in topM_indices
+            orig_in_topM = (
+                topM_indices == original_best.unsqueeze(-1)
+            )  # [B, M] bool
+            # Extract sf/sb for the baseline token
+            orig_sf = (sf * orig_in_topM.float()).sum(dim=-1)  # [B]
+            orig_sb = (sb * orig_in_topM.float()).sum(dim=-1)  # [B]
+            log_data["baseline_sf"] = orig_sf
+            log_data["baseline_sb"] = orig_sb
+
+            # ---- Option C: Reranking ------------------------------------
             if cfg.use_rerank:
                 adjusted_scores = topM_scores - cfg.beta * L
                 best_rel = torch.argmax(adjusted_scores, dim=-1)
@@ -350,17 +361,52 @@ if PYTORCH_AVAILABLE:
                     best_token_index != original_best
                 )
                 log_data["original_top_token"] = original_best
+
+                # sf/sb delta diagnostics (Risk A: is the goal embedding
+                # actually doing work?)
+                sel_in_topM = (
+                    topM_indices == best_token_index.unsqueeze(-1)
+                )
+                sel_sf = (sf * sel_in_topM.float()).sum(dim=-1)
+                sel_sb = (sb * sel_in_topM.float()).sum(dim=-1)
+                log_data["selected_sf"] = sel_sf
+                log_data["selected_sb"] = sel_sb
+                log_data["delta_sf"] = sel_sf - orig_sf
+                log_data["delta_sb"] = sel_sb - orig_sb
             else:
                 best_token_index = original_best
+
+            # ---- Base probs (always computed for KL reference) ----------
+            base_probs = F.softmax(logits, dim=-1)
+            log_data["base_probs"] = base_probs
 
             # ---- Option A: Logit modulation -----------------------------
             if cfg.use_logit_mod:
                 # Build full adjusted logit tensor (fill with -inf)
                 adjusted_logits = torch.full_like(logits, float("-inf"))
-                adjusted_logits.scatter_(1, topM_indices, topM_scores - cfg.beta * L)
+                adjusted_logits.scatter_(
+                    1, topM_indices, topM_scores - cfg.beta * L
+                )
                 probs = F.softmax(adjusted_logits, dim=-1)
+
+                # KL divergence and entropy delta (logit mod sanity)
+                eps = 1e-10
+                kl_base_mod = (
+                    base_probs
+                    * (torch.log(base_probs + eps) - torch.log(probs + eps))
+                ).sum(dim=-1)  # [B]
+                entropy_base = -(
+                    base_probs * torch.log(base_probs + eps)
+                ).sum(dim=-1)
+                entropy_mod = -(
+                    probs * torch.log(probs + eps)
+                ).sum(dim=-1)
+                log_data["kl_base_mod"] = kl_base_mod
+                log_data["entropy_base"] = entropy_base
+                log_data["entropy_mod"] = entropy_mod
+                log_data["entropy_delta"] = entropy_mod - entropy_base
             else:
-                probs = F.softmax(logits, dim=-1)
+                probs = base_probs
 
             log_data["probs"] = probs
 

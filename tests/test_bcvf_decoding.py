@@ -40,10 +40,13 @@ from symbolu.ontological.bcvf_experiments import (
     ExperimentResult,
     ExperimentRunner,
     GoNoGoVerdict,
+    ParameterSweepRunner,
     StepLogger,
     StepRecord,
+    check_topM_recall,
     config_label,
     evaluate_stop_conditions,
+    run_unit_tests,
 )
 
 
@@ -599,3 +602,349 @@ class TestEndToEnd:
             assert r.total_samples == 10
             assert 0.0 <= r.ece <= 1.0
             assert 0.0 <= r.brier <= 1.0
+
+
+# ===========================================================================
+# Risk A: Baseline sf/sb delta diagnostics
+# ===========================================================================
+
+
+class TestRiskADiagnostics:
+    def test_decode_emits_baseline_sf_sb(self, hidden, vocab_emb, goal, logits):
+        """Decode step should always log baseline_sf and baseline_sb."""
+        cfg = DecodingConfig(use_rerank=True, use_calibration=False)
+        decoder = BCVFDecoder(cfg)
+        _, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        assert "baseline_sf" in log_data
+        assert "baseline_sb" in log_data
+        assert log_data["baseline_sf"].shape == (B,)
+        assert log_data["baseline_sb"].shape == (B,)
+
+    def test_decode_emits_delta_sf_sb_when_reranking(
+        self, hidden, vocab_emb, goal, logits
+    ):
+        """When reranking, delta_sf and delta_sb are logged."""
+        cfg = DecodingConfig(use_rerank=True, use_calibration=False)
+        decoder = BCVFDecoder(cfg)
+        _, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        assert "delta_sf" in log_data
+        assert "delta_sb" in log_data
+        assert "selected_sf" in log_data
+        assert "selected_sb" in log_data
+
+    def test_step_record_captures_deltas(self, hidden, vocab_emb, goal, logits):
+        """StepRecord should populate delta_sf/sb from log_data."""
+        cfg = DecodingConfig(use_rerank=True, use_calibration=True)
+        decoder = BCVFDecoder(cfg)
+        best, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        record = StepLogger.from_decode_log(
+            step_index=0,
+            log_data=log_data,
+            predicted_token=int(best[0].item()),
+            ground_truth_token=0,
+        )
+        # These fields should be populated (may be 0.0 if token wasn't changed)
+        assert isinstance(record.sf_baseline, float)
+        assert isinstance(record.sb_baseline, float)
+        assert isinstance(record.delta_sf, float)
+        assert isinstance(record.delta_sb, float)
+
+
+# ===========================================================================
+# Logit Modulation Sanity (KL, entropy)
+# ===========================================================================
+
+
+class TestLogitModSanity:
+    def test_kl_and_entropy_logged_when_logit_mod_on(
+        self, hidden, vocab_emb, goal, logits
+    ):
+        cfg = DecodingConfig(
+            use_rerank=False, use_logit_mod=True, use_calibration=False
+        )
+        decoder = BCVFDecoder(cfg)
+        _, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        assert "kl_base_mod" in log_data
+        assert "entropy_base" in log_data
+        assert "entropy_mod" in log_data
+        assert "entropy_delta" in log_data
+        # KL should be non-negative
+        assert (log_data["kl_base_mod"] >= -1e-6).all()
+
+    def test_kl_not_logged_when_logit_mod_off(
+        self, hidden, vocab_emb, goal, logits
+    ):
+        cfg = DecodingConfig(
+            use_rerank=False, use_logit_mod=False, use_calibration=False
+        )
+        decoder = BCVFDecoder(cfg)
+        _, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        assert "kl_base_mod" not in log_data
+
+    def test_base_probs_always_logged(self, hidden, vocab_emb, goal, logits):
+        """base_probs should always be present for comparison."""
+        cfg = DecodingConfig(
+            use_rerank=False, use_logit_mod=False, use_calibration=False
+        )
+        decoder = BCVFDecoder(cfg)
+        _, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        assert "base_probs" in log_data
+
+
+# ===========================================================================
+# Top-M Recall Check (Risk B)
+# ===========================================================================
+
+
+class TestTopMRecall:
+    def test_recall_check_returns_valid_structure(self):
+        torch.manual_seed(42)
+        h = torch.randn(1, D)
+        v = torch.randn(500, D)
+        g = torch.randn(1, D)
+        result = check_topM_recall(h, v, g, M_values=[50, 100, 200, 500])
+        assert "bcvf_best_rank" in result
+        assert "recall_at_M" in result
+        assert "min_required_M" in result
+        assert isinstance(result["bcvf_best_rank"], int)
+        assert result["bcvf_best_rank"] >= 0
+        # recall_at_500 must be True since pool is 500
+        assert result["recall_at_M"][500] is True
+
+    def test_recall_monotone(self):
+        """Recall at larger M must be >= recall at smaller M."""
+        torch.manual_seed(99)
+        h = torch.randn(1, D)
+        v = torch.randn(1000, D)
+        g = torch.randn(1, D)
+        result = check_topM_recall(h, v, g, M_values=[100, 200, 500, 1000])
+        ms = sorted(result["recall_at_M"].keys())
+        for i in range(len(ms) - 1):
+            if result["recall_at_M"][ms[i]]:
+                assert result["recall_at_M"][ms[i + 1]]
+
+
+# ===========================================================================
+# Conditional ECE & Tier Confusion
+# ===========================================================================
+
+
+class TestConditionalECE:
+    @pytest.fixture
+    def experiment_with_rerank(self):
+        """Run a single experiment with reranking to get conditional metrics."""
+        torch.manual_seed(42)
+        samples = []
+        for i in range(30):
+            h = torch.randn(1, D)
+            v = torch.randn(200, D)
+            logits = h @ v.T
+            # Alternate correct/incorrect ground truths
+            gt = torch.argmax(logits, dim=-1).item() if i % 2 == 0 else 0
+            samples.append({
+                "hidden_state": h,
+                "goal_embedding": torch.randn(1, D),
+                "logits": logits,
+                "ground_truth": gt,
+            })
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50, beta=0.2)
+        )
+        flags = {"use_rerank": True, "use_logit_mod": False, "use_calibration": True}
+        return runner.run_single_experiment(flags, samples)
+
+    def test_tier_confusion_structure(self, experiment_with_rerank):
+        r = experiment_with_rerank
+        assert "HIGH" in r.tier_confusion
+        assert "MEDIUM" in r.tier_confusion
+        assert "LOW" in r.tier_confusion
+        for tier in ("HIGH", "MEDIUM", "LOW"):
+            assert "correct" in r.tier_confusion[tier]
+            assert "wrong" in r.tier_confusion[tier]
+
+    def test_conditional_ece_fields_exist(self, experiment_with_rerank):
+        r = experiment_with_rerank
+        assert isinstance(r.ece_on_wrong_baseline, float)
+        assert isinstance(r.ece_on_low_margin, float)
+        assert 0.0 <= r.ece_on_wrong_baseline <= 1.0
+        assert 0.0 <= r.ece_on_low_margin <= 1.0
+
+    def test_rerank_effectiveness_fields(self, experiment_with_rerank):
+        r = experiment_with_rerank
+        assert isinstance(r.rerank_worsened_pct, float)
+        assert isinstance(r.rerank_net_benefit, float)
+        assert isinstance(r.mean_delta_sf, float)
+        assert isinstance(r.mean_delta_sb, float)
+
+
+# ===========================================================================
+# Enhanced print_summary
+# ===========================================================================
+
+
+class TestEnhancedPrintSummary:
+    def test_summary_includes_rerank_breakdown(self):
+        torch.manual_seed(42)
+        samples = []
+        for _ in range(10):
+            h = torch.randn(1, D)
+            v = torch.randn(200, D)
+            logits = h @ v.T
+            gt = torch.argmax(logits, dim=-1).item()
+            samples.append({
+                "hidden_state": h,
+                "goal_embedding": torch.randn(1, D),
+                "logits": logits,
+                "ground_truth": gt,
+            })
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50, beta=0.2)
+        )
+        results = runner.run_ablation(samples, matrix=EXPERIMENT_MATRIX[:3])
+        table = ExperimentRunner.print_summary(results)
+        assert "Impr%" in table
+        assert "Wrsd%" in table
+        assert "Net" in table
+
+
+# ===========================================================================
+# Sandbox: run_unit_tests
+# ===========================================================================
+
+
+class TestRunUnitTests:
+    def test_passing_code(self):
+        code = "def add(a, b): return a + b\n"
+        test = "def check(fn): assert fn(1, 2) == 3\n"
+        assert run_unit_tests(code, test, "add", use_subprocess=False) is True
+
+    def test_failing_code(self):
+        code = "def add(a, b): return a - b\n"
+        test = "def check(fn): assert fn(1, 2) == 3\n"
+        assert run_unit_tests(code, test, "add", use_subprocess=False) is False
+
+    def test_timeout_with_subprocess(self):
+        code = "import time\ndef slow(): time.sleep(100)\n"
+        test = "def check(fn): fn()\n"
+        result = run_unit_tests(
+            code, test, "slow", timeout_seconds=1.0, use_subprocess=True
+        )
+        assert result is False
+
+
+# ===========================================================================
+# Parameter Sweeps
+# ===========================================================================
+
+
+class TestParameterSweeps:
+    @pytest.fixture
+    def sweep_dataset(self):
+        torch.manual_seed(42)
+        samples = []
+        for _ in range(10):
+            h = torch.randn(1, D)
+            v = torch.randn(200, D)
+            logits = h @ v.T
+            gt = torch.argmax(logits, dim=-1).item()
+            samples.append({
+                "hidden_state": h,
+                "goal_embedding": torch.randn(1, D),
+                "logits": logits,
+                "ground_truth": gt,
+            })
+        return samples
+
+    def test_beta_sweep(self, sweep_dataset):
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50)
+        )
+        sweeper = ParameterSweepRunner(runner)
+        result = sweeper.sweep_beta(
+            sweep_dataset, values=[0.0, 0.1, 0.3]
+        )
+        assert result.parameter_name == "beta"
+        assert len(result.results) == 3
+        assert result.results[0].label == "β=0.0"
+        assert result.results[2].label == "β=0.3"
+
+    def test_top_m_sweep(self, sweep_dataset):
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(beta=0.2)
+        )
+        sweeper = ParameterSweepRunner(runner)
+        result = sweeper.sweep_top_m(
+            sweep_dataset, values=[50, 100]
+        )
+        assert result.parameter_name == "top_m"
+        assert len(result.results) == 2
+
+    def test_lambda_c_sweep(self, sweep_dataset):
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50)
+        )
+        sweeper = ParameterSweepRunner(runner)
+        result = sweeper.sweep_lambda_c(
+            sweep_dataset, values=[0.0, 0.25]
+        )
+        assert result.parameter_name == "lambda_c"
+        assert len(result.results) == 2
+
+    def test_sweep_base_config_not_mutated(self, sweep_dataset):
+        """Sweeps should not permanently modify the runner's base_config."""
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50, beta=0.2, lambda_c=0.25)
+        )
+        sweeper = ParameterSweepRunner(runner)
+        sweeper.sweep_beta(sweep_dataset, values=[0.5, 1.0])
+        assert runner.base_config.beta == pytest.approx(0.2)
+        sweeper.sweep_top_m(sweep_dataset, values=[999])
+        assert runner.base_config.top_m == 50
+        sweeper.sweep_lambda_c(sweep_dataset, values=[0.99])
+        assert runner.base_config.lambda_c == pytest.approx(0.25)
+
+
+# ===========================================================================
+# StepLogger enhanced summary
+# ===========================================================================
+
+
+class TestStepLoggerEnhanced:
+    def test_summary_includes_new_fields(self):
+        logger = StepLogger()
+        for i in range(10):
+            logger.log(
+                StepRecord(
+                    step_index=i,
+                    predicted_token=i,
+                    correct=i < 7,
+                    rerank_changed=i < 3,
+                    sf_selected=0.8,
+                    sb_selected=0.7,
+                    sf_baseline=0.75,
+                    sb_baseline=0.65,
+                    delta_sf=0.05,
+                    delta_sb=0.05,
+                    kl_base_mod=0.1 if i < 5 else 0.0,
+                    entropy_delta=-0.05 if i < 5 else 0.0,
+                )
+            )
+        summary = logger.summary()
+        assert "rerank_worsened_rate" in summary
+        assert "rerank_net_benefit" in summary
+        assert "mean_delta_sf" in summary
+        assert "mean_delta_sb" in summary
+        assert "mean_kl_base_mod" in summary
+        assert "mean_entropy_delta" in summary
+
+    def test_rerank_net_benefit_correct(self):
+        logger = StepLogger()
+        # 3 changed: 2 correct, 1 wrong
+        logger.log(StepRecord(step_index=0, predicted_token=0, correct=True, rerank_changed=True))
+        logger.log(StepRecord(step_index=1, predicted_token=1, correct=True, rerank_changed=True))
+        logger.log(StepRecord(step_index=2, predicted_token=2, correct=False, rerank_changed=True))
+        logger.log(StepRecord(step_index=3, predicted_token=3, correct=True, rerank_changed=False))
+
+        assert logger.rerank_improvement_rate() == pytest.approx(2 / 3)
+        assert logger.rerank_worsened_rate() == pytest.approx(1 / 3)
+        assert logger.rerank_net_benefit() == pytest.approx(1 / 3)
