@@ -602,6 +602,91 @@ def determine_overall_verdict(
 # =========================================================================
 
 
+# =========================================================================
+# Dry-Run Mode (tiny random-weight model, no network needed)
+# =========================================================================
+
+
+def create_dry_run_model(
+    device: str = "cpu",
+) -> Tuple[Any, Any, List[str]]:
+    """
+    Create a tiny GPT-2 model with random weights and synthetic texts.
+
+    Returns (model, tokenizer, texts) — all local, no downloads.
+    The model has ~600K params (not 124M) so it runs in seconds.
+    """
+    from transformers import GPT2Config, GPT2LMHeadModel, GPT2TokenizerFast
+
+    print("DRY-RUN: Creating tiny random-weight model (no network)")
+
+    # Small vocab (50) so random chance gives ~2% accuracy,
+    # enough correct predictions to exercise the Spearman math.
+    config = GPT2Config(
+        vocab_size=50,
+        n_positions=256,
+        n_embd=64,
+        n_layer=2,
+        n_head=2,
+        n_inner=128,
+        bos_token_id=0,
+        eos_token_id=1,
+    )
+    model = GPT2LMHeadModel(config)
+    model.to(device)
+    model.eval()
+
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"  Tiny model: {n_params / 1e3:.1f}K parameters, "
+          f"vocab={config.vocab_size}, d_model={config.n_embd}")
+
+    # Build a minimal tokenizer from the model's vocab
+    # We only need encode() and decode() to work
+    class _MinimalTokenizer:
+        """Bare-bones tokenizer for dry-run (wraps random token IDs)."""
+
+        def __init__(self, vocab_size: int, eos_id: int = 1):
+            self.vocab_size = vocab_size
+            self.eos_token_id = eos_id
+            self.pad_token_id = eos_id
+            self.pad_token = "<pad>"
+            self.eos_token = "<eos>"
+
+        def encode(
+            self, text: str, return_tensors: str = "pt",
+            truncation: bool = True, max_length: int = 256,
+            **kwargs,
+        ) -> torch.Tensor:
+            # Deterministic pseudo-tokenization: hash characters to token IDs
+            ids = []
+            for i, ch in enumerate(text):
+                tok = (ord(ch) * 31 + i * 7) % (self.vocab_size - 2) + 2
+                ids.append(tok)
+            ids = ids[:max_length]
+            if return_tensors == "pt":
+                return torch.tensor([ids], dtype=torch.long)
+            return ids
+
+        def decode(self, ids, skip_special_tokens: bool = True) -> str:
+            return f"<decoded {len(ids)} tokens>"
+
+    tokenizer = _MinimalTokenizer(config.vocab_size)
+
+    # Synthetic texts — enough variety to produce 500+ token positions
+    texts = [
+        "The quick brown fox jumps over the lazy dog. " * 10,
+        "In functional programming, functions are first-class citizens. " * 8,
+        "Machine learning models learn patterns from data through optimization. " * 8,
+        "The Spearman rank correlation measures monotonic relationships. " * 10,
+        "Hidden states in transformer models encode contextual representations. " * 8,
+        "Goal alignment measures whether a token choice moves toward the objective. " * 8,
+        "Calibration ensures that model confidence reflects actual accuracy. " * 10,
+        "The Lagrangian penalizes deviations from both forward and backward scores. " * 8,
+    ]
+
+    return model, tokenizer, texts
+
+
 RECOMMENDED_MODELS = {
     "gpt2": "gpt2 (124M — sanity check, fast)",
     "phi2": "microsoft/phi-2 (2.7B — fast iteration)",
@@ -709,6 +794,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--list-models", action="store_true",
         help="List recommended models and exit",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help=(
+            "Run with a tiny random-weight model and synthetic text. "
+            "Verifies the full pipeline end-to-end without network "
+            "access.  Correlations will be near-zero (meaningless) "
+            "but the plumbing is proven correct."
+        ),
+    )
 
     return parser
 
@@ -731,10 +825,6 @@ def main() -> None:
         print("Use --model <alias> or --model <full-hf-name>")
         sys.exit(0)
 
-    # Resolve model
-    model_name = resolve_model_name(args.model)
-    print(f"Resolved model: {model_name}")
-
     # Resolve device
     device = args.device
     if device == "auto":
@@ -746,24 +836,46 @@ def main() -> None:
             device = "cpu"
     print(f"Device: {device}")
 
-    # BCVF config
+    # BCVF config — clamp top_m to dry-run vocab size if needed
+    top_m = args.top_m
+    if args.dry_run and top_m > 500:
+        top_m = 500  # dry-run vocab is only 1000
     bcvf_config = DecodingConfig(
-        top_m=args.top_m,
+        top_m=top_m,
         beta=args.beta,
         use_rerank=True,
         use_calibration=True,
         use_logit_mod=False,
     )
 
-    # Load model
-    model, tokenizer = load_hf_model(model_name, device=device, dtype=args.dtype)
-
-    # Load texts
-    print(f"\nLoading dataset: {args.dataset}")
-    texts = load_evaluation_texts(
-        args.dataset, max_texts=args.max_texts,
-    )
-    print(f"  Loaded {len(texts)} text passages")
+    # Load model + texts
+    if args.dry_run:
+        model_name = "dry-run-tiny-random"
+        model, tokenizer, texts = create_dry_run_model(device=device)
+        # Clamp to tiny model's position limit
+        args.max_seq_len = min(args.max_seq_len, 256)
+        # Override params for tiny model
+        if args.samples > 200:
+            args.samples = 200
+        # Clamp top_m to dry-run vocab size (50)
+        top_m = min(top_m, 25)
+        bcvf_config = DecodingConfig(
+            top_m=top_m,
+            beta=args.beta,
+            use_rerank=True,
+            use_calibration=True,
+            use_logit_mod=False,
+        )
+        print(f"DRY-RUN: max_seq_len={args.max_seq_len}, samples={args.samples}, top_m={top_m}")
+    else:
+        model_name = resolve_model_name(args.model)
+        print(f"Resolved model: {model_name}")
+        model, tokenizer = load_hf_model(model_name, device=device, dtype=args.dtype)
+        print(f"\nLoading dataset: {args.dataset}")
+        texts = load_evaluation_texts(
+            args.dataset, max_texts=args.max_texts,
+        )
+        print(f"  Loaded {len(texts)} text passages")
 
     # Determine effective device for tensors
     if device == "auto":
@@ -777,7 +889,7 @@ def main() -> None:
     print("Running BCVF signal validation")
     print(f"  Strategies: {args.strategies}")
     print(f"  Samples per strategy: {args.samples}")
-    print(f"  top_m={args.top_m}, beta={args.beta}")
+    print(f"  top_m={bcvf_config.top_m}, beta={bcvf_config.beta}")
     print(f"{'='*60}\n")
 
     strategy_results: List[SignalValidationResult] = []
