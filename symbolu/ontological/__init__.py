@@ -169,6 +169,25 @@ from symbolu.ontological.semantic_coherence import (
     is_coherent,
 )
 
+# GoalDirNet: Learned Future-Direction Predictor
+try:
+    from symbolu.ontological.goal_dirnet import (
+        GoalDirNet,
+        GoalDirNetConfig,
+        GoalDirFeatureBuilder,
+        GoalDirSample,
+        GoalDirEvalResult,
+        collect_from_dataset_adapter,
+        train_goal_dirnet,
+        evaluate_goal_dirnet,
+        run_alpha_sweep,
+        run_goal_dirnet_pipeline,
+        print_goal_dirnet_report,
+    )
+    GOAL_DIRNET_AVAILABLE = True
+except ImportError:
+    GOAL_DIRNET_AVAILABLE = False
+
 # USE: Phase-Based Attention (O(n) replacement for O(n²) attention)
 from symbolu.ontological.phase_attention import (
     PhaseAttention,
@@ -260,6 +279,8 @@ __all__ = [
     "GlobalCoherenceComputer",
     "compute_coherence",
     "is_coherent",
+    # GoalDirNet: Learned Future-Direction Predictor
+    "GOAL_DIRNET_AVAILABLE",
     # USE: Phase-Based Attention (O(n) replacement)
     "PhaseAttention",
     "LinearPhaseAttention",
@@ -303,4 +324,20 @@ if PYTORCH_AVAILABLE:
         "BHAVA_PAIRS",
         "SUB_LAYER_NAMES",
         "get_aspect_between",
+    ])
+
+# Add GoalDirNet exports if available
+if GOAL_DIRNET_AVAILABLE:
+    __all__.extend([
+        "GoalDirNet",
+        "GoalDirNetConfig",
+        "GoalDirFeatureBuilder",
+        "GoalDirSample",
+        "GoalDirEvalResult",
+        "collect_from_dataset_adapter",
+        "train_goal_dirnet",
+        "evaluate_goal_dirnet",
+        "run_alpha_sweep",
+        "run_goal_dirnet_pipeline",
+        "print_goal_dirnet_report",
     ])

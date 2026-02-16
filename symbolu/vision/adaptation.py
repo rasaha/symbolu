@@ -265,8 +265,13 @@ class LoRALinear(nn.Module):
         if self.base_linear.bias is not None:
             self.base_linear.bias.requires_grad = False
 
+        # Track merge state to avoid double-applying LoRA
+        self._merged = False
+
     def forward(self, x: Tensor) -> Tensor:
         """Forward with LoRA: y = Wx + (alpha/r) * B @ A @ x.
+
+        If weights are merged, just use base_linear (delta already in W).
 
         Args:
             x: Input tensor [..., in_features].
@@ -274,8 +279,12 @@ class LoRALinear(nn.Module):
         Returns:
             Output tensor [..., out_features].
         """
-        # Base path (frozen)
+        # Base path (frozen, or contains merged delta)
         base_out = self.base_linear(x)
+
+        # Skip LoRA path if weights are already merged into base
+        if self._merged:
+            return base_out
 
         # LoRA path (trainable)
         lora_out = self.lora_dropout(x)
@@ -288,17 +297,24 @@ class LoRALinear(nn.Module):
         """Merge LoRA weights into base for zero-overhead inference.
 
         After calling this, the layer behaves as a standard nn.Linear
-        with W' = W + (alpha/r) * B @ A.
+        with W' = W + (alpha/r) * B @ A. The LoRA path is skipped in
+        forward() to avoid double-applying the delta.
         """
+        if self._merged:
+            return
         with torch.no_grad():
             delta = self.scaling * (self.lora_B @ self.lora_A)
             self.base_linear.weight.add_(delta)
+        self._merged = True
 
     def unmerge_weights(self) -> None:
         """Reverse merge for continued training."""
+        if not self._merged:
+            return
         with torch.no_grad():
             delta = self.scaling * (self.lora_B @ self.lora_A)
             self.base_linear.weight.sub_(delta)
+        self._merged = False
 
     @property
     def num_trainable_params(self) -> int:
@@ -404,7 +420,11 @@ class PhaseQuadAdaptationManager(nn.Module):
                 for param in gates.parameters():
                     param.requires_grad = True
 
-        # LoRA A/B are already set as trainable in LoRALinear.__init__
+        # Unfreeze LoRA A/B (may have been frozen by block_stack freeze above
+        # since LoRA modules are set as attributes on block_stack's sub-modules)
+        for lora_module in self._lora_modules:
+            lora_module.lora_A.requires_grad = True
+            lora_module.lora_B.requires_grad = True
 
     def forward(
         self,

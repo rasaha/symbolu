@@ -70,6 +70,64 @@ if _PROJECT_ROOT not in sys.path:
 import torch
 import torch.nn.functional as F
 
+# ---------------------------------------------------------------------------
+# Patch DynamicCache for transformers versions that lack methods required by
+# custom model code loaded via trust_remote_code (covers both old versions
+# missing from_legacy_cache and new versions that removed to_legacy_cache).
+# ---------------------------------------------------------------------------
+try:
+    from transformers import DynamicCache
+
+    _patched = []
+
+    if not hasattr(DynamicCache, "from_legacy_cache"):
+        @classmethod  # type: ignore[misc]
+        def _from_legacy_cache(cls, past_key_values=None):
+            """Convert old tuple-based cache to DynamicCache."""
+            cache = cls()
+            if past_key_values is not None:
+                for layer_idx in range(len(past_key_values)):
+                    key_states, value_states = past_key_values[layer_idx]
+                    cache.update(key_states, value_states, layer_idx)
+            return cache
+        DynamicCache.from_legacy_cache = _from_legacy_cache  # type: ignore[attr-defined]
+        _patched.append("from_legacy_cache")
+
+    if not hasattr(DynamicCache, "to_legacy_cache"):
+        def _to_legacy_cache(self):
+            """Convert DynamicCache back to tuple-based format."""
+            legacy = []
+            for layer_idx in range(len(self.key_cache)):
+                legacy.append((self.key_cache[layer_idx], self.value_cache[layer_idx]))
+            return tuple(legacy)
+        DynamicCache.to_legacy_cache = _to_legacy_cache  # type: ignore[attr-defined]
+        _patched.append("to_legacy_cache")
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+        def _get_usable_length(self, new_seq_length: int = 0, layer_idx: int = 0) -> int:
+            """Return current cache length (equivalent to get_seq_length for non-sliding-window)."""
+            if hasattr(self, "get_seq_length"):
+                return self.get_seq_length(layer_idx)
+            # Fallback: empty cache
+            if hasattr(self, "key_cache") and layer_idx < len(self.key_cache):
+                return self.key_cache[layer_idx].shape[-2]
+            return 0
+        DynamicCache.get_usable_length = _get_usable_length  # type: ignore[attr-defined]
+        _patched.append("get_usable_length")
+
+    if not hasattr(DynamicCache, "get_max_length"):
+        def _get_max_length(self) -> None:
+            """No max length constraint for DynamicCache."""
+            return None
+        DynamicCache.get_max_length = _get_max_length  # type: ignore[attr-defined]
+        _patched.append("get_max_length")
+
+    if _patched:
+        print(f"  Patched DynamicCache: {', '.join(_patched)} (transformers compat)")
+
+except (ImportError, Exception):
+    pass  # transformers not installed yet or DynamicCache not available
+
 from symbolu.ontological.bcvf_decoding import BCVFDecoder, DecodingConfig
 from symbolu.ontological.bcvf_calibration import spearman_rank_correlation
 from symbolu.ontological.bcvf_experiments import (
@@ -159,19 +217,33 @@ def load_hf_model(
         torch_dtype = torch.float32
     # else "auto" — let transformers decide
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name, trust_remote_code=True
-    )
+    # Try loading without trust_remote_code first (prefer native transformers
+    # implementations which stay in sync with the library).  Fall back to
+    # trust_remote_code=True for models that require custom modelling code.
+    for trust_remote in (False, True):
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=trust_remote
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch_dtype,
+                device_map=device if device == "auto" else None,
+                trust_remote_code=trust_remote,
+                low_cpu_mem_usage=True,
+            )
+            if trust_remote:
+                print("  (loaded with trust_remote_code=True)")
+            break
+        except (ValueError, KeyError, ImportError):
+            if trust_remote:
+                raise
+            # Native loading failed — retry with custom code
+            print("  Native loading failed, retrying with trust_remote_code=True...")
+            continue
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch_dtype,
-        device_map=device if device == "auto" else None,
-        trust_remote_code=True,
-        low_cpu_mem_usage=True,
-    )
 
     if device != "auto":
         model = model.to(device)
@@ -182,12 +254,220 @@ def load_hf_model(
     print(f"  Loaded: {n_params / 1e9:.2f}B parameters")
     print(f"  Dtype: {next(model.parameters()).dtype}")
 
+    # --- Model health checks ---
+    # Check for meta-device params (incomplete weight loading)
+    meta_params = [n for n, p in model.named_parameters()
+                   if p.device.type == "meta"]
+    if meta_params:
+        print(f"  WARNING: {len(meta_params)} parameters on meta device "
+              f"(weights not loaded)! First: {meta_params[0]}")
+
+    # --- Smoke test: verify model produces diverse, contextual predictions ---
+    if not _smoke_test_model(model, tokenizer, device):
+        print("  >>> Model forward pass produces degenerate predictions.")
+        print("  >>> This usually means the custom model code is incompatible "
+              "with the installed transformers version.")
+        print("  >>> Consider using a base model (e.g., --model phi2) or "
+              "upgrading transformers.")
+
     return model, tokenizer
+
+
+def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> bool:
+    """
+    Quick sanity check that the model forward pass produces meaningful logits.
+
+    Tests:
+      1. Predictions vary across positions (not stuck on one token)
+      2. Predictions vary across different input texts (context-dependent)
+
+    Returns True if the model passes the smoke test.
+    """
+    test_texts = [
+        "The quick brown fox jumps over the lazy",
+        "In the year 2024, scientists discovered that",
+        "To cook pasta, first bring a large pot of water to a",
+    ]
+
+    all_preds: List[List[int]] = []
+    for text in test_texts:
+        tokens = tokenizer.encode(text, return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = model(tokens, output_hidden_states=False, use_cache=False)
+            logits = outputs.logits  # [1, T, V]
+        preds = torch.argmax(logits[0], dim=-1).tolist()
+        all_preds.append(preds)
+
+    # Check 1: diversity within each sequence
+    for i, preds in enumerate(all_preds):
+        unique_ratio = len(set(preds)) / max(len(preds), 1)
+        if unique_ratio < 0.1:
+            top_pred = max(set(preds), key=preds.count)
+            try:
+                tok_str = repr(tokenizer.decode([top_pred]))
+            except Exception:
+                tok_str = str(top_pred)
+            print(f"  SMOKE TEST FAIL: sequence {i} has {unique_ratio:.0%} "
+                  f"unique predictions (dominated by {tok_str})")
+            return False
+
+    # Check 2: last-token predictions differ across texts
+    last_preds = [preds[-1] for preds in all_preds]
+    if len(set(last_preds)) == 1:
+        try:
+            tok_str = repr(tokenizer.decode([last_preds[0]]))
+        except Exception:
+            tok_str = str(last_preds[0])
+        print(f"  SMOKE TEST WARNING: all texts predict same next token "
+              f"({tok_str}) — model may be degenerate")
+    else:
+        decoded = []
+        for p in last_preds:
+            try:
+                decoded.append(repr(tokenizer.decode([p])))
+            except Exception:
+                decoded.append(str(p))
+        print(f"  Smoke test OK: predictions vary across contexts "
+              f"({', '.join(decoded)})")
+    return True
 
 
 # =========================================================================
 # Dataset Loading
 # =========================================================================
+
+
+def _builtin_fallback_texts() -> List[str]:
+    """
+    Deterministic fallback texts when ``datasets`` or ``scipy`` cannot
+    be imported.  These are long enough to produce hundreds of token
+    positions for a meaningful signal evaluation.
+    """
+    return [
+        (
+            "The transformer architecture revolutionized natural language "
+            "processing by introducing self-attention mechanisms that allow "
+            "models to weigh the importance of different parts of the input "
+            "sequence simultaneously. Unlike recurrent neural networks, "
+            "transformers process all positions in parallel, making them "
+            "significantly faster to train on modern hardware. The key "
+            "innovation is the scaled dot-product attention, which computes "
+            "compatibility scores between query and key vectors, then uses "
+            "these scores to create weighted combinations of value vectors. "
+            "Multi-head attention extends this by running multiple attention "
+            "functions in parallel, allowing the model to attend to "
+            "information from different representation subspaces. "
+        ) * 4,
+        (
+            "In probability theory, calibration refers to the property that "
+            "when a model assigns probability p to an event, that event "
+            "should occur approximately p fraction of the time. A perfectly "
+            "calibrated classifier has the property that among all instances "
+            "where it predicts 70 percent confidence, exactly 70 percent "
+            "are correct. Expected Calibration Error measures the average "
+            "gap between predicted confidence and actual accuracy across "
+            "probability bins. The Brier score provides a proper scoring "
+            "rule that captures both calibration and refinement, computed "
+            "as the mean squared difference between predicted probabilities "
+            "and actual binary outcomes. Reliability diagrams visualize "
+            "calibration by plotting observed frequency against predicted "
+            "probability for each bin. "
+        ) * 4,
+        (
+            "Goal-conditioned reinforcement learning trains agents to reach "
+            "specified target states rather than maximizing a single scalar "
+            "reward. The agent receives a goal description alongside the "
+            "current observation and must learn a policy that generalizes "
+            "across different goals. Hindsight experience replay improves "
+            "sample efficiency by relabeling failed trajectories with the "
+            "actually achieved state as the goal, turning failures into "
+            "successful training examples. Universal value function "
+            "approximators extend standard value functions to condition on "
+            "both state and goal, enabling transfer across the goal space. "
+            "Contrastive learning objectives can also be used to learn "
+            "goal-conditioned representations where the embedding distance "
+            "between current state and goal state correlates with the "
+            "number of actions needed to reach the goal. "
+        ) * 4,
+        (
+            "The softmax function converts a vector of real-valued scores "
+            "into a probability distribution by exponentiating each score "
+            "and normalizing by the sum. In language models, softmax is "
+            "applied to the logit vector to produce next-token "
+            "probabilities. Temperature scaling divides logits by a "
+            "constant before applying softmax, controlling the sharpness "
+            "of the distribution. Low temperatures make the distribution "
+            "peaked around the highest-scoring token, while high "
+            "temperatures flatten it toward uniform. The log-sum-exp trick "
+            "improves numerical stability by subtracting the maximum logit "
+            "before exponentiation, preventing overflow. Sparse alternatives "
+            "like sparsemax and entmax replace softmax with functions that "
+            "can assign exactly zero probability to unlikely tokens, "
+            "potentially improving both interpretability and efficiency. "
+        ) * 4,
+        (
+            "Spearman rank correlation measures the monotonic relationship "
+            "between two variables by computing the Pearson correlation of "
+            "their rank values. Unlike Pearson correlation, Spearman does "
+            "not assume linearity and is robust to outliers. A Spearman "
+            "rho of one indicates a perfect monotonically increasing "
+            "relationship, while negative one indicates a perfect "
+            "monotonically decreasing relationship. In the context of "
+            "model evaluation, Spearman correlation can assess whether a "
+            "scoring function preserves the ordering of examples by "
+            "quality, even if the absolute scores are miscalibrated. This "
+            "makes it particularly useful for evaluating reranking systems "
+            "where the goal is to sort candidates correctly rather than "
+            "assign accurate absolute probabilities. "
+        ) * 4,
+        (
+            "Hidden states in transformer models encode contextual "
+            "representations that evolve through the network layers. "
+            "Early layers capture syntactic features like part-of-speech "
+            "tags and dependency relations, while later layers encode "
+            "more abstract semantic information. Probing classifiers can "
+            "reveal what information is encoded at each layer by training "
+            "simple models to predict linguistic properties from frozen "
+            "representations. The residual stream view interprets "
+            "transformer computation as iterative refinement of a shared "
+            "representation, where each attention head and MLP layer adds "
+            "a correction term. This perspective connects to the concept "
+            "of iterative inference, where each layer performs one step "
+            "of an implicit optimization process toward the final "
+            "prediction. "
+        ) * 4,
+        (
+            "Lagrangian optimization in machine learning provides a "
+            "principled framework for handling constrained optimization "
+            "problems. The Lagrangian function augments the objective with "
+            "weighted constraint terms, where the weights are called "
+            "Lagrange multipliers. At the optimum, the gradient of the "
+            "Lagrangian with respect to both the primal variables and the "
+            "multipliers must be zero, yielding the KKT conditions. In "
+            "variational inference, the evidence lower bound can be "
+            "derived as a Lagrangian relaxation of the log-likelihood "
+            "maximization problem with a KL divergence constraint. Dual "
+            "decomposition methods exploit the Lagrangian framework to "
+            "break complex structured prediction problems into simpler "
+            "subproblems that can be solved independently. "
+        ) * 4,
+        (
+            "Mutual information quantifies the amount of information that "
+            "one random variable contains about another. In representation "
+            "learning, maximizing mutual information between an encoding "
+            "and the input data encourages the encoder to capture all "
+            "relevant features. The InfoNCE loss provides a tractable lower "
+            "bound on mutual information that can be estimated from samples "
+            "using a contrastive learning framework. Deep InfoMax applies "
+            "this principle to learn representations by maximizing mutual "
+            "information between local and global features of an input, "
+            "yielding embeddings that capture both fine-grained details "
+            "and high-level abstractions. The information bottleneck "
+            "principle balances compression against prediction by finding "
+            "representations that retain only the information about the "
+            "input that is relevant for predicting the target variable. "
+        ) * 4,
+    ]
 
 
 def load_evaluation_texts(
@@ -200,28 +480,44 @@ def load_evaluation_texts(
 
     Returns a list of text strings, each suitable for tokenization
     and per-position next-token prediction.
-    """
-    from datasets import load_dataset
 
-    if dataset_name == "wikitext":
-        ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
-        texts = [
-            t for t in ds["text"]
-            if len(t.strip()) > 200
-        ]
-    elif dataset_name == "openwebtext":
-        ds = load_dataset("stas/openwebtext-10k", split="train")
-        texts = [t for t in ds["text"] if len(t.strip()) > 200]
-    elif dataset_name == "c4":
-        ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
-        texts = []
-        for item in ds:
-            if len(item["text"].strip()) > 200:
-                texts.append(item["text"])
-            if len(texts) >= max_texts * 2:
-                break
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
+    Falls back to built-in texts if ``datasets`` or ``scipy`` cannot
+    be imported (common numpy/scipy version mismatch).
+    """
+    try:
+        from datasets import load_dataset
+    except (ImportError, Exception) as exc:
+        print(f"  WARNING: Cannot import datasets ({exc})")
+        print("  Falling back to built-in evaluation texts")
+        print("  To fix: pip install --upgrade numpy scipy datasets")
+        return _builtin_fallback_texts()[:max_texts]
+
+    try:
+        if dataset_name == "wikitext":
+            ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+            texts = [
+                t for t in ds["text"]
+                if len(t.strip()) > 200
+            ]
+        elif dataset_name == "openwebtext":
+            ds = load_dataset("stas/openwebtext-10k", split="train")
+            texts = [t for t in ds["text"] if len(t.strip()) > 200]
+        elif dataset_name == "c4":
+            ds = load_dataset(
+                "allenai/c4", "en", split="validation", streaming=True,
+            )
+            texts = []
+            for item in ds:
+                if len(item["text"].strip()) > 200:
+                    texts.append(item["text"])
+                if len(texts) >= max_texts * 2:
+                    break
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}")
+    except Exception as exc:
+        print(f"  WARNING: Dataset load failed ({exc})")
+        print("  Falling back to built-in evaluation texts")
+        return _builtin_fallback_texts()[:max_texts]
 
     # Shuffle and limit
     rng = np.random.RandomState(42)
@@ -332,7 +628,7 @@ def evaluate_signal(
 
         # Forward pass
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits = outputs.logits  # [1, T, V]
             # Use the last hidden layer
             hidden_states = outputs.hidden_states[-1]  # [1, T, D]
@@ -448,8 +744,6 @@ def collect_dataset(
 
     This avoids re-running the model for every ablation config.
     """
-    vocab_emb = model.get_input_embeddings().weight.detach()
-
     dataset: List[Dict[str, Any]] = []
 
     for text_idx, text in enumerate(texts):
@@ -465,12 +759,29 @@ def collect_dataset(
             continue
 
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits_all = outputs.logits  # [1, T, V]
             hidden_all = outputs.hidden_states[-1]  # [1, T, D]
 
         T = tokens.shape[1]
         ground_truth = tokens[0, 1:]  # [T-1]
+
+        # First-passage diagnostic: check model predictions vs ground truth
+        if text_idx == 0 and len(dataset) == 0:
+            n_match_standard = 0  # logits[t] predicts tokens[t+1]
+            n_match_shifted = 0   # logits[t] predicts tokens[t]
+            for t in range(min(T - 1, 50)):
+                pred = torch.argmax(logits_all[0, t, :]).item()
+                if pred == tokens[0, t + 1].item():
+                    n_match_standard += 1
+                if pred == tokens[0, t].item():
+                    n_match_shifted += 1
+            n_check = min(T - 1, 50)
+            print(f"  Alignment check (first {n_check} pos): "
+                  f"standard={n_match_standard}/{n_check} "
+                  f"({n_match_standard/n_check:.0%}), "
+                  f"shifted={n_match_shifted}/{n_check} "
+                  f"({n_match_shifted/n_check:.0%})")
 
         goals = compute_goal_embeddings(
             hidden_all, strategy, prompt_length=T // 4,
@@ -555,8 +866,87 @@ def run_ablation_real(
         print("  WARNING: no data collected, skipping ablation")
         return AblationStrategyResult(strategy=strategy, experiment_results=[])
 
-    # Run through ExperimentRunner
-    runner = ExperimentRunner(base_config=base_config, device=device)
+    # Sanity check: verify baseline argmax accuracy directly
+    n_correct = sum(
+        1 for s in dataset
+        if torch.argmax(s["logits"], dim=-1).item() == s["ground_truth"]
+    )
+    n_total = len(dataset)
+    print(f"  Sanity check: direct argmax accuracy = "
+          f"{n_correct}/{n_total} ({n_correct / n_total:.1%})")
+
+    if n_correct == 0:
+        print("  WARNING: model never predicts the next token correctly!")
+        # Detect degenerate predictions: instruction-tuned models often have
+        # a handful of "always-on" tokens (chat markers, control tokens) that
+        # dominate the argmax on raw text.
+        from collections import Counter
+        preds = [torch.argmax(s["logits"], dim=-1).item() for s in dataset]
+        gts = [s["ground_truth"] for s in dataset]
+        pred_counts = Counter(preds)
+        dominant = [
+            tok for tok, cnt in pred_counts.most_common(20)
+            if cnt > n_total * 0.02  # appears in >2% of positions
+        ]
+
+        # Decode dominant tokens for diagnostics
+        tok_strs = {}
+        if hasattr(tokenizer, "decode"):
+            for tok in dominant[:10]:
+                try:
+                    tok_strs[tok] = repr(tokenizer.decode([tok]))
+                except Exception:
+                    tok_strs[tok] = "?"
+
+        print(f"  Dominant predicted tokens (>2% freq): {len(dominant)}")
+        for tok in dominant[:10]:
+            pct = pred_counts[tok] / n_total
+            s = f" = {tok_strs[tok]}" if tok in tok_strs else ""
+            print(f"    token {tok}{s}: {pred_counts[tok]}/{n_total} ({pct:.1%})")
+
+        # Check off-by-one
+        off_by_one = sum(1 for i in range(1, len(preds))
+                         if preds[i] == gts[i - 1])
+        if off_by_one > n_total * 0.3:
+            print(f"  >>> LIKELY OFF-BY-ONE ERROR: pred[t]==gt[t-1] "
+                  f"for {off_by_one}/{len(preds)-1} "
+                  f"({off_by_one / max(1, len(preds)-1):.1%})")
+
+        # Mask dominant tokens and re-check accuracy.  This reveals whether
+        # the underlying distribution is meaningful once the constant bias
+        # from instruction-tuning is removed.
+        if dominant:
+            mask_set = set(dominant)
+            n_correct_filtered = 0
+            for s in dataset:
+                logits_t = s["logits"].clone()  # [1, V]
+                for tok in mask_set:
+                    logits_t[0, tok] = float("-inf")
+                pred_filtered = torch.argmax(logits_t, dim=-1).item()
+                if pred_filtered == s["ground_truth"]:
+                    n_correct_filtered += 1
+            print(f"  Filtered accuracy (masking {len(mask_set)} dominant tokens): "
+                  f"{n_correct_filtered}/{n_total} "
+                  f"({n_correct_filtered / n_total:.1%})")
+
+            if n_correct_filtered > 0:
+                print("  >>> Underlying distribution HAS signal. "
+                      "Applying dominant-token mask to logits.")
+                for s in dataset:
+                    for tok in mask_set:
+                        s["logits"][0, tok] = float("-inf")
+            else:
+                print("  >>> No improvement from masking. "
+                      "Model may need chat-template formatting.")
+                print("  >>> Consider using a base model (not -instruct) "
+                      "for next-token evaluation.")
+
+    # Run through ExperimentRunner — pass model so it uses real vocab embeddings
+    # (without the model, ExperimentRunner falls back to random vocab_emb,
+    # which makes all BCVF scores meaningless)
+    runner = ExperimentRunner(
+        model=model, base_config=base_config, device=device,
+    )
     results = runner.run_ablation(dataset, matrix=ABLATION_MATRIX)
 
     elapsed = time.time() - t0
@@ -900,6 +1290,13 @@ def create_dry_run_model(
         eos_token_id=1,
     )
     model = GPT2LMHeadModel(config)
+    # Break weight tying: GPT-2 shares input/output embeddings by default,
+    # causing a random-weight model to predict the identity (current token).
+    # Give lm_head independent random weights so predictions are truly random.
+    with torch.no_grad():
+        model.lm_head.weight = torch.nn.Parameter(
+            torch.randn_like(model.lm_head.weight)
+        )
     model.to(device)
     model.eval()
 
