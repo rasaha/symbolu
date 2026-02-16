@@ -1481,6 +1481,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--bilinear-lr", type=float, default=1e-3,
         help="BilinearScorer learning rate (default: 1e-3)",
     )
+    parser.add_argument(
+        "--bilinear-train-top-m", type=int, default=50,
+        help=(
+            "Candidate pool size during bilinear training (default: 50). "
+            "Smaller = harder negatives.  Separate from --top-m (eval)."
+        ),
+    )
 
     return parser
 
@@ -1625,6 +1632,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             rank=args.bilinear_rank,
             use_sigmoid=use_sigmoid,
             top_m=top_m,
+            train_top_m=args.bilinear_train_top_m,
             lr=args.bilinear_lr,
             epochs=args.bilinear_epochs,
             train_samples=bl_train,
@@ -1633,6 +1641,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         )
         print(f"  Bilinear: rank={bilinear_config.rank}, "
               f"sigmoid={use_sigmoid}, "
+              f"train_top_m={bilinear_config.train_top_m}, "
               f"train={bilinear_config.train_samples}, "
               f"eval={bilinear_config.eval_samples}, "
               f"epochs={bilinear_config.epochs}")

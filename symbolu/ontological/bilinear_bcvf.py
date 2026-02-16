@@ -70,7 +70,11 @@ class BilinearConfig:
         use_sigmoid: Apply sigmoid(gamma * s) for [0,1] bounded scores.
         gamma_init: Initial value for learnable gamma scalar.
         gamma_learnable: Whether gamma is a learnable parameter.
-        top_m: Number of top-logit candidates for training negatives.
+        top_m: Number of top-logit candidates at eval time.
+        train_top_m: Candidate pool size during training (smaller = harder
+            negatives).  Defaults to 50 so InfoNCE focuses on plausible
+            near-miss candidates rather than trivially wrong tokens.
+        max_grad_norm: Gradient clipping norm.
         lr: AdamW learning rate.
         epochs: Training epochs.
         batch_size: Mini-batch size.
@@ -88,6 +92,8 @@ class BilinearConfig:
     gamma_init: float = 1.0
     gamma_learnable: bool = True
     top_m: int = 500
+    train_top_m: int = 50
+    max_grad_norm: float = 1.0
     lr: float = 1e-3
     epochs: int = 3
     batch_size: int = 64
@@ -365,12 +371,15 @@ if PYTORCH_AVAILABLE:
         torch.manual_seed(config.seed)
         n = len(samples)
         batch_size = config.batch_size
-        top_m = min(config.top_m, vocab_embeddings.shape[0])
+        # Use smaller candidate pool for training → harder negatives
+        train_m = min(config.train_top_m, vocab_embeddings.shape[0])
         loss_curve: List[float] = []
 
         for epoch in range(config.epochs):
             perm = torch.randperm(n).tolist()
             epoch_loss = 0.0
+            epoch_correct = 0
+            epoch_total = 0
             n_batches = 0
 
             for start in range(0, n, batch_size):
@@ -378,7 +387,7 @@ if PYTORCH_AVAILABLE:
                 batch_indices = perm[start:end]
 
                 h_batch, E_batch, targets, _ = _build_candidate_batch(
-                    samples, batch_indices, vocab_embeddings, top_m,
+                    samples, batch_indices, vocab_embeddings, train_m,
                 )
                 h_batch = h_batch.to(device)
                 E_batch = E_batch.to(device)
@@ -391,16 +400,26 @@ if PYTORCH_AVAILABLE:
 
                 optimizer.zero_grad()
                 loss.backward()
+                if config.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(
+                        scorer.parameters(), config.max_grad_norm
+                    )
                 optimizer.step()
 
                 epoch_loss += loss.item()
+                epoch_correct += (
+                    scores.argmax(dim=-1) == targets
+                ).sum().item()
+                epoch_total += targets.shape[0]
                 n_batches += 1
 
             avg_loss = epoch_loss / max(n_batches, 1)
+            acc = epoch_correct / max(epoch_total, 1)
             loss_curve.append(avg_loss)
             print(
                 f"  [bilinear] Epoch {epoch+1}/{config.epochs}: "
-                f"loss={avg_loss:.4f}"
+                f"loss={avg_loss:.4f}  acc={acc:.3f}  "
+                f"(train_m={train_m})"
             )
 
         # After training, set use_sigmoid for eval
@@ -423,6 +442,8 @@ if PYTORCH_AVAILABLE:
         # Primary predictive signal
         rho_sb_bilin: float           # Spearman rho(sb_bilin, correctness)
         rho_sb_bilin_top1: float      # rho(sb_top1_bilin, correctness)
+        rho_sb_argmax: float          # rho(sb_argmax, correctness)
+        rho_softmax_conf: float       # rho(softmax_conf, correctness)
 
         # Baseline signals
         rho_maxprob: float            # rho(max_prob, correctness)
@@ -441,6 +462,12 @@ if PYTORCH_AVAILABLE:
         sb_std: float
         sb_top1_mean: float
         sb_gap_mean: float            # mean(top1 - top2) in sb
+
+        # sb_argmax stats
+        sb_argmax_mean: float
+        sb_argmax_std: float
+        softmax_conf_mean: float
+        softmax_conf_std: float
 
         # Calibration
         ece: float
@@ -489,6 +516,8 @@ if PYTORCH_AVAILABLE:
         sb_bilin_all = []       # mean sb across candidates (as confidence)
         sb_top1_all = []        # sb of top-1 candidate
         sb_gap_all = []         # sb_top1 - sb_top2
+        sb_argmax_all = []      # sb of the logit-argmax token
+        softmax_conf_all = []   # softmax(raw_scores)[argmax_pos]
         maxprob_all = []
         margin_all = []
         neg_entropy_all = []
@@ -497,13 +526,18 @@ if PYTORCH_AVAILABLE:
         base_pred_correct = []  # baseline (argmax) correctness
         bilin_pred_correct = [] # bilinear reranking correctness
 
+        # We need raw scores for softmax confidence, so temporarily
+        # switch to non-sigmoid mode for the raw pass
+        orig_sigmoid = scorer.use_sigmoid
+        scorer.use_sigmoid = False
+
         with torch.no_grad():
             for s in samples:
                 logits = s.logits_t.to(device)
                 h = s.h_t.unsqueeze(0).to(device)    # [1, D]
                 gt = s.ground_truth_token
-                V = logits.shape[0]
-                eff_m = min(top_m, V)
+                V_size = logits.shape[0]
+                eff_m = min(top_m, V_size)
 
                 # Top-M candidates
                 topM_scores, topM_ids = torch.topk(logits, eff_m)
@@ -516,13 +550,16 @@ if PYTORCH_AVAILABLE:
                 # Candidate embeddings
                 E_cand = vocab_embeddings[topM_ids].unsqueeze(0)  # [1, M, D]
 
-                # Bilinear scores
-                sb = scorer(h, E_cand)  # [1, M]
-                sb_vals = sb[0]
+                # Raw bilinear scores (no sigmoid)
+                raw_scores = scorer(h, E_cand)[0]  # [M]
 
-                # sb stats
+                # Sigmoid scores for backward-compat metrics
+                gamma = scorer.gamma.float()
+                sb_vals = torch.sigmoid(gamma * raw_scores) if orig_sigmoid else raw_scores
+
+                # sb stats (sigmoid)
                 sb_mean_val = sb_vals.mean().item()
-                sb_sorted, sb_sorted_idx = sb_vals.sort(descending=True)
+                sb_sorted, _ = sb_vals.sort(descending=True)
                 sb_top1 = sb_sorted[0].item()
                 sb_top2 = sb_sorted[1].item() if len(sb_sorted) > 1 else sb_top1
                 sb_gap = sb_top1 - sb_top2
@@ -531,9 +568,18 @@ if PYTORCH_AVAILABLE:
                 sb_top1_all.append(sb_top1)
                 sb_gap_all.append(sb_gap)
 
-                # Bilinear reranking: pick candidate with best
-                # adjusted = base_logit - beta * (1 - sb)^2
-                # Simplified: just pick highest sb among top-M
+                # sb_argmax: bilinear score of the logit-argmax token
+                # The argmax of full logits is topM_ids[0] since topM is sorted
+                argmax_sb = sb_vals[0].item()
+                sb_argmax_all.append(argmax_sb)
+
+                # Softmax confidence: P(argmax | h, candidates) from
+                # bilinear scorer via softmax over raw scores
+                softmax_probs = F.softmax(raw_scores, dim=-1)
+                softmax_conf = softmax_probs[0].item()  # conf for argmax
+                softmax_conf_all.append(softmax_conf)
+
+                # Bilinear reranking: pick candidate with highest sb
                 bilin_best_rel = sb_vals.argmax().item()
                 bilin_best_token = int(topM_ids[bilin_best_rel].item())
                 bilin_correct = int(bilin_best_token == gt)
@@ -556,10 +602,15 @@ if PYTORCH_AVAILABLE:
                 correct = 1 if base_pred == gt else 0
                 correctness_all.append(correct)
 
+        # Restore original sigmoid setting
+        scorer.use_sigmoid = orig_sigmoid
+
         # Convert to arrays
         sb_bilin_arr = np.array(sb_bilin_all)
         sb_top1_arr = np.array(sb_top1_all)
         sb_gap_arr = np.array(sb_gap_all)
+        sb_argmax_arr = np.array(sb_argmax_all)
+        softmax_conf_arr = np.array(softmax_conf_all)
         maxprob_arr = np.array(maxprob_all)
         margin_arr = np.array(margin_all)
         neg_ent_arr = np.array(neg_entropy_all)
@@ -571,6 +622,10 @@ if PYTORCH_AVAILABLE:
         # Spearman correlations
         rho_sb = spearman_rank_correlation(sb_bilin_arr, corr_arr)
         rho_sb_top1 = spearman_rank_correlation(sb_top1_arr, corr_arr)
+        rho_sb_argmax = spearman_rank_correlation(sb_argmax_arr, corr_arr)
+        rho_softmax_conf = spearman_rank_correlation(
+            softmax_conf_arr, corr_arr,
+        )
         rho_maxprob = spearman_rank_correlation(maxprob_arr, corr_arr)
         rho_margin = spearman_rank_correlation(margin_arr, corr_arr)
         rho_neg_ent = spearman_rank_correlation(neg_ent_arr, corr_arr)
@@ -586,8 +641,10 @@ if PYTORCH_AVAILABLE:
         best_bl_name = max(baselines, key=baselines.get)
         best_bl_rho = baselines[best_bl_name]
 
-        # Use the better of rho_sb and rho_sb_top1 for verdict
-        best_bilin_rho = max(rho_sb, rho_sb_top1)
+        # Use the best of all bilinear metrics for verdict
+        best_bilin_rho = max(
+            rho_sb, rho_sb_top1, rho_sb_argmax, rho_softmax_conf,
+        )
         rho_improvement = best_bilin_rho - best_bl_rho
         bilinear_wins = rho_improvement > config.rho_improvement_threshold
 
@@ -655,6 +712,8 @@ if PYTORCH_AVAILABLE:
             n_eval=n_eval,
             rho_sb_bilin=rho_sb,
             rho_sb_bilin_top1=rho_sb_top1,
+            rho_sb_argmax=rho_sb_argmax,
+            rho_softmax_conf=rho_softmax_conf,
             rho_maxprob=rho_maxprob,
             rho_margin=rho_margin,
             rho_neg_entropy=rho_neg_ent,
@@ -667,6 +726,10 @@ if PYTORCH_AVAILABLE:
             sb_std=float(sb_bilin_arr.std()),
             sb_top1_mean=float(sb_top1_arr.mean()),
             sb_gap_mean=float(sb_gap_arr.mean()),
+            sb_argmax_mean=float(sb_argmax_arr.mean()),
+            sb_argmax_std=float(sb_argmax_arr.std()),
+            softmax_conf_mean=float(softmax_conf_arr.mean()),
+            softmax_conf_std=float(softmax_conf_arr.std()),
             ece=ece_val,
             brier=brier_val,
             ece_on_wrong_baseline=ece_wrong,
@@ -736,6 +799,16 @@ if PYTORCH_AVAILABLE:
                 f"{r.rho_sb_bilin_top1 - best_bl:>+10.4f}"
             )
             lines.append(
+                f"  {'sb_argmax':.<20} "
+                f"{r.rho_sb_argmax:>+8.4f}  "
+                f"{r.rho_sb_argmax - best_bl:>+10.4f}"
+            )
+            lines.append(
+                f"  {'softmax_conf':.<20} "
+                f"{r.rho_softmax_conf:>+8.4f}  "
+                f"{r.rho_softmax_conf - best_bl:>+10.4f}"
+            )
+            lines.append(
                 f"  {'maxprob':.<20} {r.rho_maxprob:>+8.4f}"
             )
             lines.append(
@@ -764,7 +837,10 @@ if PYTORCH_AVAILABLE:
                     f"~TIED (rho improvement "
                     f"{r.rho_improvement:+.4f})"
                 )
-            elif max(abs(r.rho_sb_bilin), abs(r.rho_sb_bilin_top1)) < 0.05:
+            elif max(
+                abs(r.rho_sb_bilin), abs(r.rho_sb_bilin_top1),
+                abs(r.rho_sb_argmax), abs(r.rho_softmax_conf),
+            ) < 0.05:
                 verdict = (
                     "NEITHER — bilinear rho too weak "
                     f"(max={max(abs(r.rho_sb_bilin), abs(r.rho_sb_bilin_top1)):.4f})"
@@ -783,6 +859,14 @@ if PYTORCH_AVAILABLE:
                 f"  mean={r.sb_mean:.4f}  std={r.sb_std:.4f}  "
                 f"top1_mean={r.sb_top1_mean:.4f}  "
                 f"gap_mean={r.sb_gap_mean:.4f}"
+            )
+            lines.append(
+                f"  sb_argmax: mean={r.sb_argmax_mean:.4f}  "
+                f"std={r.sb_argmax_std:.4f}"
+            )
+            lines.append(
+                f"  softmax_conf: mean={r.softmax_conf_mean:.4f}  "
+                f"std={r.softmax_conf_std:.4f}"
             )
 
             # Calibration
