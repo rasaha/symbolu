@@ -190,6 +190,139 @@ def load_hf_model(
 # =========================================================================
 
 
+def _builtin_fallback_texts() -> List[str]:
+    """
+    Deterministic fallback texts when ``datasets`` or ``scipy`` cannot
+    be imported.  These are long enough to produce hundreds of token
+    positions for a meaningful signal evaluation.
+    """
+    return [
+        (
+            "The transformer architecture revolutionized natural language "
+            "processing by introducing self-attention mechanisms that allow "
+            "models to weigh the importance of different parts of the input "
+            "sequence simultaneously. Unlike recurrent neural networks, "
+            "transformers process all positions in parallel, making them "
+            "significantly faster to train on modern hardware. The key "
+            "innovation is the scaled dot-product attention, which computes "
+            "compatibility scores between query and key vectors, then uses "
+            "these scores to create weighted combinations of value vectors. "
+            "Multi-head attention extends this by running multiple attention "
+            "functions in parallel, allowing the model to attend to "
+            "information from different representation subspaces. "
+        ) * 4,
+        (
+            "In probability theory, calibration refers to the property that "
+            "when a model assigns probability p to an event, that event "
+            "should occur approximately p fraction of the time. A perfectly "
+            "calibrated classifier has the property that among all instances "
+            "where it predicts 70 percent confidence, exactly 70 percent "
+            "are correct. Expected Calibration Error measures the average "
+            "gap between predicted confidence and actual accuracy across "
+            "probability bins. The Brier score provides a proper scoring "
+            "rule that captures both calibration and refinement, computed "
+            "as the mean squared difference between predicted probabilities "
+            "and actual binary outcomes. Reliability diagrams visualize "
+            "calibration by plotting observed frequency against predicted "
+            "probability for each bin. "
+        ) * 4,
+        (
+            "Goal-conditioned reinforcement learning trains agents to reach "
+            "specified target states rather than maximizing a single scalar "
+            "reward. The agent receives a goal description alongside the "
+            "current observation and must learn a policy that generalizes "
+            "across different goals. Hindsight experience replay improves "
+            "sample efficiency by relabeling failed trajectories with the "
+            "actually achieved state as the goal, turning failures into "
+            "successful training examples. Universal value function "
+            "approximators extend standard value functions to condition on "
+            "both state and goal, enabling transfer across the goal space. "
+            "Contrastive learning objectives can also be used to learn "
+            "goal-conditioned representations where the embedding distance "
+            "between current state and goal state correlates with the "
+            "number of actions needed to reach the goal. "
+        ) * 4,
+        (
+            "The softmax function converts a vector of real-valued scores "
+            "into a probability distribution by exponentiating each score "
+            "and normalizing by the sum. In language models, softmax is "
+            "applied to the logit vector to produce next-token "
+            "probabilities. Temperature scaling divides logits by a "
+            "constant before applying softmax, controlling the sharpness "
+            "of the distribution. Low temperatures make the distribution "
+            "peaked around the highest-scoring token, while high "
+            "temperatures flatten it toward uniform. The log-sum-exp trick "
+            "improves numerical stability by subtracting the maximum logit "
+            "before exponentiation, preventing overflow. Sparse alternatives "
+            "like sparsemax and entmax replace softmax with functions that "
+            "can assign exactly zero probability to unlikely tokens, "
+            "potentially improving both interpretability and efficiency. "
+        ) * 4,
+        (
+            "Spearman rank correlation measures the monotonic relationship "
+            "between two variables by computing the Pearson correlation of "
+            "their rank values. Unlike Pearson correlation, Spearman does "
+            "not assume linearity and is robust to outliers. A Spearman "
+            "rho of one indicates a perfect monotonically increasing "
+            "relationship, while negative one indicates a perfect "
+            "monotonically decreasing relationship. In the context of "
+            "model evaluation, Spearman correlation can assess whether a "
+            "scoring function preserves the ordering of examples by "
+            "quality, even if the absolute scores are miscalibrated. This "
+            "makes it particularly useful for evaluating reranking systems "
+            "where the goal is to sort candidates correctly rather than "
+            "assign accurate absolute probabilities. "
+        ) * 4,
+        (
+            "Hidden states in transformer models encode contextual "
+            "representations that evolve through the network layers. "
+            "Early layers capture syntactic features like part-of-speech "
+            "tags and dependency relations, while later layers encode "
+            "more abstract semantic information. Probing classifiers can "
+            "reveal what information is encoded at each layer by training "
+            "simple models to predict linguistic properties from frozen "
+            "representations. The residual stream view interprets "
+            "transformer computation as iterative refinement of a shared "
+            "representation, where each attention head and MLP layer adds "
+            "a correction term. This perspective connects to the concept "
+            "of iterative inference, where each layer performs one step "
+            "of an implicit optimization process toward the final "
+            "prediction. "
+        ) * 4,
+        (
+            "Lagrangian optimization in machine learning provides a "
+            "principled framework for handling constrained optimization "
+            "problems. The Lagrangian function augments the objective with "
+            "weighted constraint terms, where the weights are called "
+            "Lagrange multipliers. At the optimum, the gradient of the "
+            "Lagrangian with respect to both the primal variables and the "
+            "multipliers must be zero, yielding the KKT conditions. In "
+            "variational inference, the evidence lower bound can be "
+            "derived as a Lagrangian relaxation of the log-likelihood "
+            "maximization problem with a KL divergence constraint. Dual "
+            "decomposition methods exploit the Lagrangian framework to "
+            "break complex structured prediction problems into simpler "
+            "subproblems that can be solved independently. "
+        ) * 4,
+        (
+            "Mutual information quantifies the amount of information that "
+            "one random variable contains about another. In representation "
+            "learning, maximizing mutual information between an encoding "
+            "and the input data encourages the encoder to capture all "
+            "relevant features. The InfoNCE loss provides a tractable lower "
+            "bound on mutual information that can be estimated from samples "
+            "using a contrastive learning framework. Deep InfoMax applies "
+            "this principle to learn representations by maximizing mutual "
+            "information between local and global features of an input, "
+            "yielding embeddings that capture both fine-grained details "
+            "and high-level abstractions. The information bottleneck "
+            "principle balances compression against prediction by finding "
+            "representations that retain only the information about the "
+            "input that is relevant for predicting the target variable. "
+        ) * 4,
+    ]
+
+
 def load_evaluation_texts(
     dataset_name: str = "wikitext",
     split: str = "test",
@@ -200,28 +333,44 @@ def load_evaluation_texts(
 
     Returns a list of text strings, each suitable for tokenization
     and per-position next-token prediction.
-    """
-    from datasets import load_dataset
 
-    if dataset_name == "wikitext":
-        ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
-        texts = [
-            t for t in ds["text"]
-            if len(t.strip()) > 200
-        ]
-    elif dataset_name == "openwebtext":
-        ds = load_dataset("stas/openwebtext-10k", split="train")
-        texts = [t for t in ds["text"] if len(t.strip()) > 200]
-    elif dataset_name == "c4":
-        ds = load_dataset("allenai/c4", "en", split="validation", streaming=True)
-        texts = []
-        for item in ds:
-            if len(item["text"].strip()) > 200:
-                texts.append(item["text"])
-            if len(texts) >= max_texts * 2:
-                break
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
+    Falls back to built-in texts if ``datasets`` or ``scipy`` cannot
+    be imported (common numpy/scipy version mismatch).
+    """
+    try:
+        from datasets import load_dataset
+    except (ImportError, Exception) as exc:
+        print(f"  WARNING: Cannot import datasets ({exc})")
+        print("  Falling back to built-in evaluation texts")
+        print("  To fix: pip install --upgrade numpy scipy datasets")
+        return _builtin_fallback_texts()[:max_texts]
+
+    try:
+        if dataset_name == "wikitext":
+            ds = load_dataset("wikitext", "wikitext-103-raw-v1", split=split)
+            texts = [
+                t for t in ds["text"]
+                if len(t.strip()) > 200
+            ]
+        elif dataset_name == "openwebtext":
+            ds = load_dataset("stas/openwebtext-10k", split="train")
+            texts = [t for t in ds["text"] if len(t.strip()) > 200]
+        elif dataset_name == "c4":
+            ds = load_dataset(
+                "allenai/c4", "en", split="validation", streaming=True,
+            )
+            texts = []
+            for item in ds:
+                if len(item["text"].strip()) > 200:
+                    texts.append(item["text"])
+                if len(texts) >= max_texts * 2:
+                    break
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}")
+    except Exception as exc:
+        print(f"  WARNING: Dataset load failed ({exc})")
+        print("  Falling back to built-in evaluation texts")
+        return _builtin_fallback_texts()[:max_texts]
 
     # Shuffle and limit
     rng = np.random.RandomState(42)
