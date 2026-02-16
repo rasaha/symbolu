@@ -1,0 +1,53 @@
+================================================================================
+FEATURE: Guna Modulation (State Evolution Engine)
+================================================================================
+Dynamic energy state system with entropy-based modulation, causal layers,
+recursive self-improvement, and phoneme space modeling.
+================================================================================
+
+--- Core Modules ---
+symbolu/guna_modulation/__init__.py
+symbolu/guna_modulation/guna_derivation.py     # Guna (energy) state derivation
+symbolu/guna_modulation/entropy_modulation_engine.py  # Entropy-based state control
+symbolu/guna_modulation/state_evolution_engine.py     # Runtime state transitions
+symbolu/guna_modulation/causal_layer.py        # Causality modeling
+symbolu/guna_modulation/concept_readiness.py   # Learning readiness assessment
+symbolu/guna_modulation/mirror_balance.py      # Equilibrium maintenance
+symbolu/guna_modulation/recursive_self_improvement.py  # Self-optimization
+symbolu/guna_modulation/experimental_reasoning.py      # Experimental reasoning
+symbolu/guna_modulation/variance_confidence.py # Variance-confidence tracking
+
+--- Integration ---
+symbolu/guna_modulation/pipeline_integration.py     # Pipeline integration
+symbolu/guna_modulation/pipeline_signal_adapter.py  # Signal adapter
+symbolu/guna_modulation/signal_wiring.py       # Signal wiring
+
+--- Modeling ---
+symbolu/guna_modulation/phoneme_space.py       # Phoneme space modeling
+symbolu/guna_modulation/observables.py         # Observable state outputs
+
+--- Configuration & Types ---
+symbolu/guna_modulation/config.py
+symbolu/guna_modulation/state_types.py
+symbolu/guna_modulation/types.py
+symbolu/guna_modulation/utility.py
+symbolu/guna_modulation/v27_config.py
+
+--- Benchmarks ---
+symbolu/guna_modulation/benchmarks/__init__.py
+symbolu/guna_modulation/benchmarks/ema_vs_bayesian.py
+
+--- Tests ---
+tests/unit/guna_modulation/__init__.py
+tests/unit/guna_modulation/test_causal_layer.py
+tests/unit/guna_modulation/test_concept_readiness.py
+tests/unit/guna_modulation/test_guna_entropy_modulation.py
+tests/unit/guna_modulation/test_mirror_balance.py
+tests/unit/guna_modulation/test_phoneme_space.py
+tests/unit/guna_modulation/test_pipeline_signal_adapter.py
+tests/unit/guna_modulation/test_signal_wiring.py
+tests/unit/guna_modulation/test_specification_verification.py
+tests/unit/guna_modulation/test_state_evolution.py
+tests/integration/guna_modulation/__init__.py
+tests/integration/guna_modulation/test_signal_wiring_integration.py
+tests/unit/symbolu/test_recursive_self_improvement.py

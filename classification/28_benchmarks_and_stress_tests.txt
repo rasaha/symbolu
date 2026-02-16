@@ -1,0 +1,42 @@
+================================================================================
+FEATURE: Benchmarks & Stress Tests
+================================================================================
+LLM benchmarks (HellaSwag, LAMBADA, passkey), memory benchmarks, stress
+tests, industry benchmarks, and needle-in-haystack evaluation.
+================================================================================
+
+--- LLM Benchmarks ---
+benchmark_llm.py                               # LLM benchmark suite
+benchmark_memory.py                            # Memory benchmark
+
+--- Evaluations ---
+eval_hellaswag.py                              # HellaSwag benchmark
+eval_lambada.py                                # LAMBADA benchmark
+eval_passkey.py                                # Passkey retrieval
+eval_passkey_fewshot.py                        # Few-shot passkey
+
+--- Stress Tests ---
+stress_test.py                                 # General stress testing
+stress_test_evolutionary_flow.py               # Evolutionary flow stress test
+test_symbolu_stress.py                         # Symbolu stress test
+
+--- Industry & Retrieval ---
+test_industry_benchmarks.py                    # Industry standard benchmarks
+test_needle_haystack.py                        # Needle-in-haystack test
+test_synthetic_retrieval.py                    # Symbolic retrieval test
+
+--- Module Benchmarks ---
+symbolu/benchmarks/__init__.py
+symbolu/benchmarks/canonical_match_benchmark.py
+symbolu/benchmarks/comprehensive_benchmark.py
+symbolu/benchmarks/phoneme_stl_demo.py
+benchmarks/pcam_flops_to_roi.py
+benchmarks/pcam_vllm_harness.py
+benchmarks/phoneme_space_benchmark.py
+benchmarks/trading_model_comparison.py
+
+--- Quality Tests ---
+symbolu/test_sota_quality.py
+
+--- Verification ---
+verify_model.py                                # Model verification

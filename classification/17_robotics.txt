@@ -1,0 +1,137 @@
+================================================================================
+FEATURE: Robotics Subsystem (symbolu_robotics)
+================================================================================
+Full robotics stack with multi-tier control (reflexive/reactive/deliberative),
+sensor encoders, motor decoders, planning, safety, coordination, and
+learning systems.
+================================================================================
+
+--- Core ---
+symbolu_robotics/__init__.py
+symbolu_robotics/core/__init__.py
+symbolu_robotics/core/chitta_vritti.py         # Mind-state for robotics
+symbolu_robotics/core/exceptions.py            # Error handling
+symbolu_robotics/core/mirror_pairs_12d.py      # 12D mirror pairs
+symbolu_robotics/core/ontology_12d.py          # 12D ontology for robots
+symbolu_robotics/core/types.py                 # Type definitions
+symbolu_robotics/core/v27_state.py             # V27 state model
+
+--- Tier System ---
+symbolu_robotics/tiers/__init__.py
+symbolu_robotics/tiers/base.py                 # Base tier
+symbolu_robotics/tiers/reflexive.py            # Tier 1: Reflexive (fast)
+symbolu_robotics/tiers/reactive.py             # Tier 2: Reactive
+symbolu_robotics/tiers/deliberative.py         # Tier 3: Deliberative (slow)
+symbolu_robotics/tiers/factory.py              # Tier factory
+
+--- Encoders (Sensor Input) ---
+symbolu_robotics/encoders/__init__.py
+symbolu_robotics/encoders/base_encoder.py
+symbolu_robotics/encoders/audio_encoder.py
+symbolu_robotics/encoders/fusion_encoder.py
+symbolu_robotics/encoders/proprioception.py
+symbolu_robotics/encoders/tactile_encoder.py
+symbolu_robotics/encoders/vision_encoder.py
+
+--- Decoders (Motor Output) ---
+symbolu_robotics/decoders/__init__.py
+symbolu_robotics/decoders/base_decoder.py
+symbolu_robotics/decoders/gripper_decoder.py
+symbolu_robotics/decoders/locomotion_decoder.py
+symbolu_robotics/decoders/motor_decoder.py
+symbolu_robotics/decoders/speech_decoder.py
+
+--- Planning ---
+symbolu_robotics/planning/__init__.py
+symbolu_robotics/planning/action_primitives.py
+symbolu_robotics/planning/goal_stack.py
+symbolu_robotics/planning/htn_planner.py       # HTN planner
+symbolu_robotics/planning/mpc_planner.py       # MPC planner
+symbolu_robotics/planning/path_planner.py      # Path planning
+symbolu_robotics/planning/world_model.py       # World model
+
+--- Safety ---
+symbolu_robotics/safety/__init__.py
+symbolu_robotics/safety/collision_guard.py
+symbolu_robotics/safety/constraint_monitor.py
+symbolu_robotics/safety/energy_bounds.py
+symbolu_robotics/safety/human_proximity.py
+symbolu_robotics/safety/trajectory_validator.py
+
+--- Coordination ---
+symbolu_robotics/coordination/__init__.py
+symbolu_robotics/coordination/conflict_resolution.py
+symbolu_robotics/coordination/formation.py
+symbolu_robotics/coordination/shared_world.py
+symbolu_robotics/coordination/task_allocation.py
+
+--- Learning ---
+symbolu_robotics/learning/__init__.py
+symbolu_robotics/learning/calibration.py
+symbolu_robotics/learning/dynamics_model.py
+symbolu_robotics/learning/skill_learning.py
+symbolu_robotics/learning/transfer.py
+
+--- Communication ---
+symbolu_robotics/comms/__init__.py
+symbolu_robotics/comms/human_interface.py
+symbolu_robotics/comms/ros_bridge.py
+symbolu_robotics/comms/swarm_protocol.py
+
+--- State Management ---
+symbolu_robotics/state/__init__.py
+symbolu_robotics/state/ema_tracker.py
+symbolu_robotics/state/localization.py
+symbolu_robotics/state/robot_state.py
+symbolu_robotics/state/world_state.py
+
+--- Recovery ---
+symbolu_robotics/recovery/__init__.py
+symbolu_robotics/recovery/fallback.py
+symbolu_robotics/recovery/sensor_recovery.py
+symbolu_robotics/recovery/watchdog.py
+
+--- Adapters (Sim/Hardware) ---
+symbolu_robotics/adapters/__init__.py
+symbolu_robotics/adapters/base_adapter.py
+symbolu_robotics/adapters/isaac_adapter.py     # NVIDIA Isaac Sim
+symbolu_robotics/adapters/mujoco_adapter.py    # MuJoCo
+symbolu_robotics/adapters/ros2_adapter.py      # ROS2
+symbolu_robotics/adapters/serial_adapter.py    # Serial port
+
+--- Vision ---
+symbolu_robotics/vision/__init__.py
+symbolu_robotics/vision/config.py
+symbolu_robotics/vision/loss.py
+symbolu_robotics/vision/su_vit.py              # SU-ViT model
+
+--- Formulas ---
+symbolu_robotics/formulas/__init__.py
+symbolu_robotics/formulas/bcvf.py
+symbolu_robotics/formulas/scc.py
+symbolu_robotics/formulas/use.py
+
+--- Examples ---
+symbolu_robotics/examples/__init__.py
+symbolu_robotics/examples/human_handover.py
+symbolu_robotics/examples/navigation.py
+symbolu_robotics/examples/pick_and_place.py
+symbolu_robotics/examples/swarm_coordination.py
+
+--- Configs ---
+symbolu_robotics/configs/robots/manipulator_6dof.yaml
+symbolu_robotics/configs/robots/mobile_base.yaml
+symbolu_robotics/configs/safety/collaborative.yaml
+symbolu_robotics/configs/safety/industrial.yaml
+symbolu_robotics/configs/tier_r1_reflexive.yaml
+symbolu_robotics/configs/tier_r2_reactive.yaml
+symbolu_robotics/configs/tier_r3_deliberative.yaml
+
+--- Tests ---
+symbolu_robotics/tests/__init__.py
+symbolu_robotics/tests/test_decoders.py
+symbolu_robotics/tests/test_encoders.py
+symbolu_robotics/tests/test_formulas.py
+symbolu_robotics/tests/test_integration.py
+symbolu_robotics/tests/test_safety.py
+symbolu_robotics/tests/test_tiers.py

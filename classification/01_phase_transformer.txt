@@ -1,0 +1,56 @@
+================================================================================
+FEATURE: Phase Transformer (O(n) LLM Core)
+================================================================================
+Patent U1-U4 protected O(n) phase-synchronization attention transformer.
+Replaces O(n^2) softmax attention. Supports model sizes from 10M to 7B params.
+32D Sovereign State: Bhavas(12) + Koshas(5) + Vrittis(5) + Gunas(6) + Reserved(4)
+================================================================================
+
+--- Core Implementation ---
+symbolu/phase_transformer.py                   # Main O(n) phase-sync transformer (7,696 lines)
+symbolu/moe_ffn.py                             # Mixture-of-Experts feed-forward network
+symbolu/reflective_phase_quad.py               # Reflective phase quadrant mechanism
+symbolu/rlm_phase_quad.py                      # RLM phase quadrant variant
+symbolu/hp_quad.py                             # Hyperparameter optimization for phase quad
+
+--- Phase Attention Modules ---
+symbolu/ontological/phase_attention.py         # Phase-based attention in ontological engine
+symbolu/sovereign/phase_attention.py           # Phase attention in sovereign model
+
+--- Diagnostics & Analysis ---
+debug_phase_layer_learning.py                  # Phase attention layer learning diagnostics
+diagnose_phase_attention.py                    # Phase attention diagnostic tool
+diagnose_phase_correlation.py                  # Phase correlation analysis
+diagnose_phase_dynamics.py                     # Phase dynamics analysis
+phase_test.py                                  # Phase mechanism test harness
+
+--- Phase Probes (Scripts) ---
+scripts/phase_probes/__init__.py
+scripts/phase_probes/hard_probes/adapt_phase_quad.py
+scripts/phase_probes/hard_probes/test_hard_probes_d6_control_plane.py
+scripts/phase_probes/hard_probes/train_hard_probes.py
+scripts/phase_probes/phase_ablation.py
+scripts/phase_probes/phase_probe_runner.py
+scripts/phase_probes/probe_cases.py
+scripts/phase_probes/train_binding_probe.py
+scripts/phase_probes/train_probe_schemas.py
+
+--- Tests ---
+tests/phases/__init__.py
+tests/phases/test_phase7_targeted_generation/__init__.py
+tests/phases/test_phase7_targeted_generation/test_phase7_optimizations.py
+tests/phases/test_phase8a_rendering/__init__.py
+tests/phases/test_phase8a_rendering/test_phase8a_validation.py
+tests/phases/test_phase8c_interface/__init__.py
+tests/phases/test_phase8c_interface/test_contract_validation.py
+tests/phases/test_phase8d_formal_analysis/__init__.py
+tests/phases/test_phase8d_formal_analysis/test_contract_validation.py
+tests/phases/test_llm_interface/__init__.py
+tests/phases/test_llm_interface/test_contract_validation.py
+tests/core_phases/test_phase1b_validation_v3_1.py
+tests/core_phases/test_phase2_modifiers_v1.py
+tests/core_phases/test_phase3_rule_engine_v3_0.py
+tests/core_phases/test_phase4_transform_v4_0.py
+tests/core_phases/test_phase5_synthesis_v5_0.py
+tests/core_phases/test_phase7_structural_folding_v7_0.py
+tests/core_phases/test_verbalization_contract_renderer_v1_0.py

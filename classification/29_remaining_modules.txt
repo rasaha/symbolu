@@ -1,0 +1,105 @@
+================================================================================
+FEATURE: Remaining Modules & Shared Infrastructure
+================================================================================
+Miscellaneous modules that serve supporting roles: orchestration layer,
+DHA standalone, posture system, PPV contracts, dynamics, adapter,
+phases (7/8a), renderer entry, diagnostics, monitors, and common.
+================================================================================
+
+--- Orchestration ---
+symbolu/orchestration/__init__.py
+symbolu/orchestration/conversation.py          # Conversation orchestration
+symbolu/orchestration/llm_renderer.py          # LLM-based rendering
+symbolu/orchestration/pipeline_router.py       # Pipeline routing
+symbolu/orchestration/semantic_layer.py        # Semantic layer
+tests/orchestration/__init__.py
+tests/orchestration/test_conversation.py
+tests/orchestration/test_llm_renderer.py
+tests/orchestration/test_pipeline_router.py
+tests/orchestration/test_semantic_layer.py
+
+--- DHA Standalone ---
+symbolu/dha/__init__.py
+symbolu/dha/config.py
+symbolu/dha/engine.py
+symbolu/dha/integration.py
+symbolu/dha/math.py
+symbolu/dha/signal_extraction.py
+symbolu/dha/types.py
+symbolu/dha/examples/worked_example.py
+tests/dha/__init__.py
+tests/dha/test_dha_config.py
+tests/dha/test_dha_engine.py
+tests/dha/test_dha_integration.py
+tests/dha/test_dha_math.py
+
+--- Posture ---
+symbolu/posture/__init__.py
+symbolu/posture/_guna_mapping.py
+symbolu/posture/audit.py
+symbolu/posture/config.py
+symbolu/posture/modulation.py
+symbolu/posture/types.py
+tests/unit/posture/test_posture.py
+
+--- PPV (Contract Builder) ---
+symbolu/ppv/__init__.py
+symbolu/ppv/ppv_builder_v1.py
+symbolu/ppv/ppv_contract_v1.py
+tests/test_ppv_modules.py
+tests/phase11/__init__.py
+tests/phase11/test_p11b_controller.py
+tests/phase11/test_ppv_integration_v1.py
+
+--- Dynamics ---
+symbolu/dynamics/__init__.py
+symbolu/dynamics/phase5/__init__.py
+symbolu/dynamics/phase5/errors.py
+symbolu/dynamics/phase5/models.py
+symbolu/dynamics/phase5/phase5_dynamics_engine.py
+tests/dynamics/__init__.py
+tests/dynamics/test_phase5_dynamics.py
+
+--- Phases (Targeted Generation & Rendering) ---
+symbolu/phases/__init__.py
+symbolu/phases/phase7_targeted_generation/__init__.py
+symbolu/phases/phase7_targeted_generation/completeness.py
+symbolu/phases/phase7_targeted_generation/constraints.py
+symbolu/phases/phase7_targeted_generation/errors.py
+symbolu/phases/phase7_targeted_generation/executor.py
+symbolu/phases/phase7_targeted_generation/generator.py
+symbolu/phases/phase7_targeted_generation/scorer.py
+symbolu/phases/phase7_targeted_generation/selector.py
+symbolu/phases/phase7_targeted_generation/types.py
+symbolu/phases/phase8a_rendering/__init__.py
+symbolu/phases/phase8a_rendering/renderer.py
+symbolu/phases/phase8a_rendering/symbolic_renderer.py
+symbolu/phases/phase8a_rendering/types.py
+
+--- Renderer Entry ---
+symbolu/renderer/__init__.py
+symbolu/renderer/render_entry.py
+tests/unit/renderer/__init__.py
+tests/unit/renderer/snapshot_utils.py
+tests/unit/renderer/test_llm_renderer.py
+tests/unit/renderer/test_llm_renderer_snapshots.py
+tests/unit/renderer/test_rule_based_renderer.py
+tests/unit/renderer/test_rule_based_renderer_snapshots.py
+
+--- Adapter ---
+symbolu/adapter/__init__.py
+symbolu/adapter/dilchat_adapter.py
+tests/unit/adapter/__init__.py
+tests/unit/adapter/test_dilchat_adapter.py
+
+--- Diagnostics ---
+symbolu/diagnostics/__init__.py
+symbolu/diagnostics/rip_logger.py
+
+--- Monitors ---
+symbolu/monitors/__init__.py
+symbolu/monitors/graduation_monitor.py
+
+--- Common ---
+symbolu/common/__init__.py
+symbolu/common/projectors.py
