@@ -114,6 +114,12 @@ from symbolu.ontological.goal_dirnet import (
     print_goal_dirnet_report,
     GoalDirEvalResult,
 )
+from symbolu.ontological.contrastive_token_ranking import (
+    CTRConfig,
+    run_ctr_pipeline,
+    print_ctr_report,
+    CTREvalResult,
+)
 
 
 # =========================================================================
@@ -1214,6 +1220,19 @@ def build_parser() -> argparse.ArgumentParser:
             "--train-goal-samples 5000 --eval-goal-samples 1000",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --train-goal-dirnet --alpha-sweep 0.05 0.1 0.2",
+            "",
+            "CTR (Contrastive Token Ranking) examples:",
+            "  # Fast kNN-Dir falsification (nonparametric)",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run --ctr-knn",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --ctr-knn --ctr-direction delta "
+            "--train-goal-samples 10000 --eval-goal-samples 2000",
+            "  # Learned contrastive (InfoNCE)",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --train-goal-contrastive --ctr-direction delta",
+            "  # Both kNN and learned",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --ctr-knn --train-goal-contrastive",
         ]),
     )
 
@@ -1363,6 +1382,42 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Contrastive Token Ranking (CTR) flags ---
+    parser.add_argument(
+        "--ctr-knn", action="store_true",
+        help=(
+            "Run kNN-Dir nonparametric CTR baseline. "
+            "Fast falsification: if kNN fails, no learned model will help."
+        ),
+    )
+    parser.add_argument(
+        "--train-goal-contrastive", action="store_true",
+        help=(
+            "Train ContrastiveGoalNet with InfoNCE loss. "
+            "Discriminative alternative to direction regression."
+        ),
+    )
+    parser.add_argument(
+        "--ctr-direction", type=str, default="delta",
+        choices=["delta", "htp1"],
+        help=(
+            "Direction mode for CTR: delta = normalize(h_{t+1} - h_t), "
+            "htp1 = normalize(h_{t+1}). Default: delta"
+        ),
+    )
+    parser.add_argument(
+        "--ctr-knn-k", type=int, default=32,
+        help="Number of kNN neighbours for CTR (default: 32)",
+    )
+    parser.add_argument(
+        "--ctr-tau", type=float, default=0.07,
+        help="InfoNCE temperature for contrastive training (default: 0.07)",
+    )
+    parser.add_argument(
+        "--ctr-epochs", type=int, default=5,
+        help="ContrastiveGoalNet training epochs (default: 5)",
+    )
+
     return parser
 
 
@@ -1466,6 +1521,33 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"train={goal_config.train_samples}, "
               f"eval={goal_config.eval_samples}")
 
+    # --- CTR config ---
+    ctr_config = None
+    run_ctr = args.ctr_knn or args.train_goal_contrastive
+    if run_ctr:
+        ctr_train = args.train_goal_samples
+        ctr_eval = args.eval_goal_samples
+        if args.dry_run:
+            ctr_train = min(ctr_train, 500)
+            ctr_eval = min(ctr_eval, 100)
+        ctr_config = CTRConfig(
+            direction_mode=args.ctr_direction,
+            knn_k=args.ctr_knn_k,
+            top_m=top_m,
+            tau=args.ctr_tau,
+            hidden_dim=args.goal_hidden_dim,
+            lr=args.goal_lr,
+            epochs=args.ctr_epochs,
+            train_samples=ctr_train,
+            eval_samples=ctr_eval,
+            alpha_values=args.alpha_sweep or [0.01, 0.02, 0.05],
+        )
+        print(f"  CTR: direction={ctr_config.direction_mode}, "
+              f"knn_k={ctr_config.knn_k}, "
+              f"knn={args.ctr_knn}, learned={args.train_goal_contrastive}, "
+              f"train={ctr_config.train_samples}, "
+              f"eval={ctr_config.eval_samples}")
+
     # --- Determine modes to run ---
     if args.mode == "all":
         modes = ["wikitext", "humaneval", "instruction", "retrieval"]
@@ -1500,9 +1582,14 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         )
         all_results.extend(mode_results)
 
-        # Collect datasets for GoalDirNet if requested
-        if args.train_goal_dirnet:
-            goal_n = goal_config.train_samples + goal_config.eval_samples
+        # Collect datasets for GoalDirNet / CTR if requested
+        if args.train_goal_dirnet or run_ctr:
+            if goal_config is not None:
+                goal_n = goal_config.train_samples + goal_config.eval_samples
+            elif ctr_config is not None:
+                goal_n = ctr_config.train_samples + ctr_config.eval_samples
+            else:
+                goal_n = 10000
             if mode == "wikitext":
                 # Use first goal strategy for GoalDirNet data
                 strategy = args.goal_strategy[0]
@@ -1610,6 +1697,30 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         # Print report
         if goal_eval_results:
             print_goal_dirnet_report(goal_eval_results, alpha_sweep_results)
+
+    # --- CTR: Contrastive Token Ranking ---
+    if run_ctr and goal_datasets:
+        print(f"\n{'='*70}")
+        print("Contrastive Token Ranking (CTR)")
+        print(f"{'='*70}")
+
+        t2 = time.time()
+        ctr_results = run_ctr_pipeline(
+            model=model,
+            tokenizer=tokenizer,
+            datasets=goal_datasets,
+            config=ctr_config,
+            device=effective_device,
+            run_knn=args.ctr_knn,
+            run_learned=args.train_goal_contrastive,
+            run_nonparametric=True,
+        )
+
+        ctr_elapsed = time.time() - t2
+        print(f"\nCTR time: {ctr_elapsed:.1f}s")
+
+        if ctr_results:
+            print_ctr_report(ctr_results)
 
     # --- Save if requested ---
     if args.output:
