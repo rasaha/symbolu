@@ -120,6 +120,13 @@ from symbolu.ontological.contrastive_token_ranking import (
     print_ctr_report,
     CTREvalResult,
 )
+from symbolu.ontological.bilinear_bcvf import (
+    BilinearConfig,
+    BilinearScorer,
+    run_bilinear_pipeline,
+    print_bilinear_report,
+    BilinearEvalResult,
+)
 
 
 # =========================================================================
@@ -559,6 +566,13 @@ def _compute_goal_embeddings(
     elif strategy == "random":
         torch.manual_seed(12345)
         return torch.randn(
+            T, D, device=hidden_states.device, dtype=hidden_states.dtype
+        )
+
+    elif strategy == "bilinear":
+        # Bilinear strategy doesn't use goal embeddings — return zeros
+        # as a placeholder (decoder bypasses goal when bilinear is set).
+        return torch.zeros(
             T, D, device=hidden_states.device, dtype=hidden_states.dtype
         )
 
@@ -1233,6 +1247,18 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Both kNN and learned",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model phi3 --ctr-knn --train-goal-contrastive",
+            "",
+            "Bilinear BCVF examples:",
+            "  # Dry-run bilinear training + eval",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--train-bilinear",
+            "  # WikiText with bilinear scorer",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --train-bilinear --bilinear-train-samples 10000 "
+            "--samples 5000",
+            "  # HumanEval gate check",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --samples 1640 --train-bilinear",
         ]),
     )
 
@@ -1277,10 +1303,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--goal-strategy", type=str, nargs="+",
         default=["lookahead", "prompt_mean", "random"],
-        choices=["lookahead", "prompt_mean", "random"],
+        choices=["lookahead", "prompt_mean", "random", "bilinear"],
         help=(
             "Goal embedding strategies for wikitext mode "
-            "(default: all three)"
+            "(default: lookahead prompt_mean random). "
+            "Use 'bilinear' with --train-bilinear for learned scorer."
         ),
     )
 
@@ -1418,6 +1445,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="ContrastiveGoalNet training epochs (default: 5)",
     )
 
+    # --- Bilinear BCVF flags ---
+    parser.add_argument(
+        "--train-bilinear", action="store_true",
+        help=(
+            "Train BilinearScorer (low-rank bilinear metric learning) "
+            "then evaluate as BCVF backward score replacement."
+        ),
+    )
+    parser.add_argument(
+        "--bilinear-rank", type=int, default=64,
+        help="Low-rank dimension for bilinear projections U, V (default: 64)",
+    )
+    parser.add_argument(
+        "--bilinear-train-samples", type=int, default=10000,
+        help="Number of training positions for BilinearScorer (default: 10000)",
+    )
+    parser.add_argument(
+        "--bilinear-eval-samples", type=int, default=5000,
+        help="Number of eval positions for BilinearScorer (default: 5000)",
+    )
+    parser.add_argument(
+        "--bilinear-use-sigmoid", action="store_true", default=True,
+        help="Apply sigmoid to bilinear scores (default: True)",
+    )
+    parser.add_argument(
+        "--bilinear-no-sigmoid", action="store_true", default=False,
+        help="Disable sigmoid on bilinear scores (use raw scores).",
+    )
+    parser.add_argument(
+        "--bilinear-epochs", type=int, default=3,
+        help="BilinearScorer training epochs (default: 3)",
+    )
+    parser.add_argument(
+        "--bilinear-lr", type=float, default=1e-3,
+        help="BilinearScorer learning rate (default: 1e-3)",
+    )
+
     return parser
 
 
@@ -1548,6 +1612,31 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"train={ctr_config.train_samples}, "
               f"eval={ctr_config.eval_samples}")
 
+    # --- Bilinear BCVF config ---
+    bilinear_config = None
+    if args.train_bilinear:
+        bl_train = args.bilinear_train_samples
+        bl_eval = args.bilinear_eval_samples
+        if args.dry_run:
+            bl_train = min(bl_train, 500)
+            bl_eval = min(bl_eval, 100)
+        use_sigmoid = args.bilinear_use_sigmoid and not args.bilinear_no_sigmoid
+        bilinear_config = BilinearConfig(
+            rank=args.bilinear_rank,
+            use_sigmoid=use_sigmoid,
+            top_m=top_m,
+            lr=args.bilinear_lr,
+            epochs=args.bilinear_epochs,
+            train_samples=bl_train,
+            eval_samples=bl_eval,
+            alpha_values=args.alpha_sweep or [0.01, 0.02, 0.05, 0.1],
+        )
+        print(f"  Bilinear: rank={bilinear_config.rank}, "
+              f"sigmoid={use_sigmoid}, "
+              f"train={bilinear_config.train_samples}, "
+              f"eval={bilinear_config.eval_samples}, "
+              f"epochs={bilinear_config.epochs}")
+
     # --- Determine modes to run ---
     if args.mode == "all":
         modes = ["wikitext", "humaneval", "instruction", "retrieval"]
@@ -1582,12 +1671,14 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         )
         all_results.extend(mode_results)
 
-        # Collect datasets for GoalDirNet / CTR if requested
-        if args.train_goal_dirnet or run_ctr:
+        # Collect datasets for GoalDirNet / CTR / Bilinear if requested
+        if args.train_goal_dirnet or run_ctr or args.train_bilinear:
             if goal_config is not None:
                 goal_n = goal_config.train_samples + goal_config.eval_samples
             elif ctr_config is not None:
                 goal_n = ctr_config.train_samples + ctr_config.eval_samples
+            elif bilinear_config is not None:
+                goal_n = bilinear_config.train_samples + bilinear_config.eval_samples
             else:
                 goal_n = 10000
             if mode == "wikitext":
@@ -1721,6 +1812,27 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
 
         if ctr_results:
             print_ctr_report(ctr_results)
+
+    # --- Bilinear BCVF training + evaluation ---
+    if args.train_bilinear and goal_datasets:
+        print(f"\n{'='*70}")
+        print("Bilinear BCVF (Low-Rank Metric Learning)")
+        print(f"{'='*70}")
+
+        t3 = time.time()
+        bilinear_results, bilinear_loss_curves = run_bilinear_pipeline(
+            model=model,
+            tokenizer=tokenizer,
+            datasets=goal_datasets,
+            config=bilinear_config,
+            device=effective_device,
+        )
+
+        bilinear_elapsed = time.time() - t3
+        print(f"\nBilinear time: {bilinear_elapsed:.1f}s")
+
+        if bilinear_results:
+            print_bilinear_report(bilinear_results, bilinear_loss_curves)
 
     # --- Save if requested ---
     if args.output:
