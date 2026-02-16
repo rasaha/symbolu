@@ -597,8 +597,6 @@ def collect_dataset(
 
     This avoids re-running the model for every ablation config.
     """
-    vocab_emb = model.get_input_embeddings().weight.detach()
-
     dataset: List[Dict[str, Any]] = []
 
     for text_idx, text in enumerate(texts):
@@ -620,6 +618,23 @@ def collect_dataset(
 
         T = tokens.shape[1]
         ground_truth = tokens[0, 1:]  # [T-1]
+
+        # First-passage diagnostic: check model predictions vs ground truth
+        if text_idx == 0 and len(dataset) == 0:
+            n_match_standard = 0  # logits[t] predicts tokens[t+1]
+            n_match_shifted = 0   # logits[t] predicts tokens[t]
+            for t in range(min(T - 1, 50)):
+                pred = torch.argmax(logits_all[0, t, :]).item()
+                if pred == tokens[0, t + 1].item():
+                    n_match_standard += 1
+                if pred == tokens[0, t].item():
+                    n_match_shifted += 1
+            n_check = min(T - 1, 50)
+            print(f"  Alignment check (first {n_check} pos): "
+                  f"standard={n_match_standard}/{n_check} "
+                  f"({n_match_standard/n_check:.0%}), "
+                  f"shifted={n_match_shifted}/{n_check} "
+                  f"({n_match_shifted/n_check:.0%})")
 
         goals = compute_goal_embeddings(
             hidden_all, strategy, prompt_length=T // 4,
@@ -704,8 +719,51 @@ def run_ablation_real(
         print("  WARNING: no data collected, skipping ablation")
         return AblationStrategyResult(strategy=strategy, experiment_results=[])
 
-    # Run through ExperimentRunner
-    runner = ExperimentRunner(base_config=base_config, device=device)
+    # Sanity check: verify baseline argmax accuracy directly
+    n_correct = sum(
+        1 for s in dataset
+        if torch.argmax(s["logits"], dim=-1).item() == s["ground_truth"]
+    )
+    n_total = len(dataset)
+    print(f"  Sanity check: direct argmax accuracy = "
+          f"{n_correct}/{n_total} ({n_correct / n_total:.1%})")
+    if n_correct == 0:
+        print("  WARNING: model never predicts the next token correctly!")
+        # Detailed diagnostics to find the root cause
+        print("  --- Diagnostic dump (first 5 positions) ---")
+        for i, s in enumerate(dataset[:5]):
+            logits_t = s["logits"]  # [1, V]
+            gt = s["ground_truth"]
+            pred = torch.argmax(logits_t, dim=-1).item()
+            gt_logit = logits_t[0, gt].item()
+            pred_logit = logits_t[0, pred].item()
+            top5 = torch.topk(logits_t[0], 5)
+            has_nan = bool(torch.isnan(logits_t).any())
+            has_inf = bool(torch.isinf(logits_t).any())
+            print(f"    pos {i}: pred={pred} (logit={pred_logit:.2f}), "
+                  f"gt={gt} (logit={gt_logit:.2f}), "
+                  f"top5={top5.indices.tolist()}, "
+                  f"nan={has_nan}, inf={has_inf}")
+        # Check if argmax matches CURRENT token (off-by-one)
+        # Reconstruct by checking if pred[t] == ground_truth[t-1]
+        preds = [torch.argmax(s["logits"], dim=-1).item() for s in dataset]
+        gts = [s["ground_truth"] for s in dataset]
+        off_by_one = sum(1 for i in range(1, len(preds))
+                         if preds[i] == gts[i - 1])
+        print(f"  Off-by-one check: pred[t] == gt[t-1] for "
+              f"{off_by_one}/{len(preds)-1} positions "
+              f"({off_by_one / max(1, len(preds)-1):.1%})")
+        if off_by_one > n_total * 0.3:
+            print("  >>> LIKELY OFF-BY-ONE ERROR: model predicts current "
+                  "token, not next token.")
+            print("  >>> Check tokenizer BOS/shifting or model architecture.")
+
+    # Run through ExperimentRunner — pass model so it uses real vocab embeddings
+    # (without the model, ExperimentRunner falls back to random vocab_emb,
+    # which makes all BCVF scores meaningless)
+    runner = ExperimentRunner(
+        model=model, base_config=base_config, device=device,
+    )
     results = runner.run_ablation(dataset, matrix=ABLATION_MATRIX)
 
     elapsed = time.time() - t0
@@ -1049,6 +1107,13 @@ def create_dry_run_model(
         eos_token_id=1,
     )
     model = GPT2LMHeadModel(config)
+    # Break weight tying: GPT-2 shares input/output embeddings by default,
+    # causing a random-weight model to predict the identity (current token).
+    # Give lm_head independent random weights so predictions are truly random.
+    with torch.no_grad():
+        model.lm_head.weight = torch.nn.Parameter(
+            torch.randn_like(model.lm_head.weight)
+        )
     model.to(device)
     model.eval()
 
