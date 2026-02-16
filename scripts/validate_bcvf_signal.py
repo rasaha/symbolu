@@ -71,12 +71,14 @@ import torch
 import torch.nn.functional as F
 
 # ---------------------------------------------------------------------------
-# Patch DynamicCache.from_legacy_cache if missing (transformers <4.38)
-# Without this, phi-3.5 and similar models crash or produce garbage with
-# use_cache=False workarounds.
+# Patch DynamicCache for older transformers (<4.38) that lack methods
+# required by phi-3.5 and similar models loaded via trust_remote_code.
 # ---------------------------------------------------------------------------
 try:
     from transformers import DynamicCache
+
+    _patched = []
+
     if not hasattr(DynamicCache, "from_legacy_cache"):
         @classmethod  # type: ignore[misc]
         def _from_legacy_cache(cls, past_key_values=None):
@@ -88,7 +90,30 @@ try:
                     cache.update(key_states, value_states, layer_idx)
             return cache
         DynamicCache.from_legacy_cache = _from_legacy_cache  # type: ignore[attr-defined]
-        print("  Patched DynamicCache.from_legacy_cache (transformers compat)")
+        _patched.append("from_legacy_cache")
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+        def _get_usable_length(self, new_seq_length: int = 0, layer_idx: int = 0) -> int:
+            """Return current cache length (equivalent to get_seq_length for non-sliding-window)."""
+            if hasattr(self, "get_seq_length"):
+                return self.get_seq_length(layer_idx)
+            # Fallback: empty cache
+            if hasattr(self, "key_cache") and layer_idx < len(self.key_cache):
+                return self.key_cache[layer_idx].shape[-2]
+            return 0
+        DynamicCache.get_usable_length = _get_usable_length  # type: ignore[attr-defined]
+        _patched.append("get_usable_length")
+
+    if not hasattr(DynamicCache, "get_max_length"):
+        def _get_max_length(self) -> None:
+            """No max length constraint for DynamicCache."""
+            return None
+        DynamicCache.get_max_length = _get_max_length  # type: ignore[attr-defined]
+        _patched.append("get_max_length")
+
+    if _patched:
+        print(f"  Patched DynamicCache: {', '.join(_patched)} (transformers compat)")
+
 except (ImportError, Exception):
     pass  # transformers not installed yet or DynamicCache not available
 
@@ -213,12 +238,17 @@ def load_hf_model(
               f"(weights not loaded)! First: {meta_params[0]}")
 
     # --- Smoke test: verify model produces diverse, contextual predictions ---
-    _smoke_test_model(model, tokenizer, device)
+    if not _smoke_test_model(model, tokenizer, device):
+        print("  >>> Model forward pass produces degenerate predictions.")
+        print("  >>> This usually means the custom model code is incompatible "
+              "with the installed transformers version.")
+        print("  >>> Consider using a base model (e.g., --model phi2) or "
+              "upgrading transformers.")
 
     return model, tokenizer
 
 
-def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> None:
+def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> bool:
     """
     Quick sanity check that the model forward pass produces meaningful logits.
 
@@ -226,9 +256,7 @@ def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> None:
       1. Predictions vary across positions (not stuck on one token)
       2. Predictions vary across different input texts (context-dependent)
 
-    If the smoke test fails, the model is likely broken (incompatible
-    custom code, corrupted weights, or dtype issues) and the evaluation
-    results will be meaningless.
+    Returns True if the model passes the smoke test.
     """
     test_texts = [
         "The quick brown fox jumps over the lazy",
@@ -256,10 +284,7 @@ def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> None:
                 tok_str = str(top_pred)
             print(f"  SMOKE TEST FAIL: sequence {i} has {unique_ratio:.0%} "
                   f"unique predictions (dominated by {tok_str})")
-            print(f"  >>> Model forward pass is likely broken.")
-            print(f"  >>> This often happens with instruction-tuned models + "
-                  f"incompatible transformers version.")
-            return
+            return False
 
     # Check 2: last-token predictions differ across texts
     last_preds = [preds[-1] for preds in all_preds]
@@ -279,6 +304,7 @@ def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> None:
                 decoded.append(str(p))
         print(f"  Smoke test OK: predictions vary across contexts "
               f"({', '.join(decoded)})")
+    return True
 
 
 # =========================================================================
