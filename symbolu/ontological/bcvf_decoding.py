@@ -111,15 +111,17 @@ if PYTORCH_AVAILABLE:
         Computes forward / backward BCVF scores and the consistency
         Lagrangian over a batch of token candidates.
 
-        All operations are pure tensor math — no learnable parameters.
+        All operations are pure tensor math — no learnable parameters
+        (unless a bilinear_scorer is provided for the backward score).
         """
 
-        def __init__(self, config: DecodingConfig):
+        def __init__(self, config: DecodingConfig, bilinear_scorer=None):
             super().__init__()
             self.lambda_f = config.lambda_f
             self.lambda_b = config.lambda_b
             self.lambda_c = config.lambda_c
             self.beta = config.beta
+            self.bilinear_scorer = bilinear_scorer
 
         # ------------------------------------------------------------------
         def forward_score(
@@ -158,6 +160,26 @@ if PYTORCH_AVAILABLE:
                 candidates, goal.unsqueeze(1), dim=-1
             )  # [B, M]
             return torch.sigmoid(sim * 5.0)
+
+        # ------------------------------------------------------------------
+        def backward_score_bilinear(
+            self, hidden: torch.Tensor, candidates: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Bilinear backward score using learned scorer.
+
+            Replaces cosine goal-alignment with learned bilinear scoring.
+            Only called when ``self.bilinear_scorer`` is not None.
+
+            Args:
+                hidden: [B, D] hidden state.
+                candidates: [B, M, D] candidate embeddings.
+
+            Returns:
+                sb: [B, M] scores in [0, 1] (clamped).
+            """
+            sb = self.bilinear_scorer(hidden, candidates)  # [B, M]
+            return sb.clamp(0.0, 1.0)
 
         # ------------------------------------------------------------------
         def lagrangian(
@@ -281,12 +303,25 @@ if PYTORCH_AVAILABLE:
         Wraps BCVFScoringModule + CalibrationLayer and exposes a single
         ``decode_step`` method that performs one token prediction with
         optional reranking, logit modulation, and calibration.
+
+        When ``bilinear_scorer`` is provided and ``goal_strategy`` is
+        ``"bilinear"``, the backward score (sb) is computed via learned
+        bilinear scoring instead of cosine similarity with a goal
+        embedding.  This bypasses goal embedding entirely.
         """
 
-        def __init__(self, config: Optional[DecodingConfig] = None):
+        def __init__(
+            self,
+            config: Optional[DecodingConfig] = None,
+            bilinear_scorer=None,
+            goal_strategy: str = "default",
+        ):
             super().__init__()
             self.config = config or DecodingConfig()
-            self.scorer = BCVFScoringModule(self.config)
+            self.goal_strategy = goal_strategy
+            self.scorer = BCVFScoringModule(
+                self.config, bilinear_scorer=bilinear_scorer
+            )
             self.calibrator = CalibrationLayer(self.config)
 
         # ------------------------------------------------------------------
@@ -328,7 +363,31 @@ if PYTORCH_AVAILABLE:
             # ---- Stage 3: BCVF scores -----------------------------------
             candidates = vocab_embeddings[topM_indices]  # [B, M, D]
             sf = self.scorer.forward_score(hidden_state, candidates)
-            sb = self.scorer.backward_score(candidates, goal_embedding)
+
+            # Backward score: bilinear or cosine
+            use_bilinear = (
+                self.goal_strategy == "bilinear"
+                and self.scorer.bilinear_scorer is not None
+            )
+            if use_bilinear:
+                sb = self.scorer.backward_score_bilinear(
+                    hidden_state, candidates
+                )
+                # Log bilinear-specific diagnostics
+                log_data["goal_strategy"] = "bilinear"
+                log_data["sb_mean"] = sb.mean().item()
+                log_data["sb_std"] = sb.std().item()
+                sb_sorted, _ = sb.sort(dim=-1, descending=True)
+                log_data["sb_top1"] = sb_sorted[:, 0].mean().item()
+                if sb_sorted.shape[1] > 1:
+                    log_data["sb_gap"] = (
+                        sb_sorted[:, 0] - sb_sorted[:, 1]
+                    ).mean().item()
+                else:
+                    log_data["sb_gap"] = 0.0
+            else:
+                sb = self.scorer.backward_score(candidates, goal_embedding)
+
             L = self.scorer.lagrangian(sf, sb)
 
             log_data["sf"] = sf
