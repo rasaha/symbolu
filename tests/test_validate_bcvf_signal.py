@@ -23,14 +23,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 torch = pytest.importorskip("torch")
 
 from scripts.validate_bcvf_signal import (
+    ABLATION_MATRIX,
+    AblationStrategyResult,
     FullValidationReport,
     SignalValidationResult,
+    build_parser,
     compute_goal_embeddings,
     determine_overall_verdict,
+    format_ablation_report,
     format_report,
     resolve_model_name,
-    build_parser,
 )
+from symbolu.ontological.bcvf_experiments import ExperimentResult
 
 
 # ===========================================================================
@@ -277,6 +281,14 @@ class TestCLIParsing:
         assert args.beta == 0.2
         assert args.strategies == ["lookahead", "prompt_mean", "random"]
         assert args.device == "auto"
+        assert args.ablation is False
+        assert args.dry_run is False
+
+    def test_ablation_flag(self):
+        parser = build_parser()
+        args = parser.parse_args(["--ablation", "--dry-run"])
+        assert args.ablation is True
+        assert args.dry_run is True
 
     def test_custom_model(self):
         parser = build_parser()
@@ -328,3 +340,143 @@ class TestSignalValidationResult:
         )
         assert r.verdict == "sb WINS"
         assert r.sb_correctness_rho > r.base_logit_correctness_rho
+
+
+# ===========================================================================
+# Ablation Matrix
+# ===========================================================================
+
+
+class TestAblationMatrix:
+    def test_matrix_has_four_configs(self):
+        """The ablation matrix should have exactly 4 configs."""
+        assert len(ABLATION_MATRIX) == 4
+
+    def test_baseline_is_first(self):
+        """First config should be vanilla baseline (all False)."""
+        baseline = ABLATION_MATRIX[0]
+        assert baseline["use_rerank"] is False
+        assert baseline["use_logit_mod"] is False
+        assert baseline["use_calibration"] is False
+
+    def test_b_only_config(self):
+        """Second config should be calibration-only."""
+        b = ABLATION_MATRIX[1]
+        assert b["use_rerank"] is False
+        assert b["use_calibration"] is True
+        assert b["use_logit_mod"] is False
+
+    def test_c_only_config(self):
+        """Third config should be rerank-only."""
+        c = ABLATION_MATRIX[2]
+        assert c["use_rerank"] is True
+        assert c["use_calibration"] is False
+        assert c["use_logit_mod"] is False
+
+    def test_full_pipeline_config(self):
+        """Fourth config should be A+B+C."""
+        full = ABLATION_MATRIX[3]
+        assert full["use_rerank"] is True
+        assert full["use_logit_mod"] is True
+        assert full["use_calibration"] is True
+
+
+# ===========================================================================
+# Ablation Report Formatting
+# ===========================================================================
+
+
+class TestAblationReport:
+    def _make_ablation(self, strategy, sb_rho, logit_rho,
+                       baseline_ece=0.10, best_ece=0.08,
+                       delta_pass1=0.01):
+        """Helper to create an AblationStrategyResult with mock ExperimentResults."""
+        results = []
+        for flags in ABLATION_MATRIX:
+            from symbolu.ontological.bcvf_experiments import config_label
+            label = config_label(flags)
+            results.append(ExperimentResult(
+                label=label,
+                flags=flags,
+                pass_at_1=0.5 + delta_pass1 if flags.get("use_rerank") else 0.5,
+                rerank_change_pct=0.05 if flags.get("use_rerank") else 0.0,
+                rerank_net_benefit=0.02 if flags.get("use_rerank") else 0.0,
+                sb_correctness_corr=sb_rho,
+                base_logit_correctness_corr=logit_rho,
+                ece=best_ece if flags.get("use_calibration") else baseline_ece,
+                brier=0.2,
+                mean_kl_base_mod=0.5 if flags.get("use_logit_mod") else 0.0,
+                mean_entropy_delta=-0.1 if flags.get("use_logit_mod") else 0.0,
+            ))
+        return AblationStrategyResult(
+            strategy=strategy,
+            experiment_results=results,
+            baseline_pass1=0.5,
+            best_bcvf_pass1=0.5 + delta_pass1,
+            delta_pass1=delta_pass1,
+            sb_rho_at_best=sb_rho,
+            logit_rho_at_best=logit_rho,
+            baseline_ece=baseline_ece,
+            best_ece=best_ece,
+        )
+
+    def test_report_contains_all_configs(self):
+        abl = self._make_ablation("lookahead", 0.3, 0.1)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "baseline" in report
+        assert "A+B+C" in report
+        assert "SOFTMAX REVAMP" in report
+
+    def test_condition_1_detected(self):
+        """When sb_rho > logit_rho and pass@1 didn't drop, condition 1 fires."""
+        abl = self._make_ablation("lookahead", sb_rho=0.3, logit_rho=0.1,
+                                  delta_pass1=0.01)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "CONDITION 1 MET" in report
+        assert "Predictive-signal win" in report
+
+    def test_condition_2_detected(self):
+        """When ECE improves by >10%, condition 2 fires."""
+        abl = self._make_ablation("lookahead", sb_rho=0.1, logit_rho=0.1,
+                                  baseline_ece=0.20, best_ece=0.10,
+                                  delta_pass1=0.0)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "CONDITION 2 MET" in report
+        assert "Calibration win" in report
+
+    def test_neither_condition_detected(self):
+        """When neither condition is met, report says so."""
+        abl = self._make_ablation("lookahead", sb_rho=0.05, logit_rho=0.10,
+                                  baseline_ece=0.10, best_ece=0.10,
+                                  delta_pass1=-0.01)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "NEITHER CONDITION MET" in report
+
+    def test_overall_verdict_go(self):
+        """Overall verdict should be GO when lookahead shows condition 1."""
+        abl = self._make_ablation("lookahead", sb_rho=0.3, logit_rho=0.1,
+                                  delta_pass1=0.02)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "ready to be revamped" in report.lower()
+
+    def test_overall_verdict_calibration_only(self):
+        """When only calibration wins, recommend Option B."""
+        abl = self._make_ablation("lookahead", sb_rho=0.05, logit_rho=0.10,
+                                  baseline_ece=0.20, best_ece=0.08,
+                                  delta_pass1=-0.005)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "calibration layer" in report.lower() or "Option B" in report
+
+    def test_report_shows_exact_columns(self):
+        """Report should contain the exact metrics ChatGPT requested."""
+        abl = self._make_ablation("lookahead", 0.2, 0.1)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "pass@1" in report
+        assert "Rerank%" in report
+        assert "NetBen" in report
+        assert "sb_rho" in report
+        assert "logit_rho" in report
+        assert "ECE" in report
+        assert "Brier" in report
+        assert "KL" in report
+        assert "dH" in report

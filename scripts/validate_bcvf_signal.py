@@ -423,6 +423,273 @@ def evaluate_signal(
 
 
 # =========================================================================
+# Dataset Collection (run model once, reuse across ablation configs)
+# =========================================================================
+
+
+def collect_dataset(
+    model: Any,
+    tokenizer: Any,
+    texts: List[str],
+    strategy: str,
+    n_samples: int,
+    device: str = "cpu",
+    max_seq_len: int = 512,
+) -> List[Dict[str, Any]]:
+    """
+    Run the model forward once and collect per-position data into
+    ExperimentRunner-compatible dicts.
+
+    Each dict contains:
+        hidden_state: [1, D] float32 tensor
+        goal_embedding: [1, D] float32 tensor
+        logits: [1, V] float32 tensor
+        ground_truth: int token id
+
+    This avoids re-running the model for every ablation config.
+    """
+    vocab_emb = model.get_input_embeddings().weight.detach()
+
+    dataset: List[Dict[str, Any]] = []
+
+    for text_idx, text in enumerate(texts):
+        if len(dataset) >= n_samples:
+            break
+
+        tokens = tokenizer.encode(
+            text, return_tensors="pt", truncation=True,
+            max_length=max_seq_len,
+        ).to(device)
+
+        if tokens.shape[1] < 10:
+            continue
+
+        with torch.no_grad():
+            outputs = model(tokens, output_hidden_states=True)
+            logits_all = outputs.logits  # [1, T, V]
+            hidden_all = outputs.hidden_states[-1]  # [1, T, D]
+
+        T = tokens.shape[1]
+        ground_truth = tokens[0, 1:]  # [T-1]
+
+        goals = compute_goal_embeddings(
+            hidden_all, strategy, prompt_length=T // 4,
+        )
+
+        positions_to_collect = min(T - 1, n_samples - len(dataset))
+        for t in range(positions_to_collect):
+            dataset.append({
+                "hidden_state": hidden_all[:, t, :].float(),
+                "goal_embedding": goals[t].unsqueeze(0).float(),
+                "logits": logits_all[:, t, :].float(),
+                "ground_truth": int(ground_truth[t].item()),
+            })
+
+        if (text_idx + 1) % 5 == 0:
+            print(f"  [{strategy}] Collected {len(dataset)}/{n_samples} positions")
+
+    print(f"  [{strategy}] Collected {len(dataset)} positions total")
+    return dataset
+
+
+# =========================================================================
+# Ablation Matrix on Real Data
+# =========================================================================
+
+# The 4 configs that answer the softmax revamp question
+ABLATION_MATRIX = [
+    # Baseline — vanilla softmax, no BCVF
+    {"use_rerank": False, "use_logit_mod": False, "use_calibration": False},
+    # B only — calibration observation (does it improve ECE?)
+    {"use_rerank": False, "use_logit_mod": False, "use_calibration": True},
+    # C only — reranking (does it improve pass@1?)
+    {"use_rerank": True, "use_logit_mod": False, "use_calibration": False},
+    # A+B+C — full pipeline
+    {"use_rerank": True, "use_logit_mod": True, "use_calibration": True},
+]
+
+
+@dataclass
+class AblationStrategyResult:
+    """Ablation matrix results for one goal-embedding strategy."""
+
+    strategy: str
+    experiment_results: List[ExperimentResult]
+    # The key comparison
+    baseline_pass1: float = 0.0
+    best_bcvf_pass1: float = 0.0
+    delta_pass1: float = 0.0
+    # Signal
+    sb_rho_at_best: float = 0.0
+    logit_rho_at_best: float = 0.0
+    # Calibration
+    baseline_ece: float = 0.0
+    best_ece: float = 0.0
+
+
+def run_ablation_real(
+    model: Any,
+    tokenizer: Any,
+    texts: List[str],
+    strategy: str,
+    n_samples: int,
+    base_config: DecodingConfig,
+    device: str = "cpu",
+    max_seq_len: int = 512,
+) -> AblationStrategyResult:
+    """
+    Collect real hidden states, then run the 4-config ablation matrix.
+
+    Returns per-config ExperimentResults with all metrics.
+    """
+    t0 = time.time()
+    print(f"\n--- Ablation: {strategy} ---")
+    print(f"  Collecting dataset...")
+
+    dataset = collect_dataset(
+        model, tokenizer, texts, strategy,
+        n_samples, device, max_seq_len,
+    )
+
+    if not dataset:
+        print("  WARNING: no data collected, skipping ablation")
+        return AblationStrategyResult(strategy=strategy, experiment_results=[])
+
+    # Run through ExperimentRunner
+    runner = ExperimentRunner(base_config=base_config, device=device)
+    results = runner.run_ablation(dataset, matrix=ABLATION_MATRIX)
+
+    elapsed = time.time() - t0
+    print(f"  Ablation complete in {elapsed:.1f}s")
+
+    # Extract key comparisons
+    baseline = results[0]  # first config is vanilla
+    best_bcvf = max(results[1:], key=lambda r: r.pass_at_1) if len(results) > 1 else baseline
+
+    return AblationStrategyResult(
+        strategy=strategy,
+        experiment_results=results,
+        baseline_pass1=baseline.pass_at_1,
+        best_bcvf_pass1=best_bcvf.pass_at_1,
+        delta_pass1=best_bcvf.pass_at_1 - baseline.pass_at_1,
+        sb_rho_at_best=best_bcvf.sb_correctness_corr,
+        logit_rho_at_best=best_bcvf.base_logit_correctness_corr,
+        baseline_ece=baseline.ece,
+        best_ece=best_bcvf.ece,
+    )
+
+
+def format_ablation_report(
+    model_name: str,
+    model_params: str,
+    ablation_results: List[AblationStrategyResult],
+) -> str:
+    """
+    Format the ablation report with exactly the columns ChatGPT requested:
+    pass@1, rerank_change_rate, rerank_net_benefit, sb_rho, logit_rho,
+    ECE, Brier, KL(base||mod), entropy_delta.
+    """
+    lines = []
+    lines.append("=" * 100)
+    lines.append("BCVF ABLATION REPORT — SOFTMAX REVAMP DECISION")
+    lines.append("=" * 100)
+    lines.append(f"Model: {model_name} ({model_params})")
+    lines.append("")
+
+    for abl in ablation_results:
+        lines.append(f"Goal strategy: {abl.strategy}")
+        lines.append("-" * 100)
+        header = (
+            f"  {'Config':<12} {'pass@1':>7} {'Rerank%':>8} {'NetBen':>7} "
+            f"{'sb_rho':>8} {'logit_rho':>10} "
+            f"{'ECE':>7} {'Brier':>7} "
+            f"{'KL':>7} {'dH':>7}"
+        )
+        lines.append(header)
+        lines.append("  " + "-" * 96)
+
+        for r in abl.experiment_results:
+            lines.append(
+                f"  {r.label:<12} {r.pass_at_1:>7.3f} "
+                f"{r.rerank_change_pct:>7.1%} "
+                f"{r.rerank_net_benefit:>+6.1%} "
+                f"{r.sb_correctness_corr:>+8.4f} "
+                f"{r.base_logit_correctness_corr:>+10.4f} "
+                f"{r.ece:>7.4f} {r.brier:>7.4f} "
+                f"{r.mean_kl_base_mod:>7.4f} "
+                f"{r.mean_entropy_delta:>+7.4f}"
+            )
+
+        lines.append("")
+
+        # Condition check
+        lines.append(f"  Baseline pass@1:  {abl.baseline_pass1:.3f}")
+        lines.append(f"  Best BCVF pass@1: {abl.best_bcvf_pass1:.3f} "
+                     f"(delta={abl.delta_pass1:+.3f})")
+        lines.append(f"  sb_rho={abl.sb_rho_at_best:+.4f}  "
+                     f"logit_rho={abl.logit_rho_at_best:+.4f}")
+        lines.append(f"  ECE: {abl.baseline_ece:.4f} -> {abl.best_ece:.4f}")
+
+        # Condition 1: Predictive signal win
+        if (abl.sb_rho_at_best > abl.logit_rho_at_best + 0.05
+                and abl.delta_pass1 >= 0):
+            lines.append("")
+            lines.append("  >>> CONDITION 1 MET: Predictive-signal win")
+            lines.append("      sb_rho > logit_rho AND pass@1 did not drop")
+            lines.append("      Softmax augmentation is justified:")
+            lines.append("        p(t) = softmax(z_t - beta * L(t))")
+
+        # Condition 2: Calibration win
+        if abl.best_ece < abl.baseline_ece * 0.9:
+            lines.append("")
+            lines.append("  >>> CONDITION 2 MET: Calibration win")
+            lines.append(f"      ECE improved by "
+                        f"{(1 - abl.best_ece / abl.baseline_ece) * 100:.1f}%")
+            lines.append("      Option B is a product win even without accuracy gain")
+
+        # Neither
+        if (abl.sb_rho_at_best <= abl.logit_rho_at_best + 0.05
+                and abl.best_ece >= abl.baseline_ece * 0.9
+                and abl.delta_pass1 <= 0):
+            lines.append("")
+            lines.append("  >>> NEITHER CONDITION MET")
+            lines.append("      Softmax is NOT the bottleneck")
+
+        lines.append("")
+        lines.append("")
+
+    # Overall
+    lines.append("=" * 100)
+    any_c1 = any(
+        a.sb_rho_at_best > a.logit_rho_at_best + 0.05 and a.delta_pass1 >= 0
+        for a in ablation_results if a.strategy == "lookahead"
+    )
+    any_c2 = any(
+        a.best_ece < a.baseline_ece * 0.9
+        for a in ablation_results
+    )
+
+    if any_c1:
+        lines.append(
+            "VERDICT: Softmax is ready to be revamped with "
+            "p(t) = softmax(z_t - beta*L(t))"
+        )
+    elif any_c2:
+        lines.append(
+            "VERDICT: Softmax stays — but calibration layer (Option B) "
+            "is a product win. Ship it."
+        )
+    else:
+        lines.append(
+            "VERDICT: Softmax is NOT the bottleneck. "
+            "Goal embedding or the BCVF premise needs rethinking."
+        )
+    lines.append("=" * 100)
+
+    return "\n".join(lines)
+
+
+# =========================================================================
 # Report Formatting
 # =========================================================================
 
@@ -803,6 +1070,14 @@ def build_parser() -> argparse.ArgumentParser:
             "but the plumbing is proven correct."
         ),
     )
+    parser.add_argument(
+        "--ablation", action="store_true",
+        help=(
+            "Run the full ablation matrix (Baseline, B-only, C-only, "
+            "A+B+C) for each goal strategy.  This is the definitive "
+            "test that answers: is softmax ready to be revamped?"
+        ),
+    )
 
     return parser
 
@@ -884,7 +1159,95 @@ def main() -> None:
     else:
         effective_device = device
 
-    # Run strategies
+    n_params = sum(p.numel() for p in model.parameters())
+    model_params_str = f"{n_params / 1e9:.2f}B"
+
+    # ------------------------------------------------------------------
+    # Mode: --ablation (the definitive softmax revamp test)
+    # ------------------------------------------------------------------
+    if args.ablation:
+        print(f"\n{'='*60}")
+        print("ABLATION MODE: Softmax Revamp Decision")
+        print(f"  Strategies: {args.strategies}")
+        print(f"  Samples per strategy: {args.samples}")
+        print(f"  Configs: Baseline, B-only, C-only, A+B+C")
+        print(f"  top_m={bcvf_config.top_m}, beta={bcvf_config.beta}")
+        print(f"{'='*60}")
+
+        ablation_results: List[AblationStrategyResult] = []
+
+        for strategy in args.strategies:
+            abl_result = run_ablation_real(
+                model=model,
+                tokenizer=tokenizer,
+                texts=texts,
+                strategy=strategy,
+                n_samples=args.samples,
+                base_config=bcvf_config,
+                device=str(effective_device),
+                max_seq_len=args.max_seq_len,
+            )
+            ablation_results.append(abl_result)
+
+        # Print ablation report
+        abl_report = format_ablation_report(
+            model_name, model_params_str, ablation_results,
+        )
+        print("\n")
+        print(abl_report)
+
+        # Save if requested
+        if args.output:
+            output_path = Path(args.output)
+            output_data = {
+                "mode": "ablation",
+                "model_name": model_name,
+                "model_params": model_params_str,
+                "device": str(effective_device),
+                "dataset": args.dataset if not args.dry_run else "dry-run",
+                "n_samples": args.samples,
+                "bcvf_config": {
+                    "top_m": bcvf_config.top_m,
+                    "beta": bcvf_config.beta,
+                },
+                "strategies": [],
+            }
+            for abl in ablation_results:
+                strat_data = {
+                    "strategy": abl.strategy,
+                    "baseline_pass1": abl.baseline_pass1,
+                    "best_bcvf_pass1": abl.best_bcvf_pass1,
+                    "delta_pass1": abl.delta_pass1,
+                    "sb_rho_at_best": abl.sb_rho_at_best,
+                    "logit_rho_at_best": abl.logit_rho_at_best,
+                    "baseline_ece": abl.baseline_ece,
+                    "best_ece": abl.best_ece,
+                    "configs": [
+                        {
+                            "label": r.label,
+                            "pass_at_1": r.pass_at_1,
+                            "rerank_change_pct": r.rerank_change_pct,
+                            "rerank_net_benefit": r.rerank_net_benefit,
+                            "sb_correctness_corr": r.sb_correctness_corr,
+                            "base_logit_correctness_corr": r.base_logit_correctness_corr,
+                            "ece": r.ece,
+                            "brier": r.brier,
+                            "mean_kl_base_mod": r.mean_kl_base_mod,
+                            "mean_entropy_delta": r.mean_entropy_delta,
+                        }
+                        for r in abl.experiment_results
+                    ],
+                }
+                output_data["strategies"].append(strat_data)
+            with open(output_path, "w") as f:
+                json.dump(output_data, f, indent=2)
+            print(f"\nResults saved to: {output_path}")
+
+        return
+
+    # ------------------------------------------------------------------
+    # Mode: signal-only (default, the Spearman comparison)
+    # ------------------------------------------------------------------
     print(f"\n{'='*60}")
     print("Running BCVF signal validation")
     print(f"  Strategies: {args.strategies}")
@@ -913,10 +1276,9 @@ def main() -> None:
               f"verdict={result.verdict}")
 
     # Build report
-    n_params = sum(p.numel() for p in model.parameters())
     report = FullValidationReport(
         model_name=model_name,
-        model_params=f"{n_params / 1e9:.2f}B",
+        model_params=model_params_str,
         device=str(effective_device),
         dataset=args.dataset,
         n_samples=args.samples,
@@ -940,6 +1302,7 @@ def main() -> None:
     if args.output:
         output_path = Path(args.output)
         output_data = {
+            "mode": "signal",
             "model_name": report.model_name,
             "model_params": report.model_params,
             "device": report.device,
