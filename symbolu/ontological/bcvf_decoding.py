@@ -1,0 +1,455 @@
+#!/usr/bin/env python3
+"""
+BCVF Controlled Decoding Pipeline
+===================================
+
+Token-level controlled decoding using the Bidirectional Consistency
+Verification Framework (BCVF). Implements three independently togglable
+strategies on top of standard autoregressive softmax:
+
+    Option A – Logit Modulation:  Adjust the full logit distribution by
+        subtracting β·L from top-M candidate logits before softmax.
+
+    Option B – Calibration Layer:  Post-hoc confidence assessment that
+        bins predictions into HIGH / MEDIUM / LOW tiers based on
+        max-probability and margin-to-second heuristics.
+
+    Option C – Reranking:  After standard softmax, re-score the top-M
+        candidates with BCVF and pick the one with the best adjusted
+        score (base_logit − β·L).
+
+All three options are independently switchable via ``DecodingConfig``,
+enabling a full 2³ ablation matrix.
+
+Core BCVF formula (B1 – Consistency Lagrangian):
+
+    L = λf·(1 − sf)² + λb·(1 − sb)² + λc·(sf − sb)²
+
+Where:
+    sf = σ(5 · cos_sim(hidden, candidate))   (forward feasibility)
+    sb = σ(5 · cos_sim(candidate, goal))     (backward goal alignment)
+
+Usage::
+
+    from symbolu.ontological.bcvf_decoding import (
+        BCVFDecoder,
+        DecodingConfig,
+        decode_step,
+    )
+
+    config = DecodingConfig(use_rerank=True, use_calibration=True)
+    decoder = BCVFDecoder(config)
+
+    best_idx, probs, log_data = decoder.decode_step(
+        hidden_state, vocab_embeddings, goal_embedding, logits=logits
+    )
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    PYTORCH_AVAILABLE = True
+except ImportError:
+    PYTORCH_AVAILABLE = False
+
+import numpy as np
+
+
+# =========================================================================
+# Configuration
+# =========================================================================
+
+
+@dataclass
+class DecodingConfig:
+    """
+    Configuration for the BCVF controlled decoding pipeline.
+
+    Attributes:
+        top_m: Number of candidates kept after initial logit ranking.
+        lambda_f: Weight for forward-feasibility penalty.
+        lambda_b: Weight for backward-goal penalty.
+        lambda_c: Weight for forward-backward consistency penalty.
+        beta: Scaling factor applied to the Lagrangian before subtracting
+              from base logits.  Start small (0.1–0.3).
+        conf_high: Max-probability threshold for HIGH confidence tier.
+        conf_med: Max-probability threshold for MEDIUM confidence tier.
+        margin_low: Minimum margin (p1 − p2) required for HIGH confidence.
+        use_rerank: Enable Option C (BCVF reranking).
+        use_logit_mod: Enable Option A (logit modulation).
+        use_calibration: Enable Option B (calibration layer).
+    """
+
+    top_m: int = 500
+    lambda_f: float = 1.0
+    lambda_b: float = 1.0
+    lambda_c: float = 0.25
+    beta: float = 0.2
+    conf_high: float = 0.80
+    conf_med: float = 0.55
+    margin_low: float = 0.07
+    use_rerank: bool = True
+    use_logit_mod: bool = False
+    use_calibration: bool = True
+
+
+# =========================================================================
+# BCVF Scoring Components
+# =========================================================================
+
+if PYTORCH_AVAILABLE:
+
+    class BCVFScoringModule(nn.Module):
+        """
+        Computes forward / backward BCVF scores and the consistency
+        Lagrangian over a batch of token candidates.
+
+        All operations are pure tensor math — no learnable parameters.
+        """
+
+        def __init__(self, config: DecodingConfig):
+            super().__init__()
+            self.lambda_f = config.lambda_f
+            self.lambda_b = config.lambda_b
+            self.lambda_c = config.lambda_c
+            self.beta = config.beta
+
+        # ------------------------------------------------------------------
+        def forward_score(
+            self, hidden: torch.Tensor, candidates: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Cosine-similarity based forward feasibility score.
+
+            Args:
+                hidden: [B, D]
+                candidates: [B, M, D]
+
+            Returns:
+                sf: [B, M]  values in (0, 1) via sigmoid.
+            """
+            sim = F.cosine_similarity(
+                hidden.unsqueeze(1), candidates, dim=-1
+            )  # [B, M]
+            return torch.sigmoid(sim * 5.0)
+
+        # ------------------------------------------------------------------
+        def backward_score(
+            self, candidates: torch.Tensor, goal: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Cosine-similarity based backward goal-alignment score.
+
+            Args:
+                candidates: [B, M, D]
+                goal: [B, D]
+
+            Returns:
+                sb: [B, M]  values in (0, 1) via sigmoid.
+            """
+            sim = F.cosine_similarity(
+                candidates, goal.unsqueeze(1), dim=-1
+            )  # [B, M]
+            return torch.sigmoid(sim * 5.0)
+
+        # ------------------------------------------------------------------
+        def lagrangian(
+            self, sf: torch.Tensor, sb: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Consistency Lagrangian  L = λf(1−sf)² + λb(1−sb)² + λc(sf−sb)²
+
+            Args:
+                sf, sb: [B, M]
+
+            Returns:
+                L: [B, M]
+            """
+            return (
+                self.lambda_f * (1.0 - sf) ** 2
+                + self.lambda_b * (1.0 - sb) ** 2
+                + self.lambda_c * (sf - sb) ** 2
+            )
+
+        # ------------------------------------------------------------------
+        def rerank(
+            self,
+            base_logits: torch.Tensor,
+            topM_indices: torch.Tensor,
+            vocab_embeddings: torch.Tensor,
+            hidden: torch.Tensor,
+            goal: torch.Tensor,
+        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+            """
+            Re-score the top-M candidates with BCVF and return the best
+            token index together with diagnostic tensors.
+
+            Args:
+                base_logits: [B, V]  raw model logits.
+                topM_indices: [B, M] indices into vocab.
+                vocab_embeddings: [V, D] embedding matrix.
+                hidden: [B, D] last-layer hidden state.
+                goal: [B, D] goal embedding.
+
+            Returns:
+                best_idx: [B]   chosen token id.
+                sf:       [B, M]
+                sb:       [B, M]
+                L:        [B, M]
+            """
+            candidates = vocab_embeddings[topM_indices]  # [B, M, D]
+            sf = self.forward_score(hidden, candidates)
+            sb = self.backward_score(candidates, goal)
+            L = self.lagrangian(sf, sb)
+
+            # Adjusted score = base logit − β·L
+            base_scores = base_logits.gather(1, topM_indices)  # [B, M]
+            adjusted = base_scores - self.beta * L
+
+            best_rel = torch.argmax(adjusted, dim=-1)  # [B]
+            best_idx = topM_indices.gather(
+                1, best_rel.unsqueeze(-1)
+            ).squeeze(-1)  # [B]
+
+            return best_idx, sf, sb, L
+
+    # =====================================================================
+    # Calibration Layer
+    # =====================================================================
+
+    class CalibrationLayer:
+        """
+        Post-hoc confidence tier assignment.
+
+        Classifies each prediction into HIGH / MEDIUM / LOW based on
+        max probability and margin to the runner-up.
+        """
+
+        def __init__(self, config: DecodingConfig):
+            self.conf_high = config.conf_high
+            self.conf_med = config.conf_med
+            self.margin_low = config.margin_low
+
+        def __call__(
+            self, probs: torch.Tensor
+        ) -> Dict[str, torch.Tensor]:
+            """
+            Args:
+                probs: [B, V] probability distribution.
+
+            Returns:
+                dict with keys ``confidence``, ``margin``,
+                ``confidence_level`` (str list per batch element).
+            """
+            max_prob, _ = probs.max(dim=-1)  # [B]
+            sorted_probs, _ = probs.sort(dim=-1, descending=True)
+            second_prob = sorted_probs[:, 1]  # [B]
+            margin = max_prob - second_prob  # [B]
+
+            levels: list[str] = []
+            for mp, mg in zip(
+                max_prob.tolist(), margin.tolist()
+            ):
+                if mp >= self.conf_high and mg >= self.margin_low:
+                    levels.append("HIGH")
+                elif mp >= self.conf_med:
+                    levels.append("MEDIUM")
+                else:
+                    levels.append("LOW")
+
+            return {
+                "confidence": max_prob,
+                "margin": margin,
+                "confidence_level": levels,
+            }
+
+    # =====================================================================
+    # Main Decoder
+    # =====================================================================
+
+    class BCVFDecoder(nn.Module):
+        """
+        Full BCVF Controlled Decoding Pipeline.
+
+        Wraps BCVFScoringModule + CalibrationLayer and exposes a single
+        ``decode_step`` method that performs one token prediction with
+        optional reranking, logit modulation, and calibration.
+        """
+
+        def __init__(self, config: Optional[DecodingConfig] = None):
+            super().__init__()
+            self.config = config or DecodingConfig()
+            self.scorer = BCVFScoringModule(self.config)
+            self.calibrator = CalibrationLayer(self.config)
+
+        # ------------------------------------------------------------------
+        @torch.no_grad()
+        def decode_step(
+            self,
+            hidden_state: torch.Tensor,
+            vocab_embeddings: torch.Tensor,
+            goal_embedding: torch.Tensor,
+            logits: Optional[torch.Tensor] = None,
+        ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
+            """
+            Perform one controlled decoding step.
+
+            Args:
+                hidden_state: [B, D]  final hidden state from the model.
+                vocab_embeddings: [V, D]  token embedding matrix.
+                goal_embedding: [B, D]  goal / intent vector.
+                logits: [B, V]  optional pre-computed logits.
+
+            Returns:
+                best_token_index: [B]
+                probs: [B, V]
+                log_data: dict of diagnostic tensors / values.
+            """
+            cfg = self.config
+            log_data: Dict[str, Any] = {}
+
+            # ---- Stage 1: Base logits -----------------------------------
+            if logits is None:
+                logits = hidden_state @ vocab_embeddings.T  # [B, V]
+            log_data["base_logits"] = logits
+
+            # ---- Stage 2: Top-M candidate selection ---------------------
+            top_m = min(cfg.top_m, logits.shape[-1])
+            topM_scores, topM_indices = torch.topk(logits, top_m, dim=-1)
+            log_data["topM_indices"] = topM_indices
+
+            # ---- Stage 3: BCVF scores -----------------------------------
+            candidates = vocab_embeddings[topM_indices]  # [B, M, D]
+            sf = self.scorer.forward_score(hidden_state, candidates)
+            sb = self.scorer.backward_score(candidates, goal_embedding)
+            L = self.scorer.lagrangian(sf, sb)
+
+            log_data["sf"] = sf
+            log_data["sb"] = sb
+            log_data["L"] = L
+
+            # ---- Baseline sf/sb for the original top-1 (Risk A diagnostic) --
+            original_best = torch.argmax(logits, dim=-1)  # [B]
+            # Find where original_best sits in topM_indices
+            orig_in_topM = (
+                topM_indices == original_best.unsqueeze(-1)
+            )  # [B, M] bool
+            # Extract sf/sb for the baseline token
+            orig_sf = (sf * orig_in_topM.float()).sum(dim=-1)  # [B]
+            orig_sb = (sb * orig_in_topM.float()).sum(dim=-1)  # [B]
+            log_data["baseline_sf"] = orig_sf
+            log_data["baseline_sb"] = orig_sb
+
+            # ---- Option C: Reranking ------------------------------------
+            if cfg.use_rerank:
+                adjusted_scores = topM_scores - cfg.beta * L
+                best_rel = torch.argmax(adjusted_scores, dim=-1)
+                best_token_index = topM_indices.gather(
+                    1, best_rel.unsqueeze(-1)
+                ).squeeze(-1)
+
+                log_data["rerank_adjusted_scores"] = adjusted_scores
+                log_data["rerank_selected"] = best_token_index
+                log_data["rerank_changed"] = (
+                    best_token_index != original_best
+                )
+                log_data["original_top_token"] = original_best
+
+                # sf/sb delta diagnostics (Risk A: is the goal embedding
+                # actually doing work?)
+                sel_in_topM = (
+                    topM_indices == best_token_index.unsqueeze(-1)
+                )
+                sel_sf = (sf * sel_in_topM.float()).sum(dim=-1)
+                sel_sb = (sb * sel_in_topM.float()).sum(dim=-1)
+                log_data["selected_sf"] = sel_sf
+                log_data["selected_sb"] = sel_sb
+                log_data["delta_sf"] = sel_sf - orig_sf
+                log_data["delta_sb"] = sel_sb - orig_sb
+            else:
+                best_token_index = original_best
+
+            # ---- Base probs (always computed for KL reference) ----------
+            base_probs = F.softmax(logits, dim=-1)
+            log_data["base_probs"] = base_probs
+
+            # ---- Option A: Logit modulation -----------------------------
+            if cfg.use_logit_mod:
+                # Build full adjusted logit tensor (fill with -inf)
+                adjusted_logits = torch.full_like(logits, float("-inf"))
+                adjusted_logits.scatter_(
+                    1, topM_indices, topM_scores - cfg.beta * L
+                )
+                probs = F.softmax(adjusted_logits, dim=-1)
+
+                # KL divergence and entropy delta (logit mod sanity)
+                eps = 1e-10
+                kl_base_mod = (
+                    base_probs
+                    * (torch.log(base_probs + eps) - torch.log(probs + eps))
+                ).sum(dim=-1)  # [B]
+                entropy_base = -(
+                    base_probs * torch.log(base_probs + eps)
+                ).sum(dim=-1)
+                entropy_mod = -(
+                    probs * torch.log(probs + eps)
+                ).sum(dim=-1)
+                log_data["kl_base_mod"] = kl_base_mod
+                log_data["entropy_base"] = entropy_base
+                log_data["entropy_mod"] = entropy_mod
+                log_data["entropy_delta"] = entropy_mod - entropy_base
+            else:
+                probs = base_probs
+
+            log_data["probs"] = probs
+
+            # ---- Option B: Calibration ----------------------------------
+            if cfg.use_calibration:
+                cal_info = self.calibrator(probs)
+                log_data.update(cal_info)
+
+            return best_token_index, probs, log_data
+
+    # =====================================================================
+    # Convenience wrapper
+    # =====================================================================
+
+    def decode_step(
+        hidden_state: torch.Tensor,
+        vocab_embeddings: torch.Tensor,
+        goal_embedding: torch.Tensor,
+        logits: Optional[torch.Tensor] = None,
+        config: Optional[DecodingConfig] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
+        """
+        Stateless convenience wrapper around :class:`BCVFDecoder`.
+
+        Creates a temporary decoder with the given config and runs a
+        single decode step.  Prefer instantiating ``BCVFDecoder``
+        directly for repeated use.
+        """
+        decoder = BCVFDecoder(config)
+        return decoder.decode_step(
+            hidden_state, vocab_embeddings, goal_embedding, logits
+        )
+
+else:
+    # Stubs when PyTorch is not available
+    class BCVFScoringModule:  # type: ignore[no-redef]
+        pass
+
+    class CalibrationLayer:  # type: ignore[no-redef]
+        pass
+
+    class BCVFDecoder:  # type: ignore[no-redef]
+        pass
+
+    def decode_step(*args, **kwargs):  # type: ignore[no-redef]
+        raise ImportError("PyTorch is required for BCVF decoding")
