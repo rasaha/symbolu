@@ -437,6 +437,25 @@ def cmd_benchmark(args):
         print(f"{'=' * 50}")
 
         stack = build_stack(args, device)
+
+        # Pretrain base model so AdaLN-Zero gates become non-zero.
+        # Without this, gate_attn ≈ 0 and gate_ffn ≈ 0, so frozen base
+        # produces zero gradients through all gated paths.
+        x = torch.randn(batch_size, N, args.embed_dim, device=device)
+        t_emb = torch.randn(batch_size, args.embed_dim, device=device)
+        timestep = torch.randint(0, 1000, (batch_size,), device=device)
+        pretrain_target = torch.randn_like(x) * 0.1
+
+        print("  Pretraining base model (AdaLN-Zero warmup)...")
+        pretrain_opt = torch.optim.AdamW(stack.parameters(), lr=1e-3)
+        for step in range(50):
+            pretrain_opt.zero_grad()
+            out = stack(x, meta, t_emb, timestep=timestep)
+            loss = F.mse_loss(out, pretrain_target)
+            loss.backward()
+            pretrain_opt.step()
+        print(f"  Pretrain done (final loss: {loss.item():.6f})")
+
         adapter = PhaseQuadAdaptationManager(stack, adapt_config).to(device)
 
         summary = adapter.get_adaptation_summary()
