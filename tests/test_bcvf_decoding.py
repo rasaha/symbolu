@@ -34,6 +34,7 @@ from symbolu.ontological.bcvf_calibration import (
     compute_brier,
     compute_ece,
     reliability_bins,
+    spearman_rank_correlation,
 )
 from symbolu.ontological.bcvf_experiments import (
     EXPERIMENT_MATRIX,
@@ -948,3 +949,244 @@ class TestStepLoggerEnhanced:
         assert logger.rerank_improvement_rate() == pytest.approx(2 / 3)
         assert logger.rerank_worsened_rate() == pytest.approx(1 / 3)
         assert logger.rerank_net_benefit() == pytest.approx(1 / 3)
+
+
+# ===========================================================================
+# Spearman Rank Correlation (pure numpy)
+# ===========================================================================
+
+
+class TestSpearmanRankCorrelation:
+    def test_perfect_positive(self):
+        """Identical rankings should give rho = 1.0."""
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        rho = spearman_rank_correlation(x, y)
+        assert rho == pytest.approx(1.0, abs=1e-6)
+
+    def test_perfect_negative(self):
+        """Opposite rankings should give rho = -1.0."""
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([50.0, 40.0, 30.0, 20.0, 10.0])
+        rho = spearman_rank_correlation(x, y)
+        assert rho == pytest.approx(-1.0, abs=1e-6)
+
+    def test_no_correlation(self):
+        """Uncorrelated data should give rho near 0."""
+        np.random.seed(42)
+        x = np.random.randn(200)
+        y = np.random.randn(200)
+        rho = spearman_rank_correlation(x, y)
+        assert abs(rho) < 0.2
+
+    def test_with_ties(self):
+        """Should handle tied values correctly."""
+        x = np.array([1.0, 1.0, 2.0, 3.0, 3.0])
+        y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        rho = spearman_rank_correlation(x, y)
+        # Monotonically related with ties — should be positive and high
+        assert rho > 0.8
+
+    def test_constant_returns_zero(self):
+        """Constant arrays should return 0.0."""
+        x = np.array([1.0, 1.0, 1.0, 1.0])
+        y = np.array([1.0, 2.0, 3.0, 4.0])
+        rho = spearman_rank_correlation(x, y)
+        assert rho == 0.0
+
+    def test_too_short_returns_zero(self):
+        """Arrays shorter than 3 should return 0.0."""
+        x = np.array([1.0, 2.0])
+        y = np.array([3.0, 4.0])
+        assert spearman_rank_correlation(x, y) == 0.0
+
+    def test_binary_correctness(self):
+        """Works with binary correctness arrays (the actual use case)."""
+        # Higher sb should correlate with correctness
+        sbs = np.array([0.9, 0.85, 0.7, 0.3, 0.2, 0.1])
+        correct = np.array([1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
+        rho = spearman_rank_correlation(sbs, correct)
+        assert rho > 0.7  # Strong positive correlation
+
+
+# ===========================================================================
+# sb vs correctness & logit_rank vs correctness correlations
+# ===========================================================================
+
+
+class TestPredictiveSignalCorrelation:
+    def test_sb_correctness_correlation_positive(self):
+        """When high-sb predictions are correct, correlation should be positive."""
+        logger = StepLogger()
+        # High sb -> correct, low sb -> wrong
+        for i in range(20):
+            sb = 0.9 - i * 0.04  # 0.9, 0.86, 0.82, ... 0.14
+            correct = i < 10      # first 10 correct (higher sb)
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=correct,
+                sb_selected=sb,
+            ))
+        rho = logger.sb_correctness_correlation()
+        assert rho > 0.3  # Positive = sb predicts correctness
+
+    def test_sb_correctness_correlation_zero_when_random(self):
+        """When sb is unrelated to correctness, correlation should be near 0."""
+        np.random.seed(42)
+        logger = StepLogger()
+        for i in range(50):
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=bool(np.random.randint(2)),
+                sb_selected=np.random.random(),
+            ))
+        rho = logger.sb_correctness_correlation()
+        assert abs(rho) < 0.35  # Should be near zero
+
+    def test_logit_rank_correctness_correlation(self):
+        """Lower logit rank (better) should correlate with correctness."""
+        logger = StepLogger()
+        # Low rank -> correct, high rank -> wrong
+        for i in range(20):
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=i < 10,
+                logit_rank=i,  # 0..9 correct, 10..19 wrong
+            ))
+        rho = logger.logit_rank_correctness_correlation()
+        assert rho > 0.3  # Positive = lower rank predicts correctness
+
+    def test_base_logit_correctness_correlation(self):
+        """Higher base logit score should correlate with correctness."""
+        logger = StepLogger()
+        for i in range(20):
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=i < 10,
+                base_logit_score=20.0 - i,  # Higher for first 10
+            ))
+        rho = logger.base_logit_correctness_correlation()
+        assert rho > 0.3
+
+    def test_summary_includes_correlation_fields(self):
+        """Summary dict should contain the three correlation fields."""
+        logger = StepLogger()
+        for i in range(10):
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=i < 5,
+                sb_selected=0.5 + i * 0.05,
+                logit_rank=i,
+                base_logit_score=10.0 - i,
+            ))
+        summary = logger.summary()
+        assert "sb_correctness_corr" in summary
+        assert "logit_rank_correctness_corr" in summary
+        assert "base_logit_correctness_corr" in summary
+
+    def test_from_decode_log_captures_logit_rank(
+        self, hidden, vocab_emb, goal, logits
+    ):
+        """from_decode_log should extract logit_rank from log_data."""
+        cfg = DecodingConfig(use_rerank=True, use_calibration=True)
+        decoder = BCVFDecoder(cfg)
+        best, _, log_data = decoder.decode_step(hidden, vocab_emb, goal, logits)
+        pred_token = int(best[0].item())
+        record = StepLogger.from_decode_log(
+            step_index=0,
+            log_data=log_data,
+            predicted_token=pred_token,
+            ground_truth_token=0,
+        )
+        assert isinstance(record.logit_rank, int)
+        assert record.logit_rank >= 0
+        assert isinstance(record.base_logit_score, float)
+
+
+# ===========================================================================
+# Experiment-level correlation in ExperimentResult
+# ===========================================================================
+
+
+class TestExperimentCorrelation:
+    def test_experiment_result_has_correlation_fields(self):
+        """ExperimentResult should have the three correlation fields."""
+        torch.manual_seed(42)
+        samples = []
+        for i in range(30):
+            h = torch.randn(1, D)
+            v = torch.randn(200, D)
+            lo = h @ v.T
+            gt = torch.argmax(lo, dim=-1).item() if i % 2 == 0 else 0
+            samples.append({
+                "hidden_state": h,
+                "goal_embedding": torch.randn(1, D),
+                "logits": lo,
+                "ground_truth": gt,
+            })
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50, beta=0.2)
+        )
+        flags = {"use_rerank": True, "use_logit_mod": False, "use_calibration": True}
+        result = runner.run_single_experiment(flags, samples)
+        assert isinstance(result.sb_correctness_corr, float)
+        assert isinstance(result.logit_rank_correctness_corr, float)
+        assert isinstance(result.base_logit_correctness_corr, float)
+        assert -1.0 <= result.sb_correctness_corr <= 1.0
+        assert -1.0 <= result.logit_rank_correctness_corr <= 1.0
+        assert -1.0 <= result.base_logit_correctness_corr <= 1.0
+
+    def test_print_summary_includes_correlation_section(self):
+        """print_summary should include the predictive signal comparison."""
+        torch.manual_seed(42)
+        samples = []
+        for _ in range(10):
+            h = torch.randn(1, D)
+            v = torch.randn(200, D)
+            lo = h @ v.T
+            gt = torch.argmax(lo, dim=-1).item()
+            samples.append({
+                "hidden_state": h,
+                "goal_embedding": torch.randn(1, D),
+                "logits": lo,
+                "ground_truth": gt,
+            })
+        runner = ExperimentRunner(
+            base_config=DecodingConfig(top_m=50, beta=0.2)
+        )
+        results = runner.run_ablation(samples, matrix=EXPERIMENT_MATRIX[:2])
+        table = ExperimentRunner.print_summary(results)
+        assert "Predictive signal comparison" in table
+        assert "ρ(sb,corr)" in table
+        assert "ρ(logit,corr)" in table
+        assert "Verdict" in table
+
+    def test_correlation_comparison_verdicts(self):
+        """Verdicts should reflect the relative strength of correlations."""
+        # Case: sb wins
+        r1 = ExperimentResult(
+            label="test", flags={},
+            sb_correctness_corr=0.6,
+            base_logit_correctness_corr=0.1,
+        )
+        # Case: logit wins
+        r2 = ExperimentResult(
+            label="test2", flags={},
+            sb_correctness_corr=0.1,
+            base_logit_correctness_corr=0.6,
+        )
+        # Case: neither
+        r3 = ExperimentResult(
+            label="test3", flags={},
+            sb_correctness_corr=0.02,
+            base_logit_correctness_corr=0.01,
+        )
+        table = ExperimentRunner.print_summary([r1, r2, r3])
+        assert "sb WINS" in table
+        assert "logit WINS" in table
+        assert "NEITHER" in table

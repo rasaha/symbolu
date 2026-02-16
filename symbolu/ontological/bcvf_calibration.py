@@ -60,6 +60,66 @@ import numpy as np
 # =========================================================================
 
 
+def _rank_with_ties(arr: np.ndarray) -> np.ndarray:
+    """
+    Compute average ranks for array elements, handling ties.
+
+    Equivalent to scipy.stats.rankdata(arr, method='average').
+    """
+    arr = np.asarray(arr, dtype=np.float64)
+    n = len(arr)
+    order = np.argsort(arr, kind="mergesort")
+    ranks = np.empty(n, dtype=np.float64)
+    i = 0
+    while i < n:
+        j = i
+        while j < n - 1 and arr[order[j + 1]] == arr[order[j]]:
+            j += 1
+        avg_rank = 0.5 * (i + j) + 1.0  # 1-based average
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg_rank
+        i = j + 1
+    return ranks
+
+
+def spearman_rank_correlation(
+    x: np.ndarray,
+    y: np.ndarray,
+) -> float:
+    """
+    Spearman rank correlation between two arrays (pure numpy, no scipy).
+
+    Computes Pearson correlation of the rank-transformed arrays,
+    handling ties via average-rank assignment.
+
+    Args:
+        x: 1-D numeric array.
+        y: 1-D numeric array of same length.
+
+    Returns:
+        Spearman rho in [-1, 1].  Returns 0.0 if input is too
+        short (< 3) or either array is constant.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    if len(x) < 3 or len(x) != len(y):
+        return 0.0
+    if np.std(x) < 1e-8 or np.std(y) < 1e-8:
+        return 0.0
+
+    rx = _rank_with_ties(x)
+    ry = _rank_with_ties(y)
+
+    # Pearson of ranks
+    rx_centered = rx - rx.mean()
+    ry_centered = ry - ry.mean()
+    num = np.dot(rx_centered, ry_centered)
+    denom = np.sqrt(np.dot(rx_centered, rx_centered) * np.dot(ry_centered, ry_centered))
+    if denom < 1e-12:
+        return 0.0
+    return float(num / denom)
+
+
 def compute_ece(
     confidences: np.ndarray,
     correctness: np.ndarray,
@@ -176,16 +236,7 @@ def confidence_correctness_correlation(
 
     Returns 0.0 if input is too short or constant.
     """
-    from scipy import stats as _scipy_stats  # type: ignore[import-untyped]
-
-    confidences = np.asarray(confidences, dtype=np.float64)
-    correctness = np.asarray(correctness, dtype=np.float64)
-    if len(confidences) < 3:
-        return 0.0
-    if np.std(confidences) < 1e-8 or np.std(correctness) < 1e-8:
-        return 0.0
-    rho, _ = _scipy_stats.spearmanr(confidences, correctness)
-    return float(rho)
+    return spearman_rank_correlation(confidences, correctness)
 
 
 # =========================================================================

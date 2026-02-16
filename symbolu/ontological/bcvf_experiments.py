@@ -56,6 +56,7 @@ from symbolu.ontological.bcvf_calibration import (
     CalibrationTracker,
     compute_ece,
     compute_brier,
+    spearman_rank_correlation,
 )
 
 
@@ -128,6 +129,9 @@ class StepRecord:
     # Logit modulation sanity (Option A)
     kl_base_mod: float = 0.0
     entropy_delta: float = 0.0
+    # Logit rank of the predicted token (for Spearman correlation)
+    logit_rank: int = 0
+    base_logit_score: float = 0.0
 
 
 class StepLogger:
@@ -225,6 +229,21 @@ class StepLogger:
         if "entropy_delta" in log_data:
             ent_delta = _scalar(log_data["entropy_delta"])
 
+        # --- Logit rank of predicted token (for Spearman comparison) ---
+        logit_rank = 0
+        base_logit_score = 0.0
+        if PYTORCH_AVAILABLE and "base_logits" in log_data:
+            import torch as _torch
+
+            base_logits = log_data["base_logits"]
+            sorted_indices = _torch.argsort(base_logits[0], descending=True)
+            rank_match = (sorted_indices == predicted_token).nonzero(
+                as_tuple=True
+            )
+            if len(rank_match[0]) > 0:
+                logit_rank = int(rank_match[0][0].item())
+            base_logit_score = float(base_logits[0, predicted_token].item())
+
         correct = None
         if ground_truth_token is not None:
             correct = predicted_token == ground_truth_token
@@ -249,6 +268,8 @@ class StepLogger:
             confidence_level=level,
             kl_base_mod=kl_bm,
             entropy_delta=ent_delta,
+            logit_rank=logit_rank,
+            base_logit_score=base_logit_score,
         )
 
     # ------------------------------------------------------------------
@@ -332,6 +353,63 @@ class StepLogger:
         vals = [r.entropy_delta for r in self.records if r.entropy_delta != 0.0]
         return float(np.mean(vals)) if vals else 0.0
 
+    # ------------------------------------------------------------------
+    # Spearman correlation: sb vs correctness, logit rank vs correctness
+    # ------------------------------------------------------------------
+
+    def sb_correctness_correlation(self) -> float:
+        """
+        Spearman rank correlation between sb (backward goal-alignment
+        score) and correctness.
+
+        A *positive* value means higher sb predicts correct predictions.
+        This is the critical structural test: if sb does not correlate
+        with correctness, the goal embedding is not providing useful
+        signal and BCVF cannot help.
+        """
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.0
+        sbs = np.array([r.sb_selected for r in scored])
+        corr = np.array([float(r.correct) for r in scored])
+        return spearman_rank_correlation(sbs, corr)
+
+    def logit_rank_correctness_correlation(self) -> float:
+        """
+        Spearman rank correlation between logit rank and correctness.
+
+        Uses *negative* logit rank (so higher rank = worse) to make
+        the sign comparable with sb correlation: a positive value means
+        lower logit rank (= higher base confidence) predicts correctness.
+
+        If this correlation is stronger than sb_correctness_correlation,
+        the raw model confidence is already a better predictor than the
+        goal embedding and BCVF adds no value.
+        """
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.0
+        # Negate rank so that rank-0 (best) maps to the highest value
+        neg_ranks = np.array([-r.logit_rank for r in scored], dtype=np.float64)
+        corr = np.array([float(r.correct) for r in scored])
+        return spearman_rank_correlation(neg_ranks, corr)
+
+    def base_logit_correctness_correlation(self) -> float:
+        """
+        Spearman rank correlation between raw base logit score and
+        correctness.
+
+        Alternative to logit_rank — uses the continuous logit value
+        rather than the discrete rank.  Positive = higher logit score
+        predicts correctness.
+        """
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.0
+        logits = np.array([r.base_logit_score for r in scored])
+        corr = np.array([float(r.correct) for r in scored])
+        return spearman_rank_correlation(logits, corr)
+
     def summary(self) -> Dict[str, float]:
         return {
             "n_steps": len(self.records),
@@ -346,6 +424,9 @@ class StepLogger:
             "mean_delta_sb": self.mean_delta_sb(),
             "mean_kl_base_mod": self.mean_kl_base_mod(),
             "mean_entropy_delta": self.mean_entropy_delta(),
+            "sb_correctness_corr": self.sb_correctness_correlation(),
+            "logit_rank_correctness_corr": self.logit_rank_correctness_correlation(),
+            "base_logit_correctness_corr": self.base_logit_correctness_correlation(),
         }
 
 
@@ -532,6 +613,10 @@ class ExperimentResult:
     # Conditional ECE
     ece_on_wrong_baseline: float = 0.0
     ece_on_low_margin: float = 0.0
+    # Spearman correlations: sb vs correctness, logit vs correctness
+    sb_correctness_corr: float = 0.0
+    logit_rank_correctness_corr: float = 0.0
+    base_logit_correctness_corr: float = 0.0
     # Raw
     per_sample: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -766,6 +851,9 @@ class ExperimentRunner:
             low_conf_accuracy=cal_report["tier_accuracy"].get("LOW", 0.0),
             ece_on_wrong_baseline=ece_wrong,
             ece_on_low_margin=ece_low_margin,
+            sb_correctness_corr=step_summary["sb_correctness_corr"],
+            logit_rank_correctness_corr=step_summary["logit_rank_correctness_corr"],
+            base_logit_correctness_corr=step_summary["base_logit_correctness_corr"],
             per_sample=per_sample,
         )
 
@@ -964,6 +1052,31 @@ class ExperimentRunner:
             if len(parts) > 1:
                 lines.append("  ".join(parts))
 
+        # Predictive signal comparison (the critical structural test)
+        lines.append("")
+        lines.append("Predictive signal comparison (Spearman ρ with correctness):")
+        lines.append(
+            f"  {'Config':<12} {'ρ(sb,corr)':>11} {'ρ(logit,corr)':>14} "
+            f"{'ρ(rank,corr)':>13}  {'Verdict'}"
+        )
+        for r in results:
+            sb_rho = r.sb_correctness_corr
+            logit_rho = r.base_logit_correctness_corr
+            rank_rho = r.logit_rank_correctness_corr
+            # Verdict: does sb beat logit as a predictor?
+            if sb_rho > logit_rho + 0.05:
+                verdict = "sb WINS — goal embedding adds signal"
+            elif logit_rho > sb_rho + 0.05:
+                verdict = "logit WINS — BCVF may not help"
+            elif abs(sb_rho) < 0.05 and abs(logit_rho) < 0.05:
+                verdict = "NEITHER predicts — need better embeddings"
+            else:
+                verdict = "~tied — marginal BCVF benefit"
+            lines.append(
+                f"  {r.label:<12} {sb_rho:>+11.4f} {logit_rho:>+14.4f} "
+                f"{rank_rho:>+13.4f}  {verdict}"
+            )
+
         table = "\n".join(lines)
         print(table)
         return table
@@ -992,6 +1105,9 @@ class ExperimentRunner:
                 "tier_distribution": r.tier_distribution,
                 "low_conf_pct": r.low_conf_pct,
                 "low_conf_accuracy": r.low_conf_accuracy,
+                "sb_correctness_corr": r.sb_correctness_corr,
+                "logit_rank_correctness_corr": r.logit_rank_correctness_corr,
+                "base_logit_correctness_corr": r.base_logit_correctness_corr,
             }
             data.append(d)
 
