@@ -268,7 +268,7 @@ def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> bool:
     for text in test_texts:
         tokens = tokenizer.encode(text, return_tensors="pt").to(device)
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=False)
+            outputs = model(tokens, output_hidden_states=False, use_cache=False)
             logits = outputs.logits  # [1, T, V]
         preds = torch.argmax(logits[0], dim=-1).tolist()
         all_preds.append(preds)
@@ -603,7 +603,7 @@ def evaluate_signal(
 
         # Forward pass
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits = outputs.logits  # [1, T, V]
             # Use the last hidden layer
             hidden_states = outputs.hidden_states[-1]  # [1, T, D]
@@ -734,7 +734,7 @@ def collect_dataset(
             continue
 
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits_all = outputs.logits  # [1, T, V]
             hidden_all = outputs.hidden_states[-1]  # [1, T, D]
 
