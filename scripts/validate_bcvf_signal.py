@@ -70,6 +70,28 @@ if _PROJECT_ROOT not in sys.path:
 import torch
 import torch.nn.functional as F
 
+# ---------------------------------------------------------------------------
+# Patch DynamicCache.from_legacy_cache if missing (transformers <4.38)
+# Without this, phi-3.5 and similar models crash or produce garbage with
+# use_cache=False workarounds.
+# ---------------------------------------------------------------------------
+try:
+    from transformers import DynamicCache
+    if not hasattr(DynamicCache, "from_legacy_cache"):
+        @classmethod  # type: ignore[misc]
+        def _from_legacy_cache(cls, past_key_values=None):
+            """Convert old tuple-based cache to DynamicCache."""
+            cache = cls()
+            if past_key_values is not None:
+                for layer_idx in range(len(past_key_values)):
+                    key_states, value_states = past_key_values[layer_idx]
+                    cache.update(key_states, value_states, layer_idx)
+            return cache
+        DynamicCache.from_legacy_cache = _from_legacy_cache  # type: ignore[attr-defined]
+        print("  Patched DynamicCache.from_legacy_cache (transformers compat)")
+except (ImportError, Exception):
+    pass  # transformers not installed yet or DynamicCache not available
+
 from symbolu.ontological.bcvf_decoding import BCVFDecoder, DecodingConfig
 from symbolu.ontological.bcvf_calibration import spearman_rank_correlation
 from symbolu.ontological.bcvf_experiments import (
@@ -182,7 +204,81 @@ def load_hf_model(
     print(f"  Loaded: {n_params / 1e9:.2f}B parameters")
     print(f"  Dtype: {next(model.parameters()).dtype}")
 
+    # --- Model health checks ---
+    # Check for meta-device params (incomplete weight loading)
+    meta_params = [n for n, p in model.named_parameters()
+                   if p.device.type == "meta"]
+    if meta_params:
+        print(f"  WARNING: {len(meta_params)} parameters on meta device "
+              f"(weights not loaded)! First: {meta_params[0]}")
+
+    # --- Smoke test: verify model produces diverse, contextual predictions ---
+    _smoke_test_model(model, tokenizer, device)
+
     return model, tokenizer
+
+
+def _smoke_test_model(model: Any, tokenizer: Any, device: str) -> None:
+    """
+    Quick sanity check that the model forward pass produces meaningful logits.
+
+    Tests:
+      1. Predictions vary across positions (not stuck on one token)
+      2. Predictions vary across different input texts (context-dependent)
+
+    If the smoke test fails, the model is likely broken (incompatible
+    custom code, corrupted weights, or dtype issues) and the evaluation
+    results will be meaningless.
+    """
+    test_texts = [
+        "The quick brown fox jumps over the lazy",
+        "In the year 2024, scientists discovered that",
+        "To cook pasta, first bring a large pot of water to a",
+    ]
+
+    all_preds: List[List[int]] = []
+    for text in test_texts:
+        tokens = tokenizer.encode(text, return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = model(tokens, output_hidden_states=False)
+            logits = outputs.logits  # [1, T, V]
+        preds = torch.argmax(logits[0], dim=-1).tolist()
+        all_preds.append(preds)
+
+    # Check 1: diversity within each sequence
+    for i, preds in enumerate(all_preds):
+        unique_ratio = len(set(preds)) / max(len(preds), 1)
+        if unique_ratio < 0.1:
+            top_pred = max(set(preds), key=preds.count)
+            try:
+                tok_str = repr(tokenizer.decode([top_pred]))
+            except Exception:
+                tok_str = str(top_pred)
+            print(f"  SMOKE TEST FAIL: sequence {i} has {unique_ratio:.0%} "
+                  f"unique predictions (dominated by {tok_str})")
+            print(f"  >>> Model forward pass is likely broken.")
+            print(f"  >>> This often happens with instruction-tuned models + "
+                  f"incompatible transformers version.")
+            return
+
+    # Check 2: last-token predictions differ across texts
+    last_preds = [preds[-1] for preds in all_preds]
+    if len(set(last_preds)) == 1:
+        try:
+            tok_str = repr(tokenizer.decode([last_preds[0]]))
+        except Exception:
+            tok_str = str(last_preds[0])
+        print(f"  SMOKE TEST WARNING: all texts predict same next token "
+              f"({tok_str}) — model may be degenerate")
+    else:
+        decoded = []
+        for p in last_preds:
+            try:
+                decoded.append(repr(tokenizer.decode([p])))
+            except Exception:
+                decoded.append(str(p))
+        print(f"  Smoke test OK: predictions vary across contexts "
+              f"({', '.join(decoded)})")
 
 
 # =========================================================================
@@ -481,7 +577,7 @@ def evaluate_signal(
 
         # Forward pass
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True, use_cache=False)
+            outputs = model(tokens, output_hidden_states=True)
             logits = outputs.logits  # [1, T, V]
             # Use the last hidden layer
             hidden_states = outputs.hidden_states[-1]  # [1, T, D]
@@ -612,7 +708,7 @@ def collect_dataset(
             continue
 
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True, use_cache=False)
+            outputs = model(tokens, output_hidden_states=True)
             logits_all = outputs.logits  # [1, T, V]
             hidden_all = outputs.hidden_states[-1]  # [1, T, D]
 
