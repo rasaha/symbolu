@@ -597,8 +597,6 @@ def collect_dataset(
 
     This avoids re-running the model for every ablation config.
     """
-    vocab_emb = model.get_input_embeddings().weight.detach()
-
     dataset: List[Dict[str, Any]] = []
 
     for text_idx, text in enumerate(texts):
@@ -704,8 +702,24 @@ def run_ablation_real(
         print("  WARNING: no data collected, skipping ablation")
         return AblationStrategyResult(strategy=strategy, experiment_results=[])
 
-    # Run through ExperimentRunner
-    runner = ExperimentRunner(base_config=base_config, device=device)
+    # Sanity check: verify baseline argmax accuracy directly
+    n_correct = sum(
+        1 for s in dataset
+        if torch.argmax(s["logits"], dim=-1).item() == s["ground_truth"]
+    )
+    n_total = len(dataset)
+    print(f"  Sanity check: direct argmax accuracy = "
+          f"{n_correct}/{n_total} ({n_correct / n_total:.1%})")
+    if n_correct == 0:
+        print("  WARNING: model never predicts the next token correctly. "
+              "BCVF ablation results will be degenerate.")
+
+    # Run through ExperimentRunner — pass model so it uses real vocab embeddings
+    # (without the model, ExperimentRunner falls back to random vocab_emb,
+    # which makes all BCVF scores meaningless)
+    runner = ExperimentRunner(
+        model=model, base_config=base_config, device=device,
+    )
     results = runner.run_ablation(dataset, matrix=ABLATION_MATRIX)
 
     elapsed = time.time() - t0
@@ -1049,6 +1063,13 @@ def create_dry_run_model(
         eos_token_id=1,
     )
     model = GPT2LMHeadModel(config)
+    # Break weight tying: GPT-2 shares input/output embeddings by default,
+    # causing a random-weight model to predict the identity (current token).
+    # Give lm_head independent random weights so predictions are truly random.
+    with torch.no_grad():
+        model.lm_head.weight = torch.nn.Parameter(
+            torch.randn_like(model.lm_head.weight)
+        )
     model.to(device)
     model.eval()
 
