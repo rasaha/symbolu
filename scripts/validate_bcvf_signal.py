@@ -71,8 +71,9 @@ import torch
 import torch.nn.functional as F
 
 # ---------------------------------------------------------------------------
-# Patch DynamicCache for older transformers (<4.38) that lack methods
-# required by phi-3.5 and similar models loaded via trust_remote_code.
+# Patch DynamicCache for transformers versions that lack methods required by
+# custom model code loaded via trust_remote_code (covers both old versions
+# missing from_legacy_cache and new versions that removed to_legacy_cache).
 # ---------------------------------------------------------------------------
 try:
     from transformers import DynamicCache
@@ -91,6 +92,16 @@ try:
             return cache
         DynamicCache.from_legacy_cache = _from_legacy_cache  # type: ignore[attr-defined]
         _patched.append("from_legacy_cache")
+
+    if not hasattr(DynamicCache, "to_legacy_cache"):
+        def _to_legacy_cache(self):
+            """Convert DynamicCache back to tuple-based format."""
+            legacy = []
+            for layer_idx in range(len(self.key_cache)):
+                legacy.append((self.key_cache[layer_idx], self.value_cache[layer_idx]))
+            return tuple(legacy)
+        DynamicCache.to_legacy_cache = _to_legacy_cache  # type: ignore[attr-defined]
+        _patched.append("to_legacy_cache")
 
     if not hasattr(DynamicCache, "get_usable_length"):
         def _get_usable_length(self, new_seq_length: int = 0, layer_idx: int = 0) -> int:
@@ -206,19 +217,33 @@ def load_hf_model(
         torch_dtype = torch.float32
     # else "auto" — let transformers decide
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name, trust_remote_code=True
-    )
+    # Try loading without trust_remote_code first (prefer native transformers
+    # implementations which stay in sync with the library).  Fall back to
+    # trust_remote_code=True for models that require custom modelling code.
+    for trust_remote in (False, True):
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=trust_remote
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch_dtype,
+                device_map=device if device == "auto" else None,
+                trust_remote_code=trust_remote,
+                low_cpu_mem_usage=True,
+            )
+            if trust_remote:
+                print("  (loaded with trust_remote_code=True)")
+            break
+        except (ValueError, KeyError, ImportError):
+            if trust_remote:
+                raise
+            # Native loading failed — retry with custom code
+            print("  Native loading failed, retrying with trust_remote_code=True...")
+            continue
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch_dtype,
-        device_map=device if device == "auto" else None,
-        trust_remote_code=True,
-        low_cpu_mem_usage=True,
-    )
 
     if device != "auto":
         model = model.to(device)
