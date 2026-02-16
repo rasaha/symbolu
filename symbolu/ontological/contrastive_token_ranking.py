@@ -561,12 +561,13 @@ if PYTORCH_AVAILABLE:
         output_dim = vocab_embeddings.shape[1]
         V = vocab_embeddings.shape[0]
 
-        vocab_emb = F.normalize(
-            vocab_embeddings.to(device), p=2, dim=-1
-        )  # [V, D]
-
-        # Build tensors
+        # Build tensors first to determine dtype, then cast vocab_emb
+        # to match (samples are float32; model weights may be bfloat16)
         features = torch.stack([s.features for s in samples]).to(device)
+        vocab_emb = F.normalize(
+            vocab_embeddings.to(device=device, dtype=features.dtype),
+            p=2, dim=-1,
+        )  # [V, D]
         gt_tokens = torch.tensor(
             [s.ground_truth_token for s in samples], dtype=torch.long
         ).to(device)
@@ -777,12 +778,16 @@ if PYTORCH_AVAILABLE:
 
         config = config or CTRConfig()
         alpha_values = alpha_values or config.alpha_values
-        vocab_emb = F.normalize(
-            vocab_embeddings.to(device), p=2, dim=-1
-        )
 
         h_ts = torch.stack([s.h_t for s in samples]).to(device)
         logits_all = torch.stack([s.logits_t for s in samples]).to(device)
+
+        # Cast vocab embeddings to match sample dtype (samples are
+        # collected as float32; model weights may be bfloat16)
+        vocab_emb = F.normalize(
+            vocab_embeddings.to(device=device, dtype=h_ts.dtype),
+            p=2, dim=-1,
+        )
         correct = np.array([s.correct for s in samples], dtype=np.float64)
         gt_tokens = np.array([s.ground_truth_token for s in samples])
 
@@ -1130,11 +1135,16 @@ if PYTORCH_AVAILABLE:
         Returns:
             List of CTREvalResult (one per method per dataset).
         """
-        # Get vocab embeddings
+        # Get vocab embeddings (cast to float32 — samples are float32;
+        # model weights may be bfloat16 for Phi-3.5 etc.)
         vocab_emb = None
         if model is not None:
             try:
-                vocab_emb = model.get_input_embeddings().weight.detach()
+                vocab_emb = (
+                    model.get_input_embeddings()
+                    .weight.detach()
+                    .float()
+                )
             except Exception:
                 pass
         if vocab_emb is None:
@@ -1185,12 +1195,12 @@ if PYTORCH_AVAILABLE:
                 def _softmax_wt_fn(h_batch):
                     # Need logits for this — approximate with
                     # h @ vocab_emb.T
-                    approx_logits = h_batch @ vocab_emb.to(
-                        h_batch.device
-                    ).T
+                    ve = vocab_emb.to(
+                        device=h_batch.device, dtype=h_batch.dtype,
+                    )
+                    approx_logits = h_batch @ ve.T
                     return softmax_weighted_direction(
-                        approx_logits, vocab_emb.to(h_batch.device),
-                        top_m=config.top_m,
+                        approx_logits, ve, top_m=config.top_m,
                     )
 
                 result_sw = evaluate_ctr(
