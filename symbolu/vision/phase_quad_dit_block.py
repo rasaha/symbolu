@@ -18,8 +18,14 @@ import torch.nn as nn
 from torch import Tensor
 
 from symbolu.vision.adaln_zero import AdaLNZero, FinalLayer
+from symbolu.vision.alternative_attention import (
+    AlternativeAttentionToProposals,
+    PhaseQuadAttentionVariant,
+)
+from symbolu.vision.attention_normalizations import AttentionNormType
 from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
 from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
+from symbolu.vision.config import AlternativeAttentionConfig
 from symbolu.vision.controls import (
     BlockControl,
     PhaseControl,
@@ -146,6 +152,8 @@ class PhaseQuadDiTBlock(nn.Module):
         bcvf_lambda_b: float = 1.0,
         bcvf_lambda_c: float = 0.5,
         bcvf_beta: float = 2.0,
+        # Alternative attention normalization
+        alt_attention: Optional[AlternativeAttentionConfig] = None,
     ):
         super().__init__()
 
@@ -156,6 +164,7 @@ class PhaseQuadDiTBlock(nn.Module):
         self.phase_min_strength = phase_min_strength
         self.phase_max_strength = phase_max_strength
         self.use_bcvf = use_bcvf
+        self.use_alt_attention = alt_attention is not None and alt_attention.enabled
 
         # AdaLN-Zero conditioning
         self.adaln = AdaLNZero(embed_dim, embed_dim)
@@ -176,25 +185,17 @@ class PhaseQuadDiTBlock(nn.Module):
         # Quad retriever
         self.quad = QuadRetriever2D(embed_dim, num_heads, topk)
 
-        # Proposal integration: BCVF + Cross-attention hybrid or pure cross-attention
-        if use_bcvf:
-            # Hybrid BCVF + Cross-attention (Appendix I)
-            self.proposal_mixer = HybridBCVFCrossAttention(
-                embed_dim=embed_dim,
-                num_heads=num_heads,
-                bcvf_config={
-                    "lambda_f": bcvf_lambda_f,
-                    "lambda_b": bcvf_lambda_b,
-                    "lambda_c": bcvf_lambda_c,
-                    "beta": bcvf_beta,
-                },
-            )
-        else:
-            # Pure cross-attention (Appendix H)
-            self.proposal_mixer = None
-            self.cross_attn_proposals = CrossAttentionToProposals(
-                embed_dim, num_heads, dropout, use_score_bias=True
-            )
+        # Proposal integration: select based on configuration
+        self._build_proposal_mixer(
+            embed_dim, num_heads, dropout, use_bcvf,
+            bcvf_lambda_f, bcvf_lambda_b, bcvf_lambda_c, bcvf_beta,
+            alt_attention,
+        )
+
+        # Alt attention module (set by _build_proposal_mixer, used in forward)
+        # Declared here for type clarity; actual instance created above.
+        if not hasattr(self, "alt_proposal_mixer"):
+            self.alt_proposal_mixer = None
 
         # Layer norms for pre-normalization
         self.norm_local = nn.LayerNorm(embed_dim)
@@ -213,6 +214,86 @@ class PhaseQuadDiTBlock(nn.Module):
 
         # Zero-init output projections for residual-friendly start
         self._zero_init_outputs()
+
+    def _build_proposal_mixer(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float,
+        use_bcvf: bool,
+        bcvf_lambda_f: float,
+        bcvf_lambda_b: float,
+        bcvf_lambda_c: float,
+        bcvf_beta: float,
+        alt_attention: Optional[AlternativeAttentionConfig],
+    ):
+        """
+        Build the proposal integration module based on configuration.
+
+        Priority order:
+        1. Alternative attention (if alt_attention.enabled):
+           - With BCVF: PhaseQuadAttentionVariant (BCVF + entmax hybrid)
+           - Without BCVF: AlternativeAttentionToProposals (pure entmax)
+        2. BCVF hybrid (if use_bcvf): HybridBCVFCrossAttention (original)
+        3. Pure softmax cross-attention: CrossAttentionToProposals (original)
+        """
+        bcvf_config = {
+            "lambda_f": bcvf_lambda_f,
+            "lambda_b": bcvf_lambda_b,
+            "lambda_c": bcvf_lambda_c,
+            "beta": bcvf_beta,
+        }
+
+        if self.use_alt_attention and alt_attention is not None:
+            # Resolve norm type string -> enum
+            norm_type = AttentionNormType(alt_attention.norm_type)
+
+            if alt_attention.mix_with_bcvf and use_bcvf:
+                # BCVF + alternative attention hybrid (recommended)
+                self.proposal_mixer = None
+                self.cross_attn_proposals = None
+                self.alt_proposal_mixer = PhaseQuadAttentionVariant(
+                    embed_dim=embed_dim,
+                    num_heads=num_heads,
+                    norm_type=norm_type,
+                    entmax_alpha=alt_attention.entmax_alpha,
+                    bcvf_config=bcvf_config,
+                    mix_ratio=alt_attention.bcvf_mix_ratio,
+                    temperature_init=alt_attention.logit_temperature_init,
+                    learn_temperature=alt_attention.learn_temperature,
+                    top_m=alt_attention.top_m,
+                )
+            else:
+                # Pure alternative attention (no BCVF)
+                self.proposal_mixer = None
+                self.cross_attn_proposals = None
+                self.alt_proposal_mixer = AlternativeAttentionToProposals(
+                    embed_dim=embed_dim,
+                    num_heads=num_heads,
+                    dropout=dropout,
+                    norm_type=norm_type,
+                    entmax_alpha=alt_attention.entmax_alpha,
+                    score_bias_scale=alt_attention.score_bias_scale,
+                    temperature_init=alt_attention.logit_temperature_init,
+                    learn_temperature=alt_attention.learn_temperature,
+                    top_m=alt_attention.top_m,
+                )
+        elif use_bcvf:
+            # Original: BCVF + softmax cross-attention hybrid (Appendix I)
+            self.proposal_mixer = HybridBCVFCrossAttention(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                bcvf_config=bcvf_config,
+            )
+            self.cross_attn_proposals = None
+            self.alt_proposal_mixer = None
+        else:
+            # Original: Pure softmax cross-attention (Appendix H)
+            self.proposal_mixer = None
+            self.cross_attn_proposals = CrossAttentionToProposals(
+                embed_dim, num_heads, dropout, use_score_bias=True
+            )
+            self.alt_proposal_mixer = None
 
     def _zero_init_outputs(self):
         """Zero-initialize output projections for stable training."""
@@ -287,16 +368,24 @@ class PhaseQuadDiTBlock(nn.Module):
         quad_control = QuadControl(enable_quad=enable_quad)
         proposals, scores = self.quad(x, S, meta, quad_control)
 
-        # Proposal integration: BCVF hybrid or pure cross-attention
+        # Proposal integration: alternative attention, BCVF hybrid, or pure cross-attention
         x_cross_in = self.adaln.modulate(
             self.norm_cross(x), shift_attn, scale_attn
         )
 
-        if self.use_bcvf and self.proposal_mixer is not None:
-            # Hybrid BCVF + Cross-attention (Appendix I)
+        if self.use_alt_attention and self.alt_proposal_mixer is not None:
+            # Alternative attention normalization (entmax/sparsemax/kernel)
+            if isinstance(self.alt_proposal_mixer, PhaseQuadAttentionVariant):
+                # BCVF + alternative attention hybrid
+                x_cross = self.alt_proposal_mixer(x_cross_in, proposals, scores, S)
+            else:
+                # Pure alternative attention
+                x_cross = self.alt_proposal_mixer(x_cross_in, proposals, scores)
+        elif self.use_bcvf and self.proposal_mixer is not None:
+            # Original: Hybrid BCVF + softmax Cross-attention (Appendix I)
             x_cross = self.proposal_mixer(x_cross_in, proposals, scores, S)
         else:
-            # Pure cross-attention (Appendix H)
+            # Original: Pure softmax cross-attention (Appendix H)
             x_cross = self.cross_attn_proposals(x_cross_in, proposals, scores)
 
         x = x + gate_attn * x_cross
@@ -323,8 +412,18 @@ class PhaseQuadDiTBlock(nn.Module):
         for k, v in quad_metrics.items():
             diagnostics[f"quad/{k}"] = v
 
-        # BCVF metrics (if enabled)
-        if self.use_bcvf and self.proposal_mixer is not None:
+        # Alternative attention metrics (sparsity, BCVF, mix ratio)
+        if self.use_alt_attention and self.alt_proposal_mixer is not None:
+            if hasattr(self.alt_proposal_mixer, "get_diagnostics"):
+                alt_metrics = self.alt_proposal_mixer.get_diagnostics()
+                for k, v in alt_metrics.items():
+                    diagnostics[f"alt_attn/{k}"] = v
+            elif hasattr(self.alt_proposal_mixer, "get_sparsity_metrics"):
+                sp_metrics = self.alt_proposal_mixer.get_sparsity_metrics()
+                for k, v in sp_metrics.items():
+                    diagnostics[f"alt_attn/{k}"] = v
+        # BCVF metrics (original path)
+        elif self.use_bcvf and self.proposal_mixer is not None:
             bcvf_metrics = self.proposal_mixer.bcvf.get_instrumentation()
             for k, v in bcvf_metrics.items():
                 diagnostics[k] = v
@@ -354,6 +453,7 @@ class PhaseQuadDiTBlockStack(nn.Module):
         bcvf_lambda_b: BCVF backward weight.
         bcvf_lambda_c: BCVF consistency weight.
         bcvf_beta: BCVF sharpness.
+        alt_attention: Alternative attention config (entmax/sparsemax/kernel).
     """
 
     def __init__(
@@ -373,6 +473,7 @@ class PhaseQuadDiTBlockStack(nn.Module):
         bcvf_lambda_b: float = 1.0,
         bcvf_lambda_c: float = 0.5,
         bcvf_beta: float = 2.0,
+        alt_attention: Optional[AlternativeAttentionConfig] = None,
     ):
         super().__init__()
 
@@ -395,6 +496,7 @@ class PhaseQuadDiTBlockStack(nn.Module):
                 bcvf_lambda_b=bcvf_lambda_b,
                 bcvf_lambda_c=bcvf_lambda_c,
                 bcvf_beta=bcvf_beta,
+                alt_attention=alt_attention,
             )
             for _ in range(num_blocks)
         ])
