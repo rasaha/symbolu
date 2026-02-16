@@ -228,14 +228,31 @@ class TestLoRALinear:
 
         # Merge
         lora.merge_weights()
-        out_merged = base(x)  # Direct base linear, LoRA is merged in
+        assert lora._merged is True
+
+        # After merge, calling lora(x) should give same result (skips LoRA path)
+        out_merged_via_lora = lora(x).detach().clone()
+        torch.testing.assert_close(out_merged_via_lora, out_before, atol=1e-4, rtol=1e-4)
+
+        # Also verify base(x) directly matches
+        out_merged = base(x)
         torch.testing.assert_close(out_merged, out_before, atol=1e-4, rtol=1e-4)
+
+        # Double merge should be idempotent
+        lora.merge_weights()
+        out_double = lora(x).detach().clone()
+        torch.testing.assert_close(out_double, out_before, atol=1e-4, rtol=1e-4)
 
         # Unmerge
         lora.unmerge_weights()
+        assert lora._merged is False
         torch.testing.assert_close(
             base.weight.data, original_weight, atol=1e-5, rtol=1e-5
         )
+
+        # After unmerge, lora(x) should still give same result
+        out_unmerged = lora(x).detach().clone()
+        torch.testing.assert_close(out_unmerged, out_before, atol=1e-4, rtol=1e-4)
 
     def test_param_count(self):
         """LoRA parameter count should be rank * (in + out)."""
