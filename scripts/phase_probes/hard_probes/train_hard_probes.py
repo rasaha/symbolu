@@ -6253,7 +6253,7 @@ def run_spatial_causal_benchmarks(
     args,
     config,
     device: str = "cpu",
-) -> Dict[str, Any]:
+) -> Dict[str, any]:
     """
     Run Spatial-Causal Module benchmarks.
 
