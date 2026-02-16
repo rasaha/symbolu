@@ -4,8 +4,9 @@ GoalDirNet — Learned Future-Direction Predictor
 =================================================
 
 Trains a small MLP to predict the *direction* of the next hidden state
-from past-only features, then uses cosine similarity between the current
-hidden state and the predicted direction as a trust/correctness score.
+from past-only features, then feeds the prediction as a **goal vector
+into the BCVF reranking pipeline** to test whether the learned direction
+improves token selection.
 
 Core idea
 ---------
@@ -13,11 +14,22 @@ At each token position ``t`` (teacher forcing):
 
 * Target direction:  ``u_t = normalize(h_{t+1})``
 * Predicted direction: ``u_hat_t = normalize(GoalDirNet(features_t))``
-* Trust score:  ``s_goal = cos(h_t, u_hat_t)``
 
-The trust score ``s_goal`` is compared against standard logit-derived
-baselines (margin, maxprob, entropy, logit_gap) to determine whether
-hidden-state geometry contains a stronger correctness signal.
+Evaluation uses ``u_hat_t`` as the goal vector in BCVF reranking::
+
+    score_i = cos(normalize(W_e[i]), normalize(u_hat_t))
+
+This is structurally homologous to the oracle BCVF mechanism::
+
+    score_i = cos(W_e[i], mean_future_hidden)
+
+The key metric is ``sb_learned = cos(W_e[predicted_token], u_hat_t)``,
+whose Spearman rho with correctness is compared against logit-derived
+baselines (margin, maxprob, entropy, logit_gap).
+
+Note: the earlier ``s_goal = cos(h_t, u_hat_t)`` formulation was
+**structurally incorrect** — it measured state stability (how much the
+hidden state changes), not token correctness in embedding space.
 
 Feature modes (past-only — no peeking at future tokens)
 --------------------------------------------------------
@@ -35,12 +47,12 @@ Usage::
     # Train + evaluate on dry-run data
     python scripts/run_bcvf_benchmarks.py --dry-run --train-goal-dirnet
 
-    # Train on wikitext, evaluate predictive signal
-    python scripts/run_bcvf_benchmarks.py --mode wikitext --model gpt2 \\
-        --train-goal-dirnet --goal-features ht --train-goal-samples 5000
+    # Train on wikitext (Phi-3.5 — the model with oracle signal)
+    python scripts/run_bcvf_benchmarks.py --mode wikitext --model phi3 \\
+        --train-goal-dirnet --goal-features ht --train-goal-samples 10000
 
-    # Full suite with alpha sweep (gated by GoalDirNet win)
-    python scripts/run_bcvf_benchmarks.py --mode all --model gpt2 \\
+    # Full suite with alpha sweep (gated by sb_learned win)
+    python scripts/run_bcvf_benchmarks.py --mode all --model phi3 \\
         --train-goal-dirnet --alpha-sweep 0.05 0.1 0.2
 """
 
@@ -332,6 +344,7 @@ if PYTORCH_AVAILABLE:
         u_target: torch.Tensor      # [D] normalised h_{t+1}
         logits_t: torch.Tensor      # [V] logits at t
         correct: int                 # 1 if argmax(logits_t) == y_{t+1}
+        ground_truth_token: int = 0  # actual ground truth token id
 
     def collect_goal_dir_samples(
         model: Any,
@@ -398,7 +411,7 @@ if PYTORCH_AVAILABLE:
                 u_target = F.normalize(h_next.unsqueeze(0), p=2, dim=-1).squeeze(0)
 
                 pred_token = logits_all[t].argmax().item()
-                gt_token = ground_truth[t].item()
+                gt_token = int(ground_truth[t].item())
                 correct = 1 if pred_token == gt_token else 0
 
                 samples.append(GoalDirSample(
@@ -408,6 +421,7 @@ if PYTORCH_AVAILABLE:
                     u_target=u_target.cpu(),
                     logits_t=logits_all[t].cpu(),
                     correct=correct,
+                    ground_truth_token=gt_token,
                 ))
 
             if (text_idx + 1) % 5 == 0 and len(samples) > 0:
@@ -483,6 +497,7 @@ if PYTORCH_AVAILABLE:
                 logits_t = torch.zeros(10)
 
             gt = sample.get("ground_truth", 0)
+            gt_token = int(gt)
             pred = logits_t.argmax().item()
             correct = 1 if pred == gt else 0
 
@@ -504,6 +519,7 @@ if PYTORCH_AVAILABLE:
                 u_target=u_target.cpu(),
                 logits_t=logits_t.cpu(),
                 correct=correct,
+                ground_truth_token=gt_token,
             ))
 
         print(f"  [goal_dirnet] Collected {len(samples)} from adapter dataset")
@@ -610,12 +626,18 @@ if PYTORCH_AVAILABLE:
 
     @dataclass
     class GoalDirEvalResult:
-        """Evaluation result for GoalDirNet vs baselines on one dataset."""
+        """Evaluation result for GoalDirNet vs baselines on one dataset.
+
+        The primary metric is ``rho_sb_learned``: Spearman correlation between
+        ``cos(W_e[predicted_token], u_hat)`` and correctness.  This measures
+        whether the learned goal direction predicts token correctness via the
+        same embedding-space mechanism as oracle BCVF.
+        """
 
         dataset_name: str
         n_eval: int
         # Spearman rho with correctness
-        rho_s_goal: float = 0.0
+        rho_sb_learned: float = 0.0
         rho_margin: float = 0.0
         rho_maxprob: float = 0.0
         rho_neg_entropy: float = 0.0
@@ -623,21 +645,22 @@ if PYTORCH_AVAILABLE:
         # Calibration
         ece_maxprob: float = 0.0
         brier_maxprob: float = 0.0
-        ece_s_goal_calibrated: float = 0.0
-        brier_s_goal_calibrated: float = 0.0
+        ece_sb_calibrated: float = 0.0
+        brier_sb_calibrated: float = 0.0
         # Logistic calibration params
         cal_a: float = 1.0
         cal_b: float = 0.0
         # Gating verdict
-        s_goal_wins: bool = False
+        sb_learned_wins: bool = False
         best_baseline_rho: float = 0.0
         best_baseline_name: str = ""
         rho_improvement: float = 0.0
+        # Pass@1 with learned-goal BCVF reranking
+        pass_at_1_baseline: float = 0.0
+        pass_at_1_reranked: float = 0.0
+        rerank_pct: float = 0.0
         # Training stats
         training_stats: Dict[str, float] = field(default_factory=dict)
-        # Pass@1 for code tasks
-        pass_at_1_baseline: float = 0.0
-        pass_at_1_modulated: Dict[float, float] = field(default_factory=dict)
         # Alpha sweep results
         alpha_sweep: Dict[float, Dict[str, float]] = field(
             default_factory=dict
@@ -646,21 +669,32 @@ if PYTORCH_AVAILABLE:
     def evaluate_goal_dirnet(
         net: GoalDirNet,
         samples: List[GoalDirSample],
+        vocab_embeddings: torch.Tensor,
         dataset_name: str = "unknown",
         device: str = "cpu",
+        top_m: int = 500,
+        beta: float = 0.2,
     ) -> GoalDirEvalResult:
-        """Evaluate GoalDirNet vs logit-derived baselines.
+        """Evaluate GoalDirNet by feeding u_hat as goal into BCVF reranking.
+
+        Uses the structurally correct approach: rerank top-M candidates via
+        ``sb = sigmoid(5 * cos(normalize(W_e[i]), normalize(u_hat_t)))``
+        through the full BCVF Lagrangian, matching the oracle mechanism.
 
         Computes:
-        1. ``s_goal = cos(h_t, u_hat_t)`` where ``u_hat_t = net(features_t)``
-        2. Spearman rho(s_goal, correct) vs rho(margin/maxprob/entropy, correct)
-        3. Calibration: ECE/Brier for maxprob vs logistic-calibrated s_goal
+        1. ``sb_learned = cos(W_e[base_top1], u_hat)`` — Spearman rho
+           with correctness (structurally homologous to oracle sb_rho)
+        2. Reranked pass@1 using u_hat as BCVF goal vector
+        3. Baselines: margin, maxprob, entropy, logit_gap
 
         Args:
             net: Trained GoalDirNet.
-            samples: Evaluation samples.
+            samples: Evaluation samples (must have ground_truth_token).
+            vocab_embeddings: [V, D] token embedding matrix (W_e).
             dataset_name: Name for reporting.
             device: Torch device.
+            top_m: Number of top candidates for BCVF reranking.
+            beta: BCVF beta parameter.
 
         Returns:
             GoalDirEvalResult with all metrics.
@@ -670,33 +704,81 @@ if PYTORCH_AVAILABLE:
 
         net.eval()
         net = net.to(device)
+        vocab_embeddings = vocab_embeddings.to(device)
 
         features = torch.stack([s.features for s in samples]).to(device)
         h_ts = torch.stack([s.h_t for s in samples]).to(device)
         logits_all = torch.stack([s.logits_t for s in samples]).to(device)
         correct = np.array([s.correct for s in samples], dtype=np.float64)
+        gt_tokens = np.array([s.ground_truth_token for s in samples])
+
+        N, V = logits_all.shape
 
         with torch.no_grad():
-            u_hat = net(features)  # [N, D]
+            u_hat = net(features)  # [N, D] — already L2-normalized
 
-        # s_goal = cos(h_t, u_hat_t)
-        s_goal = F.cosine_similarity(h_ts, u_hat, dim=-1).cpu().numpy()
+        # ---- Normalize embeddings for clean cosine geometry ----
+        vocab_normed = F.normalize(vocab_embeddings, p=2, dim=-1)  # [V, D]
+        u_hat_normed = F.normalize(u_hat, p=2, dim=-1)  # enforce
 
-        # Baselines
+        # ---- sb_learned: cos(W_e[base_top1], u_hat) for each sample ----
+        base_preds = logits_all.argmax(dim=-1)  # [N]
+        base_pred_embs = vocab_normed[base_preds]  # [N, D]
+        sb_learned = F.cosine_similarity(
+            base_pred_embs, u_hat_normed, dim=-1
+        ).cpu().numpy()  # [N]
+
+        # ---- BCVF reranking with learned goal ----
+        top_m_actual = min(top_m, V)
+        topM_scores, topM_indices = torch.topk(
+            logits_all, top_m_actual, dim=-1
+        )  # [N, M]
+        topM_embs = vocab_normed[topM_indices]  # [N, M, D]
+
+        # Forward score: sf = sigmoid(5 * cos(h_t, candidate))
+        sf = torch.sigmoid(5.0 * F.cosine_similarity(
+            h_ts.unsqueeze(1), topM_embs, dim=-1
+        ))  # [N, M]
+
+        # Backward score: sb = sigmoid(5 * cos(candidate, u_hat))
+        sb = torch.sigmoid(5.0 * F.cosine_similarity(
+            topM_embs, u_hat_normed.unsqueeze(1), dim=-1
+        ))  # [N, M]
+
+        # Lagrangian: L = (1-sf)^2 + (1-sb)^2 + 0.25*(sf-sb)^2
+        L = (1.0 - sf) ** 2 + (1.0 - sb) ** 2 + 0.25 * (sf - sb) ** 2
+
+        # Rerank: adjusted = base_logit - beta * L
+        adjusted = topM_scores - beta * L
+        best_rel = torch.argmax(adjusted, dim=-1)  # [N]
+        reranked_tokens = topM_indices.gather(
+            1, best_rel.unsqueeze(-1)
+        ).squeeze(-1)  # [N]
+
+        reranked_tokens_np = reranked_tokens.cpu().numpy()
+        base_preds_np = base_preds.cpu().numpy()
+
+        # ---- Pass@1 ----
+        base_pass = float((base_preds_np == gt_tokens).mean())
+        reranked_pass = float((reranked_tokens_np == gt_tokens).mean())
+        rerank_changed = int((reranked_tokens_np != base_preds_np).sum())
+        rerank_pct = rerank_changed / N if N > 0 else 0.0
+
+        # ---- Baselines (logit-derived) ----
         baselines = GoalDirFeatureBuilder.compute_logit_baselines(logits_all)
         margin = baselines["margin"].cpu().numpy()
         maxprob = baselines["maxprob"].cpu().numpy()
         neg_entropy = baselines["neg_entropy"].cpu().numpy()
         logit_gap = baselines["logit_gap"].cpu().numpy()
 
-        # Spearman rho with correctness
-        rho_s_goal = spearman_rank_correlation(s_goal, correct)
+        # ---- Spearman rho with correctness ----
+        rho_sb_learned = spearman_rank_correlation(sb_learned, correct)
         rho_margin = spearman_rank_correlation(margin, correct)
         rho_maxprob = spearman_rank_correlation(maxprob, correct)
         rho_neg_entropy = spearman_rank_correlation(neg_entropy, correct)
         rho_logit_gap = spearman_rank_correlation(logit_gap, correct)
 
-        # Find best baseline
+        # ---- Find best baseline ----
         baseline_rhos = {
             "margin": rho_margin,
             "maxprob": rho_maxprob,
@@ -706,39 +788,39 @@ if PYTORCH_AVAILABLE:
         best_name = max(baseline_rhos, key=lambda k: baseline_rhos[k])
         best_rho = baseline_rhos[best_name]
 
-        rho_improvement = rho_s_goal - best_rho
-        s_goal_wins = rho_improvement >= 0.05
+        rho_improvement = rho_sb_learned - best_rho
+        sb_learned_wins = rho_improvement >= 0.05
 
-        # Calibration: ECE/Brier for maxprob
+        # ---- Calibration ----
         ece_maxprob = compute_ece(maxprob, correct)
         brier_maxprob = compute_brier(maxprob, correct)
 
-        # Simple logistic calibration: sigmoid(a * s_goal + b)
-        # Fit on the evaluation set (in practice you'd split train/cal/eval)
-        cal_a, cal_b = _fit_logistic_calibration(s_goal, correct)
-        s_goal_calibrated = _sigmoid(cal_a * s_goal + cal_b)
-
-        ece_s_goal_cal = compute_ece(s_goal_calibrated, correct)
-        brier_s_goal_cal = compute_brier(s_goal_calibrated, correct)
+        cal_a, cal_b = _fit_logistic_calibration(sb_learned, correct)
+        sb_calibrated = _sigmoid(cal_a * sb_learned + cal_b)
+        ece_sb_cal = compute_ece(sb_calibrated, correct)
+        brier_sb_cal = compute_brier(sb_calibrated, correct)
 
         return GoalDirEvalResult(
             dataset_name=dataset_name,
             n_eval=len(samples),
-            rho_s_goal=rho_s_goal,
+            rho_sb_learned=rho_sb_learned,
             rho_margin=rho_margin,
             rho_maxprob=rho_maxprob,
             rho_neg_entropy=rho_neg_entropy,
             rho_logit_gap=rho_logit_gap,
             ece_maxprob=ece_maxprob,
             brier_maxprob=brier_maxprob,
-            ece_s_goal_calibrated=ece_s_goal_cal,
-            brier_s_goal_calibrated=brier_s_goal_cal,
+            ece_sb_calibrated=ece_sb_cal,
+            brier_sb_calibrated=brier_sb_cal,
             cal_a=cal_a,
             cal_b=cal_b,
-            s_goal_wins=s_goal_wins,
+            sb_learned_wins=sb_learned_wins,
             best_baseline_rho=best_rho,
             best_baseline_name=best_name,
             rho_improvement=rho_improvement,
+            pass_at_1_baseline=base_pass,
+            pass_at_1_reranked=reranked_pass,
+            rerank_pct=rerank_pct,
         )
 
     # =====================================================================
@@ -804,37 +886,18 @@ if PYTORCH_AVAILABLE:
 
                 mod_preds = modulated_logits.argmax(dim=-1).cpu().numpy()
 
-            # Recompute correctness from original ground truth
+            # Recompute correctness using actual ground truth tokens
             mod_correct = np.zeros(len(samples))
             rerank_count = 0
             for i, s in enumerate(samples):
-                gt_token = None
-                # correct=1 means original argmax == gt
-                # We need original gt token to check modulated correctness
-                # Use logits: if s.correct==1, original pred was correct
                 orig_pred = int(logits_all[i].argmax().item())
                 mod_pred = int(mod_preds[i])
+                gt_token = s.ground_truth_token
 
                 if mod_pred != orig_pred:
                     rerank_count += 1
 
-                # For correctness, we check if mod_pred matches the ground
-                # truth token.  Since we only have the binary correct label,
-                # and we know correct==1 iff argmax(logits)==gt, we can
-                # infer: gt = orig_pred if correct==1 else unknown.
-                # For samples where correct==1, if mod_pred==orig_pred, still
-                # correct.  If correct==0, gt is unknown from our data.
-                # Best we can do: assume the correctness check is against
-                # the same gt token that the original was checked against.
-                if s.correct == 1:
-                    # gt == orig_pred
-                    mod_correct[i] = 1.0 if mod_pred == orig_pred else 0.0
-                else:
-                    # gt != orig_pred; we cannot determine if mod_pred == gt
-                    # without the actual gt token.  Conservative: 0.
-                    # However, if the modulated pred also happens to be the
-                    # same as orig_pred, still wrong.
-                    mod_correct[i] = 0.0
+                mod_correct[i] = 1.0 if mod_pred == gt_token else 0.0
 
             mod_pass = float(mod_correct.mean())
             rerank_pct = rerank_count / len(samples) if samples else 0.0
@@ -868,23 +931,24 @@ if PYTORCH_AVAILABLE:
         lines = []
         lines.append("")
         lines.append("=" * 90)
-        lines.append("GoalDirNet Evaluation Report")
+        lines.append("GoalDirNet Evaluation Report (u_hat → BCVF goal)")
         lines.append("=" * 90)
 
         # Table 1: Spearman rho comparison
         lines.append("")
         lines.append("1. Predictive Signal (Spearman rho with correctness):")
+        lines.append("   sb_learned = cos(W_e[pred_token], u_hat)")
         lines.append("-" * 90)
         lines.append(
-            f"  {'Dataset':<20} {'s_goal':>8} {'margin':>8} {'maxprob':>8} "
+            f"  {'Dataset':<20} {'sb_lrnd':>8} {'margin':>8} {'maxprob':>8} "
             f"{'-entropy':>8} {'logit_gap':>9} {'best_base':>10} {'delta':>7} {'Verdict':>10}"
         )
         lines.append("-" * 90)
 
         for r in eval_results:
-            verdict = "GO" if r.s_goal_wins else "NO WIN"
+            verdict = "GO" if r.sb_learned_wins else "NO WIN"
             lines.append(
-                f"  {r.dataset_name:<20} {r.rho_s_goal:>+8.4f} "
+                f"  {r.dataset_name:<20} {r.rho_sb_learned:>+8.4f} "
                 f"{r.rho_margin:>+8.4f} {r.rho_maxprob:>+8.4f} "
                 f"{r.rho_neg_entropy:>+8.4f} {r.rho_logit_gap:>+9.4f} "
                 f"{r.best_baseline_rho:>+10.4f} {r.rho_improvement:>+7.4f} "
@@ -893,35 +957,61 @@ if PYTORCH_AVAILABLE:
 
         lines.append("-" * 90)
 
-        # Table 2: Calibration
+        # Table 2: Pass@1 with learned-goal BCVF reranking
         lines.append("")
-        lines.append("2. Calibration (ECE / Brier — lower is better):")
+        lines.append("2. Pass@1 with Learned-Goal BCVF Reranking:")
         lines.append("-" * 72)
         lines.append(
-            f"  {'Dataset':<20} {'ECE(maxprob)':>12} {'ECE(s_goal)':>12} "
-            f"{'Brier(mp)':>10} {'Brier(sg)':>10}"
+            f"  {'Dataset':<20} {'base':>8} {'reranked':>9} "
+            f"{'delta':>8} {'rerank%':>8} {'Verdict':>10}"
+        )
+        lines.append("-" * 72)
+
+        for r in eval_results:
+            delta = r.pass_at_1_reranked - r.pass_at_1_baseline
+            if delta > 0.005:
+                v = "IMPROVED"
+            elif delta < -0.005:
+                v = "REGRESSED"
+            else:
+                v = "NEUTRAL"
+            lines.append(
+                f"  {r.dataset_name:<20} {r.pass_at_1_baseline:>8.4f} "
+                f"{r.pass_at_1_reranked:>9.4f} {delta:>+8.4f} "
+                f"{r.rerank_pct:>7.1%} {v:>10}"
+            )
+
+        lines.append("-" * 72)
+
+        # Table 3: Calibration
+        lines.append("")
+        lines.append("3. Calibration (ECE / Brier — lower is better):")
+        lines.append("-" * 72)
+        lines.append(
+            f"  {'Dataset':<20} {'ECE(maxprob)':>12} {'ECE(sb_lrn)':>12} "
+            f"{'Brier(mp)':>10} {'Brier(sb)':>10}"
         )
         lines.append("-" * 72)
 
         for r in eval_results:
             lines.append(
                 f"  {r.dataset_name:<20} {r.ece_maxprob:>12.4f} "
-                f"{r.ece_s_goal_calibrated:>12.4f} "
-                f"{r.brier_maxprob:>10.4f} {r.brier_s_goal_calibrated:>10.4f}"
+                f"{r.ece_sb_calibrated:>12.4f} "
+                f"{r.brier_maxprob:>10.4f} {r.brier_sb_calibrated:>10.4f}"
             )
 
         lines.append("-" * 72)
 
-        # Table 3: GO/STOP verdicts
+        # Table 4: GO/STOP verdicts
         lines.append("")
-        lines.append("3. GO / STOP Gating:")
+        lines.append("4. GO / STOP Gating:")
         lines.append("-" * 60)
 
         any_win = False
         for r in eval_results:
-            if r.s_goal_wins:
+            if r.sb_learned_wins:
                 lines.append(
-                    f"  {r.dataset_name:<20} GO  — s_goal beats "
+                    f"  {r.dataset_name:<20} GO  — sb_learned beats "
                     f"{r.best_baseline_name} by {r.rho_improvement:+.4f}"
                 )
                 any_win = True
@@ -936,7 +1026,8 @@ if PYTORCH_AVAILABLE:
 
         if any_win:
             lines.append(
-                "  >> GoalDirNet shows signal advantage on at least one dataset."
+                "  >> GoalDirNet sb_learned shows signal advantage — "
+                "proceed with logit modulation."
             )
         else:
             lines.append(
@@ -944,10 +1035,10 @@ if PYTORCH_AVAILABLE:
                 "skip logit modulation."
             )
 
-        # Table 4: Alpha sweep (if present)
+        # Table 5: Alpha sweep (if present)
         if alpha_results:
             lines.append("")
-            lines.append("4. Alpha Sweep (logit modulation — gated by GoalDirNet win):")
+            lines.append("5. Alpha Sweep (logit modulation — gated by GoalDirNet win):")
             lines.append("-" * 80)
             lines.append(
                 f"  {'Dataset':<20} {'alpha':>6} {'pass@1':>8} "
@@ -1071,6 +1162,24 @@ if PYTORCH_AVAILABLE:
             window_size=config.window_size,
         )
 
+        # Get vocab embeddings (W_e) from model — needed for BCVF reranking
+        vocab_emb = None
+        if model is not None:
+            try:
+                vocab_emb = model.get_input_embeddings().weight.detach()
+            except Exception:
+                pass
+        if vocab_emb is None:
+            # Fallback for dry-run or missing model
+            sample_dataset = next(iter(datasets.values()), [])
+            if sample_dataset:
+                V = sample_dataset[0].get("logits", torch.zeros(1, 10)).shape[-1]
+                D = sample_dataset[0].get("hidden_state", torch.zeros(1, 64)).shape[-1]
+            else:
+                V, D = 50, 64
+            torch.manual_seed(config.seed)
+            vocab_emb = torch.randn(V, D)
+
         all_eval_results: List[GoalDirEvalResult] = []
         alpha_results: Dict[str, Dict[float, Dict[str, float]]] = {}
 
@@ -1115,32 +1224,20 @@ if PYTORCH_AVAILABLE:
                 train_samples, config, device=device,
             )
 
-            # Evaluate
+            # Evaluate — feed u_hat as BCVF goal, rerank via cos(W_e, u_hat)
             eval_result = evaluate_goal_dirnet(
                 net, eval_samples,
+                vocab_embeddings=vocab_emb,
                 dataset_name=mode_name,
                 device=device,
             )
             eval_result.training_stats = train_stats
             all_eval_results.append(eval_result)
 
-            # Alpha sweep (gated by win)
-            if run_alpha_sweep_flag and eval_result.s_goal_wins:
-                print(f"  [goal_dirnet] s_goal WINS on {mode_name}, "
+            # Alpha sweep (gated by sb_learned win)
+            if run_alpha_sweep_flag and eval_result.sb_learned_wins:
+                print(f"  [goal_dirnet] sb_learned WINS on {mode_name}, "
                       f"running alpha sweep...")
-
-                vocab_emb = None
-                if model is not None:
-                    try:
-                        vocab_emb = model.get_input_embeddings().weight.detach()
-                    except Exception:
-                        pass
-
-                if vocab_emb is None:
-                    V = eval_samples[0].logits_t.shape[0]
-                    D = eval_samples[0].h_t.shape[0]
-                    torch.manual_seed(config.seed)
-                    vocab_emb = torch.randn(V, D)
 
                 sweep = run_alpha_sweep(
                     net, eval_samples, vocab_emb,
@@ -1150,8 +1247,8 @@ if PYTORCH_AVAILABLE:
                 )
                 alpha_results[mode_name] = sweep
             elif run_alpha_sweep_flag:
-                print(f"  [goal_dirnet] s_goal does NOT win on {mode_name}, "
-                      f"skipping alpha sweep")
+                print(f"  [goal_dirnet] sb_learned does NOT win on "
+                      f"{mode_name}, skipping alpha sweep")
 
         return all_eval_results, alpha_results if alpha_results else None
 

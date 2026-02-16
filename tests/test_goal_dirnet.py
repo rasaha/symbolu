@@ -122,6 +122,7 @@ def small_samples(hidden_dim, vocab_size):
             u_target=u_target,
             logits_t=logits_t,
             correct=correct,
+            ground_truth_token=gt,
         ))
     return samples
 
@@ -427,60 +428,69 @@ class TestTraining:
 class TestEvaluation:
     """Test GoalDirNet evaluation pipeline."""
 
-    def test_eval_produces_valid_result(self, small_samples, hidden_dim):
+    def test_eval_produces_valid_result(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=2, batch_size=10,
         )
         net, _ = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test_data")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test_data")
 
         assert isinstance(result, GoalDirEvalResult)
         assert result.dataset_name == "test_data"
         assert result.n_eval == len(small_samples)
+        # New fields: pass@1 with reranking
+        assert 0.0 <= result.pass_at_1_baseline <= 1.0
+        assert 0.0 <= result.pass_at_1_reranked <= 1.0
+        assert 0.0 <= result.rerank_pct <= 1.0
 
-    def test_rho_values_in_range(self, small_samples, hidden_dim):
+    def test_rho_values_in_range(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=2, batch_size=10,
         )
         net, _ = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test")
 
         for rho_name in [
-            "rho_s_goal", "rho_margin", "rho_maxprob",
+            "rho_sb_learned", "rho_margin", "rho_maxprob",
             "rho_neg_entropy", "rho_logit_gap",
         ]:
             val = getattr(result, rho_name)
             assert -1.0 <= val <= 1.0, f"{rho_name}={val} out of range"
 
-    def test_calibration_metrics(self, small_samples, hidden_dim):
+    def test_calibration_metrics(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=2, batch_size=10,
         )
         net, _ = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test")
 
         assert 0.0 <= result.ece_maxprob <= 1.0
         assert 0.0 <= result.brier_maxprob <= 1.0
-        assert 0.0 <= result.ece_s_goal_calibrated <= 1.0
-        assert 0.0 <= result.brier_s_goal_calibrated <= 1.0
+        assert 0.0 <= result.ece_sb_calibrated <= 1.0
+        assert 0.0 <= result.brier_sb_calibrated <= 1.0
 
-    def test_gating_verdict(self, small_samples, hidden_dim):
+    def test_gating_verdict(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=2, batch_size=10,
         )
         net, _ = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test")
 
-        # s_goal_wins is bool
-        assert isinstance(result.s_goal_wins, bool)
+        # sb_learned_wins is bool
+        assert isinstance(result.sb_learned_wins, bool)
         # best_baseline_name is one of the known baselines
         assert result.best_baseline_name in {
             "margin", "maxprob", "neg_entropy", "logit_gap",
         }
 
-    def test_empty_samples(self, hidden_dim):
+    def test_empty_samples(self, hidden_dim, vocab_size):
         net = GoalDirNet(hidden_dim, hidden_dim, hidden_dim=64)
-        result = evaluate_goal_dirnet(net, [], "empty")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, [], vocab_emb, "empty")
         assert result.n_eval == 0
 
 
@@ -632,7 +642,7 @@ class TestFullPipeline:
         assert len(eval_results) == 1
         assert eval_results[0].dataset_name == "DryRun"
         assert eval_results[0].n_eval > 0
-        assert not np.isnan(eval_results[0].rho_s_goal)
+        assert not np.isnan(eval_results[0].rho_sb_learned)
 
     def test_pipeline_with_alpha_sweep(self, dry_run_dataset):
         config = GoalDirNetConfig(
@@ -665,23 +675,25 @@ class TestFullPipeline:
 class TestReporting:
     """Test report printing."""
 
-    def test_print_report_no_crash(self, small_samples, hidden_dim):
+    def test_print_report_no_crash(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=1, batch_size=10,
         )
         net, stats = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test_data")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test_data")
 
         report = print_goal_dirnet_report([result])
         assert "GoalDirNet Evaluation Report" in report
         assert "test_data" in report
 
-    def test_print_report_with_alpha(self, small_samples, hidden_dim):
+    def test_print_report_with_alpha(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=1, batch_size=10,
         )
         net, stats = train_goal_dirnet(small_samples, config)
-        result = evaluate_goal_dirnet(net, small_samples, "test_data")
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
+        result = evaluate_goal_dirnet(net, small_samples, vocab_emb, "test_data")
 
         alpha_results = {
             "test_data": {
@@ -697,15 +709,16 @@ class TestReporting:
         report = print_goal_dirnet_report([result], alpha_results)
         assert "Alpha Sweep" in report
 
-    def test_print_report_multiple_datasets(self, small_samples, hidden_dim):
+    def test_print_report_multiple_datasets(self, small_samples, hidden_dim, vocab_size):
         config = GoalDirNetConfig(
             hidden_dim=64, epochs=1, batch_size=10,
         )
         net, stats = train_goal_dirnet(small_samples, config)
+        vocab_emb = torch.randn(vocab_size, hidden_dim)
 
         results = [
-            evaluate_goal_dirnet(net, small_samples, "wikitext"),
-            evaluate_goal_dirnet(net, small_samples, "humaneval"),
+            evaluate_goal_dirnet(net, small_samples, vocab_emb, "wikitext"),
+            evaluate_goal_dirnet(net, small_samples, vocab_emb, "humaneval"),
         ]
 
         report = print_goal_dirnet_report(results)
