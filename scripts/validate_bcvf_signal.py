@@ -481,7 +481,7 @@ def evaluate_signal(
 
         # Forward pass
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits = outputs.logits  # [1, T, V]
             # Use the last hidden layer
             hidden_states = outputs.hidden_states[-1]  # [1, T, D]
@@ -614,7 +614,7 @@ def collect_dataset(
             continue
 
         with torch.no_grad():
-            outputs = model(tokens, output_hidden_states=True)
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
             logits_all = outputs.logits  # [1, T, V]
             hidden_all = outputs.hidden_states[-1]  # [1, T, D]
 
