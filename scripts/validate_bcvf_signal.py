@@ -727,36 +727,72 @@ def run_ablation_real(
     n_total = len(dataset)
     print(f"  Sanity check: direct argmax accuracy = "
           f"{n_correct}/{n_total} ({n_correct / n_total:.1%})")
+
     if n_correct == 0:
         print("  WARNING: model never predicts the next token correctly!")
-        # Detailed diagnostics to find the root cause
-        print("  --- Diagnostic dump (first 5 positions) ---")
-        for i, s in enumerate(dataset[:5]):
-            logits_t = s["logits"]  # [1, V]
-            gt = s["ground_truth"]
-            pred = torch.argmax(logits_t, dim=-1).item()
-            gt_logit = logits_t[0, gt].item()
-            pred_logit = logits_t[0, pred].item()
-            top5 = torch.topk(logits_t[0], 5)
-            has_nan = bool(torch.isnan(logits_t).any())
-            has_inf = bool(torch.isinf(logits_t).any())
-            print(f"    pos {i}: pred={pred} (logit={pred_logit:.2f}), "
-                  f"gt={gt} (logit={gt_logit:.2f}), "
-                  f"top5={top5.indices.tolist()}, "
-                  f"nan={has_nan}, inf={has_inf}")
-        # Check if argmax matches CURRENT token (off-by-one)
-        # Reconstruct by checking if pred[t] == ground_truth[t-1]
+        # Detect degenerate predictions: instruction-tuned models often have
+        # a handful of "always-on" tokens (chat markers, control tokens) that
+        # dominate the argmax on raw text.
+        from collections import Counter
         preds = [torch.argmax(s["logits"], dim=-1).item() for s in dataset]
         gts = [s["ground_truth"] for s in dataset]
+        pred_counts = Counter(preds)
+        dominant = [
+            tok for tok, cnt in pred_counts.most_common(20)
+            if cnt > n_total * 0.02  # appears in >2% of positions
+        ]
+
+        # Decode dominant tokens for diagnostics
+        tok_strs = {}
+        if hasattr(tokenizer, "decode"):
+            for tok in dominant[:10]:
+                try:
+                    tok_strs[tok] = repr(tokenizer.decode([tok]))
+                except Exception:
+                    tok_strs[tok] = "?"
+
+        print(f"  Dominant predicted tokens (>2% freq): {len(dominant)}")
+        for tok in dominant[:10]:
+            pct = pred_counts[tok] / n_total
+            s = f" = {tok_strs[tok]}" if tok in tok_strs else ""
+            print(f"    token {tok}{s}: {pred_counts[tok]}/{n_total} ({pct:.1%})")
+
+        # Check off-by-one
         off_by_one = sum(1 for i in range(1, len(preds))
                          if preds[i] == gts[i - 1])
-        print(f"  Off-by-one check: pred[t] == gt[t-1] for "
-              f"{off_by_one}/{len(preds)-1} positions "
-              f"({off_by_one / max(1, len(preds)-1):.1%})")
         if off_by_one > n_total * 0.3:
-            print("  >>> LIKELY OFF-BY-ONE ERROR: model predicts current "
-                  "token, not next token.")
-            print("  >>> Check tokenizer BOS/shifting or model architecture.")
+            print(f"  >>> LIKELY OFF-BY-ONE ERROR: pred[t]==gt[t-1] "
+                  f"for {off_by_one}/{len(preds)-1} "
+                  f"({off_by_one / max(1, len(preds)-1):.1%})")
+
+        # Mask dominant tokens and re-check accuracy.  This reveals whether
+        # the underlying distribution is meaningful once the constant bias
+        # from instruction-tuning is removed.
+        if dominant:
+            mask_set = set(dominant)
+            n_correct_filtered = 0
+            for s in dataset:
+                logits_t = s["logits"].clone()  # [1, V]
+                for tok in mask_set:
+                    logits_t[0, tok] = float("-inf")
+                pred_filtered = torch.argmax(logits_t, dim=-1).item()
+                if pred_filtered == s["ground_truth"]:
+                    n_correct_filtered += 1
+            print(f"  Filtered accuracy (masking {len(mask_set)} dominant tokens): "
+                  f"{n_correct_filtered}/{n_total} "
+                  f"({n_correct_filtered / n_total:.1%})")
+
+            if n_correct_filtered > 0:
+                print("  >>> Underlying distribution HAS signal. "
+                      "Applying dominant-token mask to logits.")
+                for s in dataset:
+                    for tok in mask_set:
+                        s["logits"][0, tok] = float("-inf")
+            else:
+                print("  >>> No improvement from masking. "
+                      "Model may need chat-template formatting.")
+                print("  >>> Consider using a base model (not -instruct) "
+                      "for next-token evaluation.")
 
     # Run through ExperimentRunner — pass model so it uses real vocab embeddings
     # (without the model, ExperimentRunner falls back to random vocab_emb,
