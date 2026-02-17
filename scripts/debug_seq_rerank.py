@@ -149,10 +149,13 @@ def has_close_elements(numbers: List[float], threshold: float) -> bool:
         pad_token_id=tokenizer.pad_token_id,
     )
 
+    from symbolu.ontological.bcvf_seq_reranking import fix_completion_indent
+
     for k in range(3):
         cand_ids = outputs[k, P:]
         cand_text = tokenizer.decode(cand_ids, skip_special_tokens=True)
-        full_fn = prompt + cand_text
+        cand_text_fixed = fix_completion_indent(prompt, cand_text)
+        full_fn = prompt + cand_text_fixed
 
         print(f"\n--- Candidate {k} ({len(cand_ids)} tokens) ---")
         print(repr(cand_text[:300]))
@@ -181,7 +184,11 @@ def has_close_elements(numbers: List[float], threshold: float) -> bool:
         except Exception as e:
             print(f"  EXECUTION: EXCEPTION {e}")
 
-except ImportError:
-    print("  (torch/transformers not available, skipping model test)")
+except ImportError as e:
+    import traceback
+    traceback.print_exc()
+    print(f"  (torch/transformers not available, skipping model test: {e})")
 except Exception as e:
+    import traceback
+    traceback.print_exc()
     print(f"  ERROR: {e}")

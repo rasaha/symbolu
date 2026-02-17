@@ -604,6 +604,65 @@ def logprob_rerank_candidates(
 
 
 # =========================================================================
+# Indentation normalization for assembled code
+# =========================================================================
+
+
+def _get_prompt_body_indent(prompt: str) -> Optional[int]:
+    """Return the expected body indentation level (in spaces) from a prompt.
+
+    Walks backwards through the prompt lines to find the indentation of the
+    last non-empty, indented line (typically the closing ``\"\"\"`` of a
+    docstring or the last statement in the function header).  Returns *None*
+    if no indented content is found.
+    """
+    for line in reversed(prompt.split("\n")):
+        stripped = line.lstrip()
+        if stripped and stripped != line:  # non-empty and indented
+            return len(line) - len(stripped)
+    return None
+
+
+def _get_first_line_indent(text: str) -> Optional[int]:
+    """Return the indentation of the first non-empty line in *text*."""
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        if stripped:
+            return len(line) - len(stripped)
+    return None
+
+
+def fix_completion_indent(prompt: str, completion: str) -> str:
+    """Adjust the first line of *completion* so its indentation matches the prompt.
+
+    BPE tokenisers frequently decode the first completion token with one
+    fewer (or more) leading space than the prompt body expects.  Subsequent
+    lines are almost always correctly indented because the model copies the
+    indent pattern from its own earlier output.
+
+    This helper therefore only touches the **first non-empty line**: it
+    shifts it to match the expected indent derived from the prompt, leaving
+    all other lines untouched.
+    """
+    if not completion or not completion.strip():
+        return completion
+
+    expected = _get_prompt_body_indent(prompt)
+    actual = _get_first_line_indent(completion)
+
+    if expected is None or actual is None or expected == actual:
+        return completion
+
+    lines = completion.split("\n")
+    for idx, line in enumerate(lines):
+        if line.strip():
+            # Fix only this first non-empty line
+            lines[idx] = " " * expected + line.lstrip()
+            break
+    return "\n".join(lines)
+
+
+# =========================================================================
 # Candidate Generation
 # =========================================================================
 
@@ -956,7 +1015,7 @@ def run_seq_rerank_benchmark_humaneval(
             # --- Oracle mode: test ALL K candidates, pick first passer ---
             pass_results: List[bool] = []
             for k in range(K):
-                code = prompt + candidate_texts[k]
+                code = prompt + fix_completion_indent(prompt, candidate_texts[k])
                 passed = test_fn(code, test_code, entry_point)
                 pass_results.append(passed)
 
@@ -1059,8 +1118,8 @@ def run_seq_rerank_benchmark_humaneval(
             selected_idx = best_idx
 
         # --- Common pass/fail evaluation (bcvf and logprob modes) ---
-        base_code = prompt + candidate_texts[logprob_best_idx]
-        selected_code = prompt + candidate_texts[selected_idx]
+        base_code = prompt + fix_completion_indent(prompt, candidate_texts[logprob_best_idx])
+        selected_code = prompt + fix_completion_indent(prompt, candidate_texts[selected_idx])
         result.base_passed = test_fn(base_code, test_code, entry_point)
         result.bcvf_passed = test_fn(selected_code, test_code, entry_point)
         result.any_passed = result.base_passed or result.bcvf_passed
