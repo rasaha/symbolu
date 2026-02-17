@@ -130,7 +130,9 @@ from symbolu.ontological.bilinear_bcvf import (
     BilinearEvalResult,
 )
 from symbolu.ontological.bcvf_seq_reranking import (
+    RERANK_MODES,
     rerank_candidates,
+    logprob_rerank_candidates,
     generate_and_rerank,
     run_seq_rerank_benchmark_humaneval,
     run_seq_rerank_benchmark_wikitext,
@@ -1357,21 +1359,26 @@ def build_parser() -> argparse.ArgumentParser:
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --softmax-entmax-mix --bayesian-energy",
             "",
-            "Sequence-level BCVF reranking examples:",
-            "  # Dry-run sequence reranking",
+            "Sequence-level reranking examples:",
+            "  # Dry-run BCVF reranking",
             "  python scripts/run_bcvf_benchmarks.py --dry-run "
             "--seq-rerank-bcvf",
-            "  # WikiText sequence reranking with K=8 candidates",
+            "  # Logprob baseline: does K>1 + logprob beat greedy?",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --seq-rerank-bcvf --rerank-mode logprob "
+            "--rerank-k 8",
+            "  # Oracle ceiling: best any perfect verifier could do",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --seq-rerank-bcvf --rerank-mode oracle_verifier "
+            "--rerank-k 8",
+            "  # BCVF reranking (original)",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --seq-rerank-bcvf --rerank-mode bcvf "
+            "--rerank-k 8 --rerank-lambda 0.5",
+            "  # WikiText with K=8 (BCVF mode)",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --seq-rerank-bcvf --rerank-k 8 "
             "--rerank-lambda 1.0 --goal-strategy lookahead",
-            "  # HumanEval sequence reranking",
-            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
-            "--model phi3 --seq-rerank-bcvf --rerank-k 8 "
-            "--rerank-lambda 0.5",
-            "  # Sanity check: lambda=0 should reproduce base reranking",
-            "  python scripts/run_bcvf_benchmarks.py --dry-run "
-            "--seq-rerank-bcvf --rerank-lambda 0.0",
         ]),
     )
 
@@ -1669,6 +1676,19 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--rerank-mode", type=str, default="bcvf",
+        choices=list(RERANK_MODES),
+        help=(
+            "Reranking mode for sequence-level evaluation. "
+            "bcvf: BCVF-adjusted logits (original). "
+            "logprob: pure logprob reranking — no BCVF, picks best logprob "
+            "among K candidates. Answers: does K>1 + logprob beat greedy? "
+            "oracle_verifier: tests ALL K candidates, picks first passer "
+            "(tie-break by logprob). Gives the ceiling for any selector. "
+            "(default: bcvf)"
+        ),
+    )
+    parser.add_argument(
         "--rerank-k", type=int, default=8,
         help=(
             "Number of candidate continuations to generate per prompt "
@@ -1798,7 +1818,8 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"γ_low={args.gamma_low}, γ_high={args.gamma_high}")
     if args.seq_rerank_bcvf:
         rerank_k = min(args.rerank_k, 8)
-        print(f"  SeqRerank: K={rerank_k}, λ={args.rerank_lambda}, "
+        print(f"  SeqRerank: mode={args.rerank_mode}, K={rerank_k}, "
+              f"λ={args.rerank_lambda}, "
               f"max_tokens={args.rerank_max_tokens}, "
               f"temp={args.rerank_temperature}, top_p={args.rerank_top_p}")
     print(f"{'='*70}")
@@ -2007,12 +2028,25 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         print()
         print_extended_summary(all_results)
 
-    # --- Sequence-level BCVF reranking ---
+    # --- Sequence-level reranking ---
     if args.seq_rerank_bcvf:
+        rerank_mode = args.rerank_mode
+        _mode_titles = {
+            "bcvf": "Sequence-Level BCVF Reranking",
+            "logprob": "Sequence-Level Logprob Reranking (baseline)",
+            "oracle_verifier": "Sequence-Level Oracle Verifier (ceiling)",
+        }
         print(f"\n{'='*70}")
-        print("Sequence-Level BCVF Reranking")
-        print(f"  Equation (B): z'_i(t) = z_i(t) - lambda*beta*L_i(t)")
-        print(f"  Score(y) = sum_i log softmax(z'_i)(y_i)")
+        print(_mode_titles.get(rerank_mode, f"Sequence-Level Reranking ({rerank_mode})"))
+        if rerank_mode == "bcvf":
+            print(f"  Equation (B): z'_i(t) = z_i(t) - lambda*beta*L_i(t)")
+            print(f"  Score(y) = sum_i log softmax(z'_i)(y_i)")
+        elif rerank_mode == "logprob":
+            print(f"  Pick candidate with highest base logprob among K.")
+            print(f"  Answers: does K>1 + logprob-selection beat greedy?")
+        elif rerank_mode == "oracle_verifier":
+            print(f"  Test ALL K candidates, pick first passer (tie-break logprob).")
+            print(f"  This is the ceiling: best any perfect verifier could do.")
         print(f"{'='*70}")
 
         rerank_k = min(args.rerank_k, 8)
@@ -2030,6 +2064,13 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
 
         for mode in modes:
             if mode == "wikitext":
+                if rerank_mode == "oracle_verifier":
+                    print(
+                        "\n  Skipping WikiText for oracle_verifier mode "
+                        "(no pass/fail tests for text generation)"
+                    )
+                    continue
+
                 for strategy in args.goal_strategy:
                     print(f"\n--- Seq Rerank: WikiText / {strategy} ---")
                     if args.dry_run:
@@ -2041,6 +2082,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         if not texts:
                             texts = _builtin_fallback_texts()
 
+                    # For logprob mode, run wikitext with lambda=0
+                    wt_lambda = (
+                        0.0 if rerank_mode == "logprob"
+                        else args.rerank_lambda
+                    )
                     sr_report = run_seq_rerank_benchmark_wikitext(
                         model=model,
                         tokenizer=tokenizer,
@@ -2048,7 +2094,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         bcvf_config=bcvf_config,
                         goal_strategy=strategy,
                         K=rerank_k,
-                        rerank_lambda=args.rerank_lambda,
+                        rerank_lambda=wt_lambda,
                         max_new_tokens=rerank_max_tokens,
                         temperature=rerank_temperature,
                         top_p=rerank_top_p,
@@ -2099,6 +2145,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                     temperature=rerank_temperature,
                     top_p=rerank_top_p,
                     n_bootstrap=args.n_bootstrap,
+                    rerank_mode=rerank_mode,
                 )
                 seq_rerank_reports.append(sr_report)
                 print_seq_rerank_report(sr_report)
@@ -2106,20 +2153,25 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         # Print combined summary if multiple reports
         if len(seq_rerank_reports) > 1:
             print(f"\n{'='*70}")
-            print("Sequence Reranking Summary (all benchmarks)")
+            print(f"Sequence Reranking Summary — mode={rerank_mode}")
             print(f"{'='*70}")
             for sr in seq_rerank_reports:
                 label = (
                     f"n={sr.n_prompts}"
                     f" K={sr.K}"
-                    f" λ={sr.rerank_lambda}"
+                    + (f" λ={sr.rerank_lambda}" if rerank_mode == "bcvf" else "")
                 )
                 rerank_pct = f"{sr.rerank_rate:.1%}"
                 if sr.pass_at_1_delta is not None:
+                    sel_label = {
+                        "bcvf": "bcvf_p@1",
+                        "logprob": "logprob_p@1",
+                        "oracle_verifier": "oracle_p@1",
+                    }.get(rerank_mode, "sel_p@1")
                     print(
                         f"  {label:<30} rerank={rerank_pct:>6} "
                         f"base_p@1={sr.base_pass_at_1:.3f} "
-                        f"bcvf_p@1={sr.bcvf_pass_at_1:.3f} "
+                        f"{sel_label}={sr.bcvf_pass_at_1:.3f} "
                         f"delta={sr.pass_at_1_delta:+.3f} "
                         f"win={sr.rerank_win_rate:.1%}"
                     )
