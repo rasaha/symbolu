@@ -92,10 +92,15 @@ try:
 
     model_name = "microsoft/phi-3.5-mini-instruct"
     print(f"Loading {model_name}...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype="auto", device_map="auto"
+        model_name, torch_dtype=None, trust_remote_code=True,
+        low_cpu_mem_usage=True,
     )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model = model.to("cuda")
+    model.eval()
 
     # Use a simple HumanEval prompt
     prompt = '''from typing import List
@@ -116,9 +121,6 @@ def has_close_elements(numbers: List[float], threshold: float) -> bool:
     print(f"  Prompt length: {P} tokens")
 
     # Generate 3 candidates
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-
     outputs = model.generate(
         input_ids,
         attention_mask=torch.ones_like(input_ids),
