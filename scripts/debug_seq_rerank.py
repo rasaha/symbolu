@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Quick diagnostic: why does seq-rerank get 0% pass@1 on HumanEval?"""
+import os
 import subprocess
 import sys
 import tempfile
+
+# Ensure the repo root is on the Python path so 'symbolu' is importable.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ── Test 1: Does run_unit_tests work at ALL with a known-good function? ──
 print("=" * 60)
