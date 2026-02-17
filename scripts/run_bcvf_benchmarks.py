@@ -129,6 +129,14 @@ from symbolu.ontological.bilinear_bcvf import (
     print_bilinear_report,
     BilinearEvalResult,
 )
+from symbolu.ontological.bcvf_seq_reranking import (
+    rerank_candidates,
+    generate_and_rerank,
+    run_seq_rerank_benchmark_humaneval,
+    run_seq_rerank_benchmark_wikitext,
+    print_seq_rerank_report,
+    SeqRerankReport,
+)
 
 
 # =========================================================================
@@ -597,7 +605,10 @@ def _compute_goal_embeddings(
 def _load_humaneval_problems(
     path: Optional[str] = None,
 ) -> List[Dict[str, str]]:
-    """Load HumanEval problems from JSONL or HuggingFace."""
+    """Load HumanEval problems from JSONL or HuggingFace.
+
+    Returns dicts with: task_id, prompt, test (optional), entry_point (optional).
+    """
     if path is not None:
         p = Path(path)
         if p.exists():
@@ -608,6 +619,8 @@ def _load_humaneval_problems(
                     problems.append({
                         "task_id": obj["task_id"],
                         "prompt": obj["prompt"],
+                        "test": obj.get("test", ""),
+                        "entry_point": obj.get("entry_point", ""),
                     })
             return problems
 
@@ -615,7 +628,12 @@ def _load_humaneval_problems(
         from datasets import load_dataset
         ds = load_dataset("openai_humaneval", split="test")
         return [
-            {"task_id": item["task_id"], "prompt": item["prompt"]}
+            {
+                "task_id": item["task_id"],
+                "prompt": item["prompt"],
+                "test": item.get("test", ""),
+                "entry_point": item.get("entry_point", ""),
+            }
             for item in ds
         ]
     except Exception as exc:
@@ -905,6 +923,8 @@ class _DryRunModel(torch.nn.Module):
         use_cache: bool = False,
         **kwargs,
     ):
+        # Mask out-of-range token ids to avoid embedding errors
+        input_ids = input_ids.clamp(0, self.embedding.num_embeddings - 1)
         emb = self.embedding(input_ids)       # [B, T, D]
         hidden = torch.relu(self.linear(emb))  # [B, T, D]
         logits = self.lm_head(hidden)          # [B, T, V]
@@ -917,6 +937,40 @@ class _DryRunModel(torch.nn.Module):
         if output_hidden_states:
             out.hidden_states = (emb, hidden)
         return out
+
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 32,
+        num_return_sequences: int = 1,
+        do_sample: bool = True,
+        temperature: float = 0.8,
+        top_p: float = 0.95,
+        pad_token_id: Optional[int] = None,
+        **kwargs,
+    ) -> torch.Tensor:
+        """Simple autoregressive generation for dry-run testing."""
+        B = input_ids.shape[0]
+        V = self.lm_head.out_features
+        device = input_ids.device
+
+        # Replicate input for num_return_sequences
+        cur = input_ids.repeat(num_return_sequences, 1)  # [K, P]
+
+        for _ in range(max_new_tokens):
+            out = self.forward(cur)
+            next_logits = out.logits[:, -1, :]  # [K, V]
+
+            if do_sample and temperature > 0:
+                probs = torch.softmax(next_logits / temperature, dim=-1)
+                next_token = torch.multinomial(probs, 1)  # [K, 1]
+            else:
+                next_token = next_logits.argmax(dim=-1, keepdim=True)
+
+            cur = torch.cat([cur, next_token], dim=-1)
+
+        return cur  # [K, P + max_new_tokens]
 
 
 class _MinimalTokenizer:
@@ -1302,6 +1356,22 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Combined with Bayesian Energy",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --softmax-entmax-mix --bayesian-energy",
+            "",
+            "Sequence-level BCVF reranking examples:",
+            "  # Dry-run sequence reranking",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--seq-rerank-bcvf",
+            "  # WikiText sequence reranking with K=8 candidates",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --seq-rerank-bcvf --rerank-k 8 "
+            "--rerank-lambda 1.0 --goal-strategy lookahead",
+            "  # HumanEval sequence reranking",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --seq-rerank-bcvf --rerank-k 8 "
+            "--rerank-lambda 0.5",
+            "  # Sanity check: lambda=0 should reproduce base reranking",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--seq-rerank-bcvf --rerank-lambda 0.0",
         ]),
     )
 
@@ -1588,6 +1658,49 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Sequence-level BCVF reranking flags ---
+    parser.add_argument(
+        "--seq-rerank-bcvf", action="store_true",
+        help=(
+            "Enable sequence-level BCVF candidate reranking. "
+            "Generates K candidates with sampling, then reranks using "
+            "Equation (B): adjusted logits -> sequence logprob. "
+            "Score(y) = sum_i log softmax(z_i - lambda*beta*L_i)(y_i)"
+        ),
+    )
+    parser.add_argument(
+        "--rerank-k", type=int, default=8,
+        help=(
+            "Number of candidate continuations to generate per prompt "
+            "for sequence-level reranking (default: 8, max: 8)"
+        ),
+    )
+    parser.add_argument(
+        "--rerank-lambda", type=float, default=1.0,
+        help=(
+            "BCVF mixing parameter for sequence reranking. "
+            "0.0 = pure base logprob reranking (no BCVF). "
+            "1.0 = full BCVF penalty (default). "
+            "Interpolates: effective_beta = lambda * beta."
+        ),
+    )
+    parser.add_argument(
+        "--rerank-max-tokens", type=int, default=128,
+        help="Max new tokens per candidate in sequence reranking (default: 128)",
+    )
+    parser.add_argument(
+        "--rerank-temperature", type=float, default=0.8,
+        help="Sampling temperature for candidate generation (default: 0.8)",
+    )
+    parser.add_argument(
+        "--rerank-top-p", type=float, default=0.95,
+        help="Top-p (nucleus) sampling for candidate generation (default: 0.95)",
+    )
+    parser.add_argument(
+        "--rerank-n-prompts", type=int, default=50,
+        help="Number of prompts for WikiText seq reranking (default: 50)",
+    )
+
     return parser
 
 
@@ -1683,6 +1796,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     if args.softmax_entmax_mix:
         print(f"  Entmax:  α={args.entmax_alpha}, "
               f"γ_low={args.gamma_low}, γ_high={args.gamma_high}")
+    if args.seq_rerank_bcvf:
+        rerank_k = min(args.rerank_k, 8)
+        print(f"  SeqRerank: K={rerank_k}, λ={args.rerank_lambda}, "
+              f"max_tokens={args.rerank_max_tokens}, "
+              f"temp={args.rerank_temperature}, top_p={args.rerank_top_p}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
@@ -1888,6 +2006,128 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     if all_results:
         print()
         print_extended_summary(all_results)
+
+    # --- Sequence-level BCVF reranking ---
+    if args.seq_rerank_bcvf:
+        print(f"\n{'='*70}")
+        print("Sequence-Level BCVF Reranking")
+        print(f"  Equation (B): z'_i(t) = z_i(t) - lambda*beta*L_i(t)")
+        print(f"  Score(y) = sum_i log softmax(z'_i)(y_i)")
+        print(f"{'='*70}")
+
+        rerank_k = min(args.rerank_k, 8)
+        rerank_max_tokens = args.rerank_max_tokens
+        rerank_temperature = args.rerank_temperature
+        rerank_top_p = args.rerank_top_p
+        rerank_n_prompts = args.rerank_n_prompts
+
+        if args.dry_run:
+            rerank_k = min(rerank_k, 4)
+            rerank_max_tokens = min(rerank_max_tokens, 32)
+            rerank_n_prompts = min(rerank_n_prompts, 10)
+
+        seq_rerank_reports: List[SeqRerankReport] = []
+
+        for mode in modes:
+            if mode == "wikitext":
+                for strategy in args.goal_strategy:
+                    print(f"\n--- Seq Rerank: WikiText / {strategy} ---")
+                    if args.dry_run:
+                        texts = _builtin_fallback_texts()
+                    else:
+                        texts = _load_evaluation_texts(
+                            args.dataset, max_texts=100,
+                        )
+                        if not texts:
+                            texts = _builtin_fallback_texts()
+
+                    sr_report = run_seq_rerank_benchmark_wikitext(
+                        model=model,
+                        tokenizer=tokenizer,
+                        texts=texts,
+                        bcvf_config=bcvf_config,
+                        goal_strategy=strategy,
+                        K=rerank_k,
+                        rerank_lambda=args.rerank_lambda,
+                        max_new_tokens=rerank_max_tokens,
+                        temperature=rerank_temperature,
+                        top_p=rerank_top_p,
+                        n_prompts=rerank_n_prompts,
+                        n_bootstrap=args.n_bootstrap,
+                    )
+                    seq_rerank_reports.append(sr_report)
+                    print_seq_rerank_report(sr_report)
+
+            elif mode == "humaneval":
+                print(f"\n--- Seq Rerank: HumanEval ---")
+                if args.dry_run:
+                    # Dry-run: generate synthetic "problems" with no tests
+                    problems = [
+                        {
+                            "prompt": f"def solution_{i}(x):\n    ",
+                            "test": "",
+                            "entry_point": f"solution_{i}",
+                            "task_id": f"dry_run_{i}",
+                        }
+                        for i in range(min(rerank_n_prompts, 5))
+                    ]
+                else:
+                    raw_problems = _load_humaneval_problems(
+                        args.humaneval_path,
+                    )
+                    problems = [
+                        {
+                            "prompt": p["prompt"],
+                            "test": p.get("test", ""),
+                            "entry_point": p.get("entry_point", ""),
+                            "task_id": p.get("task_id", f"he_{i}"),
+                        }
+                        for i, p in enumerate(raw_problems)
+                    ]
+                    if not problems:
+                        print("  No HumanEval problems loaded, skipping")
+                        continue
+
+                sr_report = run_seq_rerank_benchmark_humaneval(
+                    model=model,
+                    tokenizer=tokenizer,
+                    problems=problems[:rerank_n_prompts],
+                    bcvf_config=bcvf_config,
+                    K=rerank_k,
+                    rerank_lambda=args.rerank_lambda,
+                    max_new_tokens=rerank_max_tokens,
+                    temperature=rerank_temperature,
+                    top_p=rerank_top_p,
+                    n_bootstrap=args.n_bootstrap,
+                )
+                seq_rerank_reports.append(sr_report)
+                print_seq_rerank_report(sr_report)
+
+        # Print combined summary if multiple reports
+        if len(seq_rerank_reports) > 1:
+            print(f"\n{'='*70}")
+            print("Sequence Reranking Summary (all benchmarks)")
+            print(f"{'='*70}")
+            for sr in seq_rerank_reports:
+                label = (
+                    f"n={sr.n_prompts}"
+                    f" K={sr.K}"
+                    f" λ={sr.rerank_lambda}"
+                )
+                rerank_pct = f"{sr.rerank_rate:.1%}"
+                if sr.pass_at_1_delta is not None:
+                    print(
+                        f"  {label:<30} rerank={rerank_pct:>6} "
+                        f"base_p@1={sr.base_pass_at_1:.3f} "
+                        f"bcvf_p@1={sr.bcvf_pass_at_1:.3f} "
+                        f"delta={sr.pass_at_1_delta:+.3f} "
+                        f"win={sr.rerank_win_rate:.1%}"
+                    )
+                else:
+                    print(
+                        f"  {label:<30} rerank={rerank_pct:>6} "
+                        f"margin={sr.mean_score_margin:.4f}"
+                    )
 
     # --- Bayesian Energy Softmax comparison ---
     if args.bayesian_energy and all_results:
