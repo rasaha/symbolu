@@ -1283,6 +1283,18 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Full suite with MC-Dropout uncertainty",
             "  python scripts/run_bcvf_benchmarks.py --mode all "
             "--model phi3 --bayesian-energy --uncertainty dropout_var",
+            "",
+            "Softmax-Entmax Mix examples:",
+            "  # Dry-run with default entmax(1.3)",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--softmax-entmax-mix",
+            "  # WikiText with custom gamma thresholds",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --softmax-entmax-mix --gamma-low 0.5 "
+            "--gamma-high 4.0",
+            "  # Combined with Bayesian Energy",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --softmax-entmax-mix --bayesian-energy",
         ]),
     )
 
@@ -1541,6 +1553,34 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Softmax-Entmax Mix flags ---
+    parser.add_argument(
+        "--softmax-entmax-mix", action="store_true",
+        help=(
+            "Enable entropy-gated softmax + entmax(α) mixture at decode "
+            "time.  In uncertain (high-entropy) regimes, entmax sparsifies "
+            "the distribution; in confident regimes, softmax is preserved."
+        ),
+    )
+    parser.add_argument(
+        "--entmax-alpha", type=float, default=1.3,
+        help="Entmax Tsallis alpha (> 1, default: 1.3)",
+    )
+    parser.add_argument(
+        "--gamma-low", type=float, default=1.0,
+        help=(
+            "Lower entropy threshold for gamma ramp.  Below this entropy "
+            "gamma=0 (pure softmax).  Default: 1.0"
+        ),
+    )
+    parser.add_argument(
+        "--gamma-high", type=float, default=5.0,
+        help=(
+            "Upper entropy threshold for gamma ramp.  Above this entropy "
+            "gamma=1 (pure entmax).  Default: 5.0"
+        ),
+    )
+
     return parser
 
 
@@ -1600,6 +1640,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         energy_alpha=args.alpha,
         energy_beta=args.energy_beta,
         uncertainty_mode=args.uncertainty,
+        # Softmax-Entmax Mix
+        use_softmax_entmax_mix=args.softmax_entmax_mix,
+        entmax_alpha=args.entmax_alpha,
+        gamma_low=args.gamma_low,
+        gamma_high=args.gamma_high,
     )
 
     # --- Load model ---
@@ -1628,6 +1673,9 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     if args.bayesian_energy:
         print(f"  Energy:  α={args.alpha}, β={args.energy_beta}, "
               f"uncertainty={args.uncertainty}")
+    if args.softmax_entmax_mix:
+        print(f"  Entmax:  α={args.entmax_alpha}, "
+              f"γ_low={args.gamma_low}, γ_high={args.gamma_high}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
