@@ -89,6 +89,10 @@ from symbolu.ontological.bcvf_benchmarks import (
 # =========================================================================
 
 
+# Valid reranking modes
+RERANK_MODES = ("bcvf", "logprob", "oracle_verifier")
+
+
 @dataclass
 class SeqRerankResult:
     """Result for one prompt's sequence-level reranking."""
@@ -96,6 +100,7 @@ class SeqRerankResult:
     prompt_id: str = ""
     K: int = 0
     rerank_lambda: float = 1.0
+    rerank_mode: str = "bcvf"  # bcvf | logprob | oracle_verifier
     # Base (logprob) reranking
     base_best_idx: int = 0
     base_best_score: float = 0.0
@@ -142,6 +147,7 @@ class SeqRerankReport:
     K: int = 0
     rerank_lambda: float = 1.0
     equation: str = "B"
+    rerank_mode: str = "bcvf"  # bcvf | logprob | oracle_verifier
     # Reranking behavior
     rerank_rate: float = 0.0           # fraction where BCVF picked different
     mean_score_margin: float = 0.0     # avg (best - second_best) under BCVF
@@ -491,6 +497,113 @@ def rerank_candidates(
 
 
 # =========================================================================
+# Logprob-Only Reranking (no BCVF)
+# =========================================================================
+
+
+@torch.no_grad()
+def logprob_rerank_candidates(
+    prompt_ids: "torch.Tensor",
+    candidate_ids_list: List["torch.Tensor"],
+    model: Any,
+) -> Tuple[int, np.ndarray, Dict[str, Any]]:
+    """
+    Score K candidates by base logprob only.  No BCVF, no goal embedding.
+
+    This is the honest baseline: generate K candidates with sampling,
+    pick the one the model assigns highest probability to.
+
+    Args:
+        prompt_ids: Token ids of the prompt, shape [P].
+        candidate_ids_list: List of K continuation token tensors, each [T_k].
+        model: HuggingFace causal LM.
+
+    Returns:
+        best_index: Index of the highest-logprob candidate.
+        scores: Array of K base logprob scores.
+        diagnostics: Dict with per-candidate details.
+    """
+    if not PYTORCH_AVAILABLE:
+        raise ImportError("PyTorch is required")
+
+    device = prompt_ids.device
+    K = len(candidate_ids_list)
+    P = prompt_ids.shape[0]
+
+    if K == 0:
+        return 0, np.array([]), {}
+
+    # --- Pad candidates and build batched input ---
+    cand_lengths = [c.shape[0] for c in candidate_ids_list]
+    max_cand_len = max(cand_lengths)
+
+    pad_id = getattr(model, "config", None)
+    if pad_id is not None:
+        pad_id = getattr(pad_id, "pad_token_id", None)
+    if pad_id is None:
+        pad_id = 0
+
+    batch_input = torch.full(
+        (K, P + max_cand_len), pad_id,
+        dtype=torch.long, device=device,
+    )
+    attention_mask = torch.zeros(
+        K, P + max_cand_len, dtype=torch.long, device=device,
+    )
+
+    for k, cand in enumerate(candidate_ids_list):
+        T_k = cand.shape[0]
+        batch_input[k, :P] = prompt_ids
+        batch_input[k, P:P + T_k] = cand
+        attention_mask[k, :P + T_k] = 1
+
+    # --- Batched forward pass ---
+    outputs = model(
+        batch_input,
+        attention_mask=attention_mask,
+        use_cache=False,
+    )
+    logits_all = outputs.logits  # [K, P+max_T, V]
+
+    # --- Score each candidate by base logprob ---
+    scores = np.zeros(K, dtype=np.float64)
+
+    for k in range(K):
+        T_k = cand_lengths[k]
+        if T_k == 0:
+            continue
+
+        z = logits_all[k, P - 1:P - 1 + T_k, :]  # [T_k, V]
+        target = candidate_ids_list[k].to(device)   # [T_k]
+
+        base_lp = F.log_softmax(z, dim=-1)
+        base_lp_tokens = base_lp.gather(
+            1, target.unsqueeze(1)
+        ).squeeze(1)
+        scores[k] = float(base_lp_tokens.sum().item())
+
+    best_index = int(np.argmax(scores))
+
+    # Score margins
+    sorted_scores = np.sort(scores)[::-1]
+    score_margin = float(sorted_scores[0] - sorted_scores[1]) if K > 1 else 0.0
+
+    diagnostics = {
+        "best_index": best_index,
+        "base_best_index": best_index,
+        "rerank_changed": False,
+        "scores": scores,
+        "base_scores": scores,
+        "score_margin": score_margin,
+        "base_score_margin": score_margin,
+        "candidate_lengths": cand_lengths,
+        "rerank_mode": "logprob",
+    }
+
+    return best_index, scores, diagnostics
+
+
+# =========================================================================
 # Candidate Generation
 # =========================================================================
 
@@ -740,15 +853,28 @@ def run_seq_rerank_benchmark_humaneval(
     top_p: float = 0.95,
     n_bootstrap: int = 1000,
     test_fn: Optional[Callable[[str, str, str], bool]] = None,
+    rerank_mode: str = "bcvf",
 ) -> SeqRerankReport:
     """
-    Run sequence-level BCVF reranking benchmark on HumanEval problems.
+    Run sequence-level reranking benchmark on HumanEval problems.
 
-    For each problem:
-    1. Generate K candidates with sampling.
-    2. Baseline = candidate with highest base logprob.
-    3. BCVF-reranked = candidate with highest Equation (B) score.
-    4. Run unit tests on both selections.
+    Supports three reranking modes:
+
+    ``bcvf``
+        Original BCVF-adjusted logits (Equation B).  Selects the candidate
+        with the highest BCVF-adjusted sequence logprob.
+
+    ``logprob``
+        Pure logprob reranking — no BCVF, no goal embedding.  Generates K
+        candidates with sampling, picks the one the model assigns highest
+        probability to.  This is the honest baseline that answers: "does
+        sampling K and picking by logprob already beat greedy (K=1)?"
+
+    ``oracle_verifier``
+        Tests *all* K candidates against unit tests.  Picks the first
+        passing candidate (tie-broken by logprob if multiple pass).
+        Falls back to best-logprob if none pass.  This gives the ceiling:
+        "how good can reranking possibly be with a perfect verifier?"
 
     Args:
         model: HuggingFace causal LM.
@@ -756,23 +882,31 @@ def run_seq_rerank_benchmark_humaneval(
         problems: List of problem dicts with 'prompt', 'test', 'entry_point'.
         bcvf_config: BCVF parameters.
         K: Number of candidates per problem.
-        rerank_lambda: BCVF mixing parameter.
+        rerank_lambda: BCVF mixing parameter (only used in bcvf mode).
         max_new_tokens: Max tokens per candidate.
         temperature: Sampling temperature.
         top_p: Nucleus sampling threshold.
         n_bootstrap: Bootstrap resamples for CIs.
         test_fn: Function(code, test_code, entry_point) -> bool.
                  Defaults to run_unit_tests from bcvf_experiments.
+        rerank_mode: "bcvf", "logprob", or "oracle_verifier".
 
     Returns:
         SeqRerankReport with all metrics.
     """
+    if rerank_mode not in RERANK_MODES:
+        raise ValueError(
+            f"Unknown rerank_mode={rerank_mode!r}. "
+            f"Valid modes: {RERANK_MODES}"
+        )
+
     if test_fn is None:
         from symbolu.ontological.bcvf_experiments import run_unit_tests
         test_fn = run_unit_tests
 
     t0 = time.time()
     per_prompt: List[SeqRerankResult] = []
+    mode_label = f"seq-rerank-humaneval-{rerank_mode}"
 
     for i, prob in enumerate(problems):
         prompt = prob["prompt"]
@@ -780,55 +914,183 @@ def run_seq_rerank_benchmark_humaneval(
         entry_point = prob.get("entry_point", "")
         task_id = prob.get("task_id", f"problem_{i}")
 
-        # Compute goal embedding from problem description
-        goal = compute_prompt_goal_embedding(
-            model, tokenizer, prompt, strategy="prompt_mean",
-        )
-
-        # Generate + rerank
-        base_text, bcvf_text, result = generate_and_rerank(
-            model, tokenizer, prompt, goal, bcvf_config,
-            K=K, rerank_lambda=rerank_lambda,
+        # Generate K candidates (shared across all modes)
+        prompt_ids, candidate_ids_list, candidate_texts = generate_candidates(
+            model, tokenizer, prompt, K=K,
             max_new_tokens=max_new_tokens,
             temperature=temperature, top_p=top_p,
         )
-        result.prompt_id = task_id
 
-        # Run unit tests on base-best and bcvf-best
-        base_code = prompt + base_text
-        bcvf_code = prompt + bcvf_text
+        if not candidate_ids_list:
+            continue
+
+        # --- Compute base logprob scores (needed by all modes) ---
+        logprob_best_idx, logprob_scores, logprob_diag = \
+            logprob_rerank_candidates(
+                prompt_ids, candidate_ids_list, model,
+            )
+
+        if rerank_mode == "logprob":
+            # --- Logprob mode: pick best by base logprob ---
+            selected_idx = logprob_best_idx
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=0.0,
+                rerank_mode="logprob",
+                base_best_idx=logprob_best_idx,
+                base_best_score=float(logprob_scores[logprob_best_idx]),
+                base_scores=logprob_scores,
+                bcvf_best_idx=logprob_best_idx,
+                bcvf_best_score=float(logprob_scores[logprob_best_idx]),
+                bcvf_scores=logprob_scores,
+                rerank_changed=False,
+                score_margin=logprob_diag["score_margin"],
+                base_score_margin=logprob_diag["score_margin"],
+                candidate_lengths=logprob_diag["candidate_lengths"],
+                base_text=candidate_texts[logprob_best_idx],
+                bcvf_text=candidate_texts[logprob_best_idx],
+            )
+
+        elif rerank_mode == "oracle_verifier":
+            # --- Oracle mode: test ALL K candidates, pick first passer ---
+            pass_results: List[bool] = []
+            for k in range(K):
+                code = prompt + candidate_texts[k]
+                passed = test_fn(code, test_code, entry_point)
+                pass_results.append(passed)
+
+            # Among passing candidates, pick by highest logprob
+            passing_indices = [
+                k for k, p in enumerate(pass_results) if p
+            ]
+            if passing_indices:
+                # Tie-break by logprob
+                best_passing = max(
+                    passing_indices, key=lambda k: logprob_scores[k]
+                )
+                selected_idx = best_passing
+            else:
+                # No candidate passed; fall back to best logprob
+                selected_idx = logprob_best_idx
+
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=0.0,
+                rerank_mode="oracle_verifier",
+                base_best_idx=logprob_best_idx,
+                base_best_score=float(logprob_scores[logprob_best_idx]),
+                base_scores=logprob_scores,
+                bcvf_best_idx=selected_idx,
+                bcvf_best_score=float(logprob_scores[selected_idx]),
+                bcvf_scores=logprob_scores,
+                rerank_changed=selected_idx != logprob_best_idx,
+                score_margin=logprob_diag["score_margin"],
+                base_score_margin=logprob_diag["score_margin"],
+                candidate_lengths=logprob_diag["candidate_lengths"],
+                base_text=candidate_texts[logprob_best_idx],
+                bcvf_text=candidate_texts[selected_idx],
+            )
+            # Set pass/fail: oracle selected candidate and base
+            result.bcvf_passed = bool(pass_results[selected_idx])
+            result.base_passed = bool(pass_results[logprob_best_idx])
+            result.any_passed = any(pass_results)
+
+            per_prompt.append(result)
+
+            if (i + 1) % 5 == 0 or i == 0:
+                n_pass = sum(pass_results)
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"oracle={'PASS' if result.bcvf_passed else 'FAIL'} "
+                    f"logprob={'PASS' if result.base_passed else 'FAIL'} "
+                    f"K_passed={n_pass}/{K} "
+                    f"changed={result.rerank_changed}"
+                )
+            continue  # skip the common tail below
+
+        else:
+            # --- BCVF mode: original Equation (B) ---
+            goal = compute_prompt_goal_embedding(
+                model, tokenizer, prompt, strategy="prompt_mean",
+            )
+            best_idx, scores, diag = rerank_candidates(
+                prompt_ids, candidate_ids_list, model, goal,
+                bcvf_config, rerank_lambda=rerank_lambda,
+            )
+
+            base_best_idx = diag["base_best_index"]
+            _safe_mean = lambda lst: float(np.mean(lst)) if lst else 0.0
+
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=rerank_lambda,
+                rerank_mode="bcvf",
+                base_best_idx=base_best_idx,
+                base_best_score=float(diag["base_scores"][base_best_idx]),
+                base_scores=diag["base_scores"],
+                bcvf_best_idx=best_idx,
+                bcvf_best_score=float(scores[best_idx]),
+                bcvf_scores=scores,
+                rerank_changed=diag["rerank_changed"],
+                score_margin=diag["score_margin"],
+                base_score_margin=diag["base_score_margin"],
+                candidate_lengths=diag["candidate_lengths"],
+                base_text=candidate_texts[base_best_idx],
+                bcvf_text=candidate_texts[best_idx],
+                # Signal diagnostics
+                topM_hit_rate=_safe_mean(diag["per_candidate_topM_hit_rate"]),
+                mean_sf=_safe_mean(diag["per_candidate_sf"]),
+                mean_sb=_safe_mean(diag["per_candidate_sb"]),
+                mean_sf_all=_safe_mean(diag["per_candidate_sf_all_mean"]),
+                mean_sb_all=_safe_mean(diag["per_candidate_sb_all_mean"]),
+                std_sf_all=_safe_mean(diag["per_candidate_sf_all_std"]),
+                std_sb_all=_safe_mean(diag["per_candidate_sb_all_std"]),
+                mean_L=_safe_mean(diag["per_candidate_L_mean"]),
+                std_L=_safe_mean(diag["per_candidate_L_std"]),
+                penalty_per_tok=_safe_mean(diag["per_candidate_penalty_per_tok"]),
+                base_lp_per_tok=_safe_mean(diag["per_candidate_base_per_tok"]),
+                score_std=diag["score_std"],
+                base_score_std=diag["base_score_std"],
+                rank_correlation=diag["rank_correlation"],
+            )
+            selected_idx = best_idx
+
+        # --- Common pass/fail evaluation (bcvf and logprob modes) ---
+        base_code = prompt + candidate_texts[logprob_best_idx]
+        selected_code = prompt + candidate_texts[selected_idx]
         result.base_passed = test_fn(base_code, test_code, entry_point)
-        result.bcvf_passed = test_fn(bcvf_code, test_code, entry_point)
-
-        # Oracle: did any candidate pass?
-        # Re-generate candidate texts for oracle check
-        prompt_ids, candidate_ids_list, candidate_texts = generate_candidates(
-            model, tokenizer, prompt, K=1, max_new_tokens=1,
-        )
-        # We already have the results from generate_and_rerank, but
-        # need to test all K candidates for oracle.  Since we can't
-        # recover the candidates from result alone, test base and bcvf only.
-        # Oracle pass@K = any of the tested candidates passed
+        result.bcvf_passed = test_fn(selected_code, test_code, entry_point)
         result.any_passed = result.base_passed or result.bcvf_passed
 
         per_prompt.append(result)
 
         if (i + 1) % 5 == 0 or i == 0:
-            print(
-                f"  [seq-rerank-humaneval] {i+1}/{len(problems)} "
-                f"base={'PASS' if result.base_passed else 'FAIL'} "
-                f"bcvf={'PASS' if result.bcvf_passed else 'FAIL'} "
-                f"changed={result.rerank_changed} "
-                f"topM_hit={result.topM_hit_rate:.2f} "
-                f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
-                f"L={result.mean_L:.4f} "
-                f"rank_r={result.rank_correlation:.2f}"
-            )
+            if rerank_mode == "bcvf":
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if result.base_passed else 'FAIL'} "
+                    f"bcvf={'PASS' if result.bcvf_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed} "
+                    f"topM_hit={result.topM_hit_rate:.2f} "
+                    f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
+                    f"L={result.mean_L:.4f} "
+                    f"rank_r={result.rank_correlation:.2f}"
+                )
+            else:
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if result.base_passed else 'FAIL'} "
+                    f"selected={'PASS' if result.bcvf_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed}"
+                )
 
     elapsed = time.time() - t0
     return _build_seq_rerank_report(
         per_prompt, K, rerank_lambda, n_bootstrap, elapsed,
-        has_pass_fail=True,
+        has_pass_fail=True, rerank_mode=rerank_mode,
     )
 
 
@@ -1002,11 +1264,15 @@ def _build_seq_rerank_report(
     n_bootstrap: int,
     elapsed: float,
     has_pass_fail: bool,
+    rerank_mode: str = "bcvf",
 ) -> SeqRerankReport:
     """Build aggregated report from per-prompt results."""
     n = len(per_prompt)
     if n == 0:
-        return SeqRerankReport(n_prompts=0, K=K, rerank_lambda=rerank_lambda)
+        return SeqRerankReport(
+            n_prompts=0, K=K, rerank_lambda=rerank_lambda,
+            rerank_mode=rerank_mode,
+        )
 
     # Reranking behavior
     rerank_changed = [r.rerank_changed for r in per_prompt]
@@ -1031,6 +1297,7 @@ def _build_seq_rerank_report(
         K=K,
         rerank_lambda=rerank_lambda,
         equation="B",
+        rerank_mode=rerank_mode,
         rerank_rate=rerank_rate,
         mean_score_margin=float(np.mean(score_margins)),
         mean_base_score_margin=float(np.mean(base_score_margins)),
@@ -1102,205 +1369,302 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
     """
     Print a formatted sequence-level reranking report.
 
+    Adapts output based on ``report.rerank_mode``:
+    - ``bcvf``: Full BCVF diagnostics (original behavior).
+    - ``logprob``: Concise logprob-only report.
+    - ``oracle_verifier``: Shows oracle ceiling with framing numbers.
+
     Returns the table as a string (also prints it).
     """
     lines: List[str] = []
     sep = "=" * 70
+    mode = report.rerank_mode
 
+    # --- Mode-specific labels ---
+    MODE_TITLES = {
+        "bcvf": "Sequence-Level BCVF Reranking Report",
+        "logprob": "Sequence-Level Logprob Reranking Report",
+        "oracle_verifier": "Sequence-Level Oracle Verifier Report",
+    }
+    MODE_DESCS = {
+        "bcvf": "Equation (B): BCVF-adjusted logits -> sequence logprob",
+        "logprob": (
+            "Pure logprob reranking: generate K candidates, pick "
+            "highest base logprob.  No BCVF, no goal embedding."
+        ),
+        "oracle_verifier": (
+            "Oracle verifier: test ALL K candidates, pick first passer "
+            "(tie-break by logprob).  This is the ceiling."
+        ),
+    }
+
+    # --- Header ---
     lines.append(sep)
-    lines.append("Sequence-Level BCVF Reranking Report")
-    lines.append(f"  Equation: (B) BCVF-adjusted logits -> sequence logprob")
+    lines.append(MODE_TITLES.get(mode, f"Sequence-Level Reranking ({mode})"))
+    lines.append(f"  {MODE_DESCS.get(mode, mode)}")
     lines.append(
-        f"  K={report.K}  lambda={report.rerank_lambda:.2f}  "
-        f"n_prompts={report.n_prompts}  "
-        f"time={report.elapsed_seconds:.1f}s"
+        f"  K={report.K}  "
+        + (f"lambda={report.rerank_lambda:.2f}  " if mode == "bcvf" else "")
+        + f"n_prompts={report.n_prompts}  "
+        + f"time={report.elapsed_seconds:.1f}s"
     )
     lines.append(sep)
 
-    # Reranking behavior
+    # --- Reranking behavior ---
     lines.append("")
     lines.append("Reranking Behavior:")
-    lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
+    if mode == "oracle_verifier":
+        lines.append(
+            f"  Override rate:      {report.rerank_rate:.1%} "
+            f"(oracle picked different candidate than logprob)"
+        )
+    elif mode == "logprob":
+        lines.append(f"  (Logprob baseline — no reranking applied)")
+    else:
+        lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
+        lines.append(
+            f"  Mean BCVF margin:   {report.mean_score_margin:.4f} "
+            f"(best - 2nd best under BCVF scoring)"
+        )
     lines.append(
-        f"  Mean BCVF margin:   {report.mean_score_margin:.4f} "
-        f"(best - 2nd best under BCVF scoring)"
-    )
-    lines.append(
-        f"  Mean base margin:   {report.mean_base_score_margin:.4f} "
+        f"  Mean logprob margin: {report.mean_base_score_margin:.4f} "
         f"(best - 2nd best under base logprob)"
     )
 
-    # Score-based metrics
+    # --- Score-based metrics ---
     lines.append("")
     lines.append("Score Metrics (base logprob of selected candidate):")
     lines.append(
-        f"  Base selection:     {report.mean_base_logprob_selected:.4f} "
+        f"  Logprob selection:  {report.mean_base_logprob_selected:.4f} "
         f"avg logprob"
     )
-    lines.append(
-        f"  BCVF selection:     {report.mean_bcvf_logprob_selected:.4f} "
-        f"avg logprob"
-    )
+    if mode == "bcvf":
+        lines.append(
+            f"  BCVF selection:     {report.mean_bcvf_logprob_selected:.4f} "
+            f"avg logprob"
+        )
+    elif mode == "oracle_verifier":
+        lines.append(
+            f"  Oracle selection:   {report.mean_bcvf_logprob_selected:.4f} "
+            f"avg logprob"
+        )
 
-    # Pass@1 metrics (HumanEval)
+    # --- Pass@1 metrics ---
     if report.base_pass_at_1 is not None:
         lines.append("")
-        lines.append("Pass@1 Metrics (HumanEval):")
-        lines.append(
-            f"  Base pass@1:        {report.base_pass_at_1:.3f}"
-        )
-        lines.append(
-            f"  BCVF pass@1:        {report.bcvf_pass_at_1:.3f}"
-        )
-        delta = report.pass_at_1_delta or 0.0
-        lines.append(
-            f"  Delta (BCVF-base):  {delta:+.3f}"
-        )
-        if report.oracle_pass_at_k is not None:
+
+        if mode == "oracle_verifier":
+            # Framing numbers for oracle verifier
+            lines.append("Pass@1 — Oracle Verifier Framing:")
             lines.append(
-                f"  Oracle pass@{report.K}:     "
-                f"{report.oracle_pass_at_k:.3f}"
+                f"  Logprob pass@1:     {report.base_pass_at_1:.3f}  "
+                f"<- floor (best logprob among K)"
+            )
+            lines.append(
+                f"  Oracle pass@1:      {report.bcvf_pass_at_1:.3f}  "
+                f"<- ceiling (any passer among K)"
+            )
+            if report.oracle_pass_at_k is not None:
+                lines.append(
+                    f"  Any-pass@{report.K}:        "
+                    f"{report.oracle_pass_at_k:.3f}  "
+                    f"<- any candidate passed (= oracle)"
+                )
+            gap = (report.bcvf_pass_at_1 or 0) - (report.base_pass_at_1 or 0)
+            lines.append(
+                f"  Headroom:           {gap:+.3f}  "
+                f"<- max gain a perfect selector could achieve over logprob"
+            )
+        elif mode == "logprob":
+            lines.append("Pass@1 — Logprob Reranking:")
+            lines.append(
+                f"  Logprob pass@1:     {report.base_pass_at_1:.3f}  "
+                f"(= logprob-best among K candidates)"
+            )
+            if report.oracle_pass_at_k is not None:
+                lines.append(
+                    f"  Any-pass@{report.K}:        "
+                    f"{report.oracle_pass_at_k:.3f}  "
+                    f"(upper bound: any candidate passed)"
+                )
+        else:
+            # BCVF mode (original)
+            lines.append("Pass@1 Metrics (HumanEval):")
+            lines.append(
+                f"  Base pass@1:        {report.base_pass_at_1:.3f}"
+            )
+            lines.append(
+                f"  BCVF pass@1:        {report.bcvf_pass_at_1:.3f}"
+            )
+            delta = report.pass_at_1_delta or 0.0
+            lines.append(
+                f"  Delta (BCVF-base):  {delta:+.3f}"
+            )
+            if report.oracle_pass_at_k is not None:
+                lines.append(
+                    f"  Oracle pass@{report.K}:     "
+                    f"{report.oracle_pass_at_k:.3f}"
+                )
+
+        # Win/loss
+        if mode == "oracle_verifier":
+            lines.append("")
+            lines.append("Oracle Override Analysis:")
+            lines.append(
+                f"  Win-rate:           {report.rerank_win_rate:.1%} "
+                f"(oracle passed, logprob failed)"
+            )
+            lines.append(
+                f"  Loss-rate:          {report.rerank_loss_rate:.1%} "
+                f"(should be 0% for oracle)"
+            )
+        elif mode == "bcvf":
+            lines.append("")
+            lines.append("Win/Loss Analysis:")
+            lines.append(
+                f"  Rerank win-rate:    {report.rerank_win_rate:.1%} "
+                f"(BCVF passed, base failed)"
+            )
+            lines.append(
+                f"  Rerank loss-rate:   {report.rerank_loss_rate:.1%} "
+                f"(BCVF failed, base passed)"
+            )
+            net = report.rerank_win_rate - report.rerank_loss_rate
+            lines.append(
+                f"  Net benefit:        {net:+.1%}"
             )
 
-        lines.append("")
-        lines.append("Win/Loss Analysis:")
-        lines.append(
-            f"  Rerank win-rate:    {report.rerank_win_rate:.1%} "
-            f"(BCVF passed, base failed)"
-        )
-        lines.append(
-            f"  Rerank loss-rate:   {report.rerank_loss_rate:.1%} "
-            f"(BCVF failed, base passed)"
-        )
-        net = report.rerank_win_rate - report.rerank_loss_rate
-        lines.append(
-            f"  Net benefit:        {net:+.1%}"
-        )
-
+        # Bootstrap CI
         if report.pass_at_1_delta_ci is not None:
             ci = report.pass_at_1_delta_ci
             lines.append("")
+            delta_label = {
+                "bcvf": "BCVF-base",
+                "logprob": "logprob-greedy",
+                "oracle_verifier": "oracle-logprob",
+            }.get(mode, "delta")
             lines.append(
-                f"  Bootstrap 95% CI for pass@1 delta: "
+                f"  Bootstrap 95% CI for pass@1 delta ({delta_label}): "
                 f"{ci.mean:+.4f} [{ci.lower:+.4f}, {ci.upper:+.4f}] "
                 f"(n={ci.n_bootstrap})"
             )
 
-    # BCVF Signal Diagnostics
-    lines.append("")
-    lines.append("-" * 70)
-    lines.append("BCVF Signal Diagnostics (is BCVF providing useful signal?)")
-    lines.append("-" * 70)
+    # --- BCVF Signal Diagnostics (only for bcvf mode) ---
+    if mode == "bcvf":
+        lines.append("")
+        lines.append("-" * 70)
+        lines.append("BCVF Signal Diagnostics (is BCVF providing useful signal?)")
+        lines.append("-" * 70)
 
-    lines.append("")
-    lines.append("1. Top-M Coverage (are generated tokens in the BCVF window?):")
-    lines.append(f"     Mean top-M hit rate:  {report.agg_topM_hit_rate:.3f}")
-    if report.agg_topM_hit_rate < 0.5:
-        lines.append(
-            "     ** WARNING: <50% of target tokens are in top-M. "
-            "BCVF cannot influence most token scores. Increase top_m."
-        )
-
-    lines.append("")
-    lines.append("2. Forward/Backward Score Distributions (saturation check):")
-    lines.append(
-        f"     sf (target tokens): mean={report.agg_mean_sf:.4f}"
-    )
-    lines.append(
-        f"     sb (target tokens): mean={report.agg_mean_sb:.4f}"
-    )
-    lines.append(
-        f"     sf (all top-M):     mean={report.agg_mean_sf_all:.4f}  "
-        f"std={report.agg_std_sf_all:.4f}"
-    )
-    lines.append(
-        f"     sb (all top-M):     mean={report.agg_mean_sb_all:.4f}  "
-        f"std={report.agg_std_sb_all:.4f}"
-    )
-    if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
-        lines.append(
-            "     ** WARNING: Very low std in sf/sb across top-M tokens. "
-            "Scores are saturated -> Lagrangian is near-constant -> "
-            "BCVF cannot differentiate candidates."
-        )
-
-    lines.append("")
-    lines.append("3. Lagrangian Penalty Magnitude:")
-    lines.append(f"     Mean L (target toks): {report.agg_mean_L:.6f}")
-    lines.append(f"     Penalty/token:        {report.agg_penalty_per_tok:.6f}")
-    lines.append(f"     Base logprob/token:   {report.agg_base_lp_per_tok:.4f}")
-    if report.agg_base_lp_per_tok != 0:
-        ratio = abs(report.agg_penalty_per_tok / report.agg_base_lp_per_tok)
-        lines.append(f"     |penalty/base_lp|:    {ratio:.4f}")
-        if ratio < 0.01:
+        lines.append("")
+        lines.append("1. Top-M Coverage (are generated tokens in the BCVF window?):")
+        lines.append(f"     Mean top-M hit rate:  {report.agg_topM_hit_rate:.3f}")
+        if report.agg_topM_hit_rate < 0.5:
             lines.append(
-                "     ** WARNING: BCVF penalty is <1% of base logprob magnitude. "
-                "The penalty is too small to meaningfully rerank. "
-                "Increase beta or lambda."
+                "     ** WARNING: <50% of target tokens are in top-M. "
+                "BCVF cannot influence most token scores. Increase top_m."
             )
 
-    lines.append("")
-    lines.append("4. Score Differentiation Across Candidates:")
-    lines.append(
-        f"     BCVF score std:       {report.agg_score_std:.4f}  "
-        f"(spread of BCVF scores across K)"
-    )
-    lines.append(
-        f"     Base score std:       {report.agg_base_score_std:.4f}  "
-        f"(spread of base scores across K)"
-    )
-    lines.append(
-        f"     Rank correlation:     {report.agg_rank_correlation:.3f}  "
-        f"(Spearman: base vs BCVF ranking)"
-    )
-    if abs(report.agg_rank_correlation) > 0.95:
+        lines.append("")
+        lines.append("2. Forward/Backward Score Distributions (saturation check):")
         lines.append(
-            "     ** NOTE: Near-perfect rank correlation means BCVF is "
-            "not changing the ranking. The penalty is too weak or uniform."
+            f"     sf (target tokens): mean={report.agg_mean_sf:.4f}"
         )
+        lines.append(
+            f"     sb (target tokens): mean={report.agg_mean_sb:.4f}"
+        )
+        lines.append(
+            f"     sf (all top-M):     mean={report.agg_mean_sf_all:.4f}  "
+            f"std={report.agg_std_sf_all:.4f}"
+        )
+        lines.append(
+            f"     sb (all top-M):     mean={report.agg_mean_sb_all:.4f}  "
+            f"std={report.agg_std_sb_all:.4f}"
+        )
+        if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
+            lines.append(
+                "     ** WARNING: Very low std in sf/sb across top-M tokens. "
+                "Scores are saturated -> Lagrangian is near-constant -> "
+                "BCVF cannot differentiate candidates."
+            )
 
-    # Diagnosis summary
-    lines.append("")
-    problems_found = []
-    if report.agg_topM_hit_rate < 0.5:
-        problems_found.append("low top-M coverage")
-    if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
-        problems_found.append("saturated sf/sb scores")
-    if report.agg_base_lp_per_tok != 0 and abs(
-        report.agg_penalty_per_tok / report.agg_base_lp_per_tok
-    ) < 0.01:
-        problems_found.append("penalty magnitude too small")
-    if abs(report.agg_rank_correlation) > 0.95:
-        problems_found.append("BCVF not changing rankings")
-    if problems_found:
-        lines.append(
-            f"  DIAGNOSIS: {', '.join(problems_found)}"
-        )
-    else:
-        lines.append(
-            "  DIAGNOSIS: BCVF signal looks active. Check pass@1 delta "
-            "for whether it helps."
-        )
-    lines.append("")
+        lines.append("")
+        lines.append("3. Lagrangian Penalty Magnitude:")
+        lines.append(f"     Mean L (target toks): {report.agg_mean_L:.6f}")
+        lines.append(f"     Penalty/token:        {report.agg_penalty_per_tok:.6f}")
+        lines.append(f"     Base logprob/token:   {report.agg_base_lp_per_tok:.4f}")
+        if report.agg_base_lp_per_tok != 0:
+            ratio = abs(report.agg_penalty_per_tok / report.agg_base_lp_per_tok)
+            lines.append(f"     |penalty/base_lp|:    {ratio:.4f}")
+            if ratio < 0.01:
+                lines.append(
+                    "     ** WARNING: BCVF penalty is <1% of base logprob magnitude. "
+                    "The penalty is too small to meaningfully rerank. "
+                    "Increase beta or lambda."
+                )
 
-    # Sanity check notes
-    lines.append("")
-    lines.append("Sanity Checks:")
-    if report.rerank_lambda == 0.0:
+        lines.append("")
+        lines.append("4. Score Differentiation Across Candidates:")
         lines.append(
-            "  lambda=0: BCVF penalty disabled, scores should equal "
-            "base logprobs -> rerank_rate should be ~0%"
+            f"     BCVF score std:       {report.agg_score_std:.4f}  "
+            f"(spread of BCVF scores across K)"
         )
-    elif report.rerank_lambda == 1.0:
         lines.append(
-            "  lambda=1: Full BCVF penalty applied "
-            "(effective_beta = beta)"
+            f"     Base score std:       {report.agg_base_score_std:.4f}  "
+            f"(spread of base scores across K)"
         )
-    else:
         lines.append(
-            f"  lambda={report.rerank_lambda}: "
-            f"Interpolated BCVF strength"
+            f"     Rank correlation:     {report.agg_rank_correlation:.3f}  "
+            f"(Spearman: base vs BCVF ranking)"
         )
+        if abs(report.agg_rank_correlation) > 0.95:
+            lines.append(
+                "     ** NOTE: Near-perfect rank correlation means BCVF is "
+                "not changing the ranking. The penalty is too weak or uniform."
+            )
+
+        # Diagnosis summary
+        lines.append("")
+        problems_found = []
+        if report.agg_topM_hit_rate < 0.5:
+            problems_found.append("low top-M coverage")
+        if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
+            problems_found.append("saturated sf/sb scores")
+        if report.agg_base_lp_per_tok != 0 and abs(
+            report.agg_penalty_per_tok / report.agg_base_lp_per_tok
+        ) < 0.01:
+            problems_found.append("penalty magnitude too small")
+        if abs(report.agg_rank_correlation) > 0.95:
+            problems_found.append("BCVF not changing rankings")
+        if problems_found:
+            lines.append(
+                f"  DIAGNOSIS: {', '.join(problems_found)}"
+            )
+        else:
+            lines.append(
+                "  DIAGNOSIS: BCVF signal looks active. Check pass@1 delta "
+                "for whether it helps."
+            )
+        lines.append("")
+
+        # Sanity check notes
+        lines.append("")
+        lines.append("Sanity Checks:")
+        if report.rerank_lambda == 0.0:
+            lines.append(
+                "  lambda=0: BCVF penalty disabled, scores should equal "
+                "base logprobs -> rerank_rate should be ~0%"
+            )
+        elif report.rerank_lambda == 1.0:
+            lines.append(
+                "  lambda=1: Full BCVF penalty applied "
+                "(effective_beta = beta)"
+            )
+        else:
+            lines.append(
+                f"  lambda={report.rerank_lambda}: "
+                f"Interpolated BCVF strength"
+            )
 
     lines.append(sep)
 
