@@ -695,43 +695,56 @@ class ValueReranker:
         >0.5 = signs of correctness.
         <0.5 = obvious structural failure.
         """
-        # NOTE: HumanEval prompts end with trailing whitespace (e.g. '\n    ')
-        # which already provides correct indentation when concatenated with
-        # the raw candidate.  Do NOT apply fix_completion_indent here — that
-        # adds *additional* indent and causes false AST failures.
-        full_code = prompt + candidate
+        # Extract just the function body from the candidate.  Model output
+        # often extends beyond the function (test code, markdown, extra
+        # definitions) and 128-token truncation can leave partial statements.
+        # Both cause false AST failures.
+        body = self._extract_function_body(candidate)
+        full_code = prompt + body
         adj = 0.0
 
-        # (A) Syntax validity (AST)
+        # (A) Syntax validity (AST) — bonus, not a gate.
+        # Many valid completions fail full AST due to trailing text or
+        # truncation.  A syntax error is a mild penalty; other structural
+        # signals still differentiate candidates.
         if self.use_ast:
             try:
                 ast.parse(full_code)
-                adj += 0.1
+                adj += 0.20
             except SyntaxError:
-                return np.clip(0.5 + (-0.3), 0.0, 1.0)
+                adj -= 0.15
 
         # Extract expected function name from prompt
         expected_fn = self._extract_function_name(prompt)
 
         # (B) Required function presence
         if expected_fn:
-            if self._defines_function(candidate, expected_fn):
+            if self._defines_function(body, expected_fn):
                 adj += 0.15
             else:
-                adj -= 0.2
+                adj -= 0.25
 
         # (C) Return statement check
         if expected_fn and self._likely_needs_return(prompt):
-            if not self._has_return(candidate):
+            if not self._has_return(body):
                 adj -= 0.15
 
         # (D) Placeholder / incomplete code penalty
-        if self._has_placeholder(candidate):
-            adj -= 0.2
+        if self._has_placeholder(body):
+            adj -= 0.25
 
         # (E) Structural completeness bonus
-        if len(candidate.strip()) > 20 and adj >= 0.0:
+        if len(body.strip()) > 20 and adj >= 0.0:
             adj += 0.05
+
+        # (F) Parameter usage — does candidate use the function's arguments?
+        param_names = self._extract_param_names(prompt)
+        if param_names:
+            used = sum(1 for p in param_names if p in body)
+            if used == 0:
+                adj -= 0.10  # suspicious: ignores all parameters
+            elif used == len(param_names):
+                adj += 0.05  # uses all parameters
 
         return float(np.clip(0.5 + adj, 0.0, 1.0))
 
@@ -748,6 +761,42 @@ class ValueReranker:
         return base_logprob + self.alpha * utility_logit
 
     # --- Internal helpers --------------------------------------------------
+
+    @staticmethod
+    def _extract_function_body(candidate: str) -> str:
+        """Extract just the function body from a candidate continuation.
+
+        Model-generated candidates often extend beyond the target function
+        (test code, markdown explanations, additional definitions) and
+        128-token max generation can truncate mid-statement.  Both cause
+        false ``ast.parse()`` failures.
+
+        This extracts body lines by stopping at the first non-blank,
+        non-indented line that follows at least one body line — which
+        marks the start of content outside the function.
+        """
+        lines = candidate.split("\n")
+        body_lines: List[str] = []
+        seen_content = False
+
+        for line in lines:
+            # Blank lines are always included
+            if not line.strip():
+                body_lines.append(line)
+                continue
+            # Once we've seen body content, a line at column 0 that looks
+            # like a new definition, comment, or statement means the
+            # function body is over.
+            if seen_content and line and not line[0].isspace():
+                break
+            body_lines.append(line)
+            seen_content = True
+
+        # Strip trailing blank lines
+        while body_lines and not body_lines[-1].strip():
+            body_lines.pop()
+
+        return "\n".join(body_lines)
 
     @staticmethod
     def _extract_function_name(prompt: str) -> Optional[str]:
@@ -795,6 +844,24 @@ class ValueReranker:
             if stripped.startswith("yield "):
                 return True
         return False
+
+    @staticmethod
+    def _extract_param_names(prompt: str) -> List[str]:
+        """Extract parameter names from the function signature in prompt."""
+        match = re.search(r"def\s+\w+\s*\(([^)]*)\)", prompt)
+        if not match:
+            return []
+        params_str = match.group(1)
+        names: List[str] = []
+        for part in params_str.split(","):
+            part = part.strip()
+            if not part or part == "self":
+                continue
+            # Strip type annotations and defaults
+            name = part.split(":")[0].split("=")[0].strip()
+            if name:
+                names.append(name)
+        return names
 
     @staticmethod
     def _has_placeholder(candidate: str) -> bool:
