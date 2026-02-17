@@ -2607,6 +2607,437 @@ def create_csr_phoneme_head(
 
 
 # =============================================================================
+# PHONEME-CONTEXTUALIZED PROBABILITY HEAD (Softmax-Free)
+# =============================================================================
+#
+# Factored token probability:
+#
+#   P(token_i | h_t) ∝ phoneme_match(i, h_t) × context_match(i, h_t)
+#
+# Where:
+#   phoneme_match(i) = σ(W_φ · h_t) · w_i        (41 independent sigmoids)
+#   context_match(i) = σ(h_t · e_i / τ)           (sigmoid per token)
+#
+# No softmax over vocabulary. Normalization is L1 (divide by sum).
+#
+# Training loss (also softmax-free):
+#   L_phon  = BCE(predicted_phonemes, target_phoneme_weights)
+#   L_ctx   = margin(s_pos - s_neg) + cosine_pull(h, e_target)
+#   L_total = L_phon + β · L_ctx
+#
+# The Sanskrit phoneme structure acts as a PRIOR over token selection.
+# The context signal DISAMBIGUATES among phonemically similar tokens.
+# Together they produce a probability distribution without softmax.
+
+@dataclass
+class PhonemeContextConfig:
+    """Configuration for phoneme-contextualized probability head."""
+    d_model: int = 512
+    num_phonemes: int = 41           # ARPABET inventory size
+    vocab_size: int = 50257
+    temperature: float = 1.0         # Context scoring temperature
+    margin: float = 0.5              # Contrastive margin for context loss
+    num_negatives: int = 256         # Hard negatives per position
+    beta: float = 1.0               # Weight of context loss vs phoneme loss
+    phoneme_hidden: int = 256        # Hidden dim for phoneme predictor
+    use_hard_negatives: bool = True  # Sample negatives from same phoneme cluster
+    dropout: float = 0.1
+
+
+class PhonemeContextHead(nn.Module):
+    """
+    Softmax-Free Token Probability via Phoneme Prediction + Context Signal.
+
+    Factored probability:
+        P(token_i | h_t) ∝ phoneme_match(i) × context_match(i)
+
+    Phoneme branch (WHAT sounds should come next):
+        φ = σ(MLP(h_t))                    — [41] predicted phoneme activations
+        phoneme_match(i) = φ · w_i          — dot with token i's phoneme weights
+
+    Context branch (WHICH token among phoneme-compatible ones):
+        context_match(i) = σ(h_t · e_i / τ) — sigmoid similarity with token embedding
+
+    Combined:
+        s(i) = phoneme_match(i) × context_match(i)
+        P(i) = s(i) / Σ_j s(j)             — L1 normalization, NOT softmax
+
+    Training (both branches softmax-free):
+        L_phon = BCE(φ, target_phoneme_weights)     — predict correct phonemes
+        L_ctx  = Σ_k max(0, m - s_pos + s_neg_k)    — margin against negatives
+
+    The Sanskrit phoneme decomposition acts as a structural PRIOR.
+    The context signal provides semantic DISAMBIGUATION.
+    """
+
+    def __init__(
+        self,
+        config: PhonemeContextConfig,
+        token_phoneme_weights: torch.Tensor,
+    ):
+        """
+        Args:
+            config: PhonemeContextConfig
+            token_phoneme_weights: [vocab_size, num_phonemes] — fixed matrix from CSRPhonemeHead
+        """
+        super().__init__()
+        self.config = config
+
+        # Fixed token-to-phoneme decomposition (from Sanskrit G2P)
+        self.register_buffer('token_phoneme_weights', token_phoneme_weights)
+
+        # Phoneme predictor: h_t → predicted phoneme activations [num_phonemes]
+        self.phoneme_predictor = nn.Sequential(
+            nn.Linear(config.d_model, config.phoneme_hidden),
+            nn.GELU(),
+            nn.Linear(config.phoneme_hidden, config.num_phonemes),
+        )
+
+        # Context projection: transforms h_t before scoring against token embeddings
+        self.context_proj = nn.Linear(config.d_model, config.d_model, bias=False)
+
+        self.dropout = nn.Dropout(config.dropout)
+
+        # Precompute phoneme cluster membership for hard negative sampling
+        if config.use_hard_negatives:
+            self._build_phoneme_clusters()
+
+    def _build_phoneme_clusters(self):
+        """
+        Build phoneme cluster index for hard negative sampling.
+
+        For each token, find tokens that share its dominant phoneme
+        (phonemically similar but different tokens = hard negatives).
+        """
+        # Dominant phoneme per token: which phoneme has highest weight
+        dominant = self.token_phoneme_weights.argmax(dim=-1)  # [V]
+
+        # Group tokens by dominant phoneme
+        clusters: Dict[int, List[int]] = {}
+        for token_id in range(self.config.vocab_size):
+            phon_idx = dominant[token_id].item()
+            if phon_idx not in clusters:
+                clusters[phon_idx] = []
+            clusters[phon_idx].append(token_id)
+
+        # Store as buffer-friendly format: for each token, store its cluster
+        self._phoneme_clusters = clusters
+        self._token_dominant_phoneme = dominant
+
+    def predict_phonemes(self, h_t: torch.Tensor) -> torch.Tensor:
+        """
+        Predict phoneme activation pattern from hidden state.
+
+        Args:
+            h_t: [batch, seq, d_model]
+
+        Returns:
+            [batch, seq, num_phonemes] — sigmoid activations ∈ (0, 1)
+        """
+        return torch.sigmoid(self.phoneme_predictor(h_t))
+
+    def compute_scores(
+        self,
+        h_t: torch.Tensor,
+        token_embeddings: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute factored token scores.
+
+        Args:
+            h_t: [batch, seq, d_model] — hidden states from final layer
+            token_embeddings: [vocab_size, d_model] — token embedding matrix
+
+        Returns:
+            Dict with phoneme_scores, context_scores, combined_scores
+        """
+        # Phoneme branch: which phonemes should come next?
+        phi = self.predict_phonemes(h_t)                            # [B, T, P]
+        s_phon = phi @ self.token_phoneme_weights.T                 # [B, T, V]
+
+        # Context branch: which token fits semantically?
+        h_ctx = self.context_proj(h_t)                              # [B, T, d]
+        s_ctx = torch.sigmoid(
+            h_ctx @ token_embeddings.T / self.config.temperature
+        )                                                           # [B, T, V]
+
+        # Combined: phoneme gates × context alignment
+        s_combined = s_phon * s_ctx                                 # [B, T, V]
+
+        return {
+            'phoneme_scores': s_phon,
+            'context_scores': s_ctx,
+            'combined_scores': s_combined,
+            'phoneme_activations': phi,
+        }
+
+    def compute_probs(
+        self,
+        h_t: torch.Tensor,
+        token_embeddings: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute token probabilities (L1 normalized, no softmax).
+
+        P(token_i) = s_phon(i) × s_ctx(i) / Σ_j s_phon(j) × s_ctx(j)
+
+        Args:
+            h_t: [batch, seq, d_model]
+            token_embeddings: [vocab_size, d_model]
+
+        Returns:
+            [batch, seq, vocab_size] — probability distribution
+        """
+        scores = self.compute_scores(h_t, token_embeddings)
+        s = scores['combined_scores']
+        probs = s / (s.sum(dim=-1, keepdim=True) + 1e-8)
+        return probs
+
+    def _sample_hard_negatives(
+        self,
+        target_ids: torch.Tensor,
+        K: int,
+    ) -> torch.Tensor:
+        """
+        Sample hard negatives: tokens sharing a dominant phoneme with the target.
+
+        These are phonemically similar tokens that the context branch
+        must learn to distinguish.
+
+        Args:
+            target_ids: [batch, seq]
+            K: number of negatives per position
+
+        Returns:
+            [batch, seq, K] — negative token IDs
+        """
+        B, T = target_ids.shape
+        device = target_ids.device
+        neg_ids = torch.zeros(B, T, K, dtype=torch.long, device=device)
+
+        if not hasattr(self, '_phoneme_clusters'):
+            # Fallback: random negatives
+            return torch.randint(0, self.config.vocab_size, (B, T, K), device=device)
+
+        for b in range(B):
+            for t in range(T):
+                tid = target_ids[b, t].item()
+                phon_idx = self._token_dominant_phoneme[tid].item()
+                cluster = self._phoneme_clusters.get(phon_idx, [])
+
+                if len(cluster) > 1:
+                    # Sample from same phoneme cluster (hard negatives)
+                    # Half hard, half random for diversity
+                    K_hard = K // 2
+                    K_rand = K - K_hard
+
+                    # Hard negatives (same phoneme cluster, excluding target)
+                    candidates = [c for c in cluster if c != tid]
+                    if candidates:
+                        hard = torch.tensor(candidates, device=device)
+                        hard_sample = hard[torch.randint(0, len(hard), (K_hard,))]
+                    else:
+                        hard_sample = torch.randint(0, self.config.vocab_size, (K_hard,), device=device)
+
+                    # Random negatives
+                    rand_sample = torch.randint(0, self.config.vocab_size, (K_rand,), device=device)
+
+                    neg_ids[b, t] = torch.cat([hard_sample, rand_sample])
+                else:
+                    neg_ids[b, t] = torch.randint(0, self.config.vocab_size, (K,), device=device)
+
+        return neg_ids
+
+    def compute_loss(
+        self,
+        h_t: torch.Tensor,
+        target_ids: torch.Tensor,
+        token_embeddings: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute training loss. No softmax anywhere.
+
+        L_phon  = BCE(predicted_phonemes, target_phoneme_weights)
+        L_ctx   = margin_loss(s_pos, s_neg) + cosine_loss(h, e_target)
+        L_total = L_phon + β · L_ctx
+
+        Args:
+            h_t: [batch, seq, d_model] — hidden states
+            target_ids: [batch, seq] — target token IDs
+            token_embeddings: [vocab_size, d_model] — token embedding matrix
+
+        Returns:
+            Dict with loss_phoneme, loss_context, loss_total, and diagnostics
+        """
+        B, T = target_ids.shape
+        cfg = self.config
+
+        # === Phoneme loss: BCE on 41 independent sigmoids ===
+        phi = self.predict_phonemes(h_t)                             # [B, T, P]
+        target_phonemes = self.token_phoneme_weights[target_ids]     # [B, T, P]
+        L_phon = F.binary_cross_entropy(phi, target_phonemes)
+
+        # === Context loss: margin-based contrastive ===
+        h_ctx = self.context_proj(h_t)                               # [B, T, d]
+        h_ctx = F.normalize(h_ctx, dim=-1)                           # unit norm
+
+        # Positive: target token embedding
+        target_emb = token_embeddings[target_ids]                    # [B, T, d]
+        target_emb = F.normalize(target_emb, dim=-1)
+        s_pos = (h_ctx * target_emb).sum(-1)                         # [B, T] cosine
+
+        # Negative: hard negatives from phoneme clusters
+        K = min(cfg.num_negatives, cfg.vocab_size - 1)
+        if cfg.use_hard_negatives:
+            neg_ids = self._sample_hard_negatives(target_ids, K)
+        else:
+            neg_ids = torch.randint(0, cfg.vocab_size, (B, T, K), device=h_t.device)
+
+        neg_emb = token_embeddings[neg_ids]                          # [B, T, K, d]
+        neg_emb = F.normalize(neg_emb, dim=-1)
+        s_neg = (h_ctx.unsqueeze(2) * neg_emb).sum(-1)              # [B, T, K] cosine
+
+        # Margin loss: s_pos should exceed all s_neg by at least margin
+        L_margin = F.relu(cfg.margin - s_pos.unsqueeze(-1) + s_neg).mean()
+
+        # Cosine pull: directly maximize similarity with target
+        L_cosine = 1.0 - s_pos.mean()
+
+        L_ctx = L_margin + L_cosine
+
+        # === Total ===
+        L_total = L_phon + cfg.beta * L_ctx
+
+        # === Diagnostics ===
+        with torch.no_grad():
+            # Phoneme prediction accuracy (per-phoneme, threshold 0.5)
+            phon_pred = (phi > 0.5).float()
+            phon_target = (target_phonemes > 0.1).float()
+            phon_acc = (phon_pred == phon_target).float().mean()
+
+            # Context ranking: what fraction of positives beat all negatives?
+            ctx_correct = (s_pos.unsqueeze(-1) > s_neg).all(dim=-1).float().mean()
+
+        return {
+            'loss_phoneme': L_phon,
+            'loss_context': L_ctx,
+            'loss_margin': L_margin,
+            'loss_cosine': L_cosine,
+            'loss_total': L_total,
+            'phoneme_accuracy': phon_acc,
+            'context_ranking_accuracy': ctx_correct,
+            'avg_pos_score': s_pos.mean(),
+            'avg_neg_score': s_neg.mean(),
+        }
+
+    def decode(
+        self,
+        h_t: torch.Tensor,
+        token_embeddings: torch.Tensor,
+        top_k: int = 0,
+    ) -> torch.Tensor:
+        """
+        Decode: select tokens from factored probability.
+
+        Args:
+            h_t: [batch, seq, d_model]
+            token_embeddings: [vocab_size, d_model]
+            top_k: if > 0, sample from top-k; if 0, argmax
+
+        Returns:
+            [batch, seq] — selected token IDs
+        """
+        probs = self.compute_probs(h_t, token_embeddings)  # [B, T, V]
+
+        if top_k > 0:
+            # Top-k sampling from phoneme-context probabilities
+            top_vals, top_idx = probs.topk(top_k, dim=-1)
+            top_probs = top_vals / (top_vals.sum(dim=-1, keepdim=True) + 1e-8)
+            sampled = torch.multinomial(
+                top_probs.view(-1, top_k), num_samples=1
+            ).view(probs.shape[0], probs.shape[1])
+            token_ids = top_idx.gather(-1, sampled.unsqueeze(-1)).squeeze(-1)
+        else:
+            token_ids = probs.argmax(dim=-1)
+
+        return token_ids
+
+    def forward(
+        self,
+        h_t: torch.Tensor,
+        token_embeddings: torch.Tensor,
+        target_ids: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Full forward: scores + optional loss.
+
+        Args:
+            h_t: [batch, seq, d_model]
+            token_embeddings: [vocab_size, d_model]
+            target_ids: [batch, seq] — if provided, computes loss
+
+        Returns:
+            Dict with probs, scores, and optionally loss components
+        """
+        result = self.compute_scores(h_t, token_embeddings)
+        s = result['combined_scores']
+        result['probs'] = s / (s.sum(dim=-1, keepdim=True) + 1e-8)
+
+        if target_ids is not None:
+            loss_result = self.compute_loss(h_t, target_ids, token_embeddings)
+            result.update(loss_result)
+
+        return result
+
+
+def create_phoneme_context_head(
+    csr_phoneme_head: CSRPhonemeHead,
+    temperature: float = 1.0,
+    margin: float = 0.5,
+    num_negatives: int = 256,
+    beta: float = 1.0,
+) -> PhonemeContextHead:
+    """
+    Create PhonemeContextHead from an existing CSRPhonemeHead.
+
+    Reuses the token-phoneme weight matrix built by CSRPhonemeHead
+    (which contains the Sanskrit G2P decomposition).
+
+    Args:
+        csr_phoneme_head: Existing CSRPhonemeHead with built token_phoneme_weights
+        temperature: Context scoring temperature
+        margin: Contrastive margin
+        num_negatives: Hard negatives per position
+        beta: Context loss weight
+
+    Returns:
+        Configured PhonemeContextHead
+    """
+    if csr_phoneme_head._token_phoneme_weights is None:
+        raise RuntimeError("CSRPhonemeHead has no token_phoneme_weights — provide a tokenizer")
+
+    config = PhonemeContextConfig(
+        d_model=csr_phoneme_head.config.d_model,
+        num_phonemes=csr_phoneme_head.num_phonemes,
+        vocab_size=csr_phoneme_head.config.vocab_size,
+        temperature=temperature,
+        margin=margin,
+        num_negatives=num_negatives,
+        beta=beta,
+    )
+
+    head = PhonemeContextHead(
+        config=config,
+        token_phoneme_weights=csr_phoneme_head._token_phoneme_weights,
+    )
+
+    print(f"  [PhonemeContextHead] Created: d_model={config.d_model}, "
+          f"phonemes={config.num_phonemes}, vocab={config.vocab_size:,}, "
+          f"τ={temperature}, margin={margin}, K={num_negatives}, β={beta}")
+    return head
+
+
+# =============================================================================
 # PUBLIC EXPORTS
 # =============================================================================
 
@@ -2614,10 +3045,12 @@ __all__ = [
     # Config
     "CSRConfig",
     "CSRPhonemeHeadConfig",
+    "PhonemeContextConfig",
     "AblationConfig",
     # Main classes
     "CSREmbeddingProvider",
     "CSRPhonemeHead",
+    "PhonemeContextHead",
     "VarnaCSRBridge",
     "EntropySink",
     "SynthesisGate",
@@ -2639,6 +3072,7 @@ __all__ = [
     # Helper functions
     "create_csr_for_training",
     "create_csr_phoneme_head",
+    "create_phoneme_context_head",
     "integrate_csr_into_forward",
 ]
 
