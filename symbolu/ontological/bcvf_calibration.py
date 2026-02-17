@@ -224,6 +224,125 @@ def reliability_bins(
     return results
 
 
+def compute_auroc(
+    scores: np.ndarray,
+    labels: np.ndarray,
+) -> float:
+    """
+    Area Under the ROC Curve (pure numpy, no sklearn).
+
+    Computes AUROC using the Mann-Whitney U statistic formulation:
+
+        AUROC = U / (n_pos * n_neg)
+
+    where U counts the number of (positive, negative) pairs where
+    the positive sample has a higher score than the negative sample,
+    with ties counting as 0.5.
+
+    Args:
+        scores: 1-D array of real-valued scores (higher = more likely positive).
+        labels: 1-D binary array (1 = positive, 0 = negative).
+
+    Returns:
+        AUROC in [0, 1].  Returns 0.5 if input is degenerate
+        (all-same labels, empty, or all-same scores).
+    """
+    scores = np.asarray(scores, dtype=np.float64)
+    labels = np.asarray(labels, dtype=np.float64)
+    if len(scores) < 2 or len(scores) != len(labels):
+        return 0.5
+    n_pos = labels.sum()
+    n_neg = len(labels) - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return 0.5
+
+    # Sort by score descending
+    order = np.argsort(-scores)
+    sorted_labels = labels[order]
+
+    # Compute via trapezoidal ROC integration
+    # Walk through sorted scores, accumulate TPR/FPR
+    tp = 0.0
+    fp = 0.0
+    auc = 0.0
+    prev_tp = 0.0
+    prev_fp = 0.0
+
+    sorted_scores = scores[order]
+    i = 0
+    n = len(sorted_scores)
+    while i < n:
+        # Find block of tied scores
+        j = i
+        while j < n and sorted_scores[j] == sorted_scores[i]:
+            if sorted_labels[j] == 1.0:
+                tp += 1.0
+            else:
+                fp += 1.0
+            j += 1
+        # Trapezoidal area for this block
+        auc += (fp - prev_fp) * (tp + prev_tp) / 2.0
+        prev_tp = tp
+        prev_fp = fp
+        i = j
+
+    # Normalize
+    if n_pos * n_neg == 0:
+        return 0.5
+    return float(auc / (n_pos * n_neg))
+
+
+def compute_auroc_combined(
+    scores_a: np.ndarray,
+    scores_b: np.ndarray,
+    labels: np.ndarray,
+) -> float:
+    """
+    AUROC of a combined linear model: w*scores_a + (1-w)*scores_b.
+
+    Finds the optimal weight w in [0, 1] by grid search (21 points)
+    and returns the best AUROC.  This tests whether the two score
+    sources contain orthogonal signal.
+
+    If AUROC(combined) > max(AUROC(a), AUROC(b)), the signals are
+    complementary and combining them is justified.
+
+    Args:
+        scores_a: 1-D array (e.g. logit confidence).
+        scores_b: 1-D array (e.g. sb score).
+        labels: 1-D binary array (1 = correct, 0 = wrong).
+
+    Returns:
+        Best AUROC achievable by the linear combination.
+    """
+    scores_a = np.asarray(scores_a, dtype=np.float64)
+    scores_b = np.asarray(scores_b, dtype=np.float64)
+    labels = np.asarray(labels, dtype=np.float64)
+
+    if len(scores_a) < 2:
+        return 0.5
+
+    # Normalize each to [0, 1] for fair combination
+    def _normalize(x: np.ndarray) -> np.ndarray:
+        r = x.max() - x.min()
+        if r < 1e-12:
+            return np.full_like(x, 0.5)
+        return (x - x.min()) / r
+
+    a_norm = _normalize(scores_a)
+    b_norm = _normalize(scores_b)
+
+    best_auroc = 0.5
+    for w_int in range(21):  # w = 0.0, 0.05, ..., 1.0
+        w = w_int / 20.0
+        combined = w * a_norm + (1.0 - w) * b_norm
+        auc = compute_auroc(combined, labels)
+        if auc > best_auroc:
+            best_auroc = auc
+
+    return best_auroc
+
+
 def confidence_correctness_correlation(
     confidences: np.ndarray,
     correctness: np.ndarray,

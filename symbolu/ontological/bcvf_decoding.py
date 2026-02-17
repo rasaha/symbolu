@@ -747,11 +747,21 @@ if PYTORCH_AVAILABLE:
 
             log_data["probs"] = probs
 
-            # ---- Option B: Calibration ----------------------------------
-            # Confidence values come from the final distribution (which
-            # is the mixed distribution when softmax-entmax is enabled).
+            # ---- Always compute confidence from the active distribution --
+            # This ensures ECE/Brier are computed from actual max_prob
+            # regardless of whether the calibration layer is enabled.
+            max_prob, _ = probs.max(dim=-1)  # [B]
+            sorted_probs, _ = probs.sort(dim=-1, descending=True)
+            second_prob = sorted_probs[:, 1]  # [B]
+            margin = max_prob - second_prob  # [B]
+            log_data["confidence"] = max_prob
+            log_data["margin"] = margin
+
+            # ---- Option B: Calibration tier assignment -------------------
             if cfg.use_calibration:
                 cal_info = self.calibrator(probs)
+                # Calibrator also sets confidence/margin — let it override
+                # so tier thresholds stay consistent with its own values
                 log_data.update(cal_info)
 
             return best_token_index, probs, log_data
