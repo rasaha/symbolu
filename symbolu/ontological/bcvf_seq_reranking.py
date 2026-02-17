@@ -695,6 +695,10 @@ class ValueReranker:
         >0.5 = signs of correctness.
         <0.5 = obvious structural failure.
         """
+        # NOTE: HumanEval prompts end with trailing whitespace (e.g. '\n    ')
+        # which already provides correct indentation when concatenated with
+        # the raw candidate.  Do NOT apply fix_completion_indent here — that
+        # adds *additional* indent and causes false AST failures.
         full_code = prompt + candidate
         adj = 0.0
 
@@ -1271,6 +1275,29 @@ def run_seq_rerank_benchmark_humaneval(
             else:
                 rank_corr = 1.0
 
+            # --- Evaluate pass/fail for base, value, and ALL K (oracle) ---
+            base_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[logprob_best_idx],
+            )
+            selected_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[selected_idx],
+            )
+            base_passed = test_fn(base_code, test_code, entry_point)
+            value_passed = test_fn(selected_code, test_code, entry_point)
+
+            # Test ALL K candidates for true oracle ceiling
+            oracle_any = base_passed or value_passed
+            if not oracle_any:
+                for k in range(len(candidate_texts)):
+                    if k == logprob_best_idx or k == selected_idx:
+                        continue  # already tested
+                    code_k = prompt + fix_completion_indent(
+                        prompt, candidate_texts[k],
+                    )
+                    if test_fn(code_k, test_code, entry_point):
+                        oracle_any = True
+                        break
+
             result = SeqRerankResult(
                 prompt_id=task_id,
                 K=K,
@@ -1294,6 +1321,22 @@ def run_seq_rerank_benchmark_humaneval(
                 score_std=float(np.std(value_scores)),
                 base_score_std=float(np.std(logprob_scores)),
             )
+            result.base_passed = base_passed
+            result.bcvf_passed = value_passed
+            result.any_passed = oracle_any
+
+            per_prompt.append(result)
+
+            if (i + 1) % 5 == 0 or i == 0:
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if base_passed else 'FAIL'} "
+                    f"value={'PASS' if value_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed} "
+                    f"util={float(np.mean(utilities)):.2f} "
+                    f"base_lp={float(logprob_scores[logprob_best_idx]):.2f}"
+                )
+            continue  # skip common tail below
 
         else:
             # --- BCVF mode: original Equation (B) ---
@@ -1363,15 +1406,6 @@ def run_seq_rerank_benchmark_humaneval(
                     f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
                     f"L={result.mean_L:.4f} "
                     f"rank_r={result.rank_correlation:.2f}"
-                )
-            elif rerank_mode == "value":
-                print(
-                    f"  [{mode_label}] {i+1}/{len(problems)} "
-                    f"base={'PASS' if result.base_passed else 'FAIL'} "
-                    f"value={'PASS' if result.bcvf_passed else 'FAIL'} "
-                    f"changed={result.rerank_changed} "
-                    f"util={result.mean_sf:.2f} "
-                    f"base_lp={result.base_best_score:.2f}"
                 )
             else:
                 print(
