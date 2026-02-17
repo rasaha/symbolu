@@ -131,6 +131,7 @@ from symbolu.ontological.bilinear_bcvf import (
 )
 from symbolu.ontological.bcvf_seq_reranking import (
     RERANK_MODES,
+    ValueReranker,
     rerank_candidates,
     logprob_rerank_candidates,
     generate_and_rerank,
@@ -1720,6 +1721,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--rerank-n-prompts", type=int, default=50,
         help="Number of prompts for WikiText seq reranking (default: 50)",
     )
+    parser.add_argument(
+        "--value-alpha", type=float, default=1.0,
+        help=(
+            "Weight for value utility logit in value reranking mode. "
+            "S(y) = logprob + alpha * logit(V(x,y)). (default: 1.0)"
+        ),
+    )
+    parser.add_argument(
+        "--value-use-ast", action="store_true", default=True,
+        help="Use AST parsing in value reranker utility estimation (default: True)",
+    )
+    parser.add_argument(
+        "--no-value-use-ast", dest="value_use_ast", action="store_false",
+        help="Disable AST parsing in value reranker",
+    )
 
     return parser
 
@@ -1822,6 +1838,9 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"λ={args.rerank_lambda}, "
               f"max_tokens={args.rerank_max_tokens}, "
               f"temp={args.rerank_temperature}, top_p={args.rerank_top_p}")
+        if args.rerank_mode == "value":
+            print(f"  Value: alpha={args.value_alpha}, "
+                  f"use_ast={args.value_use_ast}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
@@ -2035,6 +2054,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             "bcvf": "Sequence-Level BCVF Reranking",
             "logprob": "Sequence-Level Logprob Reranking (baseline)",
             "oracle_verifier": "Sequence-Level Oracle Verifier (ceiling)",
+            "value": "Sequence-Level Value Reranking",
         }
         print(f"\n{'='*70}")
         print(_mode_titles.get(rerank_mode, f"Sequence-Level Reranking ({rerank_mode})"))
@@ -2047,6 +2067,10 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         elif rerank_mode == "oracle_verifier":
             print(f"  Test ALL K candidates, pick first passer (tie-break logprob).")
             print(f"  This is the ceiling: best any perfect verifier could do.")
+        elif rerank_mode == "value":
+            print(f"  S(y) = log p(y|x) + alpha * logit(V(x,y))")
+            print(f"  V = deterministic proxy verifier (AST + structural checks)")
+            print(f"  alpha={args.value_alpha}, use_ast={args.value_use_ast}")
         print(f"{'='*70}")
 
         rerank_k = min(args.rerank_k, 8)
@@ -2146,6 +2170,8 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                     top_p=rerank_top_p,
                     n_bootstrap=args.n_bootstrap,
                     rerank_mode=rerank_mode,
+                    value_alpha=args.value_alpha,
+                    value_use_ast=args.value_use_ast,
                 )
                 seq_rerank_reports.append(sr_report)
                 print_seq_rerank_report(sr_report)
@@ -2167,6 +2193,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         "bcvf": "bcvf_p@1",
                         "logprob": "logprob_p@1",
                         "oracle_verifier": "oracle_p@1",
+                        "value": "value_p@1",
                     }.get(rerank_mode, "sel_p@1")
                     print(
                         f"  {label:<30} rerank={rerank_pct:>6} "
