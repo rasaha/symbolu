@@ -755,9 +755,9 @@ class ValueReranker:
     ) -> float:
         """Compute combined score: logprob + alpha * logit(utility)."""
         utility = self.estimate_utility(prompt, candidate)
-        utility_logit = math.log(
-            utility / (1.0 - utility + 1e-8)
-        )
+        # Clamp to (0.01, 0.99) to avoid log(0) domain errors
+        utility = max(0.01, min(0.99, utility))
+        utility_logit = math.log(utility / (1.0 - utility))
         return base_logprob + self.alpha * utility_logit
 
     # --- Internal helpers --------------------------------------------------
