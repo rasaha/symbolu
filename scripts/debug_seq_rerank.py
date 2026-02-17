@@ -92,14 +92,31 @@ try:
 
     model_name = "microsoft/phi-3.5-mini-instruct"
     print(f"Loading {model_name}...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype=None, trust_remote_code=True,
-        low_cpu_mem_usage=True,
-    )
+    # Try without trust_remote_code first (built-in phi3 is compatible
+    # with transformers 5.x; the custom modeling_phi3.py uses removed
+    # cache.seen_tokens attribute).
+    for trust_remote in (False, True):
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=trust_remote
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name, torch_dtype=torch.float16,
+                device_map="auto",
+                trust_remote_code=trust_remote,
+                low_cpu_mem_usage=True,
+            )
+            if trust_remote:
+                print("  (loaded with trust_remote_code=True)")
+            break
+        except (ValueError, KeyError, ImportError) as e:
+            if trust_remote:
+                raise
+            print(f"  Native loading failed ({e}), retrying with "
+                  "trust_remote_code=True...")
+            continue
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = model.to("cuda")
     model.eval()
 
     # Use a simple HumanEval prompt
