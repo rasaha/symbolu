@@ -117,6 +117,21 @@ class SeqRerankResult:
     # Generated texts (for debugging)
     base_text: str = ""
     bcvf_text: str = ""
+    # --- BCVF signal diagnostics ---
+    topM_hit_rate: float = 0.0         # mean across candidates: frac of tokens in top-M
+    mean_sf: float = 0.0               # mean forward score (target tokens)
+    mean_sb: float = 0.0               # mean backward score (target tokens)
+    mean_sf_all: float = 0.0           # mean forward score (all top-M tokens)
+    mean_sb_all: float = 0.0           # mean backward score (all top-M tokens)
+    std_sf_all: float = 0.0            # std forward score (all top-M tokens)
+    std_sb_all: float = 0.0            # std backward score (all top-M tokens)
+    mean_L: float = 0.0                # mean Lagrangian on target tokens
+    std_L: float = 0.0                 # std Lagrangian on target tokens
+    penalty_per_tok: float = 0.0       # mean BCVF penalty per token
+    base_lp_per_tok: float = 0.0       # mean base logprob per token
+    score_std: float = 0.0             # std of BCVF scores across K candidates
+    base_score_std: float = 0.0        # std of base scores across K candidates
+    rank_correlation: float = 0.0      # Spearman corr(base_rank, bcvf_rank)
 
 
 @dataclass
@@ -147,6 +162,20 @@ class SeqRerankReport:
     per_prompt: List[SeqRerankResult] = field(default_factory=list)
     # Timing
     elapsed_seconds: float = 0.0
+    # --- Aggregated BCVF signal diagnostics ---
+    agg_topM_hit_rate: float = 0.0       # mean top-M hit rate across prompts
+    agg_mean_sf: float = 0.0             # mean forward score (target tokens)
+    agg_mean_sb: float = 0.0             # mean backward score (target tokens)
+    agg_mean_sf_all: float = 0.0         # mean sf across ALL top-M tokens
+    agg_mean_sb_all: float = 0.0         # mean sb across ALL top-M tokens
+    agg_std_sf_all: float = 0.0          # mean of per-prompt sf std (saturation?)
+    agg_std_sb_all: float = 0.0          # mean of per-prompt sb std (saturation?)
+    agg_mean_L: float = 0.0              # mean Lagrangian on target tokens
+    agg_penalty_per_tok: float = 0.0     # mean penalty per token
+    agg_base_lp_per_tok: float = 0.0     # mean base logprob per token
+    agg_score_std: float = 0.0           # mean score std across candidates
+    agg_base_score_std: float = 0.0      # mean base score std across candidates
+    agg_rank_correlation: float = 0.0    # mean Spearman correlation
 
 
 # =========================================================================
@@ -267,10 +296,34 @@ def rerank_candidates(
     bcvf_penalties = np.zeros(K, dtype=np.float64)
     per_candidate_sf = []
     per_candidate_sb = []
+    # Signal diagnostics: per-candidate details
+    per_candidate_topM_hit_rate = []   # fraction of target tokens in top-M
+    per_candidate_L_mean = []          # mean Lagrangian on target tokens
+    per_candidate_L_std = []           # std  Lagrangian on target tokens
+    per_candidate_sf_std = []          # std  forward score on target tokens
+    per_candidate_sb_std = []          # std  backward score on target tokens
+    per_candidate_sf_all_mean = []     # mean sf across ALL top-M tokens (not just target)
+    per_candidate_sb_all_mean = []     # mean sb across ALL top-M tokens
+    per_candidate_sf_all_std = []      # std  sf across ALL top-M tokens
+    per_candidate_sb_all_std = []      # std  sb across ALL top-M tokens
+    per_candidate_penalty_per_tok = [] # bcvf penalty / T_k
+    per_candidate_base_per_tok = []    # base logprob / T_k
 
     for k in range(K):
         T_k = cand_lengths[k]
         if T_k == 0:
+            _zero_diag = 0.0
+            per_candidate_topM_hit_rate.append(_zero_diag)
+            per_candidate_L_mean.append(_zero_diag)
+            per_candidate_L_std.append(_zero_diag)
+            per_candidate_sf_std.append(_zero_diag)
+            per_candidate_sb_std.append(_zero_diag)
+            per_candidate_sf_all_mean.append(_zero_diag)
+            per_candidate_sb_all_mean.append(_zero_diag)
+            per_candidate_sf_all_std.append(_zero_diag)
+            per_candidate_sb_all_std.append(_zero_diag)
+            per_candidate_penalty_per_tok.append(_zero_diag)
+            per_candidate_base_per_tok.append(_zero_diag)
             continue
 
         # Positions: logits at (P-1)..(P-1+T_k-1) predict tokens at P..(P+T_k-1)
@@ -286,6 +339,9 @@ def rerank_candidates(
             1, target.unsqueeze(1)
         ).squeeze(1)                          # [T_k]
         base_scores[k] = float(base_lp_tokens.sum().item())
+        per_candidate_base_per_tok.append(
+            float(base_lp_tokens.sum().item()) / T_k
+        )
 
         if effective_beta > 0:
             # --- Top-M selection ---
@@ -312,19 +368,66 @@ def rerank_candidates(
             # --- Track BCVF penalty for the actual generated tokens ---
             # Find which target tokens are in top-M
             in_topM = (topM_indices == target.unsqueeze(1))  # [T_k, M]
-            L_for_targets = (L * in_topM.float()).sum(dim=-1)  # [T_k]
-            bcvf_penalties[k] = float(L_for_targets.sum().item())
+            in_topM_f = in_topM.float()
+            hit_rate = float(in_topM.any(dim=-1).float().mean().item())
+            per_candidate_topM_hit_rate.append(hit_rate)
 
-            # Mean sf/sb across positions (for diagnostics)
-            sf_for_targets = (sf * in_topM.float()).sum(dim=-1)
-            sb_for_targets = (sb * in_topM.float()).sum(dim=-1)
+            L_for_targets = (L * in_topM_f).sum(dim=-1)  # [T_k]
+            bcvf_penalties[k] = float(L_for_targets.sum().item())
+            per_candidate_penalty_per_tok.append(
+                float(L_for_targets.sum().item()) / T_k
+            )
+
+            # Per-position L stats for target tokens (only where in top-M)
+            hits_mask = in_topM.any(dim=-1)  # [T_k] bool
+            if hits_mask.any():
+                L_hit = L_for_targets[hits_mask]
+                per_candidate_L_mean.append(float(L_hit.mean().item()))
+                per_candidate_L_std.append(
+                    float(L_hit.std().item()) if L_hit.numel() > 1 else 0.0
+                )
+            else:
+                per_candidate_L_mean.append(0.0)
+                per_candidate_L_std.append(0.0)
+
+            # Mean sf/sb across positions for target tokens
+            sf_for_targets = (sf * in_topM_f).sum(dim=-1)
+            sb_for_targets = (sb * in_topM_f).sum(dim=-1)
             per_candidate_sf.append(float(sf_for_targets.mean().item()))
             per_candidate_sb.append(float(sb_for_targets.mean().item()))
+            if hits_mask.any():
+                sf_hit = sf_for_targets[hits_mask]
+                sb_hit = sb_for_targets[hits_mask]
+                per_candidate_sf_std.append(
+                    float(sf_hit.std().item()) if sf_hit.numel() > 1 else 0.0
+                )
+                per_candidate_sb_std.append(
+                    float(sb_hit.std().item()) if sb_hit.numel() > 1 else 0.0
+                )
+            else:
+                per_candidate_sf_std.append(0.0)
+                per_candidate_sb_std.append(0.0)
+
+            # sf/sb across ALL top-M candidates (saturation check)
+            per_candidate_sf_all_mean.append(float(sf.mean().item()))
+            per_candidate_sb_all_mean.append(float(sb.mean().item()))
+            per_candidate_sf_all_std.append(float(sf.std().item()))
+            per_candidate_sb_all_std.append(float(sb.std().item()))
         else:
             # lambda=0: pure base logprob
             scores[k] = base_scores[k]
             per_candidate_sf.append(0.0)
             per_candidate_sb.append(0.0)
+            per_candidate_topM_hit_rate.append(1.0)
+            per_candidate_L_mean.append(0.0)
+            per_candidate_L_std.append(0.0)
+            per_candidate_sf_std.append(0.0)
+            per_candidate_sb_std.append(0.0)
+            per_candidate_sf_all_mean.append(0.0)
+            per_candidate_sb_all_mean.append(0.0)
+            per_candidate_sf_all_std.append(0.0)
+            per_candidate_sb_all_std.append(0.0)
+            per_candidate_penalty_per_tok.append(0.0)
 
     # --- Select best ---
     best_index = int(np.argmax(scores))
@@ -335,6 +438,22 @@ def rerank_candidates(
     score_margin = float(sorted_scores[0] - sorted_scores[1]) if K > 1 else 0.0
     sorted_base = np.sort(base_scores)[::-1]
     base_margin = float(sorted_base[0] - sorted_base[1]) if K > 1 else 0.0
+
+    # --- Score spread across candidates (is BCVF differentiating?) ---
+    score_std = float(np.std(scores)) if K > 1 else 0.0
+    base_score_std = float(np.std(base_scores)) if K > 1 else 0.0
+    # Rank correlation: does BCVF preserve or scramble base ordering?
+    if K > 2:
+        # Spearman correlation without scipy: correlate ranks
+        base_ranks = np.argsort(np.argsort(base_scores)).astype(float)
+        bcvf_ranks = np.argsort(np.argsort(scores)).astype(float)
+        d = base_ranks - bcvf_ranks
+        n_k = float(K)
+        rank_corr = 1.0 - 6.0 * float(np.sum(d ** 2)) / (n_k * (n_k ** 2 - 1))
+    elif K == 2:
+        rank_corr = 1.0 if np.argmax(base_scores) == np.argmax(scores) else -1.0
+    else:
+        rank_corr = float("nan")
 
     diagnostics = {
         "best_index": best_index,
@@ -351,6 +470,21 @@ def rerank_candidates(
         "effective_beta": effective_beta,
         "rerank_lambda": rerank_lambda,
         "top_m": top_m,
+        # --- Signal diagnostics ---
+        "score_std": score_std,
+        "base_score_std": base_score_std,
+        "rank_correlation": float(rank_corr),
+        "per_candidate_topM_hit_rate": per_candidate_topM_hit_rate,
+        "per_candidate_L_mean": per_candidate_L_mean,
+        "per_candidate_L_std": per_candidate_L_std,
+        "per_candidate_sf_std": per_candidate_sf_std,
+        "per_candidate_sb_std": per_candidate_sb_std,
+        "per_candidate_sf_all_mean": per_candidate_sf_all_mean,
+        "per_candidate_sb_all_mean": per_candidate_sb_all_mean,
+        "per_candidate_sf_all_std": per_candidate_sf_all_std,
+        "per_candidate_sb_all_std": per_candidate_sb_all_std,
+        "per_candidate_penalty_per_tok": per_candidate_penalty_per_tok,
+        "per_candidate_base_per_tok": per_candidate_base_per_tok,
     }
 
     return best_index, scores, diagnostics
@@ -505,6 +639,9 @@ def generate_and_rerank(
 
     base_best_idx = diag["base_best_index"]
 
+    # Aggregate per-candidate diagnostics into per-prompt means
+    _safe_mean = lambda lst: float(np.mean(lst)) if lst else 0.0
+
     result = SeqRerankResult(
         K=K,
         rerank_lambda=rerank_lambda,
@@ -520,6 +657,21 @@ def generate_and_rerank(
         candidate_lengths=diag["candidate_lengths"],
         base_text=candidate_texts[base_best_idx],
         bcvf_text=candidate_texts[best_idx],
+        # Signal diagnostics
+        topM_hit_rate=_safe_mean(diag["per_candidate_topM_hit_rate"]),
+        mean_sf=_safe_mean(diag["per_candidate_sf"]),
+        mean_sb=_safe_mean(diag["per_candidate_sb"]),
+        mean_sf_all=_safe_mean(diag["per_candidate_sf_all_mean"]),
+        mean_sb_all=_safe_mean(diag["per_candidate_sb_all_mean"]),
+        std_sf_all=_safe_mean(diag["per_candidate_sf_all_std"]),
+        std_sb_all=_safe_mean(diag["per_candidate_sb_all_std"]),
+        mean_L=_safe_mean(diag["per_candidate_L_mean"]),
+        std_L=_safe_mean(diag["per_candidate_L_std"]),
+        penalty_per_tok=_safe_mean(diag["per_candidate_penalty_per_tok"]),
+        base_lp_per_tok=_safe_mean(diag["per_candidate_base_per_tok"]),
+        score_std=diag["score_std"],
+        base_score_std=diag["base_score_std"],
+        rank_correlation=diag["rank_correlation"],
     )
 
     return candidate_texts[base_best_idx], candidate_texts[best_idx], result
@@ -666,7 +818,11 @@ def run_seq_rerank_benchmark_humaneval(
                 f"  [seq-rerank-humaneval] {i+1}/{len(problems)} "
                 f"base={'PASS' if result.base_passed else 'FAIL'} "
                 f"bcvf={'PASS' if result.bcvf_passed else 'FAIL'} "
-                f"changed={result.rerank_changed}"
+                f"changed={result.rerank_changed} "
+                f"topM_hit={result.topM_hit_rate:.2f} "
+                f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
+                f"L={result.mean_L:.4f} "
+                f"rank_r={result.rank_correlation:.2f}"
             )
 
     elapsed = time.time() - t0
@@ -781,6 +937,7 @@ def run_seq_rerank_benchmark_wikitext(
 
         base_best_idx = diag["base_best_index"]
 
+        _safe_mean = lambda lst: float(np.mean(lst)) if lst else 0.0
         result = SeqRerankResult(
             prompt_id=f"wikitext_{i}",
             K=K,
@@ -797,6 +954,21 @@ def run_seq_rerank_benchmark_wikitext(
             candidate_lengths=diag["candidate_lengths"],
             base_text=candidate_texts[base_best_idx],
             bcvf_text=candidate_texts[best_idx],
+            # Signal diagnostics
+            topM_hit_rate=_safe_mean(diag["per_candidate_topM_hit_rate"]),
+            mean_sf=_safe_mean(diag["per_candidate_sf"]),
+            mean_sb=_safe_mean(diag["per_candidate_sb"]),
+            mean_sf_all=_safe_mean(diag["per_candidate_sf_all_mean"]),
+            mean_sb_all=_safe_mean(diag["per_candidate_sb_all_mean"]),
+            std_sf_all=_safe_mean(diag["per_candidate_sf_all_std"]),
+            std_sb_all=_safe_mean(diag["per_candidate_sb_all_std"]),
+            mean_L=_safe_mean(diag["per_candidate_L_mean"]),
+            std_L=_safe_mean(diag["per_candidate_L_std"]),
+            penalty_per_tok=_safe_mean(diag["per_candidate_penalty_per_tok"]),
+            base_lp_per_tok=_safe_mean(diag["per_candidate_base_per_tok"]),
+            score_std=diag["score_std"],
+            base_score_std=diag["base_score_std"],
+            rank_correlation=diag["rank_correlation"],
         )
 
         per_prompt.append(result)
@@ -805,7 +977,10 @@ def run_seq_rerank_benchmark_wikitext(
             print(
                 f"  [seq-rerank-wikitext] {len(per_prompt)}/{n_prompts} "
                 f"changed={result.rerank_changed} "
-                f"margin={result.score_margin:.3f}"
+                f"margin={result.score_margin:.3f} "
+                f"topM_hit={result.topM_hit_rate:.2f} "
+                f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
+                f"L={result.mean_L:.4f}"
             )
 
     elapsed = time.time() - t0
@@ -848,6 +1023,9 @@ def _build_seq_rerank_report(
         for r in per_prompt
     ]
 
+    # Aggregate signal diagnostics across prompts
+    _agg = lambda attr: float(np.mean([getattr(r, attr) for r in per_prompt]))
+
     report = SeqRerankReport(
         n_prompts=n,
         K=K,
@@ -860,6 +1038,20 @@ def _build_seq_rerank_report(
         mean_bcvf_logprob_selected=float(np.mean(bcvf_logprobs)),
         per_prompt=per_prompt,
         elapsed_seconds=elapsed,
+        # Signal diagnostics
+        agg_topM_hit_rate=_agg("topM_hit_rate"),
+        agg_mean_sf=_agg("mean_sf"),
+        agg_mean_sb=_agg("mean_sb"),
+        agg_mean_sf_all=_agg("mean_sf_all"),
+        agg_mean_sb_all=_agg("mean_sb_all"),
+        agg_std_sf_all=_agg("std_sf_all"),
+        agg_std_sb_all=_agg("std_sb_all"),
+        agg_mean_L=_agg("mean_L"),
+        agg_penalty_per_tok=_agg("penalty_per_tok"),
+        agg_base_lp_per_tok=_agg("base_lp_per_tok"),
+        agg_score_std=_agg("score_std"),
+        agg_base_score_std=_agg("base_score_std"),
+        agg_rank_correlation=_agg("rank_correlation"),
     )
 
     if has_pass_fail:
@@ -993,6 +1185,103 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 f"{ci.mean:+.4f} [{ci.lower:+.4f}, {ci.upper:+.4f}] "
                 f"(n={ci.n_bootstrap})"
             )
+
+    # BCVF Signal Diagnostics
+    lines.append("")
+    lines.append("-" * 70)
+    lines.append("BCVF Signal Diagnostics (is BCVF providing useful signal?)")
+    lines.append("-" * 70)
+
+    lines.append("")
+    lines.append("1. Top-M Coverage (are generated tokens in the BCVF window?):")
+    lines.append(f"     Mean top-M hit rate:  {report.agg_topM_hit_rate:.3f}")
+    if report.agg_topM_hit_rate < 0.5:
+        lines.append(
+            "     ** WARNING: <50% of target tokens are in top-M. "
+            "BCVF cannot influence most token scores. Increase top_m."
+        )
+
+    lines.append("")
+    lines.append("2. Forward/Backward Score Distributions (saturation check):")
+    lines.append(
+        f"     sf (target tokens): mean={report.agg_mean_sf:.4f}"
+    )
+    lines.append(
+        f"     sb (target tokens): mean={report.agg_mean_sb:.4f}"
+    )
+    lines.append(
+        f"     sf (all top-M):     mean={report.agg_mean_sf_all:.4f}  "
+        f"std={report.agg_std_sf_all:.4f}"
+    )
+    lines.append(
+        f"     sb (all top-M):     mean={report.agg_mean_sb_all:.4f}  "
+        f"std={report.agg_std_sb_all:.4f}"
+    )
+    if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
+        lines.append(
+            "     ** WARNING: Very low std in sf/sb across top-M tokens. "
+            "Scores are saturated -> Lagrangian is near-constant -> "
+            "BCVF cannot differentiate candidates."
+        )
+
+    lines.append("")
+    lines.append("3. Lagrangian Penalty Magnitude:")
+    lines.append(f"     Mean L (target toks): {report.agg_mean_L:.6f}")
+    lines.append(f"     Penalty/token:        {report.agg_penalty_per_tok:.6f}")
+    lines.append(f"     Base logprob/token:   {report.agg_base_lp_per_tok:.4f}")
+    if report.agg_base_lp_per_tok != 0:
+        ratio = abs(report.agg_penalty_per_tok / report.agg_base_lp_per_tok)
+        lines.append(f"     |penalty/base_lp|:    {ratio:.4f}")
+        if ratio < 0.01:
+            lines.append(
+                "     ** WARNING: BCVF penalty is <1% of base logprob magnitude. "
+                "The penalty is too small to meaningfully rerank. "
+                "Increase beta or lambda."
+            )
+
+    lines.append("")
+    lines.append("4. Score Differentiation Across Candidates:")
+    lines.append(
+        f"     BCVF score std:       {report.agg_score_std:.4f}  "
+        f"(spread of BCVF scores across K)"
+    )
+    lines.append(
+        f"     Base score std:       {report.agg_base_score_std:.4f}  "
+        f"(spread of base scores across K)"
+    )
+    lines.append(
+        f"     Rank correlation:     {report.agg_rank_correlation:.3f}  "
+        f"(Spearman: base vs BCVF ranking)"
+    )
+    if abs(report.agg_rank_correlation) > 0.95:
+        lines.append(
+            "     ** NOTE: Near-perfect rank correlation means BCVF is "
+            "not changing the ranking. The penalty is too weak or uniform."
+        )
+
+    # Diagnosis summary
+    lines.append("")
+    problems_found = []
+    if report.agg_topM_hit_rate < 0.5:
+        problems_found.append("low top-M coverage")
+    if report.agg_std_sf_all < 0.02 or report.agg_std_sb_all < 0.02:
+        problems_found.append("saturated sf/sb scores")
+    if report.agg_base_lp_per_tok != 0 and abs(
+        report.agg_penalty_per_tok / report.agg_base_lp_per_tok
+    ) < 0.01:
+        problems_found.append("penalty magnitude too small")
+    if abs(report.agg_rank_correlation) > 0.95:
+        problems_found.append("BCVF not changing rankings")
+    if problems_found:
+        lines.append(
+            f"  DIAGNOSIS: {', '.join(problems_found)}"
+        )
+    else:
+        lines.append(
+            "  DIAGNOSIS: BCVF signal looks active. Check pass@1 delta "
+            "for whether it helps."
+        )
+    lines.append("")
 
     # Sanity check notes
     lines.append("")
