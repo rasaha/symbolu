@@ -913,6 +913,43 @@ class ValueReranker:
 # =========================================================================
 
 
+class PCATransform:
+    """Lightweight PCA via torch SVD — no sklearn dependency.
+
+    Fits on training hidden states and transforms to ``n_components``
+    dimensions.  All tensors stored on CPU in float32.
+    """
+
+    def __init__(self, n_components: int = 32):
+        self.n_components = n_components
+        self.mean_: Optional["torch.Tensor"] = None       # [D]
+        self.components_: Optional["torch.Tensor"] = None  # [n_comp, D]
+        self.explained_var_ratio_: Optional[float] = None
+
+    def fit(self, X: "torch.Tensor") -> "PCATransform":
+        """Fit PCA on X of shape [N, D] (CPU float32)."""
+        X = X.float().cpu()
+        self.mean_ = X.mean(dim=0)
+        X_c = X - self.mean_
+        # Economy SVD — only need first n_components singular vectors
+        _U, S, Vt = torch.linalg.svd(X_c, full_matrices=False)
+        self.components_ = Vt[:self.n_components]  # [n_comp, D]
+        total_var = (S ** 2).sum().item()
+        kept_var = (S[:self.n_components] ** 2).sum().item()
+        self.explained_var_ratio_ = kept_var / max(total_var, 1e-12)
+        return self
+
+    def transform(self, X: "torch.Tensor") -> "torch.Tensor":
+        """Project X [N, D] -> [N, n_components]."""
+        assert self.mean_ is not None, "PCA not fitted"
+        X = X.float().cpu()
+        return (X - self.mean_) @ self.components_.T  # [N, n_comp]
+
+    def fit_transform(self, X: "torch.Tensor") -> "torch.Tensor":
+        self.fit(X)
+        return self.transform(X)
+
+
 @dataclass
 class CandidateSample:
     """One collected sample for learned reranker training.
@@ -933,12 +970,21 @@ class CandidateSample:
 if PYTORCH_AVAILABLE:
 
     class LearnedValueReranker(nn.Module):
-        """MLP that predicts P(pass | hidden_state, logprob, length).
+        """MLP that predicts P(pass | features).
 
-        Input features:  [pooled_hidden (D), base_logprob (1), length (1)]
-        Output:          scalar logit (apply sigmoid for probability).
+        Supports two feature modes controlled by ``hidden_only``:
 
-        Scoring formula matches ValueReranker::
+        * ``hidden_only=False`` (legacy):
+          features = [pooled_hidden (D'), base_logprob (1), length (1)]
+        * ``hidden_only=True`` (recommended):
+          features = [pooled_hidden (D')]
+          This forces the MLP to learn signal orthogonal to logprob.
+
+        When ``pca`` is set, pooled_hidden is projected from the raw
+        hidden dimension D to D' = pca.n_components before being fed
+        to the network.
+
+        Scoring formula::
 
             S(y) = base_logprob + alpha * mlp_logit(features)
 
@@ -955,6 +1001,9 @@ if PYTORCH_AVAILABLE:
                 nn.Linear(hidden_dim // 2, 1),
             )
             self.input_dim = input_dim
+            # Set after training via train_learned_reranker()
+            self.pca: Optional[PCATransform] = None
+            self.hidden_only: bool = False
 
         def forward(self, x: "torch.Tensor") -> "torch.Tensor":
             """Return raw logits, shape [B]."""
@@ -963,6 +1012,32 @@ if PYTORCH_AVAILABLE:
         def predict_proba(self, x: "torch.Tensor") -> "torch.Tensor":
             """Return P(pass) in [0, 1], shape [B]."""
             return torch.sigmoid(self.forward(x))
+
+        def _build_features(
+            self,
+            pooled_hiddens: "torch.Tensor",
+            base_logprobs: np.ndarray,
+            candidate_lengths: List[int],
+        ) -> "torch.Tensor":
+            """Build feature tensor, applying PCA and hidden_only as needed."""
+            device = next(self.parameters()).device
+
+            # Apply PCA if configured
+            h = pooled_hiddens
+            if self.pca is not None:
+                h = self.pca.transform(h)  # [K, pca_dim], CPU
+            h = h.to(device)
+
+            if self.hidden_only:
+                return h  # [K, D']
+
+            lp = torch.tensor(
+                base_logprobs, dtype=torch.float32, device=device,
+            ).unsqueeze(1)
+            lens = torch.tensor(
+                candidate_lengths, dtype=torch.float32, device=device,
+            ).unsqueeze(1)
+            return torch.cat([h, lp, lens], dim=1)  # [K, D'+2]
 
         def score_candidates(
             self,
@@ -973,8 +1048,10 @@ if PYTORCH_AVAILABLE:
         ) -> np.ndarray:
             """Score K candidates: base_logprob + alpha * mlp_logit.
 
+            Applies PCA and hidden_only settings automatically.
+
             Args:
-                pooled_hiddens: [K, D] pooled hidden states.
+                pooled_hiddens: [K, D] raw pooled hidden states.
                 base_logprobs: [K] base logprob scores.
                 candidate_lengths: List of K candidate lengths.
                 alpha: Weight for MLP logit.
@@ -982,19 +1059,9 @@ if PYTORCH_AVAILABLE:
             Returns:
                 scores: [K] combined scores as numpy array.
             """
-            device = next(self.parameters()).device
-            K = pooled_hiddens.shape[0]
-
-            # Build feature vectors: [hidden, logprob, length]
-            lp = torch.tensor(
-                base_logprobs, dtype=torch.float32, device=device,
-            ).unsqueeze(1)  # [K, 1]
-            lens = torch.tensor(
-                candidate_lengths, dtype=torch.float32, device=device,
-            ).unsqueeze(1)  # [K, 1]
-            features = torch.cat(
-                [pooled_hiddens.to(device), lp, lens], dim=1,
-            )  # [K, D+2]
+            features = self._build_features(
+                pooled_hiddens, base_logprobs, candidate_lengths,
+            )
 
             with torch.no_grad():
                 logits = self.forward(features)  # [K]
@@ -1004,28 +1071,48 @@ if PYTORCH_AVAILABLE:
     def _build_feature_tensor(
         samples: List[CandidateSample],
         device: str = "cpu",
-    ) -> Tuple["torch.Tensor", "torch.Tensor"]:
-        """Build (features, labels) tensors from collected samples.
+        pca: Optional[PCATransform] = None,
+        hidden_only: bool = False,
+    ) -> Tuple["torch.Tensor", "torch.Tensor", "torch.Tensor"]:
+        """Build (features, labels, logprobs) tensors from collected samples.
+
+        Args:
+            samples: Collected candidate samples.
+            device: Target torch device.
+            pca: If set, project hidden states through PCA first.
+            hidden_only: If True, exclude logprob/length from features.
 
         Returns:
-            features: [N, D+2] tensor (hidden, logprob, length).
+            features: [N, F] tensor.
             labels: [N] tensor of 0.0/1.0.
+            logprobs: [N] tensor of base logprobs (for diagnostics).
         """
         hiddens = torch.stack([s.pooled_hidden for s in samples])  # [N, D]
+        if pca is not None:
+            hiddens = pca.transform(hiddens)  # [N, pca_dim]
+
         lps = torch.tensor(
             [s.base_logprob for s in samples],
             dtype=torch.float32,
-        ).unsqueeze(1)  # [N, 1]
-        lens = torch.tensor(
-            [s.candidate_length for s in samples],
-            dtype=torch.float32,
-        ).unsqueeze(1)  # [N, 1]
-        features = torch.cat([hiddens, lps, lens], dim=1).to(device)
+        )  # [N]
+
         labels = torch.tensor(
             [1.0 if s.passed else 0.0 for s in samples],
             dtype=torch.float32,
         ).to(device)
-        return features, labels
+
+        if hidden_only:
+            features = hiddens.to(device)
+        else:
+            lens = torch.tensor(
+                [s.candidate_length for s in samples],
+                dtype=torch.float32,
+            ).unsqueeze(1)  # [N, 1]
+            features = torch.cat(
+                [hiddens, lps.unsqueeze(1), lens], dim=1,
+            ).to(device)
+
+        return features, labels, lps.to(device)
 
 
 # =========================================================================
@@ -1311,6 +1398,17 @@ def collect_learned_reranker_data(
     return samples
 
 
+def _spearman_rho(x: np.ndarray, y: np.ndarray) -> float:
+    """Manual Spearman rank correlation (no scipy)."""
+    n = len(x)
+    if n < 3:
+        return 0.0
+    rx = np.argsort(np.argsort(x)).astype(float)
+    ry = np.argsort(np.argsort(y)).astype(float)
+    d = rx - ry
+    return 1.0 - 6.0 * float(np.sum(d ** 2)) / (n * (n ** 2 - 1))
+
+
 def train_learned_reranker(
     samples: List["CandidateSample"],
     hidden_dim: int = 256,
@@ -1320,6 +1418,8 @@ def train_learned_reranker(
     train_ratio: float = 0.8,
     seed: int = 42,
     device: str = "cpu",
+    pca_dim: int = 0,
+    hidden_only: bool = False,
 ) -> Tuple["LearnedValueReranker", Dict[str, Any]]:
     """Train a LearnedValueReranker MLP on collected candidate samples.
 
@@ -1332,9 +1432,15 @@ def train_learned_reranker(
         train_ratio: Fraction for training (rest for eval).
         seed: Random seed.
         device: Torch device.
+        pca_dim: If > 0, reduce hidden states from D to pca_dim via PCA
+            before training.  This addresses the p >> n problem when
+            D (e.g. 3072) vastly exceeds N (e.g. 400).
+        hidden_only: If True, exclude logprob and length from MLP input,
+            forcing the network to learn signal orthogonal to base logprob.
 
     Returns:
-        (model, metrics) where metrics contains train/eval loss and accuracy.
+        (model, metrics) where metrics contains train/eval loss, accuracy,
+        and the critical rho-inequality diagnostic.
     """
     if not PYTORCH_AVAILABLE:
         raise ImportError("PyTorch is required")
@@ -1342,8 +1448,23 @@ def train_learned_reranker(
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    # Build feature/label tensors
-    features, labels = _build_feature_tensor(samples, device=device)
+    # ---- PCA: fit on raw hidden states before building features ----
+    pca_obj: Optional[PCATransform] = None
+    if pca_dim > 0:
+        raw_hiddens = torch.stack([s.pooled_hidden for s in samples])
+        raw_D = raw_hiddens.shape[1]
+        effective_pca_dim = min(pca_dim, raw_D, len(samples))
+        pca_obj = PCATransform(n_components=effective_pca_dim)
+        pca_obj.fit(raw_hiddens)
+        print(
+            f"  [train] PCA: {raw_D} -> {effective_pca_dim}  "
+            f"explained_var={pca_obj.explained_var_ratio_:.3f}"
+        )
+
+    # Build feature/label tensors (with PCA and hidden_only applied)
+    features, labels, logprobs = _build_feature_tensor(
+        samples, device=device, pca=pca_obj, hidden_only=hidden_only,
+    )
     input_dim = features.shape[1]
     N = features.shape[0]
 
@@ -1351,19 +1472,25 @@ def train_learned_reranker(
     perm = torch.randperm(N)
     features = features[perm]
     labels = labels[perm]
+    logprobs = logprobs[perm]
     n_train = int(N * train_ratio)
     X_train, X_eval = features[:n_train], features[n_train:]
     y_train, y_eval = labels[:n_train], labels[n_train:]
+    lp_train, lp_eval = logprobs[:n_train], logprobs[n_train:]
 
     n_pos_train = int(y_train.sum().item())
     n_pos_eval = int(y_eval.sum().item())
+    mode_label = "hidden_only" if hidden_only else "hidden+lp+len"
     print(
         f"  [train] N={N}  train={n_train} (pos={n_pos_train})  "
-        f"eval={N - n_train} (pos={n_pos_eval})  input_dim={input_dim}"
+        f"eval={N - n_train} (pos={n_pos_eval})  input_dim={input_dim}  "
+        f"mode={mode_label}"
     )
 
     # Initialize model
     mlp = LearnedValueReranker(input_dim=input_dim, hidden_dim=hidden_dim)
+    mlp.pca = pca_obj
+    mlp.hidden_only = hidden_only
     mlp = mlp.to(device)
     optimizer = torch.optim.Adam(mlp.parameters(), lr=lr, weight_decay=1e-5)
     loss_fn = nn.BCEWithLogitsLoss()
@@ -1441,6 +1568,54 @@ def train_learned_reranker(
             (final_train_preds == y_train).float().mean().item()
         )
 
+    # ================================================================
+    # Rho-inequality diagnostic:
+    #   ρ(V(x,y), correctness) vs ρ(logprob, correctness)
+    #
+    # The MLP can only help if its signal is MORE correlated with
+    # correctness than logprob already is.  If not, the reranker
+    # adds nothing — S(y) = logprob + alpha*V preserves the base
+    # ranking.
+    # ================================================================
+    with torch.no_grad():
+        all_logits = mlp(features)  # [N]
+    v_np = all_logits.cpu().numpy()
+    lp_np = logprobs.cpu().numpy()
+    y_np = labels.cpu().numpy()
+
+    rho_v_corr = _spearman_rho(v_np, y_np)
+    rho_lp_corr = _spearman_rho(lp_np, y_np)
+    rho_gap = rho_v_corr - rho_lp_corr
+
+    # Also compute on eval split only (out-of-sample)
+    with torch.no_grad():
+        eval_v = mlp(X_eval).cpu().numpy()
+    eval_lp = lp_eval.cpu().numpy()
+    eval_y = y_eval.cpu().numpy()
+
+    rho_v_eval = _spearman_rho(eval_v, eval_y)
+    rho_lp_eval = _spearman_rho(eval_lp, eval_y)
+    rho_gap_eval = rho_v_eval - rho_lp_eval
+
+    print(
+        f"  [train] Final: train_acc={final_train_acc:.3f}  "
+        f"eval_acc={final_eval_acc:.3f}  best_eval_acc={best_eval_acc:.3f}"
+    )
+    print(f"  [rho-inequality] Critical diagnostic — "
+          f"does MLP beat logprob at predicting correctness?")
+    print(f"    All data:  ρ(V,corr)={rho_v_corr:+.4f}  "
+          f"ρ(logprob,corr)={rho_lp_corr:+.4f}  "
+          f"gap={rho_gap:+.4f}"
+          f"{'  << MLP WINS' if rho_gap > 0.05 else ''}"
+          f"{'  << LOGPROB WINS — MLP not helping' if rho_gap < -0.02 else ''}"
+          f"{'  << ~TIED — MLP is redundant' if -0.02 <= rho_gap <= 0.05 else ''}")
+    print(f"    Eval only: ρ(V,corr)={rho_v_eval:+.4f}  "
+          f"ρ(logprob,corr)={rho_lp_eval:+.4f}  "
+          f"gap={rho_gap_eval:+.4f}"
+          f"{'  << MLP WINS' if rho_gap_eval > 0.05 else ''}"
+          f"{'  << LOGPROB WINS — MLP not helping' if rho_gap_eval < -0.02 else ''}"
+          f"{'  << ~TIED — MLP is redundant' if -0.02 <= rho_gap_eval <= 0.05 else ''}")
+
     metrics = {
         "n_samples": N,
         "n_train": n_train,
@@ -1453,11 +1628,18 @@ def train_learned_reranker(
         "best_eval_acc": best_eval_acc,
         "train_pos_rate": n_pos_train / max(n_train, 1),
         "eval_pos_rate": n_pos_eval / max(N - n_train, 1),
+        "pca_dim": pca_dim,
+        "pca_explained_var": (
+            pca_obj.explained_var_ratio_ if pca_obj else None
+        ),
+        "hidden_only": hidden_only,
+        "rho_v_correctness": rho_v_corr,
+        "rho_logprob_correctness": rho_lp_corr,
+        "rho_gap": rho_gap,
+        "rho_v_correctness_eval": rho_v_eval,
+        "rho_logprob_correctness_eval": rho_lp_eval,
+        "rho_gap_eval": rho_gap_eval,
     }
-    print(
-        f"  [train] Final: train_acc={final_train_acc:.3f}  "
-        f"eval_acc={final_eval_acc:.3f}  best_eval_acc={best_eval_acc:.3f}"
-    )
     return mlp, metrics
 
 
@@ -1829,15 +2011,8 @@ def run_seq_rerank_benchmark_humaneval(
             selected_idx = int(np.argmax(learned_scores))
 
             # MLP predicted probabilities for diagnostics
-            device_lr = next(learned_reranker.parameters()).device
-            lp_t = torch.tensor(
-                logprob_scores, dtype=torch.float32, device=device_lr,
-            ).unsqueeze(1)
-            len_t = torch.tensor(
-                cand_lengths_h, dtype=torch.float32, device=device_lr,
-            ).unsqueeze(1)
-            feat = torch.cat(
-                [pooled_hiddens.to(device_lr), lp_t, len_t], dim=1,
+            feat = learned_reranker._build_features(
+                pooled_hiddens, logprob_scores, cand_lengths_h,
             )
             with torch.no_grad():
                 mlp_probs = learned_reranker.predict_proba(feat).cpu().numpy()
@@ -2321,7 +2496,7 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
             "V = deterministic proxy verifier (AST + structural checks)"
         ),
         "learned_value": (
-            "S(y) = logprob + alpha * MLP_logit(pooled_hidden, logprob, len)  "
+            "S(y) = logprob + alpha * MLP_logit(features)  "
             "MLP trained on candidate pass/fail data"
         ),
     }

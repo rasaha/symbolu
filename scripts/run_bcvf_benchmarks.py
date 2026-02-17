@@ -1770,6 +1770,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--learned-train-ratio", type=float, default=0.8,
         help="Train/eval split ratio for learned reranker (default: 0.8)",
     )
+    parser.add_argument(
+        "--learned-pca-dim", type=int, default=0,
+        help=(
+            "PCA dimensionality reduction for hidden states before MLP. "
+            "0 = no PCA (raw D-dim hidden).  Recommended: 32 or 64 to "
+            "address the p >> n problem (D=3072 >> N=400). (default: 0)"
+        ),
+    )
+    parser.add_argument(
+        "--learned-hidden-only", action="store_true", default=False,
+        help=(
+            "Exclude logprob and length from MLP input features. "
+            "Forces the MLP to learn signal orthogonal to base logprob, "
+            "preventing it from just replicating the base ranking. "
+            "(default: False)"
+        ),
+    )
 
     return parser
 
@@ -1875,6 +1892,15 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         if args.rerank_mode == "value":
             print(f"  Value: alpha={args.value_alpha}, "
                   f"use_ast={args.value_use_ast}")
+        if args.rerank_mode == "learned_value":
+            pca_str = (
+                f"pca_dim={args.learned_pca_dim}"
+                if args.learned_pca_dim > 0 else "no_pca"
+            )
+            print(f"  Learned: alpha={args.learned_alpha}, "
+                  f"hidden_dim={args.learned_hidden_dim}, "
+                  f"{pca_str}, "
+                  f"hidden_only={args.learned_hidden_only}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
@@ -2107,10 +2133,15 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             print(f"  V = deterministic proxy verifier (AST + structural checks)")
             print(f"  alpha={args.value_alpha}, use_ast={args.value_use_ast}")
         elif rerank_mode == "learned_value":
-            print(f"  S(y) = logprob + alpha * MLP_logit(pooled_hidden, logprob, len)")
+            feat_mode = "hidden_only" if args.learned_hidden_only else "hidden+logprob+len"
+            print(f"  S(y) = logprob + alpha * MLP_logit({feat_mode})")
             print(f"  MLP trained on candidate pass/fail data")
+            pca_info = (
+                f"pca_dim={args.learned_pca_dim}"
+                if args.learned_pca_dim > 0 else "no_pca"
+            )
             print(f"  alpha={args.learned_alpha}, hidden_dim={args.learned_hidden_dim}, "
-                  f"epochs={args.learned_epochs}")
+                  f"epochs={args.learned_epochs}, {pca_info}")
         print(f"{'='*70}")
 
         rerank_k = min(args.rerank_k, 8)
@@ -2219,9 +2250,15 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
 
                     import torch as _torch
                     _device = next(model.parameters()).device
+                    pca_label = (
+                        f"pca={args.learned_pca_dim}"
+                        if args.learned_pca_dim > 0 else "no_pca"
+                    )
+                    ho_label = "hidden_only" if args.learned_hidden_only else "hidden+lp+len"
                     print(f"\n  Phase 2: Train MLP "
                           f"(hidden_dim={args.learned_hidden_dim}, "
-                          f"epochs={args.learned_epochs})")
+                          f"epochs={args.learned_epochs}, "
+                          f"{pca_label}, {ho_label})")
                     learned_reranker_obj, train_metrics = train_learned_reranker(
                         samples=samples,
                         hidden_dim=args.learned_hidden_dim,
@@ -2229,6 +2266,8 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         lr=args.learned_lr,
                         train_ratio=args.learned_train_ratio,
                         device=str(_device),
+                        pca_dim=args.learned_pca_dim,
+                        hidden_only=args.learned_hidden_only,
                     )
                     print(f"\n  Phase 3: Evaluate with trained MLP "
                           f"(alpha={args.learned_alpha})")
