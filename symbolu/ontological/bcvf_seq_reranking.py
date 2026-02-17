@@ -73,6 +73,7 @@ import numpy as np
 
 try:
     import torch
+    import torch.nn as nn
     import torch.nn.functional as F
 
     PYTORCH_AVAILABLE = True
@@ -93,7 +94,7 @@ from symbolu.ontological.bcvf_benchmarks import (
 
 
 # Valid reranking modes
-RERANK_MODES = ("bcvf", "logprob", "oracle_verifier", "value")
+RERANK_MODES = ("bcvf", "logprob", "oracle_verifier", "value", "learned_value")
 
 
 @dataclass
@@ -509,6 +510,7 @@ def logprob_rerank_candidates(
     prompt_ids: "torch.Tensor",
     candidate_ids_list: List["torch.Tensor"],
     model: Any,
+    return_hidden_states: bool = False,
 ) -> Tuple[int, np.ndarray, Dict[str, Any]]:
     """
     Score K candidates by base logprob only.  No BCVF, no goal embedding.
@@ -520,11 +522,14 @@ def logprob_rerank_candidates(
         prompt_ids: Token ids of the prompt, shape [P].
         candidate_ids_list: List of K continuation token tensors, each [T_k].
         model: HuggingFace causal LM.
+        return_hidden_states: If True, extract and return mean-pooled hidden
+            states for each candidate in diagnostics["pooled_hiddens"].
 
     Returns:
         best_index: Index of the highest-logprob candidate.
         scores: Array of K base logprob scores.
-        diagnostics: Dict with per-candidate details.
+        diagnostics: Dict with per-candidate details.  If return_hidden_states
+            is True, includes "pooled_hiddens" as [K, D] tensor (CPU).
     """
     if not PYTORCH_AVAILABLE:
         raise ImportError("PyTorch is required")
@@ -564,9 +569,26 @@ def logprob_rerank_candidates(
     outputs = model(
         batch_input,
         attention_mask=attention_mask,
+        output_hidden_states=return_hidden_states,
         use_cache=False,
     )
     logits_all = outputs.logits  # [K, P+max_T, V]
+
+    # --- Extract pooled hidden states per candidate ---
+    pooled_hiddens = None
+    if return_hidden_states and hasattr(outputs, "hidden_states"):
+        hidden_all = outputs.hidden_states[-1]  # [K, P+max_T, D]
+        pooled_list = []
+        for k in range(K):
+            T_k = cand_lengths[k]
+            if T_k == 0:
+                D = hidden_all.shape[-1]
+                pooled_list.append(torch.zeros(D, device="cpu"))
+            else:
+                # Mean-pool over candidate token positions
+                h_k = hidden_all[k, P:P + T_k, :]  # [T_k, D]
+                pooled_list.append(h_k.mean(dim=0).cpu().float())
+        pooled_hiddens = torch.stack(pooled_list, dim=0)  # [K, D]
 
     # --- Score each candidate by base logprob ---
     scores = np.zeros(K, dtype=np.float64)
@@ -602,6 +624,8 @@ def logprob_rerank_candidates(
         "candidate_lengths": cand_lengths,
         "rerank_mode": "logprob",
     }
+    if pooled_hiddens is not None:
+        diagnostics["pooled_hiddens"] = pooled_hiddens
 
     return best_index, scores, diagnostics
 
@@ -885,6 +909,126 @@ class ValueReranker:
 
 
 # =========================================================================
+# Learned Value Reranker — MLP on hidden states
+# =========================================================================
+
+
+@dataclass
+class CandidateSample:
+    """One collected sample for learned reranker training.
+
+    Stores the pooled hidden state (on CPU), base logprob, candidate
+    length, and pass/fail label.  Prompt/candidate text kept for
+    diagnostics only.
+    """
+
+    pooled_hidden: "torch.Tensor"  # [D] float32, CPU
+    base_logprob: float
+    candidate_length: int
+    passed: bool
+    prompt_text: str = ""
+    candidate_text: str = ""
+
+
+if PYTORCH_AVAILABLE:
+
+    class LearnedValueReranker(nn.Module):
+        """MLP that predicts P(pass | hidden_state, logprob, length).
+
+        Input features:  [pooled_hidden (D), base_logprob (1), length (1)]
+        Output:          scalar logit (apply sigmoid for probability).
+
+        Scoring formula matches ValueReranker::
+
+            S(y) = base_logprob + alpha * mlp_logit(features)
+
+        Architecture: 2 hidden layers with GELU activation.
+        """
+
+        def __init__(self, input_dim: int, hidden_dim: int = 256):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.GELU(),
+                nn.Linear(hidden_dim, hidden_dim // 2),
+                nn.GELU(),
+                nn.Linear(hidden_dim // 2, 1),
+            )
+            self.input_dim = input_dim
+
+        def forward(self, x: "torch.Tensor") -> "torch.Tensor":
+            """Return raw logits, shape [B]."""
+            return self.net(x).squeeze(-1)
+
+        def predict_proba(self, x: "torch.Tensor") -> "torch.Tensor":
+            """Return P(pass) in [0, 1], shape [B]."""
+            return torch.sigmoid(self.forward(x))
+
+        def score_candidates(
+            self,
+            pooled_hiddens: "torch.Tensor",
+            base_logprobs: np.ndarray,
+            candidate_lengths: List[int],
+            alpha: float = 1.0,
+        ) -> np.ndarray:
+            """Score K candidates: base_logprob + alpha * mlp_logit.
+
+            Args:
+                pooled_hiddens: [K, D] pooled hidden states.
+                base_logprobs: [K] base logprob scores.
+                candidate_lengths: List of K candidate lengths.
+                alpha: Weight for MLP logit.
+
+            Returns:
+                scores: [K] combined scores as numpy array.
+            """
+            device = next(self.parameters()).device
+            K = pooled_hiddens.shape[0]
+
+            # Build feature vectors: [hidden, logprob, length]
+            lp = torch.tensor(
+                base_logprobs, dtype=torch.float32, device=device,
+            ).unsqueeze(1)  # [K, 1]
+            lens = torch.tensor(
+                candidate_lengths, dtype=torch.float32, device=device,
+            ).unsqueeze(1)  # [K, 1]
+            features = torch.cat(
+                [pooled_hiddens.to(device), lp, lens], dim=1,
+            )  # [K, D+2]
+
+            with torch.no_grad():
+                logits = self.forward(features)  # [K]
+
+            return base_logprobs + alpha * logits.cpu().numpy()
+
+    def _build_feature_tensor(
+        samples: List[CandidateSample],
+        device: str = "cpu",
+    ) -> Tuple["torch.Tensor", "torch.Tensor"]:
+        """Build (features, labels) tensors from collected samples.
+
+        Returns:
+            features: [N, D+2] tensor (hidden, logprob, length).
+            labels: [N] tensor of 0.0/1.0.
+        """
+        hiddens = torch.stack([s.pooled_hidden for s in samples])  # [N, D]
+        lps = torch.tensor(
+            [s.base_logprob for s in samples],
+            dtype=torch.float32,
+        ).unsqueeze(1)  # [N, 1]
+        lens = torch.tensor(
+            [s.candidate_length for s in samples],
+            dtype=torch.float32,
+        ).unsqueeze(1)  # [N, 1]
+        features = torch.cat([hiddens, lps, lens], dim=1).to(device)
+        labels = torch.tensor(
+            [1.0 if s.passed else 0.0 for s in samples],
+            dtype=torch.float32,
+        ).to(device)
+        return features, labels
+
+
+# =========================================================================
 # Candidate Generation
 # =========================================================================
 
@@ -1072,6 +1216,252 @@ def generate_and_rerank(
 
 
 # =========================================================================
+# Learned Reranker — Data Collection & Training
+# =========================================================================
+
+
+@torch.no_grad()
+def collect_learned_reranker_data(
+    model: Any,
+    tokenizer: Any,
+    problems: Sequence[Dict[str, Any]],
+    K: int = 8,
+    max_new_tokens: int = 128,
+    temperature: float = 0.8,
+    top_p: float = 0.95,
+    test_fn: Optional[Callable[[str, str, str], bool]] = None,
+) -> List["CandidateSample"]:
+    """Collect (hidden_state, logprob, length, pass/fail) for training.
+
+    For each problem, generates K candidates, runs a forward pass with
+    hidden state extraction, evaluates pass/fail, and stores one
+    ``CandidateSample`` per candidate.
+
+    Args:
+        model: HuggingFace causal LM.
+        tokenizer: Tokenizer.
+        problems: HumanEval-style problem dicts.
+        K: Candidates per problem.
+        max_new_tokens: Max tokens per candidate.
+        temperature: Sampling temperature.
+        top_p: Nucleus sampling threshold.
+        test_fn: Unit-test runner.  Defaults to ``run_unit_tests``.
+
+    Returns:
+        List of CandidateSample (one per candidate across all problems).
+    """
+    if test_fn is None:
+        from symbolu.ontological.bcvf_experiments import run_unit_tests
+        test_fn = run_unit_tests
+
+    samples: List[CandidateSample] = []
+    n_pass = 0
+    n_total = 0
+
+    for i, prob in enumerate(problems):
+        prompt = prob["prompt"]
+        test_code = prob.get("test", "")
+        entry_point = prob.get("entry_point", "")
+
+        # Generate K candidates
+        prompt_ids, candidate_ids_list, candidate_texts = generate_candidates(
+            model, tokenizer, prompt, K=K,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature, top_p=top_p,
+        )
+        if not candidate_ids_list:
+            continue
+
+        # Forward pass WITH hidden states
+        _, logprob_scores, diag = logprob_rerank_candidates(
+            prompt_ids, candidate_ids_list, model,
+            return_hidden_states=True,
+        )
+        pooled_hiddens = diag["pooled_hiddens"]  # [K, D], CPU
+        cand_lengths = diag["candidate_lengths"]
+
+        # Evaluate pass/fail for each candidate
+        for k in range(len(candidate_texts)):
+            code = prompt + fix_completion_indent(prompt, candidate_texts[k])
+            passed = test_fn(code, test_code, entry_point)
+            samples.append(CandidateSample(
+                pooled_hidden=pooled_hiddens[k],
+                base_logprob=float(logprob_scores[k]),
+                candidate_length=cand_lengths[k],
+                passed=passed,
+                prompt_text=prompt,
+                candidate_text=candidate_texts[k],
+            ))
+            n_total += 1
+            if passed:
+                n_pass += 1
+
+        if (i + 1) % 10 == 0 or i == 0:
+            rate = n_pass / n_total if n_total > 0 else 0.0
+            print(
+                f"  [collect] {i+1}/{len(problems)}  "
+                f"samples={n_total}  pass_rate={rate:.3f}"
+            )
+
+    print(
+        f"  [collect] Done: {n_total} samples, "
+        f"{n_pass} passed ({n_pass/n_total:.3f})"
+        if n_total > 0 else "  [collect] No samples collected"
+    )
+    return samples
+
+
+def train_learned_reranker(
+    samples: List["CandidateSample"],
+    hidden_dim: int = 256,
+    epochs: int = 10,
+    lr: float = 1e-3,
+    batch_size: int = 64,
+    train_ratio: float = 0.8,
+    seed: int = 42,
+    device: str = "cpu",
+) -> Tuple["LearnedValueReranker", Dict[str, Any]]:
+    """Train a LearnedValueReranker MLP on collected candidate samples.
+
+    Args:
+        samples: List of CandidateSample from ``collect_learned_reranker_data``.
+        hidden_dim: MLP hidden dimension.
+        epochs: Training epochs.
+        lr: Learning rate.
+        batch_size: Mini-batch size.
+        train_ratio: Fraction for training (rest for eval).
+        seed: Random seed.
+        device: Torch device.
+
+    Returns:
+        (model, metrics) where metrics contains train/eval loss and accuracy.
+    """
+    if not PYTORCH_AVAILABLE:
+        raise ImportError("PyTorch is required")
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    # Build feature/label tensors
+    features, labels = _build_feature_tensor(samples, device=device)
+    input_dim = features.shape[1]
+    N = features.shape[0]
+
+    # Shuffle and split
+    perm = torch.randperm(N)
+    features = features[perm]
+    labels = labels[perm]
+    n_train = int(N * train_ratio)
+    X_train, X_eval = features[:n_train], features[n_train:]
+    y_train, y_eval = labels[:n_train], labels[n_train:]
+
+    n_pos_train = int(y_train.sum().item())
+    n_pos_eval = int(y_eval.sum().item())
+    print(
+        f"  [train] N={N}  train={n_train} (pos={n_pos_train})  "
+        f"eval={N - n_train} (pos={n_pos_eval})  input_dim={input_dim}"
+    )
+
+    # Initialize model
+    mlp = LearnedValueReranker(input_dim=input_dim, hidden_dim=hidden_dim)
+    mlp = mlp.to(device)
+    optimizer = torch.optim.Adam(mlp.parameters(), lr=lr, weight_decay=1e-5)
+    loss_fn = nn.BCEWithLogitsLoss()
+
+    # Training loop
+    best_eval_acc = 0.0
+    best_state = None
+
+    for epoch in range(epochs):
+        mlp.train()
+        epoch_loss = 0.0
+        n_batches = 0
+
+        # Shuffle training data each epoch
+        perm_epoch = torch.randperm(n_train)
+        X_shuf = X_train[perm_epoch]
+        y_shuf = y_train[perm_epoch]
+
+        for start in range(0, n_train, batch_size):
+            end = min(start + batch_size, n_train)
+            xb = X_shuf[start:end]
+            yb = y_shuf[start:end]
+
+            logits = mlp(xb)
+            loss = loss_fn(logits, yb)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            n_batches += 1
+
+        avg_loss = epoch_loss / max(n_batches, 1)
+
+        # Evaluate
+        mlp.eval()
+        with torch.no_grad():
+            eval_logits = mlp(X_eval)
+            eval_loss = loss_fn(eval_logits, y_eval).item()
+            eval_preds = (eval_logits > 0).float()
+            eval_acc = float((eval_preds == y_eval).float().mean().item())
+
+            train_logits = mlp(X_train)
+            train_preds = (train_logits > 0).float()
+            train_acc = float((train_preds == y_train).float().mean().item())
+
+        if eval_acc >= best_eval_acc:
+            best_eval_acc = eval_acc
+            best_state = {k: v.cpu().clone() for k, v in mlp.state_dict().items()}
+
+        if (epoch + 1) % max(1, epochs // 5) == 0 or epoch == 0:
+            print(
+                f"  [train] epoch {epoch+1}/{epochs}  "
+                f"train_loss={avg_loss:.4f}  train_acc={train_acc:.3f}  "
+                f"eval_loss={eval_loss:.4f}  eval_acc={eval_acc:.3f}"
+            )
+
+    # Load best checkpoint
+    if best_state is not None:
+        mlp.load_state_dict(best_state)
+        mlp = mlp.to(device)
+
+    # Final metrics
+    mlp.eval()
+    with torch.no_grad():
+        final_eval_logits = mlp(X_eval)
+        final_eval_preds = (final_eval_logits > 0).float()
+        final_eval_acc = float(
+            (final_eval_preds == y_eval).float().mean().item()
+        )
+        final_train_logits = mlp(X_train)
+        final_train_preds = (final_train_logits > 0).float()
+        final_train_acc = float(
+            (final_train_preds == y_train).float().mean().item()
+        )
+
+    metrics = {
+        "n_samples": N,
+        "n_train": n_train,
+        "n_eval": N - n_train,
+        "input_dim": input_dim,
+        "hidden_dim": hidden_dim,
+        "epochs": epochs,
+        "train_acc": final_train_acc,
+        "eval_acc": final_eval_acc,
+        "best_eval_acc": best_eval_acc,
+        "train_pos_rate": n_pos_train / max(n_train, 1),
+        "eval_pos_rate": n_pos_eval / max(N - n_train, 1),
+    }
+    print(
+        f"  [train] Final: train_acc={final_train_acc:.3f}  "
+        f"eval_acc={final_eval_acc:.3f}  best_eval_acc={best_eval_acc:.3f}"
+    )
+    return mlp, metrics
+
+
+# =========================================================================
 # Goal Embedding Helpers
 # =========================================================================
 
@@ -1137,11 +1527,13 @@ def run_seq_rerank_benchmark_humaneval(
     rerank_mode: str = "bcvf",
     value_alpha: float = 1.0,
     value_use_ast: bool = True,
+    learned_reranker: Optional[Any] = None,
+    learned_alpha: float = 1.0,
 ) -> SeqRerankReport:
     """
     Run sequence-level reranking benchmark on HumanEval problems.
 
-    Supports four reranking modes:
+    Supports five reranking modes:
 
     ``bcvf``
         Original BCVF-adjusted logits (Equation B).  Selects the candidate
@@ -1164,6 +1556,11 @@ def run_seq_rerank_benchmark_humaneval(
         S(y) = logprob + alpha * logit(V(x,y)) where V is a cheap
         structural utility estimate (AST, function presence, etc.).
 
+    ``learned_value``
+        Learned MLP reranker.  Scores each candidate using
+        S(y) = logprob + alpha * MLP_logit(pooled_hidden, logprob, length).
+        Requires a trained ``LearnedValueReranker`` instance.
+
     Args:
         model: HuggingFace causal LM.
         tokenizer: Tokenizer.
@@ -1177,9 +1574,12 @@ def run_seq_rerank_benchmark_humaneval(
         n_bootstrap: Bootstrap resamples for CIs.
         test_fn: Function(code, test_code, entry_point) -> bool.
                  Defaults to run_unit_tests from bcvf_experiments.
-        rerank_mode: "bcvf", "logprob", "oracle_verifier", or "value".
+        rerank_mode: "bcvf", "logprob", "oracle_verifier", "value",
+                     or "learned_value".
         value_alpha: Weight for utility logit (value mode only).
         value_use_ast: Whether to use AST parsing (value mode only).
+        learned_reranker: Trained LearnedValueReranker (learned_value only).
+        learned_alpha: Weight for MLP logit (learned_value mode only).
 
     Returns:
         SeqRerankReport with all metrics.
@@ -1404,6 +1804,129 @@ def run_seq_rerank_benchmark_humaneval(
                     f"base_lp={float(logprob_scores[logprob_best_idx]):.2f}"
                 )
             continue  # skip common tail below
+
+        elif rerank_mode == "learned_value":
+            # --- Learned value mode: MLP on hidden states ---
+            if learned_reranker is None:
+                raise ValueError(
+                    "learned_value mode requires a trained "
+                    "LearnedValueReranker (learned_reranker= parameter)"
+                )
+
+            # Forward pass WITH hidden states
+            _, logprob_scores_h, diag_h = logprob_rerank_candidates(
+                prompt_ids, candidate_ids_list, model,
+                return_hidden_states=True,
+            )
+            pooled_hiddens = diag_h["pooled_hiddens"]  # [K, D], CPU
+            cand_lengths_h = diag_h["candidate_lengths"]
+
+            # Score with MLP: base_logprob + alpha * mlp_logit
+            learned_scores = learned_reranker.score_candidates(
+                pooled_hiddens, logprob_scores, cand_lengths_h,
+                alpha=learned_alpha,
+            )
+            selected_idx = int(np.argmax(learned_scores))
+
+            # MLP predicted probabilities for diagnostics
+            device_lr = next(learned_reranker.parameters()).device
+            lp_t = torch.tensor(
+                logprob_scores, dtype=torch.float32, device=device_lr,
+            ).unsqueeze(1)
+            len_t = torch.tensor(
+                cand_lengths_h, dtype=torch.float32, device=device_lr,
+            ).unsqueeze(1)
+            feat = torch.cat(
+                [pooled_hiddens.to(device_lr), lp_t, len_t], dim=1,
+            )
+            with torch.no_grad():
+                mlp_probs = learned_reranker.predict_proba(feat).cpu().numpy()
+
+            # Score margin
+            sorted_lscores = np.sort(learned_scores)[::-1]
+            learned_margin = (
+                float(sorted_lscores[0] - sorted_lscores[1])
+                if len(sorted_lscores) > 1 else 0.0
+            )
+
+            # Rank correlation (manual Spearman)
+            n_k = len(learned_scores)
+            if n_k > 2:
+                base_ranks = np.argsort(np.argsort(logprob_scores)).astype(float)
+                lr_ranks = np.argsort(np.argsort(learned_scores)).astype(float)
+                d = base_ranks - lr_ranks
+                rank_corr = 1.0 - 6.0 * float(np.sum(d ** 2)) / (
+                    float(n_k) * (float(n_k) ** 2 - 1)
+                )
+            elif n_k == 2:
+                rank_corr = (
+                    1.0 if np.argmax(logprob_scores) == np.argmax(learned_scores)
+                    else -1.0
+                )
+            else:
+                rank_corr = 1.0
+
+            # Evaluate pass/fail for base, learned, and ALL K (oracle)
+            base_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[logprob_best_idx],
+            )
+            selected_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[selected_idx],
+            )
+            base_passed = test_fn(base_code, test_code, entry_point)
+            learned_passed = test_fn(selected_code, test_code, entry_point)
+
+            oracle_any = base_passed or learned_passed
+            if not oracle_any:
+                for k in range(len(candidate_texts)):
+                    if k == logprob_best_idx or k == selected_idx:
+                        continue
+                    code_k = prompt + fix_completion_indent(
+                        prompt, candidate_texts[k],
+                    )
+                    if test_fn(code_k, test_code, entry_point):
+                        oracle_any = True
+                        break
+
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=0.0,
+                rerank_mode="learned_value",
+                base_best_idx=logprob_best_idx,
+                base_best_score=float(logprob_scores[logprob_best_idx]),
+                base_scores=logprob_scores,
+                bcvf_best_idx=selected_idx,
+                bcvf_best_score=float(learned_scores[selected_idx]),
+                bcvf_scores=learned_scores,
+                rerank_changed=selected_idx != logprob_best_idx,
+                score_margin=learned_margin,
+                base_score_margin=logprob_diag["score_margin"],
+                candidate_lengths=logprob_diag["candidate_lengths"],
+                base_text=candidate_texts[logprob_best_idx],
+                bcvf_text=candidate_texts[selected_idx],
+                # Repurpose mean_sf for mean MLP prob
+                mean_sf=float(np.mean(mlp_probs)),
+                rank_correlation=rank_corr,
+                score_std=float(np.std(learned_scores)),
+                base_score_std=float(np.std(logprob_scores)),
+            )
+            result.base_passed = base_passed
+            result.bcvf_passed = learned_passed
+            result.any_passed = oracle_any
+
+            per_prompt.append(result)
+
+            if (i + 1) % 5 == 0 or i == 0:
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if base_passed else 'FAIL'} "
+                    f"learned={'PASS' if learned_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed} "
+                    f"mlp_prob={float(np.mean(mlp_probs)):.3f} "
+                    f"rank_r={rank_corr:.2f}"
+                )
+            continue  # skip common tail
 
         else:
             # --- BCVF mode: original Equation (B) ---
@@ -1781,6 +2304,7 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         "logprob": "Sequence-Level Logprob Reranking Report",
         "oracle_verifier": "Sequence-Level Oracle Verifier Report",
         "value": "Sequence-Level Value Reranking Report",
+        "learned_value": "Sequence-Level Learned Value Reranking Report",
     }
     MODE_DESCS = {
         "bcvf": "Equation (B): BCVF-adjusted logits -> sequence logprob",
@@ -1795,6 +2319,10 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         "value": (
             "S(y) = logprob + alpha * logit(V(x,y))  "
             "V = deterministic proxy verifier (AST + structural checks)"
+        ),
+        "learned_value": (
+            "S(y) = logprob + alpha * MLP_logit(pooled_hidden, logprob, len)  "
+            "MLP trained on candidate pass/fail data"
         ),
     }
 
@@ -1825,6 +2353,12 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         lines.append(
             f"  Mean value margin:  {report.mean_score_margin:.4f} "
             f"(best - 2nd best under value scoring)"
+        )
+    elif mode == "learned_value":
+        lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
+        lines.append(
+            f"  Mean learned margin: {report.mean_score_margin:.4f} "
+            f"(best - 2nd best under learned scoring)"
         )
     else:
         lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
@@ -1857,6 +2391,11 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
     elif mode == "oracle_verifier":
         lines.append(
             f"  Oracle selection:   {report.mean_bcvf_logprob_selected:.4f} "
+            f"avg logprob"
+        )
+    elif mode == "learned_value":
+        lines.append(
+            f"  Learned selection:  {report.mean_bcvf_logprob_selected:.4f} "
             f"avg logprob"
         )
 
@@ -1915,6 +2454,23 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                     f"  Oracle pass@{report.K}:     "
                     f"{report.oracle_pass_at_k:.3f}"
                 )
+        elif mode == "learned_value":
+            lines.append("Pass@1 — Learned Value Reranking:")
+            lines.append(
+                f"  Base pass@1:        {report.base_pass_at_1:.3f}"
+            )
+            lines.append(
+                f"  Learned pass@1:     {report.bcvf_pass_at_1:.3f}"
+            )
+            delta = report.pass_at_1_delta or 0.0
+            lines.append(
+                f"  Delta (learned-base): {delta:+.3f}"
+            )
+            if report.oracle_pass_at_k is not None:
+                lines.append(
+                    f"  Oracle pass@{report.K}:     "
+                    f"{report.oracle_pass_at_k:.3f}"
+                )
         else:
             # BCVF mode (original)
             lines.append("Pass@1 Metrics (HumanEval):")
@@ -1946,8 +2502,8 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 f"  Loss-rate:          {report.rerank_loss_rate:.1%} "
                 f"(should be 0% for oracle)"
             )
-        elif mode in ("bcvf", "value"):
-            mode_name = "BCVF" if mode == "bcvf" else "Value"
+        elif mode in ("bcvf", "value", "learned_value"):
+            mode_name = {"bcvf": "BCVF", "value": "Value", "learned_value": "Learned"}[mode]
             lines.append("")
             lines.append("Win/Loss Analysis:")
             lines.append(
@@ -1972,6 +2528,7 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 "logprob": "logprob-greedy",
                 "oracle_verifier": "oracle-logprob",
                 "value": "value-base",
+                "learned_value": "learned-base",
             }.get(mode, "delta")
             lines.append(
                 f"  Bootstrap 95% CI for pass@1 delta ({delta_label}): "
@@ -1979,25 +2536,26 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 f"(n={ci.n_bootstrap})"
             )
 
-        # --- Headroom Recovery (value mode) ---
-        if mode == "value" and report.oracle_pass_at_k is not None:
+        # --- Headroom Recovery (value / learned_value modes) ---
+        if mode in ("value", "learned_value") and report.oracle_pass_at_k is not None:
+            label = "Value" if mode == "value" else "Learned"
             lines.append("")
             lines.append("Headroom Recovery:")
             oracle_gain = (
                 (report.oracle_pass_at_k or 0)
                 - (report.base_pass_at_1 or 0)
             )
-            value_gain = (
+            reranker_gain = (
                 (report.bcvf_pass_at_1 or 0)
                 - (report.base_pass_at_1 or 0)
             )
             if oracle_gain > 0:
-                recovery = value_gain / oracle_gain
+                recovery = reranker_gain / oracle_gain
             else:
                 recovery = 0.0
-            lines.append(f"  Oracle headroom: {oracle_gain:+.3f}")
-            lines.append(f"  Value recovered: {value_gain:+.3f}")
-            lines.append(f"  Recovery ratio:  {recovery:.1%}")
+            lines.append(f"  Oracle headroom:   {oracle_gain:+.3f}")
+            lines.append(f"  {label} recovered: {reranker_gain:+.3f}")
+            lines.append(f"  Recovery ratio:    {recovery:.1%}")
 
     # --- BCVF Signal Diagnostics (only for bcvf mode) ---
     if mode == "bcvf":
@@ -2161,6 +2719,55 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         elif abs(report.agg_rank_correlation) < 0.5:
             lines.append(
                 "     ** NOTE: Low rank correlation — value reranker is "
+                "significantly reshuffling candidates."
+            )
+
+    # --- Learned Value Signal Diagnostics ---
+    if mode == "learned_value":
+        lines.append("")
+        lines.append("-" * 70)
+        lines.append(
+            "Learned Value Diagnostics (is MLP providing useful signal?)"
+        )
+        lines.append("-" * 70)
+
+        lines.append("")
+        lines.append("1. MLP Probability Distribution:")
+        lines.append(
+            f"     Mean P(pass):     {report.agg_mean_sf:.3f}"
+        )
+        if report.agg_mean_sf > 0.8:
+            lines.append(
+                "     NOTE: High mean P(pass) — MLP is very confident."
+            )
+        elif report.agg_mean_sf < 0.2:
+            lines.append(
+                "     NOTE: Low mean P(pass) — MLP predicts most will fail."
+            )
+
+        lines.append("")
+        lines.append("2. Score Differentiation Across Candidates:")
+        lines.append(
+            f"     Learned score std: {report.agg_score_std:.4f}  "
+            f"(spread of learned scores across K)"
+        )
+        lines.append(
+            f"     Base score std:    {report.agg_base_score_std:.4f}  "
+            f"(spread of base scores across K)"
+        )
+        lines.append(
+            f"     Rank correlation:  {report.agg_rank_correlation:.3f}  "
+            f"(Spearman: base vs learned ranking)"
+        )
+        if abs(report.agg_rank_correlation) > 0.95:
+            lines.append(
+                "     ** NOTE: Near-perfect rank correlation — MLP is not "
+                "changing the ranking. alpha may be too low or MLP "
+                "is not discriminative."
+            )
+        elif abs(report.agg_rank_correlation) < 0.5:
+            lines.append(
+                "     ** NOTE: Low rank correlation — MLP is "
                 "significantly reshuffling candidates."
             )
 
