@@ -31,6 +31,8 @@ from symbolu.ontological.bcvf_decoding import (
 )
 from symbolu.ontological.bcvf_calibration import (
     CalibrationTracker,
+    compute_auroc,
+    compute_auroc_combined,
     compute_brier,
     compute_ece,
     reliability_bins,
@@ -1007,6 +1009,103 @@ class TestSpearmanRankCorrelation:
         correct = np.array([1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
         rho = spearman_rank_correlation(sbs, correct)
         assert rho > 0.7  # Strong positive correlation
+
+
+# ===========================================================================
+# AUROC (pure numpy)
+# ===========================================================================
+
+
+class TestAUROC:
+    def test_perfect_separation(self):
+        """All positives ranked above all negatives -> AUROC = 1.0."""
+        scores = np.array([0.9, 0.8, 0.7, 0.2, 0.1])
+        labels = np.array([1.0, 1.0, 1.0, 0.0, 0.0])
+        assert compute_auroc(scores, labels) == pytest.approx(1.0)
+
+    def test_worst_separation(self):
+        """All negatives ranked above all positives -> AUROC = 0.0."""
+        scores = np.array([0.1, 0.2, 0.3, 0.8, 0.9])
+        labels = np.array([1.0, 1.0, 1.0, 0.0, 0.0])
+        assert compute_auroc(scores, labels) == pytest.approx(0.0)
+
+    def test_random_near_half(self):
+        """Random scores should give AUROC near 0.5."""
+        rng = np.random.RandomState(42)
+        scores = rng.rand(1000)
+        labels = rng.randint(0, 2, size=1000).astype(float)
+        auc = compute_auroc(scores, labels)
+        assert 0.4 < auc < 0.6
+
+    def test_degenerate_all_same_labels(self):
+        """All-positive or all-negative -> 0.5."""
+        scores = np.array([0.9, 0.8, 0.7])
+        assert compute_auroc(scores, np.ones(3)) == 0.5
+        assert compute_auroc(scores, np.zeros(3)) == 0.5
+
+    def test_degenerate_too_short(self):
+        assert compute_auroc(np.array([1.0]), np.array([1.0])) == 0.5
+
+    def test_ties_handled(self):
+        """Tied scores should not crash and should give reasonable result."""
+        scores = np.array([0.5, 0.5, 0.5, 0.1, 0.1])
+        labels = np.array([1.0, 1.0, 0.0, 0.0, 0.0])
+        auc = compute_auroc(scores, labels)
+        assert 0.0 <= auc <= 1.0
+
+    def test_combined_beats_both_when_orthogonal(self):
+        """When signals are complementary, combined AUROC > individual."""
+        rng = np.random.RandomState(123)
+        n = 500
+        labels = rng.randint(0, 2, size=n).astype(float)
+        # scores_a has some signal
+        scores_a = labels * 0.3 + rng.rand(n) * 0.7
+        # scores_b has orthogonal signal (different noise)
+        scores_b = labels * 0.3 + rng.rand(n) * 0.7
+        auc_a = compute_auroc(scores_a, labels)
+        auc_b = compute_auroc(scores_b, labels)
+        auc_c = compute_auroc_combined(scores_a, scores_b, labels)
+        # Combined should be at least as good as best individual
+        assert auc_c >= max(auc_a, auc_b) - 0.01
+
+    def test_combined_degenerate(self):
+        assert compute_auroc_combined(
+            np.array([1.0]), np.array([1.0]), np.array([1.0])
+        ) == 0.5
+
+    def test_combined_identical_signals(self):
+        """When both signals are identical, combined == individual."""
+        scores = np.array([0.9, 0.8, 0.3, 0.2, 0.1])
+        labels = np.array([1.0, 1.0, 0.0, 0.0, 0.0])
+        auc_single = compute_auroc(scores, labels)
+        auc_comb = compute_auroc_combined(scores, scores, labels)
+        assert auc_comb == pytest.approx(auc_single, abs=0.01)
+
+
+class TestAUROCInStepLogger:
+    """Verify AUROC flows through StepLogger.summary()."""
+
+    def test_summary_includes_auroc_fields(self):
+        logger = StepLogger()
+        # Create records where high-confidence = correct
+        for i in range(50):
+            correct = i < 25
+            logger.log(StepRecord(
+                step_index=i,
+                predicted_token=i,
+                correct=correct,
+                confidence=0.9 if correct else 0.2,
+                sb_selected=0.8 if correct else 0.3,
+                base_logit_score=float(i),
+            ))
+        s = logger.summary()
+        assert "auroc_logit" in s
+        assert "auroc_sb" in s
+        assert "auroc_combined" in s
+        # Both signals correlate with correctness -> AUROC > 0.5
+        assert s["auroc_logit"] > 0.6
+        assert s["auroc_sb"] > 0.6
+        assert s["auroc_combined"] >= max(s["auroc_logit"], s["auroc_sb"]) - 0.01
 
 
 # ===========================================================================

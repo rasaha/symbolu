@@ -436,13 +436,13 @@ class TestAblationReport:
         assert "Predictive-signal win" in report
 
     def test_condition_2_detected(self):
-        """When ECE improves by >10%, condition 2 fires."""
+        """When ECE improves by >10% via logit modulation, condition 2 fires."""
         abl = self._make_ablation("lookahead", sb_rho=0.1, logit_rho=0.1,
                                   baseline_ece=0.20, best_ece=0.10,
                                   delta_pass1=0.0)
         report = format_ablation_report("test", "3B", [abl])
         assert "CONDITION 2 MET" in report
-        assert "Calibration win" in report
+        assert "calibration win" in report.lower()
 
     def test_neither_condition_detected(self):
         """When neither condition is met, report says so."""
@@ -460,15 +460,15 @@ class TestAblationReport:
         assert "ready to be revamped" in report.lower()
 
     def test_overall_verdict_calibration_only(self):
-        """When only calibration wins, recommend Option B."""
+        """When logit mod improves calibration, recommend Option A."""
         abl = self._make_ablation("lookahead", sb_rho=0.05, logit_rho=0.10,
                                   baseline_ece=0.20, best_ece=0.08,
                                   delta_pass1=-0.005)
         report = format_ablation_report("test", "3B", [abl])
-        assert "calibration layer" in report.lower() or "Option B" in report
+        assert "logit modulation" in report.lower() or "option a" in report.lower()
 
     def test_report_shows_exact_columns(self):
-        """Report should contain the exact metrics ChatGPT requested."""
+        """Report should contain the exact metrics ChatGPT requested + AUROC."""
         abl = self._make_ablation("lookahead", 0.2, 0.1)
         report = format_ablation_report("test", "3B", [abl])
         assert "pass@1" in report
@@ -480,3 +480,15 @@ class TestAblationReport:
         assert "Brier" in report
         assert "KL" in report
         assert "dH" in report
+        assert "AUC_l" in report
+        assert "AUC_s" in report
+        assert "AUC_c" in report
+
+    def test_auroc_verdict_present(self):
+        """Report should contain AUROC correctness-prediction verdict."""
+        abl = self._make_ablation("lookahead", 0.2, 0.1)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "AUROC correctness-prediction test" in report
+        assert "AUROC(logit)" in report
+        assert "AUROC(sb)" in report
+        assert "AUROC(combined)" in report
