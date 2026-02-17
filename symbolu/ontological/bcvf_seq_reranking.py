@@ -299,9 +299,8 @@ def rerank_candidates(
 
             # --- Adjusted logits ---
             adjusted_logits = torch.full_like(z, float("-inf"))
-            adjusted_logits.scatter_(
-                1, topM_indices, topM_scores - effective_beta * L
-            )
+            src = (topM_scores - effective_beta * L).to(adjusted_logits.dtype)
+            adjusted_logits.scatter_(1, topM_indices, src)
 
             # --- Adjusted log-probs ---
             adj_lp = F.log_softmax(adjusted_logits, dim=-1)   # [T_k, V]
