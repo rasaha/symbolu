@@ -62,6 +62,9 @@ Usage::
 
 from __future__ import annotations
 
+import ast
+import math
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -90,7 +93,7 @@ from symbolu.ontological.bcvf_benchmarks import (
 
 
 # Valid reranking modes
-RERANK_MODES = ("bcvf", "logprob", "oracle_verifier")
+RERANK_MODES = ("bcvf", "logprob", "oracle_verifier", "value")
 
 
 @dataclass
@@ -663,6 +666,154 @@ def fix_completion_indent(prompt: str, completion: str) -> str:
 
 
 # =========================================================================
+# Value Reranker — deterministic proxy verifier
+# =========================================================================
+
+
+class ValueReranker:
+    """Deterministic proxy verifier for candidate reranking.
+
+    Scores each candidate using cheap structural checks (AST parse,
+    function presence, return statement, placeholder detection) and
+    combines the utility estimate with the base logprob::
+
+        S(y) = log p_theta(y|x) + alpha * logit(V(x,y))
+
+    No training, no external models, no torch tensors.
+    """
+
+    def __init__(self, alpha: float = 1.0, use_ast: bool = True):
+        self.alpha = alpha
+        self.use_ast = use_ast
+
+    # --- Utility estimation ------------------------------------------------
+
+    def estimate_utility(self, prompt: str, candidate: str) -> float:
+        """Return utility score in [0, 1].
+
+        0.5 = neutral baseline.
+        >0.5 = signs of correctness.
+        <0.5 = obvious structural failure.
+        """
+        full_code = prompt + candidate
+        adj = 0.0
+
+        # (A) Syntax validity (AST)
+        if self.use_ast:
+            try:
+                ast.parse(full_code)
+                adj += 0.1
+            except SyntaxError:
+                return np.clip(0.5 + (-0.3), 0.0, 1.0)
+
+        # Extract expected function name from prompt
+        expected_fn = self._extract_function_name(prompt)
+
+        # (B) Required function presence
+        if expected_fn:
+            if self._defines_function(candidate, expected_fn):
+                adj += 0.15
+            else:
+                adj -= 0.2
+
+        # (C) Return statement check
+        if expected_fn and self._likely_needs_return(prompt):
+            if not self._has_return(candidate):
+                adj -= 0.15
+
+        # (D) Placeholder / incomplete code penalty
+        if self._has_placeholder(candidate):
+            adj -= 0.2
+
+        # (E) Structural completeness bonus
+        if len(candidate.strip()) > 20 and adj >= 0.0:
+            adj += 0.05
+
+        return float(np.clip(0.5 + adj, 0.0, 1.0))
+
+    # --- Scoring -----------------------------------------------------------
+
+    def score_candidate(
+        self, prompt: str, candidate: str, base_logprob: float,
+    ) -> float:
+        """Compute combined score: logprob + alpha * logit(utility)."""
+        utility = self.estimate_utility(prompt, candidate)
+        utility_logit = math.log(
+            utility / (1.0 - utility + 1e-8)
+        )
+        return base_logprob + self.alpha * utility_logit
+
+    # --- Internal helpers --------------------------------------------------
+
+    @staticmethod
+    def _extract_function_name(prompt: str) -> Optional[str]:
+        """Extract function name from HumanEval-style prompt."""
+        match = re.search(r"def\s+(\w+)\s*\(", prompt)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _defines_function(candidate: str, name: str) -> bool:
+        """Check if candidate re-defines or continues the named function."""
+        # The candidate is a continuation — it may not re-define the
+        # function.  Accept if it has a return/yield or substantive body
+        # lines (meaning it's filling in the function body).
+        stripped = candidate.strip()
+        if not stripped:
+            return False
+        # If candidate itself contains `def name(`, it re-defines
+        if re.search(rf"def\s+{re.escape(name)}\s*\(", candidate):
+            return True
+        # Otherwise accept if it looks like function body content
+        # (indented code, return statements, assignments, etc.)
+        lines = [l for l in candidate.split("\n") if l.strip()]
+        if lines:
+            return True
+        return False
+
+    @staticmethod
+    def _likely_needs_return(prompt: str) -> bool:
+        """Heuristic: does this problem likely expect a return value?"""
+        # Check docstring for "return" / "returns" / "->"
+        lower = prompt.lower()
+        if "-> none" in lower or "print(" in lower:
+            return False
+        if "->" in prompt or "return" in lower or "returns" in lower:
+            return True
+        return True  # default: most HumanEval problems expect a return
+
+    @staticmethod
+    def _has_return(candidate: str) -> bool:
+        """Check if candidate has a return or yield statement."""
+        for line in candidate.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("return ") or stripped == "return":
+                return True
+            if stripped.startswith("yield "):
+                return True
+        return False
+
+    @staticmethod
+    def _has_placeholder(candidate: str) -> bool:
+        """Detect placeholder/incomplete code patterns."""
+        stripped = candidate.strip()
+        # Check for common placeholder patterns
+        if stripped == "pass" or stripped.endswith("\n    pass"):
+            return True
+        for pattern in ("TODO", "raise NotImplementedError", "..."):
+            if pattern in candidate:
+                # Don't flag "..." inside strings
+                if pattern == "...":
+                    # Only flag if it appears as a statement, not in a string
+                    for line in candidate.split("\n"):
+                        ls = line.strip()
+                        if ls == "..." or ls == "Ellipsis":
+                            return True
+                else:
+                    return True
+        return False
+
+
+# =========================================================================
 # Candidate Generation
 # =========================================================================
 
@@ -913,11 +1064,13 @@ def run_seq_rerank_benchmark_humaneval(
     n_bootstrap: int = 1000,
     test_fn: Optional[Callable[[str, str, str], bool]] = None,
     rerank_mode: str = "bcvf",
+    value_alpha: float = 1.0,
+    value_use_ast: bool = True,
 ) -> SeqRerankReport:
     """
     Run sequence-level reranking benchmark on HumanEval problems.
 
-    Supports three reranking modes:
+    Supports four reranking modes:
 
     ``bcvf``
         Original BCVF-adjusted logits (Equation B).  Selects the candidate
@@ -935,6 +1088,11 @@ def run_seq_rerank_benchmark_humaneval(
         Falls back to best-logprob if none pass.  This gives the ceiling:
         "how good can reranking possibly be with a perfect verifier?"
 
+    ``value``
+        Deterministic proxy verifier.  Scores each candidate using
+        S(y) = logprob + alpha * logit(V(x,y)) where V is a cheap
+        structural utility estimate (AST, function presence, etc.).
+
     Args:
         model: HuggingFace causal LM.
         tokenizer: Tokenizer.
@@ -948,7 +1106,9 @@ def run_seq_rerank_benchmark_humaneval(
         n_bootstrap: Bootstrap resamples for CIs.
         test_fn: Function(code, test_code, entry_point) -> bool.
                  Defaults to run_unit_tests from bcvf_experiments.
-        rerank_mode: "bcvf", "logprob", or "oracle_verifier".
+        rerank_mode: "bcvf", "logprob", "oracle_verifier", or "value".
+        value_alpha: Weight for utility logit (value mode only).
+        value_use_ast: Whether to use AST parsing (value mode only).
 
     Returns:
         SeqRerankReport with all metrics.
@@ -1069,6 +1229,72 @@ def run_seq_rerank_benchmark_humaneval(
                 )
             continue  # skip the common tail below
 
+        elif rerank_mode == "value":
+            # --- Value mode: deterministic proxy verifier ---
+            reranker = ValueReranker(
+                alpha=value_alpha, use_ast=value_use_ast,
+            )
+            # Score each candidate: logprob + alpha * logit(utility)
+            value_scores = np.array([
+                reranker.score_candidate(
+                    prompt, candidate_texts[k], float(logprob_scores[k]),
+                )
+                for k in range(len(candidate_texts))
+            ])
+            utilities = np.array([
+                reranker.estimate_utility(prompt, candidate_texts[k])
+                for k in range(len(candidate_texts))
+            ])
+            selected_idx = int(np.argmax(value_scores))
+
+            # Score margin (value-best minus value-second-best)
+            sorted_scores = np.sort(value_scores)[::-1]
+            value_margin = (
+                float(sorted_scores[0] - sorted_scores[1])
+                if len(sorted_scores) > 1 else 0.0
+            )
+            # Rank correlation between base logprob and value scores
+            # (manual Spearman, no scipy dependency)
+            n_k = len(value_scores)
+            if n_k > 2:
+                base_ranks = np.argsort(np.argsort(logprob_scores)).astype(float)
+                val_ranks = np.argsort(np.argsort(value_scores)).astype(float)
+                d = base_ranks - val_ranks
+                rank_corr = 1.0 - 6.0 * float(np.sum(d ** 2)) / (
+                    float(n_k) * (float(n_k) ** 2 - 1)
+                )
+            elif n_k == 2:
+                rank_corr = (
+                    1.0 if np.argmax(logprob_scores) == np.argmax(value_scores)
+                    else -1.0
+                )
+            else:
+                rank_corr = 1.0
+
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=0.0,
+                rerank_mode="value",
+                base_best_idx=logprob_best_idx,
+                base_best_score=float(logprob_scores[logprob_best_idx]),
+                base_scores=logprob_scores,
+                bcvf_best_idx=selected_idx,
+                bcvf_best_score=float(value_scores[selected_idx]),
+                bcvf_scores=value_scores,
+                rerank_changed=selected_idx != logprob_best_idx,
+                score_margin=value_margin,
+                base_score_margin=logprob_diag["score_margin"],
+                candidate_lengths=logprob_diag["candidate_lengths"],
+                base_text=candidate_texts[logprob_best_idx],
+                bcvf_text=candidate_texts[selected_idx],
+                # Reuse diagnostics fields for value-specific info
+                mean_sf=float(np.mean(utilities)),  # repurpose: mean utility
+                rank_correlation=rank_corr,
+                score_std=float(np.std(value_scores)),
+                base_score_std=float(np.std(logprob_scores)),
+            )
+
         else:
             # --- BCVF mode: original Equation (B) ---
             goal = compute_prompt_goal_embedding(
@@ -1137,6 +1363,15 @@ def run_seq_rerank_benchmark_humaneval(
                     f"sf={result.mean_sf:.3f} sb={result.mean_sb:.3f} "
                     f"L={result.mean_L:.4f} "
                     f"rank_r={result.rank_correlation:.2f}"
+                )
+            elif rerank_mode == "value":
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if result.base_passed else 'FAIL'} "
+                    f"value={'PASS' if result.bcvf_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed} "
+                    f"util={result.mean_sf:.2f} "
+                    f"base_lp={result.base_best_score:.2f}"
                 )
             else:
                 print(
@@ -1444,6 +1679,7 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         "bcvf": "Sequence-Level BCVF Reranking Report",
         "logprob": "Sequence-Level Logprob Reranking Report",
         "oracle_verifier": "Sequence-Level Oracle Verifier Report",
+        "value": "Sequence-Level Value Reranking Report",
     }
     MODE_DESCS = {
         "bcvf": "Equation (B): BCVF-adjusted logits -> sequence logprob",
@@ -1454,6 +1690,10 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         "oracle_verifier": (
             "Oracle verifier: test ALL K candidates, pick first passer "
             "(tie-break by logprob).  This is the ceiling."
+        ),
+        "value": (
+            "S(y) = logprob + alpha * logit(V(x,y))  "
+            "V = deterministic proxy verifier (AST + structural checks)"
         ),
     }
 
@@ -1479,6 +1719,12 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
         )
     elif mode == "logprob":
         lines.append(f"  (Logprob baseline — no reranking applied)")
+    elif mode == "value":
+        lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
+        lines.append(
+            f"  Mean value margin:  {report.mean_score_margin:.4f} "
+            f"(best - 2nd best under value scoring)"
+        )
     else:
         lines.append(f"  Rerank rate:        {report.rerank_rate:.1%}")
         lines.append(
@@ -1500,6 +1746,11 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
     if mode == "bcvf":
         lines.append(
             f"  BCVF selection:     {report.mean_bcvf_logprob_selected:.4f} "
+            f"avg logprob"
+        )
+    elif mode == "value":
+        lines.append(
+            f"  Value selection:    {report.mean_bcvf_logprob_selected:.4f} "
             f"avg logprob"
         )
     elif mode == "oracle_verifier":
@@ -1546,6 +1797,23 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                     f"{report.oracle_pass_at_k:.3f}  "
                     f"(upper bound: any candidate passed)"
                 )
+        elif mode == "value":
+            lines.append("Pass@1 — Value Reranking:")
+            lines.append(
+                f"  Base pass@1:        {report.base_pass_at_1:.3f}"
+            )
+            lines.append(
+                f"  Value pass@1:       {report.bcvf_pass_at_1:.3f}"
+            )
+            delta = report.pass_at_1_delta or 0.0
+            lines.append(
+                f"  Delta (value-base): {delta:+.3f}"
+            )
+            if report.oracle_pass_at_k is not None:
+                lines.append(
+                    f"  Oracle pass@{report.K}:     "
+                    f"{report.oracle_pass_at_k:.3f}"
+                )
         else:
             # BCVF mode (original)
             lines.append("Pass@1 Metrics (HumanEval):")
@@ -1577,16 +1845,17 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 f"  Loss-rate:          {report.rerank_loss_rate:.1%} "
                 f"(should be 0% for oracle)"
             )
-        elif mode == "bcvf":
+        elif mode in ("bcvf", "value"):
+            mode_name = "BCVF" if mode == "bcvf" else "Value"
             lines.append("")
             lines.append("Win/Loss Analysis:")
             lines.append(
                 f"  Rerank win-rate:    {report.rerank_win_rate:.1%} "
-                f"(BCVF passed, base failed)"
+                f"({mode_name} passed, base failed)"
             )
             lines.append(
                 f"  Rerank loss-rate:   {report.rerank_loss_rate:.1%} "
-                f"(BCVF failed, base passed)"
+                f"({mode_name} failed, base passed)"
             )
             net = report.rerank_win_rate - report.rerank_loss_rate
             lines.append(
@@ -1601,12 +1870,33 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
                 "bcvf": "BCVF-base",
                 "logprob": "logprob-greedy",
                 "oracle_verifier": "oracle-logprob",
+                "value": "value-base",
             }.get(mode, "delta")
             lines.append(
                 f"  Bootstrap 95% CI for pass@1 delta ({delta_label}): "
                 f"{ci.mean:+.4f} [{ci.lower:+.4f}, {ci.upper:+.4f}] "
                 f"(n={ci.n_bootstrap})"
             )
+
+        # --- Headroom Recovery (value mode) ---
+        if mode == "value" and report.oracle_pass_at_k is not None:
+            lines.append("")
+            lines.append("Headroom Recovery:")
+            oracle_gain = (
+                (report.oracle_pass_at_k or 0)
+                - (report.base_pass_at_1 or 0)
+            )
+            value_gain = (
+                (report.bcvf_pass_at_1 or 0)
+                - (report.base_pass_at_1 or 0)
+            )
+            if oracle_gain > 0:
+                recovery = value_gain / oracle_gain
+            else:
+                recovery = 0.0
+            lines.append(f"  Oracle headroom: {oracle_gain:+.3f}")
+            lines.append(f"  Value recovered: {value_gain:+.3f}")
+            lines.append(f"  Recovery ratio:  {recovery:.1%}")
 
     # --- BCVF Signal Diagnostics (only for bcvf mode) ---
     if mode == "bcvf":
@@ -1723,6 +2013,54 @@ def print_seq_rerank_report(report: SeqRerankReport) -> str:
             lines.append(
                 f"  lambda={report.rerank_lambda}: "
                 f"Interpolated BCVF strength"
+            )
+
+    # --- Value Signal Diagnostics (only for value mode) ---
+    if mode == "value":
+        lines.append("")
+        lines.append("-" * 70)
+        lines.append(
+            "Value Signal Diagnostics (is proxy verifier providing useful signal?)"
+        )
+        lines.append("-" * 70)
+
+        lines.append("")
+        lines.append("1. Utility Score Distribution:")
+        lines.append(
+            f"     Mean utility:     {report.agg_mean_sf:.3f}"
+        )
+        if report.agg_mean_sf > 0.7:
+            lines.append(
+                "     NOTE: High mean utility — most candidates look structurally valid."
+            )
+        elif report.agg_mean_sf < 0.3:
+            lines.append(
+                "     NOTE: Low mean utility — many candidates have structural issues."
+            )
+
+        lines.append("")
+        lines.append("2. Score Differentiation Across Candidates:")
+        lines.append(
+            f"     Value score std:  {report.agg_score_std:.4f}  "
+            f"(spread of value scores across K)"
+        )
+        lines.append(
+            f"     Base score std:   {report.agg_base_score_std:.4f}  "
+            f"(spread of base scores across K)"
+        )
+        lines.append(
+            f"     Rank correlation: {report.agg_rank_correlation:.3f}  "
+            f"(Spearman: base vs value ranking)"
+        )
+        if abs(report.agg_rank_correlation) > 0.95:
+            lines.append(
+                "     ** NOTE: Near-perfect rank correlation means value "
+                "reranker is not changing the ranking."
+            )
+        elif abs(report.agg_rank_correlation) < 0.5:
+            lines.append(
+                "     ** NOTE: Low rank correlation — value reranker is "
+                "significantly reshuffling candidates."
             )
 
     lines.append(sep)
