@@ -408,9 +408,13 @@ def generate_candidates(
         "top_p": top_p,
     }
 
-    # Set pad_token_id if not set
-    if tokenizer.pad_token_id is None:
+    # Set pad_token_id on model's generation config to suppress warnings
+    if tokenizer.pad_token_id is not None:
+        gen_kwargs["pad_token_id"] = tokenizer.pad_token_id
+    else:
         gen_kwargs["pad_token_id"] = tokenizer.eos_token_id
+    if hasattr(model, "generation_config"):
+        model.generation_config.pad_token_id = gen_kwargs["pad_token_id"]
 
     # Create attention mask (all 1s for the prompt tokens)
     attention_mask = torch.ones_like(input_ids)
