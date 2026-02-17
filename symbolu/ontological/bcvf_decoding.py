@@ -47,6 +47,7 @@ Usage::
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -88,7 +89,7 @@ class DecodingConfig:
         use_bayesian_energy: Enable Bayesian Energy Softmax.
         energy_alpha: Scaling for uncertainty boost (α in z' = z + α·σ² − β·penalty).
         energy_beta: Scaling for penalty term (β, default 0 = no penalty).
-        uncertainty_mode: Uncertainty estimator: prob_var, dropout_var, or margin_inv.
+        uncertainty_mode: Uncertainty estimator: prob_var, dropout_var, margin_inv, or entropy_temp.
     """
 
     top_m: int = 500
@@ -106,7 +107,7 @@ class DecodingConfig:
     use_bayesian_energy: bool = False
     energy_alpha: float = 0.1
     energy_beta: float = 0.0
-    uncertainty_mode: str = "prob_var"  # prob_var, dropout_var, margin_inv
+    uncertainty_mode: str = "prob_var"  # prob_var, dropout_var, margin_inv, entropy_temp
 
 
 # =========================================================================
@@ -469,21 +470,46 @@ if PYTORCH_AVAILABLE:
 
             # ---- Bayesian Energy Softmax --------------------------------
             if cfg.use_bayesian_energy:
-                temp_probs = F.softmax(logits, dim=-1)
-                sigma2 = self._compute_uncertainty(
-                    temp_probs, logits, hidden_state, vocab_embeddings,
-                )
-                penalty = torch.zeros_like(logits)
-                logits = (
-                    logits
-                    + cfg.energy_alpha * sigma2
-                    - cfg.energy_beta * penalty
-                )
-                log_data["energy_mode"] = "bayesian"
-                log_data["energy_sigma2_mean"] = float(sigma2.mean().item())
-                log_data["energy_alpha"] = cfg.energy_alpha
-                log_data["energy_beta"] = cfg.energy_beta
-                log_data["uncertainty_mode"] = cfg.uncertainty_mode
+                if cfg.uncertainty_mode == "entropy_temp":
+                    # Entropy-conditioned temperature scaling
+                    eps = 1e-9
+                    # 1) base probs from raw logits
+                    p_base = F.softmax(logits, dim=-1)
+                    # 2) entropy: H = -sum(p * log(p + eps))
+                    H = -(p_base * torch.log(p_base + eps)).sum(dim=-1)  # [B]
+                    # 3) normalised entropy: Hn = H / log(V)
+                    V = logits.shape[-1]
+                    Hn = H / math.log(V)  # [B]
+                    # 4) temperature: T = 1 + alpha * (1 - Hn)
+                    T = 1.0 + cfg.energy_alpha * (1.0 - Hn)  # [B]
+                    # 5) scale logits and apply penalty
+                    penalty = torch.zeros_like(logits)
+                    logits = (
+                        logits / T.unsqueeze(-1)
+                        - cfg.energy_beta * penalty
+                    )
+                    log_data["energy_mode"] = "bayesian"
+                    log_data["entropy_temp_T_mean"] = float(T.mean().item())
+                    log_data["entropy_Hn_mean"] = float(Hn.mean().item())
+                    log_data["energy_alpha"] = cfg.energy_alpha
+                    log_data["energy_beta"] = cfg.energy_beta
+                    log_data["uncertainty_mode"] = cfg.uncertainty_mode
+                else:
+                    temp_probs = F.softmax(logits, dim=-1)
+                    sigma2 = self._compute_uncertainty(
+                        temp_probs, logits, hidden_state, vocab_embeddings,
+                    )
+                    penalty = torch.zeros_like(logits)
+                    logits = (
+                        logits
+                        + cfg.energy_alpha * sigma2
+                        - cfg.energy_beta * penalty
+                    )
+                    log_data["energy_mode"] = "bayesian"
+                    log_data["energy_sigma2_mean"] = float(sigma2.mean().item())
+                    log_data["energy_alpha"] = cfg.energy_alpha
+                    log_data["energy_beta"] = cfg.energy_beta
+                    log_data["uncertainty_mode"] = cfg.uncertainty_mode
             else:
                 log_data["energy_mode"] = "baseline"
 

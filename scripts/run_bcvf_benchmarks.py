@@ -1531,11 +1531,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--uncertainty", type=str, default="prob_var",
-        choices=["prob_var", "dropout_var", "margin_inv"],
+        choices=["prob_var", "dropout_var", "margin_inv", "entropy_temp"],
         help=(
             "Uncertainty estimator for Bayesian Energy Softmax. "
             "prob_var: p(1-p), margin_inv: 1/(margin+ε), "
-            "dropout_var: MC-Dropout variance (default: prob_var)"
+            "dropout_var: MC-Dropout variance, "
+            "entropy_temp: entropy-conditioned temperature scaling "
+            "(default: prob_var)"
         ),
     )
 
