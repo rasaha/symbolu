@@ -90,6 +90,7 @@ from symbolu.ontological.bcvf_experiments import (
     ExperimentResult,
     ExperimentRunner,
     StepLogger,
+    evaluate_energy_stop_conditions,
 )
 from symbolu.ontological.bcvf_benchmarks import (
     BenchmarkResult,
@@ -99,6 +100,7 @@ from symbolu.ontological.bcvf_benchmarks import (
     bootstrap_pass_at_1_delta,
     bootstrap_spearman,
     compute_verdict,
+    print_energy_comparison,
     print_extended_summary,
 )
 from symbolu.ontological.bcvf_goal_embeddings import GoalEmbeddingFactory
@@ -113,6 +115,19 @@ from symbolu.ontological.goal_dirnet import (
     run_goal_dirnet_pipeline,
     print_goal_dirnet_report,
     GoalDirEvalResult,
+)
+from symbolu.ontological.contrastive_token_ranking import (
+    CTRConfig,
+    run_ctr_pipeline,
+    print_ctr_report,
+    CTREvalResult,
+)
+from symbolu.ontological.bilinear_bcvf import (
+    BilinearConfig,
+    BilinearScorer,
+    run_bilinear_pipeline,
+    print_bilinear_report,
+    BilinearEvalResult,
 )
 
 
@@ -556,6 +571,13 @@ def _compute_goal_embeddings(
             T, D, device=hidden_states.device, dtype=hidden_states.dtype
         )
 
+    elif strategy == "bilinear":
+        # Bilinear strategy doesn't use goal embeddings — return zeros
+        # as a placeholder (decoder bypasses goal when bilinear is set).
+        return torch.zeros(
+            T, D, device=hidden_states.device, dtype=hidden_states.dtype
+        )
+
     else:
         raise ValueError(f"Unknown strategy: {strategy}")
 
@@ -988,15 +1010,19 @@ def run_single_mode(
         device=device,
     )
 
+    energy_mode = "bayesian" if bcvf_config.use_bayesian_energy else "baseline"
+
     flags_bcvf = {
         "use_rerank": True,
         "use_logit_mod": False,
         "use_calibration": True,
+        # use_bayesian_energy inherited from base_config via _make_config
     }
     flags_baseline = {
         "use_rerank": False,
         "use_logit_mod": False,
         "use_calibration": False,
+        "use_bayesian_energy": False,  # baseline never uses energy softmax
     }
 
     results: List[BenchmarkResult] = []
@@ -1034,6 +1060,7 @@ def run_single_mode(
                 benchmark_type="wikitext",
                 goal_strategy=strategy,
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1058,6 +1085,7 @@ def run_single_mode(
                 benchmark_type="code_gen",
                 goal_strategy="code_problem_only",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1087,6 +1115,7 @@ def run_single_mode(
                 benchmark_type="instruction",
                 goal_strategy="instruction_only",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1117,6 +1146,7 @@ def run_single_mode(
                 benchmark_type="retrieval",
                 goal_strategy="retrieval_context",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
     else:
@@ -1132,6 +1162,7 @@ def _build_benchmark_result(
     benchmark_type: str,
     goal_strategy: str,
     n_bootstrap: int = 1000,
+    energy_mode: str = "baseline",
 ) -> BenchmarkResult:
     """Build BenchmarkResult with bootstrap CIs from BCVF vs baseline."""
     bcvf_correct = np.array([
@@ -1169,6 +1200,7 @@ def _build_benchmark_result(
         pass_at_1_delta_ci=delta_ci,
         sb_rho_ci=sb_ci,
         verdict=verdict,
+        energy_mode=energy_mode,
     )
 
 
@@ -1214,6 +1246,43 @@ def build_parser() -> argparse.ArgumentParser:
             "--train-goal-samples 5000 --eval-goal-samples 1000",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --train-goal-dirnet --alpha-sweep 0.05 0.1 0.2",
+            "",
+            "CTR (Contrastive Token Ranking) examples:",
+            "  # Fast kNN-Dir falsification (nonparametric)",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run --ctr-knn",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --ctr-knn --ctr-direction delta "
+            "--train-goal-samples 10000 --eval-goal-samples 2000",
+            "  # Learned contrastive (InfoNCE)",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --train-goal-contrastive --ctr-direction delta",
+            "  # Both kNN and learned",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --ctr-knn --train-goal-contrastive",
+            "",
+            "Bilinear BCVF examples:",
+            "  # Dry-run bilinear training + eval",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--train-bilinear",
+            "  # WikiText with bilinear scorer",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model phi3 --train-bilinear --bilinear-train-samples 10000 "
+            "--samples 5000",
+            "  # HumanEval gate check",
+            "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
+            "--model phi3 --samples 1640 --train-bilinear",
+            "",
+            "Bayesian Energy Softmax examples:",
+            "  # Dry-run with default prob_var uncertainty",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--bayesian-energy",
+            "  # WikiText with margin-inverse uncertainty and custom alpha",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --bayesian-energy --uncertainty margin_inv "
+            "--alpha 0.2",
+            "  # Full suite with MC-Dropout uncertainty",
+            "  python scripts/run_bcvf_benchmarks.py --mode all "
+            "--model phi3 --bayesian-energy --uncertainty dropout_var",
         ]),
     )
 
@@ -1258,10 +1327,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--goal-strategy", type=str, nargs="+",
         default=["lookahead", "prompt_mean", "random"],
-        choices=["lookahead", "prompt_mean", "random"],
+        choices=["lookahead", "prompt_mean", "random", "bilinear"],
         help=(
             "Goal embedding strategies for wikitext mode "
-            "(default: all three)"
+            "(default: lookahead prompt_mean random). "
+            "Use 'bilinear' with --train-bilinear for learned scorer."
         ),
     )
 
@@ -1363,6 +1433,112 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Contrastive Token Ranking (CTR) flags ---
+    parser.add_argument(
+        "--ctr-knn", action="store_true",
+        help=(
+            "Run kNN-Dir nonparametric CTR baseline. "
+            "Fast falsification: if kNN fails, no learned model will help."
+        ),
+    )
+    parser.add_argument(
+        "--train-goal-contrastive", action="store_true",
+        help=(
+            "Train ContrastiveGoalNet with InfoNCE loss. "
+            "Discriminative alternative to direction regression."
+        ),
+    )
+    parser.add_argument(
+        "--ctr-direction", type=str, default="delta",
+        choices=["delta", "htp1"],
+        help=(
+            "Direction mode for CTR: delta = normalize(h_{t+1} - h_t), "
+            "htp1 = normalize(h_{t+1}). Default: delta"
+        ),
+    )
+    parser.add_argument(
+        "--ctr-knn-k", type=int, default=32,
+        help="Number of kNN neighbours for CTR (default: 32)",
+    )
+    parser.add_argument(
+        "--ctr-tau", type=float, default=0.07,
+        help="InfoNCE temperature for contrastive training (default: 0.07)",
+    )
+    parser.add_argument(
+        "--ctr-epochs", type=int, default=5,
+        help="ContrastiveGoalNet training epochs (default: 5)",
+    )
+
+    # --- Bilinear BCVF flags ---
+    parser.add_argument(
+        "--train-bilinear", action="store_true",
+        help=(
+            "Train BilinearScorer (low-rank bilinear metric learning) "
+            "then evaluate as BCVF backward score replacement."
+        ),
+    )
+    parser.add_argument(
+        "--bilinear-rank", type=int, default=64,
+        help="Low-rank dimension for bilinear projections U, V (default: 64)",
+    )
+    parser.add_argument(
+        "--bilinear-train-samples", type=int, default=10000,
+        help="Number of training positions for BilinearScorer (default: 10000)",
+    )
+    parser.add_argument(
+        "--bilinear-eval-samples", type=int, default=5000,
+        help="Number of eval positions for BilinearScorer (default: 5000)",
+    )
+    parser.add_argument(
+        "--bilinear-use-sigmoid", action="store_true", default=True,
+        help="Apply sigmoid to bilinear scores (default: True)",
+    )
+    parser.add_argument(
+        "--bilinear-no-sigmoid", action="store_true", default=False,
+        help="Disable sigmoid on bilinear scores (use raw scores).",
+    )
+    parser.add_argument(
+        "--bilinear-epochs", type=int, default=3,
+        help="BilinearScorer training epochs (default: 3)",
+    )
+    parser.add_argument(
+        "--bilinear-lr", type=float, default=1e-3,
+        help="BilinearScorer learning rate (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--bilinear-train-top-m", type=int, default=50,
+        help=(
+            "Candidate pool size during bilinear training (default: 50). "
+            "Smaller = harder negatives.  Separate from --top-m (eval)."
+        ),
+    )
+
+    # --- Bayesian Energy Softmax flags ---
+    parser.add_argument(
+        "--bayesian-energy", action="store_true",
+        help=(
+            "Enable Bayesian Energy Softmax: z'_y = z_y + α·σ²_y − β·penalty. "
+            "Modifies logits before softmax at decode time."
+        ),
+    )
+    parser.add_argument(
+        "--alpha", type=float, default=0.1,
+        help="Bayesian Energy α — uncertainty scaling (default: 0.1)",
+    )
+    parser.add_argument(
+        "--energy-beta", type=float, default=0.0,
+        help="Bayesian Energy β — penalty scaling (default: 0.0)",
+    )
+    parser.add_argument(
+        "--uncertainty", type=str, default="prob_var",
+        choices=["prob_var", "dropout_var", "margin_inv"],
+        help=(
+            "Uncertainty estimator for Bayesian Energy Softmax. "
+            "prob_var: p(1-p), margin_inv: 1/(margin+ε), "
+            "dropout_var: MC-Dropout variance (default: prob_var)"
+        ),
+    )
+
     return parser
 
 
@@ -1417,6 +1593,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         use_rerank=True,
         use_calibration=True,
         use_logit_mod=False,
+        # Bayesian Energy Softmax
+        use_bayesian_energy=args.bayesian_energy,
+        energy_alpha=args.alpha,
+        energy_beta=args.energy_beta,
+        uncertainty_mode=args.uncertainty,
     )
 
     # --- Load model ---
@@ -1442,6 +1623,9 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     print(f"  Bootstrap: {args.n_bootstrap} resamples")
     if args.mode == "wikitext":
         print(f"  Strategies: {args.goal_strategy}")
+    if args.bayesian_energy:
+        print(f"  Energy:  α={args.alpha}, β={args.energy_beta}, "
+              f"uncertainty={args.uncertainty}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
@@ -1465,6 +1649,60 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"hidden={goal_config.hidden_dim}, "
               f"train={goal_config.train_samples}, "
               f"eval={goal_config.eval_samples}")
+
+    # --- CTR config ---
+    ctr_config = None
+    run_ctr = args.ctr_knn or args.train_goal_contrastive
+    if run_ctr:
+        ctr_train = args.train_goal_samples
+        ctr_eval = args.eval_goal_samples
+        if args.dry_run:
+            ctr_train = min(ctr_train, 500)
+            ctr_eval = min(ctr_eval, 100)
+        ctr_config = CTRConfig(
+            direction_mode=args.ctr_direction,
+            knn_k=args.ctr_knn_k,
+            top_m=top_m,
+            tau=args.ctr_tau,
+            hidden_dim=args.goal_hidden_dim,
+            lr=args.goal_lr,
+            epochs=args.ctr_epochs,
+            train_samples=ctr_train,
+            eval_samples=ctr_eval,
+            alpha_values=args.alpha_sweep or [0.01, 0.02, 0.05],
+        )
+        print(f"  CTR: direction={ctr_config.direction_mode}, "
+              f"knn_k={ctr_config.knn_k}, "
+              f"knn={args.ctr_knn}, learned={args.train_goal_contrastive}, "
+              f"train={ctr_config.train_samples}, "
+              f"eval={ctr_config.eval_samples}")
+
+    # --- Bilinear BCVF config ---
+    bilinear_config = None
+    if args.train_bilinear:
+        bl_train = args.bilinear_train_samples
+        bl_eval = args.bilinear_eval_samples
+        if args.dry_run:
+            bl_train = min(bl_train, 500)
+            bl_eval = min(bl_eval, 100)
+        use_sigmoid = args.bilinear_use_sigmoid and not args.bilinear_no_sigmoid
+        bilinear_config = BilinearConfig(
+            rank=args.bilinear_rank,
+            use_sigmoid=use_sigmoid,
+            top_m=top_m,
+            train_top_m=args.bilinear_train_top_m,
+            lr=args.bilinear_lr,
+            epochs=args.bilinear_epochs,
+            train_samples=bl_train,
+            eval_samples=bl_eval,
+            alpha_values=args.alpha_sweep or [0.01, 0.02, 0.05, 0.1],
+        )
+        print(f"  Bilinear: rank={bilinear_config.rank}, "
+              f"sigmoid={use_sigmoid}, "
+              f"train_top_m={bilinear_config.train_top_m}, "
+              f"train={bilinear_config.train_samples}, "
+              f"eval={bilinear_config.eval_samples}, "
+              f"epochs={bilinear_config.epochs}")
 
     # --- Determine modes to run ---
     if args.mode == "all":
@@ -1500,9 +1738,16 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         )
         all_results.extend(mode_results)
 
-        # Collect datasets for GoalDirNet if requested
-        if args.train_goal_dirnet:
-            goal_n = goal_config.train_samples + goal_config.eval_samples
+        # Collect datasets for GoalDirNet / CTR / Bilinear if requested
+        if args.train_goal_dirnet or run_ctr or args.train_bilinear:
+            if goal_config is not None:
+                goal_n = goal_config.train_samples + goal_config.eval_samples
+            elif ctr_config is not None:
+                goal_n = ctr_config.train_samples + ctr_config.eval_samples
+            elif bilinear_config is not None:
+                goal_n = bilinear_config.train_samples + bilinear_config.eval_samples
+            else:
+                goal_n = 10000
             if mode == "wikitext":
                 # Use first goal strategy for GoalDirNet data
                 strategy = args.goal_strategy[0]
@@ -1587,6 +1832,79 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         print()
         print_extended_summary(all_results)
 
+    # --- Bayesian Energy Softmax comparison ---
+    if args.bayesian_energy and all_results:
+        print(f"\n{'='*70}")
+        print("Bayesian Energy Softmax — Stop-Condition Evaluation")
+        print(f"{'='*70}")
+
+        # Re-run baselines without energy to get reference results
+        baseline_config = DecodingConfig(
+            top_m=bcvf_config.top_m,
+            beta=bcvf_config.beta,
+            lambda_c=bcvf_config.lambda_c,
+            use_rerank=True,
+            use_calibration=True,
+            use_logit_mod=False,
+            use_bayesian_energy=False,
+        )
+        baseline_runner = ExperimentRunner(
+            model=model, tokenizer=tokenizer,
+            base_config=baseline_config, device=effective_device,
+        )
+        baseline_flags = {
+            "use_rerank": True,
+            "use_logit_mod": False,
+            "use_calibration": True,
+            "use_bayesian_energy": False,
+        }
+
+        # Collect baseline results for each dataset (rerun without energy)
+        baseline_bench: List[BenchmarkResult] = []
+        for mode in modes:
+            if mode == "wikitext":
+                for strategy in args.goal_strategy:
+                    if args.dry_run:
+                        ds = DatasetAdapter.from_dry_run(
+                            n_samples=args.samples, strategy=strategy,
+                        )
+                    else:
+                        texts = _load_evaluation_texts(
+                            args.dataset, max_texts=100,
+                        )
+                        if not texts:
+                            texts = _builtin_fallback_texts()
+                        ds = DatasetAdapter.from_wikitext(
+                            model, tokenizer, texts, strategy,
+                            args.samples, effective_device,
+                            args.max_seq_len,
+                        )
+                    if ds:
+                        res_bl = baseline_runner.run_single_experiment(
+                            baseline_flags, ds
+                        )
+                        res_no = baseline_runner.run_single_experiment(
+                            {"use_rerank": False, "use_logit_mod": False,
+                             "use_calibration": False,
+                             "use_bayesian_energy": False}, ds
+                        )
+                        baseline_bench.append(_build_benchmark_result(
+                            res_bl, res_no,
+                            dataset_name=f"WikiText/{strategy}",
+                            benchmark_type="wikitext",
+                            goal_strategy=strategy,
+                            n_bootstrap=args.n_bootstrap,
+                            energy_mode="baseline",
+                        ))
+
+        if baseline_bench and all_results:
+            print_energy_comparison(
+                baseline_bench, all_results,
+                alpha=args.alpha,
+                energy_beta=args.energy_beta,
+                uncertainty_mode=args.uncertainty,
+            )
+
     # --- GoalDirNet training + evaluation ---
     if args.train_goal_dirnet and goal_datasets:
         print(f"\n{'='*70}")
@@ -1610,6 +1928,51 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         # Print report
         if goal_eval_results:
             print_goal_dirnet_report(goal_eval_results, alpha_sweep_results)
+
+    # --- CTR: Contrastive Token Ranking ---
+    if run_ctr and goal_datasets:
+        print(f"\n{'='*70}")
+        print("Contrastive Token Ranking (CTR)")
+        print(f"{'='*70}")
+
+        t2 = time.time()
+        ctr_results = run_ctr_pipeline(
+            model=model,
+            tokenizer=tokenizer,
+            datasets=goal_datasets,
+            config=ctr_config,
+            device=effective_device,
+            run_knn=args.ctr_knn,
+            run_learned=args.train_goal_contrastive,
+            run_nonparametric=True,
+        )
+
+        ctr_elapsed = time.time() - t2
+        print(f"\nCTR time: {ctr_elapsed:.1f}s")
+
+        if ctr_results:
+            print_ctr_report(ctr_results)
+
+    # --- Bilinear BCVF training + evaluation ---
+    if args.train_bilinear and goal_datasets:
+        print(f"\n{'='*70}")
+        print("Bilinear BCVF (Low-Rank Metric Learning)")
+        print(f"{'='*70}")
+
+        t3 = time.time()
+        bilinear_results, bilinear_loss_curves = run_bilinear_pipeline(
+            model=model,
+            tokenizer=tokenizer,
+            datasets=goal_datasets,
+            config=bilinear_config,
+            device=effective_device,
+        )
+
+        bilinear_elapsed = time.time() - t3
+        print(f"\nBilinear time: {bilinear_elapsed:.1f}s")
+
+        if bilinear_results:
+            print_bilinear_report(bilinear_results, bilinear_loss_curves)
 
     # --- Save if requested ---
     if args.output:

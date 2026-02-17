@@ -668,6 +668,14 @@ class ExperimentRunner:
             use_rerank=flags.get("use_rerank", False),
             use_logit_mod=flags.get("use_logit_mod", False),
             use_calibration=flags.get("use_calibration", False),
+            # Bayesian Energy Softmax — inherit from base, allow override
+            use_bayesian_energy=flags.get(
+                "use_bayesian_energy",
+                self.base_config.use_bayesian_energy,
+            ),
+            energy_alpha=self.base_config.energy_alpha,
+            energy_beta=self.base_config.energy_beta,
+            uncertainty_mode=self.base_config.uncertainty_mode,
         )
         return cfg
 
@@ -1479,6 +1487,70 @@ def evaluate_stop_conditions(
     if h_acc > l_acc + 0.1:
         reasons.append(
             f"GO: Calibration meaningful (HIGH={h_acc:.3f} > LOW={l_acc:.3f})"
+        )
+
+    return GoNoGoVerdict(should_continue=should_continue, reasons=reasons)
+
+
+def evaluate_energy_stop_conditions(
+    baseline: ExperimentResult,
+    energy: ExperimentResult,
+) -> GoNoGoVerdict:
+    """
+    Bayesian Energy Softmax stop-condition evaluator.
+
+    Stricter than the general BCVF evaluator:
+        - FAIL if pass@1 drops > 1.5 percentage points.
+        - FAIL if Spearman ρ(sb, correctness) does not improve.
+        - FAIL if ECE does not improve (lower is better).
+
+    Args:
+        baseline: Results from vanilla softmax (no energy).
+        energy: Results from Bayesian Energy Softmax.
+
+    Returns:
+        GoNoGoVerdict indicating pass/fail.
+    """
+    reasons: List[str] = []
+    should_continue = True
+
+    delta_pass = energy.pass_at_1 - baseline.pass_at_1
+
+    # Gate 1: pass@1 regression > 1.5%
+    if delta_pass < -0.015:
+        reasons.append(
+            f"FAIL: pass@1 dropped by {abs(delta_pass):.3f} (>1.5% threshold)"
+        )
+        should_continue = False
+
+    # Gate 2: Spearman ρ must improve
+    if energy.sb_correctness_corr <= baseline.sb_correctness_corr:
+        reasons.append(
+            f"FAIL: ρ did not improve "
+            f"({baseline.sb_correctness_corr:+.4f} → "
+            f"{energy.sb_correctness_corr:+.4f})"
+        )
+        should_continue = False
+
+    # Gate 3: ECE must improve (lower is better)
+    if energy.ece >= baseline.ece:
+        reasons.append(
+            f"FAIL: ECE did not improve "
+            f"({baseline.ece:.4f} → {energy.ece:.4f})"
+        )
+        should_continue = False
+
+    # Positive signals
+    if delta_pass >= 0:
+        reasons.append(f"PASS: pass@1 delta = {delta_pass:+.4f}")
+    if energy.ece < baseline.ece:
+        reasons.append(
+            f"PASS: ECE improved {baseline.ece:.4f} → {energy.ece:.4f}"
+        )
+    if energy.sb_correctness_corr > baseline.sb_correctness_corr:
+        reasons.append(
+            f"PASS: ρ improved {baseline.sb_correctness_corr:+.4f} → "
+            f"{energy.sb_correctness_corr:+.4f}"
         )
 
     return GoNoGoVerdict(should_continue=should_continue, reasons=reasons)
