@@ -58,6 +58,27 @@ from .sovereign_state_monitor import (
     get_sovereign_state_summary,
 )
 
+# Logit Modulation Decoding
+from .logit_modulation import (
+    LogitModulationConfig,
+    LogitModulator,
+    ModulationMode,
+)
+from .retrieval_scorer import (
+    RetrievalScorer,
+    RetrievalScorerConfig,
+    RetrievalStrategy,
+)
+from .penalty_scorer import (
+    PenaltyScorer,
+    PenaltyScorerConfig,
+)
+from .logit_modulation_benchmark import (
+    LogitModulationBenchmark,
+    BenchmarkMetrics,
+    SweepResult,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -98,6 +119,19 @@ __all__ = [
     "VRITTI_NAMES",
     "GUNA_NAMES",
     "get_sovereign_state_summary",
+
+    # Logit Modulation Decoding
+    "LogitModulationConfig",
+    "LogitModulator",
+    "ModulationMode",
+    "RetrievalScorer",
+    "RetrievalScorerConfig",
+    "RetrievalStrategy",
+    "PenaltyScorer",
+    "PenaltyScorerConfig",
+    "LogitModulationBenchmark",
+    "BenchmarkMetrics",
+    "SweepResult",
 ]
 
 __version__ = "2.0.0"
