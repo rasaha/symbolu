@@ -108,6 +108,11 @@ class DecodingConfig:
     energy_alpha: float = 0.1
     energy_beta: float = 0.0
     uncertainty_mode: str = "prob_var"  # prob_var, dropout_var, margin_inv, entropy_temp
+    # Softmax-Entmax Mix
+    use_softmax_entmax_mix: bool = False
+    entmax_alpha: float = 1.5
+    gamma_low: float = 1.0
+    gamma_high: float = 5.0
 
 
 # =========================================================================
@@ -303,6 +308,61 @@ if PYTORCH_AVAILABLE:
             }
 
     # =====================================================================
+    # Entmax (sparse softmax alternative)
+    # =====================================================================
+
+    def _entmax_bisect(
+        z: torch.Tensor,
+        alpha: float = 1.3,
+        n_iter: int = 50,
+    ) -> torch.Tensor:
+        """
+        Compute alpha-entmax via bisection on shifted logits.
+
+        Entmax generalises softmax (alpha=1) and sparsemax (alpha=2).
+        For 1 < alpha < 2, it produces a sparse probability distribution
+        where low-probability tokens are driven exactly to zero.
+
+        The solution satisfies:
+            p_i = max(0, (alpha-1)*z_i - tau)^{1/(alpha-1)}
+        where tau is the unique threshold such that sum(p_i) = 1.
+
+        Args:
+            z: [*, V] logits (last dim is the simplex dimension).
+            alpha: Tsallis alpha parameter (> 1).  Default 1.3.
+            n_iter: Number of bisection iterations (50 → ~1e-15 precision).
+
+        Returns:
+            p: [*, V] sparse probability distribution summing to 1.
+        """
+        am1 = alpha - 1.0
+        power = 1.0 / am1  # 1/(alpha-1)
+
+        # Shift for numerical stability: max becomes 0
+        z_max = z.max(dim=-1, keepdim=True)[0]
+        z_shift = z - z_max
+
+        # Bisection: find tau such that
+        #   sum_i [am1 * z_shift_i - tau]_+^power = 1
+        # On shifted scale, tau ∈ (-inf, 0).  Use [-10, 0] as bracket.
+        tau_lo = torch.full_like(z_max, -10.0)
+        tau_hi = torch.zeros_like(z_max)
+
+        for _ in range(n_iter):
+            tau_mid = (tau_lo + tau_hi) * 0.5
+            p = (am1 * z_shift - tau_mid).clamp(min=0.0).pow(power)
+            s = p.sum(dim=-1, keepdim=True)
+
+            tau_lo = torch.where(s > 1.0, tau_mid, tau_lo)
+            tau_hi = torch.where(s <= 1.0, tau_mid, tau_hi)
+
+        # Final computation with converged tau
+        tau = (tau_lo + tau_hi) * 0.5
+        p = (am1 * z_shift - tau).clamp(min=0.0).pow(power)
+        p_sum = p.sum(dim=-1, keepdim=True)
+        return p / (p_sum + 1e-10)
+
+    # =====================================================================
     # Main Decoder
     # =====================================================================
 
@@ -333,6 +393,7 @@ if PYTORCH_AVAILABLE:
                 self.config, bilinear_scorer=bilinear_scorer
             )
             self.calibrator = CalibrationLayer(self.config)
+            self._entmax_mix_step_count = 0
 
         # ------------------------------------------------------------------
         # Bayesian Energy Softmax — uncertainty estimators
@@ -598,6 +659,10 @@ if PYTORCH_AVAILABLE:
             log_data["base_probs"] = base_probs
 
             # ---- Option A: Logit modulation -----------------------------
+            # Track which logits produced the softmax distribution
+            # (needed by softmax-entmax mix to apply entmax to the same
+            # edited logits).
+            effective_logits = logits
             if cfg.use_logit_mod:
                 # Build full adjusted logit tensor (fill with -inf)
                 adjusted_logits = torch.full_like(logits, float("-inf"))
@@ -605,6 +670,7 @@ if PYTORCH_AVAILABLE:
                     1, topM_indices, topM_scores - cfg.beta * L
                 )
                 probs = F.softmax(adjusted_logits, dim=-1)
+                effective_logits = adjusted_logits
 
                 # KL divergence and entropy delta (logit mod sanity)
                 eps = 1e-10
@@ -624,6 +690,60 @@ if PYTORCH_AVAILABLE:
                 log_data["entropy_delta"] = entropy_mod - entropy_base
             else:
                 probs = base_probs
+
+            # ---- Softmax-Entmax(α) Mix ----------------------------------
+            # Entropy-gated mixture: in high-entropy (uncertain) regimes,
+            # entmax sparsifies the distribution, concentrating mass on
+            # fewer tokens.  In low-entropy (confident) regimes, standard
+            # softmax is preserved unchanged.
+            if cfg.use_softmax_entmax_mix:
+                p_soft = probs  # softmax on effective_logits
+
+                # Entmax on the *same* edited logits
+                p_ent = _entmax_bisect(
+                    effective_logits, alpha=cfg.entmax_alpha,
+                )
+
+                # Entropy of softmax distribution: H = -Σ p log p
+                _eps = 1e-10
+                H = -(p_soft * torch.log(p_soft + _eps)).sum(
+                    dim=-1, keepdim=True
+                )  # [B, 1]
+
+                # Dynamic gamma: 0 at low entropy, 1 at high entropy
+                gamma = (
+                    (H - cfg.gamma_low) / (cfg.gamma_high - cfg.gamma_low)
+                ).clamp(0.0, 1.0)  # [B, 1]
+
+                # Mix: p = (1 - γ) · softmax + γ · entmax
+                probs = (1.0 - gamma) * p_soft + gamma * p_ent
+
+                # Update token selection to reflect mixed distribution
+                # (reranking selects its own token via BCVF scores,
+                #  so only override when reranking is off)
+                if not cfg.use_rerank:
+                    best_token_index = torch.argmax(probs, dim=-1)
+
+                # Diagnostics
+                log_data["entropy_soft"] = H.squeeze(-1)
+                log_data["gamma_entmax"] = gamma.squeeze(-1)
+                log_data["p_soft_top1"] = p_soft.max(dim=-1)[0]
+                log_data["p_ent_top1"] = p_ent.max(dim=-1)[0]
+                log_data["p_mixed_top1"] = probs.max(dim=-1)[0]
+
+                # Diagnostic prints for the first 10 decode steps
+                self._entmax_mix_step_count += 1
+                if self._entmax_mix_step_count <= 10:
+                    for b in range(H.shape[0]):
+                        print(
+                            f"  [entmax-mix step "
+                            f"{self._entmax_mix_step_count}] "
+                            f"H={H[b, 0].item():.3f} "
+                            f"γ={gamma[b, 0].item():.3f} "
+                            f"top1_soft={p_soft[b].max().item():.4f} "
+                            f"top1_ent={p_ent[b].max().item():.4f} "
+                            f"top1_mixed={probs[b].max().item():.4f}"
+                        )
 
             log_data["probs"] = probs
 
