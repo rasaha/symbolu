@@ -184,7 +184,11 @@ def has_close_elements(numbers: List[float], threshold: float) -> bool:
         except Exception as e:
             print(f"  EXECUTION: EXCEPTION {e}")
 
-except ImportError:
-    print("  (torch/transformers not available, skipping model test)")
+except ImportError as e:
+    import traceback
+    traceback.print_exc()
+    print(f"  (torch/transformers not available, skipping model test: {e})")
 except Exception as e:
+    import traceback
+    traceback.print_exc()
     print(f"  ERROR: {e}")
