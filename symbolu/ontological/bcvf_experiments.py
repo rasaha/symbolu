@@ -54,6 +54,8 @@ import numpy as np
 from symbolu.ontological.bcvf_decoding import BCVFDecoder, DecodingConfig
 from symbolu.ontological.bcvf_calibration import (
     CalibrationTracker,
+    compute_auroc,
+    compute_auroc_combined,
     compute_ece,
     compute_brier,
     spearman_rank_correlation,
@@ -410,6 +412,43 @@ class StepLogger:
         corr = np.array([float(r.correct) for r in scored])
         return spearman_rank_correlation(logits, corr)
 
+    # ------------------------------------------------------------------
+    # AUROC: the definitive correctness-prediction metric
+    # ------------------------------------------------------------------
+
+    def auroc_logit(self) -> float:
+        """AUROC for predicting correctness from base logit confidence."""
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        scores = np.array([r.confidence for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc(scores, labels)
+
+    def auroc_sb(self) -> float:
+        """AUROC for predicting correctness from sb (backward goal-alignment)."""
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        scores = np.array([r.sb_selected for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc(scores, labels)
+
+    def auroc_combined(self) -> float:
+        """
+        Best AUROC from linear combination w*logit + (1-w)*sb.
+
+        If this exceeds max(auroc_logit, auroc_sb), the two signals
+        contain orthogonal information and combining them is justified.
+        """
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        logits = np.array([r.confidence for r in scored])
+        sbs = np.array([r.sb_selected for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc_combined(logits, sbs, labels)
+
     def summary(self) -> Dict[str, float]:
         return {
             "n_steps": len(self.records),
@@ -427,6 +466,9 @@ class StepLogger:
             "sb_correctness_corr": self.sb_correctness_correlation(),
             "logit_rank_correctness_corr": self.logit_rank_correctness_correlation(),
             "base_logit_correctness_corr": self.base_logit_correctness_correlation(),
+            "auroc_logit": self.auroc_logit(),
+            "auroc_sb": self.auroc_sb(),
+            "auroc_combined": self.auroc_combined(),
         }
 
 
@@ -617,6 +659,10 @@ class ExperimentResult:
     sb_correctness_corr: float = 0.0
     logit_rank_correctness_corr: float = 0.0
     base_logit_correctness_corr: float = 0.0
+    # AUROC: the definitive correctness-prediction test
+    auroc_logit: float = 0.5
+    auroc_sb: float = 0.5
+    auroc_combined: float = 0.5
     # Raw
     per_sample: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -871,6 +917,9 @@ class ExperimentRunner:
             sb_correctness_corr=step_summary["sb_correctness_corr"],
             logit_rank_correctness_corr=step_summary["logit_rank_correctness_corr"],
             base_logit_correctness_corr=step_summary["base_logit_correctness_corr"],
+            auroc_logit=step_summary["auroc_logit"],
+            auroc_sb=step_summary["auroc_sb"],
+            auroc_combined=step_summary["auroc_combined"],
             per_sample=per_sample,
         )
 

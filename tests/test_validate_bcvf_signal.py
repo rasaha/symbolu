@@ -468,7 +468,7 @@ class TestAblationReport:
         assert "logit modulation" in report.lower() or "option a" in report.lower()
 
     def test_report_shows_exact_columns(self):
-        """Report should contain the exact metrics ChatGPT requested."""
+        """Report should contain the exact metrics ChatGPT requested + AUROC."""
         abl = self._make_ablation("lookahead", 0.2, 0.1)
         report = format_ablation_report("test", "3B", [abl])
         assert "pass@1" in report
@@ -480,3 +480,15 @@ class TestAblationReport:
         assert "Brier" in report
         assert "KL" in report
         assert "dH" in report
+        assert "AUC_l" in report
+        assert "AUC_s" in report
+        assert "AUC_c" in report
+
+    def test_auroc_verdict_present(self):
+        """Report should contain AUROC correctness-prediction verdict."""
+        abl = self._make_ablation("lookahead", 0.2, 0.1)
+        report = format_ablation_report("test", "3B", [abl])
+        assert "AUROC correctness-prediction test" in report
+        assert "AUROC(logit)" in report
+        assert "AUROC(sb)" in report
+        assert "AUROC(combined)" in report

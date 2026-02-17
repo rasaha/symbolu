@@ -988,15 +988,16 @@ def format_ablation_report(
 
     for abl in ablation_results:
         lines.append(f"Goal strategy: {abl.strategy}")
-        lines.append("-" * 100)
+        lines.append("-" * 120)
         header = (
             f"  {'Config':<12} {'pass@1':>7} {'Rerank%':>8} {'NetBen':>7} "
             f"{'sb_rho':>8} {'logit_rho':>10} "
             f"{'ECE':>7} {'Brier':>7} "
-            f"{'KL':>7} {'dH':>7}"
+            f"{'KL':>7} {'dH':>7} "
+            f"{'AUC_l':>6} {'AUC_s':>6} {'AUC_c':>6}"
         )
         lines.append(header)
-        lines.append("  " + "-" * 96)
+        lines.append("  " + "-" * 116)
 
         for r in abl.experiment_results:
             lines.append(
@@ -1007,7 +1008,8 @@ def format_ablation_report(
                 f"{r.base_logit_correctness_corr:>+10.4f} "
                 f"{r.ece:>7.4f} {r.brier:>7.4f} "
                 f"{r.mean_kl_base_mod:>7.4f} "
-                f"{r.mean_entropy_delta:>+7.4f}"
+                f"{r.mean_entropy_delta:>+7.4f} "
+                f"{r.auroc_logit:>6.3f} {r.auroc_sb:>6.3f} {r.auroc_combined:>6.3f}"
             )
 
         lines.append("")
@@ -1077,6 +1079,35 @@ def format_ablation_report(
             lines.append("")
             lines.append("  >>> NEITHER CONDITION MET")
             lines.append("      Softmax is NOT the bottleneck")
+
+        # AUROC verdict — the definitive correctness-prediction test
+        # Use baseline config for the comparison (all configs share the
+        # same logit/sb values; only the selected token may differ)
+        baseline_r = abl.experiment_results[0] if abl.experiment_results else None
+        if baseline_r is not None:
+            auc_l = baseline_r.auroc_logit
+            auc_s = baseline_r.auroc_sb
+            auc_c = baseline_r.auroc_combined
+            lines.append("")
+            lines.append(f"  AUROC correctness-prediction test:")
+            lines.append(f"    AUROC(logit) = {auc_l:.4f}")
+            lines.append(f"    AUROC(sb)    = {auc_s:.4f}")
+            lines.append(f"    AUROC(combined) = {auc_c:.4f}  (best w*logit + (1-w)*sb)")
+            if auc_s > auc_l + 0.01:
+                lines.append(f"    >>> sb is SUPERIOR confidence estimator "
+                             f"(+{auc_s - auc_l:.4f})")
+            elif auc_l > auc_s + 0.01:
+                lines.append(f"    >>> Logit confidence is superior "
+                             f"(+{auc_l - auc_s:.4f})")
+            else:
+                lines.append(f"    >>> Logit and sb are ~tied")
+            if auc_c > max(auc_l, auc_s) + 0.005:
+                lines.append(f"    >>> ORTHOGONAL SIGNAL: combined > best single "
+                             f"by {auc_c - max(auc_l, auc_s):.4f}")
+                lines.append(f"    >>> sb contains information NOT in logits — "
+                             f"BCVF integration justified")
+            elif auc_c <= max(auc_l, auc_s):
+                lines.append(f"    >>> No orthogonal signal — sb is redundant with logits")
 
         lines.append("")
         lines.append("")
@@ -1673,6 +1704,9 @@ def main() -> None:
                             "brier": r.brier,
                             "mean_kl_base_mod": r.mean_kl_base_mod,
                             "mean_entropy_delta": r.mean_entropy_delta,
+                            "auroc_logit": r.auroc_logit,
+                            "auroc_sb": r.auroc_sb,
+                            "auroc_combined": r.auroc_combined,
                         }
                         for r in abl.experiment_results
                     ],
