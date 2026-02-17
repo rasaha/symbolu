@@ -90,6 +90,7 @@ from symbolu.ontological.bcvf_experiments import (
     ExperimentResult,
     ExperimentRunner,
     StepLogger,
+    evaluate_energy_stop_conditions,
 )
 from symbolu.ontological.bcvf_benchmarks import (
     BenchmarkResult,
@@ -99,6 +100,7 @@ from symbolu.ontological.bcvf_benchmarks import (
     bootstrap_pass_at_1_delta,
     bootstrap_spearman,
     compute_verdict,
+    print_energy_comparison,
     print_extended_summary,
 )
 from symbolu.ontological.bcvf_goal_embeddings import GoalEmbeddingFactory
@@ -1008,15 +1010,19 @@ def run_single_mode(
         device=device,
     )
 
+    energy_mode = "bayesian" if bcvf_config.use_bayesian_energy else "baseline"
+
     flags_bcvf = {
         "use_rerank": True,
         "use_logit_mod": False,
         "use_calibration": True,
+        # use_bayesian_energy inherited from base_config via _make_config
     }
     flags_baseline = {
         "use_rerank": False,
         "use_logit_mod": False,
         "use_calibration": False,
+        "use_bayesian_energy": False,  # baseline never uses energy softmax
     }
 
     results: List[BenchmarkResult] = []
@@ -1054,6 +1060,7 @@ def run_single_mode(
                 benchmark_type="wikitext",
                 goal_strategy=strategy,
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1078,6 +1085,7 @@ def run_single_mode(
                 benchmark_type="code_gen",
                 goal_strategy="code_problem_only",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1107,6 +1115,7 @@ def run_single_mode(
                 benchmark_type="instruction",
                 goal_strategy="instruction_only",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
 
@@ -1137,6 +1146,7 @@ def run_single_mode(
                 benchmark_type="retrieval",
                 goal_strategy="retrieval_context",
                 n_bootstrap=n_bootstrap,
+                energy_mode=energy_mode,
             )
             results.append(br)
     else:
@@ -1152,6 +1162,7 @@ def _build_benchmark_result(
     benchmark_type: str,
     goal_strategy: str,
     n_bootstrap: int = 1000,
+    energy_mode: str = "baseline",
 ) -> BenchmarkResult:
     """Build BenchmarkResult with bootstrap CIs from BCVF vs baseline."""
     bcvf_correct = np.array([
@@ -1189,6 +1200,7 @@ def _build_benchmark_result(
         pass_at_1_delta_ci=delta_ci,
         sb_rho_ci=sb_ci,
         verdict=verdict,
+        energy_mode=energy_mode,
     )
 
 
@@ -1259,6 +1271,18 @@ def build_parser() -> argparse.ArgumentParser:
             "  # HumanEval gate check",
             "  python scripts/run_bcvf_benchmarks.py --mode humaneval "
             "--model phi3 --samples 1640 --train-bilinear",
+            "",
+            "Bayesian Energy Softmax examples:",
+            "  # Dry-run with default prob_var uncertainty",
+            "  python scripts/run_bcvf_benchmarks.py --dry-run "
+            "--bayesian-energy",
+            "  # WikiText with margin-inverse uncertainty and custom alpha",
+            "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
+            "--model gpt2 --bayesian-energy --uncertainty margin_inv "
+            "--alpha 0.2",
+            "  # Full suite with MC-Dropout uncertainty",
+            "  python scripts/run_bcvf_benchmarks.py --mode all "
+            "--model phi3 --bayesian-energy --uncertainty dropout_var",
         ]),
     )
 
@@ -1489,6 +1513,32 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Bayesian Energy Softmax flags ---
+    parser.add_argument(
+        "--bayesian-energy", action="store_true",
+        help=(
+            "Enable Bayesian Energy Softmax: z'_y = z_y + α·σ²_y − β·penalty. "
+            "Modifies logits before softmax at decode time."
+        ),
+    )
+    parser.add_argument(
+        "--alpha", type=float, default=0.1,
+        help="Bayesian Energy α — uncertainty scaling (default: 0.1)",
+    )
+    parser.add_argument(
+        "--energy-beta", type=float, default=0.0,
+        help="Bayesian Energy β — penalty scaling (default: 0.0)",
+    )
+    parser.add_argument(
+        "--uncertainty", type=str, default="prob_var",
+        choices=["prob_var", "dropout_var", "margin_inv"],
+        help=(
+            "Uncertainty estimator for Bayesian Energy Softmax. "
+            "prob_var: p(1-p), margin_inv: 1/(margin+ε), "
+            "dropout_var: MC-Dropout variance (default: prob_var)"
+        ),
+    )
+
     return parser
 
 
@@ -1543,6 +1593,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         use_rerank=True,
         use_calibration=True,
         use_logit_mod=False,
+        # Bayesian Energy Softmax
+        use_bayesian_energy=args.bayesian_energy,
+        energy_alpha=args.alpha,
+        energy_beta=args.energy_beta,
+        uncertainty_mode=args.uncertainty,
     )
 
     # --- Load model ---
@@ -1568,6 +1623,9 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     print(f"  Bootstrap: {args.n_bootstrap} resamples")
     if args.mode == "wikitext":
         print(f"  Strategies: {args.goal_strategy}")
+    if args.bayesian_energy:
+        print(f"  Energy:  α={args.alpha}, β={args.energy_beta}, "
+              f"uncertainty={args.uncertainty}")
     print(f"{'='*70}")
 
     # --- GoalDirNet config ---
@@ -1773,6 +1831,79 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
     if all_results:
         print()
         print_extended_summary(all_results)
+
+    # --- Bayesian Energy Softmax comparison ---
+    if args.bayesian_energy and all_results:
+        print(f"\n{'='*70}")
+        print("Bayesian Energy Softmax — Stop-Condition Evaluation")
+        print(f"{'='*70}")
+
+        # Re-run baselines without energy to get reference results
+        baseline_config = DecodingConfig(
+            top_m=bcvf_config.top_m,
+            beta=bcvf_config.beta,
+            lambda_c=bcvf_config.lambda_c,
+            use_rerank=True,
+            use_calibration=True,
+            use_logit_mod=False,
+            use_bayesian_energy=False,
+        )
+        baseline_runner = ExperimentRunner(
+            model=model, tokenizer=tokenizer,
+            base_config=baseline_config, device=effective_device,
+        )
+        baseline_flags = {
+            "use_rerank": True,
+            "use_logit_mod": False,
+            "use_calibration": True,
+            "use_bayesian_energy": False,
+        }
+
+        # Collect baseline results for each dataset (rerun without energy)
+        baseline_bench: List[BenchmarkResult] = []
+        for mode in modes:
+            if mode == "wikitext":
+                for strategy in args.goal_strategy:
+                    if args.dry_run:
+                        ds = DatasetAdapter.from_dry_run(
+                            n_samples=args.samples, strategy=strategy,
+                        )
+                    else:
+                        texts = _load_evaluation_texts(
+                            args.dataset, max_texts=100,
+                        )
+                        if not texts:
+                            texts = _builtin_fallback_texts()
+                        ds = DatasetAdapter.from_wikitext(
+                            model, tokenizer, texts, strategy,
+                            args.samples, effective_device,
+                            args.max_seq_len,
+                        )
+                    if ds:
+                        res_bl = baseline_runner.run_single_experiment(
+                            baseline_flags, ds
+                        )
+                        res_no = baseline_runner.run_single_experiment(
+                            {"use_rerank": False, "use_logit_mod": False,
+                             "use_calibration": False,
+                             "use_bayesian_energy": False}, ds
+                        )
+                        baseline_bench.append(_build_benchmark_result(
+                            res_bl, res_no,
+                            dataset_name=f"WikiText/{strategy}",
+                            benchmark_type="wikitext",
+                            goal_strategy=strategy,
+                            n_bootstrap=args.n_bootstrap,
+                            energy_mode="baseline",
+                        ))
+
+        if baseline_bench and all_results:
+            print_energy_comparison(
+                baseline_bench, all_results,
+                alpha=args.alpha,
+                energy_beta=args.energy_beta,
+                uncertainty_mode=args.uncertainty,
+            )
 
     # --- GoalDirNet training + evaluation ---
     if args.train_goal_dirnet and goal_datasets:

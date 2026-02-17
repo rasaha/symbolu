@@ -74,6 +74,7 @@ from symbolu.ontological.bcvf_experiments import (
     StepRecord,
     config_label,
     evaluate_stop_conditions,
+    evaluate_energy_stop_conditions,
     generate_with_bcvf,
     run_unit_tests,
 )
@@ -141,6 +142,8 @@ class BenchmarkResult:
     logit_rho_ci: Optional[BootstrapCI] = None
     # Verdict
     verdict: str = ""
+    # Energy mode: "baseline" or "bayesian"
+    energy_mode: str = "baseline"
 
     @property
     def sb_rho(self) -> float:
@@ -883,6 +886,7 @@ class BenchmarkSuite:
         """
         header = (
             f"{'Dataset':<20} {'Type':<14} {'Goal':<20} "
+            f"{'Energy':<10} "
             f"{'pass@1':>7} {'Δpass@1':>8} {'95% CI':>22} "
             f"{'sb_rho':>8} {'95% CI':>22} "
             f"{'logit_rho':>10} {'Verdict':<14}"
@@ -913,6 +917,7 @@ class BenchmarkSuite:
             line = (
                 f"{r.dataset_name:<20} {r.benchmark_type:<14} "
                 f"{r.goal_strategy:<20} "
+                f"{r.energy_mode:<10} "
                 f"{r.pass_at_1:>7.3f} {delta_str} {delta_ci_str:>22} "
                 f"{r.sb_rho:>+8.4f} {sb_ci_str:>22} "
                 f"{r.logit_rho:>+10.4f} {r.verdict:<14}"
@@ -980,6 +985,7 @@ class BenchmarkSuite:
                 "logit_rho": r.logit_rho,
                 "verdict": r.verdict,
                 "config_label": r.label,
+                "energy_mode": r.energy_mode,
             }
             if r.pass_at_1_delta_ci is not None:
                 entry["pass_at_1_delta_ci"] = {
@@ -1002,6 +1008,85 @@ class BenchmarkSuite:
 # =========================================================================
 # Extended print_summary — patched into ExperimentRunner
 # =========================================================================
+
+
+def print_energy_comparison(
+    baseline_results: List[BenchmarkResult],
+    energy_results: List[BenchmarkResult],
+    alpha: float,
+    energy_beta: float,
+    uncertainty_mode: str,
+) -> str:
+    """
+    Print a comparison table specific to Bayesian Energy Softmax.
+
+    Columns: Mode | α | β | Uncertainty | pass@1 | Δpass | ECE | Brier | ρ | Verdict
+
+    Args:
+        baseline_results: Results without energy softmax.
+        energy_results: Results with energy softmax.
+        alpha: Energy α parameter.
+        energy_beta: Energy β parameter.
+        uncertainty_mode: Uncertainty estimator name.
+
+    Returns:
+        The table as a string (also printed).
+    """
+    header = (
+        f"{'Mode':<12} {'α':>5} {'β':>5} {'Uncertainty':<12} "
+        f"{'pass@1':>7} {'Δpass':>8} {'ECE':>8} {'Brier':>8} "
+        f"{'ρ':>8} {'Verdict':<10}"
+    )
+    sep = "─" * len(header)
+    lines = [sep, header, sep]
+
+    # Build paired rows (baseline → energy for each dataset)
+    pairs = {}
+    for br in baseline_results:
+        pairs.setdefault(br.dataset_name, {})["baseline"] = br
+    for er in energy_results:
+        pairs.setdefault(er.dataset_name, {})["energy"] = er
+
+    for dataset_name, pair in pairs.items():
+        bl = pair.get("baseline")
+        en = pair.get("energy")
+
+        if bl is not None:
+            exp = bl.experiment_result
+            lines.append(
+                f"{'baseline':<12} {'–':>5} {'–':>5} {'–':<12} "
+                f"{exp.pass_at_1:>7.3f} {'–':>8} "
+                f"{exp.ece:>8.4f} {exp.brier:>8.4f} "
+                f"{exp.sb_correctness_corr:>+8.4f} {'–':<10}"
+            )
+
+        if en is not None and bl is not None:
+            exp_e = en.experiment_result
+            exp_b = bl.experiment_result
+            delta_pass = exp_e.pass_at_1 - exp_b.pass_at_1
+
+            verdict_obj = evaluate_energy_stop_conditions(exp_b, exp_e)
+            verdict_str = "PASS" if verdict_obj.should_continue else "FAIL"
+
+            lines.append(
+                f"{'bayesian':<12} {alpha:>5.2f} {energy_beta:>5.2f} "
+                f"{uncertainty_mode:<12} "
+                f"{exp_e.pass_at_1:>7.3f} {delta_pass:>+8.4f} "
+                f"{exp_e.ece:>8.4f} {exp_e.brier:>8.4f} "
+                f"{exp_e.sb_correctness_corr:>+8.4f} {verdict_str:<10}"
+            )
+
+            # Print stop-condition reasons
+            for reason in verdict_obj.reasons:
+                lines.append(f"    {reason}")
+
+        lines.append("")
+
+    lines.append(sep)
+
+    table = "\n".join(lines)
+    print(table)
+    return table
 
 
 def print_extended_summary(
