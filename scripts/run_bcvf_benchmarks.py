@@ -135,6 +135,8 @@ from symbolu.ontological.bcvf_seq_reranking import (
     rerank_candidates,
     logprob_rerank_candidates,
     generate_and_rerank,
+    collect_learned_reranker_data,
+    train_learned_reranker,
     run_seq_rerank_benchmark_humaneval,
     run_seq_rerank_benchmark_wikitext,
     print_seq_rerank_report,
@@ -1737,6 +1739,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable AST parsing in value reranker",
     )
 
+    # --- Learned value reranker ---
+    parser.add_argument(
+        "--learned-alpha", type=float, default=1.0,
+        help=(
+            "Weight for MLP logit in learned_value reranking mode. "
+            "S(y) = logprob + alpha * MLP_logit(h, lp, len). (default: 1.0)"
+        ),
+    )
+    parser.add_argument(
+        "--learned-hidden-dim", type=int, default=256,
+        help="MLP hidden dimension for learned reranker (default: 256)",
+    )
+    parser.add_argument(
+        "--learned-epochs", type=int, default=10,
+        help="Training epochs for learned reranker (default: 10)",
+    )
+    parser.add_argument(
+        "--learned-lr", type=float, default=1e-3,
+        help="Learning rate for learned reranker (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--learned-collect-K", type=int, default=0,
+        help=(
+            "K for data collection phase (0 = use same K as eval). "
+            "Set higher for more training data per problem."
+        ),
+    )
+    parser.add_argument(
+        "--learned-train-ratio", type=float, default=0.8,
+        help="Train/eval split ratio for learned reranker (default: 0.8)",
+    )
+
     return parser
 
 
@@ -2055,6 +2089,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             "logprob": "Sequence-Level Logprob Reranking (baseline)",
             "oracle_verifier": "Sequence-Level Oracle Verifier (ceiling)",
             "value": "Sequence-Level Value Reranking",
+            "learned_value": "Sequence-Level Learned Value Reranking",
         }
         print(f"\n{'='*70}")
         print(_mode_titles.get(rerank_mode, f"Sequence-Level Reranking ({rerank_mode})"))
@@ -2071,6 +2106,11 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             print(f"  S(y) = log p(y|x) + alpha * logit(V(x,y))")
             print(f"  V = deterministic proxy verifier (AST + structural checks)")
             print(f"  alpha={args.value_alpha}, use_ast={args.value_use_ast}")
+        elif rerank_mode == "learned_value":
+            print(f"  S(y) = logprob + alpha * MLP_logit(pooled_hidden, logprob, len)")
+            print(f"  MLP trained on candidate pass/fail data")
+            print(f"  alpha={args.learned_alpha}, hidden_dim={args.learned_hidden_dim}, "
+                  f"epochs={args.learned_epochs}")
         print(f"{'='*70}")
 
         rerank_k = min(args.rerank_k, 8)
@@ -2158,6 +2198,41 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         print("  No HumanEval problems loaded, skipping")
                         continue
 
+                # --- Learned value: collect → train → evaluate ---
+                learned_reranker_obj = None
+                if rerank_mode == "learned_value":
+                    collect_k = args.learned_collect_K or rerank_k
+                    print(f"\n  Phase 1: Collect training data "
+                          f"(K={collect_k}, {rerank_n_prompts} problems)")
+                    samples = collect_learned_reranker_data(
+                        model=model,
+                        tokenizer=tokenizer,
+                        problems=problems[:rerank_n_prompts],
+                        K=collect_k,
+                        max_new_tokens=rerank_max_tokens,
+                        temperature=rerank_temperature,
+                        top_p=rerank_top_p,
+                    )
+                    if not samples:
+                        print("  No samples collected, skipping learned_value")
+                        continue
+
+                    import torch as _torch
+                    _device = next(model.parameters()).device
+                    print(f"\n  Phase 2: Train MLP "
+                          f"(hidden_dim={args.learned_hidden_dim}, "
+                          f"epochs={args.learned_epochs})")
+                    learned_reranker_obj, train_metrics = train_learned_reranker(
+                        samples=samples,
+                        hidden_dim=args.learned_hidden_dim,
+                        epochs=args.learned_epochs,
+                        lr=args.learned_lr,
+                        train_ratio=args.learned_train_ratio,
+                        device=str(_device),
+                    )
+                    print(f"\n  Phase 3: Evaluate with trained MLP "
+                          f"(alpha={args.learned_alpha})")
+
                 sr_report = run_seq_rerank_benchmark_humaneval(
                     model=model,
                     tokenizer=tokenizer,
@@ -2172,6 +2247,8 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                     rerank_mode=rerank_mode,
                     value_alpha=args.value_alpha,
                     value_use_ast=args.value_use_ast,
+                    learned_reranker=learned_reranker_obj,
+                    learned_alpha=args.learned_alpha,
                 )
                 seq_rerank_reports.append(sr_report)
                 print_seq_rerank_report(sr_report)
@@ -2194,6 +2271,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         "logprob": "logprob_p@1",
                         "oracle_verifier": "oracle_p@1",
                         "value": "value_p@1",
+                        "learned_value": "learned_p@1",
                     }.get(rerank_mode, "sel_p@1")
                     print(
                         f"  {label:<30} rerank={rerank_pct:>6} "
