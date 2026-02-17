@@ -11,8 +11,8 @@ USAGE:
     python -m symbolu.agentic_framework.benchmark_critics
 
     # With specific backends
-    python -m symbolu.agentic_framework.benchmark_critics --ollama phi3:mini
-    python -m symbolu.agentic_framework.benchmark_critics --transformers microsoft/phi-3-mini-4k-instruct
+    python -m symbolu.agentic_framework.benchmark_critics --ollama phi4-mini
+    python -m symbolu.agentic_framework.benchmark_critics --transformers microsoft/Phi-4-mini-instruct
 
 METRICS:
     - Latency (ms per evaluation)
@@ -401,10 +401,10 @@ Examples:
   python -m symbolu.agentic_framework.benchmark_critics
 
   # Include Ollama local model
-  python -m symbolu.agentic_framework.benchmark_critics --ollama phi3:mini
+  python -m symbolu.agentic_framework.benchmark_critics --ollama phi4-mini
 
   # Include HuggingFace model
-  python -m symbolu.agentic_framework.benchmark_critics --transformers microsoft/phi-3-mini-4k-instruct
+  python -m symbolu.agentic_framework.benchmark_critics --transformers microsoft/Phi-4-mini-instruct
 
   # Output as JSON
   python -m symbolu.agentic_framework.benchmark_critics --json
@@ -414,7 +414,7 @@ Examples:
     parser.add_argument(
         "--ollama",
         type=str,
-        help="Ollama model to benchmark (e.g., phi3:mini)",
+        help="Ollama model to benchmark (e.g., phi4-mini)",
     )
     parser.add_argument(
         "--transformers",
