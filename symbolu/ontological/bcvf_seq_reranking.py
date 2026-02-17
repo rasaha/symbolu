@@ -412,7 +412,12 @@ def generate_candidates(
     if tokenizer.pad_token_id is None:
         gen_kwargs["pad_token_id"] = tokenizer.eos_token_id
 
-    outputs = model.generate(input_ids, **gen_kwargs)  # [K, P+T]
+    # Create attention mask (all 1s for the prompt tokens)
+    attention_mask = torch.ones_like(input_ids)
+
+    outputs = model.generate(
+        input_ids, attention_mask=attention_mask, **gen_kwargs
+    )  # [K, P+T]
 
     prompt_ids = input_ids[0]  # [P]
     candidate_ids_list: List[torch.Tensor] = []
