@@ -85,6 +85,10 @@ class DecodingConfig:
         use_rerank: Enable Option C (BCVF reranking).
         use_logit_mod: Enable Option A (logit modulation).
         use_calibration: Enable Option B (calibration layer).
+        use_bayesian_energy: Enable Bayesian Energy Softmax.
+        energy_alpha: Scaling for uncertainty boost (α in z' = z + α·σ² − β·penalty).
+        energy_beta: Scaling for penalty term (β, default 0 = no penalty).
+        uncertainty_mode: Uncertainty estimator: prob_var, dropout_var, or margin_inv.
     """
 
     top_m: int = 500
@@ -98,6 +102,11 @@ class DecodingConfig:
     use_rerank: bool = True
     use_logit_mod: bool = False
     use_calibration: bool = True
+    # Bayesian Energy Softmax
+    use_bayesian_energy: bool = False
+    energy_alpha: float = 0.1
+    energy_beta: float = 0.0
+    uncertainty_mode: str = "prob_var"  # prob_var, dropout_var, margin_inv
 
 
 # =========================================================================
@@ -325,6 +334,109 @@ if PYTORCH_AVAILABLE:
             self.calibrator = CalibrationLayer(self.config)
 
         # ------------------------------------------------------------------
+        # Bayesian Energy Softmax — uncertainty estimators
+        # ------------------------------------------------------------------
+
+        def _uncertainty_prob_var(
+            self, probs: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Probability-variance uncertainty: σ²_y = p_y · (1 − p_y).
+
+            Args:
+                probs: [B, V] probability distribution.
+
+            Returns:
+                sigma2: [B, V] per-token variance.
+            """
+            return probs * (1.0 - probs)
+
+        def _uncertainty_margin_inv(
+            self, probs: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Inverse-margin uncertainty: σ² = 1 / (margin + ε).
+
+            The margin is (p_top1 − p_top2).  The scalar σ² is
+            broadcast to all candidate tokens.
+
+            Args:
+                probs: [B, V] probability distribution.
+
+            Returns:
+                sigma2: [B, V] (constant across V for each batch element).
+            """
+            sorted_probs, _ = probs.sort(dim=-1, descending=True)
+            margin = sorted_probs[:, 0] - sorted_probs[:, 1]  # [B]
+            eps = 1e-8
+            sigma2 = 1.0 / (margin + eps)  # [B]
+            return sigma2.unsqueeze(-1).expand_as(probs)  # [B, V]
+
+        def _uncertainty_dropout_var(
+            self,
+            hidden_state: torch.Tensor,
+            vocab_embeddings: torch.Tensor,
+            K: int = 3,
+            drop_rate: float = 0.1,
+        ) -> torch.Tensor:
+            """
+            MC-Dropout uncertainty: K stochastic forward passes.
+
+            Applies dropout to the hidden state, recomputes logits,
+            and returns the per-token variance across the K passes.
+
+            Args:
+                hidden_state: [B, D] hidden state.
+                vocab_embeddings: [V, D] embedding matrix.
+                K: Number of stochastic forward passes.
+                drop_rate: Dropout probability.
+
+            Returns:
+                sigma2: [B, V] per-token logit variance.
+            """
+            logit_samples = []
+            for _ in range(K):
+                mask = torch.bernoulli(
+                    torch.full_like(hidden_state, 1.0 - drop_rate)
+                ) / (1.0 - drop_rate)
+                h_drop = hidden_state * mask
+                logits_k = h_drop @ vocab_embeddings.T  # [B, V]
+                logit_samples.append(logits_k)
+            stacked = torch.stack(logit_samples, dim=0)  # [K, B, V]
+            return stacked.var(dim=0)  # [B, V]
+
+        def _compute_uncertainty(
+            self,
+            probs: torch.Tensor,
+            logits: torch.Tensor,
+            hidden_state: torch.Tensor,
+            vocab_embeddings: torch.Tensor,
+        ) -> torch.Tensor:
+            """
+            Dispatch to the configured uncertainty estimator.
+
+            Args:
+                probs: [B, V] softmax probabilities (from original logits).
+                logits: [B, V] raw logits (unused by prob_var/margin_inv).
+                hidden_state: [B, D] (used by dropout_var).
+                vocab_embeddings: [V, D] (used by dropout_var).
+
+            Returns:
+                sigma2: [B, V] uncertainty estimates.
+            """
+            mode = self.config.uncertainty_mode
+            if mode == "prob_var":
+                return self._uncertainty_prob_var(probs)
+            elif mode == "margin_inv":
+                return self._uncertainty_margin_inv(probs)
+            elif mode == "dropout_var":
+                return self._uncertainty_dropout_var(
+                    hidden_state, vocab_embeddings
+                )
+            else:
+                raise ValueError(f"Unknown uncertainty mode: {mode}")
+
+        # ------------------------------------------------------------------
         @torch.no_grad()
         def decode_step(
             self,
@@ -354,6 +466,26 @@ if PYTORCH_AVAILABLE:
             if logits is None:
                 logits = hidden_state @ vocab_embeddings.T  # [B, V]
             log_data["base_logits"] = logits
+
+            # ---- Bayesian Energy Softmax --------------------------------
+            if cfg.use_bayesian_energy:
+                temp_probs = F.softmax(logits, dim=-1)
+                sigma2 = self._compute_uncertainty(
+                    temp_probs, logits, hidden_state, vocab_embeddings,
+                )
+                penalty = torch.zeros_like(logits)
+                logits = (
+                    logits
+                    + cfg.energy_alpha * sigma2
+                    - cfg.energy_beta * penalty
+                )
+                log_data["energy_mode"] = "bayesian"
+                log_data["energy_sigma2_mean"] = float(sigma2.mean().item())
+                log_data["energy_alpha"] = cfg.energy_alpha
+                log_data["energy_beta"] = cfg.energy_beta
+                log_data["uncertainty_mode"] = cfg.uncertainty_mode
+            else:
+                log_data["energy_mode"] = "baseline"
 
             # ---- Stage 2: Top-M candidate selection ---------------------
             top_m = min(cfg.top_m, logits.shape[-1])
