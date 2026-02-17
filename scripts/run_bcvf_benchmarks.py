@@ -1285,7 +1285,7 @@ def build_parser() -> argparse.ArgumentParser:
             "--model phi3 --bayesian-energy --uncertainty dropout_var",
             "",
             "Softmax-Entmax Mix examples:",
-            "  # Dry-run with default entmax(1.3)",
+            "  # Dry-run with default entmax(1.5)",
             "  python scripts/run_bcvf_benchmarks.py --dry-run "
             "--softmax-entmax-mix",
             "  # WikiText with custom gamma thresholds",
@@ -1563,8 +1563,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--entmax-alpha", type=float, default=1.3,
-        help="Entmax Tsallis alpha (> 1, default: 1.3)",
+        "--entmax-alpha", type=float, default=1.5,
+        help="Entmax Tsallis alpha (> 1, default: 1.5)",
     )
     parser.add_argument(
         "--gamma-low", type=float, default=1.0,

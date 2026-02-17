@@ -110,7 +110,7 @@ class DecodingConfig:
     uncertainty_mode: str = "prob_var"  # prob_var, dropout_var, margin_inv, entropy_temp
     # Softmax-Entmax Mix
     use_softmax_entmax_mix: bool = False
-    entmax_alpha: float = 1.3
+    entmax_alpha: float = 1.5
     gamma_low: float = 1.0
     gamma_high: float = 5.0
 
