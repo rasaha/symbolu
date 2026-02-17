@@ -68,7 +68,7 @@ class TestOllamaBackend:
 
     def test_init_defaults(self):
         backend = OllamaBackend()
-        assert backend.model == "phi3:mini"
+        assert backend.model == "phi4-mini"
         assert backend.host == "http://localhost:11434"
         assert backend.timeout == 30.0
 
@@ -83,18 +83,18 @@ class TestOllamaBackend:
         assert backend.timeout == 60.0
 
     def test_model_name(self):
-        backend = OllamaBackend(model="phi3:mini")
-        assert backend.model_name == "ollama:phi3:mini"
+        backend = OllamaBackend(model="phi4-mini")
+        assert backend.model_name == "ollama:phi4-mini"
 
     @patch("urllib.request.urlopen")
     def test_is_available_true(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = b'{"models": [{"name": "phi3:mini"}]}'
+        mock_response.read.return_value = b'{"models": [{"name": "phi4-mini"}]}'
         mock_response.__enter__ = lambda s: mock_response
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        backend = OllamaBackend(model="phi3:mini")
+        backend = OllamaBackend(model="phi4-mini")
         assert backend.is_available() is True
 
     @patch("urllib.request.urlopen")
@@ -105,7 +105,7 @@ class TestOllamaBackend:
         mock_response.__exit__ = Mock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        backend = OllamaBackend(model="phi3:mini")
+        backend = OllamaBackend(model="phi4-mini")
         assert backend.is_available() is False
 
     @patch("urllib.request.urlopen")
@@ -127,7 +127,7 @@ class TestTransformersBackend:
 
     def test_init_defaults(self):
         backend = TransformersBackend()
-        assert backend.model_id == "microsoft/phi-3-mini-4k-instruct"
+        assert backend.model_id == "microsoft/Phi-4-mini-instruct"
         assert backend.device == "auto"
 
     def test_model_name(self):
@@ -438,7 +438,7 @@ class TestFactoryFunctions:
         assert critic.backend.model == "llama3.2:3b"
 
     def test_create_cost_aware_critic(self):
-        selector = create_cost_aware_critic(local_model="phi3:mini")
+        selector = create_cost_aware_critic(local_model="phi4-mini")
         assert isinstance(selector, CostAwareCriticSelector)
         assert selector.local_critic is not None
 

@@ -180,6 +180,18 @@ class TestModelAliasResolution:
     def test_phi3_with_dash(self):
         assert resolve_model_name("phi-3") == "microsoft/phi-3.5-mini-instruct"
 
+    def test_phi4_alias(self):
+        assert resolve_model_name("phi4") == "microsoft/Phi-4-mini-instruct"
+
+    def test_phi4mini_alias(self):
+        assert resolve_model_name("phi4mini") == "microsoft/Phi-4-mini-instruct"
+
+    def test_phi4_14b_alias(self):
+        assert resolve_model_name("phi414b") == "microsoft/phi-4"
+
+    def test_phi4_reasoning_alias(self):
+        assert resolve_model_name("phi4reasoning") == "microsoft/Phi-4-reasoning"
+
     def test_stablelm_alias(self):
         assert resolve_model_name("stablelm") == "stabilityai/stablelm-zephyr-3b"
 
@@ -194,6 +206,7 @@ class TestModelAliasResolution:
     def test_case_insensitive(self):
         assert resolve_model_name("GPT2") == "gpt2"
         assert resolve_model_name("Phi3") == "microsoft/phi-3.5-mini-instruct"
+        assert resolve_model_name("PHI4") == "microsoft/Phi-4-mini-instruct"
 
 
 # ===========================================================================

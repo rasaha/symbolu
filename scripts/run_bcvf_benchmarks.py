@@ -138,7 +138,9 @@ from symbolu.ontological.bilinear_bcvf import (
 RECOMMENDED_MODELS = {
     "gpt2": "gpt2 (124M — sanity check, fast)",
     "phi2": "microsoft/phi-2 (2.7B — fast iteration)",
-    "phi3": "microsoft/phi-3.5-mini-instruct (3.8B — best quality)",
+    "phi3": "microsoft/phi-3.5-mini-instruct (3.8B — good baseline)",
+    "phi4mini": "microsoft/Phi-4-mini-instruct (3.8B — best quality, 128K ctx)",
+    "phi4": "microsoft/phi-4 (14B — highest quality)",
     "stablelm": "stabilityai/stablelm-zephyr-3b (3B — good baseline)",
     "openllama3b": "openlm-research/open_llama_3b_v2 (3B — llama arch)",
 }
@@ -150,6 +152,11 @@ MODEL_ALIASES = {
     "phi3": "microsoft/phi-3.5-mini-instruct",
     "phi-3": "microsoft/phi-3.5-mini-instruct",
     "phi3.5": "microsoft/phi-3.5-mini-instruct",
+    "phi4": "microsoft/Phi-4-mini-instruct",
+    "phi4mini": "microsoft/Phi-4-mini-instruct",
+    "phi414b": "microsoft/phi-4",
+    "phi4reasoning": "microsoft/Phi-4-reasoning",
+    "phi4minireasoning": "microsoft/Phi-4-mini-reasoning",
     "stablelm": "stabilityai/stablelm-zephyr-3b",
     "stablelm3b": "stabilityai/stablelm-zephyr-3b",
     "openllama": "openlm-research/open_llama_3b_v2",
@@ -1225,14 +1232,14 @@ def build_parser() -> argparse.ArgumentParser:
             "  all           Run all benchmarks",
             "",
             "Models:",
-            *(f"  {k:<14} {v}" for k, v in RECOMMENDED_MODELS.items()),
+            *(f"  {k:<18} {v}" for k, v in RECOMMENDED_MODELS.items()),
             "",
             "Examples:",
             "  python scripts/run_bcvf_benchmarks.py --dry-run",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--model gpt2 --samples 100",
             "  python scripts/run_bcvf_benchmarks.py --mode all "
-            "--model phi3 --samples 500",
+            "--model phi4mini --samples 500",
             "  python scripts/run_bcvf_benchmarks.py --mode wikitext "
             "--goal-strategy lookahead prompt_mean random",
             "",
