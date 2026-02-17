@@ -1029,18 +1029,51 @@ def format_ablation_report(
             lines.append("      Softmax augmentation is justified:")
             lines.append("        p(t) = softmax(z_t - beta * L(t))")
 
-        # Condition 2: Calibration win
-        if abl.best_ece < abl.baseline_ece * 0.9:
+        # Condition 2: Calibration win — only counts if a config that
+        # actually changes the distribution (logit_mod=True) improves ECE.
+        # B-only doesn't change the distribution so its ECE == baseline ECE.
+        logit_mod_results = [
+            r for r in abl.experiment_results
+            if r.flags.get("use_logit_mod", False)
+        ]
+        best_logit_mod_ece = min(
+            (r.ece for r in logit_mod_results), default=abl.baseline_ece
+        )
+        if best_logit_mod_ece < abl.baseline_ece * 0.9:
+            lines.append("")
+            lines.append("  >>> CONDITION 2 MET: Distribution-level calibration win")
+            lines.append(f"      ECE improved by "
+                        f"{(1 - best_logit_mod_ece / abl.baseline_ece) * 100:.1f}%")
+            lines.append("      Logit modulation (Option A) changed the distribution AND improved ECE")
+        elif abl.best_ece < abl.baseline_ece * 0.9:
+            # This case should not happen after the fix (B-only can't improve ECE)
+            # but keep as a safety net
             lines.append("")
             lines.append("  >>> CONDITION 2 MET: Calibration win")
             lines.append(f"      ECE improved by "
                         f"{(1 - abl.best_ece / abl.baseline_ece) * 100:.1f}%")
-            lines.append("      Option B is a product win even without accuracy gain")
+
+        # Tier usefulness check (Option B's real value)
+        b_results = [
+            r for r in abl.experiment_results
+            if r.flags.get("use_calibration", False)
+            and not r.flags.get("use_logit_mod", False)
+            and not r.flags.get("use_rerank", False)
+        ]
+        if b_results:
+            b_r = b_results[0]
+            h_acc = b_r.tier_accuracy.get("HIGH", 0.0)
+            l_acc = b_r.tier_accuracy.get("LOW", 0.0)
+            if h_acc > l_acc + 0.05:
+                lines.append("")
+                lines.append(f"  >>> Option B tier signal: HIGH acc={h_acc:.3f} > LOW acc={l_acc:.3f}")
+                lines.append("      Tier labels are meaningful for abstention/routing")
 
         # Neither
-        if (abl.sb_rho_at_best <= abl.logit_rho_at_best + 0.05
-                and abl.best_ece >= abl.baseline_ece * 0.9
-                and abl.delta_pass1 <= 0):
+        has_c1 = (abl.sb_rho_at_best > abl.logit_rho_at_best + 0.05
+                  and abl.delta_pass1 >= 0)
+        has_c2 = best_logit_mod_ece < abl.baseline_ece * 0.9
+        if not has_c1 and not has_c2 and abl.delta_pass1 <= 0:
             lines.append("")
             lines.append("  >>> NEITHER CONDITION MET")
             lines.append("      Softmax is NOT the bottleneck")
@@ -1054,10 +1087,19 @@ def format_ablation_report(
         a.sb_rho_at_best > a.logit_rho_at_best + 0.05 and a.delta_pass1 >= 0
         for a in ablation_results if a.strategy == "lookahead"
     )
-    any_c2 = any(
-        a.best_ece < a.baseline_ece * 0.9
-        for a in ablation_results
-    )
+    # Condition 2 now requires a distribution-level change (logit_mod)
+    any_c2 = False
+    for a in ablation_results:
+        logit_mod_results = [
+            r for r in a.experiment_results
+            if r.flags.get("use_logit_mod", False)
+        ]
+        best_lm_ece = min(
+            (r.ece for r in logit_mod_results), default=a.baseline_ece
+        )
+        if best_lm_ece < a.baseline_ece * 0.9:
+            any_c2 = True
+            break
 
     if any_c1:
         lines.append(
@@ -1066,8 +1108,8 @@ def format_ablation_report(
         )
     elif any_c2:
         lines.append(
-            "VERDICT: Softmax stays — but calibration layer (Option B) "
-            "is a product win. Ship it."
+            "VERDICT: Logit modulation (Option A) improves calibration. "
+            "Proceed with p(t) = softmax(z_t - beta*L(t))."
         )
     else:
         lines.append(

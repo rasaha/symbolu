@@ -755,6 +755,15 @@ class ExperimentRunner:
             pred_token = int(best_idx[0].item())
             gt = sample.get("ground_truth")
 
+            # Diagnostic: log p_top1 vs conf_used_for_ECE for first 20 samples
+            if i < 20:
+                p_top1 = float(probs.max(dim=-1).values[0].item())
+                conf_ece = float(log_data["confidence"][0].item()) if "confidence" in log_data and hasattr(log_data["confidence"], "item") else (float(log_data["confidence"]) if "confidence" in log_data else 0.0)
+                _diag_match = "OK" if abs(p_top1 - conf_ece) < 1e-6 else f"MISMATCH p={p_top1:.4f}"
+                if i == 0:
+                    print(f"    [diag:{label}] sample | p_top1   | conf_ECE | match")
+                print(f"    [diag:{label}] {i:>5d}  | {p_top1:.6f} | {conf_ece:.6f} | {_diag_match}")
+
             record = StepLogger.from_decode_log(
                 step_index=i,
                 log_data=log_data,
