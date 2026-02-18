@@ -1889,7 +1889,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
               f"λ={args.rerank_lambda}, "
               f"max_tokens={args.rerank_max_tokens}, "
               f"temp={args.rerank_temperature}, top_p={args.rerank_top_p}")
-        if args.rerank_mode == "value":
+        if args.rerank_mode in ("value", "value_feature"):
             print(f"  Value: alpha={args.value_alpha}, "
                   f"use_ast={args.value_use_ast}")
         if args.rerank_mode == "learned_value":
@@ -1984,6 +1984,14 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         modes = ["wikitext", "humaneval", "instruction", "retrieval"]
     else:
         modes = [args.mode]
+
+    # Auto-include humaneval for code-specific reranking modes
+    if (args.seq_rerank_bcvf
+            and args.rerank_mode in ("value_feature", "value", "oracle_verifier")
+            and "humaneval" not in modes):
+        print(f"\n  NOTE: --rerank-mode {args.rerank_mode} requires code tasks; "
+              f"auto-adding humaneval mode")
+        modes.append("humaneval")
 
     # --- Run benchmarks ---
     all_results: List[BenchmarkResult] = []
@@ -2171,6 +2179,13 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                     )
                     continue
 
+                if rerank_mode == "value_feature":
+                    print(
+                        "\n  Skipping WikiText for value_feature mode "
+                        "(structure BCVF uses AST/unbound checks — only meaningful for code)"
+                    )
+                    continue
+
                 for strategy in args.goal_strategy:
                     print(f"\n--- Seq Rerank: WikiText / {strategy} ---")
                     if args.dry_run:
@@ -2316,6 +2331,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
                         "oracle_verifier": "oracle_p@1",
                         "value": "value_p@1",
                         "learned_value": "learned_p@1",
+                        "value_feature": "struct_p@1",
                     }.get(rerank_mode, "sel_p@1")
                     print(
                         f"  {label:<30} rerank={rerank_pct:>6} "

@@ -21,7 +21,7 @@ Constraint energies (higher = better candidate):
 
     E_ast       = +0.3 if ast.parse succeeds, -0.2 otherwise
     E_unbound   = -0.1 per unbound variable
-    E_runtime   = +0.4 if runs without exception on smoke input, -0.1 otherwise
+    E_runtime   = +0.05 if runs without exception on smoke input, -0.30 otherwise
     E_return    = +0.1 if has return, -0.15 if missing when expected
     E_params    = +0.05 per used param, -0.1 if none used
     E_complete  = -0.25 if placeholder code detected
@@ -79,8 +79,8 @@ class StructureConfig:
     w_ast: float = 0.30              # AST parse success bonus
     w_ast_fail: float = -0.15        # AST parse failure penalty
     w_unbound: float = -0.10         # Per unbound variable penalty
-    w_runtime_pass: float = 0.40     # Smoke test pass bonus
-    w_runtime_fail: float = -0.10    # Smoke test failure penalty
+    w_runtime_pass: float = 0.05     # Weak positive (most valid code runs on trivial input)
+    w_runtime_fail: float = -0.30    # Strong negative (crash/timeout = real breakage)
     w_return_present: float = 0.10   # Return statement bonus
     w_return_missing: float = -0.15  # Missing return penalty
     w_param_used: float = 0.05       # Per parameter used bonus
@@ -255,8 +255,13 @@ for p in sig.parameters.values():
 
 try:
     result = {function_name}(*trivial_args)
+    _SMOKE_OK = True
+except (TypeError, NameError, AttributeError) as e:
+    # These indicate real code problems (wrong args, undefined vars, bad attrs)
+    _SMOKE_OK = False
+    _SMOKE_ERR = str(e)
 except Exception:
-    pass  # Exceptions on trivial input are OK, crash is the concern
+    _SMOKE_OK = True  # Value errors, index errors on trivial input are OK
 """
 
     class TimeoutError(Exception):
@@ -275,6 +280,10 @@ except Exception:
 
         signal_mod.alarm(0)
         signal_mod.signal(signal_mod.SIGALRM, old_handler)
+
+        # Check if the function call itself failed
+        if not exec_globals.get("_SMOKE_OK", True):
+            return False, exec_globals.get("_SMOKE_ERR", "unknown")
         return True, None
 
     except TimeoutError:
