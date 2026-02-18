@@ -19,12 +19,16 @@ This module implements the structure and value channels for code generation.
 
 Constraint energies (higher = better candidate):
 
-    E_ast       = +0.3 if ast.parse succeeds, -0.2 otherwise
-    E_unbound   = -0.1 per unbound variable
-    E_runtime   = +0.05 if runs without exception on smoke input, -0.30 otherwise
-    E_return    = +0.1 if has return, -0.15 if missing when expected
-    E_params    = +0.05 per used param, -0.1 if none used
-    E_complete  = -0.25 if placeholder code detected
+    E_ast        = +0.3 if ast.parse succeeds, -0.15 otherwise
+    E_unbound    = -0.1 per unbound variable
+    E_runtime    = +0.05 if runs without exception on smoke input, -0.30 otherwise
+    E_return     = +0.1 if has return, -0.15 if missing when expected
+    E_params     = +0.05 per used param, -0.1 if none used
+    E_complete   = -0.25 if placeholder code detected
+    E_doctest    = +0.35 if docstring examples pass, -0.40 if they fail
+    E_truncation = -0.20 if mid-statement truncation detected
+    E_repetition = -0.25 * ratio if degenerate line repetition detected
+    E_branch     = +0.10 if all branches return, -0.15 otherwise
 
 Combined:
     S(y) = log p(y|x) + α · logit(clip(0.5 + ΣE, 0.01, 0.99))
@@ -74,6 +78,11 @@ class StructureConfig:
     use_return_check: bool = True
     use_param_usage: bool = True
     use_placeholder_check: bool = True
+    # --- Discriminative feature toggles (new) ---
+    use_doctest: bool = True         # Extract & run >>> examples from docstring
+    use_truncation_check: bool = True  # Detect mid-statement truncation
+    use_repetition_check: bool = True  # Detect degenerate line repetition
+    use_control_flow_check: bool = True  # Branch completeness analysis
 
     # --- Weights ---
     w_ast: float = 0.30              # AST parse success bonus
@@ -87,6 +96,13 @@ class StructureConfig:
     w_param_none: float = -0.10      # No params used penalty
     w_placeholder: float = -0.25     # Placeholder code penalty
     w_complete: float = 0.05         # Non-trivial body bonus
+    # --- Discriminative feature weights (new) ---
+    w_doctest_pass: float = 0.35     # Strong: passes a real functional test
+    w_doctest_fail: float = -0.40    # Strong: fails a functional test
+    w_truncated: float = -0.20       # Mid-statement truncation penalty
+    w_repetition: float = -0.25      # Degenerate repetition penalty
+    w_branch_complete: float = 0.10  # All branches return
+    w_branch_incomplete: float = -0.15  # Dangling branches without return
 
     # --- Combination ---
     alpha: float = 1.0               # Weight of logit(utility) in final score
@@ -96,6 +112,8 @@ class StructureConfig:
     # --- Runtime smoke test ---
     runtime_timeout_s: float = 2.0   # Max seconds for smoke test
     runtime_trivial_inputs: int = 3  # Number of trivial inputs to try
+    # --- Doctest ---
+    doctest_timeout_s: float = 3.0   # Max seconds for doctest execution
 
 
 # =========================================================================
@@ -298,6 +316,238 @@ except Exception:
 
 
 # =========================================================================
+# Discriminative Feature Functions
+# =========================================================================
+
+
+def extract_doctests(prompt: str) -> List[Tuple[str, str]]:
+    """Extract (input_expr, expected_output) pairs from ``>>>`` examples in docstrings.
+
+    Parses Python doctest-style examples found in HumanEval prompts::
+
+        >>> func(1, 2)
+        3
+        >>> func("a")
+        'a'
+
+    Returns list of (call_expression, expected_result_repr) tuples.
+    """
+    pairs: List[Tuple[str, str]] = []
+    lines = prompt.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith(">>>"):
+            expr = line[3:].strip()
+            # Collect expected output (next non->>> non-empty lines)
+            expected_lines: List[str] = []
+            j = i + 1
+            while j < len(lines):
+                next_line = lines[j].strip()
+                if not next_line or next_line.startswith(">>>"):
+                    break
+                # Stop at docstring closing delimiter
+                if next_line in ('"""', "'''"):
+                    break
+                # Skip continuation lines (... prefix)
+                if next_line.startswith("..."):
+                    expr += "\n" + next_line[3:].strip()
+                else:
+                    expected_lines.append(next_line)
+                j += 1
+            if expected_lines:
+                expected = "\n".join(expected_lines)
+                pairs.append((expr, expected))
+            i = j
+        else:
+            i += 1
+    return pairs
+
+
+def run_doctests(
+    full_code: str,
+    doctests: List[Tuple[str, str]],
+    timeout_s: float = 3.0,
+) -> Tuple[int, int]:
+    """Run extracted doctests against assembled code.
+
+    Returns (n_passed, n_total).
+    """
+    if not doctests:
+        return 0, 0
+
+    import signal as signal_mod
+
+    n_passed = 0
+    n_total = len(doctests)
+
+    class _Timeout(Exception):
+        pass
+
+    def _handler(signum, frame):
+        raise _Timeout()
+
+    for expr, expected in doctests:
+        test_script = f"""{full_code}
+
+_result = {expr}
+_expected_repr = repr(_result)
+"""
+        try:
+            old_handler = signal_mod.signal(signal_mod.SIGALRM, _handler)
+            signal_mod.alarm(int(timeout_s) + 1)
+
+            exec_globals: Dict[str, Any] = {}
+            exec(test_script, exec_globals)
+
+            signal_mod.alarm(0)
+            signal_mod.signal(signal_mod.SIGALRM, old_handler)
+
+            actual_repr = exec_globals.get("_expected_repr", "")
+            # Compare repr strings (handles ints, strings, lists, etc.)
+            if actual_repr.strip() == expected.strip():
+                n_passed += 1
+            else:
+                # Also try direct str comparison (some doctests use print-style output)
+                actual_str = str(exec_globals.get("_result", ""))
+                if actual_str.strip() == expected.strip():
+                    n_passed += 1
+        except _Timeout:
+            try:
+                signal_mod.alarm(0)
+            except Exception:
+                pass
+        except Exception:
+            try:
+                signal_mod.alarm(0)
+                signal_mod.signal(signal_mod.SIGALRM, old_handler)
+            except Exception:
+                pass
+
+    return n_passed, n_total
+
+
+def detect_truncation(candidate: str) -> bool:
+    """Detect if a candidate was truncated mid-statement.
+
+    Looks for signs of incomplete code at the end:
+    - Trailing open parenthesis/bracket/brace
+    - Incomplete string literal
+    - Line ending with an operator
+    - Unmatched delimiters
+    """
+    if not candidate.strip():
+        return False
+
+    # Get last non-empty line
+    lines = [l for l in candidate.rstrip().split("\n") if l.strip()]
+    if not lines:
+        return False
+    last_line = lines[-1].strip()
+
+    # Obvious truncation: ends with operator, comma, or open delimiter
+    truncation_endings = (
+        '(', '[', '{', ',', '+', '-', '*', '/', '=', ':', '\\',
+        'and', 'or', 'not', 'in', 'is', 'if', 'else',
+    )
+    for ending in truncation_endings:
+        if last_line.endswith(ending):
+            return True
+
+    # Unmatched delimiters in the whole candidate
+    opens = sum(candidate.count(c) for c in '([{')
+    closes = sum(candidate.count(c) for c in ')]}')
+    if opens > closes + 1:  # Allow 1 mismatch (common in function bodies)
+        return True
+
+    # Unterminated string (odd number of quotes)
+    for q in ('"""', "'''", '"', "'"):
+        # Don't count escaped quotes
+        count = candidate.count(q)
+        if q in ('"""', "'''"):
+            if count % 2 != 0:
+                return True
+
+    return False
+
+
+def detect_repetition(candidate: str) -> float:
+    """Detect degenerate line repetition in a candidate.
+
+    Returns ratio of repeated non-trivial lines (0.0 = no repetition, 1.0 = all repeated).
+    """
+    lines = [l.strip() for l in candidate.split("\n") if l.strip()]
+    if len(lines) < 3:
+        return 0.0
+
+    # Skip trivial lines (single tokens, common patterns)
+    trivial = {'', 'pass', 'return', 'else:', 'try:', 'except:', 'finally:'}
+    meaningful = [l for l in lines if l not in trivial and len(l) > 8]
+
+    if len(meaningful) < 3:
+        return 0.0
+
+    from collections import Counter
+    counts = Counter(meaningful)
+    repeated = sum(c - 1 for c in counts.values() if c > 1)
+    return repeated / len(meaningful)
+
+
+def check_branch_completeness(full_code: str, function_name: str) -> Tuple[int, int]:
+    """Check if all if/elif/else branches in a function end with return.
+
+    Returns (branches_with_return, total_branches).
+    Uses AST analysis for accuracy.
+    """
+    try:
+        tree = ast.parse(full_code)
+    except SyntaxError:
+        return 0, 0
+
+    # Find the target function
+    target_func = None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name == function_name:
+                target_func = node
+                break
+
+    if target_func is None:
+        return 0, 0
+
+    def _block_returns(stmts: List[Any]) -> bool:
+        """Check if a block of statements definitely returns."""
+        if not stmts:
+            return False
+        last = stmts[-1]
+        if isinstance(last, ast.Return):
+            return True
+        if isinstance(last, ast.If):
+            # Both branches must return
+            if_returns = _block_returns(last.body)
+            else_returns = _block_returns(last.orelse) if last.orelse else False
+            return if_returns and else_returns
+        return False
+
+    total_branches = 0
+    branches_with_return = 0
+
+    for node in ast.walk(target_func):
+        if isinstance(node, ast.If):
+            # Count the if branch
+            total_branches += 1
+            if _block_returns(node.body):
+                branches_with_return += 1
+            # Count each elif/else
+            if node.orelse:
+                total_branches += 1
+                if _block_returns(node.orelse):
+                    branches_with_return += 1
+
+    return branches_with_return, total_branches
+
+
+# =========================================================================
 # Structure BCVF
 # =========================================================================
 
@@ -317,6 +567,15 @@ class ConstraintDiagnostics:
     params_total: int = 0
     has_placeholder: bool = False
     body_length: int = 0
+    # --- Discriminative features (new) ---
+    doctest_passed: Optional[bool] = None   # Did extracted doctests pass?
+    doctest_total: int = 0                  # Number of doctests found
+    doctest_ok: int = 0                     # Number that passed
+    is_truncated: bool = False              # Mid-statement truncation detected
+    repetition_ratio: float = 0.0           # Fraction of repeated lines
+    branches_total: int = 0                 # Number of if/elif/else branches
+    branches_with_return: int = 0           # Branches that end with return
+    branch_complete: Optional[bool] = None  # All branches return?
     # Individual energy contributions
     e_ast: float = 0.0
     e_unbound: float = 0.0
@@ -325,6 +584,10 @@ class ConstraintDiagnostics:
     e_params: float = 0.0
     e_placeholder: float = 0.0
     e_complete: float = 0.0
+    e_doctest: float = 0.0
+    e_truncation: float = 0.0
+    e_repetition: float = 0.0
+    e_branch: float = 0.0
     # Combined
     utility: float = 0.5
     utility_logit: float = 0.0
@@ -411,11 +674,61 @@ class StructureBCVF:
         if diag.body_length > 20 and not diag.has_placeholder:
             diag.e_complete = cfg.w_complete
 
+        # (H) Doctest execution — extract >>> examples and run them
+        if cfg.use_doctest and fn_name and diag.ast_ok:
+            doctests = extract_doctests(prompt)
+            if doctests:
+                n_ok, n_total = run_doctests(
+                    full_code, doctests, cfg.doctest_timeout_s,
+                )
+                diag.doctest_total = n_total
+                diag.doctest_ok = n_ok
+                if n_ok == n_total:
+                    diag.doctest_passed = True
+                    diag.e_doctest = cfg.w_doctest_pass
+                elif n_ok > 0:
+                    # Partial pass: proportional bonus
+                    diag.doctest_passed = False
+                    ratio = n_ok / n_total
+                    diag.e_doctest = (
+                        cfg.w_doctest_pass * ratio
+                        + cfg.w_doctest_fail * (1 - ratio)
+                    )
+                else:
+                    diag.doctest_passed = False
+                    diag.e_doctest = cfg.w_doctest_fail
+
+        # (I) Truncation detection
+        if cfg.use_truncation_check:
+            diag.is_truncated = detect_truncation(body)
+            if diag.is_truncated:
+                diag.e_truncation = cfg.w_truncated
+
+        # (J) Repetition detection
+        if cfg.use_repetition_check:
+            diag.repetition_ratio = detect_repetition(body)
+            if diag.repetition_ratio > 0.3:
+                diag.e_repetition = cfg.w_repetition * diag.repetition_ratio
+
+        # (K) Branch completeness
+        if cfg.use_control_flow_check and fn_name and diag.ast_ok:
+            br_ret, br_total = check_branch_completeness(full_code, fn_name)
+            diag.branches_total = br_total
+            diag.branches_with_return = br_ret
+            if br_total > 0:
+                if br_ret == br_total:
+                    diag.branch_complete = True
+                    diag.e_branch = cfg.w_branch_complete
+                else:
+                    diag.branch_complete = False
+                    diag.e_branch = cfg.w_branch_incomplete
+
         # --- Combined utility ---
         total_energy = (
             diag.e_ast + diag.e_unbound + diag.e_runtime +
             diag.e_return + diag.e_params + diag.e_placeholder +
-            diag.e_complete
+            diag.e_complete + diag.e_doctest + diag.e_truncation +
+            diag.e_repetition + diag.e_branch
         )
         raw = 0.5 + total_energy
         diag.utility = float(np.clip(raw, cfg.utility_floor, cfg.utility_ceil))
@@ -463,7 +776,7 @@ class StructureBCVF:
             return {}
 
         utilities = [d.utility for d in diagnostics]
-        return {
+        result = {
             "n_candidates": n,
             "ast_pass_rate": sum(d.ast_ok for d in diagnostics) / n,
             "mean_unbound": np.mean([d.n_unbound for d in diagnostics]),
@@ -474,12 +787,25 @@ class StructureBCVF:
             ),
             "return_present_rate": sum(d.has_return for d in diagnostics) / n,
             "placeholder_rate": sum(d.has_placeholder for d in diagnostics) / n,
+            # --- Discriminative features ---
+            "doctest_rate": (
+                sum(1 for d in diagnostics if d.doctest_passed is True) / n
+                if any(d.doctest_total > 0 for d in diagnostics) else None
+            ),
+            "truncation_rate": sum(d.is_truncated for d in diagnostics) / n,
+            "mean_repetition": float(np.mean([d.repetition_ratio for d in diagnostics])),
+            "branch_complete_rate": (
+                sum(1 for d in diagnostics if d.branch_complete is True) / n
+                if any(d.branches_total > 0 for d in diagnostics) else None
+            ),
+            # --- Utilities ---
             "utility_mean": float(np.mean(utilities)),
             "utility_std": float(np.std(utilities)),
             "utility_min": float(np.min(utilities)),
             "utility_max": float(np.max(utilities)),
             "utility_spread": float(np.max(utilities) - np.min(utilities)),
         }
+        return result
 
 
 # =========================================================================
