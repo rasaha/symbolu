@@ -8,6 +8,10 @@ Validates that the Sanskrit mapping layer is:
     3. Structural — varga initialization produces non-random clustering
     4. Voiced/voiceless distinction is respected
 
+Deliberately excludes 12D ontological affinity assertions to keep
+the Varna mapping layer open — it should not be locked to a specific
+dimensional interpretation.
+
 These are linguistic invariance tests, NOT framework plumbing tests.
 They verify that the Sanskrit grammar is correctly encoded.
 """
@@ -191,91 +195,7 @@ class TestVargaConsistency:
 
 
 # =========================================================================
-# Test 2.3: Ontological Affinity Structure
-# =========================================================================
-
-
-class TestOntologicalAffinity:
-    """PHONEME_MAP_ARPABET 12D affinities encode articulatory structure."""
-
-    def test_plosives_share_execution_dominance(self):
-        """Plosives (P, T, K, B, D, G) have O3_Execution as dominant layer."""
-        plosives = ['P', 'T', 'K', 'B', 'D', 'G']
-        for p in plosives:
-            affinity = PHONEME_MAP_ARPABET[p]
-            # O3_Execution is index 2
-            o3 = affinity[2]
-            # O3 should be the max or near-max
-            assert o3 >= 0.6, (
-                f"Plosive '{p}' has O3_Execution={o3:.2f}, expected >= 0.6"
-            )
-
-    def test_fricatives_share_agency_dominance(self):
-        """Fricatives (F, TH, S, SH, V, DH, Z, ZH) have O6_Agency dominant."""
-        fricatives = ['F', 'TH', 'S', 'SH', 'V', 'DH', 'Z', 'ZH']
-        for f in fricatives:
-            affinity = PHONEME_MAP_ARPABET[f]
-            # O6_Agency is index 5
-            o6 = affinity[5]
-            assert o6 >= 0.6, (
-                f"Fricative '{f}' has O6_Agency={o6:.2f}, expected >= 0.6"
-            )
-
-    def test_nasals_share_unifying_dominance(self):
-        """Nasals (M, N, NG) have O10_Unifying dominant."""
-        nasals = ['M', 'N', 'NG']
-        for n in nasals:
-            affinity = PHONEME_MAP_ARPABET[n]
-            # O10_Unifying is index 9
-            o10 = affinity[9]
-            assert o10 >= 0.8, (
-                f"Nasal '{n}' has O10_Unifying={o10:.2f}, expected >= 0.8"
-            )
-
-    def test_vowel_a_has_potential_dominance(self):
-        """Vowel 'a' (AA, AH) has O1_Potential dominant — primordial birth."""
-        for v in ['AA', 'AH']:
-            affinity = PHONEME_MAP_ARPABET[v]
-            o1 = affinity[0]  # O1_Potential
-            assert o1 >= 0.8, (
-                f"Vowel '{v}' has O1_Potential={o1:.2f}, expected >= 0.8"
-            )
-
-    def test_articulatory_groups_cluster_in_12d(self):
-        """Phonemes within the same articulatory group are closer in 12D
-        than phonemes from different groups."""
-        groups = {
-            'plosives': ['P', 'T', 'K', 'B', 'D', 'G'],
-            'fricatives': ['F', 'TH', 'S', 'SH'],
-            'nasals': ['M', 'N', 'NG'],
-        }
-
-        # Compute mean affinity per group
-        means = {}
-        for name, phonemes in groups.items():
-            vecs = [PHONEME_MAP_ARPABET[p] for p in phonemes]
-            means[name] = np.mean(vecs, axis=0)
-
-        # Within-group variance should be < between-group variance
-        for name, phonemes in groups.items():
-            vecs = np.array([PHONEME_MAP_ARPABET[p] for p in phonemes])
-            within_var = np.mean(np.var(vecs, axis=0))
-
-            # Compare to distance from other groups
-            other_means = [m for n, m in means.items() if n != name]
-            between_dist = np.mean([
-                np.sum((means[name] - om) ** 2) for om in other_means
-            ])
-
-            assert within_var < between_dist, (
-                f"Group '{name}' within-var ({within_var:.4f}) >= "
-                f"between-group dist ({between_dist:.4f}) — "
-                f"articulatory groups don't cluster"
-            )
-
-
-# =========================================================================
-# Test 2.4: Varga Initialization in CSRPhonemeHead
+# Test 2.3: Varga Initialization in CSRPhonemeHead
 # =========================================================================
 
 
