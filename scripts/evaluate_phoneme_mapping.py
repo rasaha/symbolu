@@ -22,23 +22,23 @@ The core question answered:
 
 Usage::
 
-    # Offline mode — no downloads, random-weight GPT-2, but REAL G2P pipeline
+    # Offline: train phoneme predictor, then test BCVF during inference
     python scripts/evaluate_phoneme_mapping.py --offline --samples 200
 
-    # GPT-2 (smallest, fastest — requires network for first download)
-    python scripts/evaluate_phoneme_mapping.py --model gpt2 --samples 200
+    # More training epochs, higher LR
+    python scripts/evaluate_phoneme_mapping.py --offline --train-epochs 10 --train-lr 3e-3
 
-    # With structural diagnostics
-    python scripts/evaluate_phoneme_mapping.py --model gpt2 --samples 500 --verbose
+    # Skip training (test with random MLP — untrained baseline)
+    python scripts/evaluate_phoneme_mapping.py --offline --no-train --samples 200
+
+    # GPT-2 (requires network for first download)
+    python scripts/evaluate_phoneme_mapping.py --model gpt2 --samples 500
 
     # Phi-3 (larger, better signal)
     python scripts/evaluate_phoneme_mapping.py --model phi3 --samples 300
 
-    # Save JSON report
-    python scripts/evaluate_phoneme_mapping.py --model gpt2 --output report.json
-
-    # Lambda sweep
-    python scripts/evaluate_phoneme_mapping.py --model gpt2 --lambdas 0.0 0.1 0.5 1.0
+    # Lambda sweep with JSON output
+    python scripts/evaluate_phoneme_mapping.py --offline --lambdas 0.0 0.1 0.5 1.0 --output report.json
 """
 
 from __future__ import annotations
@@ -99,6 +99,23 @@ MODEL_ALIASES = {
 # =========================================================================
 # Result Dataclasses
 # =========================================================================
+
+
+@dataclass
+class TrainingReport:
+    """Phoneme predictor MLP training metrics."""
+    epochs: int = 0
+    train_steps: int = 0
+    final_loss: float = 0.0
+    initial_loss: float = 0.0
+    best_loss: float = 0.0
+    # Phoneme prediction quality
+    phoneme_accuracy_before: float = 0.0
+    phoneme_accuracy_after: float = 0.0
+    # Prior quality
+    prior_ratio_before: float = 0.0
+    prior_ratio_after: float = 0.0
+    elapsed_seconds: float = 0.0
 
 
 @dataclass
@@ -166,6 +183,7 @@ class FullReport:
     device: str
     n_positions: int
     matrix_structure: MatrixStructureReport = field(default_factory=MatrixStructureReport)
+    training: Optional[TrainingReport] = None
     lambda_results: List[LambdaResult] = field(default_factory=list)
     varna_usage: VarnaUsageReport = field(default_factory=VarnaUsageReport)
     verdict: str = ""
@@ -616,6 +634,164 @@ def analyze_matrix_structure(
 
 
 # =========================================================================
+# Phase 0: Train Phoneme Predictor MLP
+# =========================================================================
+
+
+def train_phoneme_predictor(
+    model: Any,
+    tokenizer: Any,
+    bcvf: PhonemeBCVF,
+    texts: List[str],
+    epochs: int = 3,
+    lr: float = 1e-3,
+    max_seq_len: int = 512,
+    device: str = "cpu",
+    verbose: bool = False,
+) -> TrainingReport:
+    """
+    Train the phoneme predictor MLP inside PhonemeBCVF.
+
+    The MLP learns: given hidden state h_t from position t,
+    predict the phoneme decomposition of the NEXT token (t+1).
+
+    Target: token_phoneme_weights[next_token_id]  (from Sanskrit G2P)
+    Loss:   BCE between σ(MLP(h_t)) and target phoneme vector
+
+    The base model is FROZEN — only the phoneme predictor MLP trains.
+    This teaches the MLP to read the model's hidden state and predict
+    which phonemes will appear next.
+    """
+    t0 = time.time()
+
+    token_phoneme = bcvf.token_phoneme_weights  # [V, P] buffer
+
+    # Freeze base model, train only phoneme predictor + lambda
+    model.eval()
+    for p in model.parameters():
+        p.requires_grad_(False)
+
+    trainable = list(bcvf.phoneme_predictor.parameters())
+    trainable.append(bcvf.lambda_base)
+    if hasattr(bcvf, 'lambda_net'):
+        trainable.extend(bcvf.lambda_net.parameters())
+
+    optimizer = torch.optim.Adam(trainable, lr=lr)
+
+    # --- Measure BEFORE training ---
+    acc_before, ratio_before = _measure_phoneme_quality(
+        model, tokenizer, bcvf, texts[:2], max_seq_len, device,
+    )
+
+    report = TrainingReport(
+        epochs=epochs,
+        phoneme_accuracy_before=acc_before,
+        prior_ratio_before=ratio_before,
+    )
+
+    all_losses = []
+    step = 0
+
+    for epoch in range(epochs):
+        epoch_losses = []
+        for text in texts:
+            tokens = tokenizer.encode(
+                text, return_tensors="pt", truncation=True,
+                max_length=max_seq_len,
+            ).to(device)
+
+            if tokens.shape[1] < 10:
+                continue
+
+            # Get hidden states from frozen model
+            with torch.no_grad():
+                outputs = model(tokens, output_hidden_states=True, use_cache=False)
+                hidden = outputs.hidden_states[-1].float()  # [1, T, D]
+
+            # Targets: phoneme vector for each NEXT token
+            next_ids = tokens[0, 1:]                         # [T-1]
+            target_phonemes = token_phoneme[next_ids]         # [T-1, P]
+            # Normalize to [0,1] for BCE
+            target_binary = (target_phonemes > 0.05).float()  # [T-1, P]
+
+            # Predict from h_t at positions 0..T-2
+            h_context = hidden[:, :-1, :]                     # [1, T-1, D]
+            pred_phi = bcvf.predict_phonemes(h_context)       # [1, T-1, P]
+            pred_phi = pred_phi.squeeze(0)                    # [T-1, P]
+
+            # BCE loss
+            loss = F.binary_cross_entropy(pred_phi, target_binary)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            loss_val = loss.item()
+            epoch_losses.append(loss_val)
+            all_losses.append(loss_val)
+            step += 1
+
+            if step == 1:
+                report.initial_loss = loss_val
+
+        epoch_mean = np.mean(epoch_losses) if epoch_losses else 0
+        if verbose:
+            print(f"    Epoch {epoch+1}/{epochs}: loss={epoch_mean:.4f} ({len(epoch_losses)} batches)")
+
+    # --- Measure AFTER training ---
+    bcvf.eval()
+    acc_after, ratio_after = _measure_phoneme_quality(
+        model, tokenizer, bcvf, texts[:2], max_seq_len, device,
+    )
+
+    report.train_steps = step
+    report.final_loss = all_losses[-1] if all_losses else 0
+    report.best_loss = min(all_losses) if all_losses else 0
+    report.phoneme_accuracy_after = acc_after
+    report.prior_ratio_after = ratio_after
+    report.elapsed_seconds = time.time() - t0
+
+    return report
+
+
+def _measure_phoneme_quality(
+    model: Any,
+    tokenizer: Any,
+    bcvf: PhonemeBCVF,
+    texts: List[str],
+    max_seq_len: int,
+    device: str,
+) -> Tuple[float, float]:
+    """Measure phoneme prediction accuracy and prior ratio on a few texts."""
+    acc_vals = []
+    ratio_vals = []
+
+    with torch.no_grad():
+        for text in texts:
+            tokens = tokenizer.encode(
+                text, return_tensors="pt", truncation=True,
+                max_length=max_seq_len,
+            ).to(device)
+
+            if tokens.shape[1] < 10:
+                continue
+
+            outputs = model(tokens, output_hidden_states=True, use_cache=False)
+            hidden = outputs.hidden_states[-1].float()
+
+            h_context = hidden[:, :-1, :]
+            next_ids = tokens[:, 1:]
+
+            diag = bcvf.get_diagnostics(h_context, next_ids)
+            acc_vals.append(diag['phoneme_accuracy'].item())
+            ratio_vals.append(diag['prior_ratio'].item())
+
+    acc = float(np.mean(acc_vals)) if acc_vals else 0.0
+    ratio = float(np.mean(ratio_vals)) if ratio_vals else 0.0
+    return acc, ratio
+
+
+# =========================================================================
 # Phase 2: Inference Evaluation
 # =========================================================================
 
@@ -629,18 +805,29 @@ def evaluate_inference(
     n_positions: int,
     device: str,
     max_seq_len: int = 512,
+    trained_bcvf: Optional[PhonemeBCVF] = None,
 ) -> Tuple[LambdaResult, VarnaUsageReport]:
     """
     Run inference evaluation for one lambda value.
 
     Compares real phoneme matrix vs random baseline at every position.
     Tracks which varnas/vrittis are activated by selected tokens.
+
+    If trained_bcvf is provided, reuses it (with updated lambda).
+    Otherwise creates a fresh (untrained) BCVF.
     """
     t0 = time.time()
 
-    # Build real BCVF
-    real_bcvf = create_phoneme_bcvf(csr_head, lambda_init=lambda_value, dynamic_lambda=False)
-    real_bcvf.to(device).eval()
+    # Build or reuse real BCVF
+    if trained_bcvf is not None:
+        real_bcvf = trained_bcvf
+        # Update lambda for this sweep point
+        with torch.no_grad():
+            real_bcvf.lambda_base.fill_(lambda_value)
+        real_bcvf.eval()
+    else:
+        real_bcvf = create_phoneme_bcvf(csr_head, lambda_init=lambda_value, dynamic_lambda=False)
+        real_bcvf.to(device).eval()
 
     # Build random BCVF (same shape, random weights)
     torch.manual_seed(42)
@@ -923,6 +1110,19 @@ def format_report(report: FullReport) -> str:
     lines.append(f"  Varga coverage:  {ms.varga_coverage}")
     lines.append("")
 
+    # Training
+    if report.training is not None:
+        tr = report.training
+        lines.append("--- Phoneme Predictor Training ---")
+        lines.append(f"  Epochs: {tr.epochs}  Steps: {tr.train_steps}  Time: {tr.elapsed_seconds:.1f}s")
+        lines.append(f"  Loss:   {tr.initial_loss:.4f} -> {tr.final_loss:.4f} (best: {tr.best_loss:.4f})")
+        lines.append(f"  Phoneme accuracy: {tr.phoneme_accuracy_before:.1%} -> {tr.phoneme_accuracy_after:.1%}")
+        lines.append(f"  Prior ratio:      {tr.prior_ratio_before:.3f} -> {tr.prior_ratio_after:.3f}")
+        lines.append("")
+    else:
+        lines.append("--- Phoneme Predictor: UNTRAINED (random MLP) ---")
+        lines.append("")
+
     # Lambda sweep
     lines.append("--- Lambda Sweep ---")
     cols = ["lambda", "flip%", "KL", "dNLL", "dH", "phi_sel", "var(lgp)",
@@ -982,11 +1182,17 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python scripts/evaluate_phoneme_mapping.py --model gpt2 --samples 200
+  # Train + test (default)
+  python scripts/evaluate_phoneme_mapping.py --offline --samples 200
+  python scripts/evaluate_phoneme_mapping.py --offline --train-epochs 10 --train-lr 3e-3
+
+  # Untrained baseline
+  python scripts/evaluate_phoneme_mapping.py --offline --no-train --samples 200
+
+  # Real models (require network)
   python scripts/evaluate_phoneme_mapping.py --model gpt2 --samples 500 --verbose
   python scripts/evaluate_phoneme_mapping.py --model phi3 --samples 300
   python scripts/evaluate_phoneme_mapping.py --model gpt2 --lambdas 0.0 0.1 0.5 1.0
-  python scripts/evaluate_phoneme_mapping.py --model gpt2 --output report.json
 """,
     )
 
@@ -1002,6 +1208,14 @@ Examples:
     p.add_argument("--offline", action="store_true",
                    help="Offline mode: random-weight GPT-2 with real-word tokenizer "
                         "(no downloads, but exercises real G2P pipeline)")
+
+    # Training args
+    p.add_argument("--train-epochs", type=int, default=3,
+                   help="Epochs to train phoneme predictor MLP (0 = skip training)")
+    p.add_argument("--train-lr", type=float, default=1e-3,
+                   help="Learning rate for phoneme predictor training")
+    p.add_argument("--no-train", action="store_true",
+                   help="Skip training entirely (test with random MLP weights)")
 
     return p
 
@@ -1055,8 +1269,50 @@ def main() -> None:
     n_params = sum(p.numel() for p in model.parameters())
     model_params_str = f"{n_params / 1e9:.2f}B" if n_params > 1e8 else f"{n_params / 1e6:.1f}M"
 
+    # Phase 0: Train phoneme predictor MLP (unless --no-train)
+    trained_bcvf = None
+    training_report = None
+
+    if not args.no_train and args.train_epochs > 0:
+        print(f"\n=== Phase 0: Train Phoneme Predictor MLP ===")
+        print(f"  Objective: MLP(h_t) → phoneme vector of next token")
+        print(f"  Epochs: {args.train_epochs}, LR: {args.train_lr}")
+        print(f"  Base model FROZEN — only MLP trains")
+
+        # Create BCVF for training (lambda doesn't matter, will be overridden per sweep)
+        trained_bcvf = create_phoneme_bcvf(csr_head, lambda_init=0.1, dynamic_lambda=False)
+        trained_bcvf.to(device)
+
+        training_report = train_phoneme_predictor(
+            model=model,
+            tokenizer=tokenizer,
+            bcvf=trained_bcvf,
+            texts=texts,
+            epochs=args.train_epochs,
+            lr=args.train_lr,
+            max_seq_len=args.max_seq_len,
+            device=device,
+            verbose=args.verbose,
+        )
+
+        print(f"\n  Training complete ({training_report.elapsed_seconds:.1f}s):")
+        print(f"    Loss: {training_report.initial_loss:.4f} → {training_report.final_loss:.4f} "
+              f"(best: {training_report.best_loss:.4f})")
+        print(f"    Phoneme accuracy: {training_report.phoneme_accuracy_before:.1%} → "
+              f"{training_report.phoneme_accuracy_after:.1%}")
+        print(f"    Prior ratio (target/mean): {training_report.prior_ratio_before:.3f} → "
+              f"{training_report.prior_ratio_after:.3f}")
+    else:
+        if args.no_train:
+            print("\n  Skipping training (--no-train)")
+        else:
+            print("\n  Skipping training (--train-epochs 0)")
+
+    # Phase 2: Inference evaluation
     lambdas = sorted(set(args.lambdas))
     print(f"\n=== Phase 2: Inference Evaluation ===")
+    label = "TRAINED" if trained_bcvf is not None else "UNTRAINED"
+    print(f"  Phoneme predictor: {label}")
     print(f"  Lambda sweep: {lambdas}")
     print(f"  Positions: {args.samples}")
 
@@ -1074,6 +1330,7 @@ def main() -> None:
             n_positions=args.samples,
             device=device,
             max_seq_len=args.max_seq_len,
+            trained_bcvf=trained_bcvf,
         )
         lambda_results.append(lr)
 
@@ -1097,6 +1354,7 @@ def main() -> None:
         device=device,
         n_positions=args.samples,
         matrix_structure=matrix_report,
+        training=training_report,
         lambda_results=lambda_results,
         varna_usage=varna_usage,
         verdict=verdict,
