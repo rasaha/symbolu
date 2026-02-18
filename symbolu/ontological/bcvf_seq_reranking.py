@@ -94,7 +94,7 @@ from symbolu.ontological.bcvf_benchmarks import (
 
 
 # Valid reranking modes
-RERANK_MODES = ("bcvf", "logprob", "oracle_verifier", "value", "learned_value")
+RERANK_MODES = ("bcvf", "logprob", "oracle_verifier", "value", "learned_value", "value_feature")
 
 
 @dataclass
@@ -2099,6 +2099,125 @@ def run_seq_rerank_benchmark_humaneval(
                     f"learned={'PASS' if learned_passed else 'FAIL'} "
                     f"changed={result.rerank_changed} "
                     f"mlp_prob={float(np.mean(mlp_probs)):.3f} "
+                    f"rank_r={rank_corr:.2f}"
+                )
+            continue  # skip common tail
+
+        elif rerank_mode == "value_feature":
+            # --- Value-feature mode: StructureBCVF multi-channel ---
+            # Uses AST + unbound-variable + return/param/placeholder
+            # checks as constraint energies combined with logprob.
+            from symbolu.ontological.structure_bcvf import (
+                StructureBCVF, StructureConfig,
+            )
+            struct_config = StructureConfig(
+                use_ast=value_use_ast,
+                use_unbound=True,
+                use_runtime=False,  # too slow for benchmark loop
+                alpha=value_alpha,
+            )
+            struct_bcvf = StructureBCVF(struct_config)
+
+            # Score each candidate
+            struct_scores = np.zeros(len(candidate_texts))
+            struct_diags = []
+            for k in range(len(candidate_texts)):
+                diag_k = struct_bcvf.compute_energies(
+                    prompt, candidate_texts[k],
+                )
+                struct_diags.append(diag_k)
+                struct_scores[k] = (
+                    float(logprob_scores[k])
+                    + value_alpha * diag_k.utility_logit
+                )
+
+            selected_idx = int(np.argmax(struct_scores))
+            utilities = np.array([d.utility for d in struct_diags])
+
+            # Score margin
+            sorted_scores = np.sort(struct_scores)[::-1]
+            struct_margin = (
+                float(sorted_scores[0] - sorted_scores[1])
+                if len(sorted_scores) > 1 else 0.0
+            )
+
+            # Rank correlation (manual Spearman)
+            n_k = len(struct_scores)
+            if n_k > 2:
+                base_ranks = np.argsort(np.argsort(logprob_scores)).astype(float)
+                val_ranks = np.argsort(np.argsort(struct_scores)).astype(float)
+                d = base_ranks - val_ranks
+                rank_corr = 1.0 - 6.0 * float(np.sum(d ** 2)) / (
+                    float(n_k) * (float(n_k) ** 2 - 1)
+                )
+            elif n_k == 2:
+                rank_corr = (
+                    1.0 if np.argmax(logprob_scores) == np.argmax(struct_scores)
+                    else -1.0
+                )
+            else:
+                rank_corr = 1.0
+
+            # Evaluate pass/fail
+            base_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[logprob_best_idx],
+            )
+            selected_code = prompt + fix_completion_indent(
+                prompt, candidate_texts[selected_idx],
+            )
+            base_passed = test_fn(base_code, test_code, entry_point)
+            struct_passed = test_fn(selected_code, test_code, entry_point)
+
+            oracle_any = base_passed or struct_passed
+            if not oracle_any:
+                for k in range(len(candidate_texts)):
+                    if k == logprob_best_idx or k == selected_idx:
+                        continue
+                    code_k = prompt + fix_completion_indent(
+                        prompt, candidate_texts[k],
+                    )
+                    if test_fn(code_k, test_code, entry_point):
+                        oracle_any = True
+                        break
+
+            result = SeqRerankResult(
+                prompt_id=task_id,
+                K=K,
+                rerank_lambda=0.0,
+                rerank_mode="value_feature",
+                base_best_idx=logprob_best_idx,
+                base_best_score=float(logprob_scores[logprob_best_idx]),
+                base_scores=logprob_scores,
+                bcvf_best_idx=selected_idx,
+                bcvf_best_score=float(struct_scores[selected_idx]),
+                bcvf_scores=struct_scores,
+                rerank_changed=selected_idx != logprob_best_idx,
+                score_margin=struct_margin,
+                base_score_margin=logprob_diag["score_margin"],
+                candidate_lengths=logprob_diag["candidate_lengths"],
+                base_text=candidate_texts[logprob_best_idx],
+                bcvf_text=candidate_texts[selected_idx],
+                # Repurpose mean_sf for mean utility
+                mean_sf=float(np.mean(utilities)),
+                rank_correlation=rank_corr,
+                score_std=float(np.std(struct_scores)),
+                base_score_std=float(np.std(logprob_scores)),
+            )
+            result.base_passed = base_passed
+            result.bcvf_passed = struct_passed
+            result.any_passed = oracle_any
+
+            per_prompt.append(result)
+
+            if (i + 1) % 5 == 0 or i == 0:
+                ast_rate = sum(1 for d in struct_diags if d.ast_ok) / max(len(struct_diags), 1)
+                print(
+                    f"  [{mode_label}] {i+1}/{len(problems)} "
+                    f"base={'PASS' if base_passed else 'FAIL'} "
+                    f"struct={'PASS' if struct_passed else 'FAIL'} "
+                    f"changed={result.rerank_changed} "
+                    f"ast={ast_rate:.0%} "
+                    f"util={float(np.mean(utilities)):.2f} "
                     f"rank_r={rank_corr:.2f}"
                 )
             continue  # skip common tail

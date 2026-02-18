@@ -2116,6 +2116,7 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
             "oracle_verifier": "Sequence-Level Oracle Verifier (ceiling)",
             "value": "Sequence-Level Value Reranking",
             "learned_value": "Sequence-Level Learned Value Reranking",
+            "value_feature": "Sequence-Level Structure BCVF Reranking",
         }
         print(f"\n{'='*70}")
         print(_mode_titles.get(rerank_mode, f"Sequence-Level Reranking ({rerank_mode})"))
@@ -2131,6 +2132,10 @@ def main(argv: Optional[List[str]] = None) -> ComparisonReport:
         elif rerank_mode == "value":
             print(f"  S(y) = log p(y|x) + alpha * logit(V(x,y))")
             print(f"  V = deterministic proxy verifier (AST + structural checks)")
+            print(f"  alpha={args.value_alpha}, use_ast={args.value_use_ast}")
+        elif rerank_mode == "value_feature":
+            print(f"  S(y) = log p(y|x) + alpha * logit(V_struct(x,y))")
+            print(f"  V_struct = AST + unbound vars + return/param/placeholder checks")
             print(f"  alpha={args.value_alpha}, use_ast={args.value_use_ast}")
         elif rerank_mode == "learned_value":
             feat_mode = "hidden_only" if args.learned_hidden_only else "hidden+logprob+len"
