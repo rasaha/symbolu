@@ -2122,8 +2122,15 @@ def run_seq_rerank_benchmark_humaneval(
             struct_scores = np.zeros(len(candidate_texts))
             struct_diags = []
             for k in range(len(candidate_texts)):
-                diag_k = struct_bcvf.compute_energies(
+                # Fix first-line indentation before structural analysis
+                # (same fix applied to test evaluation — without this,
+                # AST parse fails on ~88% of candidates due to BPE
+                # tokenizer dropping/adding a leading space)
+                fixed_cand = fix_completion_indent(
                     prompt, candidate_texts[k],
+                )
+                diag_k = struct_bcvf.compute_energies(
+                    prompt, fixed_cand,
                 )
                 struct_diags.append(diag_k)
                 struct_scores[k] = (
