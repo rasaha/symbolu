@@ -2211,13 +2211,20 @@ def run_seq_rerank_benchmark_humaneval(
 
             if (i + 1) % 5 == 0 or i == 0:
                 ast_rate = sum(1 for d in struct_diags if d.ast_ok) / max(len(struct_diags), 1)
+                dt_total = sum(d.doctest_total for d in struct_diags)
+                dt_ok = sum(d.doctest_ok for d in struct_diags)
+                trunc_n = sum(1 for d in struct_diags if d.is_truncated)
+                util_spread = float(np.max(utilities) - np.min(utilities))
                 print(
                     f"  [{mode_label}] {i+1}/{len(problems)} "
                     f"base={'PASS' if base_passed else 'FAIL'} "
                     f"struct={'PASS' if struct_passed else 'FAIL'} "
                     f"changed={result.rerank_changed} "
                     f"ast={ast_rate:.0%} "
+                    f"dt={dt_ok}/{dt_total} "
+                    f"trunc={trunc_n}/{len(struct_diags)} "
                     f"util={float(np.mean(utilities)):.2f} "
+                    f"spread={util_spread:.3f} "
                     f"rank_r={rank_corr:.2f}"
                 )
             continue  # skip common tail
