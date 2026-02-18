@@ -675,7 +675,10 @@ class StructureBCVF:
             diag.e_complete = cfg.w_complete
 
         # (H) Doctest execution — extract >>> examples and run them
-        if cfg.use_doctest and fn_name and diag.ast_ok:
+        # Not gated on AST: exec() can succeed even when ast.parse()
+        # fails (e.g., trailing garbage after the function body).
+        # run_doctests catches exceptions internally.
+        if cfg.use_doctest and fn_name:
             doctests = extract_doctests(prompt)
             if doctests:
                 n_ok, n_total = run_doctests(
@@ -711,7 +714,9 @@ class StructureBCVF:
                 diag.e_repetition = cfg.w_repetition * diag.repetition_ratio
 
         # (K) Branch completeness
-        if cfg.use_control_flow_check and fn_name and diag.ast_ok:
+        # Not gated on AST: check_branch_completeness handles
+        # SyntaxError internally (returns 0, 0).
+        if cfg.use_control_flow_check and fn_name:
             br_ret, br_total = check_branch_completeness(full_code, fn_name)
             diag.branches_total = br_total
             diag.branches_with_return = br_ret

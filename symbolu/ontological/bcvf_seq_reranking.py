@@ -1887,16 +1887,22 @@ def run_seq_rerank_benchmark_humaneval(
             reranker = ValueReranker(
                 alpha=value_alpha, use_ast=value_use_ast,
             )
+            # Fix indentation before structural analysis (same BPE
+            # issue as value_feature mode)
+            fixed_texts = [
+                fix_completion_indent(prompt, ct)
+                for ct in candidate_texts
+            ]
             # Score each candidate: logprob + alpha * logit(utility)
             value_scores = np.array([
                 reranker.score_candidate(
-                    prompt, candidate_texts[k], float(logprob_scores[k]),
+                    prompt, fixed_texts[k], float(logprob_scores[k]),
                 )
-                for k in range(len(candidate_texts))
+                for k in range(len(fixed_texts))
             ])
             utilities = np.array([
-                reranker.estimate_utility(prompt, candidate_texts[k])
-                for k in range(len(candidate_texts))
+                reranker.estimate_utility(prompt, fixed_texts[k])
+                for k in range(len(fixed_texts))
             ])
             selected_idx = int(np.argmax(value_scores))
 
@@ -2122,8 +2128,15 @@ def run_seq_rerank_benchmark_humaneval(
             struct_scores = np.zeros(len(candidate_texts))
             struct_diags = []
             for k in range(len(candidate_texts)):
-                diag_k = struct_bcvf.compute_energies(
+                # Fix first-line indentation before structural analysis
+                # (same fix applied to test evaluation — without this,
+                # AST parse fails on ~88% of candidates due to BPE
+                # tokenizer dropping/adding a leading space)
+                fixed_cand = fix_completion_indent(
                     prompt, candidate_texts[k],
+                )
+                diag_k = struct_bcvf.compute_energies(
+                    prompt, fixed_cand,
                 )
                 struct_diags.append(diag_k)
                 struct_scores[k] = (
