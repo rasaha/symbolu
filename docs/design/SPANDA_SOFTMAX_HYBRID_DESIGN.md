@@ -1,6 +1,6 @@
 # Spanda-Softmax Hybrid: Design Evaluation
 
-**Version:** 0.2.0 (Evaluation Only -- No Implementation)
+**Version:** 0.3.0 (Evaluation Only -- No Implementation)
 **Date:** 2026-02-19
 **Status:** Design evaluation. Not approved for implementation.
 
@@ -45,13 +45,14 @@ Introduce an explicit semantic state vector Psi that evolves continuously:
 ```
 h_t = Transformer(x_<=t)              # unchanged backbone
 Delta_Psi_t = f_theta(h_t)            # MLP computes state update
-Psi_{t+1} = Psi_t + Delta_Psi_t       # state accumulates
+Psi_{t+1} = LN(gamma * Psi_t + Delta_Psi_t)  # bounded leaky integration
 
 z_y = -||Psi_{t+1} - A[y]||^2         # distance to token anchors
 p(y|Psi_{t+1}) = softmax(z_y)         # softmax preserved
 ```
 
-Where `A[y]` are fixed or learned token anchors in R^d_psi.
+Where `A[y]` are projected token anchors in R^d_psi (see Section 3.4),
+`gamma` is a decay factor (default 0.99), and `LN` is LayerNorm.
 
 ### 2.3 What Changes, What Stays
 
@@ -94,32 +95,60 @@ These are orthogonal concerns and can coexist cleanly:
 
 ### 3.2 What the Psi State Module Would Look Like
 
+**Critical constraint:** Psi must be computed per-sequence, per-timestep,
+with no shared mutable state across batch elements. A `register_buffer`
+approach (storing `prev_psi` on the module) breaks:
+- Batched training (state leaks between unrelated sequences in a batch).
+- DDP (each GPU process has inconsistent implicit state).
+- Teacher forcing (all timesteps are computed in parallel; a single
+  `prev_psi` per model is conceptually wrong).
+
+The correct approach computes Psi as a parallel cumulative sum over the
+sequence dimension:
+
 ```python
 class SpandaState(nn.Module):
-    def __init__(self, embed_dim, psi_dim=256):
+    def __init__(self, embed_dim, psi_dim=256, decay_gamma=0.99):
+        super().__init__()
         self.delta_mlp = nn.Sequential(
             nn.Linear(embed_dim, embed_dim // 2),
             nn.GELU(),
             nn.Linear(embed_dim // 2, psi_dim),
         )
-        self.register_buffer('prev_psi', None, persistent=False)
+        self.decay_gamma = decay_gamma
+        self.psi_norm = nn.LayerNorm(psi_dim)
 
-    def forward(self, h_t, reset=False):
-        # h_t: [B, N, D] -> pool to [B, D]
-        pooled = h_t.mean(dim=1)
-        delta = self.delta_mlp(pooled)         # [B, psi_dim]
+    def forward(self, h):
+        # h: [B, T, D] -- full sequence of hidden states
+        delta = self.delta_mlp(h)              # [B, T, psi_dim]
 
-        if reset or self.prev_psi is None:
-            psi = delta
-        else:
-            psi = self.prev_psi + delta
+        # Leaky cumulative sum (bounded integrator)
+        # For pure cumsum: psi = torch.cumsum(delta, dim=1)
+        # With decay: Psi_t = gamma * Psi_{t-1} + Delta_t
+        # Implemented as sequential scan (T is typically small vs B*D)
+        psi = torch.zeros_like(delta[:, :1, :])  # [B, 1, psi_dim]
+        psi_seq = []
+        for t in range(delta.size(1)):
+            psi = self.decay_gamma * psi + delta[:, t:t+1, :]
+            psi_seq.append(psi)
+        psi = torch.cat(psi_seq, dim=1)        # [B, T, psi_dim]
 
-        self.prev_psi = psi.detach()
-        return psi, delta
+        # LayerNorm prevents drift without tuning regularizer weights
+        psi = self.psi_norm(psi)
+
+        return psi, delta   # psi: [B, T, psi_dim], delta: [B, T, psi_dim]
 ```
 
+**Training:** The leaky cumsum can be parallelized via a linear scan
+(associative scan) if T is large. For typical sequence lengths, the
+sequential loop is fast enough since the bottleneck is the backbone.
+
+**Inference:** During autoregressive generation, pass `h: [B, 1, D]`
+per step and maintain `prev_psi` externally in a generation cache
+(same pattern as KV-cache), not as module state.
+
 This mirrors the existing `compute_state_delta()` pattern at line 4034,
-so the implementation style is native to the codebase.
+but corrects the statefulness to be per-sequence rather than per-model.
 
 ### 3.3 What the Anchor Emission Would Replace
 
@@ -129,21 +158,43 @@ self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)  # line 5827
 logits = self.lm_head(x) * self.logit_scale                  # line 5985
 ```
 
-Anchor emission:
+Anchor emission (algebraic matmul form):
 ```python
-self.anchors = nn.Parameter(torch.randn(vocab_size, psi_dim))  # A[y]
-# or: self.anchors = nn.Embedding(vocab_size, psi_dim)
+class AnchorEmission(nn.Module):
+    def __init__(self, vocab_size, psi_dim, temperature=1.0):
+        super().__init__()
+        self.anchors = nn.Parameter(torch.randn(vocab_size, psi_dim))
+        self.temperature = temperature
+        # Precomputed for efficiency; updated each forward pass
+        self.register_buffer('_anchor_norm_sq', None, persistent=False)
 
-def emit(self, psi):
-    # psi: [B, psi_dim], anchors: [V, psi_dim]
-    diff = psi.unsqueeze(1) - self.anchors.unsqueeze(0)  # [B, V, psi_dim]
-    logits = -(diff ** 2).sum(dim=-1)                     # [B, V]
-    return logits
+    def forward(self, psi):
+        # psi: [B, T, psi_dim], anchors: [V, psi_dim]
+        #
+        # We need: logits_y = -||Psi - A[y]||^2
+        # Expand:  -||Psi||^2 + 2*Psi^T*A[y] - ||A[y]||^2
+        #
+        # This avoids allocating the [B, T, V, psi_dim] diff tensor,
+        # which would blow GPU RAM at scale (e.g., V=50k, psi_dim=256
+        # -> 50GB per batch element per timestep).
+
+        anchor_norm_sq = (self.anchors ** 2).sum(dim=-1)  # [V]
+        psi_norm_sq = (psi ** 2).sum(dim=-1, keepdim=True)  # [B, T, 1]
+        dot = psi @ self.anchors.T                         # [B, T, V] (fast GEMM)
+
+        logits = (2 * dot - anchor_norm_sq - psi_norm_sq) / self.temperature
+        return logits  # [B, T, V]
 ```
+
+**Why not the naive form?** The naive `psi.unsqueeze(2) - anchors`
+allocates a `[B, T, V, psi_dim]` tensor. For V=50k and psi_dim=256,
+that's ~50GB per batch element -- completely impractical. The algebraic
+expansion uses a `[B, T, V]` matmul (standard GEMM, same as `lm_head`)
+plus two cheap norm computations.
 
 **Compute cost:** O(V * d_psi) per token -- same order as the current
 `nn.Linear(embed_dim, vocab_size)` which is also O(V * embed_dim). If
-d_psi < embed_dim, it's actually cheaper.
+d_psi < embed_dim, it's actually cheaper. Memory cost is also identical.
 
 ### 3.4 Weight Tying Consideration
 
@@ -152,14 +203,31 @@ The current architecture optionally ties `lm_head.weight = token_embed.weight`
 form:
 
 - **Option A:** `anchors = token_embed.weight` (use raw embeddings as anchors).
-  Simple but constrains anchor geometry to embedding space.
-- **Option B:** `anchors = projection(token_embed.weight)` (learned projection
-  from embedding to anchor space). More flexible.
+  Simple but **dangerous**: the embedding space is optimized for *encoding*
+  (input representation), not *emission* (distance-based prediction). Weight
+  tying works in standard LMs because the head uses dot-product similarity
+  in the same space. Anchor emission uses *distance geometry*, which imposes
+  different structural requirements. Locking anchors to encoding geometry
+  can cripple emission learning.
+- **Option B:** `anchors = normalize(P(token_embed.weight))` where P is a
+  learned low-rank projection from embed_dim to psi_dim. Preserves semantic
+  initialization from embeddings while allowing emission geometry to diverge.
+  Parameter cost: one `[embed_dim, psi_dim]` matrix (~200K params for
+  768->256).
 - **Option C:** Independent anchors. Most expressive but doubles vocabulary
-  parameters.
+  parameters (~12.8M for V=50k, psi_dim=256).
 
-Recommendation: Start with Option A (direct tying) for minimal parameter
-increase, then evaluate Option B if anchor geometry proves too constrained.
+**Recommendation: Start with Option B (projected tying) as default.** It
+provides semantic initialization without geometry lock-in. Option A is a
+valid ablation to test whether the projection is necessary, but should not
+be the default.
+
+```python
+# Option B initialization
+self.anchor_proj = nn.Linear(embed_dim, psi_dim, bias=False)
+# During forward:
+anchors = F.normalize(self.anchor_proj(token_embed.weight), dim=-1)
+```
 
 ---
 
@@ -167,17 +235,22 @@ increase, then evaluate Option B if anchor geometry proves too constrained.
 
 ### 4.1 State Persistence Across Emission
 
-Current flow: each timestep's emission is independent.
+Current flow: the emission *parameterization* has no explicit trajectory
+state. Any temporal continuity in logits is implicit in `h_t` (which
+carries context through attention). But the emission function itself --
+`lm_head(h_t)` -- is a stateless linear projection applied independently
+at each timestep:
 
 ```
-h_1 -> logits_1     (no memory of what was emitted)
-h_2 -> logits_2     (no trajectory)
+h_1 -> logits_1     (no emission-level memory)
+h_2 -> logits_2     (no emission-level trajectory)
 h_3 -> logits_3
 ```
 
-The transformer backbone carries forward context through attention, but the
-*emission decision* has no explicit trajectory. Each `lm_head(h_t)` is a
-fresh linear projection with no state.
+Note: `h_t` itself depends on all prior tokens through attention, so
+there *is* temporal memory in the system. The point is that the emission
+layer adds no additional trajectory structure beyond what `h_t` already
+carries. Each `lm_head(h_t)` is a memoryless function of its input.
 
 Spanda adds:
 
@@ -248,16 +321,37 @@ to the transformer backbone.
 
 Psi accumulates: `Psi_{t+1} = Psi_t + Delta_Psi_t`. Without constraint,
 `||Psi||` can grow unboundedly, pushing all logits toward zero (since
-distances grow quadratically). The `L_step` regularizer mitigates this,
-but may not be sufficient for long sequences.
+distances grow quadratically).
 
-**Mitigation options:**
-- Periodic Psi normalization (LayerNorm or L2 projection to sphere).
-- Leaky integration: `Psi_{t+1} = gamma * Psi_t + Delta_Psi_t` with
-  `gamma < 1`. The codebase already uses `decay_gamma` for phase state
-  (line 5794), so this pattern is established.
+**v0.1 default: bounded integrator (leaky + LayerNorm).** Drift must be
+prevented structurally in the update rule, not only via loss penalties.
+Loss-based mitigation (L_step, L_smooth) requires careful weight tuning
+and can fail silently on long sequences. Structural bounds are robust.
+
+The default v0.1 update rule is:
+
+```
+Psi_{t+1} = LayerNorm(gamma * Psi_t + Delta_Psi_t)
+```
+
+With `gamma = 0.99` (matching existing `decay_gamma` at line 5794).
+
+This provides:
+- **Leaky integration** (`gamma < 1`): exponential forgetting prevents
+  unbounded accumulation. Information half-life ~69 steps.
+- **LayerNorm**: normalizes Psi to unit variance at each step, preventing
+  norm blowup without tuning regularizer weights.
+
+Together they make Psi structurally bounded regardless of sequence length.
+
+**L_step and L_smooth are optional additions** (see Section 4.2) that
+provide gradient-level smoothness incentives. They should be added only
+after the base hybrid is confirmed working with cross-entropy alone.
+
+**Alternative mitigations** (not default, available for ablation):
 - Hard clamp: `Psi = tanh(Psi)` (matching the RESERVED_RANGE constraint
   in `SovereignStateProjector._apply_constraints()`, line 199).
+- L2 projection to sphere: `Psi = Psi / ||Psi||` (loses magnitude info).
 
 ### 6.2 Anchor Collapse
 
@@ -275,10 +369,20 @@ rotation (lines 3958-3967). Adding Psi as a separate state that modulates
 emission creates two interacting dynamical systems. If poorly coupled, they
 could oscillate or fight.
 
-**Mitigation:** Keep them orthogonal by design:
+**Mitigation:** Keep them functionally orthogonal:
 - Sovereign State S[32] feeds *only* attention (phase rotation + binding annotation).
 - Spanda Psi feeds *only* emission (anchor distance).
-- No cross-gradient between S and Psi (stop_gradient at boundary).
+- No direct coupling losses between S and Psi.
+
+**Gradient policy:** Both S and Psi branches backpropagate into the shared
+backbone (`h_t`). True gradient isolation via `stop_gradient` on either
+branch would prevent that branch from influencing backbone learning, which
+is likely undesirable (the backbone should adapt to serve both consumers).
+
+The default is: **shared backbone gradients, no cross-coupling losses.**
+Only introduce `stop_gradient` if training shows oscillation between the
+two dynamical systems. This is a tunable knob, not a hard architectural
+constraint.
 
 ### 6.4 Sequential Bottleneck
 
@@ -473,7 +577,58 @@ Comparing (5) vs (7) and (6) vs (8) answers: does Spanda help at all?
 The most interesting outcome would be: (5) approaches (8) -- meaning Spanda
 + linear attention rivals quadratic attention alone for coherence.
 
-### 9.3 Dataset
+### 9.3 Spanda-Specific Diagnostics
+
+These diagnostics are unique to the hybrid and must be logged during
+training and evaluation to catch failure modes early.
+
+**Emission continuity vs backbone continuity:**
+
+Measure at each timestep:
+- `cosine(Psi_t, Psi_{t+1})` -- emission trajectory smoothness.
+- `cosine(h_t, h_{t+1})` -- backbone hidden state smoothness.
+
+If Spanda is working, emission continuity should be *higher* than
+backbone continuity (Psi adds smoothness). If they track identically,
+the Psi accumulator is adding nothing. If emission continuity is *lower*,
+something is wrong (the MLP is injecting noise).
+
+Log as time series during training. Plot distribution over sequences
+at evaluation.
+
+**Anchor geometry sanity checks:**
+
+Compute periodically (every N training steps):
+- **Anchor norm distribution:** `||A[y]||` for all y. Should be roughly
+  uniform if using normalized anchors. Skew indicates collapse direction.
+- **Pairwise cosine similarity histogram:** Sample ~1000 anchor pairs,
+  compute `cos(A[i], A[j])`. Should be roughly uniform on [-1, 1] for
+  a well-structured space. A spike near 1.0 indicates collapse.
+- **Anchor collapse metric:** Mean nearest-neighbor distance among
+  anchors. If this drops below a threshold (e.g., 0.01 * mean pairwise
+  distance), anchors are collapsing and decorrelation intervention is
+  needed.
+- **Psi-anchor coverage:** What fraction of anchors are "active" (closest
+  anchor to some Psi_t during a validation pass)? Dead anchors indicate
+  the emission space is underutilized.
+
+These catch anchor collapse (Section 6.2) early enough to intervene.
+
+### 9.4 Regularizer Staging Protocol
+
+Regularizers (L_step, L_smooth) should NOT be enabled in the initial
+training runs. The staging order is:
+
+1. **Phase 1:** Cross-entropy only + bounded integrator (leaky + LN).
+   Confirm the hybrid trains and does not regress on perplexity.
+2. **Phase 2:** Add L_step (alpha=1e-4). Confirm trajectory smoothness
+   improves without perplexity regression.
+3. **Phase 3:** Add L_smooth (beta=1e-4). Confirm jerk reduction without
+   over-smoothing (which would manifest as increased repetition).
+
+This prevents blaming regularization for base architecture failures.
+
+### 9.5 Dataset
 
 Use the same training data as current Phase Transformer benchmarks
 (WikiText-2/103 via `TextDataset` or `FineWebStreamingDataset`).
@@ -517,9 +672,22 @@ is future work -- v0.1 should use a flat Psi vector.
 4. **Do not add rounding during training.** Quantization of Psi would
    destroy gradients. Keep everything continuous.
 5. **Do not couple Psi with the 32D Sovereign State.** They serve different
-   purposes (emission vs. attention). Keep them orthogonal.
+   purposes (emission vs. attention). Keep them functionally separate.
 6. **Do not start with OntologicalBindingCacheTransformer.** Too many
-   moving parts. Start with vanilla PhaseTransformer.
+   moving parts. Start with PhaseTransformer + StandardTransformer.
+7. **Do not store Psi as module-level mutable state.** No
+   `register_buffer('prev_psi', ...)` -- Psi must be computed per-sequence
+   via cumsum/scan. Module-level state breaks batched training, DDP, and
+   teacher forcing (see Section 3.2).
+8. **Do not compute emission via explicit diff tensor.** The naive
+   `psi.unsqueeze - anchors.unsqueeze` allocates [B,T,V,d] and blows
+   GPU RAM. Use the algebraic matmul form (see Section 3.3).
+9. **Do not tie anchors directly to embedding weights (Option A).**
+   Distance geometry has different structural requirements than dot-product
+   similarity. Use projected tying (Option B) as default.
+10. **Do not enable regularizers before confirming base hybrid works.**
+    L_step and L_smooth should be staged in after cross-entropy-only
+    training succeeds (see Section 9.4).
 
 ---
 
