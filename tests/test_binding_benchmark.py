@@ -26,9 +26,12 @@ from resonant_model.dataset import (
 )
 from resonant_model.heads import (
     CharTokenizer,
+    FeatureInterferenceBindingHead,
     HeadConfig,
     NamePooler,
     PositionalEncoding,
+    QuadraticBindingHead,
+    QueryConditionedBindingHead,
     ResonanceBindingHead,
     SoftmaxBindingHead,
     build_name_masks,
@@ -322,6 +325,217 @@ class TestResonanceBindingHead:
             if "gate_proj" in name
         ]
         assert len(gate_params) > 0
+
+
+class TestQuadraticBindingHead:
+    """Tests for Model C: quadratic bilinear attention control."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    def test_forward_shape(self, config):
+        model = QuadraticBindingHead(config)
+        token_ids = torch.randint(0, 256, (2, 128))
+        name_masks = torch.zeros(2, 8, 128)
+        name_masks[:, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_gradient_flow(self, config):
+        model = QuadraticBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        logits.sum().backward()
+        grad_count = sum(
+            1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0
+        )
+        assert grad_count > 0
+
+    def test_attention_type(self, config):
+        model = QuadraticBindingHead(config)
+        assert model.get_attention_type() == "quadratic_bilinear"
+
+    def test_has_bilinear_projections(self, config):
+        model = QuadraticBindingHead(config)
+        bilinear_params = [
+            name for name, _ in model.named_parameters()
+            if "u_proj" in name or "w_proj" in name
+        ]
+        assert len(bilinear_params) >= 2
+
+    def test_more_params_than_softmax(self, config):
+        model_a = SoftmaxBindingHead(config)
+        model_c = QuadraticBindingHead(config)
+        assert count_parameters(model_c) > count_parameters(model_a)
+
+    def test_train_and_evaluate(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = QuadraticBindingHead(config)
+        result = train_and_evaluate(model, ds, "quadratic", epochs=2, config=config)
+        assert result.total_examples == 5
+
+
+class TestQueryConditionedBindingHead:
+    """Tests for Model B-v2: query-conditioned interference."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    def test_forward_shape(self, config):
+        model = QueryConditionedBindingHead(config)
+        token_ids = torch.randint(0, 256, (2, 128))
+        name_masks = torch.zeros(2, 8, 128)
+        name_masks[:, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_gradient_flow(self, config):
+        model = QueryConditionedBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        logits.sum().backward()
+        grad_count = sum(
+            1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0
+        )
+        assert grad_count > 0
+
+    def test_attention_type(self, config):
+        model = QueryConditionedBindingHead(config)
+        assert model.get_attention_type() == "query_conditioned_interference"
+
+    def test_has_qk_amplitude_projections(self, config):
+        model = QueryConditionedBindingHead(config)
+        amp_params = [
+            name for name, _ in model.named_parameters()
+            if "amp1_q" in name or "amp2_q" in name
+            or "amp1_k" in name or "amp2_k" in name
+        ]
+        assert len(amp_params) >= 4
+
+    def test_has_separate_qk_gates(self, config):
+        model = QueryConditionedBindingHead(config)
+        gate_params = [
+            name for name, _ in model.named_parameters()
+            if "gate_q_proj" in name or "gate_k_proj" in name
+        ]
+        assert len(gate_params) >= 2
+
+    def test_gate_regularization(self, config):
+        model = QueryConditionedBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        loss = model.compute_gate_regularization(1.0, 1.0)
+        assert loss.shape == ()
+        assert loss.requires_grad
+
+    def test_train_and_evaluate(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = QueryConditionedBindingHead(config)
+        result = train_and_evaluate(model, ds, "qc", epochs=2, config=config)
+        assert result.total_examples == 5
+
+    def test_train_with_regularization(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = QueryConditionedBindingHead(config)
+        result = train_and_evaluate(
+            model, ds, "qc", epochs=2, config=config,
+            gate_entropy_weight=0.1, gate_variance_weight=0.1,
+        )
+        assert result.total_examples == 5
+
+
+class TestFeatureInterferenceBindingHead:
+    """Tests for Model B-v3: interference as feature injection."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    def test_forward_shape(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        token_ids = torch.randint(0, 256, (2, 128))
+        name_masks = torch.zeros(2, 8, 128)
+        name_masks[:, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_gradient_flow(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        logits.sum().backward()
+        grad_count = sum(
+            1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0
+        )
+        assert grad_count > 0
+
+    def test_attention_type(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        assert model.get_attention_type() == "feature_interference"
+
+    def test_has_feature_projection(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        feat_params = [
+            name for name, _ in model.named_parameters()
+            if "feature_proj" in name
+        ]
+        assert len(feat_params) >= 1
+
+    def test_gate_regularization(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        loss = model.compute_gate_regularization(1.0, 1.0)
+        assert loss.shape == ()
+        assert loss.requires_grad
+
+    def test_get_last_internals(self, config):
+        model = FeatureInterferenceBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        internals = model.get_last_internals()
+        assert "g" in internals
+        assert "a1" in internals
+        assert "a2" in internals
+
+    def test_train_and_evaluate(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = FeatureInterferenceBindingHead(config)
+        result = train_and_evaluate(model, ds, "feat", epochs=2, config=config)
+        assert result.total_examples == 5
+
+    def test_train_with_regularization(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = FeatureInterferenceBindingHead(config)
+        result = train_and_evaluate(
+            model, ds, "feat", epochs=2, config=config,
+            gate_entropy_weight=0.1, gate_variance_weight=0.1,
+            gate_lr_multiplier=2.0,
+        )
+        assert result.total_examples == 5
 
 
 class TestGateRegularization:

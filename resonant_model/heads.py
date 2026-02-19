@@ -2,27 +2,36 @@
 Binding Attention Heads
 ========================
 
-Two attention head implementations for the binding benchmark:
+Multiple attention head implementations for the binding benchmark:
 
 Model A: SoftmaxBindingHead
   - Standard linear softmax attention over token embeddings.
   - Computes Q/K/V projections, softmax(QK^T/sqrt(d)) * V.
   - Baseline for role-filler binding.
 
-Model B: ResonanceBindingHead
-  - Interference-based attention using per-token amplitude cross-terms.
-  - Decomposes each token into two amplitude components (a1, a2) with
-    a learned mixing gate g, then computes the scalar cross-term:
-        I_k = 2 * sqrt(g_k * (1 - g_k)) * (a1_k . a2_k)
-    This is O(L) per token, not O(L^2) pairwise.
-  - The cross-term acts as a key-side bias on attention scores:
-    tokens with high interference signal attract more attention,
-    strengthening correct role-filler bindings.
+Model B: ResonanceBindingHead (broadcast interference)
+  - Per-token interference cross-term as key-side attention bias.
+  - I_k = 2 * sqrt(g_k * (1 - g_k)) * (a1_k . a2_k)
+  - O(L) per token. Known issue: query-independent broadcast.
 
-Both heads:
+Model C: QuadraticBindingHead (bilinear control)
+  - Adds bilinear attention term: (U·h_i)^T(V·h_j).
+  - Tests whether quadratic capacity alone helps binding,
+    without any interference/phase mechanism.
+
+Model B-v2: QueryConditionedBindingHead (query-conditioned interference)
+  - Interaction term I_{i,j} = <a1_q_i, a1_k_j> · <a2_q_i, a2_k_j>
+  - Multiplicative coupling gives binding selectivity.
+  - O(L^2) but tests the corrected interference hypothesis.
+
+Model B-v3: FeatureInterferenceBindingHead (interference as feature)
+  - Injects interference into token embedding: x' = x + W_f · f_k
+  - Standard QK attention decides whether to use the signal.
+  - Prevents broadcast bias problem.
+
+All heads:
   - Accept tokenized passage+question input.
   - Produce per-name logits for answer selection.
-  - Use the same embedding dimension and parameter budget.
 """
 
 import math
@@ -540,6 +549,599 @@ class ResonanceBindingHead(nn.Module):
         }
         result = {}
         for attr, key in mapping.items():
+            val = getattr(last_layer, attr, None)
+            if val is not None:
+                result[key] = val
+        return result
+
+
+# ─── Model C: Quadratic Attention Baseline ────────────────────────────────────
+
+class QuadraticAttentionLayer(nn.Module):
+    """
+    Bilinear attention layer — quadratic capacity control.
+
+    Adds a bilinear term to standard attention:
+        score[i,j] = QK^T/√d + λ · (U·x_i)^T(V·x_j) / d
+
+    This provides O(L²) quadratic scoring capacity WITHOUT any
+    interference or phase mechanism — a control for whether benefits
+    come from quadratic geometry alone.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        lambda_bilinear: float = 0.3,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Standard Q/K/V projections
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Bilinear projections: two separate D->D maps
+        self.u_proj = nn.Linear(embed_dim, embed_dim)
+        self.w_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Learnable bilinear strength per head
+        self.bilinear_gate = nn.Parameter(
+            torch.full((num_heads, 1, 1), lambda_bilinear)
+        )
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        Q = self.q_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        K = self.k_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        V = self.v_proj(x).view(B, L, H, d_h).transpose(1, 2)
+
+        # Standard attention scores
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_h)
+
+        # Bilinear term: (U·x_i)^T(W·x_j) per head
+        U = self.u_proj(x).view(B, L, H, d_h).transpose(1, 2)  # [B, H, L, d_h]
+        W = self.w_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        bilinear = torch.matmul(U, W.transpose(-2, -1)) / math.sqrt(d_h)
+
+        gate = torch.sigmoid(self.bilinear_gate)  # [H, 1, 1]
+        scores = scores + gate * bilinear
+
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        attn_out = torch.matmul(attn_weights, V)
+        attn_out = attn_out.transpose(1, 2).reshape(B, L, D)
+        attn_out = self.out_proj(attn_out)
+
+        x = self.norm1(x + attn_out)
+        ff_out = self.ff(x)
+        x = self.norm2(x + ff_out)
+        return x
+
+
+class QuadraticBindingHead(nn.Module):
+    """
+    Model C: Quadratic bilinear attention head for binding tasks.
+
+    Control model — tests whether quadratic attention capacity alone
+    (without interference/phase mechanism) improves binding.
+    """
+
+    def __init__(
+        self,
+        config: Optional[HeadConfig] = None,
+        lambda_bilinear: float = 0.3,
+    ):
+        super().__init__()
+        self.config = config or HeadConfig()
+        c = self.config
+
+        self.embedding = nn.Embedding(c.vocab_size, c.embed_dim, padding_idx=0)
+        self.pos_enc = PositionalEncoding(c.embed_dim, c.max_seq_len)
+        self.drop = nn.Dropout(c.dropout)
+
+        self.layers = nn.ModuleList([
+            QuadraticAttentionLayer(
+                c.embed_dim, c.num_heads, c.dropout, lambda_bilinear,
+            )
+            for _ in range(c.num_layers)
+        ])
+
+        self.pooler = NamePooler(c.embed_dim)
+        self.tokenizer = CharTokenizer(c.vocab_size)
+
+    def forward(self, x: Tensor, name_masks: Tensor) -> Tensor:
+        x = self.embedding(x)
+        x = self.pos_enc(x)
+        x = self.drop(x)
+        for layer in self.layers:
+            x = layer(x)
+        return self.pooler(x, name_masks)
+
+    def get_attention_type(self) -> str:
+        return "quadratic_bilinear"
+
+
+# ─── Model B-v2: Query-Conditioned Interference ─────────────────────────────
+
+class QueryConditionedInterferenceLayer(nn.Module):
+    """
+    Query-conditioned interference: I_{i,j} depends on BOTH positions.
+
+    Both query (i) and key (j) get amplitude decomposition:
+        a1_q_i, a2_q_i  and  a1_k_j, a2_k_j
+
+    Multiplicative coupling interaction:
+        I_{i,j} = <a1_q_i, a1_k_j> · <a2_q_i, a2_k_j> / d_h
+
+    Gated by mixing factors at both sides:
+        score_{i,j} = QK^T/√d + λ · m_i · m_j · I_{i,j}
+        where m = 2√(g(1-g))
+
+    This is O(L²) but provides the selectivity needed for binding:
+    the interference signal varies with the specific query-key pair,
+    enabling role-dependent attention modulation.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        lambda_interference: float = 0.3,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Standard Q/K/V
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Query-side amplitude projections
+        self.amp1_q_proj = nn.Linear(embed_dim, embed_dim)
+        self.amp2_q_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Key-side amplitude projections
+        self.amp1_k_proj = nn.Linear(embed_dim, embed_dim)
+        self.amp2_k_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Mixing gates (separate for query and key)
+        self.gate_q_proj = nn.Linear(embed_dim, num_heads)
+        self.gate_k_proj = nn.Linear(embed_dim, num_heads)
+
+        # Learnable interference strength per head
+        self.interference_gate = nn.Parameter(
+            torch.full((num_heads, 1, 1), lambda_interference)
+        )
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def _compute_interference(self, x: Tensor) -> Tensor:
+        """
+        Compute query-conditioned interference interaction.
+
+        I_{i,j} = m_i · m_j · <a1_q_i, a1_k_j> · <a2_q_i, a2_k_j> / d_h
+
+        Returns: [B, H, L, L] pairwise interference matrix.
+        """
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        # Query-side amplitudes: [B, H, L, d_h]
+        a1_q = self.amp1_q_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        a2_q = self.amp2_q_proj(x).view(B, L, H, d_h).transpose(1, 2)
+
+        # Key-side amplitudes: [B, H, L, d_h]
+        a1_k = self.amp1_k_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        a2_k = self.amp2_k_proj(x).view(B, L, H, d_h).transpose(1, 2)
+
+        # Cross-component dot products: [B, H, L_q, L_k]
+        dot1 = torch.matmul(a1_q, a1_k.transpose(-2, -1))
+        dot2 = torch.matmul(a2_q, a2_k.transpose(-2, -1))
+
+        # Multiplicative coupling (the binding-capable interaction)
+        interference = dot1 * dot2 / d_h  # [B, H, L, L]
+
+        # Mixing gates: [B, L, H]
+        g_q = torch.sigmoid(self.gate_q_proj(x))
+        g_k = torch.sigmoid(self.gate_k_proj(x))
+
+        # Mixing factors: 2√(g(1-g))
+        mix_q = 2.0 * torch.sqrt(g_q * (1.0 - g_q) + 1e-8)  # [B, L, H]
+        mix_k = 2.0 * torch.sqrt(g_k * (1.0 - g_k) + 1e-8)
+
+        # Outer product of mixing factors: [B, H, L, 1] * [B, H, 1, L]
+        mix_q = mix_q.permute(0, 2, 1).unsqueeze(-1)   # [B, H, L, 1]
+        mix_k = mix_k.permute(0, 2, 1).unsqueeze(-2)   # [B, H, 1, L]
+
+        interference = mix_q * mix_k * interference  # [B, H, L, L]
+
+        # Store for diagnostics
+        self._last_g_q = g_q.detach()
+        self._last_g_k = g_k.detach()
+        self._gate_q_for_reg = g_q
+        self._gate_k_for_reg = g_k
+
+        return interference
+
+    def forward(self, x: Tensor) -> Tensor:
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        Q = self.q_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        K = self.k_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        V = self.v_proj(x).view(B, L, H, d_h).transpose(1, 2)
+
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_h)
+
+        # Query-conditioned interference: [B, H, L, L]
+        interference = self._compute_interference(x)
+        gate = torch.sigmoid(self.interference_gate)  # [H, 1, 1]
+        scores = scores + gate * interference
+
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        attn_out = torch.matmul(attn_weights, V)
+        attn_out = attn_out.transpose(1, 2).reshape(B, L, D)
+        attn_out = self.out_proj(attn_out)
+
+        x = self.norm1(x + attn_out)
+        ff_out = self.ff(x)
+        x = self.norm2(x + ff_out)
+        return x
+
+
+class QueryConditionedBindingHead(nn.Module):
+    """
+    Model B-v2: Query-conditioned interference for binding tasks.
+
+    Fixes the broadcast bias problem: I_{i,j} depends on both query
+    and key positions via multiplicative coupling of amplitude components.
+    O(L²) but provides genuine binding selectivity.
+    """
+
+    def __init__(
+        self,
+        config: Optional[HeadConfig] = None,
+        lambda_interference: float = 0.3,
+    ):
+        super().__init__()
+        self.config = config or HeadConfig()
+        c = self.config
+
+        self.embedding = nn.Embedding(c.vocab_size, c.embed_dim, padding_idx=0)
+        self.pos_enc = PositionalEncoding(c.embed_dim, c.max_seq_len)
+        self.drop = nn.Dropout(c.dropout)
+
+        self.layers = nn.ModuleList([
+            QueryConditionedInterferenceLayer(
+                c.embed_dim, c.num_heads, c.dropout, lambda_interference,
+            )
+            for _ in range(c.num_layers)
+        ])
+
+        self.pooler = NamePooler(c.embed_dim)
+        self.tokenizer = CharTokenizer(c.vocab_size)
+
+    def forward(self, x: Tensor, name_masks: Tensor) -> Tensor:
+        x = self.embedding(x)
+        x = self.pos_enc(x)
+        x = self.drop(x)
+        for layer in self.layers:
+            x = layer(x)
+        return self.pooler(x, name_masks)
+
+    def get_attention_type(self) -> str:
+        return "query_conditioned_interference"
+
+    def compute_gate_regularization(
+        self,
+        entropy_weight: float = 1.0,
+        variance_weight: float = 1.0,
+    ) -> Tensor:
+        """Gate regularization for query-conditioned variant (both q and k gates)."""
+        total = torch.tensor(0.0, device=next(self.parameters()).device)
+        eps = 1e-7
+        for layer in self.layers:
+            for g in [
+                getattr(layer, "_gate_q_for_reg", None),
+                getattr(layer, "_gate_k_for_reg", None),
+            ]:
+                if g is None:
+                    continue
+                g_clamped = g.clamp(eps, 1.0 - eps)
+                entropy = -(
+                    g_clamped * torch.log(g_clamped)
+                    + (1.0 - g_clamped) * torch.log(1.0 - g_clamped)
+                )
+                entropy_loss = -entropy.mean() / math.log(2.0)
+                variance_loss = -g.std(dim=1).mean()
+                total = total + entropy_weight * entropy_loss + variance_weight * variance_loss
+        return total
+
+    def get_gate_parameters(self) -> List[nn.Parameter]:
+        params = []
+        for layer in self.layers:
+            params.extend(layer.gate_q_proj.parameters())
+            params.extend(layer.gate_k_proj.parameters())
+            params.append(layer.interference_gate)
+        return params
+
+    def get_non_gate_parameters(self) -> List[nn.Parameter]:
+        gate_ids = {id(p) for p in self.get_gate_parameters()}
+        return [p for p in self.parameters() if id(p) not in gate_ids]
+
+    def get_amplitude_parameters(self) -> List[nn.Parameter]:
+        params = []
+        for layer in self.layers:
+            params.extend(layer.amp1_q_proj.parameters())
+            params.extend(layer.amp2_q_proj.parameters())
+            params.extend(layer.amp1_k_proj.parameters())
+            params.extend(layer.amp2_k_proj.parameters())
+        return params
+
+    def get_last_internals(self) -> Dict[str, Tensor]:
+        last_layer = self.layers[-1]
+        result = {}
+        g_q = getattr(last_layer, "_last_g_q", None)
+        g_k = getattr(last_layer, "_last_g_k", None)
+        if g_q is not None:
+            result["g"] = (g_q + g_k) / 2  # average for diagnostics
+        return result
+
+
+# ─── Model B-v3: Interference as Feature ─────────────────────────────────────
+
+class FeatureInterferenceLayer(nn.Module):
+    """
+    Interference-as-feature: inject cross-term into embedding, not scores.
+
+    Per-token interference feature (vector, not scalar):
+        f_j = √(g_j(1-g_j)) · (a1_j ⊙ a2_j)    [B, L, D]
+
+    Injected into token representation:
+        x'_j = x_j + λ · W_f(f_j)
+
+    Then standard attention decides whether to use it:
+        score[i,j] = q_i^T k'_j / √d
+
+    This prevents the broadcast bias because the interference signal
+    must compete through the standard QK mechanism — the query decides
+    which interference-enhanced tokens to attend to.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        lambda_interference: float = 0.3,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        # Standard Q/K/V
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Interference components (same as original)
+        self.amp1_proj = nn.Linear(embed_dim, embed_dim)
+        self.amp2_proj = nn.Linear(embed_dim, embed_dim)
+        self.gate_proj = nn.Linear(embed_dim, num_heads)
+
+        # Feature injection: maps D-dim interference feature to embedding
+        self.feature_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Learnable interference strength
+        self.interference_scale = nn.Parameter(
+            torch.tensor(lambda_interference)
+        )
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def _compute_interference_feature(self, x: Tensor) -> Tensor:
+        """
+        Compute per-token interference feature vector.
+
+        f_j = √(g_j(1-g_j)) · (a1_j ⊙ a2_j)
+
+        Returns: [B, L, D] feature vector per token.
+        """
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        a1 = self.amp1_proj(x).view(B, L, H, d_h)
+        a2 = self.amp2_proj(x).view(B, L, H, d_h)
+        g = torch.sigmoid(self.gate_proj(x))  # [B, L, H]
+
+        # Element-wise product of amplitudes: [B, L, H, d_h]
+        amp_product = a1 * a2
+
+        # Mixing factor: √(g(1-g)), per head
+        mix = torch.sqrt(g * (1.0 - g) + 1e-8)  # [B, L, H]
+
+        # Scale each head's feature by its mixing factor
+        feature = mix.unsqueeze(-1) * amp_product  # [B, L, H, d_h]
+
+        # Reshape back to [B, L, D]
+        feature = feature.reshape(B, L, D)
+
+        # Store for diagnostics
+        self._last_g = g.detach()
+        self._last_a1 = a1.detach()
+        self._last_a2 = a2.detach()
+        self._gate_for_reg = g
+
+        return feature
+
+    def forward(self, x: Tensor) -> Tensor:
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        # Compute interference feature and inject into representation
+        feature = self._compute_interference_feature(x)
+        x_enhanced = x + self.interference_scale * self.feature_proj(feature)
+
+        # Standard attention on enhanced representation
+        Q = self.q_proj(x_enhanced).view(B, L, H, d_h).transpose(1, 2)
+        K = self.k_proj(x_enhanced).view(B, L, H, d_h).transpose(1, 2)
+        V = self.v_proj(x_enhanced).view(B, L, H, d_h).transpose(1, 2)
+
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_h)
+
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        attn_out = torch.matmul(attn_weights, V)
+        attn_out = attn_out.transpose(1, 2).reshape(B, L, D)
+        attn_out = self.out_proj(attn_out)
+
+        x = self.norm1(x + attn_out)
+        ff_out = self.ff(x)
+        x = self.norm2(x + ff_out)
+        return x
+
+
+class FeatureInterferenceBindingHead(nn.Module):
+    """
+    Model B-v3: Interference as feature injection for binding tasks.
+
+    Instead of biasing attention scores (broadcast), injects the
+    interference cross-term as a feature into the token embedding.
+    Standard QK attention then decides what to attend to — preventing
+    the query-independent salience problem.
+    """
+
+    def __init__(
+        self,
+        config: Optional[HeadConfig] = None,
+        lambda_interference: float = 0.3,
+    ):
+        super().__init__()
+        self.config = config or HeadConfig()
+        c = self.config
+
+        self.embedding = nn.Embedding(c.vocab_size, c.embed_dim, padding_idx=0)
+        self.pos_enc = PositionalEncoding(c.embed_dim, c.max_seq_len)
+        self.drop = nn.Dropout(c.dropout)
+
+        self.layers = nn.ModuleList([
+            FeatureInterferenceLayer(
+                c.embed_dim, c.num_heads, c.dropout, lambda_interference,
+            )
+            for _ in range(c.num_layers)
+        ])
+
+        self.pooler = NamePooler(c.embed_dim)
+        self.tokenizer = CharTokenizer(c.vocab_size)
+
+    def forward(self, x: Tensor, name_masks: Tensor) -> Tensor:
+        x = self.embedding(x)
+        x = self.pos_enc(x)
+        x = self.drop(x)
+        for layer in self.layers:
+            x = layer(x)
+        return self.pooler(x, name_masks)
+
+    def get_attention_type(self) -> str:
+        return "feature_interference"
+
+    def compute_gate_regularization(
+        self,
+        entropy_weight: float = 1.0,
+        variance_weight: float = 1.0,
+    ) -> Tensor:
+        """Gate regularization for feature interference variant."""
+        total = torch.tensor(0.0, device=next(self.parameters()).device)
+        eps = 1e-7
+        for layer in self.layers:
+            g = getattr(layer, "_gate_for_reg", None)
+            if g is None:
+                continue
+            g_clamped = g.clamp(eps, 1.0 - eps)
+            entropy = -(
+                g_clamped * torch.log(g_clamped)
+                + (1.0 - g_clamped) * torch.log(1.0 - g_clamped)
+            )
+            entropy_loss = -entropy.mean() / math.log(2.0)
+            variance_loss = -g.std(dim=1).mean()
+            total = total + entropy_weight * entropy_loss + variance_weight * variance_loss
+        return total
+
+    def get_gate_parameters(self) -> List[nn.Parameter]:
+        params = []
+        for layer in self.layers:
+            params.extend(layer.gate_proj.parameters())
+            params.append(layer.interference_scale)
+        return params
+
+    def get_non_gate_parameters(self) -> List[nn.Parameter]:
+        gate_ids = {id(p) for p in self.get_gate_parameters()}
+        return [p for p in self.parameters() if id(p) not in gate_ids]
+
+    def get_amplitude_parameters(self) -> List[nn.Parameter]:
+        params = []
+        for layer in self.layers:
+            params.extend(layer.amp1_proj.parameters())
+            params.extend(layer.amp2_proj.parameters())
+        return params
+
+    def get_last_internals(self) -> Dict[str, Tensor]:
+        last_layer = self.layers[-1]
+        result = {}
+        for attr, key in {"_last_g": "g", "_last_a1": "a1", "_last_a2": "a2"}.items():
             val = getattr(last_layer, attr, None)
             if val is not None:
                 result[key] = val

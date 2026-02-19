@@ -334,18 +334,17 @@ def train_and_evaluate(
     Returns:
         EvaluationResult after training.
     """
-    from resonant_model.heads import ResonanceBindingHead
-
     config = config or HeadConfig()
     device = device or torch.device("cpu")
     model = model.to(device)
     tokenizer = CharTokenizer(config.vocab_size)
 
-    has_gate_reg = isinstance(model, ResonanceBindingHead) and (
+    # Use duck typing: check for methods rather than specific classes
+    has_gate_reg = hasattr(model, "compute_gate_regularization") and (
         gate_entropy_weight > 0 or gate_variance_weight > 0
     )
-    has_warmup = isinstance(model, ResonanceBindingHead) and warmup_epochs > 0
-    has_gate_lr = isinstance(model, ResonanceBindingHead) and gate_lr_multiplier != 1.0
+    has_warmup = hasattr(model, "get_amplitude_parameters") and warmup_epochs > 0
+    has_gate_lr = hasattr(model, "get_gate_parameters") and gate_lr_multiplier != 1.0
 
     # Build optimizer with optional separate gate LR
     if has_gate_lr:
