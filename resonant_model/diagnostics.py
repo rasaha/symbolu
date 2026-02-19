@@ -144,13 +144,19 @@ def extract_log_entries(
 
             if len(mask_positions) > 0 and "g" in internals:
                 g_vals = internals["g"]  # [1, L, H]
-                a1_vals = internals["a1"]  # [1, L, H, d_h]
-                a2_vals = internals["a2"]  # [1, L, H, d_h]
 
                 # Mean over correct-answer positions and heads
                 g_at_pos = g_vals[0, mask_positions].mean().item()
-                a1_at_pos = a1_vals[0, mask_positions].norm(dim=-1).mean().item()
-                a2_at_pos = a2_vals[0, mask_positions].norm(dim=-1).mean().item()
+
+                # a1/a2 may not be present for all model variants
+                if "a1" in internals and "a2" in internals:
+                    a1_vals = internals["a1"]  # [1, L, H, d_h]
+                    a2_vals = internals["a2"]  # [1, L, H, d_h]
+                    a1_at_pos = a1_vals[0, mask_positions].norm(dim=-1).mean().item()
+                    a2_at_pos = a2_vals[0, mask_positions].norm(dim=-1).mean().item()
+                else:
+                    a1_at_pos = 1.0
+                    a2_at_pos = 1.0
             else:
                 g_at_pos = 0.5
                 a1_at_pos = 0.0
