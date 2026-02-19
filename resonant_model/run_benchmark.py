@@ -17,12 +17,13 @@ Model B variants:
   quadratic           — Bilinear attention control (no interference)
   query_conditioned   — Query-conditioned interference interaction (O(L²))
   feature_interference — Interference injected as embedding feature
+  hybrid              — Quadratic + interference falsification test
 
 Usage:
     python -m resonant_model.run_benchmark
-    python -m resonant_model.run_benchmark --model-b-type query_conditioned
-    python -m resonant_model.run_benchmark --model-b-type feature_interference
     python -m resonant_model.run_benchmark --model-b-type quadratic
+    python -m resonant_model.run_benchmark --model-b-type hybrid
+    python -m resonant_model.run_benchmark --model-b-type feature_interference
 """
 
 import argparse
@@ -38,6 +39,7 @@ from resonant_model.heads import (
     QuadraticBindingHead,
     QueryConditionedBindingHead,
     FeatureInterferenceBindingHead,
+    HybridQuadraticInterferenceHead,
     count_parameters,
 )
 from resonant_model.evaluator import train_and_evaluate
@@ -55,6 +57,7 @@ MODEL_B_TYPES = {
     "quadratic": ("Quadratic Bilinear (control)", QuadraticBindingHead),
     "query_conditioned": ("Query-Conditioned Interference", QueryConditionedBindingHead),
     "feature_interference": ("Feature Interference (embedding)", FeatureInterferenceBindingHead),
+    "hybrid": ("Hybrid Quadratic + Interference (falsification)", HybridQuadraticInterferenceHead),
 }
 
 
@@ -68,6 +71,10 @@ def _build_model_b(model_type: str, config: HeadConfig, lambda_val: float):
         return QueryConditionedBindingHead(config, lambda_interference=lambda_val)
     elif model_type == "feature_interference":
         return FeatureInterferenceBindingHead(config, lambda_interference=lambda_val)
+    elif model_type == "hybrid":
+        return HybridQuadraticInterferenceHead(
+            config, lambda_bilinear=lambda_val, lambda_interference=lambda_val,
+        )
     else:
         raise ValueError(f"Unknown model-b-type: {model_type}")
 

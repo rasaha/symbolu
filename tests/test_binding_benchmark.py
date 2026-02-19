@@ -28,6 +28,7 @@ from resonant_model.heads import (
     CharTokenizer,
     FeatureInterferenceBindingHead,
     HeadConfig,
+    HybridQuadraticInterferenceHead,
     NamePooler,
     PositionalEncoding,
     QuadraticBindingHead,
@@ -532,6 +533,109 @@ class TestFeatureInterferenceBindingHead:
         model = FeatureInterferenceBindingHead(config)
         result = train_and_evaluate(
             model, ds, "feat", epochs=2, config=config,
+            gate_entropy_weight=0.1, gate_variance_weight=0.1,
+            gate_lr_multiplier=2.0,
+        )
+        assert result.total_examples == 5
+
+
+class TestHybridQuadraticInterferenceHead:
+    """Tests for Model D: hybrid quadratic + interference (falsification)."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    def test_forward_shape(self, config):
+        model = HybridQuadraticInterferenceHead(config)
+        token_ids = torch.randint(0, 256, (2, 128))
+        name_masks = torch.zeros(2, 8, 128)
+        name_masks[:, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_gradient_flow(self, config):
+        model = HybridQuadraticInterferenceHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        logits.sum().backward()
+        grad_count = sum(
+            1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0
+        )
+        assert grad_count > 0
+
+    def test_attention_type(self, config):
+        model = HybridQuadraticInterferenceHead(config)
+        assert model.get_attention_type() == "hybrid_quadratic_interference"
+
+    def test_has_both_channels(self, config):
+        """Verify model has both bilinear and interference projections."""
+        model = HybridQuadraticInterferenceHead(config)
+        param_names = [name for name, _ in model.named_parameters()]
+        assert any("u_proj" in n for n in param_names), "missing bilinear U projection"
+        assert any("w_proj" in n for n in param_names), "missing bilinear W projection"
+        assert any("amp1_proj" in n for n in param_names), "missing amplitude 1 projection"
+        assert any("amp2_proj" in n for n in param_names), "missing amplitude 2 projection"
+        assert any("gate_proj" in n for n in param_names), "missing gate projection"
+
+    def test_more_params_than_quadratic(self, config):
+        """Hybrid should have more params than quadratic (extra interference)."""
+        quad = QuadraticBindingHead(config)
+        hybrid = HybridQuadraticInterferenceHead(config)
+        assert count_parameters(hybrid) > count_parameters(quad)
+
+    def test_gate_regularization(self, config):
+        model = HybridQuadraticInterferenceHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        loss = model.compute_gate_regularization(1.0, 1.0)
+        assert loss.shape == ()
+        assert loss.requires_grad
+
+    def test_get_last_internals(self, config):
+        model = HybridQuadraticInterferenceHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        internals = model.get_last_internals()
+        assert "g" in internals
+        assert "a1" in internals
+        assert "a2" in internals
+        assert "interference" in internals
+        # Interference should be [B, H, L, L] (pairwise, not broadcast)
+        assert internals["interference"].dim() == 4
+
+    def test_interference_is_pairwise(self, config):
+        """Verify interference matrix is L x L (not broadcast)."""
+        model = HybridQuadraticInterferenceHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+        internals = model.get_last_internals()
+        interference = internals["interference"]
+        B, H, L1, L2 = interference.shape
+        assert L1 == L2 == 128
+
+    def test_train_and_evaluate(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = HybridQuadraticInterferenceHead(config)
+        result = train_and_evaluate(model, ds, "hybrid", epochs=2, config=config)
+        assert result.total_examples == 5
+
+    def test_train_with_regularization(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = HybridQuadraticInterferenceHead(config)
+        result = train_and_evaluate(
+            model, ds, "hybrid", epochs=2, config=config,
             gate_entropy_weight=0.1, gate_variance_weight=0.1,
             gate_lr_multiplier=2.0,
         )
