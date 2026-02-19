@@ -10,12 +10,14 @@ Model A: SoftmaxBindingHead
   - Baseline for role-filler binding.
 
 Model B: ResonanceBindingHead
-  - Interference-based attention using phase cross-terms.
-  - Encodes tokens as phase vectors, computes pairwise interference
-    via cos(phi_i - phi_j) cross-terms.
-  - Interference matrix modulates attention: tokens whose phases
-    constructively interfere get amplified; destructive interference
-    suppresses spurious bindings.
+  - Interference-based attention using per-token amplitude cross-terms.
+  - Decomposes each token into two amplitude components (a1, a2) with
+    a learned mixing gate g, then computes the scalar cross-term:
+        I_k = 2 * sqrt(g_k * (1 - g_k)) * (a1_k . a2_k)
+    This is O(L) per token, not O(L^2) pairwise.
+  - The cross-term acts as a key-side bias on attention scores:
+    tokens with high interference signal attract more attention,
+    strengthening correct role-filler bindings.
 
 Both heads:
   - Accept tokenized passage+question input.
@@ -244,22 +246,25 @@ class SoftmaxBindingHead(nn.Module):
 
 class InterferenceAttentionLayer(nn.Module):
     """
-    Interference-based attention layer using phase cross-terms.
+    Interference-based attention layer using per-token amplitude cross-terms.
 
-    Instead of softmax(QK^T/sqrt(d)), computes:
+    Each token is decomposed into two amplitude components with a learned
+    mixing gate, and the scalar cross-term modulates attention:
 
-    1. Phase encoding: phi_i = 2*pi * sigmoid(W_phase * x_i)
-    2. Interference matrix: I[i,j] = mean_k(cos(phi_i[k] - phi_j[k]))
-       This captures constructive/destructive interference between tokens.
-    3. Cross-term modulation: A[i,j] = (QK^T/sqrt(d)) * (1 + lambda * I[i,j])
-       The interference cross-terms amplify structurally coherent bindings
-       and suppress spurious nearest-name associations.
-    4. Normalize via softmax over the modulated scores.
+    1. Amplitude decomposition:
+       a1_k = W_1 x_k   (first amplitude component, per head)
+       a2_k = W_2 x_k   (second amplitude component, per head)
+       g_k  = sigmoid(W_g x_k)   (mixing gate ∈ (0,1), per head)
 
-    The key insight: interference cross-terms encode structural similarity
-    between role-filler pairs. Tokens that play similar structural roles
-    (e.g., both are recipients) have aligned phases and constructively
-    interfere, strengthening the correct binding signal.
+    2. Per-token cross-term (O(L), not O(L²)):
+       I_k = 2√(g_k(1-g_k)) · sum_d(a1_k[d] · a2_k[d])
+       This is a scalar per token per head.
+
+    3. Key-side attention bias:
+       score[i,j] = QK^T/√d + λ · I_j
+       Tokens with constructive interference (high cross-term)
+       attract more attention from all query positions, strengthening
+       correct role-filler bindings and suppressing spurious associations.
     """
 
     def __init__(
@@ -281,8 +286,12 @@ class InterferenceAttentionLayer(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
 
-        # Phase projection: maps embeddings to phase vectors
-        self.phase_proj = nn.Linear(embed_dim, embed_dim)
+        # Interference amplitude projections: two components per token
+        self.amp1_proj = nn.Linear(embed_dim, embed_dim)
+        self.amp2_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Mixing gate: per-token, per-head balance between components
+        self.gate_proj = nn.Linear(embed_dim, num_heads)
 
         # Learnable interference strength per head
         self.interference_gate = nn.Parameter(
@@ -302,29 +311,42 @@ class InterferenceAttentionLayer(nn.Module):
 
     def _compute_interference(self, x: Tensor) -> Tensor:
         """
-        Compute pairwise interference matrix from phase encodings.
+        Compute per-token interference cross-term.
+
+        Cross-term: I_k = 2√(g_k(1-g_k)) · (a1_k · a2_k)
+        This is a scalar per token per head — O(L).
 
         Args:
             x: [B, L, D] input embeddings.
 
         Returns:
-            interference: [B, H, L, L] interference cross-term matrix.
+            interference: [B, H, L] per-token interference signal.
         """
         B, L, D = x.shape
         H = self.num_heads
         d_h = self.head_dim
 
-        # Phase encoding: map to [0, 2*pi]
-        phases = torch.sigmoid(self.phase_proj(x)) * (2 * math.pi)
-        # Reshape to heads: [B, H, L, d_h]
-        phases = phases.view(B, L, H, d_h).transpose(1, 2)
+        # Two amplitude projections: [B, L, D] -> [B, L, H, d_h]
+        a1 = self.amp1_proj(x).view(B, L, H, d_h)
+        a2 = self.amp2_proj(x).view(B, L, H, d_h)
 
-        # Pairwise phase difference: [B, H, L, L, d_h]
-        phase_diff = phases.unsqueeze(3) - phases.unsqueeze(2)
+        # Mixing gate: [B, L, H] -> sigmoid gives g ∈ (0, 1)
+        g = torch.sigmoid(self.gate_proj(x))  # [B, L, H]
 
-        # Interference cross-term: mean cosine of phase differences
-        # Constructive: cos(0) = 1, Destructive: cos(pi) = -1
-        interference = torch.cos(phase_diff).mean(dim=-1)  # [B, H, L, L]
+        # Dot product of amplitude components, summed over head_dim: [B, L, H]
+        amp_product = (a1 * a2).sum(dim=-1)
+
+        # Mixing factor: 2√(g(1-g)), maximized at g=0.5
+        mix = 2.0 * torch.sqrt(g * (1.0 - g) + 1e-8)  # [B, L, H]
+
+        # Per-token interference: [B, L, H] -> [B, H, L]
+        interference = (mix * amp_product).permute(0, 2, 1)
+
+        # Store internals for diagnostics (detached to avoid graph retention)
+        self._last_g = g.detach()                    # [B, L, H]
+        self._last_a1 = a1.detach()                  # [B, L, H, d_h]
+        self._last_a2 = a2.detach()                  # [B, L, H, d_h]
+        self._last_interference = interference.detach()  # [B, H, L]
 
         return interference
 
@@ -341,17 +363,16 @@ class InterferenceAttentionLayer(nn.Module):
         # Standard attention scores
         scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_h)  # [B, H, L, L]
 
-        # Compute interference cross-terms
-        interference = self._compute_interference(x)  # [B, H, L, L]
+        # Compute per-token interference cross-terms: O(L)
+        interference = self._compute_interference(x)  # [B, H, L]
 
-        # Modulate attention with interference:
-        # Positive interference amplifies (constructive binding).
-        # Negative interference suppresses (destructive/spurious).
-        gate = torch.sigmoid(self.interference_gate)  # [H, 1, 1] -> learned per head
-        modulated_scores = scores * (1.0 + gate * interference)
+        # Key-side bias: tokens with high interference attract more attention.
+        # interference.unsqueeze(2) -> [B, H, 1, L] broadcasts across query dim.
+        gate = torch.sigmoid(self.interference_gate)  # [H, 1, 1]
+        scores = scores + gate * interference.unsqueeze(2)
 
         # Normalize
-        attn_weights = F.softmax(modulated_scores, dim=-1)
+        attn_weights = F.softmax(scores, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
         # Aggregate values
@@ -373,14 +394,13 @@ class ResonanceBindingHead(nn.Module):
 
     Architecture:
       1. Character embedding + positional encoding
-      2. N transformer layers with interference-modulated attention
+      2. N transformer layers with per-token interference cross-terms
       3. Name pooling -> per-name logits
 
-    The interference cross-terms cos(phi_i - phi_j) act as a structural
-    binding signal that augments the standard Q/K dot-product attention.
+    Each token's interference signal I_k = 2√(g(1-g)) · (a1·a2) acts as
+    a key-side bias on attention scores — O(L) per token, not O(L²).
     This helps maintain correct role-filler assignments under distractors
-    by amplifying structurally coherent token relationships and suppressing
-    spurious nearest-name associations.
+    by amplifying attention to structurally resonant tokens.
     """
 
     def __init__(
@@ -431,6 +451,31 @@ class ResonanceBindingHead(nn.Module):
 
     def get_attention_type(self) -> str:
         return "resonance_interference"
+
+    def get_last_internals(self) -> Dict[str, Tensor]:
+        """
+        Retrieve internal tensors from the last forward pass.
+
+        Returns dict with keys (from the last interference layer):
+            g: [B, L, H] mixing gate values
+            a1: [B, L, H, d_h] first amplitude component
+            a2: [B, L, H, d_h] second amplitude component
+            interference: [B, H, L] per-token interference signal
+        """
+        # Use the last layer's internals (deepest representation)
+        last_layer = self.layers[-1]
+        mapping = {
+            "_last_g": "g",
+            "_last_a1": "a1",
+            "_last_a2": "a2",
+            "_last_interference": "interference",
+        }
+        result = {}
+        for attr, key in mapping.items():
+            val = getattr(last_layer, attr, None)
+            if val is not None:
+                result[key] = val
+        return result
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────

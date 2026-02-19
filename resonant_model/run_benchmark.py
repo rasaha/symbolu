@@ -9,10 +9,13 @@ Runs the full binding benchmark:
   3. Train + evaluate Model B (resonance interference)
   4. Statistical comparison
   5. Print structured report
+  6. Behavioral pass criteria evaluation
+  7. Interference cross-term validation (6-step diagnostics)
 
 Usage:
     python -m resonant_model.run_benchmark
     python -m resonant_model.run_benchmark --num-examples 200 --epochs 10
+    python -m resonant_model.run_benchmark --log-path resonance_eval.jsonl
 """
 
 import argparse
@@ -31,6 +34,12 @@ from resonant_model.heads import (
 from resonant_model.evaluator import train_and_evaluate
 from resonant_model.statistics import BindingStatistics, format_report
 from resonant_model.pass_criteria import PassCriteria, format_pass_result
+from resonant_model.diagnostics import (
+    extract_log_entries,
+    write_log,
+    run_validation,
+    format_validation_report,
+)
 
 
 def main():
@@ -44,6 +53,8 @@ def main():
     parser.add_argument("--num-layers", type=int, default=2)
     parser.add_argument("--lambda-interference", type=float, default=0.3)
     parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument("--log-path", type=str, default=None,
+                        help="Path to write JSONL diagnostic log")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -120,7 +131,21 @@ def main():
     print()
     print(format_pass_result(pass_result))
 
-    return report, pass_result
+    # Step 7: Interference cross-term diagnostics
+    print()
+    print("Extracting interference cross-term diagnostics...")
+    log_entries = extract_log_entries(
+        model_b, dataset, result_b, config, device,
+    )
+    if args.log_path:
+        write_log(log_entries, args.log_path)
+        print(f"  JSONL log written to: {args.log_path}")
+
+    validation = run_validation(log_entries, result_a, result_b)
+    print()
+    print(format_validation_report(validation))
+
+    return report, pass_result, validation
 
 
 if __name__ == "__main__":

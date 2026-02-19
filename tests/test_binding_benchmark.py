@@ -307,13 +307,21 @@ class TestResonanceBindingHead:
         ]
         assert len(gate_params) > 0
 
-    def test_phase_proj_exists(self, config):
+    def test_amplitude_projections_exist(self, config):
         model = ResonanceBindingHead(config)
-        phase_params = [
+        amp_params = [
             name for name, p in model.named_parameters()
-            if "phase_proj" in name
+            if "amp1_proj" in name or "amp2_proj" in name
         ]
-        assert len(phase_params) > 0
+        assert len(amp_params) >= 2  # at least amp1 and amp2 weight
+
+    def test_gate_proj_exists(self, config):
+        model = ResonanceBindingHead(config)
+        gate_params = [
+            name for name, p in model.named_parameters()
+            if "gate_proj" in name
+        ]
+        assert len(gate_params) > 0
 
 
 class TestParameterComparison:
@@ -801,12 +809,15 @@ class TestEndToEnd:
         """Verify the interference computation is actually invoked."""
         model = ResonanceBindingHead(small_config, lambda_interference=0.5)
 
-        # Check that phase_proj weight is non-trivially used
-        has_phase = any("phase_proj" in n for n, _ in model.named_parameters())
-        assert has_phase
-
-        has_gate = any("interference_gate" in n for n, _ in model.named_parameters())
-        assert has_gate
+        # Check that amplitude projections and gate are present
+        has_amp1 = any("amp1_proj" in n for n, _ in model.named_parameters())
+        has_amp2 = any("amp2_proj" in n for n, _ in model.named_parameters())
+        has_gate_proj = any("gate_proj" in n for n, _ in model.named_parameters())
+        has_interference_gate = any("interference_gate" in n for n, _ in model.named_parameters())
+        assert has_amp1
+        assert has_amp2
+        assert has_gate_proj
+        assert has_interference_gate
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

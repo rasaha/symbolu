@@ -17,6 +17,7 @@ Modules:
   evaluator      - Evaluation harness with accuracy and failure-type tracking
   statistics     - Significance testing and distance/distractor analysis
   pass_criteria  - Three-tier behavioral pass gate (minimal/strong/breakthrough)
+  diagnostics    - Interference cross-term validation (6-step analysis)
 """
 
 from resonant_model.dataset import BindingDataset, BindingExample
@@ -24,6 +25,7 @@ from resonant_model.heads import SoftmaxBindingHead, ResonanceBindingHead
 from resonant_model.evaluator import BindingEvaluator, EvaluationResult
 from resonant_model.statistics import BindingStatistics, ComparisonReport
 from resonant_model.pass_criteria import PassCriteria, PassResult, PassTier
+from resonant_model.diagnostics import ValidationReport, run_validation
 
 __all__ = [
     "BindingDataset",
@@ -37,4 +39,6 @@ __all__ = [
     "PassCriteria",
     "PassResult",
     "PassTier",
+    "ValidationReport",
+    "run_validation",
 ]
