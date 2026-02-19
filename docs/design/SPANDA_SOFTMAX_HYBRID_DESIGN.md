@@ -1,6 +1,6 @@
 # Spanda-Softmax Hybrid: Design Evaluation
 
-**Version:** 0.1.0 (Evaluation Only -- No Implementation)
+**Version:** 0.2.0 (Evaluation Only -- No Implementation)
 **Date:** 2026-02-19
 **Status:** Design evaluation. Not approved for implementation.
 
@@ -294,19 +294,104 @@ For training, the Psi accumulation can be computed as a cumulative sum:
 
 ---
 
-## 7. Integration with Existing Architecture
+## 7. Attention Agnosticism
 
-### 7.1 Affected Models
+### 7.1 Separation of Concerns
 
-The hybrid should be tested on one model first. Recommended:
-**`PhaseTransformer`** (line 5773) -- the simplest architecture, fewest
-moving parts, cleanest baseline.
+Spanda operates at the **state / emission layer**, not the attention
+computation layer. The two concerns are orthogonal:
+
+| Layer | Controls | Complexity |
+|-------|----------|------------|
+| Attention | How context tokens interact across the sequence | O(L^2), O(L), O(L*w) |
+| Spanda | How hidden state evolves and maps to output tokens | O(d_psi) per step |
+
+The interface is clean:
+
+```
+h_t = AnySequenceModel(x_<=t)     # attention type determines this
+Delta_Psi_t = f_theta(h_t)        # Spanda consumes h_t, agnostic to source
+Psi_{t+1} = Psi_t + Delta_Psi_t   # state evolution, no attention dependency
+z_y = -||Psi_{t+1} - A[y]||^2     # emission, no attention dependency
+```
+
+### 7.2 Compatibility with All Existing Backbones
+
+Every transformer variant in `phase_transformer.py` produces `h_t` through
+the same interface (`x = self.norm(x)` after the block stack). Spanda
+consumes that output identically regardless of how it was computed:
+
+| Model (line) | Attention Type | Spanda Compatible? |
+|--------------|---------------|-------------------|
+| `PhaseTransformer` (5773) | O(L) phase sync | Yes |
+| `StandardTransformer` (7188) | O(L^2) quadratic | Yes |
+| `HybridPhaseTransformer` (6029) | Local + Phase | Yes |
+| `LocalOnlyTransformer` (7021) | O(L*w) sliding window | Yes |
+| `GroupedHybridTransformer` (5130) | Grouped hybrid | Yes |
+| `BindingCacheTransformer` (3489) | Phase + Top-K | Yes |
+| `OntologicalBindingCacheTransformer` (3854) | Phase + Ontological | Yes |
+| `OntologicalHybridTransformer` (6692) | Ontological hybrid | Yes |
+
+### 7.3 Performance Will Vary by Backbone
+
+While Spanda runs on all backbones, the quality of `h_t` determines
+effectiveness:
+
+- **Quadratic attention** -- best long-range reasoning in h_t, so Psi
+  receives the richest signal. Spanda adds trajectory structure on top
+  of already-strong context.
+- **Linear attention** -- efficient but may lose subtle long-range
+  interactions. Spanda's state persistence partially compensates by
+  carrying forward semantic signal that attention dropped.
+- **Local attention** -- strong locality, weaker global coherence.
+  Spanda becomes *more* valuable here because local attention forgets
+  long context, and Psi's accumulation provides a persistent memory
+  channel at the emission layer.
+
+**Spanda cannot compensate for a weak backbone.** It adds trajectory
+regularization, not missing context. But for local/linear backbones,
+the persistent Psi state provides a complementary long-range channel
+that the attention mechanism lacks.
+
+### 7.4 The Strategic Research Question
+
+The interesting experiment is not "Does Spanda work on all backbones?"
+(it does trivially, by construction).
+
+The question is:
+
+> **Does Spanda reduce reliance on quadratic attention for long-range
+> coherence?**
+
+If Spanda + O(L) Phase backbone achieves coherence comparable to
+Spanda + O(L^2) Standard backbone, that is a meaningful result: it
+means trajectory-level state persistence can partially substitute for
+full quadratic context.
+
+This is testable: compare `PhaseTransformer + Spanda` vs
+`StandardTransformer + Spanda` on long-range coherence benchmarks
+(binding benchmark, needle-in-haystack).
+
+---
+
+## 8. Integration with Existing Architecture
+
+### 8.1 Affected Models
+
+Start with **two** models to test attention-agnosticism from day one:
+
+1. **`PhaseTransformer`** (line 5773) -- O(L) backbone. Simplest
+   architecture, cleanest baseline. Tests whether Spanda helps when
+   attention is efficient but limited.
+2. **`StandardTransformer`** (line 7188) -- O(L^2) backbone. Full
+   quadratic attention. Tests whether Spanda adds value even when
+   the backbone already has full context.
 
 Do NOT start with `OntologicalBindingCacheTransformer` -- it has two-pass
 architecture, binding annotators, and the 32D Sovereign State, all of
 which add confounders.
 
-### 7.2 Minimal Diff
+### 8.2 Minimal Diff
 
 The implementation would touch:
 
@@ -319,7 +404,7 @@ The implementation would touch:
 
 Estimated: ~100 lines of new code, ~20 lines of modified code.
 
-### 7.3 Suggested Module Location
+### 8.3 Suggested Module Location
 
 ```
 symbolu/
@@ -333,7 +418,7 @@ symbolu/
 Or, more conservatively, add directly to `phase_transformer.py` alongside
 the existing `StateDeltaPredictor` (line 5838).
 
-### 7.4 Training Configuration
+### 8.4 Training Configuration
 
 Starting hyperparameters (from the proposal):
 
@@ -347,11 +432,11 @@ Starting hyperparameters (from the proposal):
 
 ---
 
-## 8. Evaluation Protocol
+## 9. Evaluation Protocol
 
-### 8.1 Metrics
+### 9.1 Metrics
 
-Compare Spanda-Softmax hybrid vs. baseline `PhaseTransformer`:
+Compare Spanda-Softmax hybrid vs. baselines across backbone types:
 
 1. **Perplexity** -- primary metric, must not regress.
 2. **Coherence** -- measure topic drift over long generations. Use existing
@@ -364,7 +449,9 @@ Compare Spanda-Softmax hybrid vs. baseline `PhaseTransformer`:
 6. **Anchor space analysis** -- visualize A[y] clusters, measure
    inter-token distances, verify semantic structure.
 
-### 8.2 Ablation Plan
+### 9.2 Ablation Plan
+
+**Component ablations** (on PhaseTransformer):
 
 1. Full hybrid (Psi state + anchor emission + regularizers).
 2. Anchor emission only (no Psi state -- emit from h_t directly with distance).
@@ -373,14 +460,27 @@ Compare Spanda-Softmax hybrid vs. baseline `PhaseTransformer`:
 
 This separates the contribution of each component.
 
-### 8.3 Dataset
+**Backbone ablations** (full hybrid on each):
+
+5. PhaseTransformer + Spanda (O(L) + state trajectory).
+6. StandardTransformer + Spanda (O(L^2) + state trajectory).
+7. PhaseTransformer baseline (O(L), no Spanda).
+8. StandardTransformer baseline (O(L^2), no Spanda).
+
+Comparing (5) vs (6) answers: does Spanda compensate for reduced attention?
+Comparing (5) vs (7) and (6) vs (8) answers: does Spanda help at all?
+
+The most interesting outcome would be: (5) approaches (8) -- meaning Spanda
++ linear attention rivals quadratic attention alone for coherence.
+
+### 9.3 Dataset
 
 Use the same training data as current Phase Transformer benchmarks
 (WikiText-2/103 via `TextDataset` or `FineWebStreamingDataset`).
 
 ---
 
-## 9. Ontology Blocks (Future, Not v0.1)
+## 10. Ontology Blocks (Future, Not v0.1)
 
 The proposal mentions structuring Psi into sub-blocks:
 
@@ -405,7 +505,7 @@ is future work -- v0.1 should use a flat Psi vector.
 
 ---
 
-## 10. What NOT To Do
+## 11. What NOT To Do
 
 1. **Do not remove softmax.** It provides stability, gradient flow, and
    calibrated probabilities. The hybrid adds to it, not replaces it.
@@ -423,7 +523,7 @@ is future work -- v0.1 should use a flat Psi vector.
 
 ---
 
-## 11. Summary Position
+## 12. Summary Position
 
 The Spanda-Softmax hybrid is a well-motivated inductive bias change. It
 does not expand the function class but provides:
@@ -431,6 +531,7 @@ does not expand the function class but provides:
 - Explicit state trajectory at the emission layer.
 - Geometric interpretability of token prediction.
 - Trajectory smoothness as a regularizable quantity.
+- Attention-agnostic design: works on all 8 existing backbone variants.
 
 The codebase is structurally ready: `compute_state_delta()` already
 implements the accumulation pattern, `SovereignStateProjector` provides
@@ -438,7 +539,13 @@ the MLP template, and `KoshaGyroscopicLoss` demonstrates how to add
 regularization objectives.
 
 The implementation is minimal (~100 new lines) and non-destructive
-(existing architectures unchanged).
+(existing architectures unchanged). Spanda is orthogonal to attention
+complexity -- it consumes `h_t` regardless of how it was computed.
+
+The key research question is not compatibility but consequence:
+**Does Spanda reduce reliance on quadratic attention for long-range
+coherence?** The backbone ablation plan (Section 9.2, experiments 5-8)
+is designed to answer this directly.
 
 **This is an evaluation document. Implementation should proceed only
 after review and approval.**
