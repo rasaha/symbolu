@@ -52,6 +52,14 @@ def main():
     parser.add_argument("--num-heads", type=int, default=4)
     parser.add_argument("--num-layers", type=int, default=2)
     parser.add_argument("--lambda-interference", type=float, default=0.3)
+    parser.add_argument("--gate-entropy-weight", type=float, default=0.0,
+                        help="Weight for gate entropy regularization (prevents degenerate gates)")
+    parser.add_argument("--gate-variance-weight", type=float, default=0.0,
+                        help="Weight for gate variance encouragement (prevents constant gates)")
+    parser.add_argument("--gate-lr-multiplier", type=float, default=1.0,
+                        help="Learning rate multiplier for gate parameters")
+    parser.add_argument("--warmup-epochs", type=int, default=0,
+                        help="Epochs to freeze amplitude projections (force gate dynamics)")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--log-path", type=str, default=None,
                         help="Path to write JSONL diagnostic log")
@@ -102,6 +110,13 @@ def main():
         config, lambda_interference=args.lambda_interference,
     )
     print(f"  Parameters: {count_parameters(model_b):,}")
+    if args.gate_entropy_weight > 0 or args.gate_variance_weight > 0:
+        print(f"  Gate entropy weight: {args.gate_entropy_weight}")
+        print(f"  Gate variance weight: {args.gate_variance_weight}")
+    if args.gate_lr_multiplier != 1.0:
+        print(f"  Gate LR multiplier: {args.gate_lr_multiplier}x")
+    if args.warmup_epochs > 0:
+        print(f"  Warmup epochs: {args.warmup_epochs} (amplitude projections frozen)")
     t0 = time.time()
     result_b = train_and_evaluate(
         model_b, dataset,
@@ -110,6 +125,10 @@ def main():
         lr=args.lr,
         device=device,
         config=config,
+        gate_entropy_weight=args.gate_entropy_weight,
+        gate_variance_weight=args.gate_variance_weight,
+        gate_lr_multiplier=args.gate_lr_multiplier,
+        warmup_epochs=args.warmup_epochs,
     )
     print(f"  Accuracy: {result_b.accuracy:.1%} ({time.time() - t0:.1f}s)")
     print()

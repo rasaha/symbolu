@@ -298,6 +298,10 @@ def train_and_evaluate(
     lr: float = 1e-3,
     device: Optional[torch.device] = None,
     config: Optional[HeadConfig] = None,
+    gate_entropy_weight: float = 0.0,
+    gate_variance_weight: float = 0.0,
+    gate_lr_multiplier: float = 1.0,
+    warmup_epochs: int = 0,
 ) -> EvaluationResult:
     """
     Train a binding head on the dataset (supervised) then evaluate.
@@ -313,18 +317,64 @@ def train_and_evaluate(
         lr: Learning rate.
         device: Torch device.
         config: Head config.
+        gate_entropy_weight: Weight for gate entropy regularization
+            (prevents degenerate g near 0 or 1). Only applies to
+            ResonanceBindingHead.
+        gate_variance_weight: Weight for gate variance encouragement
+            (prevents constant gate across tokens). Only applies to
+            ResonanceBindingHead.
+        gate_lr_multiplier: Learning rate multiplier for gate parameters
+            relative to base lr. Values > 1 give gate faster training.
+            Only applies to ResonanceBindingHead.
+        warmup_epochs: Number of initial epochs where amplitude projections
+            are frozen, forcing the gate to learn dynamic modulation before
+            projections can collapse the signal. Only applies to
+            ResonanceBindingHead.
 
     Returns:
         EvaluationResult after training.
     """
+    from resonant_model.heads import ResonanceBindingHead
+
     config = config or HeadConfig()
     device = device or torch.device("cpu")
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     tokenizer = CharTokenizer(config.vocab_size)
+
+    has_gate_reg = isinstance(model, ResonanceBindingHead) and (
+        gate_entropy_weight > 0 or gate_variance_weight > 0
+    )
+    has_warmup = isinstance(model, ResonanceBindingHead) and warmup_epochs > 0
+    has_gate_lr = isinstance(model, ResonanceBindingHead) and gate_lr_multiplier != 1.0
+
+    # Build optimizer with optional separate gate LR
+    if has_gate_lr:
+        gate_params = model.get_gate_parameters()
+        other_params = model.get_non_gate_parameters()
+        optimizer = torch.optim.Adam([
+            {"params": other_params, "lr": lr},
+            {"params": gate_params, "lr": lr * gate_lr_multiplier},
+        ])
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # Track amplitude params for warmup freezing
+    amp_params = None
+    if has_warmup:
+        amp_params = model.get_amplitude_parameters()
 
     model.train()
     for epoch in range(epochs):
+        # Warmup: freeze amplitude projections for first N epochs
+        in_warmup = has_warmup and epoch < warmup_epochs
+        if in_warmup and amp_params:
+            for p in amp_params:
+                p.requires_grad = False
+        elif has_warmup and epoch == warmup_epochs and amp_params:
+            # Unfreeze at end of warmup
+            for p in amp_params:
+                p.requires_grad = True
+
         total_loss = 0.0
         for example in dataset:
             optimizer.zero_grad()
@@ -358,6 +408,14 @@ def train_and_evaluate(
             loss = torch.nn.functional.cross_entropy(
                 logits[:, :num_valid], target,
             )
+
+            # Gate regularization (only for ResonanceBindingHead)
+            if has_gate_reg:
+                gate_loss = model.compute_gate_regularization(
+                    entropy_weight=gate_entropy_weight,
+                    variance_weight=gate_variance_weight,
+                )
+                loss = loss + gate_loss
 
             loss.backward()
             optimizer.step()

@@ -324,6 +324,127 @@ class TestResonanceBindingHead:
         assert len(gate_params) > 0
 
 
+class TestGateRegularization:
+    """Tests for gate regularization to prevent collapse."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    def test_compute_gate_regularization_returns_scalar(self, config):
+        model = ResonanceBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+
+        loss = model.compute_gate_regularization(
+            entropy_weight=1.0, variance_weight=1.0,
+        )
+        assert loss.shape == ()
+        assert loss.requires_grad
+
+    def test_gate_regularization_gradient_flow(self, config):
+        model = ResonanceBindingHead(config)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        model(token_ids, name_masks)
+
+        loss = model.compute_gate_regularization(
+            entropy_weight=1.0, variance_weight=1.0,
+        )
+        loss.backward()
+
+        gate_grads = sum(
+            1 for name, p in model.named_parameters()
+            if "gate_proj" in name and p.grad is not None
+            and p.grad.abs().sum() > 0
+        )
+        assert gate_grads > 0
+
+    def test_get_gate_parameters(self, config):
+        model = ResonanceBindingHead(config)
+        gate_params = model.get_gate_parameters()
+        assert len(gate_params) > 0
+        gate_names = [
+            name for name, p in model.named_parameters()
+            if "gate_proj" in name or "interference_gate" in name
+        ]
+        assert len(gate_params) == len(gate_names)
+
+    def test_get_non_gate_parameters(self, config):
+        model = ResonanceBindingHead(config)
+        gate_params = model.get_gate_parameters()
+        non_gate_params = model.get_non_gate_parameters()
+        total = len(list(model.parameters()))
+        assert len(gate_params) + len(non_gate_params) == total
+
+    def test_get_amplitude_parameters(self, config):
+        model = ResonanceBindingHead(config)
+        amp_params = model.get_amplitude_parameters()
+        assert len(amp_params) > 0
+        for p in amp_params:
+            assert p.requires_grad
+
+    def test_train_with_gate_regularization(self, config):
+        """Training with gate regularization should run without error."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = ResonanceBindingHead(config, lambda_interference=0.3)
+        result = train_and_evaluate(
+            model, ds, "resonance", epochs=2, config=config,
+            gate_entropy_weight=0.1, gate_variance_weight=0.1,
+        )
+        assert isinstance(result, EvaluationResult)
+        assert result.total_examples == 5
+
+    def test_train_with_gate_lr_multiplier(self, config):
+        """Training with separate gate LR should run without error."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = ResonanceBindingHead(config, lambda_interference=0.3)
+        result = train_and_evaluate(
+            model, ds, "resonance", epochs=2, config=config,
+            gate_lr_multiplier=2.0,
+        )
+        assert isinstance(result, EvaluationResult)
+
+    def test_train_with_warmup(self, config):
+        """Training with warmup epochs should run without error."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = ResonanceBindingHead(config, lambda_interference=0.3)
+        result = train_and_evaluate(
+            model, ds, "resonance", epochs=4, config=config,
+            warmup_epochs=2,
+        )
+        assert isinstance(result, EvaluationResult)
+
+    def test_train_with_all_regularization(self, config):
+        """Training with all regularization features enabled."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = ResonanceBindingHead(config, lambda_interference=0.3)
+        result = train_and_evaluate(
+            model, ds, "resonance", epochs=4, config=config,
+            gate_entropy_weight=0.1,
+            gate_variance_weight=0.1,
+            gate_lr_multiplier=2.0,
+            warmup_epochs=2,
+        )
+        assert isinstance(result, EvaluationResult)
+
+    def test_softmax_ignores_regularization_params(self, config):
+        """Softmax model should work fine when regularization args are passed."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        model = SoftmaxBindingHead(config)
+        result = train_and_evaluate(
+            model, ds, "softmax", epochs=2, config=config,
+            gate_entropy_weight=0.1, gate_variance_weight=0.1,
+        )
+        assert isinstance(result, EvaluationResult)
+
+
 class TestParameterComparison:
     """Model B should have more parameters than Model A (phase projection)."""
 

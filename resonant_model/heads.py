@@ -348,6 +348,9 @@ class InterferenceAttentionLayer(nn.Module):
         self._last_a2 = a2.detach()                  # [B, L, H, d_h]
         self._last_interference = interference.detach()  # [B, H, L]
 
+        # Store non-detached gate for regularization during training
+        self._gate_for_reg = g  # [B, L, H] — keeps gradient
+
         return interference
 
     def forward(self, x: Tensor) -> Tensor:
@@ -451,6 +454,71 @@ class ResonanceBindingHead(nn.Module):
 
     def get_attention_type(self) -> str:
         return "resonance_interference"
+
+    def compute_gate_regularization(
+        self,
+        entropy_weight: float = 1.0,
+        variance_weight: float = 1.0,
+    ) -> Tensor:
+        """
+        Compute gate regularization loss to prevent collapse.
+
+        Two terms:
+          1. Entropy: maximize gate entropy H(g) = -(g log g + (1-g) log(1-g)).
+             Prevents degenerate gates (g near 0 or 1).
+          2. Variance: encourage high variance of g across token positions.
+             Prevents constant gates (same g for all tokens).
+
+        Returns:
+            Scalar regularization loss (to be minimized).
+        """
+        total = torch.tensor(0.0, device=next(self.parameters()).device)
+        for layer in self.layers:
+            g = getattr(layer, "_gate_for_reg", None)
+            if g is None:
+                continue
+            # g: [B, L, H]
+
+            # 1. Entropy maximization: minimize -H(g)
+            # H(g) = -(g*log(g) + (1-g)*log(1-g)), max at g=0.5
+            eps = 1e-7
+            g_clamped = g.clamp(eps, 1.0 - eps)
+            entropy = -(
+                g_clamped * torch.log(g_clamped)
+                + (1.0 - g_clamped) * torch.log(1.0 - g_clamped)
+            )
+            # Max possible entropy is log(2) ≈ 0.693. Normalize and negate.
+            entropy_loss = -entropy.mean() / math.log(2.0)  # in [-1, 0]
+
+            # 2. Variance encouragement across tokens (dim=1)
+            # Penalize low std(g) across the sequence dimension
+            g_std = g.std(dim=1)  # [B, H]
+            variance_loss = -g_std.mean()  # encourage high variance
+
+            total = total + entropy_weight * entropy_loss + variance_weight * variance_loss
+
+        return total
+
+    def get_amplitude_parameters(self) -> List[nn.Parameter]:
+        """Return amplitude projection parameters (for freezing during warmup)."""
+        params = []
+        for layer in self.layers:
+            params.extend(layer.amp1_proj.parameters())
+            params.extend(layer.amp2_proj.parameters())
+        return params
+
+    def get_gate_parameters(self) -> List[nn.Parameter]:
+        """Return gate-related parameters (for separate LR)."""
+        params = []
+        for layer in self.layers:
+            params.extend(layer.gate_proj.parameters())
+            params.append(layer.interference_gate)
+        return params
+
+    def get_non_gate_parameters(self) -> List[nn.Parameter]:
+        """Return all parameters except gate-related ones."""
+        gate_ids = {id(p) for p in self.get_gate_parameters()}
+        return [p for p in self.parameters() if id(p) not in gate_ids]
 
     def get_last_internals(self) -> Dict[str, Tensor]:
         """
