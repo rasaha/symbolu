@@ -1065,11 +1065,11 @@ class ExperimentRunner:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def print_summary(results: List[ExperimentResult]) -> str:
+    def format_summary(results: List[ExperimentResult]) -> str:
         """
         Format a comparison table across all experiment configs.
 
-        Returns the table as a string (also prints it).
+        Returns the table as a string (does NOT print it).
         """
         header = (
             f"{'Config':<12} {'pass@1':>7} {'ECE':>7} {'Brier':>7} "
@@ -1130,9 +1130,9 @@ class ExperimentRunner:
             logit_rho = r.base_logit_correctness_corr
             rank_rho = r.logit_rank_correctness_corr
             # Verdict: does sb beat logit as a predictor?
-            if sb_rho > logit_rho + 0.05:
+            if sb_rho > logit_rho + 0.05 and sb_rho > 0:
                 verdict = "sb WINS — goal embedding adds signal"
-            elif logit_rho > sb_rho + 0.05:
+            elif logit_rho > sb_rho + 0.05 and logit_rho > 0:
                 verdict = "logit WINS — BCVF may not help"
             elif abs(sb_rho) < 0.05 and abs(logit_rho) < 0.05:
                 verdict = "NEITHER predicts — need better embeddings"
@@ -1143,7 +1143,16 @@ class ExperimentRunner:
                 f"{rank_rho:>+13.4f}  {verdict}"
             )
 
-        table = "\n".join(lines)
+        return "\n".join(lines)
+
+    @staticmethod
+    def print_summary(results: List[ExperimentResult]) -> str:
+        """
+        Format and print a comparison table across all experiment configs.
+
+        Returns the table as a string (also prints it).
+        """
+        table = ExperimentRunner.format_summary(results)
         print(table)
         return table
 
