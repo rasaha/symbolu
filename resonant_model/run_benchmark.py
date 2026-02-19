@@ -30,6 +30,7 @@ from resonant_model.heads import (
 )
 from resonant_model.evaluator import train_and_evaluate
 from resonant_model.statistics import BindingStatistics, format_report
+from resonant_model.pass_criteria import PassCriteria, format_pass_result
 
 
 def main():
@@ -108,10 +109,18 @@ def main():
     report = stats.compare(result_a, result_b)
     print()
 
-    # Step 5: Print report
+    # Step 5: Print comparison report
     print(format_report(report))
+    print()
 
-    return report
+    # Step 6: Behavioral pass criteria evaluation
+    print("Evaluating behavioral pass criteria...")
+    pass_eval = PassCriteria()
+    pass_result = pass_eval.evaluate(result_a, result_b)
+    print()
+    print(format_pass_result(pass_result))
+
+    return report, pass_result
 
 
 if __name__ == "__main__":

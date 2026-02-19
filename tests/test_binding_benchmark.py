@@ -8,6 +8,7 @@ Tests cover:
   3. Evaluator — accuracy tracking, failure classification, condition binning
   4. Statistics — McNemar's test, confidence intervals, report generation
   5. End-to-end — train + evaluate pipeline
+  6. Pass criteria — three-tier behavioral gate with hard subsets
 """
 
 import math
@@ -50,6 +51,23 @@ from resonant_model.statistics import (
     accuracy_confidence_interval,
     format_report,
     mcnemar_test,
+)
+from resonant_model.pass_criteria import (
+    CriterionResult,
+    PassCriteria,
+    PassResult,
+    PassTier,
+    TierResult,
+    cohens_d,
+    format_pass_result,
+    _accuracy_slope,
+    _distractor_gap_slope,
+    _extract_high_distance_subset,
+    _extract_high_distractor_subset,
+    _interference_correctness_correlation,
+    _role_swap_reduction,
+    _nearest_name_reduction,
+    _subset_accuracy,
 )
 
 
@@ -789,3 +807,558 @@ class TestEndToEnd:
 
         has_gate = any("interference_gate" in n for n, _ in model.named_parameters())
         assert has_gate
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PASS CRITERIA TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class _PassCriteriaTestHelper:
+    """Shared helpers for pass criteria tests."""
+
+    @staticmethod
+    def make_predictions(
+        n: int,
+        correct_flags: list,
+        distances: list = None,
+        distractors: list = None,
+        depths: list = None,
+        confidences: list = None,
+        failure_types: list = None,
+    ) -> list:
+        """Create PredictionRecord list with controlled attributes."""
+        if distances is None:
+            distances = [30] * n
+        if distractors is None:
+            distractors = [3] * n
+        if depths is None:
+            depths = [1] * n
+        if confidences is None:
+            confidences = [0.9 if c else 0.1 for c in correct_flags]
+        if failure_types is None:
+            failure_types = [
+                FailureType.CORRECT if c else FailureType.ROLE_SWAP
+                for c in correct_flags
+            ]
+
+        return [
+            PredictionRecord(
+                example_id=i,
+                template_type=TemplateType.GIVE_RECEIVE,
+                correct_answer="X",
+                predicted_answer="X" if correct_flags[i] else "Y",
+                is_correct=correct_flags[i],
+                failure_type=failure_types[i],
+                num_distractors=distractors[i],
+                separation_distance=distances[i],
+                nesting_depth=depths[i],
+                confidence=confidences[i],
+            )
+            for i in range(n)
+        ]
+
+    @staticmethod
+    def make_result(
+        model_name: str,
+        predictions: list,
+        role_swaps: int = 0,
+        nn_bias: int = 0,
+    ) -> EvaluationResult:
+        """Build EvaluationResult from predictions list."""
+        n = len(predictions)
+        correct = sum(1 for p in predictions if p.is_correct)
+        return EvaluationResult(
+            model_name=model_name,
+            total_examples=n,
+            correct=correct,
+            accuracy=correct / n if n > 0 else 0.0,
+            predictions=predictions,
+            failure_counts={
+                FailureType.CORRECT.value: correct,
+                FailureType.ROLE_SWAP.value: role_swaps,
+                FailureType.NEAREST_NAME_BIAS.value: nn_bias,
+                FailureType.OBJECT_CONFUSION.value: 0,
+                FailureType.RANDOM_GUESS.value: n - correct - role_swaps - nn_bias,
+            },
+            template_accuracy={"GIVE_RECEIVE": correct / n if n > 0 else 0.0},
+            template_counts={"GIVE_RECEIVE": n},
+            distractor_accuracy={},
+            distance_accuracy={},
+            nesting_accuracy={},
+        )
+
+
+class TestSubsetExtraction(_PassCriteriaTestHelper):
+
+    def test_high_distance_subset(self):
+        preds = self.make_predictions(
+            10,
+            [True] * 10,
+            distances=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        )
+        subset = _extract_high_distance_subset(preds, quantile=0.67)
+        # Top 33% of distances: should pick the highest values
+        assert len(subset) > 0
+        assert all(p.separation_distance >= 60 for p in subset)
+
+    def test_high_distractor_subset(self):
+        preds = self.make_predictions(
+            10,
+            [True] * 10,
+            distractors=[1, 1, 2, 2, 3, 3, 4, 4, 5, 6],
+        )
+        subset = _extract_high_distractor_subset(preds, quantile=0.67)
+        assert len(subset) > 0
+        assert all(p.num_distractors >= 4 for p in subset)
+
+    def test_empty_predictions(self):
+        assert _extract_high_distance_subset([]) == []
+        assert _extract_high_distractor_subset([]) == []
+
+    def test_subset_accuracy_perfect(self):
+        preds = self.make_predictions(5, [True] * 5)
+        assert _subset_accuracy(preds) == 1.0
+
+    def test_subset_accuracy_zero(self):
+        preds = self.make_predictions(5, [False] * 5)
+        assert _subset_accuracy(preds) == 0.0
+
+    def test_subset_accuracy_empty(self):
+        assert _subset_accuracy([]) == 0.0
+
+    def test_subset_accuracy_half(self):
+        preds = self.make_predictions(4, [True, True, False, False])
+        assert _subset_accuracy(preds) == 0.5
+
+
+class TestCohensD(_PassCriteriaTestHelper):
+
+    def test_identical(self):
+        flags = [True, True, False, False, True]
+        preds_a = self.make_predictions(5, flags)
+        preds_b = self.make_predictions(5, flags)
+        d = cohens_d(preds_a, preds_b)
+        assert d == 0.0
+
+    def test_positive_when_b_better(self):
+        preds_a = self.make_predictions(10, [False] * 10)
+        preds_b = self.make_predictions(10, [True] * 10)
+        d = cohens_d(preds_a, preds_b)
+        assert d > 0
+
+    def test_negative_when_a_better(self):
+        preds_a = self.make_predictions(10, [True] * 10)
+        preds_b = self.make_predictions(10, [False] * 10)
+        d = cohens_d(preds_a, preds_b)
+        assert d < 0
+        assert math.isfinite(d)  # should not be -inf
+
+    def test_empty(self):
+        assert cohens_d([], []) == 0.0
+
+    def test_large_effect(self):
+        n = 50
+        preds_a = self.make_predictions(n, [False] * 40 + [True] * 10)
+        preds_b = self.make_predictions(n, [True] * 40 + [False] * 10)
+        d = cohens_d(preds_a, preds_b)
+        assert d >= 0.5  # should be a large effect
+
+
+class TestAccuracySlope(_PassCriteriaTestHelper):
+
+    def test_negative_slope(self):
+        """Accuracy that degrades with distance should have negative slope."""
+        # Low distance: correct. High distance: wrong.
+        preds = self.make_predictions(
+            6,
+            [True, True, True, False, False, False],
+            distances=[10, 20, 30, 70, 80, 90],
+        )
+        slope = _accuracy_slope(preds)
+        assert slope < 0
+
+    def test_flat_slope(self):
+        """Constant accuracy should have near-zero slope."""
+        preds = self.make_predictions(
+            6,
+            [True, False, True, False, True, False],
+            distances=[10, 10, 50, 50, 90, 90],
+        )
+        slope = _accuracy_slope(preds)
+        assert abs(slope) < 0.05
+
+    def test_positive_slope(self):
+        """Accuracy that improves with distance (unusual but testable)."""
+        preds = self.make_predictions(
+            6,
+            [False, False, False, True, True, True],
+            distances=[10, 20, 30, 70, 80, 90],
+        )
+        slope = _accuracy_slope(preds)
+        assert slope > 0
+
+    def test_empty(self):
+        assert _accuracy_slope([]) == 0.0
+
+    def test_single_prediction(self):
+        preds = self.make_predictions(1, [True])
+        assert _accuracy_slope(preds) == 0.0
+
+
+class TestErrorReduction(_PassCriteriaTestHelper):
+
+    def test_role_swap_reduction(self):
+        preds_a = self.make_predictions(10, [True] * 5 + [False] * 5)
+        preds_b = self.make_predictions(10, [True] * 8 + [False] * 2)
+        result_a = self.make_result("A", preds_a, role_swaps=5)
+        result_b = self.make_result("B", preds_b, role_swaps=2)
+        reduction = _role_swap_reduction(result_a, result_b)
+        assert reduction == pytest.approx(0.6)  # (5-2)/5
+
+    def test_role_swap_no_reduction(self):
+        preds = self.make_predictions(10, [True] * 5 + [False] * 5)
+        result_a = self.make_result("A", preds, role_swaps=5)
+        result_b = self.make_result("B", preds, role_swaps=5)
+        reduction = _role_swap_reduction(result_a, result_b)
+        assert reduction == 0.0
+
+    def test_role_swap_increase(self):
+        preds = self.make_predictions(10, [True] * 5 + [False] * 5)
+        result_a = self.make_result("A", preds, role_swaps=2)
+        result_b = self.make_result("B", preds, role_swaps=4)
+        reduction = _role_swap_reduction(result_a, result_b)
+        assert reduction < 0
+
+    def test_role_swap_zero_baseline(self):
+        preds = self.make_predictions(5, [True] * 5)
+        result_a = self.make_result("A", preds, role_swaps=0)
+        result_b = self.make_result("B", preds, role_swaps=0)
+        assert _role_swap_reduction(result_a, result_b) == 0.0
+
+    def test_nearest_name_reduction(self):
+        preds = self.make_predictions(10, [True] * 5 + [False] * 5)
+        result_a = self.make_result("A", preds, nn_bias=4)
+        result_b = self.make_result("B", preds, nn_bias=1)
+        reduction = _nearest_name_reduction(result_a, result_b)
+        assert reduction == pytest.approx(0.75)  # (4-1)/4
+
+
+class TestDistractorGapSlope(_PassCriteriaTestHelper):
+
+    def test_positive_gap_slope(self):
+        """Gap widens with distractors = positive slope."""
+        # A degrades with distractors, B stays strong
+        preds_a = self.make_predictions(
+            6,
+            [True, True, True, False, False, False],
+            distractors=[1, 1, 1, 5, 5, 5],
+        )
+        preds_b = self.make_predictions(
+            6,
+            [True, True, True, True, True, True],
+            distractors=[1, 1, 1, 5, 5, 5],
+        )
+        slope = _distractor_gap_slope(preds_a, preds_b)
+        assert slope > 0
+
+    def test_zero_gap_slope(self):
+        """Same performance at all distractor levels = zero slope."""
+        flags = [True, True, False, False]
+        preds_a = self.make_predictions(4, flags, distractors=[2, 2, 5, 5])
+        preds_b = self.make_predictions(4, flags, distractors=[2, 2, 5, 5])
+        slope = _distractor_gap_slope(preds_a, preds_b)
+        assert abs(slope) < 1e-10
+
+    def test_empty(self):
+        assert _distractor_gap_slope([], []) == 0.0
+
+
+class TestInterferenceCorrelation(_PassCriteriaTestHelper):
+
+    def test_perfect_correlation(self):
+        """High confidence = correct, low confidence = wrong."""
+        preds = self.make_predictions(
+            4,
+            [True, True, False, False],
+            confidences=[0.9, 0.8, 0.1, 0.2],
+        )
+        corr = _interference_correctness_correlation(preds)
+        assert corr > 0.5
+
+    def test_zero_correlation(self):
+        """Confidence unrelated to correctness."""
+        preds = self.make_predictions(
+            4,
+            [True, False, True, False],
+            confidences=[0.5, 0.5, 0.5, 0.5],
+        )
+        corr = _interference_correctness_correlation(preds)
+        assert abs(corr) < 0.01
+
+    def test_empty(self):
+        assert _interference_correctness_correlation([]) == 0.0
+
+
+# ─── Tier Evaluation Tests ────────────────────────────────────────────────────
+
+class TestMinimalPass(_PassCriteriaTestHelper):
+
+    def test_all_criteria_pass(self):
+        """Scenario where Model B clearly beats A on all minimal criteria."""
+        n = 100
+        # A gets 30% correct, B gets 60% correct
+        flags_a = [True] * 30 + [False] * 70
+        flags_b = [True] * 60 + [False] * 40
+        # Give high distance to top 33% so HD subset shows gain
+        distances = list(range(10, 110))  # 10..109
+        preds_a = self.make_predictions(n, flags_a, distances=distances)
+        preds_b = self.make_predictions(n, flags_b, distances=distances)
+        result_a = self.make_result("A", preds_a, role_swaps=50, nn_bias=10)
+        result_b = self.make_result("B", preds_b, role_swaps=20, nn_bias=5)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert result.minimal.passed or result.minimal.passed_count >= 2
+        # At minimum, overall gain and significance should pass
+        overall = next(c for c in result.minimal.criteria if c.name == "overall_accuracy_gain")
+        assert overall.passed  # 30% gain > 5% threshold
+
+    def test_fails_when_no_improvement(self):
+        """Identical performance should fail minimal."""
+        n = 50
+        flags = [True] * 25 + [False] * 25
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds, role_swaps=20)
+        result_b = self.make_result("B", preds, role_swaps=20)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert not result.minimal.passed
+        assert result.highest_pass == PassTier.NONE
+
+    def test_fails_with_small_improvement(self):
+        """2-3% improvement should NOT pass minimal (requires 5%)."""
+        n = 100
+        flags_a = [True] * 47 + [False] * 53
+        flags_b = [True] * 50 + [False] * 50  # only 3% gain
+        preds_a = self.make_predictions(n, flags_a)
+        preds_b = self.make_predictions(n, flags_b)
+        result_a = self.make_result("A", preds_a, role_swaps=40)
+        result_b = self.make_result("B", preds_b, role_swaps=38)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        overall = next(c for c in result.minimal.criteria if c.name == "overall_accuracy_gain")
+        assert not overall.passed  # 3% < 5% threshold
+
+    def test_fails_when_only_easy_examples_improve(self):
+        """Improvement only on short distance should fail high-distance criterion."""
+        n = 100
+        # A is wrong on all, B is right only on short-distance items
+        distances = list(range(10, 110))
+        flags_a = [False] * 100
+        # B correct only on first 33 (short distance), wrong on rest
+        flags_b = [True] * 33 + [False] * 67
+        preds_a = self.make_predictions(n, flags_a, distances=distances)
+        preds_b = self.make_predictions(n, flags_b, distances=distances)
+        result_a = self.make_result("A", preds_a, role_swaps=80)
+        result_b = self.make_result("B", preds_b, role_swaps=60)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        hd = next(c for c in result.minimal.criteria if c.name == "high_distance_gain")
+        assert not hd.passed  # no gain in high-distance subset
+
+    def test_fails_when_role_swaps_unchanged(self):
+        """No change in role swap errors should fail error pattern criterion."""
+        n = 50
+        flags_a = [True] * 20 + [False] * 30
+        flags_b = [True] * 25 + [False] * 25
+        preds_a = self.make_predictions(n, flags_a)
+        preds_b = self.make_predictions(n, flags_b)
+        result_a = self.make_result("A", preds_a, role_swaps=20, nn_bias=5)
+        result_b = self.make_result("B", preds_b, role_swaps=20, nn_bias=5)  # same!
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        error_shift = next(c for c in result.minimal.criteria if c.name == "error_pattern_shift")
+        assert not error_shift.passed  # 0% reduction < 20% threshold
+
+
+class TestStrongPass(_PassCriteriaTestHelper):
+
+    def test_strong_criteria_count(self):
+        """Strong tier should have 5 criteria."""
+        n = 50
+        flags = [True] * 25 + [False] * 25
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds)
+        result_b = self.make_result("B", preds)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert result.strong.total_count == 5
+
+    def test_cohens_d_criterion(self):
+        """Large effect size should pass Cohen's d criterion."""
+        n = 100
+        flags_a = [False] * 80 + [True] * 20
+        flags_b = [True] * 80 + [False] * 20
+        preds_a = self.make_predictions(n, flags_a)
+        preds_b = self.make_predictions(n, flags_b)
+        result_a = self.make_result("A", preds_a)
+        result_b = self.make_result("B", preds_b)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        cd = next(c for c in result.strong.criteria if c.name == "cohens_d")
+        assert cd.passed  # 60% difference should give d >> 0.5
+
+
+class TestBreakthroughPass(_PassCriteriaTestHelper):
+
+    def test_breakthrough_criteria_count(self):
+        """Breakthrough tier should have 7 criteria."""
+        n = 50
+        flags = [True] * 25 + [False] * 25
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds)
+        result_b = self.make_result("B", preds)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert result.breakthrough.total_count == 7
+
+    def test_no_collapse_criterion(self):
+        """Both models above 10% should pass no-collapse."""
+        n = 50
+        preds_a = self.make_predictions(n, [True] * 15 + [False] * 35)
+        preds_b = self.make_predictions(n, [True] * 25 + [False] * 25)
+        result_a = self.make_result("A", preds_a)
+        result_b = self.make_result("B", preds_b)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        no_collapse = next(c for c in result.breakthrough.criteria if c.name == "no_collapse")
+        assert no_collapse.passed
+
+    def test_collapse_detected(self):
+        """Model with < 10% accuracy should trigger collapse."""
+        n = 50
+        preds_a = self.make_predictions(n, [True] * 3 + [False] * 47)  # 6%
+        preds_b = self.make_predictions(n, [True] * 25 + [False] * 25)
+        result_a = self.make_result("A", preds_a)
+        result_b = self.make_result("B", preds_b)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        no_collapse = next(c for c in result.breakthrough.criteria if c.name == "no_collapse")
+        assert not no_collapse.passed
+
+
+class TestPassTierHierarchy(_PassCriteriaTestHelper):
+
+    def test_none_is_lowest(self):
+        """Equal models should get NONE tier."""
+        n = 50
+        flags = [True] * 25 + [False] * 25
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds, role_swaps=20)
+        result_b = self.make_result("B", preds, role_swaps=20)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert result.highest_pass == PassTier.NONE
+
+    def test_custom_thresholds(self):
+        """Custom thresholds should be respected."""
+        criteria = PassCriteria(
+            min_overall_gain=0.01,  # very low threshold
+            min_high_distance_gain=0.01,
+            min_role_swap_reduction=0.01,
+        )
+
+        n = 100
+        flags_a = [True] * 48 + [False] * 52
+        flags_b = [True] * 55 + [False] * 45  # 7% gain
+        distances = list(range(10, 110))
+        preds_a = self.make_predictions(n, flags_a, distances=distances)
+        preds_b = self.make_predictions(n, flags_b, distances=distances)
+        result_a = self.make_result("A", preds_a, role_swaps=40, nn_bias=5)
+        result_b = self.make_result("B", preds_b, role_swaps=30, nn_bias=3)
+
+        result = criteria.evaluate(result_a, result_b)
+        # With low thresholds, overall gain should pass
+        overall = next(c for c in result.minimal.criteria if c.name == "overall_accuracy_gain")
+        assert overall.passed
+
+    def test_summary_is_nonempty(self):
+        n = 20
+        flags = [True] * 10 + [False] * 10
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds)
+        result_b = self.make_result("B", preds)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        assert result.summary
+        assert "BEHAVIORAL PASS CRITERIA" in result.summary
+        assert "VERDICT" in result.summary
+
+    def test_format_pass_result(self):
+        n = 20
+        flags = [True] * 10 + [False] * 10
+        preds = self.make_predictions(n, flags)
+        result_a = self.make_result("A", preds)
+        result_b = self.make_result("B", preds)
+
+        criteria = PassCriteria()
+        result = criteria.evaluate(result_a, result_b)
+
+        text = format_pass_result(result)
+        assert isinstance(text, str)
+        assert "MINIMAL" in text
+        assert "STRONG" in text
+        assert "BREAKTHROUGH" in text
+
+
+class TestEndToEndWithPassCriteria:
+    """Integration: full pipeline including pass criteria evaluation."""
+
+    def test_pipeline_with_pass_criteria(self):
+        config = HeadConfig(
+            vocab_size=256, embed_dim=32, num_heads=2,
+            num_layers=1, max_seq_len=64, max_names=8,
+        )
+        ds = generate_dataset(num_examples=10, seed=42)
+
+        model_a = SoftmaxBindingHead(config)
+        model_b = ResonanceBindingHead(config, lambda_interference=0.3)
+
+        result_a = train_and_evaluate(
+            model_a, ds, "softmax", epochs=2, config=config,
+        )
+        result_b = train_and_evaluate(
+            model_b, ds, "resonance", epochs=2, config=config,
+        )
+
+        criteria = PassCriteria()
+        pass_result = criteria.evaluate(result_a, result_b)
+
+        assert isinstance(pass_result, PassResult)
+        assert pass_result.highest_pass in PassTier
+        assert pass_result.minimal.total_count == 4
+        assert pass_result.strong.total_count == 5
+        assert pass_result.breakthrough.total_count == 7

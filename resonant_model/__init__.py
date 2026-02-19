@@ -12,16 +12,18 @@ softmax head at maintaining correct role assignments under:
   - Multiple agents/patients
 
 Modules:
-  dataset     - Synthetic role-filler binding dataset generator
-  heads       - Model A (softmax baseline) and Model B (resonance interference)
-  evaluator   - Evaluation harness with accuracy and failure-type tracking
-  statistics  - Significance testing and distance/distractor analysis
+  dataset        - Synthetic role-filler binding dataset generator
+  heads          - Model A (softmax baseline) and Model B (resonance interference)
+  evaluator      - Evaluation harness with accuracy and failure-type tracking
+  statistics     - Significance testing and distance/distractor analysis
+  pass_criteria  - Three-tier behavioral pass gate (minimal/strong/breakthrough)
 """
 
 from resonant_model.dataset import BindingDataset, BindingExample
 from resonant_model.heads import SoftmaxBindingHead, ResonanceBindingHead
 from resonant_model.evaluator import BindingEvaluator, EvaluationResult
 from resonant_model.statistics import BindingStatistics, ComparisonReport
+from resonant_model.pass_criteria import PassCriteria, PassResult, PassTier
 
 __all__ = [
     "BindingDataset",
@@ -32,4 +34,7 @@ __all__ = [
     "EvaluationResult",
     "BindingStatistics",
     "ComparisonReport",
+    "PassCriteria",
+    "PassResult",
+    "PassTier",
 ]
