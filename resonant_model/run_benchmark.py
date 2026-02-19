@@ -18,12 +18,13 @@ Model B variants:
   query_conditioned   — Query-conditioned interference interaction (O(L²))
   feature_interference — Interference injected as embedding feature
   hybrid              — Quadratic + interference falsification test
+  scalable            — Scalable quadratic (low-rank, multi-channel)
 
 Usage:
     python -m resonant_model.run_benchmark
     python -m resonant_model.run_benchmark --model-b-type quadratic
     python -m resonant_model.run_benchmark --model-b-type hybrid
-    python -m resonant_model.run_benchmark --model-b-type feature_interference
+    python -m resonant_model.run_benchmark --model-b-type scalable --bilinear-rank 32 --bilinear-channels 4
 """
 
 import argparse
@@ -40,6 +41,8 @@ from resonant_model.heads import (
     QueryConditionedBindingHead,
     FeatureInterferenceBindingHead,
     HybridQuadraticInterferenceHead,
+    ScalableQuadraticBindingHead,
+    ScalableQuadraticConfig,
     count_parameters,
 )
 from resonant_model.evaluator import train_and_evaluate
@@ -58,6 +61,7 @@ MODEL_B_TYPES = {
     "query_conditioned": ("Query-Conditioned Interference", QueryConditionedBindingHead),
     "feature_interference": ("Feature Interference (embedding)", FeatureInterferenceBindingHead),
     "hybrid": ("Hybrid Quadratic + Interference (falsification)", HybridQuadraticInterferenceHead),
+    "scalable": ("Scalable Quadratic (configurable)", ScalableQuadraticBindingHead),
 }
 
 
@@ -75,6 +79,7 @@ def _build_model_b(model_type: str, config: HeadConfig, lambda_val: float):
         return HybridQuadraticInterferenceHead(
             config, lambda_bilinear=lambda_val, lambda_interference=lambda_val,
         )
+    # scalable is handled specially in main() due to extra config
     else:
         raise ValueError(f"Unknown model-b-type: {model_type}")
 
@@ -100,6 +105,15 @@ def main():
                         help="Learning rate multiplier for gate parameters")
     parser.add_argument("--warmup-epochs", type=int, default=0,
                         help="Epochs to freeze amplitude projections (force gate dynamics)")
+    # Scalable quadratic options
+    parser.add_argument("--bilinear-rank", type=int, default=0,
+                        help="Low-rank bottleneck dimension (0=full rank)")
+    parser.add_argument("--bilinear-channels", type=int, default=1,
+                        help="Number of independent bilinear channels")
+    parser.add_argument("--spectral-norm", action="store_true",
+                        help="Apply spectral normalization to bilinear projections")
+    parser.add_argument("--bilinear-dropout", type=float, default=0.0,
+                        help="Dropout on bilinear scores (independent of attention dropout)")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--log-path", type=str, default=None,
                         help="Path to write JSONL diagnostic log")
@@ -148,7 +162,22 @@ def main():
 
     # Step 3: Model B — Selected variant
     print(f"Training Model B ({model_b_label})...")
-    model_b = _build_model_b(args.model_b_type, config, args.lambda_interference)
+    if args.model_b_type == "scalable":
+        scale_config = ScalableQuadraticConfig(
+            num_channels=args.bilinear_channels,
+            rank=args.bilinear_rank,
+            use_spectral_norm=args.spectral_norm,
+            bilinear_dropout=args.bilinear_dropout,
+        )
+        model_b = ScalableQuadraticBindingHead(config, scale_config)
+        print(f"  Rank: {'full' if args.bilinear_rank == 0 else args.bilinear_rank}")
+        print(f"  Channels: {args.bilinear_channels}")
+        if args.spectral_norm:
+            print(f"  Spectral norm: enabled")
+        if args.bilinear_dropout > 0:
+            print(f"  Bilinear dropout: {args.bilinear_dropout}")
+    else:
+        model_b = _build_model_b(args.model_b_type, config, args.lambda_interference)
     print(f"  Parameters: {count_parameters(model_b):,}")
     if args.gate_entropy_weight > 0 or args.gate_variance_weight > 0:
         print(f"  Gate entropy weight: {args.gate_entropy_weight}")

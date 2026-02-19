@@ -1400,6 +1400,263 @@ class HybridQuadraticInterferenceHead(nn.Module):
         return result
 
 
+# ─── Model E: Scalable Quadratic Attention ────────────────────────────────────
+
+class LowRankBilinearChannel(nn.Module):
+    """
+    A single low-rank bilinear attention channel.
+
+    Full-rank bilinear: score = (Ux)^T(Wx) where U,W are D×D.
+    Low-rank:           score = (U_b U_a x)^T (W_b W_a x)
+      where U_a: D→r, U_b: r→D (rank-r bottleneck).
+
+    Parameter savings: 2Dr per projection vs D² full-rank.
+    At D=1024, r=64: 131K vs 1.05M per projection (87% reduction).
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        rank: int,
+        use_spectral_norm: bool = False,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.rank = rank
+
+        # Low-rank factorization: D → r → D
+        u_down = nn.Linear(embed_dim, rank, bias=False)
+        u_up = nn.Linear(rank, embed_dim, bias=False)
+        w_down = nn.Linear(embed_dim, rank, bias=False)
+        w_up = nn.Linear(rank, embed_dim, bias=False)
+
+        if use_spectral_norm:
+            u_down = nn.utils.parametrizations.spectral_norm(u_down)
+            u_up = nn.utils.parametrizations.spectral_norm(u_up)
+            w_down = nn.utils.parametrizations.spectral_norm(w_down)
+            w_up = nn.utils.parametrizations.spectral_norm(w_up)
+
+        self.u_down = u_down
+        self.u_up = u_up
+        self.w_down = w_down
+        self.w_up = w_up
+
+        # Per-head learnable strength
+        self.gate = nn.Parameter(torch.zeros(num_heads, 1, 1))
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Compute low-rank bilinear scores.
+
+        Args:
+            x: [B, L, D]
+
+        Returns:
+            scores: [B, H, L, L]
+        """
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        # Low-rank projection: D → r → D, then reshape to per-head
+        U = self.u_up(self.u_down(x)).view(B, L, H, d_h).transpose(1, 2)
+        W = self.w_up(self.w_down(x)).view(B, L, H, d_h).transpose(1, 2)
+
+        # Bilinear dot product: [B, H, L, L]
+        scores = torch.matmul(U, W.transpose(-2, -1)) / math.sqrt(d_h)
+
+        return torch.sigmoid(self.gate) * scores
+
+
+class ScalableQuadraticAttentionLayer(nn.Module):
+    """
+    Multi-channel low-rank bilinear attention layer.
+
+    score_{i,j} = QK^T/√d + Σ_{c=1}^{C} channel_c(x_i, x_j)
+
+    Each channel is a low-rank bilinear: (U_c x)^T (W_c x) / √d_h
+    with rank-r bottleneck factorization.
+
+    Scaling dimensions:
+      1. Low-rank (r): controls per-channel parameter cost.
+         Full-rank: r = embed_dim (no bottleneck).
+         Typical:   r = embed_dim // 4 or embed_dim // 8.
+
+      2. Channels (C): number of independent bilinear interactions.
+         Each channel learns a different "binding mode."
+         C=1 recovers original quadratic head (if r=embed_dim).
+
+      3. Spectral norm: constrains singular values of projections,
+         prevents bilinear score explosion at initialization.
+
+      4. Bilinear dropout: independent dropout on bilinear scores
+         (separate from attention dropout), regularizes the
+         quadratic channel to prevent over-reliance.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.1,
+        num_channels: int = 1,
+        rank: int = 0,  # 0 = full rank (embed_dim)
+        use_spectral_norm: bool = False,
+        bilinear_dropout: float = 0.0,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.num_channels = num_channels
+
+        effective_rank = rank if rank > 0 else embed_dim
+
+        # Standard Q/K/V
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        # Multi-channel low-rank bilinear
+        self.channels = nn.ModuleList([
+            LowRankBilinearChannel(
+                embed_dim, num_heads, effective_rank, use_spectral_norm,
+            )
+            for _ in range(num_channels)
+        ])
+
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.bilinear_dropout = nn.Dropout(bilinear_dropout) if bilinear_dropout > 0 else None
+
+    def forward(self, x: Tensor) -> Tensor:
+        B, L, D = x.shape
+        H = self.num_heads
+        d_h = self.head_dim
+
+        Q = self.q_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        K = self.k_proj(x).view(B, L, H, d_h).transpose(1, 2)
+        V = self.v_proj(x).view(B, L, H, d_h).transpose(1, 2)
+
+        # Standard attention
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_h)
+
+        # Sum of bilinear channels
+        for channel in self.channels:
+            bilinear = channel(x)  # [B, H, L, L]
+            if self.bilinear_dropout is not None:
+                bilinear = self.bilinear_dropout(bilinear)
+            scores = scores + bilinear
+
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        attn_out = torch.matmul(attn_weights, V)
+        attn_out = attn_out.transpose(1, 2).reshape(B, L, D)
+        attn_out = self.out_proj(attn_out)
+
+        x = self.norm1(x + attn_out)
+        ff_out = self.ff(x)
+        x = self.norm2(x + ff_out)
+        return x
+
+
+@dataclass
+class ScalableQuadraticConfig:
+    """Configuration for scalable quadratic attention."""
+    num_channels: int = 1       # independent bilinear channels
+    rank: int = 0               # 0 = full rank; >0 = low-rank bottleneck
+    use_spectral_norm: bool = False
+    bilinear_dropout: float = 0.0
+
+
+class ScalableQuadraticBindingHead(nn.Module):
+    """
+    Model E: Scalable quadratic bilinear attention for binding tasks.
+
+    Extends Model C with four scaling dimensions:
+      1. Low-rank factorization (rank): D→r→D bottleneck reduces
+         params from O(D²) to O(Dr) per projection.
+      2. Multi-channel (num_channels): C independent bilinear
+         interactions, each capturing a different binding mode.
+      3. Spectral normalization: constrains projection norms
+         to prevent score explosion.
+      4. Bilinear dropout: regularizes quadratic channel independently.
+
+    Param budget comparison (D=128, H=4, L=2 layers):
+      Full rank, C=1:  +66K  (original Model C)
+      Rank 32, C=1:    +33K  (50% reduction)
+      Rank 32, C=4:    +131K (4 channels at 50% each)
+
+    At scale (D=1024, L=6 layers):
+      Full rank, C=1:  +12.6M
+      Rank 64, C=1:    +1.6M  (87% reduction)
+      Rank 64, C=4:    +6.3M  (4 channels at 87% each)
+    """
+
+    def __init__(
+        self,
+        config: Optional[HeadConfig] = None,
+        scale_config: Optional[ScalableQuadraticConfig] = None,
+    ):
+        super().__init__()
+        self.config = config or HeadConfig()
+        self.scale_config = scale_config or ScalableQuadraticConfig()
+        c = self.config
+        sc = self.scale_config
+
+        self.embedding = nn.Embedding(c.vocab_size, c.embed_dim, padding_idx=0)
+        self.pos_enc = PositionalEncoding(c.embed_dim, c.max_seq_len)
+        self.drop = nn.Dropout(c.dropout)
+
+        self.layers = nn.ModuleList([
+            ScalableQuadraticAttentionLayer(
+                c.embed_dim, c.num_heads, c.dropout,
+                num_channels=sc.num_channels,
+                rank=sc.rank,
+                use_spectral_norm=sc.use_spectral_norm,
+                bilinear_dropout=sc.bilinear_dropout,
+            )
+            for _ in range(c.num_layers)
+        ])
+
+        self.pooler = NamePooler(c.embed_dim)
+        self.tokenizer = CharTokenizer(c.vocab_size)
+
+    def forward(self, x: Tensor, name_masks: Tensor) -> Tensor:
+        x = self.embedding(x)
+        x = self.pos_enc(x)
+        x = self.drop(x)
+        for layer in self.layers:
+            x = layer(x)
+        return self.pooler(x, name_masks)
+
+    def get_attention_type(self) -> str:
+        sc = self.scale_config
+        parts = ["scalable_quadratic"]
+        if sc.rank > 0:
+            parts.append(f"r{sc.rank}")
+        if sc.num_channels > 1:
+            parts.append(f"c{sc.num_channels}")
+        if sc.use_spectral_norm:
+            parts.append("sn")
+        if sc.bilinear_dropout > 0:
+            parts.append(f"bd{sc.bilinear_dropout}")
+        return "_".join(parts)
+
+
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 def count_parameters(model: nn.Module) -> int:

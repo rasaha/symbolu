@@ -34,6 +34,8 @@ from resonant_model.heads import (
     QuadraticBindingHead,
     QueryConditionedBindingHead,
     ResonanceBindingHead,
+    ScalableQuadraticBindingHead,
+    ScalableQuadraticConfig,
     SoftmaxBindingHead,
     build_name_masks,
     count_parameters,
@@ -639,6 +641,120 @@ class TestHybridQuadraticInterferenceHead:
             gate_entropy_weight=0.1, gate_variance_weight=0.1,
             gate_lr_multiplier=2.0,
         )
+        assert result.total_examples == 5
+
+
+class TestScalableQuadraticBindingHead:
+    """Tests for Model E: scalable quadratic with low-rank, multi-channel, regularization."""
+
+    @pytest.fixture
+    def config(self):
+        return HeadConfig(
+            vocab_size=256, embed_dim=64, num_heads=2,
+            num_layers=1, max_seq_len=128, max_names=8,
+        )
+
+    @pytest.fixture
+    def token_ids(self):
+        return torch.randint(0, 256, (2, 128))
+
+    @pytest.fixture
+    def name_masks(self):
+        m = torch.zeros(2, 8, 128)
+        m[:, 0, 5:10] = 1.0
+        return m
+
+    def test_full_rank_forward_shape(self, config, token_ids, name_masks):
+        """Full-rank single channel (equivalent to Model C)."""
+        model = ScalableQuadraticBindingHead(config)
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_low_rank_forward_shape(self, config, token_ids, name_masks):
+        sc = ScalableQuadraticConfig(rank=16)
+        model = ScalableQuadraticBindingHead(config, sc)
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_multi_channel_forward_shape(self, config, token_ids, name_masks):
+        sc = ScalableQuadraticConfig(num_channels=4, rank=16)
+        model = ScalableQuadraticBindingHead(config, sc)
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_spectral_norm(self, config, token_ids, name_masks):
+        sc = ScalableQuadraticConfig(rank=16, use_spectral_norm=True)
+        model = ScalableQuadraticBindingHead(config, sc)
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+        # Verify spectral norm is applied (parametrization present)
+        channel = model.layers[0].channels[0]
+        assert hasattr(channel.u_down, "parametrizations")
+
+    def test_bilinear_dropout(self, config, token_ids, name_masks):
+        sc = ScalableQuadraticConfig(bilinear_dropout=0.5)
+        model = ScalableQuadraticBindingHead(config, sc)
+        model.train()
+        logits = model(token_ids, name_masks)
+        assert logits.shape == (2, 8)
+
+    def test_gradient_flow(self, config):
+        sc = ScalableQuadraticConfig(rank=16, num_channels=2)
+        model = ScalableQuadraticBindingHead(config, sc)
+        token_ids = torch.randint(0, 256, (1, 128))
+        name_masks = torch.zeros(1, 8, 128)
+        name_masks[0, 0, 5:10] = 1.0
+        logits = model(token_ids, name_masks)
+        logits.sum().backward()
+        grad_count = sum(
+            1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0
+        )
+        assert grad_count > 0
+
+    def test_low_rank_fewer_params(self, config):
+        """Low-rank should have fewer params than full-rank."""
+        full = ScalableQuadraticBindingHead(config, ScalableQuadraticConfig(rank=0))
+        low = ScalableQuadraticBindingHead(config, ScalableQuadraticConfig(rank=16))
+        assert count_parameters(low) < count_parameters(full)
+
+    def test_multi_channel_more_params(self, config):
+        """More channels = more params."""
+        c1 = ScalableQuadraticBindingHead(config, ScalableQuadraticConfig(rank=16, num_channels=1))
+        c4 = ScalableQuadraticBindingHead(config, ScalableQuadraticConfig(rank=16, num_channels=4))
+        assert count_parameters(c4) > count_parameters(c1)
+
+    def test_attention_type_encoding(self, config):
+        """Attention type string should encode configuration."""
+        sc = ScalableQuadraticConfig(rank=32, num_channels=4, use_spectral_norm=True)
+        model = ScalableQuadraticBindingHead(config, sc)
+        attn_type = model.get_attention_type()
+        assert "r32" in attn_type
+        assert "c4" in attn_type
+        assert "sn" in attn_type
+
+    def test_train_and_evaluate_low_rank(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        sc = ScalableQuadraticConfig(rank=16)
+        model = ScalableQuadraticBindingHead(config, sc)
+        result = train_and_evaluate(model, ds, "scalable", epochs=2, config=config)
+        assert result.total_examples == 5
+
+    def test_train_and_evaluate_multi_channel(self, config):
+        ds = generate_dataset(num_examples=5, seed=42)
+        sc = ScalableQuadraticConfig(rank=16, num_channels=4)
+        model = ScalableQuadraticBindingHead(config, sc)
+        result = train_and_evaluate(model, ds, "scalable_mc", epochs=2, config=config)
+        assert result.total_examples == 5
+
+    def test_train_with_all_options(self, config):
+        """Full option stack: low-rank + multi-channel + spectral norm + bilinear dropout."""
+        ds = generate_dataset(num_examples=5, seed=42)
+        sc = ScalableQuadraticConfig(
+            rank=16, num_channels=2,
+            use_spectral_norm=True, bilinear_dropout=0.1,
+        )
+        model = ScalableQuadraticBindingHead(config, sc)
+        result = train_and_evaluate(model, ds, "scalable_full", epochs=2, config=config)
         assert result.total_examples == 5
 
 
