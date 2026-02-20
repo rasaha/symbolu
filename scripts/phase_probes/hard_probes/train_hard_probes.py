@@ -167,6 +167,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
+# Entropy-based logit scale control
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from symbolu.training.entropy_control import (
+    EntropyControlConfig,
+    LogitScaleModule,
+    AdaptiveEntropyController,
+    topk_entropy,
+    attach_logit_scale,
+    log_entropy_metrics,
+)
+
 
 # =============================================================================
 # SRK (SOVEREIGN REASONING KERNEL) IMPORTS
@@ -9778,6 +9791,26 @@ def train_real_language(
             print(f"  ║    L{i}: {comp_str:<30}                     ║")
         print(f"  ╚═══════════════════════════════════════════════════════════════════╝")
 
+    # Entropy-Based Logit Scale Control (attach BEFORE optimizer)
+    entropy_scale_module = None
+    if getattr(args, 'enable_entropy_control_train', False):
+        entropy_cfg = EntropyControlConfig(
+            enable_entropy_control_train=True,
+            enable_entropy_control_infer=getattr(args, 'enable_entropy_control_infer', False),
+            entropy_topk=getattr(args, 'entropy_topk', 50),
+            entropy_h_min=getattr(args, 'entropy_h_min', 0.15),
+            entropy_h_max=getattr(args, 'entropy_h_max', 0.35),
+            entropy_lambda=getattr(args, 'entropy_control_lambda', 0.01),
+            logit_scale_min=getattr(args, 'logit_scale_min', -4.0),
+            logit_scale_max=getattr(args, 'logit_scale_max', 4.0),
+            infer_h_target=getattr(args, 'infer_h_target', 0.25),
+            infer_eta=getattr(args, 'infer_eta', 0.02),
+            infer_delta_clip=getattr(args, 'infer_delta_clip', 0.05),
+        )
+        entropy_scale_module = attach_logit_scale(model, entropy_cfg)
+        print(f"  Entropy Logit Scale Control: ENABLED")
+        print(f"    H_band=[{entropy_cfg.entropy_h_min}, {entropy_cfg.entropy_h_max}], lambda={entropy_cfg.entropy_lambda}")
+
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
@@ -9863,6 +9896,14 @@ def train_real_language(
             lambda_entropy = getattr(args, 'witness_entropy_lambda', 0.1)
             entropy_loss = witness_diagnostics.get_entropy_loss(lambda_entropy)
             loss = loss + entropy_loss
+
+        # Entropy-Based Logit Scale Control (train-time)
+        if entropy_scale_module is not None:
+            scaled_logits = entropy_scale_module(logits)
+            loss, ec_metrics = entropy_scale_module.compute_loss(scaled_logits, loss)
+            if step % log_interval == 0:
+                log_msg = log_entropy_metrics(ec_metrics, step)
+                print(log_msg)
 
         # Backward
         optimizer.zero_grad()
@@ -12430,6 +12471,30 @@ Examples:
                         help="Enable entropy regularization to prevent vritti collapse")
     parser.add_argument("--witness-entropy-lambda", type=float, default=0.1,
                         help="Weight for vritti entropy regularization (default: 0.1)")
+
+    # ENTROPY-BASED LOGIT SCALE CONTROL
+    parser.add_argument("--enable-entropy-control-train", action="store_true",
+                        help="Enable train-time entropy-based logit scale control")
+    parser.add_argument("--enable-entropy-control-infer", action="store_true",
+                        help="Enable inference-time adaptive entropy control")
+    parser.add_argument("--entropy-topk", type=int, default=50,
+                        help="K for top-K entropy computation (default: 50)")
+    parser.add_argument("--entropy-h-min", type=float, default=0.15,
+                        help="Lower bound of target entropy band (default: 0.15)")
+    parser.add_argument("--entropy-h-max", type=float, default=0.35,
+                        help="Upper bound of target entropy band (default: 0.35)")
+    parser.add_argument("--entropy-control-lambda", type=float, default=0.01,
+                        help="Weight for entropy band penalty (default: 0.01)")
+    parser.add_argument("--logit-scale-min", type=float, default=-4.0,
+                        help="Minimum logit scale clamp (default: -4.0)")
+    parser.add_argument("--logit-scale-max", type=float, default=4.0,
+                        help="Maximum logit scale clamp (default: 4.0)")
+    parser.add_argument("--infer-h-target", type=float, default=0.25,
+                        help="Target entropy midpoint for inference (default: 0.25)")
+    parser.add_argument("--infer-eta", type=float, default=0.02,
+                        help="Inference adaptation rate (default: 0.02)")
+    parser.add_argument("--infer-delta-clip", type=float, default=0.05,
+                        help="Inference error clipping bound (default: 0.05)")
 
     # V10.3.5: DOMAIN SEPARATION - Aligned with SRK component layout
     # Layer assignments (4-layer model):
