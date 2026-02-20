@@ -93,6 +93,36 @@ try:
 except ImportError:
     HF_AVAILABLE = False
 
+
+class _SimpleByteTokenizer:
+    """Minimal byte-level tokenizer fallback when HuggingFace is unavailable."""
+
+    name_or_path = "byte-fallback"
+    eos_token_id = 0
+    model_max_length = int(1e12)
+
+    def encode(self, text, return_tensors=None, **kwargs):
+        ids = [b + 1 for b in text.encode("utf-8", errors="replace")]  # 1-indexed
+        if return_tensors == "pt":
+            return torch.tensor([ids], dtype=torch.long)
+        return ids
+
+    def decode(self, ids, skip_special_tokens=False, **kwargs):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        if isinstance(ids, list) and ids and isinstance(ids[0], list):
+            ids = ids[0]
+        return bytes([max(0, i - 1) for i in ids]).decode("utf-8", errors="replace")
+
+    def convert_ids_to_tokens(self, ids):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        return [chr(max(0, i - 1)) if 0 < i < 128 else f"<{i}>" for i in ids]
+
+    @property
+    def vocab_size(self):
+        return 256
+
 # TensorBoard
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -109,6 +139,21 @@ from symbolu.training.entropy_control import (
     attach_logit_scale,
     log_entropy_metrics,
 )
+
+# BCVF Contrastive Structural Pressure on Representations
+try:
+    from symbolu.ontological.bcvf_contrastive import (
+        BCVFContrastiveConfig,
+        BCVFContrastiveHead,
+        BCVFNegativeSampler,
+        HiddenStateCaptureHook,
+        compute_bcvf_contrastive_loss,
+        log_bcvf_contrastive_diagnostics,
+        get_token_embedding_weight,
+    )
+    BCVF_CONTRASTIVE_AVAILABLE = True
+except ImportError:
+    BCVF_CONTRASTIVE_AVAILABLE = False
 
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -10120,6 +10165,21 @@ class UnifiedTrainingConfig:
     vritti_entropy_reg: bool = False       # Enable entropy regularization for vritti
     vritti_entropy_lambda: float = 0.1     # Weight for entropy regularization
 
+    # ==========================================================================
+    # BCVF Contrastive Structural Pressure on Representations
+    # Reference: symbolu/ontological/bcvf_contrastive.py
+    # ==========================================================================
+    use_bcvf_contrastive: bool = False     # Master toggle for contrastive objective
+    bcvf_contrastive_lambda: float = 0.1   # Weight for L_rep in total loss
+    bcvf_contrastive_K: int = 16           # Number of negatives per position
+    bcvf_contrastive_K_pool: int = 256     # Candidate pool size for Stage A
+    bcvf_contrastive_margin: float = 0.15  # Margin for ranking loss
+    bcvf_contrastive_alpha: float = 2.0    # Temperature for BCVF negative weighting
+    bcvf_contrastive_eta: float = 0.3      # Token embedding injection scale for proxy r_neg
+    bcvf_contrastive_d_r: int = 128        # Projection output dimensionality
+    bcvf_contrastive_T_sample: int = 4     # Positions per sequence to sample
+    bcvf_contrastive_projector: str = "mlp"  # "linear" or "mlp"
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -10583,8 +10643,36 @@ def load_data(
 
         return train_loader, val_loader
 
+    elif config.dataset == "synthetic":
+        # Offline synthetic dataset (random tokens for architecture validation)
+        vocab_size = getattr(tokenizer, 'vocab_size', 256)
+        num_train = max(200_000, effective_seq_len * config.batch_size * 100)
+        num_val = max(20_000, effective_seq_len * config.batch_size * 10)
+        print(f"  Generating synthetic data: {num_train:,} train + {num_val:,} val tokens (vocab={vocab_size})")
+        train_tokens = torch.randint(1, vocab_size, (num_train,))
+        val_tokens = torch.randint(1, vocab_size, (num_val,))
+
+        train_dataset = TextDataset(train_tokens, effective_seq_len)
+        val_dataset = TextDataset(val_tokens, effective_seq_len)
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=0,
+            drop_last=True,
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=0,
+            drop_last=True,
+        )
+        return train_loader, val_loader
+
     else:
-        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', or 'fineweb'")
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', or 'synthetic'")
 
 
 # =============================================================================
@@ -13404,9 +13492,17 @@ def train(config: UnifiedTrainingConfig):
             print(f"     Current model_type: {config.model_type}")
             print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    tokenizer.model_max_length = int(1e12)
+    # Load tokenizer (with offline fallback)
+    if HF_AVAILABLE:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            tokenizer.model_max_length = int(1e12)
+        except (OSError, Exception) as e:
+            print(f"  ⚠️  Cannot load GPT-2 tokenizer ({type(e).__name__}). Using byte-level fallback.")
+            tokenizer = _SimpleByteTokenizer()
+    else:
+        print("  ⚠️  HuggingFace not installed. Using byte-level fallback tokenizer.")
+        tokenizer = _SimpleByteTokenizer()
 
     # Create model BEFORE data loading (needed for AutoBatchSizer)
     model = create_model(config, device)
@@ -15049,6 +15145,67 @@ def train(config: UnifiedTrainingConfig):
             print(f"\n  ❌ [CHUNK DIAGNOSTIC] Failed to run diagnostic: {e}")
             print(f"      Training will continue without diagnostic validation.\n")
 
+    # ==========================================================================
+    # BCVF Contrastive Structural Pressure — Initialization
+    # ==========================================================================
+    bcvf_contrastive_head = None
+    bcvf_contrastive_sampler = None
+    bcvf_contrastive_config = None
+    bcvf_hidden_hook = None
+
+    if config.use_bcvf_contrastive and BCVF_CONTRASTIVE_AVAILABLE:
+        # Determine model hidden dimension
+        _bcvf_embed_dim = getattr(config, 'n_embd', None) or MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+
+        bcvf_contrastive_config = BCVFContrastiveConfig(
+            use_bcvf_contrastive=True,
+            lambda_rep=config.bcvf_contrastive_lambda,
+            K=config.bcvf_contrastive_K,
+            K_pool=min(config.bcvf_contrastive_K_pool, config.vocab_size),
+            margin=config.bcvf_contrastive_margin,
+            alpha=config.bcvf_contrastive_alpha,
+            eta=config.bcvf_contrastive_eta,
+            d_r=config.bcvf_contrastive_d_r,
+            T_sample=config.bcvf_contrastive_T_sample,
+            projector_type=config.bcvf_contrastive_projector,
+        )
+
+        bcvf_contrastive_head = BCVFContrastiveHead(
+            hidden_dim=_bcvf_embed_dim,
+            proj_dim=bcvf_contrastive_config.d_r,
+            projector_type=bcvf_contrastive_config.projector_type,
+        ).to(device)
+
+        # Add contrastive head params to optimizer
+        optimizer.add_param_group({
+            'params': bcvf_contrastive_head.parameters(),
+            'lr': config.learning_rate,
+            'weight_decay': 0.01,
+        })
+
+        bcvf_contrastive_sampler = BCVFNegativeSampler(
+            K=bcvf_contrastive_config.K,
+            K_pool=bcvf_contrastive_config.K_pool,
+            top_p=bcvf_contrastive_config.top_p,
+        )
+
+        # Register hidden state capture hook
+        bcvf_hidden_hook = HiddenStateCaptureHook()
+        hook_ok = bcvf_hidden_hook.register(model)
+
+        print(f"\n  [BCVF-REP] Contrastive Structural Pressure ENABLED")
+        print(f"     lambda_rep={bcvf_contrastive_config.lambda_rep}, "
+              f"K={bcvf_contrastive_config.K}, "
+              f"margin={bcvf_contrastive_config.margin}")
+        print(f"     d_r={bcvf_contrastive_config.d_r}, "
+              f"T_sample={bcvf_contrastive_config.T_sample}, "
+              f"projector={bcvf_contrastive_config.projector_type}")
+        print(f"     Hidden hook registered: {hook_ok}")
+        print(f"     Head params: {sum(p.numel() for p in bcvf_contrastive_head.parameters()):,}")
+
+    elif config.use_bcvf_contrastive and not BCVF_CONTRASTIVE_AVAILABLE:
+        print("  [BCVF-REP] WARNING: use_bcvf_contrastive=True but module not available")
+
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
         # This allows VRAM to stabilize after memory reallocation
@@ -16252,6 +16409,70 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [32D REGULARIZER] Error: {e}")
+
+            # =====================================================================
+            # BCVF Contrastive Structural Pressure on Representations
+            # Adds L_rep to total loss — shapes hidden-state geometry
+            # =====================================================================
+            if bcvf_contrastive_head is not None and bcvf_contrastive_config is not None:
+                try:
+                    # Get hidden states
+                    bcvf_h = None
+                    if bcvf_hidden_hook is not None:
+                        bcvf_h = bcvf_hidden_hook.get()
+
+                    # Get logits
+                    bcvf_logits = None
+                    if isinstance(outputs, dict):
+                        bcvf_logits = outputs.get('logits', outputs.get('output'))
+                    elif isinstance(outputs, torch.Tensor):
+                        bcvf_logits = outputs
+                    # Handle case where logits was separately extracted
+                    if bcvf_logits is None and 'logits' in dir():
+                        bcvf_logits = logits
+
+                    if bcvf_h is not None and bcvf_logits is not None and bcvf_h.dim() == 3 and bcvf_logits.dim() == 3:
+                        # Get token embeddings
+                        bcvf_tok_emb = get_token_embedding_weight(model)
+                        if bcvf_tok_emb is None:
+                            # Fallback: try lm_head weight (tied embeddings)
+                            for _n, _m in model.named_modules():
+                                if 'lm_head' in _n and isinstance(_m, nn.Linear):
+                                    bcvf_tok_emb = _m.weight.detach()
+                                    break
+
+                        if bcvf_tok_emb is not None:
+                            rep_loss, rep_diag = compute_bcvf_contrastive_loss(
+                                h_all=bcvf_h,
+                                logits_all=bcvf_logits.detach() if bcvf_logits.requires_grad else bcvf_logits,
+                                labels=y,
+                                contrastive_head=bcvf_contrastive_head,
+                                token_embeddings=bcvf_tok_emb,
+                                config=bcvf_contrastive_config,
+                                sampler=bcvf_contrastive_sampler,
+                            )
+
+                            # Add weighted contrastive loss
+                            loss = loss + bcvf_contrastive_config.lambda_rep * rep_loss
+
+                            # Log diagnostics
+                            for k, v in rep_diag.items():
+                                if isinstance(v, (int, float)):
+                                    metrics[k] = v
+
+                            log_bcvf_contrastive_diagnostics(
+                                rep_diag, global_step,
+                                writer=writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None,
+                                print_every=config.log_every,
+                            )
+
+                    # Clear hook state for next step
+                    if bcvf_hidden_hook is not None:
+                        bcvf_hidden_hook.clear()
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [BCVF-REP] Error at step {global_step}: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -18715,8 +18936,8 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2", "fineweb"],
-                       help="Training dataset: wikitext103, wikitext2, or fineweb (streaming)")
+                       choices=["wikitext103", "wikitext2", "fineweb", "synthetic"],
+                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), or synthetic (offline)")
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
                        help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
     parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
@@ -19882,6 +20103,29 @@ def main():
     parser.add_argument("--vritti_entropy_lambda", type=float, default=0.1,
                        help="Weight for vritti entropy regularization (higher = more balanced)")
 
+    # BCVF Contrastive Structural Pressure on Representations
+    parser.add_argument("--use_bcvf_contrastive", action="store_true",
+                       help="Enable BCVF contrastive structural pressure on representations")
+    parser.add_argument("--bcvf_contrastive_lambda", type=float, default=0.1,
+                       help="Weight for contrastive representation loss L_rep")
+    parser.add_argument("--bcvf_contrastive_K", type=int, default=16,
+                       help="Number of negatives per sampled position")
+    parser.add_argument("--bcvf_contrastive_K_pool", type=int, default=256,
+                       help="Candidate pool size for Stage A negative sampling")
+    parser.add_argument("--bcvf_contrastive_margin", type=float, default=0.15,
+                       help="Margin for contrastive ranking loss")
+    parser.add_argument("--bcvf_contrastive_alpha", type=float, default=2.0,
+                       help="Temperature for BCVF-based negative weighting")
+    parser.add_argument("--bcvf_contrastive_eta", type=float, default=0.3,
+                       help="Token embedding injection scale for proxy r_neg")
+    parser.add_argument("--bcvf_contrastive_d_r", type=int, default=128,
+                       help="Projection output dimensionality")
+    parser.add_argument("--bcvf_contrastive_T_sample", type=int, default=4,
+                       help="Number of positions per sequence to sample for contrastive loss")
+    parser.add_argument("--bcvf_contrastive_projector", type=str, default="mlp",
+                       choices=["linear", "mlp"],
+                       help="Projection head type for contrastive representations")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -20426,6 +20670,17 @@ def main():
         no_protected_phase=args.no_protected_phase,
         run_chunk_diagnostic=args.run_chunk_diagnostic,
         chunk_diagnostic_seq_len=args.chunk_diagnostic_seq_len,
+        # BCVF Contrastive Structural Pressure on Representations
+        use_bcvf_contrastive=args.use_bcvf_contrastive,
+        bcvf_contrastive_lambda=args.bcvf_contrastive_lambda,
+        bcvf_contrastive_K=args.bcvf_contrastive_K,
+        bcvf_contrastive_K_pool=args.bcvf_contrastive_K_pool,
+        bcvf_contrastive_margin=args.bcvf_contrastive_margin,
+        bcvf_contrastive_alpha=args.bcvf_contrastive_alpha,
+        bcvf_contrastive_eta=args.bcvf_contrastive_eta,
+        bcvf_contrastive_d_r=args.bcvf_contrastive_d_r,
+        bcvf_contrastive_T_sample=args.bcvf_contrastive_T_sample,
+        bcvf_contrastive_projector=args.bcvf_contrastive_projector,
     )
 
     # ==========================================================================
