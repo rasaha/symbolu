@@ -155,6 +155,18 @@ try:
 except ImportError:
     BCVF_CONTRASTIVE_AVAILABLE = False
 
+# Kosha-Vritti Structured Supervision (Static Compatibility Version)
+try:
+    from symbolu.training.kosha_vritti_supervision import (
+        KoshaVrittiSupervisionConfig,
+        KoshaVrittiSupervisor,
+        log_kv_metrics,
+    )
+    KV_SUPERVISION_AVAILABLE = True
+except ImportError as e:
+    KV_SUPERVISION_AVAILABLE = False
+    print(f"Warning: Kosha-Vritti Supervision not available: {e}")
+
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -10180,6 +10192,27 @@ class UnifiedTrainingConfig:
     bcvf_contrastive_T_sample: int = 4     # Positions per sequence to sample
     bcvf_contrastive_projector: str = "mlp"  # "linear" or "mlp"
 
+    # ==========================================================================
+    # KOSHA-VRITTI STRUCTURED SUPERVISION (Static Compatibility Version)
+    # Reference: symbolu/training/kosha_vritti_supervision.py
+    # ==========================================================================
+    # Auxiliary soft-label supervision for Kosha (4-class) and Vritti (5-class)
+    # with entropy floor, static joint compatibility matrix, and staged curriculum.
+    # Does NOT modify transformer blocks -- only adds auxiliary linear heads.
+    enable_kv_supervision: bool = False        # Master toggle
+    kv_weight_kosha_kl: float = 0.1            # Weight for Kosha KL loss
+    kv_weight_vritti_kl: float = 0.1           # Weight for Vritti KL loss
+    kv_weight_entropy_floor: float = 0.01      # Weight for entropy floor penalty
+    kv_weight_compatibility: float = 0.05      # Weight for joint compatibility loss
+    kv_weight_prior: float = 0.001             # Weight for W_kv prior regularization
+    kv_entropy_floor_ratio: float = 0.4        # Hmin = ratio * log(num_classes)
+    kv_compatibility_prior_path: str = ""      # Path to W0 prior matrix (empty = none)
+    kv_curriculum_exclude_epochs: int = 2      # Epochs to exclude Viparyaya/Nidra
+    kv_curriculum_ramp_epochs: int = 1         # Epochs to ramp inclusion
+    kv_teacher_mode: str = "heuristic"         # "uniform" or "heuristic" teacher labels
+    kv_collapse_check_interval: int = 100      # Steps between collapse checks
+    kv_kl_clamp_max: float = 100.0             # Clamp individual KL values
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -13738,6 +13771,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_pidv2_curriculum_state = None
     resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
     resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+    resumed_kv_supervisor_state = None  # KV Supervision (Kosha-Vritti Structured Supervision)
 
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
@@ -14307,6 +14341,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
                 resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
                 resumed_evoflow_state = resume_result.get("evoflow_state")
+                resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -15205,6 +15240,67 @@ def train(config: UnifiedTrainingConfig):
 
     elif config.use_bcvf_contrastive and not BCVF_CONTRASTIVE_AVAILABLE:
         print("  [BCVF-REP] WARNING: use_bcvf_contrastive=True but module not available")
+
+    # ==========================================================================
+    # KOSHA-VRITTI STRUCTURED SUPERVISION Initialization
+    # Reference: symbolu/training/kosha_vritti_supervision.py
+    # ==========================================================================
+    kv_supervisor = None
+
+    if config.enable_kv_supervision and KV_SUPERVISION_AVAILABLE:
+        # Determine hidden dimension from model preset
+        _kv_embed_dim = (
+            config.n_embd if config.n_embd is not None
+            else MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+        )
+
+        kv_config = KoshaVrittiSupervisionConfig(
+            enable=True,
+            weight_kosha_kl=config.kv_weight_kosha_kl,
+            weight_vritti_kl=config.kv_weight_vritti_kl,
+            weight_entropy_floor=config.kv_weight_entropy_floor,
+            weight_compatibility=config.kv_weight_compatibility,
+            weight_prior=config.kv_weight_prior,
+            entropy_floor_ratio=config.kv_entropy_floor_ratio,
+            compatibility_prior_path=config.kv_compatibility_prior_path or None,
+            curriculum_exclude_epochs=config.kv_curriculum_exclude_epochs,
+            curriculum_ramp_epochs=config.kv_curriculum_ramp_epochs,
+            default_kosha_dist=config.kv_teacher_mode,
+            default_vritti_dist=config.kv_teacher_mode,
+            collapse_check_interval=config.kv_collapse_check_interval,
+            kl_clamp_max=config.kv_kl_clamp_max,
+        )
+
+        kv_supervisor = KoshaVrittiSupervisor(
+            config=kv_config,
+            hidden_dim=_kv_embed_dim,
+            device=device,
+            tokenizer=tokenizer if 'tokenizer' in dir() else None,
+        )
+
+        # Add KV supervisor params to optimizer
+        optimizer.add_param_group({
+            'params': list(kv_supervisor.parameters()),
+            'lr': config.learning_rate,
+            'weight_decay': 0.01,
+        })
+
+        kv_param_count = sum(p.numel() for p in kv_supervisor.parameters())
+        print(f"\n  [KV-SUPERVISION] Kosha-Vritti Structured Supervision ENABLED")
+        print(f"     Kosha: 4 classes | Vritti: 5 classes | Params: {kv_param_count:,}")
+        print(f"     Weights: KL(K)={config.kv_weight_kosha_kl} KL(V)={config.kv_weight_vritti_kl} "
+              f"H={config.kv_weight_entropy_floor} Compat={config.kv_weight_compatibility}")
+        print(f"     Curriculum: exclude={config.kv_curriculum_exclude_epochs} epochs, "
+              f"ramp={config.kv_curriculum_ramp_epochs} epochs")
+        print(f"     Teacher: {config.kv_teacher_mode} | Entropy floor: {config.kv_entropy_floor_ratio}")
+
+    elif config.enable_kv_supervision and not KV_SUPERVISION_AVAILABLE:
+        print("  [KV-SUPERVISION] WARNING: enable_kv_supervision=True but module not available")
+
+    # Restore KV Supervision state from checkpoint
+    if kv_supervisor is not None and resumed_kv_supervisor_state is not None:
+        kv_supervisor.load_state_dict(resumed_kv_supervisor_state)
+        print(f"  ✓ KV Supervision state restored from checkpoint")
 
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
@@ -16473,6 +16569,67 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [BCVF-REP] Error at step {global_step}: {e}")
+
+            # =====================================================================
+            # KOSHA-VRITTI STRUCTURED SUPERVISION
+            # Adds auxiliary KL + entropy floor + compatibility losses
+            # Does NOT modify transformer blocks
+            # =====================================================================
+            if kv_supervisor is not None:
+                try:
+                    # Extract hidden states for KV supervision
+                    kv_hidden = None
+                    if hidden_state_extractor is not None:
+                        kv_layer_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                        if kv_layer_states is not None and len(kv_layer_states) > 0:
+                            kv_hidden = kv_layer_states[-1]  # Last layer hidden states
+
+                    # Fallback: try to get from model outputs dict
+                    if kv_hidden is None and isinstance(outputs, dict):
+                        kv_hidden = outputs.get('hidden_states', None)
+                        if kv_hidden is None:
+                            kv_hidden = outputs.get('last_hidden_state', None)
+
+                    if kv_hidden is not None and kv_hidden.dim() == 3:
+                        # Compute epoch for curriculum
+                        kv_epoch = global_step // max(len(train_loader), 1)
+
+                        # DDP info
+                        kv_rank = int(os.environ.get('RANK', 0))
+                        kv_world_size = int(os.environ.get('WORLD_SIZE', 1))
+
+                        # Detach hidden states — KV supervision is auxiliary-only,
+                        # it should NOT backprop through the transformer backbone
+                        kv_hidden_detached = kv_hidden.detach()
+
+                        kv_loss, kv_metrics = kv_supervisor.step(
+                            hidden_states=kv_hidden_detached,
+                            input_ids=x,
+                            epoch=kv_epoch,
+                            global_step=global_step,
+                            rank=kv_rank,
+                            world_size=kv_world_size,
+                        )
+
+                        # Add to total loss (only auxiliary head gradients flow)
+                        loss = loss + kv_loss
+
+                        # Merge metrics
+                        metrics.update(kv_metrics)
+
+                        # Log periodically
+                        if KV_SUPERVISION_AVAILABLE:
+                            writer_ref = writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None
+                            log_kv_metrics(
+                                kv_metrics, global_step,
+                                writer=writer_ref,
+                                print_every=config.log_every,
+                                rank=kv_rank,
+                            )
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [KV-SUPERVISION] Error at step {global_step}: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -18239,6 +18396,7 @@ def train(config: UnifiedTrainingConfig):
                         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                         kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                         evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -18285,6 +18443,7 @@ def train(config: UnifiedTrainingConfig):
                     pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                     kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                    kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -18310,6 +18469,7 @@ def train(config: UnifiedTrainingConfig):
         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
         kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
         evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -18617,6 +18777,8 @@ def save_checkpoint(
     kosha_gyroscope_state: Optional[dict] = None,
     # V9.8.6: EvoFlow state (EvolutionaryIntelligenceEngine)
     evoflow_state: Optional[dict] = None,
+    # Kosha-Vritti Supervision state
+    kv_supervisor_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
 ):
@@ -18677,6 +18839,10 @@ def save_checkpoint(
     # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
     if evoflow_state is not None:
         checkpoint["evoflow_state"] = evoflow_state
+
+    # Kosha-Vritti Supervision state
+    if kv_supervisor_state is not None:
+        checkpoint["kv_supervisor_state"] = kv_supervisor_state
 
     # V9.8.6: Add dataloader position for reproducibility
     if dataloader_position is not None:
@@ -18855,6 +19021,11 @@ def load_checkpoint(
     if "evoflow_state" in checkpoint:
         result["evoflow_state"] = checkpoint["evoflow_state"]
         print(f"    ✓ EvoFlow state available for restoration")
+
+    # KV Supervision state
+    if "kv_supervisor_state" in checkpoint:
+        result["kv_supervisor_state"] = checkpoint["kv_supervisor_state"]
+        print(f"    ✓ KV Supervision state available for restoration")
 
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
@@ -20125,6 +20296,35 @@ def main():
     parser.add_argument("--bcvf_contrastive_projector", type=str, default="mlp",
                        choices=["linear", "mlp"],
                        help="Projection head type for contrastive representations")
+
+    # Kosha-Vritti Structured Supervision
+    parser.add_argument("--enable_kv_supervision", action="store_true",
+                       help="Enable Kosha-Vritti structured auxiliary supervision")
+    parser.add_argument("--kv_weight_kosha_kl", type=float, default=0.1,
+                       help="Weight for Kosha KL divergence loss")
+    parser.add_argument("--kv_weight_vritti_kl", type=float, default=0.1,
+                       help="Weight for Vritti KL divergence loss")
+    parser.add_argument("--kv_weight_entropy_floor", type=float, default=0.01,
+                       help="Weight for entropy floor anti-collapse penalty")
+    parser.add_argument("--kv_weight_compatibility", type=float, default=0.05,
+                       help="Weight for static joint compatibility loss")
+    parser.add_argument("--kv_weight_prior", type=float, default=0.001,
+                       help="Weight for W_kv prior regularization")
+    parser.add_argument("--kv_entropy_floor_ratio", type=float, default=0.4,
+                       help="Entropy floor = ratio * log(num_classes)")
+    parser.add_argument("--kv_compatibility_prior_path", type=str, default="",
+                       help="Path to W0 compatibility prior matrix")
+    parser.add_argument("--kv_curriculum_exclude_epochs", type=int, default=2,
+                       help="Epochs to exclude Viparyaya/Nidra samples")
+    parser.add_argument("--kv_curriculum_ramp_epochs", type=int, default=1,
+                       help="Epochs to linearly ramp Viparyaya/Nidra inclusion")
+    parser.add_argument("--kv_teacher_mode", type=str, default="heuristic",
+                       choices=["uniform", "heuristic"],
+                       help="Teacher label generation mode")
+    parser.add_argument("--kv_collapse_check_interval", type=int, default=100,
+                       help="Steps between collapse detection checks")
+    parser.add_argument("--kv_kl_clamp_max", type=float, default=100.0,
+                       help="Maximum clamp value for individual KL terms")
 
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
