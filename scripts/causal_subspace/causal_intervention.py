@@ -91,6 +91,11 @@ class InterventionResult:
     control_kl_std: float = 0.0
     adaptive_kl_threshold: float = 0.0
 
+    # Random subspace control statistics
+    random_kl_mean: float = 0.0
+    random_kl_std: float = 0.0
+    specificity_ratio: float = 0.0  # real_kl / random_kl (>1 = specific)
+
     # Per-pair diagnostics
     pair_details: List[Dict] = field(default_factory=list)
 
@@ -298,6 +303,17 @@ class _PatchHook:
         return h_patched
 
 
+def _random_orthonormal_basis(d: int, k: int, seed: int = 0) -> np.ndarray:
+    """Generate a random orthonormal basis of shape [d, k].
+
+    Uses QR decomposition of a random Gaussian matrix.
+    """
+    rng = np.random.RandomState(seed)
+    A = rng.randn(d, k).astype(np.float64)
+    Q, _ = np.linalg.qr(A)
+    return Q[:, :k].astype(np.float32)
+
+
 def _compute_logit_metrics(
     original_logits: torch.Tensor,
     patched_logits: torch.Tensor,
@@ -366,16 +382,21 @@ def run_single_intervention(
     target_layer_idx: int,
     device: torch.device,
     kl_threshold: Optional[float] = None,
+    pair_idx: int = 0,
 ) -> Dict:
-    """Run a single interchange intervention with control baseline.
+    """Run a single interchange intervention with two control baselines.
 
-    Runs THREE forward passes:
-        1. Original (no patch)  — baseline
-        2. Control patch        — identity: swap A's own subspace back in
-        3. Real patch           — swap B's subspace into A
+    Runs FOUR forward passes:
+        1. Original (no patch)           — baseline
+        2. Identity control              — swap A's own subspace back in
+        3. Random subspace control       — swap B's projection through a
+           random orthonormal basis of the same dimensionality k
+        4. Structural patch (real)       — swap B's structural subspace into A
 
-    The control establishes a null baseline.  A structural flip is detected
-    only if the real patch KL exceeds the control KL by a significant margin.
+    **Causal specificity** requires that the real patch KL significantly
+    exceeds BOTH the identity control AND the random subspace control.
+    This rules out both numerical noise (identity) and general perturbation
+    sensitivity (random).
 
     Returns dict with structural_flip, fluency_preserved, and detailed metrics.
     """
@@ -385,6 +406,11 @@ def run_single_intervention(
     target_block = blocks[target_layer_idx]
 
     U_k_t = torch.tensor(U_k, dtype=torch.float32, device=device)
+    d, k = U_k.shape
+
+    # Build random orthonormal basis of same shape for the random control
+    U_rand = _random_orthonormal_basis(d, k, seed=pair_idx)
+    U_rand_t = torch.tensor(U_rand, dtype=torch.float32, device=device)
 
     # --- Run sequence B to get donor hidden state ---
     ids_b = torch.tensor([pair.seq_b_ids], dtype=torch.long, device=device)
@@ -402,7 +428,7 @@ def run_single_intervention(
 
     donor_h = donor_captured["h"][0, pair.target_pos_b, :].to(device)  # [d]
 
-    # --- Run sequence A to get its own hidden state (for control) ---
+    # --- Run sequence A to get its own hidden state (for controls) ---
     ids_a = torch.tensor([pair.seq_a_ids], dtype=torch.long, device=device)
 
     self_captured = {}
@@ -419,7 +445,7 @@ def run_single_intervention(
     original_logits = original_output.logits if hasattr(original_output, "logits") else original_output["logits"]
     self_h = self_captured["h"][0, pair.target_pos_a, :].to(device)  # [d]
 
-    # --- Control patch: swap A's own subspace back in (should be ~identity) ---
+    # --- Control A: Identity patch (swap A's own subspace back in) ---
     control_hook = _PatchHook(U_k_t, self_h, pair.target_pos_a)
     handle = target_block.register_forward_hook(control_hook)
     with torch.no_grad():
@@ -427,7 +453,16 @@ def run_single_intervention(
     handle.remove()
     control_logits = control_output.logits if hasattr(control_output, "logits") else control_output["logits"]
 
-    # --- Real patch: swap B's subspace into A ---
+    # --- Control B: Random subspace patch (swap B's projection through ---
+    #     a random orthonormal basis of the same dimensionality)
+    random_hook = _PatchHook(U_rand_t, donor_h, pair.target_pos_a)
+    handle = target_block.register_forward_hook(random_hook)
+    with torch.no_grad():
+        random_output = model(input_ids=ids_a)
+    handle.remove()
+    random_logits = random_output.logits if hasattr(random_output, "logits") else random_output["logits"]
+
+    # --- Real patch: swap B's structural subspace into A ---
     patch_hook = _PatchHook(U_k_t, donor_h, pair.target_pos_a)
     handle = target_block.register_forward_hook(patch_hook)
     with torch.no_grad():
@@ -435,26 +470,33 @@ def run_single_intervention(
     handle.remove()
     patched_logits = patched_output.logits if hasattr(patched_output, "logits") else patched_output["logits"]
 
-    # --- Compute metrics for both control and real patches ---
+    # --- Compute metrics for all three interventions ---
     control_metrics = _compute_logit_metrics(
         original_logits, control_logits, pair.seq_a_ids, pair.target_pos_a,
+    )
+    random_metrics = _compute_logit_metrics(
+        original_logits, random_logits, pair.seq_a_ids, pair.target_pos_a,
     )
     real_metrics = _compute_logit_metrics(
         original_logits, patched_logits, pair.seq_a_ids, pair.target_pos_a,
     )
 
-    # --- Structural flip detection (adaptive threshold) ---
-    # A flip is real only if the real patch effect significantly exceeds
-    # the control patch effect
+    # --- Structural flip detection (requires specificity over BOTH controls) ---
     if kl_threshold is not None:
         effective_threshold = kl_threshold
     else:
-        # Default: real KL must be at least 3x the control KL (or 0.05 minimum)
-        effective_threshold = max(control_metrics["kl_divergence"] * 3.0, 0.05)
+        # Threshold: must exceed both identity and random controls
+        identity_floor = max(control_metrics["kl_divergence"] * 3.0, 0.01)
+        random_floor = max(random_metrics["kl_divergence"] * 1.5, 0.01)
+        effective_threshold = max(identity_floor, random_floor)
 
     structural_flip = (
         real_metrics["kl_divergence"] > effective_threshold
-        or real_metrics["max_prob_change"] > max(control_metrics["max_prob_change"] * 3.0, 0.03)
+        or real_metrics["max_prob_change"] > max(
+            control_metrics["max_prob_change"] * 3.0,
+            random_metrics["max_prob_change"] * 1.5,
+            0.03,
+        )
     )
 
     # Fluency: perplexity ratio still bounded
@@ -469,10 +511,14 @@ def run_single_intervention(
         "perplexity_ratio": real_metrics["perplexity_ratio"],
         "original_ppl": real_metrics["original_ppl"],
         "patched_ppl": real_metrics["patched_ppl"],
-        # Control patch metrics (null baseline)
+        # Identity control metrics (null baseline — numerical noise)
         "control_kl": control_metrics["kl_divergence"],
         "control_max_prob_change": control_metrics["max_prob_change"],
         "control_ppl_ratio": control_metrics["perplexity_ratio"],
+        # Random subspace control metrics (perturbation sensitivity baseline)
+        "random_kl": random_metrics["kl_divergence"],
+        "random_max_prob_change": random_metrics["max_prob_change"],
+        "random_ppl_ratio": random_metrics["perplexity_ratio"],
         "effective_threshold": effective_threshold,
     }
 
@@ -511,13 +557,16 @@ def run_causal_intervention(
     result = InterventionResult(layer_idx=target_layer)
     result.n_pairs_tested = len(pairs)
 
-    # Phase 1: Run all pairs to collect control KL statistics
+    # Phase 1: Run all pairs to collect control & random KL statistics
     control_kls: List[float] = []
+    random_kls: List[float] = []
+    real_kls: List[float] = []
 
     for i, pair in enumerate(pairs):
         try:
             detail = run_single_intervention(
                 model, tokenizer, pair, U_k, target_layer, device,
+                pair_idx=i,
             )
         except Exception as e:
             logger.warning("Pair %d failed: %s", i, e)
@@ -525,36 +574,62 @@ def run_causal_intervention(
 
         result.pair_details.append(detail)
         control_kls.append(detail.get("control_kl", 0.0))
+        random_kls.append(detail.get("random_kl", 0.0))
+        real_kls.append(detail.get("kl_divergence", 0.0))
 
-    # Phase 2: Compute adaptive threshold from control distribution
-    # Real flips must exceed mean + 3*std of control KL
+    # Phase 2: Compute adaptive threshold from BOTH control distributions
+    # Real flips must exceed mean + 3*std of identity control KL
+    # AND demonstrate specificity over random subspace control
     if control_kls:
         result.control_kl_mean = float(np.mean(control_kls))
         result.control_kl_std = float(np.std(control_kls))
-        result.adaptive_kl_threshold = max(
-            result.control_kl_mean + 3.0 * result.control_kl_std,
-            0.01,  # absolute floor
-        )
+        identity_threshold = result.control_kl_mean + 3.0 * result.control_kl_std
     else:
-        result.adaptive_kl_threshold = 0.05
+        identity_threshold = 0.01
+
+    if random_kls:
+        result.random_kl_mean = float(np.mean(random_kls))
+        result.random_kl_std = float(np.std(random_kls))
+        random_threshold = result.random_kl_mean + 2.0 * result.random_kl_std
+    else:
+        random_threshold = 0.01
+
+    # Adaptive threshold: must exceed both identity noise floor and random
+    # perturbation sensitivity baseline
+    result.adaptive_kl_threshold = max(
+        identity_threshold,
+        random_threshold,
+        0.01,  # absolute floor
+    )
+
+    # Specificity ratio: how much more does the structural patch shift
+    # outputs compared to a random subspace patch?  >1 means specific.
+    if result.random_kl_mean > 1e-10 and real_kls:
+        result.specificity_ratio = float(np.mean(real_kls)) / result.random_kl_mean
+    else:
+        result.specificity_ratio = 0.0
 
     logger.info(
-        "Control baseline: KL_mean=%.4f, KL_std=%.4f, adaptive_threshold=%.4f",
+        "Control baselines: identity KL=%.4f±%.4f, random KL=%.4f±%.4f, "
+        "specificity_ratio=%.2f, adaptive_threshold=%.4f",
         result.control_kl_mean, result.control_kl_std,
+        result.random_kl_mean, result.random_kl_std,
+        result.specificity_ratio,
         result.adaptive_kl_threshold,
     )
 
     # Phase 3: Re-evaluate flips using the adaptive threshold
+    # A flip is only real if the structural patch KL exceeds the threshold
+    # derived from BOTH control distributions
     for detail in result.pair_details:
         real_kl = detail.get("kl_divergence", 0.0)
-        control_kl = detail.get("control_kl", 0.0)
         real_prob = detail.get("max_prob_change", 0.0)
         control_prob = detail.get("control_max_prob_change", 0.0)
+        random_prob = detail.get("random_max_prob_change", 0.0)
 
-        # A structural flip is only real if it exceeds the adaptive threshold
         structural_flip = (
             real_kl > result.adaptive_kl_threshold
-            or real_prob > max(control_prob * 3.0, 0.03)
+            or real_prob > max(control_prob * 3.0, random_prob * 1.5, 0.03)
         )
         detail["structural_flip"] = structural_flip
 
@@ -573,12 +648,13 @@ def run_causal_intervention(
     logger.info(
         "Causal intervention [layer=%d]: %d pairs, "
         "flip_rate=%.1f%%, fluency_rate=%.1f%%, causal_success=%.1f%% "
-        "(adaptive_threshold=%.4f)",
+        "(adaptive_threshold=%.4f, specificity=%.2fx)",
         target_layer, result.n_pairs_tested,
         result.flip_rate * 100,
         result.fluency_rate * 100,
         result.causal_success_rate * 100,
         result.adaptive_kl_threshold,
+        result.specificity_ratio,
     )
 
     return result

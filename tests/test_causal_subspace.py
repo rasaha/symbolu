@@ -372,10 +372,38 @@ class TestCausalIntervention:
         """InterventionResult should include control baseline statistics."""
         from scripts.causal_subspace.causal_intervention import InterventionResult
         result = InterventionResult(layer_idx=5)
+        # Identity control fields
         assert hasattr(result, "control_kl_mean")
         assert hasattr(result, "control_kl_std")
         assert hasattr(result, "adaptive_kl_threshold")
         assert result.control_kl_mean == 0.0
+        # Random subspace control fields
+        assert hasattr(result, "random_kl_mean")
+        assert hasattr(result, "random_kl_std")
+        assert hasattr(result, "specificity_ratio")
+        assert result.random_kl_mean == 0.0
+        assert result.specificity_ratio == 0.0
+
+    def test_random_orthonormal_basis(self):
+        """Random basis should be orthonormal and have correct shape."""
+        from scripts.causal_subspace.causal_intervention import _random_orthonormal_basis
+        d, k = 64, 8
+        U = _random_orthonormal_basis(d, k, seed=42)
+        assert U.shape == (d, k)
+        # Check orthonormality
+        product = U.T @ U
+        np.testing.assert_allclose(
+            product, np.eye(k), atol=1e-5,
+            err_msg="Random basis should be orthonormal",
+        )
+
+    def test_random_basis_different_seeds(self):
+        """Different seeds should produce different bases."""
+        from scripts.causal_subspace.causal_intervention import _random_orthonormal_basis
+        U1 = _random_orthonormal_basis(32, 4, seed=0)
+        U2 = _random_orthonormal_basis(32, 4, seed=1)
+        # Different seeds → different bases (not identical)
+        assert not np.allclose(U1, U2, atol=1e-3)
 
 
 # ---------------------------------------------------------------------------
