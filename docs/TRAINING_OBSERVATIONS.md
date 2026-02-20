@@ -2682,6 +2682,77 @@ Total: From impossible (>1TB) to feasible (~50-60GB for 5M context)
 
 ---
 
-*Document updated: December 29, 2025*
-*Branch: claude/validate-phase-attention-d5pfX*
+## Session Update: February 20, 2026
+
+### Entropy-Based Logit Scale Control
+
+New modular utility added for entropy-based logit scale regulation at the emission/logit level.
+
+**Module**: `symbolu/training/entropy_control.py` (436 lines)
+**Tests**: `tests/test_entropy_control.py` (544 lines)
+
+#### Problem Addressed
+
+During training, output entropy can drift outside healthy ranges:
+- **Entropy collapse** (H < 0.05): Model outputs become near-deterministic, generating repetitive text
+- **Entropy diffusion** (H > 0.60): Model outputs become near-uniform, generating incoherent text
+
+Traditional temperature scaling is static and requires manual tuning. The entropy control module provides automatic, learnable regulation.
+
+#### Components
+
+| Component | Purpose | Mode |
+|-----------|---------|------|
+| `LogitScaleModule` | Learnable scalar that scales logits via `exp(logit_scale)` | Train-time |
+| `AdaptiveEntropyController` | Adapts logit scale at each generation step toward target entropy | Inference-time |
+| `topk_entropy()` | Normalized top-K entropy computation (detached from gradients) | Both |
+| `compute_entropy_penalty()` | Quadratic penalty outside `[H_min, H_max]` band | Train-time |
+| `attach_logit_scale()` | Integration helper to add scale module to existing model | Setup |
+| `log_entropy_metrics()` | Metric formatting with optional TensorBoard logging | Monitoring |
+
+#### Key Design Decisions
+
+1. **Detached entropy**: Entropy computation is in `torch.no_grad()` block — no gradient flow through entropy itself. The logit_scale parameter receives gradient only through CE loss.
+2. **Zero initialization**: `logit_scale = 0` → `exp(0) = 1.0` → no change to initial model behavior.
+3. **Safety clamps**: Scale clamped to `[-4.0, 4.0]` in log-space (effective range: `[0.018, 54.6]`).
+4. **Mixed precision safety**: Scale computed in float32, cast back to input dtype.
+5. **DDP compatible**: Single scalar parameter, automatically synchronized across GPUs.
+
+#### Test Coverage
+
+| Test Class | Validates |
+|------------|-----------|
+| `TestInitialEntropy` | Baseline and controlled model start with identical entropy |
+| `TestLogitStdStability` | Logit std stays in stable range (0.01 - 50.0) across 20 training steps |
+| `TestTrainingStability` | No NaN/Inf, loss decreases, gradients flow through scale, entropy detached |
+| `TestInferenceAdaptiveControl` | Controller drives entropy toward target, no gradient tracking, reset works |
+| `TestUtilityFunctions` | Top-K entropy range [0,1], penalty zero in band, positive outside |
+| `TestAttachLogitScale` | Adds 1 parameter, creates attribute, appears in state_dict |
+| `TestMixedPrecision` | Works with float16, bfloat16, float32 |
+| `TestSafetyConstraints` | COLLAPSE and DIFFUSE warnings triggered appropriately |
+
+#### Integration Points
+
+- **train_unified_llm.py**: Attach via `attach_logit_scale(model, config)` in training setup
+- **Optimizer**: Scale parameter included automatically via model's parameter groups
+- **Checkpointing**: Scale appears in `model.state_dict()` as `entropy_logit_scale.logit_scale`
+- **TensorBoard**: Metrics logged via `log_entropy_metrics()` with writer support
+- **CLI flags**: `--enable_entropy_control_train`, `--enable_entropy_control_infer`, and band parameters
+
+### New Files Added This Session
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `symbolu/training/entropy_control.py` | 436 | Entropy-based logit scale control module |
+| `tests/test_entropy_control.py` | 544 | Validation tests for entropy control |
+| `Spanda/spanda/*.py` | ~1,064 | Spanda-Softmax hybrid attention module |
+| `Spanda/run_benchmark.py` | 905 | Spanda benchmark runner |
+| `resonant_model/*.py` | ~5,409 | Resonant model experiments (heads, diagnostics, benchmarks) |
+| `docs/design/SPANDA_SOFTMAX_HYBRID_DESIGN.md` | 1,000 | Spanda architectural design document |
+| `scripts/train_three_attention_benchmark.py` | 778 | Three-attention comparison benchmark |
+
+---
+
+*Document updated: February 20, 2026*
+*Branch: claude/entropy-logit-scale-vnaZ2*
 *Repository: github.com/rasaha/symbolu*

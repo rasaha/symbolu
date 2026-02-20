@@ -307,6 +307,112 @@ L = L_task + λ_B1 * L_consistency + μ_S3 * L_align
 - **L_consistency [B1]**: `(1-sf)² + (1-sb)² + (sf-sb)²` where sf=forward confidence, sb=backward R-Signal alignment
 - **L_align [S3]**: `1 - GC` penalty for low phase coherence
 
+### Entropy-Based Logit Scale Control
+
+Modular utility for entropy-based logit scale regulation at the emission/logit level. Prevents entropy collapse (repetitive outputs) and entropy diffusion (incoherent outputs) by maintaining output entropy within a target band.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--enable_entropy_control_train` | flag | False | Enable train-time entropy regulation via learnable logit scale |
+| `--enable_entropy_control_infer` | flag | False | Enable inference-time adaptive entropy control |
+| `--entropy_topk` | int | 50 | K for top-K entropy computation |
+| `--entropy_h_min` | float | 0.15 | Lower bound of target entropy band (normalized) |
+| `--entropy_h_max` | float | 0.35 | Upper bound of target entropy band (normalized) |
+| `--entropy_lambda` | float | 0.01 | Weight for entropy band penalty |
+| `--logit_scale_min` | float | -4.0 | Minimum log-scale value (safety clamp) |
+| `--logit_scale_max` | float | 4.0 | Maximum log-scale value (safety clamp) |
+| `--infer_h_target` | float | 0.25 | Target entropy midpoint for inference |
+| `--infer_eta` | float | 0.02 | Inference adaptation learning rate |
+| `--infer_delta_clip` | float | 0.05 | Inference error clipping bound |
+| `--entropy_collapse_threshold` | float | 0.05 | Warning threshold: entropy collapse |
+| `--entropy_diffuse_threshold` | float | 0.60 | Warning threshold: entropy too diffuse |
+
+**How It Works:**
+
+**Train-time** (`--enable_entropy_control_train`):
+1. Adds a single learnable scalar parameter (`logit_scale`) to the model
+2. Scales logits via `scaled_logits = logits * exp(logit_scale)`
+3. Computes normalized top-K entropy on scaled logits (detached from gradient graph)
+4. Applies quadratic penalty when entropy falls outside `[H_min, H_max]` band
+5. Total loss: `L = CE_loss + λ * entropy_penalty`
+6. The scale parameter receives gradient from CE loss; entropy penalty acts as a regularizer
+
+**Inference-time** (`--enable_entropy_control_infer`):
+1. Initializes from model's learned `logit_scale` (or 0.0)
+2. At each generation step, scales logits and measures entropy
+3. Adapts `log_scale` toward target entropy: `log_scale -= η * clamp(H - H_target, -δ, δ)`
+4. Minimal latency (single scalar operations, no gradient tracking)
+
+**Key Properties:**
+- **Attention-agnostic**: Works with linear, quadratic, sliding window, or any attention type
+- **Numerically stable**: Uses float32 for scale computation, casts back to input dtype (fp16/bf16 safe)
+- **DDP compatible**: Single scalar parameter, synchronized automatically
+- **Zero initial impact**: `logit_scale` initializes to 0 → `exp(0) = 1.0` → no scaling at start
+- **Minimal overhead**: One scalar parameter, top-K softmax per step
+
+**Monitoring Metrics:**
+
+| Metric | Description | Healthy Range |
+|--------|-------------|---------------|
+| `logit_std` | Standard deviation of scaled logits | 1.0 - 6.0 |
+| `normalized_entropy` | Top-K normalized entropy (H) | 0.15 - 0.35 (target band) |
+| `exp_logit_scale` | Current scale factor exp(s) | 0.5 - 2.0 |
+| `entropy_penalty` | Quadratic penalty value | 0.0 (in band) |
+| `entropy_warning` | COLLAPSE (<0.05) or DIFFUSE (>0.60) | None |
+
+**Example: Training with Entropy Control**
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --enable_entropy_control_train \
+    --entropy_h_min 0.15 \
+    --entropy_h_max 0.35 \
+    --entropy_lambda 0.01 \
+    --entropy_topk 50 \
+    --controller pidv2 \
+    --tensorboard \
+    --max_steps 50000
+```
+
+**Example: Inference with Adaptive Entropy**
+```python
+from symbolu.training.entropy_control import (
+    EntropyControlConfig,
+    AdaptiveEntropyController,
+)
+
+config = EntropyControlConfig(
+    enable_entropy_control_infer=True,
+    infer_h_target=0.25,
+    infer_eta=0.02,
+)
+controller = AdaptiveEntropyController(config, model.entropy_logit_scale.logit_scale)
+
+for step in generation:
+    logits = model(input_ids)
+    scaled_logits = controller.scale_logits(logits)
+    # sample from scaled_logits
+    metrics = controller.update(scaled_logits)
+```
+
+**When to Use:**
+- Enable `--enable_entropy_control_train` if you observe entropy collapse (repetitive outputs) or entropy diffusion (incoherent outputs) during training
+- Enable `--enable_entropy_control_infer` for stable generation quality without manual temperature tuning
+- Pairs well with `--enable_entropy_floor` (anti-repetition) as a complementary mechanism
+- Works alongside PIDv2, RSS, and SPC controllers without interference
+
+**Tuning Guide:**
+
+| Symptom | Solution |
+|---------|----------|
+| Model generates repetitive text | Lower `--entropy_h_min` to 0.10, increase `--entropy_lambda` to 0.05 |
+| Outputs too random/incoherent | Raise `--entropy_h_max` to 0.45, increase `--entropy_lambda` to 0.05 |
+| Scale factor drifting too far | Narrow `--logit_scale_min`/`--logit_scale_max` to [-2.0, 2.0] |
+| Inference entropy oscillating | Reduce `--infer_eta` to 0.01, reduce `--infer_delta_clip` to 0.03 |
+| COLLAPSE warning in logs | Entropy band too tight or model collapsing; widen band or check learning rate |
+| DIFFUSE warning in logs | Model not confident enough; check training data quality or model capacity |
+
 ### Logging & Checkpointing
 
 | Flag | Type | Default | Description |
@@ -918,7 +1024,25 @@ python train_unified_llm.py \
 - **RSS Controller**: Auto-engages EvoFlow/Toroidal/CSR/Kosha at PPL thresholds
 - **PIDv2**: Regulates training stability, engages at PPL < 100
 
-### 6. Stress Testing
+### 6. Entropy-Controlled Training
+
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --enable_entropy_control_train \
+    --entropy_h_min 0.15 \
+    --entropy_h_max 0.35 \
+    --entropy_lambda 0.01 \
+    --use_9_3_split \
+    --controller pidv2 \
+    --enable_rss \
+    --gradient_checkpointing \
+    --tensorboard \
+    --max_steps 50000
+```
+
+### 7. Stress Testing
 
 ```bash
 python train_unified_llm.py \
@@ -1009,6 +1133,20 @@ The PPL 120-125 range is the **semantic barrier** (syntax → semantics transiti
 **Don't change if:**
 - PPL decreasing steadily (>1 PPL per 1K steps)
 - Within 20 PPL of controller engagement threshold
+
+### Entropy Collapse or Diffuse Warnings
+
+If you see `COLLAPSE` or `DIFFUSE` warnings in entropy control logs:
+
+1. **COLLAPSE** (entropy < 0.05): Model outputs are near-deterministic
+   - Widen target band: `--entropy_h_min 0.10`
+   - Increase penalty: `--entropy_lambda 0.05`
+   - Check if learning rate is too high (causing premature convergence)
+2. **DIFFUSE** (entropy > 0.60): Model outputs are near-uniform
+   - This is common early in training and should resolve naturally
+   - If persistent: check data quality, reduce model capacity, or increase training data
+3. **Logit scale drifting**: If `exp_logit_scale` exceeds 3.0 or drops below 0.3
+   - Tighten clamp: `--logit_scale_min -2.0 --logit_scale_max 2.0`
 
 ### Gradient Explosion (NaN loss)
 
@@ -1333,9 +1471,13 @@ symbolu/
 │   ├── symbolu12_bhava.py              # SymbolU12 with Phase Attention
 │   └── ...
 ├── symbolu/phase_transformer.py        # Phase attention implementations
+├── symbolu/training/
+│   └── entropy_control.py             # Entropy-based logit scale control
 ├── train_unified_llm.py                # Main training script
 ├── debug_phase_layer_learning.py       # Phase layer diagnostics (this guide)
 ├── diagnose_phase_attention.py         # Phase attention analysis
+├── tests/
+│   └── test_entropy_control.py        # Entropy control validation tests
 └── docs/
     ├── ontological-training-guide.md   # 100D Engine training
     └── unified-llm-training-guide.md   # This file
