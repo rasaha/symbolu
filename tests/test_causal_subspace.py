@@ -549,3 +549,103 @@ class TestIntegration:
         mdl_cfg = MDLProbeConfig(n_portions=5, probe_epochs=10, device="cpu")
         result = run_mdl_probe(H, labels.astype(np.int32), 0, "integrated", mdl_cfg)
         assert result.compression_ratio > 1.0
+
+
+# ---------------------------------------------------------------------------
+# CLI: Synthetic test pipeline
+# ---------------------------------------------------------------------------
+
+class TestSyntheticCLI:
+    def test_generate_synthetic_hidden_states(self):
+        """Synthetic data generator produces correct shapes and structure."""
+        from scripts.causal_subspace.test_synthetic import generate_synthetic_hidden_states
+        states, labels = generate_synthetic_hidden_states(
+            n_samples=100, d_model=32, n_layers=4, n_classes=3, seed=42,
+        )
+        assert len(states) == 4
+        assert labels.shape == (100,)
+        assert set(np.unique(labels)).issubset({0, 1, 2})
+        for layer_idx in range(4):
+            assert states[layer_idx].shape == (100, 32)
+
+    def test_synthetic_signal_increases_across_layers(self):
+        """Later layers should have stronger class separation."""
+        from scripts.causal_subspace.test_synthetic import generate_synthetic_hidden_states
+        states, labels = generate_synthetic_hidden_states(
+            n_samples=300, d_model=32, n_layers=6, n_classes=4, seed=42,
+        )
+        # Measure class separation via mean pairwise distance
+        unique = np.unique(labels)
+        def class_separation(H):
+            means = [H[labels == c].mean(axis=0) for c in unique]
+            dists = []
+            for i in range(len(means)):
+                for j in range(i + 1, len(means)):
+                    dists.append(np.linalg.norm(means[i] - means[j]))
+            return np.mean(dists)
+
+        early_sep = class_separation(states[0])
+        late_sep = class_separation(states[5])
+        assert late_sep > early_sep, (
+            f"Late layers should have stronger separation: "
+            f"early={early_sep:.2f}, late={late_sep:.2f}"
+        )
+
+    def test_toy_transformer_forward(self):
+        """Toy transformer should produce logits of correct shape."""
+        from scripts.causal_subspace.test_synthetic import _ToyTransformer
+        model = _ToyTransformer(d_model=32, n_layers=4, vocab_size=100)
+        model.eval()
+        ids = torch.tensor([[5, 10, 15, 20]])
+        output = model(input_ids=ids)
+        assert hasattr(output, "logits")
+        assert output.logits.shape == (1, 4, 100)
+
+    def test_toy_tokenizer(self):
+        """Toy tokenizer should encode and decode."""
+        from scripts.causal_subspace.test_synthetic import _ToyTokenizer
+        tok = _ToyTokenizer(vocab_size=500)
+        ids = tok.encode("The cat sat")
+        assert isinstance(ids, list)
+        assert all(0 <= i < 500 for i in ids)
+        text = tok.decode([0, 1, 2])
+        assert isinstance(text, str)
+
+    def test_run_synthetic_pipeline_quick(self):
+        """Synthetic pipeline runs end-to-end without errors."""
+        from scripts.causal_subspace.test_synthetic import run_synthetic_pipeline
+        results = run_synthetic_pipeline(
+            n_samples=100,
+            d_model=16,
+            n_layers=3,
+            n_classes=3,
+            sae_epochs=2,
+            sae_expansion=2,
+            n_clusters=3,
+            mdl_portions=3,
+            n_pairs=3,
+            subspace_k=4,
+            parts=[3, 4, 6],  # skip interventions for speed
+            seed=42,
+        )
+        assert "disentanglement" in results
+        assert "mdl_probing" in results
+        assert "trajectory" in results
+        assert results["summary"]["checks_total"] > 0
+
+    def test_run_synthetic_pipeline_mdl_only(self):
+        """Can run only the MDL part of the pipeline."""
+        from scripts.causal_subspace.test_synthetic import run_synthetic_pipeline
+        results = run_synthetic_pipeline(
+            n_samples=200,
+            d_model=32,
+            n_layers=4,
+            n_classes=4,
+            mdl_portions=5,
+            subspace_k=8,
+            parts=[4],
+            seed=42,
+        )
+        assert "mdl_probing" in results
+        assert "disentanglement" not in results
+        assert "optimal_k" in results
