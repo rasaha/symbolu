@@ -68,6 +68,7 @@ def compute_layer_trajectory(
     mdl_cfg=None,
     intervention_cfg=None,
     run_interventions: bool = True,
+    precomputed_mdl: Optional[Dict[int, "MDLProbeResult"]] = None,
 ) -> LayerTrajectory:
     """Compute the structural subspace trajectory across all layers.
 
@@ -86,12 +87,14 @@ def compute_layer_trajectory(
     intervention_cfg : InterventionConfig (optional)
     run_interventions : bool
         Whether to also run causal interventions per layer.
+    precomputed_mdl : dict[int, MDLProbeResult] (optional)
+        If provided, reuse these MDL results instead of recomputing.
 
     Returns
     -------
     LayerTrajectory
     """
-    from scripts.causal_subspace.mdl_probing import MDLProbeConfig, run_mdl_probe
+    from scripts.causal_subspace.mdl_probing import MDLProbeConfig, MDLProbeResult, run_mdl_probe
     from scripts.causal_subspace.causal_intervention import (
         InterventionConfig,
         build_subspace_basis,
@@ -122,8 +125,12 @@ def compute_layer_trajectory(
         _, cumvar, _ = compute_pca_baseline(H, subspace_k)
         trajectory.pca_cumvar_at_k.append(float(cumvar[-1]) if len(cumvar) > 0 else 0.0)
 
-        # MDL probe
-        mdl_result = run_mdl_probe(H, labels, layer_idx, label_name, mdl_cfg)
+        # MDL probe — reuse precomputed results if available
+        if precomputed_mdl is not None and layer_idx in precomputed_mdl:
+            mdl_result = precomputed_mdl[layer_idx]
+            logger.info("  Reusing precomputed MDL result for layer %d", layer_idx)
+        else:
+            mdl_result = run_mdl_probe(H, labels, layer_idx, label_name, mdl_cfg)
         trajectory.mdl_compression.append(mdl_result.compression_ratio)
         trajectory.mdl_bits_per_label.append(
             mdl_result.online_code_length / max(mdl_result.n_samples, 1)

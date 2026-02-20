@@ -164,6 +164,37 @@ class TestDisentanglement:
         # ReLU: latent should be non-negative
         assert (latent >= 0).all()
 
+    def test_sae_decoder_unit_norm_constraint(self):
+        """After constrain_decoder_norms(), all decoder columns should be unit norm."""
+        d, sae_dim = 32, 128
+        sae = SparseAutoencoder(d, sae_dim)
+
+        # Perturb decoder weights
+        with torch.no_grad():
+            sae.decoder.weight.mul_(5.0)
+
+        sae.constrain_decoder_norms()
+
+        col_norms = sae.decoder.weight.norm(dim=0)
+        torch.testing.assert_close(
+            col_norms, torch.ones(sae_dim), atol=1e-6, rtol=1e-6,
+        )
+
+    def test_sae_training_preserves_decoder_norms(self, rng):
+        """After train_sae(), decoder columns should still be ~unit norm."""
+        H = rng.randn(200, 16).astype(np.float32)
+        cfg = DisentanglementConfig(
+            sae_expansion_factor=2, sae_epochs=5,
+            sae_batch_size=64, device="cpu",
+        )
+        sae, _, _, _ = train_sae(H, cfg)
+
+        col_norms = sae.decoder.weight.norm(dim=0)
+        # After training with constrain_decoder_norms(), all columns ~1.0
+        torch.testing.assert_close(
+            col_norms, torch.ones(col_norms.shape[0]), atol=1e-5, rtol=1e-5,
+        )
+
     def test_train_sae(self, rng):
         H = rng.randn(200, 16).astype(np.float32)
         cfg = DisentanglementConfig(
@@ -258,6 +289,27 @@ class TestMDLProbing:
             f"Random data should not compress well, got {result.compression_ratio}"
         )
 
+    def test_mdl_prior_aware_baseline(self, rng):
+        """Prior-aware baseline should be <= uniform baseline, and tighter
+        for imbalanced data."""
+        N, d = 500, 64
+        # Highly imbalanced: 80% class 0, 20% class 1
+        labels = np.zeros(N, dtype=np.int32)
+        labels[int(N * 0.8):] = 1
+        H = rng.randn(N, d).astype(np.float32)
+
+        cfg = MDLProbeConfig(n_portions=5, probe_epochs=5, device="cpu")
+        result = run_mdl_probe(H, labels, 0, "imbalanced", cfg)
+
+        # Prior code length accounts for class imbalance → shorter than uniform
+        assert result.prior_code_length < result.uniform_code_length, (
+            f"Prior baseline ({result.prior_code_length:.1f}) should be less "
+            f"than uniform ({result.uniform_code_length:.1f}) for imbalanced data"
+        )
+        # Both compression metrics should exist
+        assert result.compression_ratio > 0
+        assert result.compression_vs_uniform > 0
+
 
 # ---------------------------------------------------------------------------
 # Part 5: Causal Intervention
@@ -316,6 +368,15 @@ class TestCausalIntervention:
         assert pair.role_a == "subject"
         assert pair.role_b == "object"
 
+    def test_intervention_result_has_control_fields(self):
+        """InterventionResult should include control baseline statistics."""
+        from scripts.causal_subspace.causal_intervention import InterventionResult
+        result = InterventionResult(layer_idx=5)
+        assert hasattr(result, "control_kl_mean")
+        assert hasattr(result, "control_kl_std")
+        assert hasattr(result, "adaptive_kl_threshold")
+        assert result.control_kl_mean == 0.0
+
 
 # ---------------------------------------------------------------------------
 # Part 6: Layer Trajectory
@@ -369,6 +430,36 @@ class TestLayerTrajectory:
             f"Later layers should have higher compression: "
             f"first_half={first_half:.2f}, second_half={second_half:.2f}"
         )
+
+    def test_trajectory_with_precomputed_mdl(self, multi_layer_states):
+        """Trajectory should accept precomputed MDL results and skip recomputation."""
+        from scripts.causal_subspace.mdl_probing import MDLProbeConfig, run_mdl_probe
+        from scripts.causal_subspace.trajectory import compute_layer_trajectory
+
+        states, labels = multi_layer_states
+        cfg = MDLProbeConfig(n_portions=5, probe_epochs=10, device="cpu")
+
+        # Precompute MDL results
+        precomputed = {}
+        for layer_idx in sorted(states.keys()):
+            precomputed[layer_idx] = run_mdl_probe(
+                states[layer_idx], labels, layer_idx, "role", cfg,
+            )
+
+        # Run trajectory with precomputed results
+        traj = compute_layer_trajectory(
+            hidden_states=states,
+            labels=labels,
+            label_name="role",
+            subspace_k=8,
+            mdl_cfg=cfg,
+            run_interventions=False,
+            precomputed_mdl=precomputed,
+        )
+
+        # Trajectory should use the exact same compression values
+        for i, layer_idx in enumerate(traj.layers):
+            assert abs(traj.mdl_compression[i] - precomputed[layer_idx].compression_ratio) < 1e-10
 
 
 # ---------------------------------------------------------------------------

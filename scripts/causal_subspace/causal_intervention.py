@@ -86,6 +86,11 @@ class InterventionResult:
     fluency_rate: float = 0.0
     causal_success_rate: float = 0.0
 
+    # Control baseline (identity patch) statistics
+    control_kl_mean: float = 0.0
+    control_kl_std: float = 0.0
+    adaptive_kl_threshold: float = 0.0
+
     # Per-pair diagnostics
     pair_details: List[Dict] = field(default_factory=list)
 
@@ -293,6 +298,66 @@ class _PatchHook:
         return h_patched
 
 
+def _compute_logit_metrics(
+    original_logits: torch.Tensor,
+    patched_logits: torch.Tensor,
+    seq_ids: List[int],
+    target_pos: int,
+) -> Dict:
+    """Shared metric computation for both real and control patches.
+
+    Returns dict with kl_divergence, max_prob_change, perplexity_ratio,
+    original_ppl, patched_ppl.
+    """
+    original_log_probs = F.log_softmax(original_logits[0], dim=-1)
+    patched_log_probs = F.log_softmax(patched_logits[0], dim=-1)
+
+    # Full-sequence perplexity (not just next-token)
+    original_nll = 0.0
+    patched_nll = 0.0
+    n_tokens = len(seq_ids) - 1
+
+    for t in range(n_tokens):
+        next_token = seq_ids[t + 1]
+        original_nll -= original_log_probs[t, next_token].item()
+        patched_nll -= patched_log_probs[t, next_token].item()
+
+    original_ppl = np.exp(original_nll / max(n_tokens, 1))
+    patched_ppl = np.exp(patched_nll / max(n_tokens, 1))
+    ppl_ratio = patched_ppl / max(original_ppl, 1e-10)
+
+    # KL divergence at target position
+    pos = target_pos
+    orig_probs = torch.softmax(original_logits[0, pos], dim=-1)
+    patch_probs = torch.softmax(patched_logits[0, pos], dim=-1)
+
+    kl_div = F.kl_div(
+        patch_probs.log().unsqueeze(0),
+        orig_probs.unsqueeze(0),
+        reduction="sum",
+    ).item()
+
+    # Wider context window: ±5 tokens to catch long-range syntactic effects
+    context_range = range(
+        max(0, pos - 5),
+        min(len(seq_ids), pos + 6),
+    )
+    max_prob_change = 0.0
+    for t in context_range:
+        orig_p = torch.softmax(original_logits[0, t], dim=-1)
+        patch_p = torch.softmax(patched_logits[0, t], dim=-1)
+        diff = (orig_p - patch_p).abs().max().item()
+        max_prob_change = max(max_prob_change, diff)
+
+    return {
+        "kl_divergence": kl_div,
+        "max_prob_change": max_prob_change,
+        "perplexity_ratio": ppl_ratio,
+        "original_ppl": original_ppl,
+        "patched_ppl": patched_ppl,
+    }
+
+
 def run_single_intervention(
     model: nn.Module,
     tokenizer,
@@ -300,15 +365,19 @@ def run_single_intervention(
     U_k: np.ndarray,
     target_layer_idx: int,
     device: torch.device,
+    kl_threshold: Optional[float] = None,
 ) -> Dict:
-    """Run a single interchange intervention and measure effects.
+    """Run a single interchange intervention with control baseline.
 
-    Returns dict with:
-        - structural_flip: bool
-        - fluency_preserved: bool
-        - perplexity_ratio: float
-        - original_next_token_probs: dict
-        - patched_next_token_probs: dict
+    Runs THREE forward passes:
+        1. Original (no patch)  — baseline
+        2. Control patch        — identity: swap A's own subspace back in
+        3. Real patch           — swap B's subspace into A
+
+    The control establishes a null baseline.  A structural flip is detected
+    only if the real patch KL exceeds the control KL by a significant margin.
+
+    Returns dict with structural_flip, fluency_preserved, and detailed metrics.
     """
     from scripts.causal_subspace.data_collection import _find_transformer_blocks
 
@@ -333,14 +402,32 @@ def run_single_intervention(
 
     donor_h = donor_captured["h"][0, pair.target_pos_b, :].to(device)  # [d]
 
-    # --- Run sequence A: original (no patching) ---
+    # --- Run sequence A to get its own hidden state (for control) ---
     ids_a = torch.tensor([pair.seq_a_ids], dtype=torch.long, device=device)
 
+    self_captured = {}
+
+    def self_capture_hook(module, inp, out):
+        h = out[0] if isinstance(out, tuple) else out
+        self_captured["h"] = h.detach()
+
+    handle = target_block.register_forward_hook(self_capture_hook)
     with torch.no_grad():
         original_output = model(input_ids=ids_a)
-    original_logits = original_output.logits if hasattr(original_output, "logits") else original_output["logits"]
+    handle.remove()
 
-    # --- Run sequence A: patched ---
+    original_logits = original_output.logits if hasattr(original_output, "logits") else original_output["logits"]
+    self_h = self_captured["h"][0, pair.target_pos_a, :].to(device)  # [d]
+
+    # --- Control patch: swap A's own subspace back in (should be ~identity) ---
+    control_hook = _PatchHook(U_k_t, self_h, pair.target_pos_a)
+    handle = target_block.register_forward_hook(control_hook)
+    with torch.no_grad():
+        control_output = model(input_ids=ids_a)
+    handle.remove()
+    control_logits = control_output.logits if hasattr(control_output, "logits") else control_output["logits"]
+
+    # --- Real patch: swap B's subspace into A ---
     patch_hook = _PatchHook(U_k_t, donor_h, pair.target_pos_a)
     handle = target_block.register_forward_hook(patch_hook)
     with torch.no_grad():
@@ -348,65 +435,45 @@ def run_single_intervention(
     handle.remove()
     patched_logits = patched_output.logits if hasattr(patched_output, "logits") else patched_output["logits"]
 
-    # --- Measure effects ---
-    # 1. Perplexity comparison (fluency check)
-    original_log_probs = F.log_softmax(original_logits[0], dim=-1)
-    patched_log_probs = F.log_softmax(patched_logits[0], dim=-1)
-
-    # Compute perplexity from next-token prediction
-    original_nll = 0.0
-    patched_nll = 0.0
-    n_tokens = len(pair.seq_a_ids) - 1
-
-    for t in range(n_tokens):
-        next_token = pair.seq_a_ids[t + 1]
-        original_nll -= original_log_probs[t, next_token].item()
-        patched_nll -= patched_log_probs[t, next_token].item()
-
-    original_ppl = np.exp(original_nll / max(n_tokens, 1))
-    patched_ppl = np.exp(patched_nll / max(n_tokens, 1))
-    ppl_ratio = patched_ppl / max(original_ppl, 1e-10)
-
-    # 2. Structural flip detection
-    # Check if the model's predictions around the target position changed
-    # in a way consistent with the structural role swap
-    pos = pair.target_pos_a
-    orig_probs_at_target = torch.softmax(original_logits[0, pos], dim=-1)
-    patch_probs_at_target = torch.softmax(patched_logits[0, pos], dim=-1)
-
-    # KL divergence between original and patched at target position
-    kl_div = F.kl_div(
-        patch_probs_at_target.log().unsqueeze(0),
-        orig_probs_at_target.unsqueeze(0),
-        reduction="sum",
-    ).item()
-
-    # Also check a few positions around the target
-    context_range = range(
-        max(0, pos - 2),
-        min(len(pair.seq_a_ids), pos + 3),
+    # --- Compute metrics for both control and real patches ---
+    control_metrics = _compute_logit_metrics(
+        original_logits, control_logits, pair.seq_a_ids, pair.target_pos_a,
     )
-    max_prob_change = 0.0
-    for t in context_range:
-        orig_p = torch.softmax(original_logits[0, t], dim=-1)
-        patch_p = torch.softmax(patched_logits[0, t], dim=-1)
-        diff = (orig_p - patch_p).abs().max().item()
-        max_prob_change = max(max_prob_change, diff)
+    real_metrics = _compute_logit_metrics(
+        original_logits, patched_logits, pair.seq_a_ids, pair.target_pos_a,
+    )
 
-    # Structural flip: significant KL divergence at target position
-    structural_flip = kl_div > 0.1 or max_prob_change > 0.05
+    # --- Structural flip detection (adaptive threshold) ---
+    # A flip is real only if the real patch effect significantly exceeds
+    # the control patch effect
+    if kl_threshold is not None:
+        effective_threshold = kl_threshold
+    else:
+        # Default: real KL must be at least 3x the control KL (or 0.05 minimum)
+        effective_threshold = max(control_metrics["kl_divergence"] * 3.0, 0.05)
 
-    # Fluency: perplexity didn't explode
-    fluency_preserved = ppl_ratio < 2.0
+    structural_flip = (
+        real_metrics["kl_divergence"] > effective_threshold
+        or real_metrics["max_prob_change"] > max(control_metrics["max_prob_change"] * 3.0, 0.03)
+    )
+
+    # Fluency: perplexity ratio still bounded
+    fluency_preserved = real_metrics["perplexity_ratio"] < 2.0
 
     return {
         "structural_flip": structural_flip,
         "fluency_preserved": fluency_preserved,
-        "perplexity_ratio": ppl_ratio,
-        "kl_divergence": kl_div,
-        "max_prob_change": max_prob_change,
-        "original_ppl": original_ppl,
-        "patched_ppl": patched_ppl,
+        # Real patch metrics
+        "kl_divergence": real_metrics["kl_divergence"],
+        "max_prob_change": real_metrics["max_prob_change"],
+        "perplexity_ratio": real_metrics["perplexity_ratio"],
+        "original_ppl": real_metrics["original_ppl"],
+        "patched_ppl": real_metrics["patched_ppl"],
+        # Control patch metrics (null baseline)
+        "control_kl": control_metrics["kl_divergence"],
+        "control_max_prob_change": control_metrics["max_prob_change"],
+        "control_ppl_ratio": control_metrics["perplexity_ratio"],
+        "effective_threshold": effective_threshold,
     }
 
 
@@ -444,6 +511,9 @@ def run_causal_intervention(
     result = InterventionResult(layer_idx=target_layer)
     result.n_pairs_tested = len(pairs)
 
+    # Phase 1: Run all pairs to collect control KL statistics
+    control_kls: List[float] = []
+
     for i, pair in enumerate(pairs):
         try:
             detail = run_single_intervention(
@@ -454,12 +524,45 @@ def run_causal_intervention(
             continue
 
         result.pair_details.append(detail)
+        control_kls.append(detail.get("control_kl", 0.0))
 
-        if detail["structural_flip"]:
+    # Phase 2: Compute adaptive threshold from control distribution
+    # Real flips must exceed mean + 3*std of control KL
+    if control_kls:
+        result.control_kl_mean = float(np.mean(control_kls))
+        result.control_kl_std = float(np.std(control_kls))
+        result.adaptive_kl_threshold = max(
+            result.control_kl_mean + 3.0 * result.control_kl_std,
+            0.01,  # absolute floor
+        )
+    else:
+        result.adaptive_kl_threshold = 0.05
+
+    logger.info(
+        "Control baseline: KL_mean=%.4f, KL_std=%.4f, adaptive_threshold=%.4f",
+        result.control_kl_mean, result.control_kl_std,
+        result.adaptive_kl_threshold,
+    )
+
+    # Phase 3: Re-evaluate flips using the adaptive threshold
+    for detail in result.pair_details:
+        real_kl = detail.get("kl_divergence", 0.0)
+        control_kl = detail.get("control_kl", 0.0)
+        real_prob = detail.get("max_prob_change", 0.0)
+        control_prob = detail.get("control_max_prob_change", 0.0)
+
+        # A structural flip is only real if it exceeds the adaptive threshold
+        structural_flip = (
+            real_kl > result.adaptive_kl_threshold
+            or real_prob > max(control_prob * 3.0, 0.03)
+        )
+        detail["structural_flip"] = structural_flip
+
+        if structural_flip:
             result.n_structural_flips += 1
-        if detail["fluency_preserved"]:
+        if detail.get("fluency_preserved", False):
             result.n_fluency_preserved += 1
-        if detail["structural_flip"] and detail["fluency_preserved"]:
+        if structural_flip and detail.get("fluency_preserved", False):
             result.n_causal_successes += 1
 
     n = max(result.n_pairs_tested, 1)
@@ -469,11 +572,13 @@ def run_causal_intervention(
 
     logger.info(
         "Causal intervention [layer=%d]: %d pairs, "
-        "flip_rate=%.1f%%, fluency_rate=%.1f%%, causal_success=%.1f%%",
+        "flip_rate=%.1f%%, fluency_rate=%.1f%%, causal_success=%.1f%% "
+        "(adaptive_threshold=%.4f)",
         target_layer, result.n_pairs_tested,
         result.flip_rate * 100,
         result.fluency_rate * 100,
         result.causal_success_rate * 100,
+        result.adaptive_kl_threshold,
     )
 
     return result

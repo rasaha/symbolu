@@ -131,9 +131,14 @@ class SparseAutoencoder(nn.Module):
 
     Architecture:
         encoder: Linear(d → sae_dim) + ReLU
-        decoder: Linear(sae_dim → d)
+        decoder: Linear(sae_dim → d)  with unit-norm column constraint
 
     Loss = MSE_reconstruction + sparsity_coeff * L1(latent)
+
+    The decoder columns are constrained to unit norm after each optimizer
+    step via :meth:`constrain_decoder_norms`.  This prevents the SAE from
+    shrinking decoder norms to trivially reduce the L1 penalty on latent
+    activations (Bricken et al., 2023).
     """
 
     def __init__(self, d_model: int, sae_dim: int):
@@ -147,6 +152,20 @@ class SparseAutoencoder(nn.Module):
         # Initialize decoder as approximate transpose of encoder
         with torch.no_grad():
             self.decoder.weight.copy_(self.encoder[0].weight.T)
+            self._normalize_decoder()
+
+    def _normalize_decoder(self) -> None:
+        """Project decoder columns to unit norm."""
+        with torch.no_grad():
+            # decoder.weight shape: [d_model, sae_dim]
+            # Each column (feature direction) should be unit norm
+            norms = self.decoder.weight.norm(dim=0, keepdim=True).clamp(min=1e-8)
+            self.decoder.weight.div_(norms)
+
+    def constrain_decoder_norms(self) -> None:
+        """Call after each optimizer.step() to enforce the unit-norm
+        constraint on decoder columns."""
+        self._normalize_decoder()
 
     def forward(
         self, x: torch.Tensor
@@ -216,6 +235,9 @@ def train_sae(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            # Enforce unit-norm decoder columns (prevents L1 shortcut)
+            sae.constrain_decoder_norms()
 
             total_recon += recon_loss.item()
             total_l1 += l1_loss.item()

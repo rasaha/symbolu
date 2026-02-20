@@ -243,6 +243,8 @@ def run_full_pipeline(
     )
 
     mdl_results: Dict[str, Dict[int, Dict]] = {}
+    # Keep raw MDLProbeResult objects to avoid redundant recomputation in Part 6
+    mdl_result_objects: Dict[str, Dict[int, MDLProbeResult]] = {}
 
     # Probe for grammatical role labels
     label_sets = {
@@ -253,18 +255,23 @@ def run_full_pipeline(
     for label_name, label_arr in label_sets.items():
         print(f"\n--- MDL Probe: {label_name} ---")
         mdl_results[label_name] = {}
+        mdl_result_objects[label_name] = {}
 
         for layer_idx in active_layers:
             H = annotations.hidden_states[layer_idx]
             r = run_mdl_probe(H, label_arr, layer_idx, label_name, mdl_cfg)
+            mdl_result_objects[label_name][layer_idx] = r
             mdl_results[label_name][layer_idx] = {
                 "compression_ratio": r.compression_ratio,
+                "compression_vs_uniform": r.compression_vs_uniform,
                 "online_code_length": r.online_code_length,
+                "prior_code_length": r.prior_code_length,
                 "uniform_code_length": r.uniform_code_length,
                 "bits_per_label": r.online_code_length / max(r.n_samples, 1),
                 "n_classes": r.n_classes,
             }
-            print(f"  Layer {layer_idx}: compression={r.compression_ratio:.2f}x, "
+            print(f"  Layer {layer_idx}: compression={r.compression_ratio:.2f}x (vs prior), "
+                  f"{r.compression_vs_uniform:.2f}x (vs uniform), "
                   f"bits/label={r.online_code_length / max(r.n_samples, 1):.3f}")
 
     results["mdl_compression_ratios"] = mdl_results
@@ -355,6 +362,7 @@ def run_full_pipeline(
             seed=seed,
         ) if not skip_interventions else None,
         run_interventions=not skip_interventions,
+        precomputed_mdl=mdl_result_objects.get("grammatical_role"),
     )
 
     # Print trajectory

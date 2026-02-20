@@ -71,8 +71,10 @@ class MDLProbeResult:
     label_name: str = ""
 
     online_code_length: float = 0.0  # bits
-    uniform_code_length: float = 0.0  # bits
-    compression_ratio: float = 0.0  # uniform / online  (>1 = compression)
+    uniform_code_length: float = 0.0  # bits (N * log2(K))
+    prior_code_length: float = 0.0  # bits (entropy-aware baseline)
+    compression_ratio: float = 0.0  # prior / online  (>1 = compression)
+    compression_vs_uniform: float = 0.0  # uniform / online
 
     # Per-portion diagnostics
     portion_sizes: List[int] = field(default_factory=list)
@@ -222,6 +224,18 @@ def run_mdl_probe(
     # Uniform baseline: -log2(1/K) * N = N * log2(K)
     uniform_code_length = N * math.log2(n_classes)
 
+    # Class-prior-aware baseline: sum of -log2(p(c)) for each sample
+    # This accounts for class imbalance.  A probe that simply predicts
+    # the marginal class frequencies achieves this code length.
+    _, counts = np.unique(labels_shuffled, return_counts=True)
+    class_priors = counts / N
+    prior_code_length = 0.0
+    for c_idx in range(n_classes):
+        mask_c = labels_shuffled == c_idx
+        n_c = mask_c.sum()
+        if n_c > 0 and class_priors[c_idx] > 0:
+            prior_code_length += n_c * (-math.log2(class_priors[c_idx]))
+
     # Prequential coding
     portions = _geometric_portions(N, cfg.n_portions)
     logger.info(
@@ -267,14 +281,19 @@ def run_mdl_probe(
 
         prev_end = end
 
-    compression = uniform_code_length / max(online_code_length, 1e-10)
+    # Primary metric: compression vs the class-prior baseline
+    # (this is the fair comparison — immune to class imbalance inflation)
+    compression = prior_code_length / max(online_code_length, 1e-10)
+    compression_vs_uniform = uniform_code_length / max(online_code_length, 1e-10)
 
     result = MDLProbeResult(
         layer_idx=layer_idx,
         label_name=label_name,
         online_code_length=online_code_length,
         uniform_code_length=uniform_code_length,
+        prior_code_length=prior_code_length,
         compression_ratio=compression,
+        compression_vs_uniform=compression_vs_uniform,
         portion_sizes=portions,
         portion_code_lengths=portion_code_lengths,
         n_classes=n_classes,
@@ -282,11 +301,11 @@ def run_mdl_probe(
     )
 
     logger.info(
-        "MDL [layer=%d, %s]: online=%.1f bits, uniform=%.1f bits, "
-        "compression=%.2fx, bits/label=%.3f",
+        "MDL [layer=%d, %s]: online=%.1f bits, prior=%.1f bits, uniform=%.1f bits, "
+        "compression=%.2fx (vs_prior), %.2fx (vs_uniform), bits/label=%.3f",
         layer_idx, label_name,
-        online_code_length, uniform_code_length,
-        compression,
+        online_code_length, prior_code_length, uniform_code_length,
+        compression, compression_vs_uniform,
         online_code_length / max(N, 1),
     )
 
