@@ -93,6 +93,36 @@ try:
 except ImportError:
     HF_AVAILABLE = False
 
+
+class _SimpleByteTokenizer:
+    """Minimal byte-level tokenizer fallback when HuggingFace is unavailable."""
+
+    name_or_path = "byte-fallback"
+    eos_token_id = 0
+    model_max_length = int(1e12)
+
+    def encode(self, text, return_tensors=None, **kwargs):
+        ids = [b + 1 for b in text.encode("utf-8", errors="replace")]  # 1-indexed
+        if return_tensors == "pt":
+            return torch.tensor([ids], dtype=torch.long)
+        return ids
+
+    def decode(self, ids, skip_special_tokens=False, **kwargs):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        if isinstance(ids, list) and ids and isinstance(ids[0], list):
+            ids = ids[0]
+        return bytes([max(0, i - 1) for i in ids]).decode("utf-8", errors="replace")
+
+    def convert_ids_to_tokens(self, ids):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        return [chr(max(0, i - 1)) if 0 < i < 128 else f"<{i}>" for i in ids]
+
+    @property
+    def vocab_size(self):
+        return 256
+
 # TensorBoard
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -10613,8 +10643,36 @@ def load_data(
 
         return train_loader, val_loader
 
+    elif config.dataset == "synthetic":
+        # Offline synthetic dataset (random tokens for architecture validation)
+        vocab_size = getattr(tokenizer, 'vocab_size', 256)
+        num_train = max(200_000, effective_seq_len * config.batch_size * 100)
+        num_val = max(20_000, effective_seq_len * config.batch_size * 10)
+        print(f"  Generating synthetic data: {num_train:,} train + {num_val:,} val tokens (vocab={vocab_size})")
+        train_tokens = torch.randint(1, vocab_size, (num_train,))
+        val_tokens = torch.randint(1, vocab_size, (num_val,))
+
+        train_dataset = TextDataset(train_tokens, effective_seq_len)
+        val_dataset = TextDataset(val_tokens, effective_seq_len)
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=0,
+            drop_last=True,
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=0,
+            drop_last=True,
+        )
+        return train_loader, val_loader
+
     else:
-        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', or 'fineweb'")
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', or 'synthetic'")
 
 
 # =============================================================================
@@ -13434,9 +13492,17 @@ def train(config: UnifiedTrainingConfig):
             print(f"     Current model_type: {config.model_type}")
             print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    tokenizer.model_max_length = int(1e12)
+    # Load tokenizer (with offline fallback)
+    if HF_AVAILABLE:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            tokenizer.model_max_length = int(1e12)
+        except (OSError, Exception) as e:
+            print(f"  ⚠️  Cannot load GPT-2 tokenizer ({type(e).__name__}). Using byte-level fallback.")
+            tokenizer = _SimpleByteTokenizer()
+    else:
+        print("  ⚠️  HuggingFace not installed. Using byte-level fallback tokenizer.")
+        tokenizer = _SimpleByteTokenizer()
 
     # Create model BEFORE data loading (needed for AutoBatchSizer)
     model = create_model(config, device)
@@ -18870,8 +18936,8 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2", "fineweb"],
-                       help="Training dataset: wikitext103, wikitext2, or fineweb (streaming)")
+                       choices=["wikitext103", "wikitext2", "fineweb", "synthetic"],
+                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), or synthetic (offline)")
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
                        help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
     parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
