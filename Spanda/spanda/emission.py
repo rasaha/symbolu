@@ -1,12 +1,16 @@
 """
+Emission heads for Spanda-Softmax Hybrid.
+
 AnchorEmission: Distance-based logit computation via algebraic expansion.
+  Logits: z_y = (-||Psi||^2 + 2 * Psi^T A[y] - ||A[y]||^2) / tau
 
-Logits: z_y = (-||Psi||^2 + 2 * Psi^T A[y] - ||A[y]||^2) / tau
+ProjectedDotEmission: Dot-product logits through same psi projection (no distance geometry).
+  Logits: z_y = (Psi^T A[y]) / tau
 
-Anchors are normalized to unit norm every forward pass.
-Temperature tau is learnable (log-parametrized), initialized to psi_dim / 30.
-
-Weight tying uses Option B: anchors = normalize(Projection(token_embedding.weight)).
+Both use:
+  - Anchors normalized to unit norm every forward pass
+  - Learnable temperature tau (log-parametrized), initialized to psi_dim / 30
+  - Weight tying Option B: anchors = normalize(Projection(token_embedding.weight))
 """
 
 import math
@@ -72,6 +76,70 @@ class AnchorEmission(nn.Module):
 
         logits = (2 * dot - anchor_norm_sq.unsqueeze(0).unsqueeze(0) - psi_norm_sq) / tau
         return logits  # [B, T, V]
+
+    def get_anchors_normalized(self, token_embed_weight: torch.Tensor) -> torch.Tensor:
+        """Return unit-norm anchors for diagnostics."""
+        return F.normalize(self.anchor_proj(token_embed_weight), dim=-1)
+
+    @property
+    def temperature(self) -> float:
+        """Current temperature value (for logging)."""
+        return self.log_temperature.exp().item()
+
+
+class ProjectedDotEmission(nn.Module):
+    """
+    Projected dot-product emission: computes logits as scaled dot product
+    between Psi and unit-norm anchors. No distance geometry.
+
+    logits[y] = (Psi^T A[y]) / tau
+
+    Uses the SAME anchor projection and normalization as AnchorEmission,
+    but omits the ||Psi||^2 and ||A[y]||^2 terms. This isolates whether
+    the improvement comes from the psi projection / conditioning alone
+    vs. the distance-based geometry.
+
+    Args:
+        vocab_size: Vocabulary size.
+        embed_dim: Embedding dimension of backbone (for projection).
+        psi_dim: Dimension of Psi / anchor space.
+    """
+
+    def __init__(self, vocab_size: int, embed_dim: int, psi_dim: int = 256):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.psi_dim = psi_dim
+
+        # Same Option B weight tying as AnchorEmission
+        self.anchor_proj = nn.Linear(embed_dim, psi_dim, bias=False)
+
+        # Same learnable temperature initialization
+        self.log_temperature = nn.Parameter(
+            torch.tensor(math.log(psi_dim / 30.0))
+        )
+
+    def forward(
+        self, psi: torch.Tensor, token_embed_weight: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Compute logits via dot product (no distance terms).
+
+        Args:
+            psi: [B, T, psi_dim] -- Psi state sequence.
+            token_embed_weight: [V, embed_dim] -- token embedding weight matrix.
+
+        Returns:
+            logits: [B, T, V]
+        """
+        tau = self.log_temperature.exp()
+
+        # Same anchor computation as AnchorEmission
+        anchors = F.normalize(self.anchor_proj(token_embed_weight), dim=-1)  # [V, psi_dim]
+
+        # Pure dot product -- no ||Psi||^2 or ||A||^2 terms
+        dot = psi @ anchors.T  # [B, T, V]
+        logits = dot / tau
+        return logits
 
     def get_anchors_normalized(self, token_embed_weight: torch.Tensor) -> torch.Tensor:
         """Return unit-norm anchors for diagnostics."""
