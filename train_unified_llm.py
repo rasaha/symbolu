@@ -100,6 +100,16 @@ try:
 except ImportError:
     TENSORBOARD_AVAILABLE = False
 
+# Entropy-based logit scale control
+from symbolu.training.entropy_control import (
+    EntropyControlConfig,
+    LogitScaleModule,
+    AdaptiveEntropyController,
+    topk_entropy,
+    attach_logit_scale,
+    log_entropy_metrics,
+)
+
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -8997,6 +9007,7 @@ def generate_sample(
     top_k: int = 50,
     repetition_penalty: float = 1.15,
     no_repeat_ngram_size: int = 3,
+    entropy_controller: Optional[AdaptiveEntropyController] = None,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
@@ -9009,6 +9020,9 @@ def generate_sample(
     - repetition_penalty = 1.1-1.2
     - no_repeat_ngram_size = 3
     - max_new_tokens = 128-192
+
+    If entropy_controller is provided, applies adaptive logit scaling
+    to keep output entropy near target band.
     """
     model.eval()
 
@@ -9018,6 +9032,13 @@ def generate_sample(
 
     # Generate tokens one by one
     generated = input_ids.clone()
+
+    # Reset entropy controller for new generation
+    if entropy_controller is not None:
+        initial_scale = None
+        if hasattr(model, 'entropy_logit_scale'):
+            initial_scale = model.entropy_logit_scale.logit_scale
+        entropy_controller.reset(initial_scale)
 
     # Track generated n-grams for no_repeat_ngram blocking
     def get_ngrams(seq, n):
@@ -9050,6 +9071,11 @@ def generate_sample(
 
         # Get next token logits
         next_logits = logits[:, -1, :].clone()
+
+        # Adaptive entropy control (inference-time)
+        if entropy_controller is not None:
+            next_logits = entropy_controller.scale_logits(next_logits)
+            entropy_controller.update(next_logits)
 
         # Apply repetition penalty to previously generated tokens
         if repetition_penalty != 1.0:
@@ -9235,6 +9261,22 @@ def run_quality_samples(
             # ChatGPT recommendations for quality samples:
             # temperature=0.9, top_p=0.95, top_k=50
             # repetition_penalty=1.15, no_repeat_ngram_size=3
+            # Create adaptive entropy controller for inference if enabled
+            _infer_entropy_ctrl = None
+            if hasattr(config, 'enable_entropy_control_infer') and config.enable_entropy_control_infer:
+                _ec_cfg = EntropyControlConfig(
+                    enable_entropy_control_infer=True,
+                    entropy_topk=getattr(config, 'entropy_topk', 50),
+                    infer_h_target=getattr(config, 'infer_h_target', 0.25),
+                    infer_eta=getattr(config, 'infer_eta', 0.02),
+                    infer_delta_clip=getattr(config, 'infer_delta_clip', 0.05),
+                    logit_scale_min=getattr(config, 'logit_scale_min', -4.0),
+                    logit_scale_max=getattr(config, 'logit_scale_max', 4.0),
+                )
+                _init_scale = None
+                if hasattr(model, 'entropy_logit_scale'):
+                    _init_scale = model.entropy_logit_scale.logit_scale
+                _infer_entropy_ctrl = AdaptiveEntropyController(_ec_cfg, _init_scale)
             generated = generate_sample(
                 model, tokenizer, prompt, device,
                 max_new_tokens=128,
@@ -9243,6 +9285,7 @@ def run_quality_samples(
                 top_k=50,
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
+                entropy_controller=_infer_entropy_ctrl,
             )
             # Clean up WikiText artifacts and truncate for display
             generated = generated.strip().replace('\n', ' ')
@@ -9656,6 +9699,21 @@ class UnifiedTrainingConfig:
     enable_entropy_floor: bool = False  # Enable entropy floor penalty
     entropy_floor: float = 0.48  # Minimum entropy target
     entropy_floor_weight: float = 0.1  # Weight for floor penalty
+
+    # Entropy-Based Logit Scale Control
+    # Train-time: learnable logit scale with entropy band penalty
+    # Inference-time: adaptive temperature targeting entropy midpoint
+    enable_entropy_control_train: bool = False  # Enable train-time entropy regulation
+    enable_entropy_control_infer: bool = False  # Enable inference-time adaptive entropy
+    entropy_topk: int = 50                      # K for top-K entropy computation
+    entropy_h_min: float = 0.15                 # Lower bound of target entropy band
+    entropy_h_max: float = 0.35                 # Upper bound of target entropy band
+    entropy_control_lambda: float = 0.01        # Weight for entropy band penalty
+    logit_scale_min: float = -4.0               # Min log-scale clamp
+    logit_scale_max: float = 4.0                # Max log-scale clamp
+    infer_h_target: float = 0.25                # Target entropy for inference
+    infer_eta: float = 0.02                     # Inference adaptation rate
+    infer_delta_clip: float = 0.05              # Inference error clip
 
     # V9.5.1 Force Evolution (manual intervention)
     force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
@@ -14033,6 +14091,28 @@ def train(config: UnifiedTrainingConfig):
         print(f"      Check: symbolu/jepa/__init__.py exists and imports correctly")
         print(f"      Falling back to training without JEPA.\n")
 
+    # Entropy-Based Logit Scale Control (attach BEFORE optimizer so params are included)
+    entropy_scale_module = None
+    if config.enable_entropy_control_train:
+        entropy_cfg = EntropyControlConfig(
+            enable_entropy_control_train=True,
+            enable_entropy_control_infer=config.enable_entropy_control_infer,
+            entropy_topk=config.entropy_topk,
+            entropy_h_min=config.entropy_h_min,
+            entropy_h_max=config.entropy_h_max,
+            entropy_lambda=config.entropy_control_lambda,
+            logit_scale_min=config.logit_scale_min,
+            logit_scale_max=config.logit_scale_max,
+            infer_h_target=config.infer_h_target,
+            infer_eta=config.infer_eta,
+            infer_delta_clip=config.infer_delta_clip,
+            log_every=config.log_every,
+        )
+        entropy_scale_module = attach_logit_scale(model, entropy_cfg)
+        print(f"  Entropy Logit Scale Control: ENABLED (train)")
+        print(f"    H_band=[{config.entropy_h_min}, {config.entropy_h_max}], lambda={config.entropy_control_lambda}")
+        print(f"    Scale clamp=[{config.logit_scale_min}, {config.logit_scale_max}]")
+
     # Optimizer
     if config.use_8bit_optimizer:
         try:
@@ -15024,6 +15104,13 @@ def train(config: UnifiedTrainingConfig):
                     phase_angles=phase_angles,
                     epoch=global_step // len(train_loader),
                 )
+                # Entropy control for ontological models
+                if entropy_scale_module is not None:
+                    onto_logits = outputs.get('logits', outputs.get('output'))
+                    if onto_logits is not None:
+                        scaled_onto_logits = entropy_scale_module(onto_logits)
+                        loss, ec_metrics = entropy_scale_module.compute_loss(scaled_onto_logits, loss)
+                        metrics.update({f'ec_{k}': v for k, v in ec_metrics.items() if isinstance(v, (int, float))})
             elif config.model_type == "gen2":
                 outputs = model(x, labels=y)
                 loss = outputs['loss']
@@ -15102,6 +15189,17 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  manual CE loss: {manual_loss.item():.4f}")
 
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Entropy-Based Logit Scale Control (train-time)
+                if entropy_scale_module is not None:
+                    scaled_logits = entropy_scale_module(logits)
+                    loss, entropy_metrics = entropy_scale_module.compute_loss(scaled_logits, loss)
+                    metrics.update({f'ec_{k}': v for k, v in entropy_metrics.items() if isinstance(v, (int, float))})
+                    # Log periodically
+                    if global_step % config.log_every == 0 and global_step > 0:
+                        log_msg = log_entropy_metrics(entropy_metrics, global_step, writer=writer)
+                        if 'entropy_warning' in entropy_metrics:
+                            print(log_msg)
 
                 # Add decorrelation loss if enabled
                 # V9.9.6: Store tensor for re-adding after SRK (which replaces loss)
@@ -18952,6 +19050,30 @@ def main():
     parser.add_argument("--entropy_floor_weight", type=float, default=0.1,
                        help="Weight for entropy floor penalty")
 
+    # Entropy-Based Logit Scale Control
+    parser.add_argument("--enable_entropy_control_train", action="store_true",
+                       help="Enable train-time entropy-based logit scale control")
+    parser.add_argument("--enable_entropy_control_infer", action="store_true",
+                       help="Enable inference-time adaptive entropy control")
+    parser.add_argument("--entropy_topk", type=int, default=50,
+                       help="K for top-K entropy computation (default: 50)")
+    parser.add_argument("--entropy_h_min", type=float, default=0.15,
+                       help="Lower bound of target entropy band (default: 0.15)")
+    parser.add_argument("--entropy_h_max", type=float, default=0.35,
+                       help="Upper bound of target entropy band (default: 0.35)")
+    parser.add_argument("--entropy_control_lambda", type=float, default=0.01,
+                       help="Weight for entropy band penalty (default: 0.01)")
+    parser.add_argument("--logit_scale_min", type=float, default=-4.0,
+                       help="Minimum logit scale clamp (default: -4.0)")
+    parser.add_argument("--logit_scale_max", type=float, default=4.0,
+                       help="Maximum logit scale clamp (default: 4.0)")
+    parser.add_argument("--infer_h_target", type=float, default=0.25,
+                       help="Target entropy midpoint for inference (default: 0.25)")
+    parser.add_argument("--infer_eta", type=float, default=0.02,
+                       help="Inference adaptation learning rate (default: 0.02)")
+    parser.add_argument("--infer_delta_clip", type=float, default=0.05,
+                       help="Inference error clipping bound (default: 0.05)")
+
     # V9.5.1 Force Evolution (manual intervention)
     parser.add_argument("--force_evolution_stage", type=int, default=None,
                        help="Force evolution to specific stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9")
@@ -19953,6 +20075,18 @@ def main():
         enable_entropy_floor=args.enable_entropy_floor,
         entropy_floor=args.entropy_floor,
         entropy_floor_weight=args.entropy_floor_weight,
+        # Entropy-Based Logit Scale Control
+        enable_entropy_control_train=args.enable_entropy_control_train,
+        enable_entropy_control_infer=args.enable_entropy_control_infer,
+        entropy_topk=args.entropy_topk,
+        entropy_h_min=args.entropy_h_min,
+        entropy_h_max=args.entropy_h_max,
+        entropy_control_lambda=args.entropy_control_lambda,
+        logit_scale_min=args.logit_scale_min,
+        logit_scale_max=args.logit_scale_max,
+        infer_h_target=args.infer_h_target,
+        infer_eta=args.infer_eta,
+        infer_delta_clip=args.infer_delta_clip,
         # V9.5.1 Force Evolution
         force_evolution_stage=args.force_evolution_stage,
         # V9.9.1 Multi-Stage Evolution
