@@ -15491,6 +15491,8 @@ def train(config: UnifiedTrainingConfig):
 
             if config.model_type == "ontological":
                 outputs = model(x)
+                # Extract logits for downstream consumers (SRK, KV supervision, etc.)
+                logits = outputs.get('logits', outputs.get('output'))
                 # Extract phase angles if available (for U1/U2 coherence)
                 phase_angles = outputs.get('phase_angles', None)
                 loss, metrics = compute_ontological_loss(
@@ -15502,13 +15504,14 @@ def train(config: UnifiedTrainingConfig):
                 )
                 # Entropy control for ontological models
                 if entropy_scale_module is not None:
-                    onto_logits = outputs.get('logits', outputs.get('output'))
+                    onto_logits = logits
                     if onto_logits is not None:
                         scaled_onto_logits = entropy_scale_module(onto_logits)
                         loss, ec_metrics = entropy_scale_module.compute_loss(scaled_onto_logits, loss)
                         metrics.update({f'ec_{k}': v for k, v in ec_metrics.items() if isinstance(v, (int, float))})
             elif config.model_type == "gen2":
                 outputs = model(x, labels=y)
+                logits = outputs.get('logits', outputs.get('output'))
                 loss = outputs['loss']
                 metrics = {
                     'coherence': outputs['coherence'].mean().item(),
