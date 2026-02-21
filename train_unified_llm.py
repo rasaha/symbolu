@@ -155,6 +155,17 @@ try:
 except ImportError:
     BCVF_CONTRASTIVE_AVAILABLE = False
 
+# BCVF Logit-Margin + Entropy Band (perplexity-aligned)
+try:
+    from symbolu.ontological.bcvf_logit_margin import (
+        LogitMarginConfig,
+        compute_logit_margin_loss,
+        log_logit_margin_diagnostics,
+    )
+    BCVF_LOGIT_MARGIN_AVAILABLE = True
+except ImportError:
+    BCVF_LOGIT_MARGIN_AVAILABLE = False
+
 # Kosha-Vritti Structured Supervision (Static Compatibility Version)
 try:
     from symbolu.training.kosha_vritti_supervision import (
@@ -10210,6 +10221,18 @@ class UnifiedTrainingConfig:
     bcvf_contrastive_projector: str = "mlp"  # "linear" or "mlp"
 
     # ==========================================================================
+    # BCVF Logit-Margin + Entropy Band (perplexity-aligned)
+    # Reference: symbolu/ontological/bcvf_logit_margin.py
+    # ==========================================================================
+    use_logit_margin: bool = False         # Master toggle
+    logit_margin_lambda: float = 0.05      # Weight for margin loss
+    logit_margin_entropy_lambda: float = 0.01  # Weight for entropy band loss
+    logit_margin_m: float = 0.7            # Minimum logit gap z_pos - z_neg
+    logit_margin_H_min: float = 1.5        # Entropy band lower bound
+    logit_margin_H_max: float = 4.0        # Entropy band upper bound
+    logit_margin_top_k_neg: int = 1        # Hard negatives to average (1 = hardest)
+
+    # ==========================================================================
     # KOSHA-VRITTI STRUCTURED SUPERVISION (Static Compatibility Version)
     # Reference: symbolu/training/kosha_vritti_supervision.py
     # ==========================================================================
@@ -15337,6 +15360,31 @@ def train(config: UnifiedTrainingConfig):
         print("  [BCVF-REP] WARNING: use_bcvf_contrastive=True but module not available")
 
     # ==========================================================================
+    # BCVF Logit-Margin + Entropy Band — Initialization
+    # ==========================================================================
+    logit_margin_config = None
+
+    if config.use_logit_margin and BCVF_LOGIT_MARGIN_AVAILABLE:
+        logit_margin_config = LogitMarginConfig(
+            use_logit_margin=True,
+            lambda_margin=config.logit_margin_lambda,
+            lambda_entropy=config.logit_margin_entropy_lambda,
+            margin=config.logit_margin_m,
+            H_min=config.logit_margin_H_min,
+            H_max=config.logit_margin_H_max,
+            top_k_neg=config.logit_margin_top_k_neg,
+        )
+        print(f"\n  [BCVF-LM] Logit-Margin + Entropy Band ENABLED")
+        print(f"     lambda_m={logit_margin_config.lambda_margin}, "
+              f"lambda_H={logit_margin_config.lambda_entropy}, "
+              f"margin={logit_margin_config.margin}")
+        print(f"     H_band=[{logit_margin_config.H_min}, {logit_margin_config.H_max}], "
+              f"top_k_neg={logit_margin_config.top_k_neg}")
+
+    elif config.use_logit_margin and not BCVF_LOGIT_MARGIN_AVAILABLE:
+        print("  [BCVF-LM] WARNING: use_logit_margin=True but module not available")
+
+    # ==========================================================================
     # KOSHA-VRITTI STRUCTURED SUPERVISION Initialization
     # Reference: symbolu/training/kosha_vritti_supervision.py
     # ==========================================================================
@@ -16664,6 +16712,47 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [BCVF-REP] Error at step {global_step}: {e}")
+
+            # =====================================================================
+            # BCVF Logit-Margin + Entropy Band (perplexity-aligned)
+            # Directly improves token likelihood via logit gap pressure
+            # =====================================================================
+            if logit_margin_config is not None:
+                try:
+                    # Get logits for this step
+                    lm_logits = None
+                    if isinstance(outputs, dict):
+                        lm_logits = outputs.get('logits', outputs.get('output'))
+                    elif isinstance(outputs, torch.Tensor):
+                        lm_logits = outputs
+                    if lm_logits is None and 'logits' in dir():
+                        lm_logits = logits
+
+                    if lm_logits is not None and lm_logits.dim() == 3:
+                        lm_margin_loss, lm_entropy_loss, lm_diag = compute_logit_margin_loss(
+                            logits=lm_logits,
+                            targets=y,
+                            config=logit_margin_config,
+                        )
+
+                        # Add to total loss
+                        loss = loss + logit_margin_config.lambda_margin * lm_margin_loss
+                        loss = loss + logit_margin_config.lambda_entropy * lm_entropy_loss
+
+                        # Log diagnostics
+                        for k, v in lm_diag.items():
+                            if isinstance(v, (int, float)):
+                                metrics[k] = v
+
+                        log_logit_margin_diagnostics(
+                            lm_diag, global_step,
+                            writer=writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None,
+                            print_every=config.log_every,
+                        )
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [BCVF-LM] Error at step {global_step}: {e}")
 
             # =====================================================================
             # KOSHA-VRITTI STRUCTURED SUPERVISION
@@ -20467,6 +20556,22 @@ def main():
                        choices=["linear", "mlp"],
                        help="Projection head type for contrastive representations")
 
+    # BCVF Logit-Margin + Entropy Band (perplexity-aligned)
+    parser.add_argument("--use_logit_margin", action="store_true",
+                       help="Enable logit-margin BCVF + entropy band (perplexity-aligned)")
+    parser.add_argument("--logit_margin_lambda", type=float, default=0.05,
+                       help="Weight for logit margin loss")
+    parser.add_argument("--logit_margin_entropy_lambda", type=float, default=0.01,
+                       help="Weight for entropy band loss")
+    parser.add_argument("--logit_margin_m", type=float, default=0.7,
+                       help="Minimum logit gap z_pos - z_neg")
+    parser.add_argument("--logit_margin_H_min", type=float, default=1.5,
+                       help="Entropy band lower bound")
+    parser.add_argument("--logit_margin_H_max", type=float, default=4.0,
+                       help="Entropy band upper bound")
+    parser.add_argument("--logit_margin_top_k_neg", type=int, default=1,
+                       help="Number of hard negatives to average (1 = hardest only)")
+
     # Kosha-Vritti Structured Supervision
     parser.add_argument("--enable_kv_supervision", action="store_true",
                        help="Enable Kosha-Vritti structured auxiliary supervision")
@@ -21075,6 +21180,14 @@ def main():
         bcvf_contrastive_d_r=args.bcvf_contrastive_d_r,
         bcvf_contrastive_T_sample=args.bcvf_contrastive_T_sample,
         bcvf_contrastive_projector=args.bcvf_contrastive_projector,
+        # BCVF Logit-Margin + Entropy Band (perplexity-aligned)
+        use_logit_margin=args.use_logit_margin,
+        logit_margin_lambda=args.logit_margin_lambda,
+        logit_margin_entropy_lambda=args.logit_margin_entropy_lambda,
+        logit_margin_m=args.logit_margin_m,
+        logit_margin_H_min=args.logit_margin_H_min,
+        logit_margin_H_max=args.logit_margin_H_max,
+        logit_margin_top_k_neg=args.logit_margin_top_k_neg,
         # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
         enable_confidence_scaler=args.enable_confidence_scaler,
         confidence_s_min=args.confidence_s_min,
