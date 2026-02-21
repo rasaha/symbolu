@@ -54,6 +54,8 @@ import numpy as np
 from symbolu.ontological.bcvf_decoding import BCVFDecoder, DecodingConfig
 from symbolu.ontological.bcvf_calibration import (
     CalibrationTracker,
+    compute_auroc,
+    compute_auroc_combined,
     compute_ece,
     compute_brier,
     spearman_rank_correlation,
@@ -410,6 +412,43 @@ class StepLogger:
         corr = np.array([float(r.correct) for r in scored])
         return spearman_rank_correlation(logits, corr)
 
+    # ------------------------------------------------------------------
+    # AUROC: the definitive correctness-prediction metric
+    # ------------------------------------------------------------------
+
+    def auroc_logit(self) -> float:
+        """AUROC for predicting correctness from base logit confidence."""
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        scores = np.array([r.confidence for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc(scores, labels)
+
+    def auroc_sb(self) -> float:
+        """AUROC for predicting correctness from sb (backward goal-alignment)."""
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        scores = np.array([r.sb_selected for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc(scores, labels)
+
+    def auroc_combined(self) -> float:
+        """
+        Best AUROC from linear combination w*logit + (1-w)*sb.
+
+        If this exceeds max(auroc_logit, auroc_sb), the two signals
+        contain orthogonal information and combining them is justified.
+        """
+        scored = [r for r in self.records if r.correct is not None]
+        if len(scored) < 3:
+            return 0.5
+        logits = np.array([r.confidence for r in scored])
+        sbs = np.array([r.sb_selected for r in scored])
+        labels = np.array([float(r.correct) for r in scored])
+        return compute_auroc_combined(logits, sbs, labels)
+
     def summary(self) -> Dict[str, float]:
         return {
             "n_steps": len(self.records),
@@ -427,6 +466,9 @@ class StepLogger:
             "sb_correctness_corr": self.sb_correctness_correlation(),
             "logit_rank_correctness_corr": self.logit_rank_correctness_correlation(),
             "base_logit_correctness_corr": self.base_logit_correctness_correlation(),
+            "auroc_logit": self.auroc_logit(),
+            "auroc_sb": self.auroc_sb(),
+            "auroc_combined": self.auroc_combined(),
         }
 
 
@@ -617,6 +659,10 @@ class ExperimentResult:
     sb_correctness_corr: float = 0.0
     logit_rank_correctness_corr: float = 0.0
     base_logit_correctness_corr: float = 0.0
+    # AUROC: the definitive correctness-prediction test
+    auroc_logit: float = 0.5
+    auroc_sb: float = 0.5
+    auroc_combined: float = 0.5
     # Raw
     per_sample: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -755,6 +801,15 @@ class ExperimentRunner:
             pred_token = int(best_idx[0].item())
             gt = sample.get("ground_truth")
 
+            # Diagnostic: log p_top1 vs conf_used_for_ECE for first 20 samples
+            if i < 20:
+                p_top1 = float(probs.max(dim=-1).values[0].item())
+                conf_ece = float(log_data["confidence"][0].item()) if "confidence" in log_data and hasattr(log_data["confidence"], "item") else (float(log_data["confidence"]) if "confidence" in log_data else 0.0)
+                _diag_match = "OK" if abs(p_top1 - conf_ece) < 1e-6 else f"MISMATCH p={p_top1:.4f}"
+                if i == 0:
+                    print(f"    [diag:{label}] sample | p_top1   | conf_ECE | match")
+                print(f"    [diag:{label}] {i:>5d}  | {p_top1:.6f} | {conf_ece:.6f} | {_diag_match}")
+
             record = StepLogger.from_decode_log(
                 step_index=i,
                 log_data=log_data,
@@ -862,6 +917,9 @@ class ExperimentRunner:
             sb_correctness_corr=step_summary["sb_correctness_corr"],
             logit_rank_correctness_corr=step_summary["logit_rank_correctness_corr"],
             base_logit_correctness_corr=step_summary["base_logit_correctness_corr"],
+            auroc_logit=step_summary["auroc_logit"],
+            auroc_sb=step_summary["auroc_sb"],
+            auroc_combined=step_summary["auroc_combined"],
             per_sample=per_sample,
         )
 
@@ -1007,11 +1065,11 @@ class ExperimentRunner:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def print_summary(results: List[ExperimentResult]) -> str:
+    def format_summary(results: List[ExperimentResult]) -> str:
         """
         Format a comparison table across all experiment configs.
 
-        Returns the table as a string (also prints it).
+        Returns the table as a string (does NOT print it).
         """
         header = (
             f"{'Config':<12} {'pass@1':>7} {'ECE':>7} {'Brier':>7} "
@@ -1072,9 +1130,9 @@ class ExperimentRunner:
             logit_rho = r.base_logit_correctness_corr
             rank_rho = r.logit_rank_correctness_corr
             # Verdict: does sb beat logit as a predictor?
-            if sb_rho > logit_rho + 0.05:
+            if sb_rho > logit_rho + 0.05 and sb_rho > 0:
                 verdict = "sb WINS — goal embedding adds signal"
-            elif logit_rho > sb_rho + 0.05:
+            elif logit_rho > sb_rho + 0.05 and logit_rho > 0:
                 verdict = "logit WINS — BCVF may not help"
             elif abs(sb_rho) < 0.05 and abs(logit_rho) < 0.05:
                 verdict = "NEITHER predicts — need better embeddings"
@@ -1085,7 +1143,16 @@ class ExperimentRunner:
                 f"{rank_rho:>+13.4f}  {verdict}"
             )
 
-        table = "\n".join(lines)
+        return "\n".join(lines)
+
+    @staticmethod
+    def print_summary(results: List[ExperimentResult]) -> str:
+        """
+        Format and print a comparison table across all experiment configs.
+
+        Returns the table as a string (also prints it).
+        """
+        table = ExperimentRunner.format_summary(results)
         print(table)
         return table
 

@@ -2181,15 +2181,826 @@ def integrate_csr_into_forward(
 
 
 # =============================================================================
+# CSR PHONEME HEAD: No 12D Bottleneck, Sanskrit-Structured Output Logits
+# =============================================================================
+
+@dataclass
+class CSRPhonemeHeadConfig:
+    """
+    Configuration for CSR Phoneme Head (no ontological layers).
+
+    Replaces the 12D ontological bottleneck with learnable phoneme
+    embeddings in full d_model space. The Sanskrit Varna/Vritti structure
+    determines token-to-phoneme decomposition and initialization grouping,
+    but does NOT constrain the representation to 12 fixed dimensions.
+    """
+    d_model: int = 512
+    vocab_size: int = 50257
+    lambda_csr: float = 0.1          # Mixing weight for phonemic logits
+    lambda_csr_min: float = 0.01     # Floor after decay
+    temperature: float = 1.0         # Logit temperature
+    position_weights: Tuple[float, ...] = (1.5, 1.25, 1.0)
+    max_phonemes_per_token: int = 5
+    learnable_lambda: bool = False   # Make lambda a trainable parameter
+    dropout: float = 0.1
+    use_decay_scheduler: bool = True
+
+
+class CSRPhonemeHead(nn.Module):
+    """
+    Sanskrit Phoneme-Structured Output Head (No 12D / No Ontological Layers).
+
+    Each ARPABET phoneme gets a learnable d_model-dimensional embedding.
+    The Sanskrit Varna/Vritti system provides:
+        - Token decomposition: which phonemes each token contains (fixed, via HybridG2P)
+        - Position weighting: first phoneme weighted more heavily (1.5, 1.25, 1.0, ...)
+        - Vritti grouping: phonemes sharing a mental propensity initialize nearby
+        - Varga structure: Ka-varga, Ca-varga, etc. cluster at initialization
+
+    What is REMOVED vs CSREmbeddingProvider:
+        - No 12D ontological layer vectors (PHONEME_MAP_ARPABET affinities)
+        - No O1_Potential through O12_Absolving mapping
+        - No fixed-dimensional intermediate representation
+        - No 12 -> d_model projection bottleneck
+
+    What is KEPT:
+        - Sanskrit Varna mappings (ARPABET_TO_VARNA)
+        - Vritti / mental propensity associations (Hope, Action, Craving, etc.)
+        - HybridG2P (CMUdict + g2p_en neural fallback)
+        - Position-weighted phoneme aggregation
+
+    Pipelines:
+        Input:   token_id -> phoneme_weights [num_phonemes] -> sum(phoneme_embs) -> [d_model]
+        Output:  h_t [d_model] -> h_t @ csr_vocab.T -> logits [vocab_size]
+    """
+
+    def __init__(self, config: CSRPhonemeHeadConfig, tokenizer=None):
+        super().__init__()
+        self.config = config
+        self.tokenizer = tokenizer
+
+        # Phoneme inventory from ARPABET (the decomposition alphabet)
+        self._phoneme_list = list(PHONEME_MAP_ARPABET.keys())
+        self._phoneme_to_idx = {p: i for i, p in enumerate(self._phoneme_list)}
+        self.num_phonemes = len(self._phoneme_list)
+
+        # Learnable phoneme embeddings in FULL d_model space
+        # This is the core change: no 12D, no ontological layer bottleneck
+        self.phoneme_embeddings = nn.Embedding(self.num_phonemes, config.d_model)
+        self.phoneme_norm = nn.LayerNorm(config.d_model)
+
+        # Initialize with Vritti/Varga grouping structure
+        self._init_from_vritti_groups()
+
+        # Mixing parameter
+        if config.learnable_lambda:
+            self.log_lambda = nn.Parameter(torch.tensor(math.log(config.lambda_csr)))
+        else:
+            self.register_buffer('_lambda_val', torch.tensor(config.lambda_csr))
+
+        self.dropout = nn.Dropout(config.dropout)
+
+        # HybridG2P for token-to-phoneme conversion
+        self._hybrid_g2p = get_hybrid_g2p()
+
+        # Build token-to-phoneme weight matrix if tokenizer available
+        if tokenizer is not None:
+            self._build_token_phoneme_matrix()
+        else:
+            self.register_buffer('_token_phoneme_weights', None, persistent=False)
+
+        # Cached vocab matrix (invalidated each forward)
+        self._cached_csr_vocab: Optional[torch.Tensor] = None
+
+    @property
+    def lambda_csr(self) -> torch.Tensor:
+        """Current CSR mixing weight."""
+        if self.config.learnable_lambda:
+            return self.log_lambda.exp()
+        return self._lambda_val
+
+    def _init_from_vritti_groups(self):
+        """
+        Initialize phoneme embeddings with Sanskrit Varga/Vritti structure.
+
+        Phonemes within the same Varga (articulatory group) share a bias vector,
+        giving them correlated initial representations. This encodes the Sanskrit
+        insight that gutturals (Ka-varga) share a quality distinct from labials
+        (Pa-varga), etc. — without collapsing to 12 fixed dimensions.
+
+        Varga groupings from Sanskrit grammar:
+            Ka-varga (Guttural):  K, G, NG  — throat, propensities: Hope, Action, Vanity
+            Ca-varga (Palatal):   CH, JH    — palate, propensities: Scatter, Vanity
+            Ṭa-varga (Retroflex): T, D      — roof, propensities: Overstatement, Shyness
+            Ta-varga (Dental):    TH, DH    — teeth, propensities: Melancholy, Craving
+            Pa-varga (Labial):    P, B, M   — lips, propensities: Hatred, Indifference, Indulgence
+            Antaḥstha (Semi-vowels): Y, R, L, W, V — transitional energies
+            Ūṣman (Sibilants):   S, SH, Z, ZH — friction/heat
+            Vowels (Short):       AA, AH, AE, IH, UH, EH — consciousness states
+            Vowels (Long/Diph):   IY, UW, EY, AY, OW, AO, OY, AW, ER — extended states
+        """
+        with torch.no_grad():
+            # Base: normal initialization like standard embeddings
+            nn.init.normal_(self.phoneme_embeddings.weight, mean=0.0, std=0.02)
+
+            # Varga groups — Sanskrit articulatory classification
+            varga_groups = {
+                'ka_varga':     ['K', 'G', 'NG'],
+                'ca_varga':     ['CH', 'JH'],
+                'ta_varga':     ['T', 'D'],
+                'tha_varga':    ['TH', 'DH'],
+                'pa_varga':     ['P', 'B', 'M'],
+                'antahstha':    ['Y', 'R', 'L', 'W', 'V'],
+                'ushman':       ['S', 'SH', 'Z', 'ZH'],
+                'aspirate':     ['HH', 'F', 'N'],
+                'short_vowels': ['AA', 'AH', 'AE', 'IH', 'UH', 'EH'],
+                'long_vowels':  ['IY', 'UW', 'EY', 'AY', 'OW', 'AO', 'OY', 'AW', 'ER'],
+                'special':      ['SIL', 'SP', 'UNK'],
+            }
+
+            # Each varga gets a shared bias — phonemes in same group start correlated
+            for group_name, phonemes in varga_groups.items():
+                group_bias = torch.randn(self.config.d_model) * 0.01
+                for p in phonemes:
+                    if p in self._phoneme_to_idx:
+                        idx = self._phoneme_to_idx[p]
+                        self.phoneme_embeddings.weight[idx] += group_bias
+
+            # Voiced/voiceless distinction within vargas
+            voiced = ['G', 'D', 'B', 'JH', 'DH', 'V', 'Z', 'ZH']
+            voiceless = ['K', 'T', 'P', 'CH', 'TH', 'F', 'S', 'SH']
+            voiced_bias = torch.randn(self.config.d_model) * 0.005
+            for p in voiced:
+                if p in self._phoneme_to_idx:
+                    self.phoneme_embeddings.weight[self._phoneme_to_idx[p]] += voiced_bias
+            for p in voiceless:
+                if p in self._phoneme_to_idx:
+                    self.phoneme_embeddings.weight[self._phoneme_to_idx[p]] -= voiced_bias
+
+    def _build_token_phoneme_matrix(self):
+        """
+        Build fixed token-to-phoneme weight matrix [vocab_size, num_phonemes].
+
+        Each row is a position-weighted distribution over phonemes for that token.
+        Rows sum to 1 (convex combination). Special tokens get zero rows.
+
+        Uses HybridG2P: CMUdict (134K) -> Custom vocab -> g2p_en neural -> char fallback.
+        """
+        if self.tokenizer is None:
+            return
+
+        vocab_size = self.config.vocab_size
+        num_phonemes = self.num_phonemes
+
+        # Identify special tokens
+        special_token_ids = set()
+        for attr in ['pad_token_id', 'eos_token_id', 'bos_token_id', 'unk_token_id',
+                     'sep_token_id', 'cls_token_id', 'mask_token_id']:
+            tid = getattr(self.tokenizer, attr, None)
+            if tid is not None:
+                special_token_ids.add(tid)
+        self._special_token_ids = special_token_ids
+
+        weight_matrix = torch.zeros(vocab_size, num_phonemes, dtype=torch.float32)
+        position_weights = list(self.config.position_weights)
+
+        mapped = 0
+        for token_id in range(vocab_size):
+            if token_id in special_token_ids:
+                continue
+
+            try:
+                token_str = self.tokenizer.decode([token_id])
+                phonemes = self._hybrid_g2p.get_phonemes(token_str)
+
+                if len(phonemes) > self.config.max_phonemes_per_token:
+                    phonemes = phonemes[:self.config.max_phonemes_per_token]
+
+                # Position-weighted assignment
+                weights = list(position_weights)
+                while len(weights) < len(phonemes):
+                    weights.append(1.0)
+                weights = weights[:len(phonemes)]
+                total_weight = sum(weights)
+
+                if total_weight > 0:
+                    for phoneme, w in zip(phonemes, weights):
+                        clean = phoneme.rstrip('012')
+                        if clean in self._phoneme_to_idx:
+                            idx = self._phoneme_to_idx[clean]
+                            weight_matrix[token_id, idx] += w / total_weight
+                    mapped += 1
+            except Exception:
+                continue
+
+        self.register_buffer('_token_phoneme_weights', weight_matrix)
+        print(f"  [CSRPhonemeHead] Token-phoneme matrix built: "
+              f"{mapped:,}/{vocab_size:,} tokens mapped, "
+              f"{num_phonemes} phonemes, no 12D bottleneck")
+
+    def get_csr_vocab_matrix(self) -> torch.Tensor:
+        """
+        Compute the CSR vocabulary embedding matrix.
+
+        Each token's embedding is a weighted sum of its phoneme embeddings,
+        where weights come from the fixed token-to-phoneme decomposition.
+
+        Returns:
+            [vocab_size, d_model] — phoneme-structured embedding per token
+        """
+        if self._cached_csr_vocab is not None:
+            return self._cached_csr_vocab
+
+        phoneme_emb = self.phoneme_norm(self.phoneme_embeddings.weight)  # [P, d_model]
+        csr_vocab = self._token_phoneme_weights @ phoneme_emb            # [V, d_model]
+        self._cached_csr_vocab = csr_vocab
+        return csr_vocab
+
+    def invalidate_cache(self):
+        """Call at start of each forward pass to invalidate cached vocab matrix."""
+        self._cached_csr_vocab = None
+
+    def compute_logits(
+        self,
+        hidden_state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute phoneme-structured logits.
+
+        Scores each vocabulary token by how well the hidden state aligns
+        with that token's phonemic identity in d_model space.
+
+        Args:
+            hidden_state: [batch, seq, d_model]
+
+        Returns:
+            [batch, seq, vocab_size] — logits based on phonemic resonance
+        """
+        self.invalidate_cache()
+        csr_vocab = self.get_csr_vocab_matrix()                    # [V, d_model]
+        logits = hidden_state @ csr_vocab.T / self.config.temperature  # [B, T, V]
+        return logits
+
+    def compute_combined_logits(
+        self,
+        hidden_state: torch.Tensor,
+        standard_logits: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Combine standard lm_head logits with CSR phonemic logits.
+
+        z_combined = z_standard + λ_csr * z_phoneme
+
+        The standard logits provide contextual token selection.
+        The phonemic logits bias toward tokens whose Sanskrit phonemic
+        identity resonates with the model's current state.
+
+        Args:
+            hidden_state: [batch, seq, d_model] — from final layer norm
+            standard_logits: [batch, seq, vocab_size] — from lm_head
+
+        Returns:
+            [batch, seq, vocab_size] — combined logits
+        """
+        z_phoneme = self.compute_logits(hidden_state)
+        lam = self.lambda_csr
+        return standard_logits + lam * z_phoneme
+
+    def get_input_embedding(
+        self,
+        input_ids: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Get phoneme-structured input embeddings (replaces CSREmbeddingProvider.forward).
+
+        Each token's embedding is the weighted sum of its constituent phoneme
+        embeddings. Can be added to standard token embeddings as a bias.
+
+        Args:
+            input_ids: [batch, seq]
+
+        Returns:
+            [batch, seq, d_model] — phoneme-structured embeddings
+        """
+        if self._token_phoneme_weights is None:
+            raise RuntimeError("CSRPhonemeHead: no tokenizer provided, cannot compute input embeddings")
+
+        clamped = input_ids.clamp(0, self._token_phoneme_weights.size(0) - 1)
+        token_weights = self._token_phoneme_weights[clamped]             # [B, T, P]
+        phoneme_emb = self.phoneme_norm(self.phoneme_embeddings.weight)  # [P, d_model]
+        csr_emb = token_weights @ phoneme_emb                           # [B, T, d_model]
+        return self.dropout(csr_emb)
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        hidden_state: Optional[torch.Tensor] = None,
+        standard_logits: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Full forward pass: input embeddings + optional output logits.
+
+        Args:
+            input_ids: [batch, seq] — token IDs
+            hidden_state: [batch, seq, d_model] — if provided, computes logits
+            standard_logits: [batch, seq, vocab] — if provided, computes combined logits
+
+        Returns:
+            Dict with:
+                - csr_emb: [B, T, d_model] phoneme-structured input embeddings
+                - csr_logits: [B, T, V] phonemic logits (if hidden_state provided)
+                - combined_logits: [B, T, V] mixed logits (if both provided)
+        """
+        self.invalidate_cache()
+        result = {}
+
+        # Input embedding
+        result['csr_emb'] = self.get_input_embedding(input_ids)
+
+        # Output logits
+        if hidden_state is not None:
+            result['csr_logits'] = self.compute_logits(hidden_state)
+
+            if standard_logits is not None:
+                result['combined_logits'] = self.compute_combined_logits(
+                    hidden_state, standard_logits
+                )
+
+        return result
+
+    def get_phoneme_stats(self) -> Dict[str, Any]:
+        """Diagnostic: phoneme embedding statistics."""
+        with torch.no_grad():
+            emb = self.phoneme_embeddings.weight
+            norms = emb.norm(dim=-1)
+
+            # Cosine similarity matrix
+            normed = F.normalize(emb, dim=-1)
+            sim_matrix = normed @ normed.T
+
+            # Find most similar pairs
+            sim_matrix.fill_diagonal_(-1)
+            max_sim_flat = sim_matrix.argmax()
+            i, j = max_sim_flat // self.num_phonemes, max_sim_flat % self.num_phonemes
+
+            return {
+                'num_phonemes': self.num_phonemes,
+                'embedding_dim': self.config.d_model,
+                'norm_mean': norms.mean().item(),
+                'norm_std': norms.std().item(),
+                'avg_cosine_sim': sim_matrix.mean().item(),
+                'most_similar_pair': (self._phoneme_list[i], self._phoneme_list[j]),
+                'most_similar_score': sim_matrix[i, j].item(),
+                'lambda_csr': self.lambda_csr.item() if isinstance(self.lambda_csr, torch.Tensor) else self.lambda_csr,
+            }
+
+
+def create_csr_phoneme_head(
+    model_config: Any,
+    tokenizer: Any = None,
+    lambda_csr: float = 0.1,
+) -> CSRPhonemeHead:
+    """
+    Create a CSRPhonemeHead from model config.
+
+    This is the no-12D, no-ontological-layer version of CSR.
+    Each phoneme is a learnable d_model vector. Sanskrit structure
+    provides grouping and initialization, not a fixed dimensional mapping.
+
+    Args:
+        model_config: Model config with d_model/hidden_size/embed_dim attribute
+        tokenizer: Tokenizer for building token-phoneme matrix
+        lambda_csr: Mixing weight for phonemic logits
+
+    Returns:
+        Configured CSRPhonemeHead
+    """
+    # Resolve d_model from various config conventions
+    d_model = 512
+    for attr in ['hidden_size', 'n_embd', 'embed_dim', 'd_model', 'dim']:
+        if hasattr(model_config, attr):
+            d_model = getattr(model_config, attr)
+            break
+
+    # Resolve vocab_size
+    vocab_size = 50257
+    for attr in ['vocab_size', 'n_vocab']:
+        if hasattr(model_config, attr):
+            vocab_size = getattr(model_config, attr)
+            break
+    if tokenizer is not None:
+        try:
+            vocab_size = max(vocab_size, len(tokenizer))
+        except Exception:
+            pass
+
+    config = CSRPhonemeHeadConfig(
+        d_model=d_model,
+        vocab_size=vocab_size,
+        lambda_csr=lambda_csr,
+    )
+
+    head = CSRPhonemeHead(config, tokenizer=tokenizer)
+    print(f"  [CSRPhonemeHead] Created: d_model={d_model}, vocab={vocab_size:,}, "
+          f"phonemes={head.num_phonemes}, λ={lambda_csr}, NO 12D bottleneck")
+    return head
+
+
+# =============================================================================
+# PHONEME BCVF SIGNAL — Structural Constraint Energy for Token Decoding
+# =============================================================================
+#
+# Acts as a BCVF-style (Bias-Constraint via Variational Field) signal.
+# Does NOT replace softmax. Modulates standard logits with structured phoneme bias.
+#
+# The equation:
+#
+#   logits_i = h_t · w_i  +  λ · log(φ_i + ε)
+#   P(i) = softmax(logits)
+#
+# Where:
+#   h_t · w_i      = standard lm_head logit (semantic)
+#   φ_i            = phoneme prior for token i = σ(MLP(h_t)) · w_phoneme_i
+#   λ              = dynamic weight, driven by SMI / CSR / phase signals
+#   ε              = stability constant (prevents log(0))
+#
+# Interpretation:
+#   - Softmax chooses semantically
+#   - Phoneme prior biases structurally
+#   - λ controls how much structure matters
+#   - No brittle zeroing, no optimization instability
+#
+# This is exactly how BCVF interacts with attention:
+#   A secondary signal that injects structured constraint energy.
+
+@dataclass
+class PhonemeBCVFConfig:
+    """Configuration for phoneme BCVF signal."""
+    d_model: int = 512
+    num_phonemes: int = 41           # ARPABET inventory size
+    vocab_size: int = 50257
+    phoneme_hidden: int = 256        # Hidden dim for phoneme predictor MLP
+    lambda_init: float = 0.1         # Initial phoneme bias strength
+    lambda_min: float = 0.0          # Floor for dynamic lambda
+    lambda_max: float = 1.0          # Ceiling for dynamic lambda
+    epsilon: float = 1e-6            # log stability constant
+    dynamic_lambda: bool = True      # Whether λ adapts to SMI/CSR signals
+    dropout: float = 0.1
+
+
+class PhonemeBCVF(nn.Module):
+    """
+    Phoneme BCVF Signal — Structural constraint energy at the token decoding layer.
+
+    Standard lm_head gives:
+        logits_i = h_t · w_i
+
+    This module adds a phoneme-structural bias:
+        logits_i = h_t · w_i + λ · log(φ_i + ε)
+
+    Where φ_i is the phoneme prior for token i, computed as:
+        φ = σ(MLP(h_t))              — predict which phonemes should be active
+        φ_i = φ · token_phoneme_weights[i]  — how well token i matches
+
+    λ can be:
+        - Fixed scalar (simple mode)
+        - Dynamic: λ = f(SMI, CSR_decay, phase_drift)
+          High SMI → increase λ (stabilize with structure)
+          Low SMI  → decrease λ (let semantics dominate)
+
+    Training: standard cross-entropy on biased logits.
+    Gradients flow through both the lm_head AND the phoneme predictor.
+    No separate loss. No contrastive sampling. Just logit bias.
+    """
+
+    def __init__(
+        self,
+        config: PhonemeBCVFConfig,
+        token_phoneme_weights: torch.Tensor,
+    ):
+        """
+        Args:
+            config: PhonemeBCVFConfig
+            token_phoneme_weights: [vocab_size, num_phonemes] from CSRPhonemeHead
+        """
+        super().__init__()
+        self.config = config
+
+        # Fixed token-to-phoneme decomposition (from Sanskrit G2P mapping)
+        self.register_buffer('token_phoneme_weights', token_phoneme_weights)
+
+        # Phoneme predictor: h_t → predicted phoneme activations
+        self.phoneme_predictor = nn.Sequential(
+            nn.Linear(config.d_model, config.phoneme_hidden),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.phoneme_hidden, config.num_phonemes),
+        )
+
+        # Lambda: learnable base strength
+        self.lambda_base = nn.Parameter(torch.tensor(config.lambda_init))
+
+        # Dynamic lambda network (if enabled):
+        # Takes external signals → produces lambda scaling factor
+        if config.dynamic_lambda:
+            self.lambda_net = nn.Sequential(
+                nn.Linear(3, 16),    # inputs: [smi, csr_decay, phase_drift]
+                nn.Tanh(),
+                nn.Linear(16, 1),
+                nn.Sigmoid(),        # output ∈ (0, 1), scales lambda_base
+            )
+
+    def predict_phonemes(self, h_t: torch.Tensor) -> torch.Tensor:
+        """
+        Predict phoneme activation pattern from hidden state.
+
+        Args:
+            h_t: [batch, seq, d_model]
+
+        Returns:
+            [batch, seq, num_phonemes] — sigmoid activations ∈ (0, 1)
+        """
+        return torch.sigmoid(self.phoneme_predictor(h_t))
+
+    def compute_phoneme_prior(self, h_t: torch.Tensor) -> torch.Tensor:
+        """
+        Compute per-token phoneme prior φ_i for all tokens in vocabulary.
+
+        φ = σ(MLP(h_t))                              — [B, T, P]
+        φ_i = φ · token_phoneme_weights[i]            — [B, T, V]
+
+        Args:
+            h_t: [batch, seq, d_model]
+
+        Returns:
+            [batch, seq, vocab_size] — phoneme prior per token
+        """
+        phi = self.predict_phonemes(h_t)                         # [B, T, P]
+        prior = phi @ self.token_phoneme_weights.T               # [B, T, V]
+        return prior
+
+    def compute_lambda(
+        self,
+        smi: Optional[torch.Tensor] = None,
+        csr_decay: Optional[torch.Tensor] = None,
+        phase_drift: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Compute dynamic lambda value.
+
+        When signals are provided:
+            λ = lambda_base × lambda_net([smi, csr_decay, phase_drift])
+
+        When no signals (static mode):
+            λ = lambda_base
+
+        Args:
+            smi: Scalar or [batch] — Structural Mutual Information
+            csr_decay: Scalar or [batch] — CSR decay scheduler value
+            phase_drift: Scalar or [batch] — phase coherence drift
+
+        Returns:
+            Scalar or [batch] — effective lambda value
+        """
+        lam = self.lambda_base.clamp(
+            min=self.config.lambda_min,
+            max=self.config.lambda_max,
+        )
+
+        if self.config.dynamic_lambda and smi is not None:
+            device = self.lambda_base.device
+
+            # Pack signals into [batch, 3] or [1, 3]
+            def _to_tensor(x, default=0.0):
+                if x is None:
+                    return torch.tensor([default], device=device)
+                if isinstance(x, (int, float)):
+                    return torch.tensor([x], device=device)
+                return x.to(device).view(-1)
+
+            signals = torch.stack([
+                _to_tensor(smi),
+                _to_tensor(csr_decay),
+                _to_tensor(phase_drift),
+            ], dim=-1)  # [batch, 3] or [1, 3]
+
+            scale = self.lambda_net(signals).squeeze(-1)  # [batch] or [1]
+            lam = lam * scale
+
+            lam = lam.clamp(
+                min=self.config.lambda_min,
+                max=self.config.lambda_max,
+            )
+
+        return lam
+
+    def compute_bias(
+        self,
+        h_t: torch.Tensor,
+        smi: Optional[torch.Tensor] = None,
+        csr_decay: Optional[torch.Tensor] = None,
+        phase_drift: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Compute the phoneme BCVF bias term: λ · log(φ_i + ε)
+
+        This is ADDED to standard lm_head logits before softmax.
+
+        Args:
+            h_t: [batch, seq, d_model] — hidden states from final layer
+            smi: Optional structural mutual information signal
+            csr_decay: Optional CSR decay scheduler value
+            phase_drift: Optional phase coherence drift
+
+        Returns:
+            [batch, seq, vocab_size] — bias to add to logits
+        """
+        # Phoneme prior: how well each token matches predicted phonemes
+        prior = self.compute_phoneme_prior(h_t)                   # [B, T, V]
+
+        # Log-space bias (ε prevents log(0))
+        log_prior = torch.log(prior + self.config.epsilon)        # [B, T, V]
+
+        # Dynamic lambda
+        lam = self.compute_lambda(smi, csr_decay, phase_drift)
+
+        # Reshape lambda for broadcasting
+        if isinstance(lam, torch.Tensor) and lam.dim() >= 1:
+            while lam.dim() < log_prior.dim():
+                lam = lam.unsqueeze(-1)
+
+        bias = lam * log_prior                                    # [B, T, V]
+        return bias
+
+    def forward(
+        self,
+        logits: torch.Tensor,
+        h_t: torch.Tensor,
+        smi: Optional[torch.Tensor] = None,
+        csr_decay: Optional[torch.Tensor] = None,
+        phase_drift: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Apply phoneme BCVF signal to standard logits.
+
+        logits_out = logits + λ · log(φ + ε)
+        P = softmax(logits_out)
+
+        This is the integration point. Call this after lm_head, before softmax.
+
+        Args:
+            logits: [batch, seq, vocab_size] — standard lm_head output
+            h_t: [batch, seq, d_model] — hidden states (for phoneme prediction)
+            smi: Optional SMI signal for dynamic lambda
+            csr_decay: Optional CSR decay signal
+            phase_drift: Optional phase drift signal
+
+        Returns:
+            Dict with:
+                logits: [B, T, V] — biased logits (use these for softmax/CE loss)
+                phoneme_prior: [B, T, V] — raw phoneme prior values
+                phoneme_activations: [B, T, P] — predicted phoneme pattern
+                lambda_value: scalar — effective lambda used
+                bias: [B, T, V] — the bias term that was added
+        """
+        # Phoneme predictions
+        phi = self.predict_phonemes(h_t)                          # [B, T, P]
+        prior = phi @ self.token_phoneme_weights.T                # [B, T, V]
+
+        # Log-bias
+        log_prior = torch.log(prior + self.config.epsilon)        # [B, T, V]
+
+        # Dynamic lambda
+        lam = self.compute_lambda(smi, csr_decay, phase_drift)
+        if isinstance(lam, torch.Tensor) and lam.dim() >= 1:
+            while lam.dim() < log_prior.dim():
+                lam = lam.unsqueeze(-1)
+
+        # The BCVF equation
+        bias = lam * log_prior                                    # [B, T, V]
+        biased_logits = logits + bias                             # [B, T, V]
+
+        return {
+            'logits': biased_logits,
+            'phoneme_prior': prior,
+            'phoneme_activations': phi,
+            'lambda_value': lam,
+            'bias': bias,
+        }
+
+    def get_diagnostics(
+        self,
+        h_t: torch.Tensor,
+        target_ids: torch.Tensor,
+        logits: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Compute diagnostic metrics for monitoring.
+
+        Args:
+            h_t: [batch, seq, d_model]
+            target_ids: [batch, seq]
+            logits: Optional [batch, seq, vocab_size] — if provided, compares
+                    rank of target with and without bias
+
+        Returns:
+            Dict of diagnostic scalars
+        """
+        with torch.no_grad():
+            phi = self.predict_phonemes(h_t)
+            target_phonemes = self.token_phoneme_weights[target_ids]
+
+            # Phoneme prediction accuracy
+            phon_pred = (phi > 0.5).float()
+            phon_target = (target_phonemes > 0.1).float()
+            phon_acc = (phon_pred == phon_target).float().mean()
+
+            # Phoneme prior for target vs mean
+            prior = phi @ self.token_phoneme_weights.T
+            B, T = target_ids.shape
+            target_prior = prior.gather(
+                -1, target_ids.unsqueeze(-1)
+            ).squeeze(-1)  # [B, T]
+            mean_prior = prior.mean(dim=-1)  # [B, T]
+
+            diag = {
+                'phoneme_accuracy': phon_acc,
+                'target_prior_mean': target_prior.mean(),
+                'vocab_prior_mean': mean_prior.mean(),
+                'prior_ratio': (target_prior / (mean_prior + 1e-8)).mean(),
+                'lambda_value': self.lambda_base.detach(),
+            }
+
+            # If logits provided: check rank improvement
+            if logits is not None:
+                bias = self.compute_bias(h_t)
+                biased = logits + bias
+
+                # Rank of target token
+                rank_before = (logits > logits.gather(-1, target_ids.unsqueeze(-1))).sum(-1).float().mean()
+                rank_after = (biased > biased.gather(-1, target_ids.unsqueeze(-1))).sum(-1).float().mean()
+
+                diag['target_rank_before'] = rank_before
+                diag['target_rank_after'] = rank_after
+                diag['rank_improvement'] = rank_before - rank_after
+
+            return diag
+
+
+def create_phoneme_bcvf(
+    csr_phoneme_head: CSRPhonemeHead,
+    lambda_init: float = 0.1,
+    dynamic_lambda: bool = True,
+) -> PhonemeBCVF:
+    """
+    Create PhonemeBCVF signal from an existing CSRPhonemeHead.
+
+    Reuses the token-phoneme weight matrix (Sanskrit G2P decomposition).
+
+    Args:
+        csr_phoneme_head: Existing CSRPhonemeHead with token_phoneme_weights
+        lambda_init: Initial phoneme bias strength
+        dynamic_lambda: Whether λ adapts to external signals
+
+    Returns:
+        Configured PhonemeBCVF
+    """
+    if csr_phoneme_head._token_phoneme_weights is None:
+        raise RuntimeError("CSRPhonemeHead has no token_phoneme_weights — provide a tokenizer")
+
+    config = PhonemeBCVFConfig(
+        d_model=csr_phoneme_head.config.d_model,
+        num_phonemes=csr_phoneme_head.num_phonemes,
+        vocab_size=csr_phoneme_head.config.vocab_size,
+        lambda_init=lambda_init,
+        dynamic_lambda=dynamic_lambda,
+    )
+
+    signal = PhonemeBCVF(
+        config=config,
+        token_phoneme_weights=csr_phoneme_head._token_phoneme_weights,
+    )
+
+    print(f"  [PhonemeBCVF] Created: d_model={config.d_model}, "
+          f"phonemes={config.num_phonemes}, vocab={config.vocab_size:,}, "
+          f"λ_init={lambda_init}, dynamic={dynamic_lambda}")
+    return signal
+
+
+# =============================================================================
 # PUBLIC EXPORTS
 # =============================================================================
 
 __all__ = [
     # Config
     "CSRConfig",
+    "CSRPhonemeHeadConfig",
+    "PhonemeBCVFConfig",
     "AblationConfig",
     # Main classes
     "CSREmbeddingProvider",
+    "CSRPhonemeHead",
+    "PhonemeBCVF",
     "VarnaCSRBridge",
     "EntropySink",
     "SynthesisGate",
@@ -2207,8 +3018,11 @@ __all__ = [
     "CHAR_TO_PHONEME",
     "ONTOLOGICAL_LAYERS",
     "LAYER_NAME_TO_IDX",
+    "ARPABET_TO_VARNA",
     # Helper functions
     "create_csr_for_training",
+    "create_csr_phoneme_head",
+    "create_phoneme_bcvf",
     "integrate_csr_into_forward",
 ]
 

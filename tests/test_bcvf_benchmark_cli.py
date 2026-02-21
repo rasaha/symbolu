@@ -138,6 +138,15 @@ class TestModelResolution:
     def test_alias_phi3(self):
         assert resolve_model_name("phi3") == "microsoft/phi-3.5-mini-instruct"
 
+    def test_alias_phi4(self):
+        assert resolve_model_name("phi4") == "microsoft/Phi-4-mini-instruct"
+
+    def test_alias_phi4mini(self):
+        assert resolve_model_name("phi4mini") == "microsoft/Phi-4-mini-instruct"
+
+    def test_alias_phi4_14b(self):
+        assert resolve_model_name("phi414b") == "microsoft/phi-4"
+
     def test_alias_stablelm(self):
         assert resolve_model_name("stablelm") == "stabilityai/stablelm-zephyr-3b"
 
@@ -146,6 +155,7 @@ class TestModelResolution:
 
     def test_case_insensitive(self):
         assert resolve_model_name("PHI3") == "microsoft/phi-3.5-mini-instruct"
+        assert resolve_model_name("PHI4") == "microsoft/Phi-4-mini-instruct"
 
 
 # =========================================================================

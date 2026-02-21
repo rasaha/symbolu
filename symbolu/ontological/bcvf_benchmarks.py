@@ -319,16 +319,17 @@ def compute_verdict(sb_rho: float, logit_rho: float) -> str:
     Determine verdict from Spearman correlations.
 
     Rules:
-        - sb WINS if sb_rho > logit_rho + 0.05
-        - logit WINS if logit_rho > sb_rho + 0.05
-        - NEITHER if both < 0.05 in absolute value
-        - ~tied otherwise
+        - NEITHER if both |sb_rho| < 0.05 and |logit_rho| < 0.05
+        - sb WINS if sb_rho > logit_rho + 0.05 AND sb_rho > 0
+          (the winner must have positive predictive signal)
+        - logit WINS if logit_rho > sb_rho + 0.05 AND logit_rho > 0
+        - ~tied otherwise (includes cases where neither is positive)
     """
     if abs(sb_rho) < 0.05 and abs(logit_rho) < 0.05:
         return "NEITHER"
-    if sb_rho > logit_rho + 0.05:
+    if sb_rho > logit_rho + 0.05 and sb_rho > 0:
         return "sb WINS"
-    if logit_rho > sb_rho + 0.05:
+    if logit_rho > sb_rho + 0.05 and logit_rho > 0:
         return "logit WINS"
     return "~tied"
 
@@ -1001,6 +1002,7 @@ class BenchmarkSuite:
                 }
             data["benchmarks"].append(entry)
 
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
@@ -1096,11 +1098,18 @@ def print_extended_summary(
     Extended summary that includes benchmark metadata and bootstrap CIs.
 
     This is a standalone function that wraps the existing
-    ExperimentRunner.print_summary() and adds benchmark-specific rows.
+    ExperimentRunner.format_summary() and adds benchmark-specific rows.
     """
-    # First print the standard experiment summary
+    # Temporarily enrich labels with dataset/goal info for the summary table
     experiment_results = [r.experiment_result for r in results]
-    base_table = ExperimentRunner.print_summary(experiment_results)
+    saved_labels = [er.label for er in experiment_results]
+    for er, br in zip(experiment_results, results):
+        short_ds = br.dataset_name.split("/")[0] if "/" in br.dataset_name else br.dataset_name
+        er.label = f"{short_ds}/{br.goal_strategy}" if br.goal_strategy else short_ds
+    base_table = ExperimentRunner.format_summary(experiment_results)
+    # Restore original labels
+    for er, lbl in zip(experiment_results, saved_labels):
+        er.label = lbl
 
     lines = [base_table]
     lines.append("")

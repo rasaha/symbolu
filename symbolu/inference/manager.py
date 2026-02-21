@@ -36,6 +36,9 @@ from .ontological_binding_cache_inference import (
     OntologicalBindingCacheInferenceConfig,
 )
 from .sovereign_state_monitor import SovereignStateMonitor
+from .logit_modulation import LogitModulationConfig, LogitModulator
+from .retrieval_scorer import RetrievalScorer, RetrievalScorerConfig
+from .penalty_scorer import PenaltyScorer, PenaltyScorerConfig
 
 
 class InferenceMode(Enum):
@@ -72,6 +75,12 @@ class InferenceManagerConfig:
     enable_binding_cache_engine: bool = True  # Use specialized engine for V10.0
     enable_sovereign_state_monitor: bool = True  # Track 32D state
     track_state_trajectory: bool = True  # Track state evolution
+
+    # Logit Modulation settings
+    enable_logit_modulation: bool = False  # Inference-time logit shaping
+    logit_modulation_config: Optional[LogitModulationConfig] = None
+    retrieval_scorer_config: Optional[RetrievalScorerConfig] = None
+    penalty_scorer_config: Optional[PenaltyScorerConfig] = None
 
 
 class InferenceManager:
@@ -160,6 +169,22 @@ class InferenceManager:
         self.metacognition = InferenceMetacognition() if self.config.enable_metacognition else None
         self.gunas = InferenceGunas() if self.config.enable_gunas else None
         self.scorer = SovereignInferenceScorer() if self.config.enable_scoring else None
+
+        # Logit modulation components (inference-time logit shaping)
+        self.logit_modulator: Optional[LogitModulator] = None
+        self.retrieval_scorer: Optional[RetrievalScorer] = None
+        self.penalty_scorer: Optional[PenaltyScorer] = None
+
+        if self.config.enable_logit_modulation:
+            self.logit_modulator = LogitModulator(
+                self.config.logit_modulation_config or LogitModulationConfig()
+            )
+            self.retrieval_scorer = RetrievalScorer(
+                self.config.retrieval_scorer_config
+            )
+            self.penalty_scorer = PenaltyScorer(
+                self.config.penalty_scorer_config
+            )
 
         # Generation state
         self._generation_count: int = 0
@@ -454,6 +479,37 @@ class InferenceManager:
                     next_logits, csr_info = self.csr_guard.check_and_gate(
                         hidden_for_csr,
                         next_logits,
+                    )
+
+                # Logit modulation: modified_logits = z + α·R − β·C
+                if self.logit_modulator is not None:
+                    retrieval_scores = None
+                    penalty_scores = None
+
+                    # Compute retrieval scores if retrieval is enabled
+                    if (self.logit_modulator.config.enable_retrieval
+                            and self.retrieval_scorer is not None):
+                        vocab_emb = getattr(self.model, 'embedding', None)
+                        if vocab_emb is not None:
+                            weight = vocab_emb.weight if hasattr(vocab_emb, 'weight') else None
+                            if weight is not None:
+                                h_for_ret = hidden[-1] if hidden is not None and isinstance(hidden, list) else hidden
+                                if h_for_ret is not None and h_for_ret.dim() == 3:
+                                    h_for_ret = h_for_ret[:, -1, :]
+                                elif h_for_ret is None:
+                                    h_for_ret = torch.zeros(1, weight.size(1), device=self._device)
+                                retrieval_scores = self.retrieval_scorer.score(h_for_ret, weight)
+
+                    # Compute penalty scores if penalty is enabled
+                    if (self.logit_modulator.config.enable_penalty
+                            and self.penalty_scorer is not None):
+                        gen_ids = generated_ids[:, input_ids.size(1):]
+                        penalty_scores = self.penalty_scorer.score(
+                            next_logits, generated_ids=gen_ids,
+                        )
+
+                    next_logits = self.logit_modulator.modulate(
+                        next_logits, retrieval_scores, penalty_scores
                     )
 
                 # Apply temperature

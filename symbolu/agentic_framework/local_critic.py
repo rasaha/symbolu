@@ -9,7 +9,8 @@ SUPPORTED BACKENDS:
     3. llama.cpp via ctypes - Lightweight C++ inference (lowest overhead)
 
 RECOMMENDED MODELS (by size/quality trade-off):
-    - Phi-3-mini (3.8B): Best quality/size ratio for critique
+    - Phi-4-mini (3.8B): Best quality/size ratio for critique, 128K context
+    - Phi-4 (14B): Highest quality small model
     - Llama-3.2-3B: Good general purpose
     - Mistral-7B: Higher quality, more resources
     - Qwen2.5-3B: Fast, good for simple checks
@@ -19,7 +20,7 @@ COST COMPARISON:
     |-----------------|-------------------|----------|
     | GPT-4           | $0.03             | 500ms    |
     | Claude-3        | $0.015            | 400ms    |
-    | Local Phi-3     | ~$0.0001          | 100-200ms|
+    | Local Phi-4     | ~$0.0001          | 100-200ms|
     | Local Llama-3B  | ~$0.0001          | 80-150ms |
 
 ARCHITECTURE:
@@ -72,12 +73,12 @@ class OllamaBackend(LocalInferenceBackend):
 
     Requires Ollama to be running: https://ollama.ai
     Start with: ollama serve
-    Pull model: ollama pull phi3:mini
+    Pull model: ollama pull phi4-mini
     """
 
     def __init__(
         self,
-        model: str = "phi3:mini",
+        model: str = "phi4-mini",
         host: str = "http://localhost:11434",
         timeout: float = 30.0,
     ):
@@ -153,7 +154,7 @@ class TransformersBackend(LocalInferenceBackend):
 
     def __init__(
         self,
-        model_id: str = "microsoft/phi-3-mini-4k-instruct",
+        model_id: str = "microsoft/Phi-4-mini-instruct",
         device: str = "auto",
         torch_dtype: str = "auto",
         max_memory: Optional[Dict[int, str]] = None,
@@ -720,7 +721,7 @@ class CostAwareCriticSelector:
 
 
 def create_ollama_critic(
-    model: str = "phi3:mini",
+    model: str = "phi4-mini",
     host: str = "http://localhost:11434",
     fallback_to_rules: bool = True,
 ) -> LocalCritic:
@@ -728,7 +729,7 @@ def create_ollama_critic(
     Create a local critic using Ollama.
 
     Args:
-        model: Ollama model name (e.g., "phi3:mini", "llama3.2:3b")
+        model: Ollama model name (e.g., "phi4-mini", "llama3.2:3b")
         host: Ollama server URL
         fallback_to_rules: Fall back to rule-based if Ollama unavailable
 
@@ -743,7 +744,7 @@ def create_ollama_critic(
 
 
 def create_transformers_critic(
-    model_id: str = "microsoft/phi-3-mini-4k-instruct",
+    model_id: str = "microsoft/Phi-4-mini-instruct",
     device: str = "auto",
     fallback_to_rules: bool = True,
 ) -> LocalCritic:
@@ -789,7 +790,7 @@ def create_llamacpp_critic(
 
 
 def create_cost_aware_critic(
-    local_model: str = "phi3:mini",
+    local_model: str = "phi4-mini",
     api_critic: Optional[QualityCritic] = None,
     strategy: Optional[SelectionStrategy] = None,
 ) -> CostAwareCriticSelector:

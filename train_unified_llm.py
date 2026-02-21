@@ -93,12 +93,96 @@ try:
 except ImportError:
     HF_AVAILABLE = False
 
+
+class _SimpleByteTokenizer:
+    """Minimal byte-level tokenizer fallback when HuggingFace is unavailable."""
+
+    name_or_path = "byte-fallback"
+    eos_token_id = 0
+    model_max_length = int(1e12)
+
+    def encode(self, text, return_tensors=None, **kwargs):
+        ids = [b + 1 for b in text.encode("utf-8", errors="replace")]  # 1-indexed
+        if return_tensors == "pt":
+            return torch.tensor([ids], dtype=torch.long)
+        return ids
+
+    def decode(self, ids, skip_special_tokens=False, **kwargs):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        if isinstance(ids, list) and ids and isinstance(ids[0], list):
+            ids = ids[0]
+        return bytes([max(0, i - 1) for i in ids]).decode("utf-8", errors="replace")
+
+    def convert_ids_to_tokens(self, ids):
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        return [chr(max(0, i - 1)) if 0 < i < 128 else f"<{i}>" for i in ids]
+
+    @property
+    def vocab_size(self):
+        return 256
+
 # TensorBoard
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_AVAILABLE = True
 except ImportError:
     TENSORBOARD_AVAILABLE = False
+
+# Entropy-based logit scale control
+from symbolu.training.entropy_control import (
+    EntropyControlConfig,
+    LogitScaleModule,
+    AdaptiveEntropyController,
+    topk_entropy,
+    attach_logit_scale,
+    log_entropy_metrics,
+)
+
+# BCVF Contrastive Structural Pressure on Representations
+try:
+    from symbolu.ontological.bcvf_contrastive import (
+        BCVFContrastiveConfig,
+        BCVFContrastiveHead,
+        BCVFNegativeSampler,
+        HiddenStateCaptureHook,
+        compute_bcvf_contrastive_loss,
+        log_bcvf_contrastive_diagnostics,
+        get_token_embedding_weight,
+    )
+    BCVF_CONTRASTIVE_AVAILABLE = True
+except ImportError:
+    BCVF_CONTRASTIVE_AVAILABLE = False
+
+# Kosha-Vritti Structured Supervision (Static Compatibility Version)
+try:
+    from symbolu.training.kosha_vritti_supervision import (
+        KoshaVrittiSupervisionConfig,
+        KoshaVrittiSupervisor,
+        log_kv_metrics,
+    )
+    KV_SUPERVISION_AVAILABLE = True
+except ImportError as e:
+    KV_SUPERVISION_AVAILABLE = False
+    print(f"Warning: Kosha-Vritti Supervision not available: {e}")
+
+# State-Conditional Logit Scale ("Confidence Knob") + Entropy Band Control
+try:
+    from symbolu.training.confidence_scaler import (
+        ConfidenceScalerConfig,
+        ConfidenceScaler,
+        EntropyBandLoss,
+        VrittiRiskHead,
+        CalibrationDiagnostics,
+        ConfidenceInferenceHook,
+        log_confidence_metrics,
+        fit_constant_temperature,
+    )
+    CONFIDENCE_SCALER_AVAILABLE = True
+except ImportError as e:
+    CONFIDENCE_SCALER_AVAILABLE = False
+    print(f"Warning: Confidence Scaler not available: {e}")
 
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -8997,6 +9081,7 @@ def generate_sample(
     top_k: int = 50,
     repetition_penalty: float = 1.15,
     no_repeat_ngram_size: int = 3,
+    entropy_controller: Optional[AdaptiveEntropyController] = None,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
@@ -9009,6 +9094,9 @@ def generate_sample(
     - repetition_penalty = 1.1-1.2
     - no_repeat_ngram_size = 3
     - max_new_tokens = 128-192
+
+    If entropy_controller is provided, applies adaptive logit scaling
+    to keep output entropy near target band.
     """
     model.eval()
 
@@ -9018,6 +9106,13 @@ def generate_sample(
 
     # Generate tokens one by one
     generated = input_ids.clone()
+
+    # Reset entropy controller for new generation
+    if entropy_controller is not None:
+        initial_scale = None
+        if hasattr(model, 'entropy_logit_scale'):
+            initial_scale = model.entropy_logit_scale.logit_scale
+        entropy_controller.reset(initial_scale)
 
     # Track generated n-grams for no_repeat_ngram blocking
     def get_ngrams(seq, n):
@@ -9050,6 +9145,11 @@ def generate_sample(
 
         # Get next token logits
         next_logits = logits[:, -1, :].clone()
+
+        # Adaptive entropy control (inference-time)
+        if entropy_controller is not None:
+            next_logits = entropy_controller.scale_logits(next_logits)
+            entropy_controller.update(next_logits)
 
         # Apply repetition penalty to previously generated tokens
         if repetition_penalty != 1.0:
@@ -9235,6 +9335,22 @@ def run_quality_samples(
             # ChatGPT recommendations for quality samples:
             # temperature=0.9, top_p=0.95, top_k=50
             # repetition_penalty=1.15, no_repeat_ngram_size=3
+            # Create adaptive entropy controller for inference if enabled
+            _infer_entropy_ctrl = None
+            if hasattr(config, 'enable_entropy_control_infer') and config.enable_entropy_control_infer:
+                _ec_cfg = EntropyControlConfig(
+                    enable_entropy_control_infer=True,
+                    entropy_topk=getattr(config, 'entropy_topk', 50),
+                    infer_h_target=getattr(config, 'infer_h_target', 0.25),
+                    infer_eta=getattr(config, 'infer_eta', 0.02),
+                    infer_delta_clip=getattr(config, 'infer_delta_clip', 0.05),
+                    logit_scale_min=getattr(config, 'logit_scale_min', -4.0),
+                    logit_scale_max=getattr(config, 'logit_scale_max', 4.0),
+                )
+                _init_scale = None
+                if hasattr(model, 'entropy_logit_scale'):
+                    _init_scale = model.entropy_logit_scale.logit_scale
+                _infer_entropy_ctrl = AdaptiveEntropyController(_ec_cfg, _init_scale)
             generated = generate_sample(
                 model, tokenizer, prompt, device,
                 max_new_tokens=128,
@@ -9243,6 +9359,7 @@ def run_quality_samples(
                 top_k=50,
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
+                entropy_controller=_infer_entropy_ctrl,
             )
             # Clean up WikiText artifacts and truncate for display
             generated = generated.strip().replace('\n', ' ')
@@ -9657,6 +9774,21 @@ class UnifiedTrainingConfig:
     entropy_floor: float = 0.48  # Minimum entropy target
     entropy_floor_weight: float = 0.1  # Weight for floor penalty
 
+    # Entropy-Based Logit Scale Control
+    # Train-time: learnable logit scale with entropy band penalty
+    # Inference-time: adaptive temperature targeting entropy midpoint
+    enable_entropy_control_train: bool = False  # Enable train-time entropy regulation
+    enable_entropy_control_infer: bool = False  # Enable inference-time adaptive entropy
+    entropy_topk: int = 50                      # K for top-K entropy computation
+    entropy_h_min: float = 0.15                 # Lower bound of target entropy band
+    entropy_h_max: float = 0.35                 # Upper bound of target entropy band
+    entropy_control_lambda: float = 0.01        # Weight for entropy band penalty
+    logit_scale_min: float = -4.0               # Min log-scale clamp
+    logit_scale_max: float = 4.0                # Max log-scale clamp
+    infer_h_target: float = 0.25                # Target entropy for inference
+    infer_eta: float = 0.02                     # Inference adaptation rate
+    infer_delta_clip: float = 0.05              # Inference error clip
+
     # V9.5.1 Force Evolution (manual intervention)
     force_evolution_stage: int = None  # Force to stage: 1=6:6, 2=5:7, 3=4:8, 4=3:9
 
@@ -10061,6 +10193,62 @@ class UnifiedTrainingConfig:
     # V10.3.7: Vritti Entropy Regularization (prevents single-vritti collapse)
     vritti_entropy_reg: bool = False       # Enable entropy regularization for vritti
     vritti_entropy_lambda: float = 0.1     # Weight for entropy regularization
+
+    # ==========================================================================
+    # BCVF Contrastive Structural Pressure on Representations
+    # Reference: symbolu/ontological/bcvf_contrastive.py
+    # ==========================================================================
+    use_bcvf_contrastive: bool = False     # Master toggle for contrastive objective
+    bcvf_contrastive_lambda: float = 0.1   # Weight for L_rep in total loss
+    bcvf_contrastive_K: int = 16           # Number of negatives per position
+    bcvf_contrastive_K_pool: int = 256     # Candidate pool size for Stage A
+    bcvf_contrastive_margin: float = 0.15  # Margin for ranking loss
+    bcvf_contrastive_alpha: float = 2.0    # Temperature for BCVF negative weighting
+    bcvf_contrastive_eta: float = 0.3      # Token embedding injection scale for proxy r_neg
+    bcvf_contrastive_d_r: int = 128        # Projection output dimensionality
+    bcvf_contrastive_T_sample: int = 4     # Positions per sequence to sample
+    bcvf_contrastive_projector: str = "mlp"  # "linear" or "mlp"
+
+    # ==========================================================================
+    # KOSHA-VRITTI STRUCTURED SUPERVISION (Static Compatibility Version)
+    # Reference: symbolu/training/kosha_vritti_supervision.py
+    # ==========================================================================
+    # Auxiliary soft-label supervision for Kosha (4-class) and Vritti (5-class)
+    # with entropy floor, static joint compatibility matrix, and staged curriculum.
+    # Does NOT modify transformer blocks -- only adds auxiliary linear heads.
+    enable_kv_supervision: bool = False        # Master toggle
+    kv_weight_kosha_kl: float = 0.1            # Weight for Kosha KL loss
+    kv_weight_vritti_kl: float = 0.1           # Weight for Vritti KL loss
+    kv_weight_entropy_floor: float = 0.01      # Weight for entropy floor penalty
+    kv_weight_compatibility: float = 0.05      # Weight for joint compatibility loss
+    kv_weight_prior: float = 0.001             # Weight for W_kv prior regularization
+    kv_entropy_floor_ratio: float = 0.4        # Hmin = ratio * log(num_classes)
+    kv_compatibility_prior_path: str = ""      # Path to W0 prior matrix (empty = none)
+    kv_curriculum_exclude_epochs: int = 2      # Epochs to exclude Viparyaya/Nidra
+    kv_curriculum_ramp_epochs: int = 1         # Epochs to ramp inclusion
+    kv_teacher_mode: str = "heuristic"         # "uniform" or "heuristic" teacher labels
+    kv_collapse_check_interval: int = 100      # Steps between collapse checks
+    kv_kl_clamp_max: float = 100.0             # Clamp individual KL values
+
+    # ==========================================================================
+    # STATE-CONDITIONAL LOGIT SCALE ("Confidence Knob") + ENTROPY BAND
+    # Reference: symbolu/training/confidence_scaler.py
+    # ==========================================================================
+    # Per-token learned logit scale s_t with optional Vritti risk gating.
+    # Eliminates calibration artifacts, stabilises training, improves reliability.
+    # Does NOT modify transformer blocks -- only emission path + loss + logging.
+    enable_confidence_scaler: bool = False       # Master toggle
+    confidence_s_min: float = 0.3                # Min scale (prevents over-sharpening)
+    confidence_s_max: float = 10.0               # Max scale (prevents trivial uncertainty)
+    confidence_epsilon: float = 1e-4             # Numerical floor for softplus
+    confidence_entropy_band_min: float = 0.10    # H_min = ratio * log(V)
+    confidence_entropy_band_max: float = 0.35    # H_max = ratio * log(V)
+    confidence_lambda_band: float = 1e-3         # Weight for entropy band loss
+    confidence_lambda_scale: float = 1e-4        # Weight for log(s) regulariser
+    # Risk gating via Vritti head (Viparyaya + Nidra → increase uncertainty)
+    confidence_enable_risk_gating: bool = False   # Enable Vritti risk gating
+    confidence_alpha_risk: float = 0.5            # Risk scaling coefficient
+    confidence_vritti_kl_weight: float = 0.1      # Weight for Vritti KL aux loss
 
 
 # Model size presets
@@ -10525,8 +10713,36 @@ def load_data(
 
         return train_loader, val_loader
 
+    elif config.dataset == "synthetic":
+        # Offline synthetic dataset (random tokens for architecture validation)
+        vocab_size = getattr(tokenizer, 'vocab_size', 256)
+        num_train = max(200_000, effective_seq_len * config.batch_size * 100)
+        num_val = max(20_000, effective_seq_len * config.batch_size * 10)
+        print(f"  Generating synthetic data: {num_train:,} train + {num_val:,} val tokens (vocab={vocab_size})")
+        train_tokens = torch.randint(1, vocab_size, (num_train,))
+        val_tokens = torch.randint(1, vocab_size, (num_val,))
+
+        train_dataset = TextDataset(train_tokens, effective_seq_len)
+        val_dataset = TextDataset(val_tokens, effective_seq_len)
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=0,
+            drop_last=True,
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=0,
+            drop_last=True,
+        )
+        return train_loader, val_loader
+
     else:
-        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', or 'fineweb'")
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', or 'synthetic'")
 
 
 # =============================================================================
@@ -13346,9 +13562,17 @@ def train(config: UnifiedTrainingConfig):
             print(f"     Current model_type: {config.model_type}")
             print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    tokenizer.model_max_length = int(1e12)
+    # Load tokenizer (with offline fallback)
+    if HF_AVAILABLE:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            tokenizer.model_max_length = int(1e12)
+        except (OSError, Exception) as e:
+            print(f"  ⚠️  Cannot load GPT-2 tokenizer ({type(e).__name__}). Using byte-level fallback.")
+            tokenizer = _SimpleByteTokenizer()
+    else:
+        print("  ⚠️  HuggingFace not installed. Using byte-level fallback tokenizer.")
+        tokenizer = _SimpleByteTokenizer()
 
     # Create model BEFORE data loading (needed for AutoBatchSizer)
     model = create_model(config, device)
@@ -13584,6 +13808,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_pidv2_curriculum_state = None
     resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
     resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+    resumed_kv_supervisor_state = None  # KV Supervision (Kosha-Vritti Structured Supervision)
 
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
@@ -14033,6 +14258,85 @@ def train(config: UnifiedTrainingConfig):
         print(f"      Check: symbolu/jepa/__init__.py exists and imports correctly")
         print(f"      Falling back to training without JEPA.\n")
 
+    # Entropy-Based Logit Scale Control (attach BEFORE optimizer so params are included)
+    entropy_scale_module = None
+    if config.enable_entropy_control_train:
+        entropy_cfg = EntropyControlConfig(
+            enable_entropy_control_train=True,
+            enable_entropy_control_infer=config.enable_entropy_control_infer,
+            entropy_topk=config.entropy_topk,
+            entropy_h_min=config.entropy_h_min,
+            entropy_h_max=config.entropy_h_max,
+            entropy_lambda=config.entropy_control_lambda,
+            logit_scale_min=config.logit_scale_min,
+            logit_scale_max=config.logit_scale_max,
+            infer_h_target=config.infer_h_target,
+            infer_eta=config.infer_eta,
+            infer_delta_clip=config.infer_delta_clip,
+            log_every=config.log_every,
+        )
+        entropy_scale_module = attach_logit_scale(model, entropy_cfg)
+        print(f"  Entropy Logit Scale Control: ENABLED (train)")
+        print(f"    H_band=[{config.entropy_h_min}, {config.entropy_h_max}], lambda={config.entropy_control_lambda}")
+        print(f"    Scale clamp=[{config.logit_scale_min}, {config.logit_scale_max}]")
+
+    # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+    confidence_scaler = None
+    entropy_band_loss = None
+    vritti_risk_head = None
+    confidence_scaler_config = None
+
+    if config.enable_confidence_scaler and CONFIDENCE_SCALER_AVAILABLE:
+        # Determine hidden dimension from model preset
+        _cs_embed_dim = (
+            config.n_embd if config.n_embd is not None
+            else MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+        )
+
+        confidence_scaler_config = ConfidenceScalerConfig(
+            enable=True,
+            s_min=config.confidence_s_min,
+            s_max=config.confidence_s_max,
+            epsilon=config.confidence_epsilon,
+            enable_risk_gating=config.confidence_enable_risk_gating,
+            alpha_risk=config.confidence_alpha_risk,
+            entropy_band_ratio_min=config.confidence_entropy_band_min,
+            entropy_band_ratio_max=config.confidence_entropy_band_max,
+            lambda_entropy_band=config.confidence_lambda_band,
+            lambda_scale_penalty=config.confidence_lambda_scale,
+            enable_vritti_head=config.confidence_enable_risk_gating,
+            vritti_kl_weight=config.confidence_vritti_kl_weight,
+            log_every=config.log_every,
+        )
+
+        confidence_scaler = ConfidenceScaler(_cs_embed_dim, confidence_scaler_config).to(device)
+        entropy_band_loss = EntropyBandLoss(config.vocab_size, confidence_scaler_config).to(device)
+
+        # Register as submodule on model so parameters are in state_dict
+        model.confidence_scaler = confidence_scaler
+        model.entropy_band_loss = entropy_band_loss
+
+        cs_param_count = sum(p.numel() for p in confidence_scaler.parameters())
+
+        if config.confidence_enable_risk_gating:
+            vritti_risk_head = VrittiRiskHead(_cs_embed_dim, confidence_scaler_config).to(device)
+            model.vritti_risk_head = vritti_risk_head
+            cs_param_count += sum(p.numel() for p in vritti_risk_head.parameters())
+
+        import math as _math
+        _log_v = _math.log(config.vocab_size)
+        print(f"\n  [CONFIDENCE] Per-Token Logit Scale: ENABLED")
+        print(f"     Params: {cs_param_count:,} | s_range=[{config.confidence_s_min}, {config.confidence_s_max}]")
+        print(f"     Entropy band: [{config.confidence_entropy_band_min * _log_v:.2f}, "
+              f"{config.confidence_entropy_band_max * _log_v:.2f}] "
+              f"(ratios [{config.confidence_entropy_band_min}, {config.confidence_entropy_band_max}] * log(V)={_log_v:.2f})")
+        print(f"     lambda_band={config.confidence_lambda_band}, lambda_scale={config.confidence_lambda_scale}")
+        if config.confidence_enable_risk_gating:
+            print(f"     Risk gating: ENABLED (alpha={config.confidence_alpha_risk})")
+
+    elif config.enable_confidence_scaler and not CONFIDENCE_SCALER_AVAILABLE:
+        print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
+
     # Optimizer
     if config.use_8bit_optimizer:
         try:
@@ -14131,6 +14435,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_pidv2_curriculum_state = resume_result.get("pidv2_curriculum_state")
                 resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
                 resumed_evoflow_state = resume_result.get("evoflow_state")
+                resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -14969,6 +15274,128 @@ def train(config: UnifiedTrainingConfig):
             print(f"\n  ❌ [CHUNK DIAGNOSTIC] Failed to run diagnostic: {e}")
             print(f"      Training will continue without diagnostic validation.\n")
 
+    # ==========================================================================
+    # BCVF Contrastive Structural Pressure — Initialization
+    # ==========================================================================
+    bcvf_contrastive_head = None
+    bcvf_contrastive_sampler = None
+    bcvf_contrastive_config = None
+    bcvf_hidden_hook = None
+
+    if config.use_bcvf_contrastive and BCVF_CONTRASTIVE_AVAILABLE:
+        # Determine model hidden dimension
+        _bcvf_embed_dim = getattr(config, 'n_embd', None) or MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+
+        bcvf_contrastive_config = BCVFContrastiveConfig(
+            use_bcvf_contrastive=True,
+            lambda_rep=config.bcvf_contrastive_lambda,
+            K=config.bcvf_contrastive_K,
+            K_pool=min(config.bcvf_contrastive_K_pool, config.vocab_size),
+            margin=config.bcvf_contrastive_margin,
+            alpha=config.bcvf_contrastive_alpha,
+            eta=config.bcvf_contrastive_eta,
+            d_r=config.bcvf_contrastive_d_r,
+            T_sample=config.bcvf_contrastive_T_sample,
+            projector_type=config.bcvf_contrastive_projector,
+        )
+
+        bcvf_contrastive_head = BCVFContrastiveHead(
+            hidden_dim=_bcvf_embed_dim,
+            proj_dim=bcvf_contrastive_config.d_r,
+            projector_type=bcvf_contrastive_config.projector_type,
+        ).to(device)
+
+        # Add contrastive head params to optimizer
+        optimizer.add_param_group({
+            'params': bcvf_contrastive_head.parameters(),
+            'lr': config.learning_rate,
+            'weight_decay': 0.01,
+        })
+
+        bcvf_contrastive_sampler = BCVFNegativeSampler(
+            K=bcvf_contrastive_config.K,
+            K_pool=bcvf_contrastive_config.K_pool,
+            top_p=bcvf_contrastive_config.top_p,
+        )
+
+        # Register hidden state capture hook
+        bcvf_hidden_hook = HiddenStateCaptureHook()
+        hook_ok = bcvf_hidden_hook.register(model)
+
+        print(f"\n  [BCVF-REP] Contrastive Structural Pressure ENABLED")
+        print(f"     lambda_rep={bcvf_contrastive_config.lambda_rep}, "
+              f"K={bcvf_contrastive_config.K}, "
+              f"margin={bcvf_contrastive_config.margin}")
+        print(f"     d_r={bcvf_contrastive_config.d_r}, "
+              f"T_sample={bcvf_contrastive_config.T_sample}, "
+              f"projector={bcvf_contrastive_config.projector_type}")
+        print(f"     Hidden hook registered: {hook_ok}")
+        print(f"     Head params: {sum(p.numel() for p in bcvf_contrastive_head.parameters()):,}")
+
+    elif config.use_bcvf_contrastive and not BCVF_CONTRASTIVE_AVAILABLE:
+        print("  [BCVF-REP] WARNING: use_bcvf_contrastive=True but module not available")
+
+    # ==========================================================================
+    # KOSHA-VRITTI STRUCTURED SUPERVISION Initialization
+    # Reference: symbolu/training/kosha_vritti_supervision.py
+    # ==========================================================================
+    kv_supervisor = None
+
+    if config.enable_kv_supervision and KV_SUPERVISION_AVAILABLE:
+        # Determine hidden dimension from model preset
+        _kv_embed_dim = (
+            config.n_embd if config.n_embd is not None
+            else MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+        )
+
+        kv_config = KoshaVrittiSupervisionConfig(
+            enable=True,
+            weight_kosha_kl=config.kv_weight_kosha_kl,
+            weight_vritti_kl=config.kv_weight_vritti_kl,
+            weight_entropy_floor=config.kv_weight_entropy_floor,
+            weight_compatibility=config.kv_weight_compatibility,
+            weight_prior=config.kv_weight_prior,
+            entropy_floor_ratio=config.kv_entropy_floor_ratio,
+            compatibility_prior_path=config.kv_compatibility_prior_path or None,
+            curriculum_exclude_epochs=config.kv_curriculum_exclude_epochs,
+            curriculum_ramp_epochs=config.kv_curriculum_ramp_epochs,
+            default_kosha_dist=config.kv_teacher_mode,
+            default_vritti_dist=config.kv_teacher_mode,
+            collapse_check_interval=config.kv_collapse_check_interval,
+            kl_clamp_max=config.kv_kl_clamp_max,
+        )
+
+        kv_supervisor = KoshaVrittiSupervisor(
+            config=kv_config,
+            hidden_dim=_kv_embed_dim,
+            device=device,
+            tokenizer=tokenizer if 'tokenizer' in dir() else None,
+        )
+
+        # Add KV supervisor params to optimizer
+        optimizer.add_param_group({
+            'params': list(kv_supervisor.parameters()),
+            'lr': config.learning_rate,
+            'weight_decay': 0.01,
+        })
+
+        kv_param_count = sum(p.numel() for p in kv_supervisor.parameters())
+        print(f"\n  [KV-SUPERVISION] Kosha-Vritti Structured Supervision ENABLED")
+        print(f"     Kosha: 4 classes | Vritti: 5 classes | Params: {kv_param_count:,}")
+        print(f"     Weights: KL(K)={config.kv_weight_kosha_kl} KL(V)={config.kv_weight_vritti_kl} "
+              f"H={config.kv_weight_entropy_floor} Compat={config.kv_weight_compatibility}")
+        print(f"     Curriculum: exclude={config.kv_curriculum_exclude_epochs} epochs, "
+              f"ramp={config.kv_curriculum_ramp_epochs} epochs")
+        print(f"     Teacher: {config.kv_teacher_mode} | Entropy floor: {config.kv_entropy_floor_ratio}")
+
+    elif config.enable_kv_supervision and not KV_SUPERVISION_AVAILABLE:
+        print("  [KV-SUPERVISION] WARNING: enable_kv_supervision=True but module not available")
+
+    # Restore KV Supervision state from checkpoint
+    if kv_supervisor is not None and resumed_kv_supervisor_state is not None:
+        kv_supervisor.load_state_dict(resumed_kv_supervisor_state)
+        print(f"  ✓ KV Supervision state restored from checkpoint")
+
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
         # This allows VRAM to stabilize after memory reallocation
@@ -15024,6 +15451,13 @@ def train(config: UnifiedTrainingConfig):
                     phase_angles=phase_angles,
                     epoch=global_step // len(train_loader),
                 )
+                # Entropy control for ontological models
+                if entropy_scale_module is not None:
+                    onto_logits = outputs.get('logits', outputs.get('output'))
+                    if onto_logits is not None:
+                        scaled_onto_logits = entropy_scale_module(onto_logits)
+                        loss, ec_metrics = entropy_scale_module.compute_loss(scaled_onto_logits, loss)
+                        metrics.update({f'ec_{k}': v for k, v in ec_metrics.items() if isinstance(v, (int, float))})
             elif config.model_type == "gen2":
                 outputs = model(x, labels=y)
                 loss = outputs['loss']
@@ -15102,6 +15536,17 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  manual CE loss: {manual_loss.item():.4f}")
 
                 loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Entropy-Based Logit Scale Control (train-time)
+                if entropy_scale_module is not None:
+                    scaled_logits = entropy_scale_module(logits)
+                    loss, entropy_metrics = entropy_scale_module.compute_loss(scaled_logits, loss)
+                    metrics.update({f'ec_{k}': v for k, v in entropy_metrics.items() if isinstance(v, (int, float))})
+                    # Log periodically
+                    if global_step % config.log_every == 0 and global_step > 0:
+                        log_msg = log_entropy_metrics(entropy_metrics, global_step, writer=writer)
+                        if 'entropy_warning' in entropy_metrics:
+                            print(log_msg)
 
                 # Add decorrelation loss if enabled
                 # V9.9.6: Store tensor for re-adding after SRK (which replaces loss)
@@ -16154,6 +16599,206 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  ⚠️ [32D REGULARIZER] Error: {e}")
+
+            # =====================================================================
+            # BCVF Contrastive Structural Pressure on Representations
+            # Adds L_rep to total loss — shapes hidden-state geometry
+            # =====================================================================
+            if bcvf_contrastive_head is not None and bcvf_contrastive_config is not None:
+                try:
+                    # Get hidden states
+                    bcvf_h = None
+                    if bcvf_hidden_hook is not None:
+                        bcvf_h = bcvf_hidden_hook.get()
+
+                    # Get logits
+                    bcvf_logits = None
+                    if isinstance(outputs, dict):
+                        bcvf_logits = outputs.get('logits', outputs.get('output'))
+                    elif isinstance(outputs, torch.Tensor):
+                        bcvf_logits = outputs
+                    # Handle case where logits was separately extracted
+                    if bcvf_logits is None and 'logits' in dir():
+                        bcvf_logits = logits
+
+                    if bcvf_h is not None and bcvf_logits is not None and bcvf_h.dim() == 3 and bcvf_logits.dim() == 3:
+                        # Get token embeddings
+                        bcvf_tok_emb = get_token_embedding_weight(model)
+                        if bcvf_tok_emb is None:
+                            # Fallback: try lm_head weight (tied embeddings)
+                            for _n, _m in model.named_modules():
+                                if 'lm_head' in _n and isinstance(_m, nn.Linear):
+                                    bcvf_tok_emb = _m.weight.detach()
+                                    break
+
+                        if bcvf_tok_emb is not None:
+                            rep_loss, rep_diag = compute_bcvf_contrastive_loss(
+                                h_all=bcvf_h,
+                                logits_all=bcvf_logits.detach() if bcvf_logits.requires_grad else bcvf_logits,
+                                labels=y,
+                                contrastive_head=bcvf_contrastive_head,
+                                token_embeddings=bcvf_tok_emb,
+                                config=bcvf_contrastive_config,
+                                sampler=bcvf_contrastive_sampler,
+                            )
+
+                            # Add weighted contrastive loss
+                            loss = loss + bcvf_contrastive_config.lambda_rep * rep_loss
+
+                            # Log diagnostics
+                            for k, v in rep_diag.items():
+                                if isinstance(v, (int, float)):
+                                    metrics[k] = v
+
+                            log_bcvf_contrastive_diagnostics(
+                                rep_diag, global_step,
+                                writer=writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None,
+                                print_every=config.log_every,
+                            )
+
+                    # Clear hook state for next step
+                    if bcvf_hidden_hook is not None:
+                        bcvf_hidden_hook.clear()
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [BCVF-REP] Error at step {global_step}: {e}")
+
+            # =====================================================================
+            # KOSHA-VRITTI STRUCTURED SUPERVISION
+            # Adds auxiliary KL + entropy floor + compatibility losses
+            # Does NOT modify transformer blocks
+            # =====================================================================
+            if kv_supervisor is not None:
+                try:
+                    # Extract hidden states for KV supervision
+                    kv_hidden = None
+                    if hidden_state_extractor is not None:
+                        kv_layer_states = hidden_state_extractor.get_hidden_states(outputs, x)
+                        if kv_layer_states is not None and len(kv_layer_states) > 0:
+                            kv_hidden = kv_layer_states[-1]  # Last layer hidden states
+
+                    # Fallback: try to get from model outputs dict
+                    if kv_hidden is None and isinstance(outputs, dict):
+                        kv_hidden = outputs.get('hidden_states', None)
+                        if kv_hidden is None:
+                            kv_hidden = outputs.get('last_hidden_state', None)
+
+                    if kv_hidden is not None and kv_hidden.dim() == 3:
+                        # Compute epoch for curriculum
+                        kv_epoch = global_step // max(len(train_loader), 1)
+
+                        # DDP info
+                        kv_rank = int(os.environ.get('RANK', 0))
+                        kv_world_size = int(os.environ.get('WORLD_SIZE', 1))
+
+                        # Detach hidden states — KV supervision is auxiliary-only,
+                        # it should NOT backprop through the transformer backbone
+                        kv_hidden_detached = kv_hidden.detach()
+
+                        kv_loss, kv_metrics = kv_supervisor.step(
+                            hidden_states=kv_hidden_detached,
+                            input_ids=x,
+                            epoch=kv_epoch,
+                            global_step=global_step,
+                            rank=kv_rank,
+                            world_size=kv_world_size,
+                        )
+
+                        # Add to total loss (only auxiliary head gradients flow)
+                        loss = loss + kv_loss
+
+                        # Merge metrics
+                        metrics.update(kv_metrics)
+
+                        # Log periodically
+                        if KV_SUPERVISION_AVAILABLE:
+                            writer_ref = writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None
+                            log_kv_metrics(
+                                kv_metrics, global_step,
+                                writer=writer_ref,
+                                print_every=config.log_every,
+                                rank=kv_rank,
+                            )
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [KV-SUPERVISION] Error at step {global_step}: {e}")
+
+            # =====================================================================
+            # STATE-CONDITIONAL LOGIT SCALE ("Confidence Knob") + ENTROPY BAND
+            # Per-token s_t scales logits to eliminate calibration artifacts.
+            # Does NOT modify transformer blocks -- emission path only.
+            # =====================================================================
+            if confidence_scaler is not None:
+                try:
+                    # Extract hidden states and logits
+                    cs_hidden = None
+                    cs_logits = None
+
+                    if isinstance(outputs, dict):
+                        cs_hidden = outputs.get('last_hidden_state', outputs.get('hidden_states', None))
+                        cs_logits = outputs.get('logits', outputs.get('output', None))
+                    elif isinstance(outputs, torch.Tensor):
+                        cs_logits = outputs  # For models that return logits directly
+
+                    # If we have both hidden states and logits, apply confidence scaling
+                    if cs_hidden is not None and cs_logits is not None and cs_hidden.dim() == 3:
+                        # Compute risk probability from Vritti head (if enabled)
+                        cs_risk_prob = None
+                        cs_vritti_loss = torch.tensor(0.0, device=device)
+                        if vritti_risk_head is not None:
+                            vritti_out = vritti_risk_head(cs_hidden.detach())
+                            cs_risk_prob = vritti_out['risk_prob']
+
+                            # If KV supervision provides teacher labels, train Vritti head
+                            if kv_supervisor is not None and 'kv_vritti_freq_Viparyaya' in metrics:
+                                # Use KV supervisor's teacher as reference (if available)
+                                pass  # Vritti head trains from its own gradient through risk gating
+
+                        # Scale logits
+                        cs_logits_scaled, cs_s, cs_diag = confidence_scaler.scale_logits(
+                            cs_logits, cs_hidden, cs_risk_prob,
+                        )
+
+                        # Compute entropy band + scale penalty losses
+                        cs_band_loss, cs_band_metrics = entropy_band_loss(
+                            cs_logits_scaled, cs_s,
+                            targets=y,
+                        )
+
+                        # Add auxiliary losses to total
+                        loss = loss + cs_band_loss
+
+                        # Compute and log calibration diagnostics
+                        if global_step % config.log_every == 0:
+                            cs_calib = CalibrationDiagnostics.compute(
+                                logits_raw=cs_logits,
+                                logits_scaled=cs_logits_scaled,
+                                s=cs_s,
+                                targets=y,
+                            )
+                            cs_calib.update(cs_band_metrics)
+
+                            # DDP reduce if needed
+                            cs_rank = int(os.environ.get('RANK', 0))
+                            cs_world = int(os.environ.get('WORLD_SIZE', 1))
+                            if cs_world > 1:
+                                cs_calib = CalibrationDiagnostics.ddp_reduce(cs_calib, cs_world)
+
+                            metrics.update({f'cs_{k}': v for k, v in cs_calib.items()
+                                          if isinstance(v, (int, float))})
+
+                            log_confidence_metrics(
+                                cs_calib, global_step,
+                                writer=writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None,
+                                print_every=config.log_every,
+                                rank=cs_rank,
+                            )
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [CONFIDENCE] Error at step {global_step}: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -17920,6 +18565,7 @@ def train(config: UnifiedTrainingConfig):
                         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                         kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                         evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     )
                     print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
@@ -17966,6 +18612,7 @@ def train(config: UnifiedTrainingConfig):
                     pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
                     kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                    kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                 )
                 print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -17991,6 +18638,7 @@ def train(config: UnifiedTrainingConfig):
         pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
         kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
         evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
     )
     # v2.7 Training State Tracker: Save final state
     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -18298,6 +18946,8 @@ def save_checkpoint(
     kosha_gyroscope_state: Optional[dict] = None,
     # V9.8.6: EvoFlow state (EvolutionaryIntelligenceEngine)
     evoflow_state: Optional[dict] = None,
+    # Kosha-Vritti Supervision state
+    kv_supervisor_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
 ):
@@ -18358,6 +19008,10 @@ def save_checkpoint(
     # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
     if evoflow_state is not None:
         checkpoint["evoflow_state"] = evoflow_state
+
+    # Kosha-Vritti Supervision state
+    if kv_supervisor_state is not None:
+        checkpoint["kv_supervisor_state"] = kv_supervisor_state
 
     # V9.8.6: Add dataloader position for reproducibility
     if dataloader_position is not None:
@@ -18537,6 +19191,11 @@ def load_checkpoint(
         result["evoflow_state"] = checkpoint["evoflow_state"]
         print(f"    ✓ EvoFlow state available for restoration")
 
+    # KV Supervision state
+    if "kv_supervisor_state" in checkpoint:
+        result["kv_supervisor_state"] = checkpoint["kv_supervisor_state"]
+        print(f"    ✓ KV Supervision state available for restoration")
+
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
         result["dataloader_position"] = checkpoint["dataloader_position"]
@@ -18617,8 +19276,8 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2", "fineweb"],
-                       help="Training dataset: wikitext103, wikitext2, or fineweb (streaming)")
+                       choices=["wikitext103", "wikitext2", "fineweb", "synthetic"],
+                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), or synthetic (offline)")
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
                        help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
     parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
@@ -18951,6 +19610,30 @@ def main():
                        help="Minimum entropy target (default 0.48)")
     parser.add_argument("--entropy_floor_weight", type=float, default=0.1,
                        help="Weight for entropy floor penalty")
+
+    # Entropy-Based Logit Scale Control
+    parser.add_argument("--enable_entropy_control_train", action="store_true",
+                       help="Enable train-time entropy-based logit scale control")
+    parser.add_argument("--enable_entropy_control_infer", action="store_true",
+                       help="Enable inference-time adaptive entropy control")
+    parser.add_argument("--entropy_topk", type=int, default=50,
+                       help="K for top-K entropy computation (default: 50)")
+    parser.add_argument("--entropy_h_min", type=float, default=0.15,
+                       help="Lower bound of target entropy band (default: 0.15)")
+    parser.add_argument("--entropy_h_max", type=float, default=0.35,
+                       help="Upper bound of target entropy band (default: 0.35)")
+    parser.add_argument("--entropy_control_lambda", type=float, default=0.01,
+                       help="Weight for entropy band penalty (default: 0.01)")
+    parser.add_argument("--logit_scale_min", type=float, default=-4.0,
+                       help="Minimum logit scale clamp (default: -4.0)")
+    parser.add_argument("--logit_scale_max", type=float, default=4.0,
+                       help="Maximum logit scale clamp (default: 4.0)")
+    parser.add_argument("--infer_h_target", type=float, default=0.25,
+                       help="Target entropy midpoint for inference (default: 0.25)")
+    parser.add_argument("--infer_eta", type=float, default=0.02,
+                       help="Inference adaptation learning rate (default: 0.02)")
+    parser.add_argument("--infer_delta_clip", type=float, default=0.05,
+                       help="Inference error clipping bound (default: 0.05)")
 
     # V9.5.1 Force Evolution (manual intervention)
     parser.add_argument("--force_evolution_stage", type=int, default=None,
@@ -19760,6 +20443,82 @@ def main():
     parser.add_argument("--vritti_entropy_lambda", type=float, default=0.1,
                        help="Weight for vritti entropy regularization (higher = more balanced)")
 
+    # BCVF Contrastive Structural Pressure on Representations
+    parser.add_argument("--use_bcvf_contrastive", action="store_true",
+                       help="Enable BCVF contrastive structural pressure on representations")
+    parser.add_argument("--bcvf_contrastive_lambda", type=float, default=0.1,
+                       help="Weight for contrastive representation loss L_rep")
+    parser.add_argument("--bcvf_contrastive_K", type=int, default=16,
+                       help="Number of negatives per sampled position")
+    parser.add_argument("--bcvf_contrastive_K_pool", type=int, default=256,
+                       help="Candidate pool size for Stage A negative sampling")
+    parser.add_argument("--bcvf_contrastive_margin", type=float, default=0.15,
+                       help="Margin for contrastive ranking loss")
+    parser.add_argument("--bcvf_contrastive_alpha", type=float, default=2.0,
+                       help="Temperature for BCVF-based negative weighting")
+    parser.add_argument("--bcvf_contrastive_eta", type=float, default=0.3,
+                       help="Token embedding injection scale for proxy r_neg")
+    parser.add_argument("--bcvf_contrastive_d_r", type=int, default=128,
+                       help="Projection output dimensionality")
+    parser.add_argument("--bcvf_contrastive_T_sample", type=int, default=4,
+                       help="Number of positions per sequence to sample for contrastive loss")
+    parser.add_argument("--bcvf_contrastive_projector", type=str, default="mlp",
+                       choices=["linear", "mlp"],
+                       help="Projection head type for contrastive representations")
+
+    # Kosha-Vritti Structured Supervision
+    parser.add_argument("--enable_kv_supervision", action="store_true",
+                       help="Enable Kosha-Vritti structured auxiliary supervision")
+    parser.add_argument("--kv_weight_kosha_kl", type=float, default=0.1,
+                       help="Weight for Kosha KL divergence loss")
+    parser.add_argument("--kv_weight_vritti_kl", type=float, default=0.1,
+                       help="Weight for Vritti KL divergence loss")
+    parser.add_argument("--kv_weight_entropy_floor", type=float, default=0.01,
+                       help="Weight for entropy floor anti-collapse penalty")
+    parser.add_argument("--kv_weight_compatibility", type=float, default=0.05,
+                       help="Weight for static joint compatibility loss")
+    parser.add_argument("--kv_weight_prior", type=float, default=0.001,
+                       help="Weight for W_kv prior regularization")
+    parser.add_argument("--kv_entropy_floor_ratio", type=float, default=0.4,
+                       help="Entropy floor = ratio * log(num_classes)")
+    parser.add_argument("--kv_compatibility_prior_path", type=str, default="",
+                       help="Path to W0 compatibility prior matrix")
+    parser.add_argument("--kv_curriculum_exclude_epochs", type=int, default=2,
+                       help="Epochs to exclude Viparyaya/Nidra samples")
+    parser.add_argument("--kv_curriculum_ramp_epochs", type=int, default=1,
+                       help="Epochs to linearly ramp Viparyaya/Nidra inclusion")
+    parser.add_argument("--kv_teacher_mode", type=str, default="heuristic",
+                       choices=["uniform", "heuristic"],
+                       help="Teacher label generation mode")
+    parser.add_argument("--kv_collapse_check_interval", type=int, default=100,
+                       help="Steps between collapse detection checks")
+    parser.add_argument("--kv_kl_clamp_max", type=float, default=100.0,
+                       help="Maximum clamp value for individual KL terms")
+
+    # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+    parser.add_argument("--enable_confidence_scaler", action="store_true",
+                       help="Enable per-token confidence logit scaling with entropy band")
+    parser.add_argument("--confidence_s_min", type=float, default=0.3,
+                       help="Minimum scale value (prevents over-sharpening)")
+    parser.add_argument("--confidence_s_max", type=float, default=10.0,
+                       help="Maximum scale value (prevents trivial uncertainty)")
+    parser.add_argument("--confidence_epsilon", type=float, default=1e-4,
+                       help="Numerical floor for softplus output")
+    parser.add_argument("--confidence_entropy_band_min", type=float, default=0.10,
+                       help="Entropy band lower bound as fraction of log(V)")
+    parser.add_argument("--confidence_entropy_band_max", type=float, default=0.35,
+                       help="Entropy band upper bound as fraction of log(V)")
+    parser.add_argument("--confidence_lambda_band", type=float, default=1e-3,
+                       help="Weight for entropy band penalty loss")
+    parser.add_argument("--confidence_lambda_scale", type=float, default=1e-4,
+                       help="Weight for log(s) scale regulariser")
+    parser.add_argument("--confidence_enable_risk_gating", action="store_true",
+                       help="Enable Vritti risk gating (Viparyaya+Nidra → uncertainty)")
+    parser.add_argument("--confidence_alpha_risk", type=float, default=0.5,
+                       help="Risk scaling coefficient for s' = s * (1 + alpha * r)")
+    parser.add_argument("--confidence_vritti_kl_weight", type=float, default=0.1,
+                       help="Weight for Vritti KL auxiliary loss in risk gating")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -19953,6 +20712,18 @@ def main():
         enable_entropy_floor=args.enable_entropy_floor,
         entropy_floor=args.entropy_floor,
         entropy_floor_weight=args.entropy_floor_weight,
+        # Entropy-Based Logit Scale Control
+        enable_entropy_control_train=args.enable_entropy_control_train,
+        enable_entropy_control_infer=args.enable_entropy_control_infer,
+        entropy_topk=args.entropy_topk,
+        entropy_h_min=args.entropy_h_min,
+        entropy_h_max=args.entropy_h_max,
+        entropy_control_lambda=args.entropy_control_lambda,
+        logit_scale_min=args.logit_scale_min,
+        logit_scale_max=args.logit_scale_max,
+        infer_h_target=args.infer_h_target,
+        infer_eta=args.infer_eta,
+        infer_delta_clip=args.infer_delta_clip,
         # V9.5.1 Force Evolution
         force_evolution_stage=args.force_evolution_stage,
         # V9.9.1 Multi-Stage Evolution
@@ -20292,6 +21063,43 @@ def main():
         no_protected_phase=args.no_protected_phase,
         run_chunk_diagnostic=args.run_chunk_diagnostic,
         chunk_diagnostic_seq_len=args.chunk_diagnostic_seq_len,
+        # BCVF Contrastive Structural Pressure on Representations
+        use_bcvf_contrastive=args.use_bcvf_contrastive,
+        bcvf_contrastive_lambda=args.bcvf_contrastive_lambda,
+        bcvf_contrastive_K=args.bcvf_contrastive_K,
+        bcvf_contrastive_K_pool=args.bcvf_contrastive_K_pool,
+        bcvf_contrastive_margin=args.bcvf_contrastive_margin,
+        bcvf_contrastive_alpha=args.bcvf_contrastive_alpha,
+        bcvf_contrastive_eta=args.bcvf_contrastive_eta,
+        bcvf_contrastive_d_r=args.bcvf_contrastive_d_r,
+        bcvf_contrastive_T_sample=args.bcvf_contrastive_T_sample,
+        bcvf_contrastive_projector=args.bcvf_contrastive_projector,
+        # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+        enable_confidence_scaler=args.enable_confidence_scaler,
+        confidence_s_min=args.confidence_s_min,
+        confidence_s_max=args.confidence_s_max,
+        confidence_epsilon=args.confidence_epsilon,
+        confidence_entropy_band_min=args.confidence_entropy_band_min,
+        confidence_entropy_band_max=args.confidence_entropy_band_max,
+        confidence_lambda_band=args.confidence_lambda_band,
+        confidence_lambda_scale=args.confidence_lambda_scale,
+        confidence_enable_risk_gating=args.confidence_enable_risk_gating,
+        confidence_alpha_risk=args.confidence_alpha_risk,
+        confidence_vritti_kl_weight=args.confidence_vritti_kl_weight,
+        # Kosha-Vritti Structured Supervision
+        enable_kv_supervision=args.enable_kv_supervision,
+        kv_weight_kosha_kl=args.kv_weight_kosha_kl,
+        kv_weight_vritti_kl=args.kv_weight_vritti_kl,
+        kv_weight_entropy_floor=args.kv_weight_entropy_floor,
+        kv_weight_compatibility=args.kv_weight_compatibility,
+        kv_weight_prior=args.kv_weight_prior,
+        kv_entropy_floor_ratio=args.kv_entropy_floor_ratio,
+        kv_compatibility_prior_path=args.kv_compatibility_prior_path,
+        kv_curriculum_exclude_epochs=args.kv_curriculum_exclude_epochs,
+        kv_curriculum_ramp_epochs=args.kv_curriculum_ramp_epochs,
+        kv_teacher_mode=args.kv_teacher_mode,
+        kv_collapse_check_interval=args.kv_collapse_check_interval,
+        kv_kl_clamp_max=args.kv_kl_clamp_max,
     )
 
     # ==========================================================================

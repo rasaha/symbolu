@@ -1,0 +1,132 @@
+{
+  "benchmark_a": {
+    "easy": {
+      "mean_softmax": 0.34833333333333333,
+      "mean_quadratic": 0.425,
+      "mean_advantage": 0.07666666666666666,
+      "consistent": true,
+      "runs": [
+        {
+          "seed": 42,
+          "softmax": 0.375,
+          "quadratic": 0.41,
+          "advantage": 0.034999999999999976
+        },
+        {
+          "seed": 123,
+          "softmax": 0.365,
+          "quadratic": 0.485,
+          "advantage": 0.12
+        },
+        {
+          "seed": 7,
+          "softmax": 0.305,
+          "quadratic": 0.38,
+          "advantage": 0.07500000000000001
+        }
+      ]
+    },
+    "medium": {
+      "mean_softmax": 0.19000000000000003,
+      "mean_quadratic": 0.15333333333333335,
+      "mean_advantage": -0.03666666666666666,
+      "consistent": false,
+      "runs": [
+        {
+          "seed": 42,
+          "softmax": 0.2,
+          "quadratic": 0.1,
+          "advantage": -0.1
+        },
+        {
+          "seed": 123,
+          "softmax": 0.12,
+          "quadratic": 0.22,
+          "advantage": 0.1
+        },
+        {
+          "seed": 7,
+          "softmax": 0.25,
+          "quadratic": 0.14,
+          "advantage": -0.10999999999999999
+        }
+      ]
+    },
+    "hard": {
+      "mean_softmax": 0.10833333333333334,
+      "mean_quadratic": 0.1416666666666667,
+      "mean_advantage": 0.03333333333333333,
+      "consistent": false,
+      "runs": [
+        {
+          "seed": 42,
+          "softmax": 0.11,
+          "quadratic": 0.075,
+          "advantage": -0.035
+        },
+        {
+          "seed": 123,
+          "softmax": 0.11,
+          "quadratic": 0.18,
+          "advantage": 0.06999999999999999
+        },
+        {
+          "seed": 7,
+          "softmax": 0.105,
+          "quadratic": 0.17,
+          "advantage": 0.06500000000000002
+        }
+      ]
+    }
+  },
+  "benchmark_a_verdict": "WEAK: No consistent quadratic advantage",
+  "benchmark_a_scales": false,
+  "benchmark_b": {
+    "train_runs": [
+      {
+        "seed": 42,
+        "softmax": 0.30333333333333334,
+        "quadratic": 0.5166666666666667,
+        "advantage": 0.21333333333333337
+      },
+      {
+        "seed": 123,
+        "softmax": 0.9066666666666666,
+        "quadratic": 0.8933333333333333,
+        "advantage": -0.013333333333333308
+      },
+      {
+        "seed": 7,
+        "softmax": 0.9233333333333333,
+        "quadratic": 0.4766666666666667,
+        "advantage": -0.44666666666666666
+      }
+    ],
+    "test_runs": [
+      {
+        "seed": 42,
+        "softmax": 0.33,
+        "quadratic": 0.45,
+        "advantage": 0.12
+      },
+      {
+        "seed": 123,
+        "softmax": 0.6,
+        "quadratic": 0.58,
+        "advantage": -0.020000000000000018
+      },
+      {
+        "seed": 7,
+        "softmax": 0.87,
+        "quadratic": 0.28,
+        "advantage": -0.59
+      }
+    ],
+    "mean_train_advantage": -0.0822222222222222,
+    "mean_test_advantage": -0.16333333333333333,
+    "generalizes": false
+  },
+  "benchmark_b_verdict": "NONE: No quadratic advantage on compositional task",
+  "cross_task_pattern": "INSUFFICIENT",
+  "cross_task_confidence": "No cross-task evidence for quadratic advantage. Earlier binding results may be task-specific or artifact."
+}

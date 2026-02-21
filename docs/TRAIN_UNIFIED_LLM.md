@@ -355,6 +355,81 @@ python train_unified_llm.py \
 
 ---
 
+## Entropy-Based Logit Scale Control
+
+Learnable logit scale with entropy band regulation. Provides both train-time and inference-time entropy stabilization at the emission/logit level.
+
+### Master Toggles
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--enable_entropy_control_train` | flag | `False` | Enable train-time entropy regulation via learnable logit scale |
+| `--enable_entropy_control_infer` | flag | `False` | Enable inference-time adaptive entropy control |
+
+### Train-Time Parameters
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--entropy_topk` | int | `50` | K for top-K entropy computation |
+| `--entropy_h_min` | float | `0.15` | Lower bound of target entropy band (normalized [0,1]) |
+| `--entropy_h_max` | float | `0.35` | Upper bound of target entropy band (normalized [0,1]) |
+| `--entropy_lambda` | float | `0.01` | Weight for entropy band penalty in total loss |
+| `--logit_scale_min` | float | `-4.0` | Minimum log-scale value (safety clamp) |
+| `--logit_scale_max` | float | `4.0` | Maximum log-scale value (safety clamp) |
+
+### Inference-Time Parameters
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--infer_h_target` | float | `0.25` | Target entropy midpoint for inference adaptation |
+| `--infer_eta` | float | `0.02` | Adaptation learning rate (step size) |
+| `--infer_delta_clip` | float | `0.05` | Error clipping bound (prevents large jumps) |
+
+### Safety Thresholds
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--entropy_collapse_threshold` | float | `0.05` | Warning when entropy below this (COLLAPSE) |
+| `--entropy_diffuse_threshold` | float | `0.60` | Warning when entropy above this (DIFFUSE) |
+
+### Notes
+- **Train-time**: Adds one learnable scalar (`logit_scale`) that scales logits via `exp(logit_scale)`. Initializes to 0 (no scaling). Receives gradient from CE loss. Entropy penalty is detached (acts as regularizer only).
+- **Inference-time**: Adaptive controller adjusts logit scale each generation step to keep entropy near target. No gradient tracking. Minimal latency.
+- **Mixed precision safe**: Scale computed in float32, cast back to input dtype (fp16/bf16 compatible)
+- **DDP compatible**: Single scalar parameter, automatically synchronized
+- **Complements Entropy Floor**: Entropy floor penalizes low entropy only; logit scale control maintains a target band (both low and high bounds)
+- **Module location**: `symbolu/training/entropy_control.py`
+- **Tests**: `tests/test_entropy_control.py` (run with `pytest tests/test_entropy_control.py -v`)
+
+### Example: Train with Entropy Control
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --enable_entropy_control_train \
+    --entropy_h_min 0.15 \
+    --entropy_h_max 0.35 \
+    --entropy_lambda 0.01 \
+    --entropy_topk 50 \
+    --max_steps 50000
+```
+
+### Example: Combine with Existing Controllers
+```bash
+python train_unified_llm.py \
+    --model_type ontological_hybrid \
+    --model_size medium \
+    --enable_entropy_control_train \
+    --entropy_lambda 0.01 \
+    --controller pidv2 \
+    --enable_rss \
+    --enable_sovereign_loss \
+    --gradient_checkpointing \
+    --tensorboard \
+    --max_steps 100000
+```
+
+---
+
 ## Force Evolution Stage
 
 | Option | Type | Default | Description |
