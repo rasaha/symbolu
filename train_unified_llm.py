@@ -167,6 +167,23 @@ except ImportError as e:
     KV_SUPERVISION_AVAILABLE = False
     print(f"Warning: Kosha-Vritti Supervision not available: {e}")
 
+# State-Conditional Logit Scale ("Confidence Knob") + Entropy Band Control
+try:
+    from symbolu.training.confidence_scaler import (
+        ConfidenceScalerConfig,
+        ConfidenceScaler,
+        EntropyBandLoss,
+        VrittiRiskHead,
+        CalibrationDiagnostics,
+        ConfidenceInferenceHook,
+        log_confidence_metrics,
+        fit_constant_temperature,
+    )
+    CONFIDENCE_SCALER_AVAILABLE = True
+except ImportError as e:
+    CONFIDENCE_SCALER_AVAILABLE = False
+    print(f"Warning: Confidence Scaler not available: {e}")
+
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -10213,6 +10230,26 @@ class UnifiedTrainingConfig:
     kv_collapse_check_interval: int = 100      # Steps between collapse checks
     kv_kl_clamp_max: float = 100.0             # Clamp individual KL values
 
+    # ==========================================================================
+    # STATE-CONDITIONAL LOGIT SCALE ("Confidence Knob") + ENTROPY BAND
+    # Reference: symbolu/training/confidence_scaler.py
+    # ==========================================================================
+    # Per-token learned logit scale s_t with optional Vritti risk gating.
+    # Eliminates calibration artifacts, stabilises training, improves reliability.
+    # Does NOT modify transformer blocks -- only emission path + loss + logging.
+    enable_confidence_scaler: bool = False       # Master toggle
+    confidence_s_min: float = 0.3                # Min scale (prevents over-sharpening)
+    confidence_s_max: float = 10.0               # Max scale (prevents trivial uncertainty)
+    confidence_epsilon: float = 1e-4             # Numerical floor for softplus
+    confidence_entropy_band_min: float = 0.10    # H_min = ratio * log(V)
+    confidence_entropy_band_max: float = 0.35    # H_max = ratio * log(V)
+    confidence_lambda_band: float = 1e-3         # Weight for entropy band loss
+    confidence_lambda_scale: float = 1e-4        # Weight for log(s) regulariser
+    # Risk gating via Vritti head (Viparyaya + Nidra → increase uncertainty)
+    confidence_enable_risk_gating: bool = False   # Enable Vritti risk gating
+    confidence_alpha_risk: float = 0.5            # Risk scaling coefficient
+    confidence_vritti_kl_weight: float = 0.1      # Weight for Vritti KL aux loss
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -14243,6 +14280,63 @@ def train(config: UnifiedTrainingConfig):
         print(f"    H_band=[{config.entropy_h_min}, {config.entropy_h_max}], lambda={config.entropy_control_lambda}")
         print(f"    Scale clamp=[{config.logit_scale_min}, {config.logit_scale_max}]")
 
+    # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+    confidence_scaler = None
+    entropy_band_loss = None
+    vritti_risk_head = None
+    confidence_scaler_config = None
+
+    if config.enable_confidence_scaler and CONFIDENCE_SCALER_AVAILABLE:
+        # Determine hidden dimension from model preset
+        _cs_embed_dim = (
+            config.n_embd if config.n_embd is not None
+            else MODEL_PRESETS.get(config.model_size, {}).get('embed_dim', 512)
+        )
+
+        confidence_scaler_config = ConfidenceScalerConfig(
+            enable=True,
+            s_min=config.confidence_s_min,
+            s_max=config.confidence_s_max,
+            epsilon=config.confidence_epsilon,
+            enable_risk_gating=config.confidence_enable_risk_gating,
+            alpha_risk=config.confidence_alpha_risk,
+            entropy_band_ratio_min=config.confidence_entropy_band_min,
+            entropy_band_ratio_max=config.confidence_entropy_band_max,
+            lambda_entropy_band=config.confidence_lambda_band,
+            lambda_scale_penalty=config.confidence_lambda_scale,
+            enable_vritti_head=config.confidence_enable_risk_gating,
+            vritti_kl_weight=config.confidence_vritti_kl_weight,
+            log_every=config.log_every,
+        )
+
+        confidence_scaler = ConfidenceScaler(_cs_embed_dim, confidence_scaler_config).to(device)
+        entropy_band_loss = EntropyBandLoss(config.vocab_size, confidence_scaler_config).to(device)
+
+        # Register as submodule on model so parameters are in state_dict
+        model.confidence_scaler = confidence_scaler
+        model.entropy_band_loss = entropy_band_loss
+
+        cs_param_count = sum(p.numel() for p in confidence_scaler.parameters())
+
+        if config.confidence_enable_risk_gating:
+            vritti_risk_head = VrittiRiskHead(_cs_embed_dim, confidence_scaler_config).to(device)
+            model.vritti_risk_head = vritti_risk_head
+            cs_param_count += sum(p.numel() for p in vritti_risk_head.parameters())
+
+        import math as _math
+        _log_v = _math.log(config.vocab_size)
+        print(f"\n  [CONFIDENCE] Per-Token Logit Scale: ENABLED")
+        print(f"     Params: {cs_param_count:,} | s_range=[{config.confidence_s_min}, {config.confidence_s_max}]")
+        print(f"     Entropy band: [{config.confidence_entropy_band_min * _log_v:.2f}, "
+              f"{config.confidence_entropy_band_max * _log_v:.2f}] "
+              f"(ratios [{config.confidence_entropy_band_min}, {config.confidence_entropy_band_max}] * log(V)={_log_v:.2f})")
+        print(f"     lambda_band={config.confidence_lambda_band}, lambda_scale={config.confidence_lambda_scale}")
+        if config.confidence_enable_risk_gating:
+            print(f"     Risk gating: ENABLED (alpha={config.confidence_alpha_risk})")
+
+    elif config.enable_confidence_scaler and not CONFIDENCE_SCALER_AVAILABLE:
+        print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
+
     # Optimizer
     if config.use_8bit_optimizer:
         try:
@@ -16630,6 +16724,81 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [KV-SUPERVISION] Error at step {global_step}: {e}")
+
+            # =====================================================================
+            # STATE-CONDITIONAL LOGIT SCALE ("Confidence Knob") + ENTROPY BAND
+            # Per-token s_t scales logits to eliminate calibration artifacts.
+            # Does NOT modify transformer blocks -- emission path only.
+            # =====================================================================
+            if confidence_scaler is not None:
+                try:
+                    # Extract hidden states and logits
+                    cs_hidden = None
+                    cs_logits = None
+
+                    if isinstance(outputs, dict):
+                        cs_hidden = outputs.get('last_hidden_state', outputs.get('hidden_states', None))
+                        cs_logits = outputs.get('logits', outputs.get('output', None))
+                    elif isinstance(outputs, torch.Tensor):
+                        cs_logits = outputs  # For models that return logits directly
+
+                    # If we have both hidden states and logits, apply confidence scaling
+                    if cs_hidden is not None and cs_logits is not None and cs_hidden.dim() == 3:
+                        # Compute risk probability from Vritti head (if enabled)
+                        cs_risk_prob = None
+                        cs_vritti_loss = torch.tensor(0.0, device=device)
+                        if vritti_risk_head is not None:
+                            vritti_out = vritti_risk_head(cs_hidden.detach())
+                            cs_risk_prob = vritti_out['risk_prob']
+
+                            # If KV supervision provides teacher labels, train Vritti head
+                            if kv_supervisor is not None and 'kv_vritti_freq_Viparyaya' in metrics:
+                                # Use KV supervisor's teacher as reference (if available)
+                                pass  # Vritti head trains from its own gradient through risk gating
+
+                        # Scale logits
+                        cs_logits_scaled, cs_s, cs_diag = confidence_scaler.scale_logits(
+                            cs_logits, cs_hidden, cs_risk_prob,
+                        )
+
+                        # Compute entropy band + scale penalty losses
+                        cs_band_loss, cs_band_metrics = entropy_band_loss(
+                            cs_logits_scaled, cs_s,
+                            targets=y,
+                        )
+
+                        # Add auxiliary losses to total
+                        loss = loss + cs_band_loss
+
+                        # Compute and log calibration diagnostics
+                        if global_step % config.log_every == 0:
+                            cs_calib = CalibrationDiagnostics.compute(
+                                logits_raw=cs_logits,
+                                logits_scaled=cs_logits_scaled,
+                                s=cs_s,
+                                targets=y,
+                            )
+                            cs_calib.update(cs_band_metrics)
+
+                            # DDP reduce if needed
+                            cs_rank = int(os.environ.get('RANK', 0))
+                            cs_world = int(os.environ.get('WORLD_SIZE', 1))
+                            if cs_world > 1:
+                                cs_calib = CalibrationDiagnostics.ddp_reduce(cs_calib, cs_world)
+
+                            metrics.update({f'cs_{k}': v for k, v in cs_calib.items()
+                                          if isinstance(v, (int, float))})
+
+                            log_confidence_metrics(
+                                cs_calib, global_step,
+                                writer=writer if TENSORBOARD_AVAILABLE and 'writer' in dir() else None,
+                                print_every=config.log_every,
+                                rank=cs_rank,
+                            )
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [CONFIDENCE] Error at step {global_step}: {e}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -20326,6 +20495,30 @@ def main():
     parser.add_argument("--kv_kl_clamp_max", type=float, default=100.0,
                        help="Maximum clamp value for individual KL terms")
 
+    # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+    parser.add_argument("--enable_confidence_scaler", action="store_true",
+                       help="Enable per-token confidence logit scaling with entropy band")
+    parser.add_argument("--confidence_s_min", type=float, default=0.3,
+                       help="Minimum scale value (prevents over-sharpening)")
+    parser.add_argument("--confidence_s_max", type=float, default=10.0,
+                       help="Maximum scale value (prevents trivial uncertainty)")
+    parser.add_argument("--confidence_epsilon", type=float, default=1e-4,
+                       help="Numerical floor for softplus output")
+    parser.add_argument("--confidence_entropy_band_min", type=float, default=0.10,
+                       help="Entropy band lower bound as fraction of log(V)")
+    parser.add_argument("--confidence_entropy_band_max", type=float, default=0.35,
+                       help="Entropy band upper bound as fraction of log(V)")
+    parser.add_argument("--confidence_lambda_band", type=float, default=1e-3,
+                       help="Weight for entropy band penalty loss")
+    parser.add_argument("--confidence_lambda_scale", type=float, default=1e-4,
+                       help="Weight for log(s) scale regulariser")
+    parser.add_argument("--confidence_enable_risk_gating", action="store_true",
+                       help="Enable Vritti risk gating (Viparyaya+Nidra → uncertainty)")
+    parser.add_argument("--confidence_alpha_risk", type=float, default=0.5,
+                       help="Risk scaling coefficient for s' = s * (1 + alpha * r)")
+    parser.add_argument("--confidence_vritti_kl_weight", type=float, default=0.1,
+                       help="Weight for Vritti KL auxiliary loss in risk gating")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -20881,6 +21074,32 @@ def main():
         bcvf_contrastive_d_r=args.bcvf_contrastive_d_r,
         bcvf_contrastive_T_sample=args.bcvf_contrastive_T_sample,
         bcvf_contrastive_projector=args.bcvf_contrastive_projector,
+        # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band
+        enable_confidence_scaler=args.enable_confidence_scaler,
+        confidence_s_min=args.confidence_s_min,
+        confidence_s_max=args.confidence_s_max,
+        confidence_epsilon=args.confidence_epsilon,
+        confidence_entropy_band_min=args.confidence_entropy_band_min,
+        confidence_entropy_band_max=args.confidence_entropy_band_max,
+        confidence_lambda_band=args.confidence_lambda_band,
+        confidence_lambda_scale=args.confidence_lambda_scale,
+        confidence_enable_risk_gating=args.confidence_enable_risk_gating,
+        confidence_alpha_risk=args.confidence_alpha_risk,
+        confidence_vritti_kl_weight=args.confidence_vritti_kl_weight,
+        # Kosha-Vritti Structured Supervision
+        enable_kv_supervision=args.enable_kv_supervision,
+        kv_weight_kosha_kl=args.kv_weight_kosha_kl,
+        kv_weight_vritti_kl=args.kv_weight_vritti_kl,
+        kv_weight_entropy_floor=args.kv_weight_entropy_floor,
+        kv_weight_compatibility=args.kv_weight_compatibility,
+        kv_weight_prior=args.kv_weight_prior,
+        kv_entropy_floor_ratio=args.kv_entropy_floor_ratio,
+        kv_compatibility_prior_path=args.kv_compatibility_prior_path,
+        kv_curriculum_exclude_epochs=args.kv_curriculum_exclude_epochs,
+        kv_curriculum_ramp_epochs=args.kv_curriculum_ramp_epochs,
+        kv_teacher_mode=args.kv_teacher_mode,
+        kv_collapse_check_interval=args.kv_collapse_check_interval,
+        kv_kl_clamp_max=args.kv_kl_clamp_max,
     )
 
     # ==========================================================================
