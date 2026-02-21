@@ -10442,7 +10442,8 @@ class TextDataset(Dataset):
     def __init__(self, tokens: torch.Tensor, seq_len: int):
         self.tokens = tokens
         self.seq_len = seq_len
-        self.num_samples = len(tokens) // seq_len
+        # Need seq_len+1 tokens per sample (input[:-1] + target[1:] shift)
+        self.num_samples = (len(tokens) - 1) // seq_len
 
     def __len__(self):
         return self.num_samples
