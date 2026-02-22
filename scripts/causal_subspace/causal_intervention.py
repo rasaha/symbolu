@@ -739,30 +739,41 @@ def _generate_unrelated_sentences(
     templates so that any effect of swapping their hidden states through
     the structural subspace is purely generic perturbation, not structural.
 
+    We deliberately include *shuffled* word-salad variants alongside
+    grammatically incoherent templates.  This destroys syntactic structure
+    so that the hidden-state projection into U_k is not a clean
+    grammatical-role signal—any residual KL change is generic
+    perturbation, giving a tighter control baseline.
+
     Returns list of (token_ids, target_position) tuples.
     """
     import random
     random.seed(seed)
 
+    # Mix of topically unrelated AND structurally incoherent templates.
+    # The shuffled variants have no grammatical role encoding.
     templates = [
-        "The weather forecast predicts heavy rain tomorrow morning.",
-        "Quantum computers process information using qubits instead of bits.",
-        "Ancient civilizations built pyramids aligned with celestial bodies.",
-        "The stock market experienced significant volatility last quarter.",
-        "Deep ocean trenches contain unique species adapted to extreme pressure.",
-        "Classical music compositions often follow sonata form structure.",
-        "Volcanic eruptions release ash and gases into the atmosphere.",
-        "Modern architecture emphasizes sustainable building materials.",
-        "Arctic ice sheets have been declining over recent decades.",
-        "Photosynthesis converts sunlight into chemical energy in plants.",
+        # --- Shuffled / word-salad (no grammatical structure) ---
+        "morning heavy rain the tomorrow predicts weather forecast.",
+        "bits instead computers qubits of information process using quantum.",
+        "civilizations celestial pyramids aligned with ancient built bodies.",
+        "volatility market quarter the stock last significant experienced.",
+        "pressure species trenches deep extreme to unique adapted ocean contain.",
+        # --- Unusual/non-SVO structure ---
+        "Tomorrow comes rain.",
+        "Silently the fog drifts.",
+        "Yes no maybe perhaps certainly.",
+        "Red blue green yellow orange purple.",
+        "One two three four five six seven eight.",
     ]
 
     results = []
     for _ in range(n):
         text = random.choice(templates)
         ids = tokenizer.encode(text, add_special_tokens=False)
-        # Target the middle token — arbitrary but consistent
-        target = len(ids) // 2
+        # Vary target position across the sentence instead of always
+        # targeting the middle — avoids systematic positional confound.
+        target = random.randint(1, max(1, len(ids) - 2))
         results.append((ids, target))
     return results
 
