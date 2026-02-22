@@ -249,8 +249,13 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
                 )
 
         seq_offset += len(batch_ids)
-        if seq_offset % 200 == 0:
-            logger.info("Processed %d / %d sequences", seq_offset, len(sequences))
+        # Report progress every batch so the user sees forward-pass activity
+        elapsed_batches = seq_offset // cfg.batch_size
+        total_batches = (len(sequences) + cfg.batch_size - 1) // cfg.batch_size
+        logger.info(
+            "Forward pass: batch %d/%d (%d/%d sequences)",
+            elapsed_batches, total_batches, seq_offset, len(sequences),
+        )
 
     collector.detach()
 
