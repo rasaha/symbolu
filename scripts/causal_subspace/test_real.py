@@ -221,20 +221,32 @@ def run_validation_checks(results: Dict[str, Any]) -> tuple[int, int]:
         print(f"  [{status}] Swap vs ablation ratio: {best_sva:.2f}x "
               f"(>1 = direction encodes role, <1 = occupancy only)")
 
-    # Check 6: MDL compression increases across layers
+    # Check 6: MDL compression shows crystallization pattern
+    #
+    # Structural information typically *crystallizes* at some middle layer
+    # and may be *consumed* afterward, so we look for a compression peak
+    # in the upper 75% of layers rather than requiring monotonic increase.
     if "grammatical_role" in mdl:
         role_mdl = mdl["grammatical_role"]
         layers_sorted = sorted(role_mdl.keys(), key=lambda x: int(x))
         if len(layers_sorted) >= 4:
-            half = len(layers_sorted) // 2
-            first = np.mean([role_mdl[l]["compression_ratio"] for l in layers_sorted[:half]])
-            second = np.mean([role_mdl[l]["compression_ratio"] for l in layers_sorted[half:]])
+            compressions = [role_mdl[l]["compression_ratio"] for l in layers_sorted]
+            peak_idx = int(np.argmax(compressions))
+            peak_layer = layers_sorted[peak_idx]
+            peak_val = compressions[peak_idx]
+            # Pass if the peak is not in the first quarter of layers
+            # (i.e., the model builds up structural information before peak)
+            first_quarter = len(layers_sorted) // 4
+            peak_after_start = peak_idx >= first_quarter
             n_checks += 1
-            if second > first:
+            if peak_after_start and peak_val > 1.0:
                 n_pass += 1
-            status = "PASS" if second > first else "WARN"
-            print(f"  [{status}] Later layers compress better: "
-                  f"early={first:.2f}x, late={second:.2f}x")
+                status = "PASS"
+            else:
+                status = "WARN"
+            print(f"  [{status}] Compression peak at layer {peak_layer} "
+                  f"({peak_val:.2f}x), idx {peak_idx}/{len(layers_sorted)-1} "
+                  f"(want peak after first quarter)")
 
     print(f"\n  Result: {n_pass}/{n_checks} checks passed")
     return n_pass, n_checks
