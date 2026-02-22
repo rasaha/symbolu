@@ -152,6 +152,9 @@ def run_full_pipeline(
 
     print(f"  Collected {len(store.tokens)} tokens across {store.n_layers} layers")
     print(f"  Hidden dimension: {store.d_model}")
+    if store.attention_entropy:
+        print(f"  Attention entropy: {store.n_heads} heads/layer "
+              f"(collected for Part 7 gating analysis)")
 
     # Keep model + tokenizer for later parts
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -397,6 +400,25 @@ def run_full_pipeline(
     }
 
     # ===================================================================
+    # Attention Entropy Summary (for Part 7 go/no-go)
+    # ===================================================================
+    if store.attention_entropy:
+        attn_entropy_summary: Dict[int, Dict] = {}
+        for layer_idx in active_layers:
+            if layer_idx in store.attention_entropy:
+                ae = store.attention_entropy[layer_idx]  # [N_tokens, n_heads]
+                attn_entropy_summary[layer_idx] = {
+                    "mean_entropy": float(ae.mean()),
+                    "std_entropy": float(ae.std()),
+                    "per_head_mean": [float(x) for x in ae.mean(axis=0)],
+                    "per_head_std": [float(x) for x in ae.std(axis=0)],
+                    "min_head_entropy": float(ae.mean(axis=0).min()),
+                    "max_head_entropy": float(ae.mean(axis=0).max()),
+                    "n_heads": int(ae.shape[1]),
+                }
+        results["attention_entropy"] = attn_entropy_summary
+
+    # ===================================================================
     # FINAL REPORT
     # ===================================================================
     elapsed = time.time() - t0
@@ -442,6 +464,14 @@ def run_full_pipeline(
           f"(compression={trajectory.peak_compression:.2f}x)")
     print(f"   Consumption: Layer {trajectory.consumption_layer}")
     print(f"   Peak causal success: {trajectory.peak_causal_success * 100:.1f}%")
+
+    if store.attention_entropy:
+        print(f"\n5. Attention Entropy (per-head, per-layer):")
+        for layer_idx in active_layers:
+            if layer_idx in results.get("attention_entropy", {}):
+                ae = results["attention_entropy"][layer_idx]
+                print(f"   Layer {layer_idx}: mean={ae['mean_entropy']:.3f} nats "
+                      f"(heads: {ae['min_head_entropy']:.3f}–{ae['max_head_entropy']:.3f})")
 
     print(f"\nTotal pipeline elapsed: {elapsed:.1f}s")
     print("=" * 70)
