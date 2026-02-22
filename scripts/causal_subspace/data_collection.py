@@ -230,7 +230,12 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
 
     logger.info("Loading model: %s", cfg.model_name)
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
-    model = AutoModelForCausalLM.from_pretrained(cfg.model_name)
+    # Use "eager" attention so that output_attentions=True returns actual
+    # weight matrices.  The default SDPA backend uses fused kernels that
+    # never materialise the attention matrix, returning None instead.
+    model = AutoModelForCausalLM.from_pretrained(
+        cfg.model_name, attn_implementation="eager",
+    )
 
     n_params = count_parameters(model)
     logger.info("Model has %s parameters (%.1fM)", f"{n_params:,}", n_params / 1e6)
