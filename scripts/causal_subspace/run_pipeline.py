@@ -3,7 +3,7 @@
 Causal Subspace Extraction & Validation — Main Orchestrator
 =============================================================
 
-Runs the complete 6-part pipeline:
+Runs the complete 7-part pipeline:
 
     Part 1: Precision Data Collection
     Part 2: Structural Label Alignment
@@ -11,6 +11,7 @@ Runs the complete 6-part pipeline:
     Part 4: MDL Probing (Information-Theoretic Validation)
     Part 5: Causal Interchange Intervention (Activation Patching)
     Part 6: Layer Trajectory Mapping
+    Part 7: Ontology Alignment Discovery (optional, --run-ontology)
 
 Usage::
 
@@ -28,6 +29,9 @@ Usage::
 
     # Output results to JSON
     python scripts/causal_subspace/run_pipeline.py --output results.json
+
+    # Run Part 7 ontology alignment discovery
+    python scripts/causal_subspace/run_pipeline.py --run-ontology --output results.json
 
     # Specific layers only
     python scripts/causal_subspace/run_pipeline.py --layers 0 3 6 9 11
@@ -89,6 +93,15 @@ from scripts.causal_subspace.trajectory import (
     compute_layer_trajectory,
     plot_trajectory_ascii,
 )
+from scripts.causal_subspace.ontology_alignment import (
+    OntologyConfig,
+    DiscoveryResult,
+    MultiLayerDiscoveryResult,
+    run_multi_layer_discovery,
+    run_ontology_discovery,
+    AXIS_NAMES,
+    N_AXES,
+)
 
 logger = logging.getLogger("causal_subspace")
 
@@ -111,6 +124,8 @@ def run_full_pipeline(
     subspace_k: int = 16,
     layers: Optional[List[int]] = None,
     skip_interventions: bool = False,
+    run_ontology: bool = False,
+    ontology_mi_threshold: float = 0.1,
     device: str = "cpu",
     seed: int = 42,
     activation_source: str = "block",
@@ -434,6 +449,141 @@ def run_full_pipeline(
         results["attention_entropy"] = attn_entropy_summary
 
     # ===================================================================
+    # PART 7: Ontology Alignment Discovery (optional)
+    # ===================================================================
+    ontology_result: Optional[MultiLayerDiscoveryResult] = None
+
+    if run_ontology:
+        print("\n" + "=" * 70)
+        print("PART 7: ONTOLOGY ALIGNMENT DISCOVERY")
+        print("=" * 70)
+
+        ont_cfg = OntologyConfig(
+            naming_mi_threshold=ontology_mi_threshold,
+            device=device,
+            seed=seed,
+        )
+
+        # Determine which layers to run discovery on:
+        # - crystallization_layer (best MDL compression — structure peaks here)
+        # - consumption_layer (best causal success — causal effect peaks here)
+        discovery_layers = set()
+        crystal_layer = trajectory.crystallization_layer
+        consume_layer = trajectory.consumption_layer
+
+        if crystal_layer is not None and crystal_layer in annotations.hidden_states:
+            discovery_layers.add(crystal_layer)
+        if consume_layer is not None and consume_layer in annotations.hidden_states:
+            discovery_layers.add(consume_layer)
+
+        # Fallback: use best_layer from Part 4 if trajectory didn't find anything
+        if not discovery_layers:
+            discovery_layers.add(best_layer)
+
+        discovery_layers_sorted = sorted(discovery_layers)
+        print(f"  Running discovery at layers: {discovery_layers_sorted}")
+        if crystal_layer is not None:
+            print(f"    Crystallization layer (best MDL): L{crystal_layer}")
+        if consume_layer is not None:
+            print(f"    Consumption layer (best causal): L{consume_layer}")
+
+        # Build causal_success_by_layer from Part 5 intervention results
+        causal_success_by_layer: Optional[Dict[int, float]] = None
+        if intervention_results:
+            causal_success_by_layer = {
+                l: ir_data["causal_success_rate"]
+                for l, ir_data in intervention_results.items()
+            }
+
+        # Use the trajectory's causal success rates too (covers more layers)
+        if trajectory.causal_success_rate:
+            if causal_success_by_layer is None:
+                causal_success_by_layer = {}
+            for l, rate in zip(trajectory.layers, trajectory.causal_success_rate):
+                if rate is not None:
+                    causal_success_by_layer.setdefault(l, rate)
+
+        ontology_result = run_multi_layer_discovery(
+            annotations=annotations,
+            hidden_states={l: annotations.hidden_states[l] for l in discovery_layers_sorted},
+            labels=annotations.labels_role,
+            U_k=best_pca_basis if best_pca_basis is not None else build_pca_basis(
+                annotations.hidden_states[best_layer], optimal_k
+            ),
+            layers=discovery_layers_sorted,
+            causal_success_by_layer=causal_success_by_layer,
+            cfg=ont_cfg,
+        )
+
+        # Print summary
+        print(f"\n  --- Ontology Discovery Results ---")
+        print(f"  Overall scenario: {ontology_result.scenario}")
+        print(f"  Recommended Phase 2: {ontology_result.recommended_phase2}")
+        print(f"  Validated axes ({ontology_result.n_validated_axes}/12): "
+              f"{', '.join(ontology_result.all_validated_axes) or '(none)'}")
+        print(f"  Best alignment layer: L{ontology_result.best_alignment_layer}")
+        print(f"  Best causal layer: L{ontology_result.best_causal_layer}")
+        print(f"  Dissociation: {ontology_result.dissociation}")
+
+        if ontology_result.dissociation:
+            print(f"\n  ** L{ontology_result.best_alignment_layer}/L{ontology_result.best_causal_layer} DISSOCIATION DETECTED **")
+            print(f"     Meta-controller: READ from L{ontology_result.meta_controller_read_layer}, "
+                  f"ACT at L{ontology_result.meta_controller_act_layer}")
+            print(f"     Q/K gating: operate at L{ontology_result.qk_gating_layer}")
+
+        # Per-layer detail
+        for layer_idx in sorted(ontology_result.per_layer.keys()):
+            r = ontology_result.per_layer[layer_idx]
+            print(f"\n  Layer {layer_idx}:")
+            print(f"    Scenario: {r.scenario} (confidence={r.scenario_confidence:.2f})")
+            print(f"    Alignment MI: {r.alignment_mi:.4f} (normalized: {r.alignment_mi_normalized:.4f})")
+            print(f"    CKA: {r.cka_similarity:.4f}")
+            print(f"    Subspace overlap: {r.subspace_overlap:.4f}")
+            print(f"    Validated axes ({r.n_validated_axes}/12): {', '.join(r.validated_axes) or '(none)'}")
+            print(f"    Discriminability: ont={r.ontology_role_accuracy:.3f}, "
+                  f"emb={r.embedding_role_accuracy:.3f}, "
+                  f"concat={r.concat_role_accuracy:.3f} (gap={r.discriminability_gap:.3f})")
+
+        # Store in results dict
+        results["ontology_alignment"] = {
+            "scenario": ontology_result.scenario,
+            "recommended_phase2": ontology_result.recommended_phase2,
+            "n_validated_axes": ontology_result.n_validated_axes,
+            "validated_axes": ontology_result.all_validated_axes,
+            "best_alignment_layer": ontology_result.best_alignment_layer,
+            "best_causal_layer": ontology_result.best_causal_layer,
+            "dissociation": ontology_result.dissociation,
+            "meta_controller_read_layer": ontology_result.meta_controller_read_layer,
+            "meta_controller_act_layer": ontology_result.meta_controller_act_layer,
+            "qk_gating_layer": ontology_result.qk_gating_layer,
+            "per_layer": {},
+        }
+        for layer_idx, r in ontology_result.per_layer.items():
+            results["ontology_alignment"]["per_layer"][layer_idx] = {
+                "scenario": r.scenario,
+                "scenario_confidence": r.scenario_confidence,
+                "scenario_evidence": r.scenario_evidence,
+                "alignment_mi": r.alignment_mi,
+                "alignment_mi_normalized": r.alignment_mi_normalized,
+                "cka_similarity": r.cka_similarity,
+                "subspace_overlap": r.subspace_overlap,
+                "n_validated_axes": r.n_validated_axes,
+                "validated_axes": r.validated_axes,
+                "per_axis_mi": r.per_axis_mi,
+                "per_axis_best_pca": r.per_axis_best_pca,
+                "ontology_role_accuracy": r.ontology_role_accuracy,
+                "embedding_role_accuracy": r.embedding_role_accuracy,
+                "concat_role_accuracy": r.concat_role_accuracy,
+                "discriminability_gap": r.discriminability_gap,
+                "accuracy_ci_low": r.accuracy_ci_low,
+                "accuracy_ci_high": r.accuracy_ci_high,
+                "n_words_with_ontology": r.n_words_with_ontology,
+                "coverage_ratio": r.coverage_ratio,
+            }
+    else:
+        print("\n  (Part 7 ontology alignment skipped — use --run-ontology to enable)")
+
+    # ===================================================================
     # FINAL REPORT
     # ===================================================================
     elapsed = time.time() - t0
@@ -487,6 +637,24 @@ def run_full_pipeline(
                 ae = results["attention_entropy"][layer_idx]
                 print(f"   Layer {layer_idx}: mean={ae['mean_entropy']:.3f} nats "
                       f"(heads: {ae['min_head_entropy']:.3f}–{ae['max_head_entropy']:.3f})")
+
+    if ontology_result is not None:
+        scenario_names = {"A": "Isomorphic", "B": "Partial Overlap",
+                          "C": "Orthogonal", "D": "Complementary"}
+        sname = scenario_names.get(ontology_result.scenario, ontology_result.scenario)
+        print(f"\n6. Ontology Alignment Discovery:")
+        print(f"   Scenario: {ontology_result.scenario} ({sname})")
+        print(f"   Recommended Phase 2: {ontology_result.recommended_phase2}")
+        print(f"   Validated axes: {ontology_result.n_validated_axes}/12 "
+              f"({', '.join(ontology_result.all_validated_axes) or 'none'})")
+        if ontology_result.dissociation:
+            print(f"   DISSOCIATION: alignment peaks at L{ontology_result.best_alignment_layer}, "
+                  f"causal peaks at L{ontology_result.best_causal_layer}")
+            print(f"   -> Meta-controller: READ L{ontology_result.meta_controller_read_layer}, "
+                  f"ACT L{ontology_result.meta_controller_act_layer}")
+            print(f"   -> Q/K gating: L{ontology_result.qk_gating_layer}")
+        for ev in ontology_result.scenario_evidence:
+            print(f"   {ev}")
 
     print(f"\nTotal pipeline elapsed: {elapsed:.1f}s")
     print("=" * 70)
@@ -572,6 +740,14 @@ def main():
         help="Skip causal interventions (faster)",
     )
     parser.add_argument(
+        "--run-ontology", action="store_true",
+        help="Run Part 7: ontology alignment discovery",
+    )
+    parser.add_argument(
+        "--ontology-mi-threshold", type=float, default=0.1,
+        help="MI threshold for naming ceremony axis validation (default: 0.1)",
+    )
+    parser.add_argument(
         "--device", type=str, default="cpu",
         help="Device: cpu or cuda",
     )
@@ -629,6 +805,8 @@ def main():
         subspace_k=args.subspace_k,
         layers=args.layers,
         skip_interventions=args.skip_interventions,
+        run_ontology=args.run_ontology,
+        ontology_mi_threshold=args.ontology_mi_threshold,
         device=args.device,
         seed=args.seed,
         activation_source=args.activation_source,
