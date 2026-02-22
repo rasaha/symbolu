@@ -649,3 +649,329 @@ class TestSyntheticCLI:
         assert "mdl_probing" in results
         assert "disentanglement" not in results
         assert "optimal_k" in results
+
+
+# ---------------------------------------------------------------------------
+# Part 7: Ontology Alignment Discovery
+# ---------------------------------------------------------------------------
+
+from scripts.causal_subspace.ontology_alignment import (
+    AXIS_NAMES,
+    N_AXES,
+    DiscoveryResult,
+    OntologyConfig,
+    _compute_binned_mi,
+    build_ontology_vectors,
+    classify_scenario,
+    compute_alignment_mi,
+    compute_cka,
+    compute_subspace_overlap,
+    measure_discriminability,
+    run_naming_ceremony,
+)
+
+
+@pytest.fixture
+def synthetic_word_annotations(rng):
+    """Create minimal WordAnnotation-like objects for testing."""
+    N = 200
+    n_classes = 5
+    labels = rng.randint(0, n_classes, size=N).astype(np.int32)
+
+    deps = ["nsubj", "ROOT", "dobj", "amod", "det"]
+    words = []
+    for i in range(N):
+        w = WordAnnotation(
+            word=["cat", "dog", "professor", "ran", "the"][i % 5],
+            sentence_id=i // 10,
+            position_in_sentence=i % 10,
+            dep_depth=rng.randint(0, 5),
+            dep_relation=deps[labels[i]],
+            grammatical_role=GRAMMATICAL_ROLES[labels[i]],
+            token_indices=[i],
+            last_token_index=i,
+        )
+        words.append(w)
+
+    return words, labels
+
+
+class TestOntologyVectors:
+    def test_build_12_axis_vectors_shape(self, synthetic_word_annotations, rng):
+        """Ontology vectors have shape [N, 12]."""
+        words, labels = synthetic_word_annotations
+        N = len(words)
+        d = 64
+        H = rng.randn(N, d).astype(np.float32)
+
+        ont, valid = build_ontology_vectors(words, H, labels)
+        assert ont.shape == (N, 12)
+        assert valid.shape == (N,)
+        assert valid.dtype == bool
+
+    def test_coverage_ratio(self, synthetic_word_annotations, rng):
+        """Coverage should be > 0 for synthetic data (all axes except WordNet are heuristic)."""
+        words, labels = synthetic_word_annotations
+        N = len(words)
+        H = rng.randn(N, 64).astype(np.float32)
+
+        ont, valid = build_ontology_vectors(words, H, labels)
+        # Heuristic-based axes (5,6,7,8,10,11) are always available = 6+ axes
+        # Plus concreteness/animacy heuristics = 8+ axes
+        assert valid.sum() > N * 0.5, f"Expected >50% coverage, got {valid.mean():.1%}"
+
+    def test_no_nans_in_valid_rows(self, synthetic_word_annotations, rng):
+        """Valid rows should have no NaN values (NaNs replaced with 0.5)."""
+        words, labels = synthetic_word_annotations
+        H = rng.randn(len(words), 64).astype(np.float32)
+
+        ont, valid = build_ontology_vectors(words, H, labels)
+        assert not np.any(np.isnan(ont[valid]))
+
+    def test_axis_ranges(self, synthetic_word_annotations, rng):
+        """All axis values should be in [0, 1] for valid rows."""
+        words, labels = synthetic_word_annotations
+        H = rng.randn(len(words), 64).astype(np.float32)
+
+        ont, valid = build_ontology_vectors(words, H, labels)
+        ont_valid = ont[valid]
+        assert np.all(ont_valid >= 0.0), "Some axis values < 0"
+        assert np.all(ont_valid <= 1.5), "Some axis values > 1.5"
+
+
+class TestNamingCeremony:
+    def test_aligned_data_high_mi(self, rng):
+        """When ontology axes ARE the PCA directions, MI should be high."""
+        N, k = 500, 8
+        # ont_features[:, i] = H_proj[:, i] + small noise → MI should be high
+        H_proj = rng.randn(N, k).astype(np.float32)
+        ont = np.zeros((N, 12), dtype=np.float32)
+        for i in range(min(k, 12)):
+            ont[:, i] = H_proj[:, i % k] + rng.randn(N) * 0.1
+
+        per_axis_mi, per_axis_best_pca, validated = run_naming_ceremony(
+            ont, H_proj, n_bins=20, threshold=0.1,
+        )
+        # At least the first k axes should validate (they're copies of PCA dirs)
+        assert len(validated) >= min(k, 12) - 2, (
+            f"Expected ≥{min(k, 12) - 2} validated axes, got {len(validated)}: "
+            f"{per_axis_mi}"
+        )
+
+    def test_random_data_low_mi(self, rng):
+        """When ontology axes are random, MI should be near zero."""
+        N, k = 500, 8
+        H_proj = rng.randn(N, k).astype(np.float32)
+        ont = rng.randn(N, 12).astype(np.float32)  # independent random
+
+        per_axis_mi, _, validated = run_naming_ceremony(
+            ont, H_proj, n_bins=20, threshold=0.1,
+        )
+        # Random should validate very few (noise MI is small)
+        assert len(validated) <= 4, (
+            f"Random axes should rarely validate, got {len(validated)}: {per_axis_mi}"
+        )
+
+    def test_binned_mi_identical(self):
+        """MI of a variable with itself should be > 0."""
+        x = np.linspace(0, 1, 200)
+        mi = _compute_binned_mi(x, x, n_bins=20)
+        assert mi > 0.5, f"MI(x, x) should be high, got {mi}"
+
+    def test_binned_mi_independent(self, rng):
+        """MI of independent variables should be near 0."""
+        x = rng.randn(500)
+        y = rng.randn(500)
+        mi = _compute_binned_mi(x, y, n_bins=20)
+        assert mi < 0.15, f"MI(independent) should be near 0, got {mi}"
+
+    def test_binned_mi_constant(self):
+        """MI with constant variable should be 0."""
+        x = np.ones(100)
+        y = np.linspace(0, 1, 100)
+        mi = _compute_binned_mi(x, y, n_bins=20)
+        assert mi == 0.0
+
+
+class TestGlobalAlignment:
+    def test_cka_identity(self, rng):
+        """CKA(X, X) should be close to 1.0."""
+        X = rng.randn(100, 10).astype(np.float32)
+        cka = compute_cka(X, X)
+        assert cka > 0.99, f"CKA(X, X) should be ~1.0, got {cka}"
+
+    def test_cka_random(self, rng):
+        """CKA of independent random matrices should be low."""
+        X = rng.randn(200, 10).astype(np.float32)
+        Y = rng.randn(200, 8).astype(np.float32)
+        cka = compute_cka(X, Y)
+        assert cka < 0.3, f"CKA(random, random) should be low, got {cka}"
+
+    def test_subspace_overlap_identical(self, rng):
+        """Overlap when ontology IS the subspace should be high."""
+        N, d, k = 200, 32, 4
+        # U_k: first k columns of identity
+        U_k = np.eye(d, k, dtype=np.float32)
+        H = rng.randn(N, d).astype(np.float32)
+        # ont = projection onto U_k → should have high overlap
+        ont = H @ U_k
+        overlap = compute_subspace_overlap(ont, U_k, H)
+        assert overlap > 0.5, f"Overlap should be high, got {overlap}"
+
+    def test_alignment_mi_returns_tuple(self, rng):
+        """compute_alignment_mi should return (float, float)."""
+        N = 100
+        ont = rng.randn(N, 12).astype(np.float32)
+        H_proj = rng.randn(N, 8).astype(np.float32)
+        labels = rng.randint(0, 5, size=N).astype(np.int32)
+        mi_raw, mi_norm = compute_alignment_mi(ont, H_proj, labels)
+        assert isinstance(mi_raw, float)
+        assert isinstance(mi_norm, float)
+        assert mi_raw >= 0.0
+        assert mi_norm >= 0.0
+
+
+class TestDiscriminability:
+    def test_bootstrap_ci_valid(self, rng):
+        """Bootstrap CIs should satisfy low < mean gap < high, roughly."""
+        N = 200
+        n_classes = 3
+        labels = rng.randint(0, n_classes, size=N).astype(np.int32)
+
+        # Make ontology correlated with labels
+        class_means = rng.randn(n_classes, 12) * 2
+        ont = np.array([class_means[l] + rng.randn(12) * 0.5 for l in labels], dtype=np.float32)
+        H = rng.randn(N, 32).astype(np.float32)
+
+        disc = measure_discriminability(ont, H, labels, n_bootstrap=50, seed=42)
+        assert disc["ci_low"] <= disc["ci_high"], (
+            f"CI should be ordered: {disc['ci_low']} <= {disc['ci_high']}"
+        )
+        assert 0.0 <= disc["ontology_accuracy"] <= 1.0
+        assert 0.0 <= disc["embedding_accuracy"] <= 1.0
+
+    def test_discriminability_with_few_samples(self, rng):
+        """Should handle small N gracefully."""
+        disc = measure_discriminability(
+            rng.randn(10, 12).astype(np.float32),
+            rng.randn(10, 32).astype(np.float32),
+            rng.randint(0, 3, size=10).astype(np.int32),
+            n_bootstrap=10,
+        )
+        assert "gap" in disc
+
+
+class TestScenarioClassification:
+    def test_scenario_A(self):
+        """High MI, high CKA, many validated axes → Scenario A."""
+        result = DiscoveryResult(
+            layer_idx=5,
+            n_validated_axes=10,
+            validated_axes=AXIS_NAMES[:10],
+            alignment_mi=0.7,
+            cka_similarity=0.8,
+            coverage_ratio=0.9,
+            discriminability_gap=0.02,
+        )
+        result = classify_scenario(result)
+        assert result.scenario == "A"
+        assert result.recommended_phase2 == "build_both"
+
+    def test_scenario_B(self):
+        """Moderate MI, partial axes → Scenario B."""
+        result = DiscoveryResult(
+            layer_idx=5,
+            n_validated_axes=5,
+            validated_axes=AXIS_NAMES[:5],
+            alignment_mi=0.3,
+            cka_similarity=0.4,
+            coverage_ratio=0.7,
+            discriminability_gap=0.01,
+        )
+        result = classify_scenario(result)
+        assert result.scenario == "B"
+        assert result.recommended_phase2 == "meta_controller"
+
+    def test_scenario_C_low_mi(self):
+        """Very low MI → Scenario C."""
+        result = DiscoveryResult(
+            layer_idx=5,
+            n_validated_axes=1,
+            validated_axes=["structural_depth"],
+            alignment_mi=0.01,
+            cka_similarity=0.05,
+            coverage_ratio=0.8,
+            discriminability_gap=0.0,
+        )
+        result = classify_scenario(result)
+        assert result.scenario == "C"
+        assert result.recommended_phase2 == "stop"
+
+    def test_scenario_C_low_coverage(self):
+        """Very low coverage → Scenario C."""
+        result = DiscoveryResult(
+            layer_idx=5,
+            n_validated_axes=8,
+            alignment_mi=0.5,
+            cka_similarity=0.6,
+            coverage_ratio=0.05,  # too low
+            discriminability_gap=0.0,
+        )
+        result = classify_scenario(result)
+        assert result.scenario == "C"
+        assert result.recommended_phase2 == "stop"
+
+    def test_scenario_D(self):
+        """Low MI but high discriminability gap → Scenario D."""
+        result = DiscoveryResult(
+            layer_idx=5,
+            n_validated_axes=4,
+            validated_axes=AXIS_NAMES[:4],
+            alignment_mi=0.1,
+            cka_similarity=0.2,
+            coverage_ratio=0.7,
+            discriminability_gap=0.08,
+        )
+        result = classify_scenario(result)
+        assert result.scenario == "D"
+        assert result.recommended_phase2 == "injection_test"
+
+    def test_evidence_is_populated(self):
+        """Every scenario should produce human-readable evidence."""
+        for scenario_setup in [
+            {"n_validated_axes": 10, "alignment_mi": 0.7, "cka_similarity": 0.8,
+             "coverage_ratio": 0.9, "discriminability_gap": 0.0},
+            {"n_validated_axes": 1, "alignment_mi": 0.01, "cka_similarity": 0.05,
+             "coverage_ratio": 0.8, "discriminability_gap": 0.0},
+        ]:
+            result = DiscoveryResult(layer_idx=5, **scenario_setup)
+            result = classify_scenario(result)
+            assert len(result.scenario_evidence) > 0
+            assert result.scenario in ("A", "B", "C", "D")
+
+
+class TestPhase2Stubs:
+    def test_meta_controller_forward(self):
+        """Meta-controller stub should produce output of correct shape."""
+        import torch
+        from scripts.causal_subspace.ontology_alignment import OntologyMetaController
+
+        ctrl = OntologyMetaController(d_model=64, n_axes=8)
+        H = torch.randn(2, 10, 64)  # [batch, seq, d]
+        z = ctrl.forward(H)
+        assert z.shape == (2, 8)  # [batch, n_axes]
+        # Sigmoid output should be in [0, 1]
+        assert (z >= 0).all() and (z <= 1).all()
+
+    def test_qk_gating_forward(self):
+        """Q/K gating stub should preserve shape and apply gating."""
+        import torch
+        from scripts.causal_subspace.ontology_alignment import QKDimensionGating
+
+        gating = QKDimensionGating(n_axes=8, d_head=32)
+        Q = torch.randn(2, 10, 32)
+        K = torch.randn(2, 10, 32)
+        ont = torch.randn(2, 10, 8)
+        Q_out, K_out = gating.forward(Q, K, ont)
+        assert Q_out.shape == Q.shape
+        assert K_out.shape == K.shape

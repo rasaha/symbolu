@@ -22,4 +22,5 @@ __all__ = [
     "mdl_probing",
     "causal_intervention",
     "trajectory",
+    "ontology_alignment",
 ]
