@@ -133,6 +133,39 @@ The ontology lives **inside** attention. Each token activates a subset of Q/K di
 | C: Orthogonal | ≤ 2 | No | No |
 | D: Complementary | — | No (needs injection) | No (needs injection) |
 
+### The L0/L2 Dissociation: READ vs ACT layers
+
+Empirical finding from Parts 4–5: structure can peak at one layer (crystallization, high MDL compression) while causal effect peaks at a different layer (high intervention success rate). In our results:
+
+```
+L0: MDL compression = 1.53x (peak)     ← structure is ENCODED here
+L2: Causal success  = 25%   (peak)     ← structure is CONSUMED here
+```
+
+This means the ontological layer cannot simply "operate at the crystallization layer." It must **read** from where structure is richest and **act** where structure is causally load-bearing.
+
+```
+Option 1 (Meta-controller):
+  READ from L0 (where ontological alignment is strongest)
+  │
+  ├─→ z_ont ∈ R^N  (ontological state vector)
+  │
+  ACT at L2 (where causal effect peaks)
+  └─→ governs temperature, routing, confidence at L2 decisions
+
+Option 2 (Q/K Gating):
+  OPERATE at L2 (where attention routing matters)
+  │
+  └─→ gate(o) modulates Q/K at the layer where the model
+      actually uses structural information for attention
+```
+
+The 4.40x swap/ablation ratio confirms that *direction* in the subspace encodes role identity — different roles use different directions. This is exactly what Q/K gating would exploit: ontological type determines which dimensions of Q and K participate in attention.
+
+The 28.98x specificity gives the naming ceremony high-SNR signal to work with. If any of the 12 axes correspond to real model directions, the MI should be detectable.
+
+**Implementation**: `run_multi_layer_discovery()` runs Phase 1 at both layers, identifies the dissociation, and routes each architecture to the appropriate layer(s).
+
 ---
 
 ## 2. Two-Phase Structure

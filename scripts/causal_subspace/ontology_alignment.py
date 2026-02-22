@@ -118,6 +118,38 @@ class DiscoveryResult:
     recommended_phase2: str = ""
 
 
+@dataclass
+class MultiLayerDiscoveryResult:
+    """Discovery results across multiple layers.
+
+    Structure can peak at one layer (crystallization) while causal effect
+    peaks at another. The ontological layer may need to READ from one
+    layer and ACT at another. This dataclass captures that dissociation.
+    """
+
+    # Per-layer results
+    per_layer: Dict[int, DiscoveryResult] = field(default_factory=dict)
+
+    # Which layer is best for what
+    best_alignment_layer: int = -1       # highest MI — where to READ ontology
+    best_causal_layer: int = -1          # highest causal effect — where to ACT
+    dissociation: bool = False           # True if read_layer != act_layer
+
+    # Merged scenario (from best alignment layer)
+    scenario: str = ""
+    scenario_evidence: List[str] = field(default_factory=list)
+    recommended_phase2: str = ""
+
+    # Architecture routing based on dissociation
+    meta_controller_read_layer: int = -1   # Option 1 reads from here
+    meta_controller_act_layer: int = -1    # Option 1 governs here
+    qk_gating_layer: int = -1             # Option 2 operates here
+
+    # Merged validated axes (union across layers)
+    all_validated_axes: List[str] = field(default_factory=list)
+    n_validated_axes: int = 0
+
+
 # ---------------------------------------------------------------------------
 # 7b. Build 12-axis ontology vectors
 # ---------------------------------------------------------------------------
@@ -912,3 +944,172 @@ def run_ontology_discovery(
     )
 
     return result
+
+
+def run_multi_layer_discovery(
+    annotations,
+    hidden_states: Dict[int, np.ndarray],
+    labels: np.ndarray,
+    U_k: np.ndarray,
+    layers: List[int],
+    causal_success_by_layer: Optional[Dict[int, float]] = None,
+    cfg: Optional[OntologyConfig] = None,
+) -> MultiLayerDiscoveryResult:
+    """Run ontology discovery at multiple layers.
+
+    The key insight from the L0/L2 dissociation: structure can peak at
+    one layer (crystallization, high MDL compression) while causal effect
+    peaks at another (high causal success rate). The meta-controller should
+    READ from the layer with strongest ontological alignment, and ACT at
+    the layer with strongest causal effect. Q/K gating operates where
+    causal effect is highest (where attention routing matters most).
+
+    Parameters
+    ----------
+    annotations : StructuralAnnotations
+        Word annotations from Part 2.
+    hidden_states : dict[int, np.ndarray]
+        Per-layer hidden states, each [N_w, d].
+    labels : np.ndarray [N_w]
+        Grammatical role labels.
+    U_k : np.ndarray [d, k]
+        MDL-validated PCA basis.
+    layers : list[int]
+        Which layers to run discovery on. Typically
+        [crystallization_layer, peak_causal_layer].
+    causal_success_by_layer : dict[int, float], optional
+        Causal success rate per layer from Part 5. Used to identify
+        the peak causal layer. If None, falls back to alignment MI
+        for layer selection.
+    cfg : OntologyConfig, optional
+
+    Returns
+    -------
+    MultiLayerDiscoveryResult with per-layer results and routing.
+    """
+    if cfg is None:
+        cfg = OntologyConfig()
+
+    multi = MultiLayerDiscoveryResult()
+
+    # Run discovery at each layer
+    for layer_idx in layers:
+        if layer_idx not in hidden_states:
+            logger.warning("Layer %d not in hidden_states, skipping", layer_idx)
+            continue
+
+        H = hidden_states[layer_idx]
+        logger.info("=" * 60)
+        logger.info("Running ontology discovery at layer %d", layer_idx)
+        logger.info("=" * 60)
+
+        result = run_ontology_discovery(
+            annotations, H, labels, U_k,
+            layer_idx=layer_idx, cfg=cfg,
+        )
+        multi.per_layer[layer_idx] = result
+
+    if not multi.per_layer:
+        logger.warning("No layers produced results")
+        multi.scenario = "C"
+        multi.scenario_evidence = ["No valid layers for discovery"]
+        multi.recommended_phase2 = "stop"
+        return multi
+
+    # --- Find best alignment layer (highest MI) ---
+    best_align = max(multi.per_layer.items(), key=lambda kv: kv[1].alignment_mi)
+    multi.best_alignment_layer = best_align[0]
+
+    # --- Find best causal layer ---
+    if causal_success_by_layer:
+        # Use actual causal data from Part 5
+        valid_causal = {
+            l: rate for l, rate in causal_success_by_layer.items()
+            if l in multi.per_layer
+        }
+        if valid_causal:
+            multi.best_causal_layer = max(valid_causal, key=valid_causal.get)
+        else:
+            multi.best_causal_layer = multi.best_alignment_layer
+    else:
+        # Fallback: use alignment MI as proxy
+        multi.best_causal_layer = multi.best_alignment_layer
+
+    # --- Detect dissociation ---
+    multi.dissociation = (multi.best_alignment_layer != multi.best_causal_layer)
+
+    # --- Architecture routing ---
+    # Meta-controller: reads from alignment layer, acts at causal layer
+    multi.meta_controller_read_layer = multi.best_alignment_layer
+    multi.meta_controller_act_layer = multi.best_causal_layer
+
+    # Q/K gating: operates at causal layer (where attention routing matters)
+    multi.qk_gating_layer = multi.best_causal_layer
+
+    # --- Merge validated axes (union across layers) ---
+    all_axes = set()
+    for result in multi.per_layer.values():
+        all_axes.update(result.validated_axes)
+    multi.all_validated_axes = sorted(all_axes, key=lambda a: AXIS_NAMES.index(a) if a in AXIS_NAMES else 99)
+    multi.n_validated_axes = len(multi.all_validated_axes)
+
+    # --- Use best alignment layer's scenario as the overall scenario ---
+    best_result = multi.per_layer[multi.best_alignment_layer]
+    multi.scenario = best_result.scenario
+    multi.recommended_phase2 = best_result.recommended_phase2
+
+    # --- Build evidence incorporating dissociation ---
+    evidence = list(best_result.scenario_evidence)
+
+    if multi.dissociation:
+        align_layer = multi.best_alignment_layer
+        causal_layer = multi.best_causal_layer
+        align_mi = multi.per_layer[align_layer].alignment_mi
+        causal_mi = multi.per_layer[causal_layer].alignment_mi if causal_layer in multi.per_layer else 0.0
+
+        evidence.append(
+            f"DISSOCIATION: structure peaks at L{align_layer} (MI={align_mi:.3f}) "
+            f"but causal effect peaks at L{causal_layer}"
+        )
+        evidence.append(
+            f"Meta-controller should READ from L{align_layer}, ACT at L{causal_layer}"
+        )
+        evidence.append(
+            f"Q/K gating should operate at L{causal_layer} "
+            f"(where attention routing is causally active)"
+        )
+
+        # Check if causal layer has any alignment at all
+        if causal_layer in multi.per_layer:
+            causal_result = multi.per_layer[causal_layer]
+            if causal_result.n_validated_axes == 0:
+                evidence.append(
+                    f"WARNING: L{causal_layer} (causal peak) has 0 validated axes — "
+                    f"Q/K gating may not have signal to work with"
+                )
+    else:
+        evidence.append(
+            f"No dissociation: alignment and causal effect both peak at "
+            f"L{multi.best_alignment_layer}"
+        )
+
+    # Report per-layer summary
+    for layer_idx in sorted(multi.per_layer.keys()):
+        r = multi.per_layer[layer_idx]
+        evidence.append(
+            f"  L{layer_idx}: MI={r.alignment_mi:.3f}, CKA={r.cka_similarity:.3f}, "
+            f"validated={r.n_validated_axes}/12, scenario={r.scenario}"
+        )
+
+    multi.scenario_evidence = evidence
+
+    logger.info("Multi-layer discovery complete:")
+    logger.info("  Best alignment: L%d (MI=%.3f)", multi.best_alignment_layer,
+                multi.per_layer[multi.best_alignment_layer].alignment_mi)
+    logger.info("  Best causal: L%d", multi.best_causal_layer)
+    logger.info("  Dissociation: %s", multi.dissociation)
+    logger.info("  Validated axes (union): %d (%s)",
+                multi.n_validated_axes, ", ".join(multi.all_validated_axes))
+    logger.info("  Overall scenario: %s → %s", multi.scenario, multi.recommended_phase2)
+
+    return multi

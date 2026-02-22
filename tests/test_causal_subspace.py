@@ -975,3 +975,185 @@ class TestPhase2Stubs:
         Q_out, K_out = gating.forward(Q, K, ont)
         assert Q_out.shape == Q.shape
         assert K_out.shape == K.shape
+
+
+class TestMultiLayerDiscovery:
+    """Tests for run_multi_layer_discovery and the L0/L2 dissociation logic."""
+
+    def _make_annotations(self, rng, N, n_classes, d):
+        """Create synthetic annotations + hidden states for multi-layer tests."""
+        labels = rng.randint(0, n_classes, size=N).astype(np.int32)
+        deps = ["nsubj", "ROOT", "dobj", "amod", "det"]
+        words = []
+        for i in range(N):
+            w = WordAnnotation(
+                word=["cat", "dog", "professor", "ran", "the"][i % 5],
+                sentence_id=i // 10,
+                position_in_sentence=i % 10,
+                dep_depth=rng.randint(0, 5),
+                dep_relation=deps[labels[i] % len(deps)],
+                grammatical_role=GRAMMATICAL_ROLES[labels[i]],
+                token_indices=[i],
+                last_token_index=i,
+            )
+            words.append(w)
+
+        # Create multi-layer hidden states with class structure
+        class_means = rng.randn(n_classes, d).astype(np.float32) * 2.0
+        hidden_states = {}
+        for layer in range(4):
+            signal = 0.5 + layer * 0.5
+            noise = 1.5 - layer * 0.2
+            H = np.array(
+                [class_means[labels[i]] * signal + rng.randn(d).astype(np.float32) * noise
+                 for i in range(N)],
+                dtype=np.float32,
+            )
+            hidden_states[layer] = H
+
+        annotations = StructuralAnnotations(words=words, n_sentences=N // 10)
+        annotations.labels_role = labels
+
+        # PCA basis from the best layer
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=8)
+        pca.fit(hidden_states[2])  # use middle layer
+        U_k = pca.components_.T.astype(np.float32)
+
+        return annotations, hidden_states, labels, U_k
+
+    def test_multi_layer_returns_per_layer_results(self, rng):
+        """Should produce a DiscoveryResult for each requested layer."""
+        from scripts.causal_subspace.ontology_alignment import (
+            MultiLayerDiscoveryResult,
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)  # fast
+
+        multi = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[0, 2],
+            cfg=cfg,
+        )
+
+        assert isinstance(multi, MultiLayerDiscoveryResult)
+        assert 0 in multi.per_layer
+        assert 2 in multi.per_layer
+        assert multi.best_alignment_layer in (0, 2)
+        assert multi.scenario in ("A", "B", "C", "D")
+
+    def test_dissociation_detected(self, rng):
+        """When causal_success_by_layer points to a different layer than MI, detect dissociation."""
+        from scripts.causal_subspace.ontology_alignment import (
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)
+
+        # Force dissociation: alignment may be better at L2 (more signal),
+        # but we say causal peak is at L0
+        multi = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[0, 2],
+            causal_success_by_layer={0: 0.25, 2: 0.0},
+            cfg=cfg,
+        )
+
+        # Best causal should be L0 (highest causal success)
+        assert multi.best_causal_layer == 0
+        # Best alignment might be L2 (more signal in synthetic data)
+        # If they differ, dissociation is True
+        if multi.best_alignment_layer != 0:
+            assert multi.dissociation is True
+            assert multi.meta_controller_read_layer != multi.meta_controller_act_layer
+            assert multi.meta_controller_act_layer == 0
+            assert multi.qk_gating_layer == 0
+
+    def test_no_dissociation_when_same_layer(self, rng):
+        """When causal and alignment agree, dissociation=False."""
+        from scripts.causal_subspace.ontology_alignment import (
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)
+
+        # Both causal and alignment should point to same layer if we give
+        # high causal success to the layer with best alignment
+        multi_no_causal = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[2],  # single layer → no dissociation possible
+            cfg=cfg,
+        )
+
+        assert multi_no_causal.dissociation is False
+        assert multi_no_causal.best_alignment_layer == multi_no_causal.best_causal_layer
+
+    def test_validated_axes_union(self, rng):
+        """Union of validated axes across layers should be ≥ max per-layer."""
+        from scripts.causal_subspace.ontology_alignment import (
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)
+
+        multi = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[0, 2, 3],
+            cfg=cfg,
+        )
+
+        max_per_layer = max(r.n_validated_axes for r in multi.per_layer.values())
+        assert multi.n_validated_axes >= max_per_layer
+
+    def test_evidence_includes_layer_summary(self, rng):
+        """Evidence should contain per-layer summary lines."""
+        from scripts.causal_subspace.ontology_alignment import (
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)
+
+        multi = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[0, 2],
+            cfg=cfg,
+        )
+
+        # Should have per-layer summary in evidence
+        evidence_text = " ".join(multi.scenario_evidence)
+        assert "L0:" in evidence_text
+        assert "L2:" in evidence_text
+        assert "MI=" in evidence_text
+
+    def test_routing_with_causal_data(self, rng):
+        """Architecture routing should use causal data when available."""
+        from scripts.causal_subspace.ontology_alignment import (
+            OntologyConfig,
+            run_multi_layer_discovery,
+        )
+
+        annotations, hidden_states, labels, U_k = self._make_annotations(rng, 200, 5, 32)
+        cfg = OntologyConfig(n_bootstrap=10, seed=42)
+
+        multi = run_multi_layer_discovery(
+            annotations, hidden_states, labels, U_k,
+            layers=[0, 2, 3],
+            causal_success_by_layer={0: 0.0, 2: 0.25, 3: 0.05},
+            cfg=cfg,
+        )
+
+        # Causal peak at L2
+        assert multi.best_causal_layer == 2
+        assert multi.qk_gating_layer == 2
+        assert multi.meta_controller_act_layer == 2
