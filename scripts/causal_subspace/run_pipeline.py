@@ -80,6 +80,7 @@ from scripts.causal_subspace.mdl_probing import (
 from scripts.causal_subspace.causal_intervention import (
     InterventionConfig,
     InterventionResult,
+    build_pca_basis,
     build_subspace_basis,
     run_causal_intervention,
 )
@@ -301,7 +302,7 @@ def run_full_pipeline(
     print(f"\n--- Finding optimal subspace dimensionality at layer {best_layer} ---")
     H_best = annotations.hidden_states[best_layer]
     candidate_ks = [4, 8, 16, 32, 64]
-    optimal_k, k_results = select_top_k_components(
+    optimal_k, k_results, best_pca_basis = select_top_k_components(
         H_best, annotations.labels_role, best_layer,
         "grammatical_role", candidate_ks, mdl_cfg,
     )
@@ -335,7 +336,12 @@ def run_full_pipeline(
         for layer_idx in intervention_layers:
             print(f"\n--- Causal intervention at Layer {layer_idx} ---")
             H = annotations.hidden_states[layer_idx]
-            U_k = build_subspace_basis(H, annotations.labels_role, optimal_k)
+            # Use global PCA basis (matching what MDL validated) instead of
+            # class-conditional PCA which produces a misaligned subspace.
+            if layer_idx == best_layer and best_pca_basis is not None:
+                U_k = best_pca_basis  # exact basis MDL validated
+            else:
+                U_k = build_pca_basis(H, optimal_k)
 
             ir = run_causal_intervention(model, tokenizer, U_k, layer_idx, int_cfg)
 

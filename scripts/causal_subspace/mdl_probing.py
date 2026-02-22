@@ -323,7 +323,7 @@ def select_top_k_components(
     label_name: str,
     candidate_dims: List[int],
     cfg: MDLProbeConfig,
-) -> Tuple[int, List[MDLProbeResult]]:
+) -> Tuple[int, List[MDLProbeResult], np.ndarray]:
     """Find the optimal subspace dimensionality via MDL probe.
 
     For each candidate k, project H onto its top-k PCA components and
@@ -333,12 +333,17 @@ def select_top_k_components(
     -------
     best_k : int
     results : list of MDLProbeResult for each candidate
+    best_components : np.ndarray [d, best_k]
+        The PCA component vectors (orthonormal columns) for the winning k.
+        These are the exact directions in which MDL found compression, and
+        should be used as the subspace basis for causal interventions.
     """
     from sklearn.decomposition import PCA
 
     results = []
     best_k = candidate_dims[0]
     best_compression = 0.0
+    best_components: Optional[np.ndarray] = None
 
     for k in candidate_dims:
         actual_k = min(k, H.shape[1], H.shape[0])
@@ -351,9 +356,11 @@ def select_top_k_components(
         if r.compression_ratio > best_compression:
             best_compression = r.compression_ratio
             best_k = actual_k
+            # pca.components_ is [actual_k, d]; transpose to [d, actual_k]
+            best_components = pca.components_.T
 
     logger.info(
         "Best k=%d for [layer=%d, %s] with compression=%.2fx",
         best_k, layer_idx, label_name, best_compression,
     )
-    return best_k, results
+    return best_k, results, best_components
