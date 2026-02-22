@@ -75,6 +75,11 @@ class InterventionConfig:
     divergence than the random-subspace control for a pair to count as
     a causal success.  Enforced per-pair, not just as a summary stat."""
 
+    activation_source: str = "block"
+    """Which module to intervene on: 'block' (transformer block) or
+    'attention' (attention sublayer only).  Must match the activation_source
+    used during data collection so that U_k lives in the correct space."""
+
     device: str = "cpu"
     seed: int = 42
 
@@ -462,14 +467,21 @@ def run_single_intervention(
 
     Returns dict with structural_flip, fluency_preserved, and detailed metrics.
     """
-    from scripts.causal_subspace.data_collection import _find_transformer_blocks
+    from scripts.causal_subspace.data_collection import (
+        _find_attention_modules,
+        _find_transformer_blocks,
+    )
 
     fixed_kl = cfg.fixed_kl_threshold if cfg else 0.05
     min_spec = cfg.min_specificity_ratio if cfg else 2.0
     fluency_thresh = cfg.fluency_threshold if cfg else 2.0
+    act_source = cfg.activation_source if cfg else "block"
 
-    blocks = _find_transformer_blocks(model)
-    target_block = blocks[target_layer_idx]
+    if act_source == "attention":
+        modules = _find_attention_modules(model)
+    else:
+        modules = _find_transformer_blocks(model)
+    target_block = modules[target_layer_idx]
 
     U_k_t = torch.tensor(U_k, dtype=torch.float32, device=device)
     d, k = U_k.shape
