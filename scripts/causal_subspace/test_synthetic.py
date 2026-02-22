@@ -59,6 +59,7 @@ from scripts.causal_subspace.mdl_probing import (
 )
 from scripts.causal_subspace.causal_intervention import (
     InterventionResult,
+    build_pca_basis,
     build_subspace_basis,
     _random_orthonormal_basis,
 )
@@ -262,7 +263,7 @@ def run_part4_mdl(
     best_layer = max(mdl_results, key=lambda l: mdl_results[l]["compression_ratio"])
     H_best = states[best_layer]
     candidate_ks = [4, 8, 16, 32]
-    optimal_k, _ = select_top_k_components(
+    optimal_k, _, _pca_basis = select_top_k_components(
         H_best, labels, best_layer, "role", candidate_ks, cfg,
     )
     print(f"  Best layer: {best_layer}, optimal k: {optimal_k}")
@@ -303,7 +304,7 @@ def run_part5_intervention_synthetic(
 
     for layer_idx in layers:
         H = states[layer_idx]
-        U_k = build_subspace_basis(H, labels, subspace_k)
+        U_k = build_pca_basis(H, subspace_k)
 
         ir = run_causal_intervention(model, tokenizer, U_k, layer_idx, cfg)
         results[layer_idx] = {

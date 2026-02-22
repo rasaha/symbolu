@@ -178,6 +178,37 @@ def build_subspace_basis(
     return U_k
 
 
+def build_pca_basis(H: np.ndarray, k: int) -> np.ndarray:
+    """Construct an orthonormal basis U_k ∈ R^{d × k} using global PCA.
+
+    This uses the same top-k PCA directions that ``select_top_k_components``
+    validates via MDL probing, ensuring the intervention operates on the
+    exact subspace where compression was found.
+
+    Parameters
+    ----------
+    H : np.ndarray [N, d]
+    k : int  (subspace dimensionality)
+
+    Returns
+    -------
+    U_k : np.ndarray [d, k]  orthonormal columns
+    """
+    from sklearn.decomposition import PCA
+
+    actual_k = min(k, H.shape[1], H.shape[0])
+    pca = PCA(n_components=actual_k, random_state=42)
+    pca.fit(H)
+    U_k = pca.components_[:actual_k].T  # [d, actual_k]
+
+    logger.info(
+        "Built PCA subspace basis: d=%d, k=%d, explained_var=%.3f",
+        H.shape[1], actual_k,
+        pca.explained_variance_ratio_[:actual_k].sum(),
+    )
+    return U_k
+
+
 # ---------------------------------------------------------------------------
 # Intervention pair generation
 # ---------------------------------------------------------------------------

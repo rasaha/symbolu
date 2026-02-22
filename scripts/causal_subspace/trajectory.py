@@ -98,7 +98,7 @@ def compute_layer_trajectory(
     from scripts.causal_subspace.mdl_probing import MDLProbeConfig, MDLProbeResult, run_mdl_probe
     from scripts.causal_subspace.causal_intervention import (
         InterventionConfig,
-        build_subspace_basis,
+        build_pca_basis,
         run_causal_intervention,
     )
     from scripts.causal_subspace.disentanglement import compute_pca_baseline
@@ -139,7 +139,7 @@ def compute_layer_trajectory(
 
         # Causal intervention (optional, expensive)
         if run_interventions and model is not None and tokenizer is not None:
-            U_k = build_subspace_basis(H, labels, subspace_k)
+            U_k = build_pca_basis(H, subspace_k)
             intervention_result = run_causal_intervention(
                 model, tokenizer, U_k, layer_idx, intervention_cfg,
             )
