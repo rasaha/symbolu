@@ -69,6 +69,7 @@ def compute_layer_trajectory(
     intervention_cfg=None,
     run_interventions: bool = True,
     precomputed_mdl: Optional[Dict[int, "MDLProbeResult"]] = None,
+    activation_source: str = "block",
 ) -> LayerTrajectory:
     """Compute the structural subspace trajectory across all layers.
 

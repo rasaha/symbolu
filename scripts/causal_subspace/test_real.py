@@ -331,6 +331,13 @@ Examples:
         help="Skip causal interventions (faster)",
     )
     parser.add_argument(
+        "--activation-source", type=str, default=None,
+        choices=["block", "attention"],
+        help="Activation source: 'block' (MLP residual stream, default) or "
+             "'attention' (attention sublayer output — tests whether structural "
+             "roles live in attention heads rather than MLP directions)",
+    )
+    parser.add_argument(
         "--corpus", type=str, choices=["auto", "synthetic"], default="auto",
         help="Corpus source: auto (try WikiText, fallback to synthetic) or synthetic",
     )
@@ -391,7 +398,10 @@ Examples:
     print(f"  SAE: epochs={sae_epochs}, expansion={sae_expansion}, sparsity={args.sae_sparsity}")
     print(f"  MDL: portions={mdl_portions}, K-means clusters={n_clusters}")
     print(f"  Interventions: {'SKIP' if args.skip_interventions else f'{n_pairs} pairs'}")
+    activation_source = args.activation_source or "block"
+    source_desc = "attention sublayer (heads)" if activation_source == "attention" else "block (MLP residual)"
     print(f"  Subspace k: {subspace_k}, Layers: {layers or 'all'}")
+    print(f"  Activation source: {source_desc}")
     print(f"  Corpus: {args.corpus}")
 
     # Handle synthetic corpus override
@@ -428,6 +438,7 @@ Examples:
             skip_interventions=args.skip_interventions,
             device=args.device,
             seed=args.seed,
+            activation_source=activation_source,
         )
     finally:
         # Restore original init if patched

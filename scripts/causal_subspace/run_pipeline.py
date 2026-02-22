@@ -112,6 +112,7 @@ def run_full_pipeline(
     skip_interventions: bool = False,
     device: str = "cpu",
     seed: int = 42,
+    activation_source: str = "block",
 ) -> Dict[str, Any]:
     """Run the complete causal subspace extraction and validation pipeline.
 
@@ -119,12 +120,14 @@ def run_full_pipeline(
     """
     results: Dict[str, Any] = {
         "model_name": model_name,
+        "activation_source": activation_source,
         "config": {
             "max_sequences": max_sequences,
             "max_seq_len": max_seq_len,
             "subspace_k": subspace_k,
             "sae_expansion": sae_expansion,
             "n_clusters": n_clusters,
+            "activation_source": activation_source,
         },
     }
 
@@ -137,6 +140,8 @@ def run_full_pipeline(
     print("PART 1: PRECISION DATA COLLECTION")
     print("=" * 70)
 
+    source_desc = "attention sublayer" if activation_source == "attention" else "block (MLP residual)"
+    print(f"  Activation source: {source_desc}")
     print(f"  Loading model and running forward passes ({max_sequences} sequences)...",
           flush=True)
 
@@ -147,6 +152,7 @@ def run_full_pipeline(
         batch_size=batch_size,
         device=device,
         seed=seed,
+        activation_source=activation_source,
     )
     store = collect_hidden_states(data_cfg)
 
@@ -316,6 +322,7 @@ def run_full_pipeline(
             n_pairs=n_intervention_pairs,
             device=device,
             seed=seed,
+            activation_source=activation_source,
         )
 
         # Run at best layer and a few surrounding layers
@@ -379,9 +386,11 @@ def run_full_pipeline(
             n_pairs=max(10, n_intervention_pairs // 5),
             device=device,
             seed=seed,
+            activation_source=activation_source,
         ) if not skip_interventions else None,
         run_interventions=not skip_interventions,
         precomputed_mdl=mdl_result_objects.get("grammatical_role"),
+        activation_source=activation_source,
     )
 
     # Print trajectory
@@ -569,6 +578,12 @@ def main():
         help="Save results to JSON file",
     )
     parser.add_argument(
+        "--activation-source", type=str, default="block",
+        choices=["block", "attention"],
+        help="Activation source: 'block' (MLP residual stream) or "
+             "'attention' (attention sublayer output, no MLP)",
+    )
+    parser.add_argument(
         "--quick", action="store_true",
         help="Quick smoke test (reduced data, fewer epochs)",
     )
@@ -610,6 +625,7 @@ def main():
         skip_interventions=args.skip_interventions,
         device=args.device,
         seed=args.seed,
+        activation_source=args.activation_source,
     )
 
     if args.output:

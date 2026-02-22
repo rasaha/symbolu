@@ -53,6 +53,14 @@ class DataCollectionConfig:
     device: str = "cpu"
     """Device for inference ('cpu' or 'cuda')."""
 
+    activation_source: str = "block"
+    """Which activation to extract:
+    'block'     — full transformer block output (MLP residual stream).
+    'attention' — attention sublayer output only (before residual connection,
+                  no MLP contribution).  Use this to test whether structural
+                  roles live in attention patterns rather than MLP directions.
+    """
+
     seed: int = 42
 
 
@@ -100,24 +108,39 @@ class _LayerHookCollector:
     of its output tuple.  Rather than storing the full [B, H, T, T] matrices
     (which would be enormous), we compute per-token, per-head entropy on the
     fly and store only the [B, T, H] scalar results.
+
+    When ``activation_source='attention'``, hooks the attention sublayer
+    instead of the full block, capturing attention output before the residual
+    connection (no MLP contribution).
     """
 
-    def __init__(self, collect_attention: bool = False):
+    def __init__(
+        self,
+        collect_attention: bool = False,
+        activation_source: str = "block",
+    ):
         self.layer_outputs: Dict[int, List[torch.Tensor]] = {}
         self.layer_attn_entropy: Dict[int, List[torch.Tensor]] = {}
         self._handles: list = []
         self._collect_attention = collect_attention
+        self._activation_source = activation_source
 
     def attach(self, model: nn.Module) -> None:
-        """Find transformer blocks and register hooks."""
-        blocks = _find_transformer_blocks(model)
-        for idx, block in enumerate(blocks):
+        """Find transformer blocks (or attention modules) and register hooks."""
+        if self._activation_source == "attention":
+            modules = _find_attention_modules(model)
+            module_desc = "attention modules"
+        else:
+            modules = _find_transformer_blocks(model)
+            module_desc = "transformer blocks"
+
+        for idx, module in enumerate(modules):
             self.layer_outputs[idx] = []
             if self._collect_attention:
                 self.layer_attn_entropy[idx] = []
-            handle = block.register_forward_hook(self._make_hook(idx))
+            handle = module.register_forward_hook(self._make_hook(idx))
             self._handles.append(handle)
-        logger.info("Attached hooks to %d transformer blocks", len(blocks))
+        logger.info("Attached hooks to %d %s", len(modules), module_desc)
 
     def _make_hook(self, layer_idx: int):
         def hook_fn(module, inp, out):
@@ -205,6 +228,29 @@ def _find_transformer_blocks(model: nn.Module) -> list:
     )
 
 
+def _find_attention_modules(model: nn.Module) -> list:
+    """Locate the attention submodule inside each transformer block.
+
+    For GPT-2 this is ``block.attn``, for LLaMA ``block.self_attn``, etc.
+    The returned modules' forward output has the attention hidden state at
+    index 0 of the output tuple, same as the block output convention.
+    """
+    blocks = _find_transformer_blocks(model)
+    attn_modules: list = []
+    for block in blocks:
+        for attr in ("attn", "self_attn", "attention"):
+            mod = getattr(block, attr, None)
+            if mod is not None and isinstance(mod, nn.Module):
+                attn_modules.append(mod)
+                break
+        else:
+            raise RuntimeError(
+                f"Could not find attention module in {block.__class__.__name__}. "
+                "Expected .attn, .self_attn, or .attention attribute."
+            )
+    return attn_modules
+
+
 # ---------------------------------------------------------------------------
 # Count parameters
 # ---------------------------------------------------------------------------
@@ -262,7 +308,10 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
     logger.info("Collected %d tokenized sequences", len(sequences))
 
     # Hook collector — also collect attention entropy for Part 7 gating analysis
-    collector = _LayerHookCollector(collect_attention=True)
+    collector = _LayerHookCollector(
+        collect_attention=True,
+        activation_source=cfg.activation_source,
+    )
     collector.attach(model)
 
     all_positions: List[np.ndarray] = []
