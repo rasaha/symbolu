@@ -335,11 +335,23 @@ def run_full_pipeline(
                 "fluency_rate": ir.fluency_rate,
                 "causal_success_rate": ir.causal_success_rate,
                 "n_causal_successes": ir.n_causal_successes,
+                # New causal rigor metrics
+                "specificity_ratio": ir.specificity_ratio,
+                "cross_specificity_ratio": ir.cross_specificity_ratio,
+                "swap_vs_ablation_ratio": ir.swap_vs_ablation_ratio,
+                "control_kl_mean": ir.control_kl_mean,
+                "random_kl_mean": ir.random_kl_mean,
+                "unrelated_kl_mean": ir.unrelated_kl_mean,
+                "ablation_kl_mean": ir.ablation_kl_mean,
+                "adaptive_kl_threshold": ir.adaptive_kl_threshold,
             }
             print(f"  Pairs: {ir.n_pairs_tested}, "
                   f"Flip: {ir.flip_rate * 100:.1f}%, "
                   f"Fluency: {ir.fluency_rate * 100:.1f}%, "
                   f"Causal success: {ir.causal_success_rate * 100:.1f}%")
+            print(f"  Specificity: vs_random={ir.specificity_ratio:.2f}x, "
+                  f"vs_unrelated={ir.cross_specificity_ratio:.2f}x, "
+                  f"swap/ablation={ir.swap_vs_ablation_ratio:.2f}x")
     else:
         print("  (Skipped — use --skip-interventions=false to enable)")
 
@@ -419,6 +431,9 @@ def run_full_pipeline(
         for layer_idx, ir in intervention_results.items():
             print(f"   Layer {layer_idx}: {ir['causal_success_rate'] * 100:.1f}% "
                   f"(flip={ir['flip_rate'] * 100:.1f}%, fluency={ir['fluency_rate'] * 100:.1f}%)")
+            print(f"     Specificity: vs_random={ir.get('specificity_ratio', 0):.2f}x, "
+                  f"vs_unrelated={ir.get('cross_specificity_ratio', 0):.2f}x, "
+                  f"swap/ablation={ir.get('swap_vs_ablation_ratio', 0):.2f}x")
     else:
         print("   (Not run)")
 
