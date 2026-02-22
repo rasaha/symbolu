@@ -315,6 +315,144 @@ class OntologyAlignmentResult:
 
 ---
 
+## 3b. Space-Transfer Gap: Why the Subspace Validation Is Necessary but Not Sufficient
+
+### The problem
+
+Parts 3–5 validated U_k in **h-space** (block or attention sublayer output):
+
+```
+h_out = h_in + W_O @ concat(softmax(Q_h K_h^T / √d) @ V_h) + MLP(...)
+                                                        ↑
+U_k was derived from PCA on this h_out ─────────────────┘
+```
+
+But the three governance surfaces operate in different spaces:
+
+```
+C1 operates on: per-head outputs  head_h = attn_h @ V_h
+C2 operates on: V_h = LN(h_in) @ W_V^h
+C3 operates on: attention logits  Q_h @ K_h^T
+```
+
+None of these are h_out. The validated structural directions U_k live in h_out-space and do **not** transfer directly to V-space or per-head space.
+
+### Why applying U_k to V is wrong
+
+```
+Claim in the design:    V_governed = V - (V @ U_k) @ U_k^T + (V @ U_k ⊙ gate) @ U_k^T
+What this actually does: projects V onto h-space directions, which W_V may have rotated
+
+If W_V is an arbitrary rotation:
+  structural_directions_in_V = W_V^{-T} @ U_k    (NOT U_k itself)
+  V @ U_k ≠ "structural components of V"
+  V @ U_k = "whatever V happens to overlap with h-space structural directions"
+```
+
+### What the subspace validation DOES give us
+
+| What we know | From which part | How it helps governance |
+|-------------|----------------|----------------------|
+| Structural info exists at layer L | Part 4 (MDL) | **Layer selection**: apply governance at crystallization layer |
+| Dimensionality is k | Part 4 (MDL top-k) | **Budget**: governance has k degrees of freedom |
+| The subspace is causally load-bearing | Part 5 (intervention) | **Existence proof**: there IS something to govern |
+| Information crystallizes then is consumed | Part 6 (trajectory) | **Timing**: governance should act at peak, not after consumption |
+| Per-head entropy varies | Part 1 (attention entropy) | **Head heterogeneity**: some heads are structural candidates |
+
+### What we still need: the Space-Transfer Step
+
+Before governance can operate, we need to derive structural bases in each surface's native space:
+
+```python
+def derive_governance_bases(
+    model: nn.Module,
+    store: HiddenStateStore,
+    annotations: StructuralAnnotations,
+    target_layer: int,
+    k: int,
+) -> Dict[str, Any]:
+    """Derive structural bases in each governance surface's native space.
+
+    This bridges the gap between the h-space validation (Parts 3-5)
+    and the governance surfaces (C1, C2, C3).
+
+    Returns
+    -------
+    bases : dict with keys:
+        'per_head_structural_score' : np.ndarray [n_heads]
+            MDL compression ratio per head — which heads carry structural info.
+            Derived by running MDL probe on per-head outputs separately.
+
+        'V_basis_per_head' : Dict[int, np.ndarray]  head_idx → [d_v, k_v]
+            Structural subspace in V-space for each structurally-relevant head.
+            Derived by PCA on V_h = LN(h_in) @ W_V^h, validated by MDL.
+
+        'attention_structural_patterns' : np.ndarray [n_heads, T, T]
+            Average attention pattern for structurally-complex inputs.
+            Baseline for C3 attention prior.
+    """
+```
+
+**Per-head structural decomposition** (for C1):
+1. For each head h, extract its individual output: `head_h_out = attn_h @ V_h` → [N, d_head]
+2. Run MDL probe on `head_h_out` with `labels_role`
+3. Heads with compression > 1.2x are "structural heads"
+4. C1 uses this to set informed initial gate values
+
+**V-space basis derivation** (for C2):
+1. Extract `V_h = LN(h_in) @ W_V^h` for the target layer's structural heads
+2. Run PCA on V_h → get V-space components
+3. Run MDL probe on V_h projected onto top-k V-components
+4. The validated V-components become C2's gating basis (replacing U_k)
+
+**Attention pattern baseline** (for C3):
+1. Compute mean attention patterns for sentences with clear structural roles
+2. Compute mean attention patterns for structurally ambiguous sentences
+3. The difference is the "structural attention template" that C3's prior should approximate
+
+### Updated data flow with space-transfer
+
+```
+Parts 1-6 outputs
+    │
+    ├── U_k [d, k] in h-space ───── proves structure exists (layer, dim, causal)
+    │
+    ▼
+┌───────────────────────────────┐
+│  SPACE-TRANSFER STEP          │
+│  (new, required before 7c)    │
+│                               │
+│  For each head h at layer L:  │
+│    1. Extract head_h output   │
+│    2. MDL probe → structural? │
+│    3. If yes: PCA on V_h      │
+│       → U_k_V^h [d_v, k_v]   │
+│                               │
+│  Also:                        │
+│    4. Attention pattern avg    │
+│       → structural template   │
+└───────────────┬───────────────┘
+                │
+    ┌───────────┼───────────────┐
+    ▼           ▼               ▼
+   C1          C2              C3
+  (uses       (uses            (uses
+  per-head    U_k_V^h          attn
+  MDL scores) not U_k!)        template)
+```
+
+### Cost estimate for space-transfer
+
+| Operation | Per head? | Cost |
+|-----------|-----------|------|
+| Extract head outputs | Yes × n_heads | ~10s (forward hooks, no backward) |
+| MDL probe per head | Yes × n_heads | ~5s × 12 = 60s |
+| PCA on V_h | Only structural heads | ~2s × ~4 heads = 8s |
+| Attention template | Once | ~5s |
+| **Total** | | **~80s** |
+
+---
+
 ## 4. Subpart Specifications
 
 ### 4a. Build Ontology Vectors
@@ -469,7 +607,11 @@ Which structural components of V are allowed to flow?
 
 ```python
 class ValueSubspaceGovernor:
-    """Gates structural subspace components of V per token."""
+    """Gates structural subspace components of V per token.
+
+    IMPORTANT: Uses U_k_V (V-space basis from space-transfer step),
+    NOT the h-space U_k from Parts 3-5.  See §3b for why.
+    """
 
     def __init__(self, ont_dim: int, subspace_k: int):
         # Per-token gate: ont[i] → which V-subspace dims flow
@@ -477,22 +619,24 @@ class ValueSubspaceGovernor:
 
     def forward(
         self,
-        V: torch.Tensor,              # [batch, seq, d]
-        U_k: torch.Tensor,            # [d, k] structural basis
+        V: torch.Tensor,              # [batch, seq, d_v]
+        U_k_V: torch.Tensor,          # [d_v, k_v] V-SPACE structural basis
         ont_features: torch.Tensor,   # [batch, seq, F]
     ) -> torch.Tensor:
-        gate = torch.sigmoid(self.W_v(ont_features))  # [batch, seq, k]
+        gate = torch.sigmoid(self.W_v(ont_features))  # [batch, seq, k_v]
 
-        # Project V onto structural subspace
-        proj = V @ U_k                     # [batch, seq, k]
-        proj_gated = proj * gate           # [batch, seq, k]
+        # Project V onto its own structural subspace (NOT h-space U_k)
+        proj = V @ U_k_V                   # [batch, seq, k_v]
+        proj_gated = proj * gate           # [batch, seq, k_v]
 
         # Replace: keep V_⊥ unchanged, gate structural component
-        V_governed = V - proj @ U_k.T + proj_gated @ U_k.T
+        V_governed = V - proj @ U_k_V.T + proj_gated @ U_k_V.T
         return V_governed
 ```
 
-**What this tests**: The structural subspace U_k (validated by MDL and causal intervention) carries grammatical role information in V. If the ontology can selectively gate specific subspace dimensions — e.g., suppressing "position encoding" components while preserving "role identity" components — it demonstrates fine-grained governance over information flow.
+**What this tests**: The structural subspace U_k_V (derived by running PCA + MDL on V_h = LN(h) @ W_V in the space-transfer step, §3b) carries grammatical role information *in V's native space*. If the ontology can selectively gate specific V-subspace dimensions — e.g., suppressing "position encoding" components while preserving "role identity" components — it demonstrates fine-grained governance over information flow.
+
+**Why U_k_V and not U_k**: The h-space basis U_k was validated by Parts 3-5 on block/attention output. V lives in a different space (pre-output-projection, pre-residual). Applying U_k to V would project onto arbitrary directions. The space-transfer step (§3b) derives and validates U_k_V in V's own coordinate system.
 
 **Key distinction from Architecture B (hidden-state mask)**: This gates V *within the attention mechanism*, not h between layers. The attention routing (Q·K) is untouched. The ontology controls what information the attention mechanism *delivers*, not what tokens *represent*.
 
