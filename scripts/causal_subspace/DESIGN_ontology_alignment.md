@@ -1,8 +1,48 @@
-# Part 7: Ontology Alignment Validation — Design Document
+# Part 7: Ontology Alignment — Discovery & Validation
 
-**Status**: Draft
+**Status**: Discovery phase
 **Date**: 2026-02-22
 **Depends on**: Parts 1–6 of causal subspace pipeline (validated)
+
+---
+
+## 0. Discovery Framing
+
+We do not yet know how — or whether — an ontological layer should exist. Parts 1–6 proved that the model encodes grammatical structure in a causally load-bearing subspace. Part 7 is a **discovery process** to determine whether external ontological categories have any correspondence to this internal structure, and if so, what the natural interface looks like.
+
+The outcome is one of four scenarios, each leading to a different architecture (or none):
+
+```
+Scenario A: Isomorphic (MI >> 0.3, CKA > 0.8)
+  The model already encodes something that maps cleanly onto human
+  ontological categories.  The "ontological layer" is a LENS, not
+  a mechanism — it labels what the model already does.
+  → Deliverable: interpretability/diagnostic tool.
+  → No governance needed.
+
+Scenario B: Partial Overlap (MI ~ 0.2–0.5, CKA ~ 0.3–0.6)
+  Some ontological categories align with model structure, others
+  don't.  There's a bridge, but it's partial.
+  → Deliverable: governance on the aligned dimensions.
+  → But we need to discover WHICH surface the overlap lives on
+    before committing to an architecture.
+
+Scenario C: Orthogonal (MI < 0.05)
+  The model encodes structure in a way that has no correspondence
+  to human ontological categories.  Its encoding is alien but valid.
+  → Deliverable: NO-GO.  Scientifically informative (proves the model
+    found structure humans didn't name).
+  → No architecture will bridge this.
+
+Scenario D: Complementary (MI low, but ont + H >> H for classification)
+  The ontology captures aspects the model DOESN'T have.  It adds
+  information, not policy.
+  → Deliverable: content injection (Architecture A), not governance.
+  → Honest admission: governance may be wrong, injection may be right.
+  → This contradicts the governance principle but may be the truth.
+```
+
+**The discovery process determines which scenario we're in.  The architecture follows from the evidence, not the other way around.**
 
 ---
 
@@ -13,10 +53,7 @@ Parts 1–6 established that:
 - This subspace is causally load-bearing (12.5% causal success, 28.98x specificity over random)
 - Information crystallizes at middle layers and is consumed downstream
 
-**Part 7 asks**: Can we align an *external ontological structure* with this validated subspace, and can that alignment serve as a governance signal — controlling which computational pathways activate — without injecting content?
-
-If yes → the ontology provides interpretable, steerable control over the model's structural computation.
-If no → the model's structural encoding is self-consistent but opaque to external categorical systems.
+**Part 7 asks**: Does the model's structural encoding have a natural interface to human ontological categories? If so, what is its shape? The answer determines whether an ontological layer is a lens, a governor, an injector, or nothing.
 
 ---
 
@@ -179,7 +216,36 @@ This separation ensures:
 
 ---
 
-## 2. Architecture
+## 2. Two-Phase Structure
+
+Part 7 is split into two phases. Phase 1 is cheap and determines the scenario. Phase 2 depends on Phase 1's outcome.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  PHASE 1: DISCOVERY  (run always, ~2 min)               │
+│                                                         │
+│  7a. Build ontology vectors                             │
+│  7b. Compute alignment metrics (MI, CKA, overlap)       │
+│  7b+. Per-head alignment breakdown                      │
+│  7b+. Discriminability analysis (ont vs embeddings)      │
+│                                                         │
+│  Output: scenario classification (A / B / C / D)        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+          ┌──────────────┼──────────────┬──────────────┐
+          ▼              ▼              ▼              ▼
+      Scenario A     Scenario B     Scenario C     Scenario D
+      Isomorphic     Partial        Orthogonal     Complementary
+          │              │              │              │
+          ▼              ▼              ▼              ▼
+      Phase 2A:      Phase 2B:      STOP.          Phase 2D:
+      Build lens     Governance     Report          Test content
+      (labeling      probe          findings.       injection
+       tool)         (test C1/C2/                   (Architecture A)
+                      C3 surfaces)
+```
+
+### Phase 1 inputs (from existing pipeline)
 
 ```
 Existing pipeline outputs
@@ -196,29 +262,26 @@ Existing pipeline outputs
         │
         ▼
   ┌─────────────────────────────────────────────────┐
-  │  PART 7: Ontology Alignment Validation          │
+  │  PHASE 1: Discovery (always runs)               │
   │                                                 │
   │  7a. Build ontology vectors                     │
   │      ├── WordNet hypernym depth                 │
   │      ├── Animacy / concreteness features        │
   │      └── Dependency-derived role prototypes     │
   │                                                 │
-  │  7b. Compute alignment metrics                  │
-  │      ├── Mutual information (MI)                │
-  │      ├── Projection overlap (subspace angles)   │
-  │      └── CKA similarity                         │
+  │  7b. Alignment measurement                      │
+  │      ├── MI(ontology, subspace projection)      │
+  │      ├── CKA(ontology features, model H)        │
+  │      ├── Per-head alignment breakdown           │
+  │      └── Subspace angle overlap                 │
   │                                                 │
-  │  7c. Simulate ontology governance               │
-  │      ├── C1: Head-level gating (which heads)   │
-  │      ├── C2: V-subspace gating (which info)    │
-  │      ├── C3: Attention prior (which routing)   │
-  │      ├── Measure perplexity impact per surface │
-  │      └── Measure attention entropy change       │
-  │                                                 │
-  │  7d. Ontology discriminability analysis         │
+  │  7c. Discriminability analysis                   │
   │      ├── Classify roles from ontology features  │
-  │      ├── Compare vs model embedding baseline    │
+  │      ├── Classify roles from model embeddings   │
+  │      ├── Classify roles from ont + H (concat)   │
   │      └── Bootstrap confidence intervals         │
+  │                                                 │
+  │  → SCENARIO CLASSIFICATION (A / B / C / D)      │
   └─────────────────────────────────────────────────┘
         │
         ▼
@@ -265,8 +328,8 @@ class OntologyConfig:
 
 
 @dataclass
-class OntologyAlignmentResult:
-    """Output of ontology alignment validation for one layer."""
+class DiscoveryResult:
+    """Output of Phase 1: discovery.  Determines which scenario we're in."""
 
     layer_idx: int
 
@@ -275,42 +338,31 @@ class OntologyAlignmentResult:
     n_words_with_ontology: int = 0      # coverage (words with valid ontology vectors)
     coverage_ratio: float = 0.0         # n_words_with_ontology / total_words
 
-    # 7b: Alignment metrics
+    # 7b: Alignment metrics (global)
     alignment_mi: float = 0.0           # mutual information (nats)
     alignment_mi_normalized: float = 0.0 # MI / min(H(X), H(Y))
     subspace_overlap: float = 0.0       # principal angle cosine (0=orthogonal, 1=aligned)
     cka_similarity: float = 0.0         # centered kernel alignment
 
-    # 7c: Governance simulation (three surfaces)
-    # C1: Head-level gating
-    c1_entropy_delta: float = 0.0       # attention entropy change from head gating
-    c1_perplexity_ratio: float = 0.0    # PPL with head gating / PPL original
-    c1_heads_suppressed: int = 0        # heads with gate < 0.1
+    # 7b+: Per-head alignment breakdown
+    per_head_mi: List[float] = field(default_factory=list)  # [n_heads] MI per head
+    structural_heads: List[int] = field(default_factory=list)  # head indices with MI > threshold
 
-    # C2: Value-subspace gating
-    c2_gate_sparsity: float = 0.0       # fraction of V-subspace gates < 0.1
-    c2_perplexity_ratio: float = 0.0    # PPL with V gating / PPL original
-    c2_role_preservation: float = 0.0   # role accuracy from gated V / original
-
-    # C3: Attention prior
-    c3_attention_mi: float = 0.0        # MI between ont_bias and actual attention
-    c3_perplexity_ratio: float = 0.0    # PPL with attention prior / PPL original
-
-    # Combined
-    combined_perplexity_ratio: float = 0.0  # PPL all surfaces / PPL original
-    combined_entropy_delta: float = 0.0     # entropy change with all surfaces
-
-    # 7d: Discriminability
-    ontology_role_accuracy: float = 0.0 # classify roles from ontology features
-    embedding_role_accuracy: float = 0.0 # classify roles from model embeddings
-    discriminability_gap: float = 0.0   # ontology_acc - embedding_acc
+    # 7c: Discriminability
+    ontology_role_accuracy: float = 0.0 # classify roles from ontology features alone
+    embedding_role_accuracy: float = 0.0 # classify roles from model embeddings alone
+    concat_role_accuracy: float = 0.0   # classify roles from [ont; H] concatenated
+    discriminability_gap: float = 0.0   # concat_acc - embedding_acc (does ontology ADD info?)
     accuracy_ci_low: float = 0.0        # bootstrap CI lower
     accuracy_ci_high: float = 0.0       # bootstrap CI upper
 
-    # GO/NO-GO
-    go_decision: bool = False
-    go_reasons: List[str] = field(default_factory=list)
-    nogo_reasons: List[str] = field(default_factory=list)
+    # Scenario classification
+    scenario: str = ""                  # "A", "B", "C", or "D"
+    scenario_confidence: float = 0.0    # how clearly we fall into one scenario
+    scenario_evidence: List[str] = field(default_factory=list)  # human-readable reasoning
+
+    # What to do next
+    recommended_phase2: str = ""        # "lens", "governance_probe", "stop", "injection_test"
 ```
 
 ---
@@ -877,81 +929,99 @@ if not skip_ontology:
 
 ---
 
-## 7. GO / NO-GO Decision Logic
+## 7. Scenario Classification (Phase 1 output)
+
+Phase 1 produces a `DiscoveryResult` with a scenario classification. This replaces the old GO/NO-GO binary with a four-way routing decision.
 
 ```python
-def evaluate_go_nogo(result: OntologyAlignmentResult) -> OntologyAlignmentResult:
-    """Apply GO/NO-GO decision criteria.
+def classify_scenario(result: DiscoveryResult) -> DiscoveryResult:
+    """Classify which scenario we're in based on Phase 1 measurements.
 
-    The ontology earns GO by demonstrating:
-    1. It aligns with the model's structural subspace (MI)
-    2. It can govern without destroying fluency (PPL)
-    3. At least one governance surface produces measurable structural effect
-    4. It covers enough of the vocabulary to be useful
+    This is the central decision point. Everything downstream follows
+    from this classification.
     """
+    mi = result.alignment_mi
+    cka = result.cka_similarity
+    coverage = result.coverage_ratio
+    ont_acc = result.ontology_role_accuracy
+    emb_acc = result.embedding_role_accuracy
+    concat_acc = result.concat_role_accuracy
+    gap = result.discriminability_gap  # concat_acc - emb_acc
 
-    # --- GO conditions (ALL must hold) ---
-    go_checks = [
-        (result.alignment_mi > 0.3,
-         f"MI = {result.alignment_mi:.3f} > 0.3"),
-        (result.combined_perplexity_ratio < 2.0,
-         f"Combined PPL ratio = {result.combined_perplexity_ratio:.2f} < 2.0"),
-        (result.combined_entropy_delta < 0.0,
-         f"Entropy delta = {result.combined_entropy_delta:.3f} < 0 (more structured)"),
-        (result.coverage_ratio > 0.3,
-         f"Coverage = {result.coverage_ratio:.1%} > 30%"),
-    ]
+    evidence = []
 
-    # --- Per-surface informativeness (at least ONE must show effect) ---
-    surface_active = (
-        result.c1_entropy_delta < -0.01              # head gating sharpens attention
-        or result.c2_gate_sparsity > 0.3             # V-gating is selective
-        or result.c3_attention_mi > 0.1              # attention prior is informative
-    )
-    go_checks.append((
-        surface_active,
-        f"At least one governance surface is active: "
-        f"C1Δ={result.c1_entropy_delta:.3f}, "
-        f"C2sp={result.c2_gate_sparsity:.2f}, "
-        f"C3MI={result.c3_attention_mi:.3f}",
-    ))
+    # --- Low coverage is an immediate problem ---
+    if coverage < 0.1:
+        result.scenario = "C"  # effectively orthogonal if we can't even compute
+        evidence.append(f"Coverage too low ({coverage:.1%}): can't measure alignment")
+        result.recommended_phase2 = "stop"
+        result.scenario_evidence = evidence
+        return result
 
-    # --- Hard NO-GO conditions (ANY triggers) ---
-    nogo_checks = [
-        (result.alignment_mi < 0.05,
-         f"MI ≈ 0 ({result.alignment_mi:.4f}): ontology orthogonal to model"),
-        (result.combined_perplexity_ratio > 5.0,
-         f"PPL ratio = {result.combined_perplexity_ratio:.1f}: governance destroys fluency"),
-        (result.coverage_ratio < 0.1,
-         f"Coverage = {result.coverage_ratio:.1%}: ontology covers too few words"),
-        # Any single surface catastrophically destroys fluency
-        (max(result.c1_perplexity_ratio, result.c2_perplexity_ratio,
-             result.c3_perplexity_ratio) > 10.0,
-         "A single governance surface causes PPL > 10x: architecture mismatch"),
-    ]
+    # --- Scenario A: Isomorphic ---
+    # High MI + high CKA = model already encodes something ontology-like
+    if mi > 0.5 and cka > 0.6:
+        result.scenario = "A"
+        evidence.append(f"MI={mi:.3f} >> 0.3 and CKA={cka:.3f} > 0.6: strong alignment")
+        evidence.append("Model's structural encoding maps cleanly onto ontological categories")
+        result.recommended_phase2 = "lens"
+        result.scenario_confidence = min(mi / 0.5, cka / 0.6, 1.0)
 
-    result.go_reasons = [msg for ok, msg in go_checks if ok]
-    result.nogo_reasons = [msg for triggered, msg in nogo_checks if triggered]
+    # --- Scenario C: Orthogonal ---
+    # Near-zero MI = no correspondence
+    elif mi < 0.05:
+        result.scenario = "C"
+        evidence.append(f"MI={mi:.4f} ≈ 0: ontology is orthogonal to model encoding")
+        if ont_acc > 0.4:
+            evidence.append(f"But ontology CAN predict roles ({ont_acc:.1%}) — "
+                          "the model just doesn't use these features")
+        result.recommended_phase2 = "stop"
+        result.scenario_confidence = 1.0 - mi / 0.05
 
-    # GO requires all go_checks pass AND no hard nogo triggered
-    all_go = all(ok for ok, _ in go_checks)
-    any_nogo = any(triggered for triggered, _ in nogo_checks)
-    result.go_decision = all_go and not any_nogo
+    # --- Scenario D: Complementary ---
+    # Low MI but ontology ADDS info beyond what model has
+    elif mi < 0.2 and gap > 0.05 and concat_acc > emb_acc + 0.03:
+        result.scenario = "D"
+        evidence.append(f"MI={mi:.3f} is low but concat accuracy ({concat_acc:.1%}) "
+                      f"> embedding accuracy ({emb_acc:.1%}) by {gap:.1%}")
+        evidence.append("Ontology captures information the model DOESN'T have")
+        evidence.append("This suggests content injection, not governance")
+        result.recommended_phase2 = "injection_test"
+        result.scenario_confidence = gap / 0.1
 
+    # --- Scenario B: Partial overlap ---
+    else:
+        result.scenario = "B"
+        evidence.append(f"MI={mi:.3f}, CKA={cka:.3f}: partial alignment")
+        if result.structural_heads:
+            evidence.append(f"Structural heads: {result.structural_heads} "
+                          "(MI varies across heads)")
+        evidence.append("Some ontological categories align, others don't")
+        result.recommended_phase2 = "governance_probe"
+        result.scenario_confidence = mi / 0.5
+
+    result.scenario_evidence = evidence
     return result
 ```
 
 **Decision matrix**:
 
-| Scenario | MI | Combined PPL | Surface active? | Coverage | Decision |
-|----------|-----|-------------|-----------------|----------|----------|
-| Strong alignment | > 0.3 | < 2.0 | Yes | > 30% | **GO** |
-| Weak alignment | 0.05–0.3 | < 2.0 | Yes | > 30% | INVESTIGATE |
-| Aligned but inert | > 0.3 | < 2.0 | No | > 30% | INVESTIGATE |
-| Orthogonal | < 0.05 | any | any | any | **NO-GO** |
-| Destructive | any | > 5.0 | any | any | **NO-GO** |
-| Low coverage | any | any | any | < 10% | **NO-GO** |
-| Surface catastrophe | any | any | PPL > 10x on one | any | **NO-GO** |
+| Metrics | Scenario | Meaning | Phase 2 |
+|---------|----------|---------|---------|
+| MI > 0.5, CKA > 0.6 | **A: Isomorphic** | Model already "knows" the ontology | Build interpretability lens |
+| MI 0.2–0.5, CKA 0.3–0.6 | **B: Partial overlap** | Some categories align | Probe governance surfaces |
+| MI < 0.05 | **C: Orthogonal** | No correspondence | Stop. Report findings. |
+| MI < 0.2, concat >> emb | **D: Complementary** | Ontology adds new info | Test content injection |
+
+### What each Phase 2 looks like
+
+**Phase 2A (Lens)**: No intervention needed. Build a mapping from subspace directions to ontological labels. Deliverable: visualization/diagnostic tool that labels what each PCA direction "means" in ontological terms.
+
+**Phase 2B (Governance probe)**: Test C1/C2/C3 surfaces on the dimensions where alignment exists. Use the space-transfer step (§3b) to derive per-head and V-space bases. This is the only scenario where the governance architecture from §1b applies. See §4c for details.
+
+**Phase 2C (Stop)**: Document findings. The model's structural encoding is real (Parts 3-5 proved it) but alien to human ontological categories. This is scientifically interesting — it means the model found structure humans didn't name.
+
+**Phase 2D (Injection test)**: Test Architecture A (content injection: K_eff = K + W_ont @ ont). This contradicts the governance principle, but if the evidence points here, we should follow the evidence. If injection helps, the ontology's value is as a content source, not a policy layer.
 
 ---
 
