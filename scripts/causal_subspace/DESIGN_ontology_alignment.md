@@ -1,8 +1,50 @@
-# Part 7: Ontology Alignment Validation — Design Document
+# Part 7: Ontology Alignment — Discovery & Validation
 
-**Status**: Draft
+**Status**: Discovery phase
 **Date**: 2026-02-22
 **Depends on**: Parts 1–6 of causal subspace pipeline (validated)
+
+---
+
+## 0. Discovery Framing
+
+We do not yet know how — or whether — an ontological layer should exist. Parts 1–6 proved that the model encodes grammatical structure in a causally load-bearing subspace. Part 7 is a **discovery process** that answers two questions:
+
+1. **Do the model's internal structural directions correspond to nameable ontological axes?** (The "naming ceremony" question)
+2. **If yes, which architecture should the ontological layer use?** (Two candidates)
+
+### The Naming Ceremony Problem
+
+We propose 12 ontological axes (abstraction level, semantic density, concreteness, agency, temporal anchoring, etc.). PCA gives us k structural directions. Just because we *label* PCA axis 3 "concreteness" doesn't make it true. The label is only valid if MI(axis_3, concreteness_rating) is high.
+
+Phase 1 measures per-axis MI to determine which of the 12 proposed labels survive contact with the data. Maybe 4 of 12 survive. Maybe 11. Maybe 0. The number N of validated axes determines everything downstream.
+
+### Four Scenarios
+
+```
+Scenario A: Isomorphic (MI >> 0.3, CKA > 0.6, N ≥ 8 axes validated)
+  The model already encodes something that maps onto our proposed
+  ontological categories.  Both architectures are viable.
+  → Phase 2: Build both, benchmark.
+
+Scenario B: Partial Overlap (MI 0.15–0.5, CKA 0.3–0.6, N = 3–7 axes)
+  Some axes correspond, others don't.  There's a bridge, but it's
+  partial.  The surviving axes define the ontological space.
+  → Phase 2: Meta-controller (Option 1) on surviving axes.
+    Q/K gating (Option 2) is risky with few axes.
+
+Scenario C: Orthogonal (MI < 0.05, N ≤ 2 axes)
+  The model encodes structure in a way that has no correspondence
+  to our proposed categories.  Its encoding is alien but valid.
+  → Phase 2: STOP.  Report findings.
+  → Fall back to whatever PCA gives us (unlabeled but real).
+
+Scenario D: Complementary (MI low, but ont + H >> H for classification)
+  The ontology captures aspects the model DOESN'T have.
+  → Phase 2: Content injection (the ontology adds info, not policy).
+```
+
+**The discovery process determines which scenario we're in. The architecture follows from the evidence, not the other way around.**
 
 ---
 
@@ -13,648 +55,452 @@ Parts 1–6 established that:
 - This subspace is causally load-bearing (12.5% causal success, 28.98x specificity over random)
 - Information crystallizes at middle layers and is consumed downstream
 
-**Part 7 asks**: Can we align an *external ontological structure* with this validated subspace, and can that alignment serve as a gating signal that improves or controls model behavior?
-
-If yes → the ontology provides interpretable, steerable handles on the model's internal representations.
-If no → the model's structural encoding is self-consistent but opaque to external categorical systems.
+**Part 7 asks**: Do the model's structural PCA directions correspond to human-nameable ontological properties? If so, which architecture should exploit that correspondence?
 
 ---
 
-## 2. Architecture
+## 1b. Two Candidate Architectures
+
+Discovery (Phase 1) determines the scenario. If the scenario supports an ontological layer, two architectures compete:
+
+### Option 1: Parallel Latent State (Meta-Controller)
+
+The ontology lives **outside** the transformer. At each reasoning step, an encoder reads hidden states and emits an N-dimensional ontological state vector. This vector governs system-level decisions.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │  Hidden states H[layer]  ──→  Ontology Encoder  ──→  z_ont ∈ R^N  │
+  │                                  (frozen H,                        │
+  │                                   trained encoder)                 │
+  │                                                                    │
+  │  z_ont governs:                                                    │
+  │    • decoding temperature                                          │
+  │    • critique loop triggering                                      │
+  │    • tool use routing                                              │
+  │    • recursion depth                                               │
+  │    • confidence calibration                                        │
+  │                                                                    │
+  │  The transformer remains untouched.                                │
+  │  Ontology is a meta-controller, not a structural constraint.       │
+  └──────────────────────────────────────────────────────────┘
+
+  Pros:                              Cons:
+  • Does not destabilize training    • Labels may be aspirational
+  • No gradient flow interference    • Controller may learn useful
+  • No attention math rewriting        features that don't correspond
+  • Compatible with orchestration      to the named axes
+    patterns (OpenAI policy layers,  • Technically "orchestration",
+    Anthropic constitutional layer)    not "ontological"
+  • Safest, cleanest direction       • Naming ceremony risk: 12-D
+                                       controller with fake labels
+```
+
+### Option 2: Q/K Dimension Gating (Structural Constraint)
+
+The ontology lives **inside** attention. Each token activates a subset of Q/K dimensions based on its ontological type. This is a type-system constraint on attention.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │  For each token i with ontological type o_i:             │
+  │                                                          │
+  │    gate = σ(W_gate @ o_i)    ∈ [0,1]^d_head             │
+  │    q'_i = q_i ⊙ gate                                    │
+  │    k'_i = k_i ⊙ gate                                    │
+  │                                                          │
+  │  Effect: tokens of different ontological types attend     │
+  │  through different dimension subsets. Like a type system  │
+  │  for attention — agents attend via "agency dimensions",   │
+  │  locations via "spatial dimensions", etc.                 │
+  │                                                          │
+  │  Key invariant: gate → 1 recovers original model.        │
+  └──────────────────────────────────────────────────────────┘
+
+  Pros:                              Cons:
+  • Elegant, principled              • Hard to validate
+  • No n² mask                       • Hard to prove benefit
+  • Structural constraint is real    • Risk of capacity suppression
+  • Type-system-like                   (gating out dimensions loses
+  • Publishable if it works            expressivity in small models)
+                                     • Needs large model
+```
+
+### Which option for which scenario
+
+| Scenario | N axes | Option 1 (Meta-controller) | Option 2 (Q/K Gating) |
+|----------|--------|---------------------------|----------------------|
+| A: Isomorphic | ≥ 8 | Yes (full 12-D controller) | Yes (rich type system) |
+| B: Partial | 3–7 | Yes (N-D controller) | Risky (too few axes) |
+| C: Orthogonal | ≤ 2 | No | No |
+| D: Complementary | — | No (needs injection) | No (needs injection) |
+
+### The L0/L2 Dissociation: READ vs ACT layers
+
+Empirical finding from Parts 4–5: structure can peak at one layer (crystallization, high MDL compression) while causal effect peaks at a different layer (high intervention success rate). In our results:
+
+```
+L0: MDL compression = 1.53x (peak)     ← structure is ENCODED here
+L2: Causal success  = 25%   (peak)     ← structure is CONSUMED here
+```
+
+This means the ontological layer cannot simply "operate at the crystallization layer." It must **read** from where structure is richest and **act** where structure is causally load-bearing.
+
+```
+Option 1 (Meta-controller):
+  READ from L0 (where ontological alignment is strongest)
+  │
+  ├─→ z_ont ∈ R^N  (ontological state vector)
+  │
+  ACT at L2 (where causal effect peaks)
+  └─→ governs temperature, routing, confidence at L2 decisions
+
+Option 2 (Q/K Gating):
+  OPERATE at L2 (where attention routing matters)
+  │
+  └─→ gate(o) modulates Q/K at the layer where the model
+      actually uses structural information for attention
+```
+
+The 4.40x swap/ablation ratio confirms that *direction* in the subspace encodes role identity — different roles use different directions. This is exactly what Q/K gating would exploit: ontological type determines which dimensions of Q and K participate in attention.
+
+The 28.98x specificity gives the naming ceremony high-SNR signal to work with. If any of the 12 axes correspond to real model directions, the MI should be detectable.
+
+**Implementation**: `run_multi_layer_discovery()` runs Phase 1 at both layers, identifies the dissociation, and routes each architecture to the appropriate layer(s).
+
+---
+
+## 2. Two-Phase Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  PHASE 1: DISCOVERY  (always runs, ~2 min)                   │
+│                                                               │
+│  7a. Define 12 proposed ontological axes                      │
+│  7b. Build per-axis feature vectors from annotations          │
+│  7c. Naming ceremony: MI(each axis, each PCA direction)       │
+│  7d. Global alignment (MI, CKA, subspace overlap)             │
+│  7e. Discriminability (ont vs H vs concat)                    │
+│  7f. Scenario classification (A / B / C / D)                  │
+│                                                               │
+│  Output: N validated axes, scenario, recommended Phase 2      │
+└────────────────────────┬──────────────────────────────────────┘
+                         │
+          ┌──────────────┼──────────────┬──────────────┐
+          ▼              ▼              ▼              ▼
+      Scenario A     Scenario B     Scenario C     Scenario D
+      N ≥ 8 axes     N = 3–7        N ≤ 2          ont adds info
+          │              │              │              │
+          ▼              ▼              ▼              ▼
+      Phase 2:       Phase 2:       STOP.          Phase 2:
+      Build both     Option 1       Report          Content
+      Option 1 +     (meta-ctrl     findings.       injection
+      Option 2       on surviving                   test
+                     axes)
+```
+
+### Phase 1 inputs (from existing pipeline)
 
 ```
 Existing pipeline outputs
     │
-    ├── store.states[layer]            # [N_tok, d]   raw hidden states
-    ├── store.attention_entropy[layer]  # [N_tok, H]   per-head entropy
-    ├── annotations.hidden_states[layer]# [N_w, d]     word-level states
-    ├── annotations.labels_role         # [N_w]        grammatical roles
-    ├── best_pca_basis                  # [d, k]       MDL-validated basis
-    ├── disentanglement.sae_features    # [N_w, s]     sparse features
-    ├── disentanglement.cluster_labels  # [N_w]        contextual clusters
-    ├── trajectory.crystallization_layer# int
-    └── trajectory.consumption_layer    # int
-        │
-        ▼
-  ┌─────────────────────────────────────────────────┐
-  │  PART 7: Ontology Alignment Validation          │
-  │                                                 │
-  │  7a. Build ontology vectors                     │
-  │      ├── WordNet hypernym depth                 │
-  │      ├── Animacy / concreteness features        │
-  │      └── Dependency-derived role prototypes     │
-  │                                                 │
-  │  7b. Compute alignment metrics                  │
-  │      ├── Mutual information (MI)                │
-  │      ├── Projection overlap (subspace angles)   │
-  │      └── CKA similarity                         │
-  │                                                 │
-  │  7c. Simulate ontology-gated inference          │
-  │      ├── Fit lightweight gate on frozen acts    │
-  │      ├── Measure perplexity impact              │
-  │      └── Measure attention entropy change       │
-  │                                                 │
-  │  7d. Ontology discriminability analysis         │
-  │      ├── Classify roles from ontology features  │
-  │      ├── Compare vs model embedding baseline    │
-  │      └── Bootstrap confidence intervals         │
-  └─────────────────────────────────────────────────┘
-        │
-        ▼
-  GO / NO-GO decision (see §7)
+    ├── annotations.hidden_states[layer]  # [N_w, d]   word-level states
+    ├── annotations.labels_role           # [N_w]      grammatical roles
+    ├── annotations.words                 # List[WordAnnotation]
+    ├── best_pca_basis                    # [d, k]     MDL-validated basis
+    ├── trajectory.crystallization_layer  # int
+    └── store.attention_entropy[layer]    # [N_tok, H] per-head entropy
 ```
 
 ---
 
-## 3. Module Design
+## 3. The 12 Proposed Ontological Axes
 
-### 3.1 File: `ontology_alignment.py`
+Each axis is a scalar property computable from word annotations, dependency parse, or hidden states. The naming ceremony validates which ones correspond to real model directions.
 
-New module alongside existing pipeline components.
+| # | Axis | Source | Computation |
+|---|------|--------|-------------|
+| 0 | **Abstraction level** | WordNet hypernym depth | depth(synset) / max_depth; 0=entity, 1=most specific |
+| 1 | **Concreteness** | Brysbaert norms or POS heuristic | 1–5 rating, normalized to [0,1] |
+| 2 | **Animacy** | WordNet hypernym chain | 1 if chain includes "organism", else 0 |
+| 3 | **Agency** | dep_relation + animacy | 1 if nsubj AND animate, graded otherwise |
+| 4 | **Temporal anchoring** | Verb tense / dep type | 1 for past, 0.5 for present, 0 for non-verb |
+| 5 | **Structural depth** | dep_depth from Part 2 | depth / max_depth, normalized |
+| 6 | **Information density** | Token surprisal proxy | 1/freq(word) normalized; rare = dense |
+| 7 | **Relational role** | Grammatical role from Part 2 | One-hot → softmax distance to role centroids |
+| 8 | **Modificational load** | Count of modifiers | n_dependents / max_dependents |
+| 9 | **Semantic specificity** | WordNet synset count | 1/n_synsets; fewer senses = more specific |
+| 10 | **Positional salience** | Position in sentence | (position / sent_length), captures SVO order |
+| 11 | **Categorical type** | POS tag | Compressed: noun=0, verb=0.33, adj=0.67, other=1.0 |
+
+**Total**: 12 axes → `ont_features ∈ R^{N_w × 12}`
+
+**Key difference from old design**: The old design used a 51-dimensional kitchen-sink vector (WordNet lex files, one-hot POS, etc.). The new design uses 12 **named, individually measurable** axes. Each axis is a single scalar with a clear semantic interpretation. This makes the naming ceremony possible — we can check each axis individually.
+
+---
+
+## 4. Phase 1 Implementation
+
+### 4a. Config and Result Dataclasses
 
 ```python
-# scripts/causal_subspace/ontology_alignment.py
-
 @dataclass
 class OntologyConfig:
-    """Configuration for ontology alignment validation."""
-
-    # Ontology vector construction
-    use_wordnet: bool = True
-    use_concreteness: bool = True
-    use_role_prototypes: bool = True
-    prototype_n_samples: int = 100      # samples per role for prototype
-
-    # Alignment metrics
-    mi_n_bins: int = 20                 # bins for MI estimation
-    cka_kernel: str = "linear"          # "linear" or "rbf"
-
-    # Gating simulation
-    gate_lr: float = 1e-3
-    gate_epochs: int = 30
-    gate_batch_size: int = 256
-    gate_hidden_dim: int = 64           # small MLP for gating
-
-    # Discriminability
+    mi_n_bins: int = 20
+    cka_kernel: str = "linear"
     n_bootstrap: int = 200
     bootstrap_ci: float = 0.95
-
+    naming_mi_threshold: float = 0.1    # axis survives if MI > this
     device: str = "cpu"
     seed: int = 42
 
+AXIS_NAMES = [
+    "abstraction_level", "concreteness", "animacy", "agency",
+    "temporal_anchoring", "structural_depth", "information_density",
+    "relational_role", "modificational_load", "semantic_specificity",
+    "positional_salience", "categorical_type",
+]
 
 @dataclass
-class OntologyAlignmentResult:
-    """Output of ontology alignment validation for one layer."""
-
+class DiscoveryResult:
     layer_idx: int
 
-    # 7a: Ontology vectors
-    ontology_dim: int = 0               # dimensionality of ontology feature space
-    n_words_with_ontology: int = 0      # coverage (words with valid ontology vectors)
-    coverage_ratio: float = 0.0         # n_words_with_ontology / total_words
+    # 7b: Per-axis features
+    ontology_dim: int = 12
+    n_words_with_ontology: int = 0
+    coverage_ratio: float = 0.0
 
-    # 7b: Alignment metrics
-    alignment_mi: float = 0.0           # mutual information (nats)
-    alignment_mi_normalized: float = 0.0 # MI / min(H(X), H(Y))
-    subspace_overlap: float = 0.0       # principal angle cosine (0=orthogonal, 1=aligned)
-    cka_similarity: float = 0.0         # centered kernel alignment
+    # 7c: Naming ceremony (per-axis MI with each PCA direction)
+    per_axis_mi: Dict[str, float]         # axis_name → max MI with any PCA dir
+    per_axis_best_pca: Dict[str, int]     # axis_name → which PCA dir it maps to
+    n_validated_axes: int = 0             # how many axes pass MI threshold
+    validated_axes: List[str]             # names of surviving axes
 
-    # 7c: Gating simulation
-    gated_perplexity_ratio: float = 0.0 # patched_ppl / original_ppl
-    gated_entropy_delta: float = 0.0    # mean(entropy_gated - entropy_original)
-    gate_sparsity: float = 0.0          # fraction of gate values < 0.1
+    # 7d: Global alignment
+    alignment_mi: float = 0.0
+    alignment_mi_normalized: float = 0.0
+    subspace_overlap: float = 0.0
+    cka_similarity: float = 0.0
 
-    # 7d: Discriminability
-    ontology_role_accuracy: float = 0.0 # classify roles from ontology features
-    embedding_role_accuracy: float = 0.0 # classify roles from model embeddings
-    discriminability_gap: float = 0.0   # ontology_acc - embedding_acc
-    accuracy_ci_low: float = 0.0        # bootstrap CI lower
-    accuracy_ci_high: float = 0.0       # bootstrap CI upper
+    # 7e: Discriminability
+    ontology_role_accuracy: float = 0.0
+    embedding_role_accuracy: float = 0.0
+    concat_role_accuracy: float = 0.0
+    discriminability_gap: float = 0.0
+    accuracy_ci_low: float = 0.0
+    accuracy_ci_high: float = 0.0
 
-    # GO/NO-GO
-    go_decision: bool = False
-    go_reasons: List[str] = field(default_factory=list)
-    nogo_reasons: List[str] = field(default_factory=list)
+    # 7f: Scenario classification
+    scenario: str = ""
+    scenario_confidence: float = 0.0
+    scenario_evidence: List[str]
+    recommended_phase2: str = ""
 ```
 
----
-
-## 4. Subpart Specifications
-
-### 4a. Build Ontology Vectors
-
-**Goal**: Construct a feature vector `ont[i] ∈ R^F` for each word `i` in the annotated corpus, encoding external ontological properties.
-
-**Feature sources** (concatenated into a single vector per word):
-
-| Feature | Dim | Source | Description |
-|---------|-----|--------|-------------|
-| WordNet hypernym depth | 1 | NLTK WordNet | Depth of most common synset in hypernym tree (0=entity, higher=specific) |
-| WordNet lexicographer file | 26 | NLTK WordNet | One-hot over lex file categories (noun.animal, verb.motion, etc.) |
-| Concreteness rating | 1 | Brysbaert et al. 2014 norms | 1–5 scale (abstract→concrete). Fallback: 3.0 |
-| Animacy | 1 | WordNet "entity→organism" path | Binary: is the word's hypernym chain animate? |
-| POS tag | ~17 | spaCy or heuristic | One-hot over Universal POS tags |
-| Role prototype distance | 5 | Computed from Part 2 labels | Euclidean distance from mean hidden state of each grammatical role |
-
-**Total ontology dimension**: F ≈ 51 (exact depends on POS tag set and WordNet coverage)
-
-**Implementation**:
+### 4b. Build 12-Axis Ontology Vectors
 
 ```python
 def build_ontology_vectors(
     annotations: StructuralAnnotations,
-    H: np.ndarray,                       # [N_w, d] hidden states at target layer
-    labels: np.ndarray,                  # [N_w] role labels
-    cfg: OntologyConfig,
+    H: np.ndarray,           # [N_w, d]
+    labels: np.ndarray,       # [N_w]
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Build ontology feature vectors for annotated words.
+    """Build 12-axis ontology feature vectors.
 
     Returns
     -------
-    ont_features : np.ndarray [N_w, F]
-        Ontology feature vectors.  NaN rows for words without coverage.
+    ont_features : np.ndarray [N_w, 12]
     valid_mask : np.ndarray [N_w] bool
-        True where ontology features are available.
     """
 ```
 
-**Key design decisions**:
-- Words not in WordNet (function words, subword artifacts) get NaN → excluded from MI computation
-- Role prototype distances are computed from the same layer's hidden states, creating a bridge between model space and ontology space
-- All features are standardized (zero mean, unit variance) before alignment computation
+Each axis is computed independently. Words missing WordNet coverage get NaN for axes 0, 1, 2, 9. All other axes are always computable from parse/position info. A word is valid if ≥ 8 of 12 axes have values.
 
-### 4b. Compute Alignment Metrics
-
-Three complementary measures, each capturing a different aspect of alignment:
-
-#### Mutual Information (MI)
-
-Measures statistical dependence between ontology-predicted role and model-subspace-predicted role.
+### 4c. Naming Ceremony
 
 ```python
-def compute_alignment_mi(
-    ont_features: np.ndarray,    # [N, F]
-    H_proj: np.ndarray,          # [N, k]  (H projected onto U_k)
-    labels: np.ndarray,          # [N]     ground-truth roles
-    n_bins: int = 20,
-) -> Tuple[float, float]:
-    """Compute MI between ontology features and subspace projections.
+def run_naming_ceremony(
+    ont_features: np.ndarray,    # [N, 12]
+    H_proj: np.ndarray,          # [N, k]  (H @ U_k)
+    threshold: float = 0.1,
+) -> Tuple[Dict[str, float], Dict[str, int], List[str]]:
+    """For each of the 12 axes, compute MI with each PCA direction.
 
-    Strategy:
-    1. Discretize both ont_features and H_proj into bins
-    2. Compute MI(ont_binned; H_proj_binned)  (direct MI)
-    3. Also compute MI(ont_pred_role; subspace_pred_role)
-       where predictions come from k-NN or linear probe
+    Returns (per_axis_mi, per_axis_best_pca, validated_axes).
 
-    Returns (mi_raw, mi_normalized).
+    per_axis_mi[axis_name] = max over PCA dirs of MI(axis, pca_dir)
+    per_axis_best_pca[axis_name] = argmax PCA dir
+    validated_axes = [name for name in AXIS_NAMES if per_axis_mi[name] > threshold]
     """
 ```
 
-**Threshold**: MI > 0.3 nats for GO (this is substantial — random is ~0.0, perfect alignment is ~log(5) ≈ 1.6 nats for 5 roles).
+This is the critical step. If MI("concreteness", pca_dir_3) = 0.45 but MI("concreteness", pca_dir_j) < 0.05 for all j ≠ 3, then PCA direction 3 IS "concreteness" (validated). If MI("agency", pca_dir_j) < 0.05 for ALL j, then "agency" is not a real axis in this model (rejected).
 
-#### Subspace Overlap (Principal Angles)
+### 4d. Global Alignment Metrics
 
-Measures geometric alignment between the ontology feature subspace and the model's structural subspace.
+Same as before: MI, CKA, subspace overlap. But now computed on the N validated axes only (not the rejected ones).
 
-```python
-def compute_subspace_overlap(
-    ont_features: np.ndarray,    # [N, F]
-    U_k: np.ndarray,             # [d, k]  structural basis
-    H: np.ndarray,               # [N, d]  hidden states
-) -> float:
-    """Compute principal angle overlap.
+### 4e. Discriminability
 
-    Strategy:
-    1. PCA on ont_features → O_k ∈ R^{F × k_ont}  (ontology subspace)
-    2. Project H onto both U_k and O_k
-    3. Compute canonical correlations between projections
-    4. Return mean cosine of principal angles
+Same three-way comparison (ont vs H vs concat), but using only validated axes.
 
-    Result ∈ [0, 1]: 0 = orthogonal, 1 = perfectly aligned.
-    """
-```
-
-#### CKA Similarity
-
-Centered Kernel Alignment — measures representational similarity between two representation matrices regardless of dimensionality.
+### 4f. Scenario Classification
 
 ```python
-def compute_cka(
-    X: np.ndarray,    # [N, d1]  (model subspace projections)
-    Y: np.ndarray,    # [N, d2]  (ontology features)
-    kernel: str = "linear",
-) -> float:
-    """Linear or RBF CKA between two representation matrices.
+def classify_scenario(result: DiscoveryResult) -> DiscoveryResult:
+    N = result.n_validated_axes
+    mi = result.alignment_mi
+    cka = result.cka_similarity
+    gap = result.discriminability_gap
 
-    CKA ∈ [0, 1]: 1 = identical representational structure.
-    """
-```
-
-### 4c. Simulate Ontology-Gated Inference
-
-**Goal**: Test whether an ontology-derived gating signal can modulate model behavior meaningfully without destroying fluency.
-
-**Gating mechanism**: A small MLP that takes ontology features and outputs a gate vector in the structural subspace.
-
-```
-ont_features [F] → MLP(F, hidden, k) → σ(·) → gate [k] ∈ [0, 1]^k
-
-h_gated = h - U_k @ U_k^T @ h + U_k @ diag(gate) @ U_k^T @ h
-```
-
-This selectively scales each structural subspace component based on ontology-derived features. When `gate[i] = 1.0`, the component passes through unchanged. When `gate[i] = 0.0`, the component is ablated.
-
-**Training objective**: The gate MLP is trained to minimize a combination of:
-1. **Role prediction loss**: Cross-entropy on grammatical role prediction from gated activations (encourages the gate to preserve role-discriminative information)
-2. **Sparsity penalty**: L1 on gate values (encourages selective gating)
-3. **Reconstruction penalty**: MSE between gated and original activations (prevents catastrophic perturbation)
-
-```python
-L = L_role(gate) + λ_sparse * ||gate||_1 + λ_recon * ||h_gated - h||^2
-```
-
-**Evaluation** (on held-out words, no gradient):
-
-| Metric | Computation | GO threshold |
-|--------|-------------|--------------|
-| Perplexity ratio | Run gated activations through remaining layers, compute PPL ratio | < 2.0 |
-| Attention entropy delta | Compare attention entropy at subsequent layers with/without gating | Negative (entropy drops = more structured attention) |
-| Gate sparsity | Fraction of gate dimensions consistently < 0.1 | > 0.3 (some components are unused → parsimony) |
-
-**Implementation**:
-
-```python
-@dataclass
-class GateSimulator:
-    """Lightweight MLP that maps ontology features to subspace gates."""
-    mlp: nn.Module          # F → hidden → k, with sigmoid output
-    U_k: torch.Tensor       # [d, k] structural basis
-
-    def forward(self, h: torch.Tensor, ont: torch.Tensor) -> torch.Tensor:
-        """Apply ontology gate to hidden state.
-
-        Parameters
-        ----------
-        h : [batch, d]   hidden state at target layer
-        ont : [batch, F]  ontology features for these words
-
-        Returns
-        -------
-        h_gated : [batch, d]
-        """
-        gate = torch.sigmoid(self.mlp(ont))       # [batch, k]
-        proj = self.U_k.T @ h.unsqueeze(-1)       # [batch, k, 1]
-        proj_gated = proj * gate.unsqueeze(-1)     # [batch, k, 1]
-        h_gated = h - (self.U_k @ proj).squeeze(-1) + (self.U_k @ proj_gated).squeeze(-1)
-        return h_gated
-
-
-def simulate_gated_inference(
-    model: nn.Module,
-    store: HiddenStateStore,
-    annotations: StructuralAnnotations,
-    ont_features: np.ndarray,
-    U_k: np.ndarray,
-    target_layer: int,
-    cfg: OntologyConfig,
-) -> Dict[str, float]:
-    """Train gate MLP and measure impact on model behavior.
-
-    Returns dict with:
-        perplexity_ratio, entropy_delta, gate_sparsity,
-        role_accuracy_gated, gate_weights (for inspection).
-    """
-```
-
-**Critical constraint**: The model is frozen. Only the gate MLP (tiny — ~F*hidden + hidden*k ≈ 51*64 + 64*16 ≈ 4.3K parameters) is trained. This ensures we're measuring alignment, not fine-tuning.
-
-### 4d. Ontology Discriminability Analysis
-
-**Goal**: Determine whether ontology features carry *additional* information about grammatical roles beyond what model embeddings provide.
-
-```python
-def measure_discriminability(
-    ont_features: np.ndarray,    # [N, F]
-    H: np.ndarray,               # [N, d]
-    labels: np.ndarray,          # [N] role labels
-    n_bootstrap: int = 200,
-) -> Dict[str, float]:
-    """Compare role classification accuracy: ontology features vs model embeddings.
-
-    Strategy:
-    1. Linear probe (logistic regression) on ont_features → labels
-    2. Linear probe on H (raw model embeddings) → labels
-    3. Linear probe on [ont_features; H] (concatenated) → labels
-    4. Bootstrap all three to get confidence intervals
-
-    If concat > max(ont, H), ontology adds complementary information.
-    If ont ≈ H, ontology encodes redundant (but interpretable) features.
-    If ont << H, ontology is not useful.
-    """
-```
-
----
-
-## 5. Integration with `run_pipeline.py`
-
-```python
-# After Part 6 (trajectory), before Final Report:
-
-# ===================================================================
-# PART 7: Ontology Alignment Validation (GO/NO-GO)
-# ===================================================================
-if not skip_ontology:
-    print("\n" + "=" * 70)
-    print("PART 7: ONTOLOGY ALIGNMENT VALIDATION")
-    print("=" * 70)
-
-    ont_cfg = OntologyConfig(device=device, seed=seed)
-    cryst_layer = trajectory.crystallization_layer
-
-    # Target the crystallization layer — where structural info peaks
-    H = annotations.hidden_states[cryst_layer]
-    labels = annotations.labels_role
-
-    # 7a: Build ontology vectors
-    ont_features, valid_mask = build_ontology_vectors(
-        annotations, H, labels, ont_cfg,
-    )
-    H_valid = H[valid_mask]
-    labels_valid = labels[valid_mask]
-    ont_valid = ont_features[valid_mask]
-
-    # 7b: Alignment metrics
-    U_k = best_pca_basis  # from Part 4 (MDL-validated)
-    H_proj = H_valid @ U_k  # project onto structural subspace
-
-    mi_raw, mi_norm = compute_alignment_mi(
-        ont_valid, H_proj, labels_valid, ont_cfg.mi_n_bins,
-    )
-    overlap = compute_subspace_overlap(ont_valid, U_k, H_valid)
-    cka = compute_cka(H_proj, ont_valid, ont_cfg.cka_kernel)
-
-    # 7c: Gating simulation
-    gate_results = simulate_gated_inference(
-        model, store, annotations, ont_features,
-        U_k, cryst_layer, ont_cfg,
-    )
-
-    # 7d: Discriminability
-    disc_results = measure_discriminability(
-        ont_valid, H_valid, labels_valid, ont_cfg.n_bootstrap,
-    )
-
-    # Assemble result
-    ont_result = OntologyAlignmentResult(
-        layer_idx=cryst_layer,
-        ontology_dim=ont_valid.shape[1],
-        n_words_with_ontology=int(valid_mask.sum()),
-        coverage_ratio=float(valid_mask.mean()),
-        alignment_mi=mi_raw,
-        alignment_mi_normalized=mi_norm,
-        subspace_overlap=overlap,
-        cka_similarity=cka,
-        gated_perplexity_ratio=gate_results["perplexity_ratio"],
-        gated_entropy_delta=gate_results["entropy_delta"],
-        gate_sparsity=gate_results["gate_sparsity"],
-        ontology_role_accuracy=disc_results["ontology_accuracy"],
-        embedding_role_accuracy=disc_results["embedding_accuracy"],
-        discriminability_gap=disc_results["gap"],
-        accuracy_ci_low=disc_results["ci_low"],
-        accuracy_ci_high=disc_results["ci_high"],
-    )
-
-    # GO/NO-GO decision
-    ont_result = evaluate_go_nogo(ont_result)
-    results["ontology_alignment"] = asdict(ont_result)
-```
-
----
-
-## 6. Data Flow Diagram (Detailed)
-
-```
-                    ┌─────────────────────┐
-                    │  annotations.words   │
-                    │  (word text, POS,    │
-                    │   dep_relation)      │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │   7a. build_ontology │
-                    │        _vectors()    │
-                    │                      │
-                    │  WordNet lookup ──────── hypernym depth, lex file,
-                    │  Concreteness DB ────── concreteness, animacy
-                    │  POS tags ───────────── one-hot POS
-                    │  Role prototypes ────── dist to role centroids
-                    │                      │
-                    │  → ont_features [N,F] │
-                    │  → valid_mask [N]     │
-                    └──────────┬──────────┘
-                               │
-         ┌─────────────────────┼─────────────────────┐
-         │                     │                     │
-         ▼                     ▼                     ▼
-  ┌──────────────┐   ┌────────────────┐    ┌────────────────┐
-  │  7b. Align   │   │ 7c. Gate sim   │    │  7d. Discrim   │
-  │              │   │                │    │                │
-  │  ont ←→ U_k  │   │  ont → MLP →   │    │  ont → probe → │
-  │  MI, overlap, │   │  gate → patch  │    │  accuracy      │
-  │  CKA         │   │  → PPL, H(attn)│    │  vs H → probe  │
-  └──────┬───────┘   └───────┬────────┘    └───────┬────────┘
-         │                   │                     │
-         └─────────────────┐ │ ┌───────────────────┘
-                           ▼ ▼ ▼
-                    ┌──────────────────┐
-                    │  GO / NO-GO      │
-                    │  Decision Logic  │
-                    └──────────────────┘
-```
-
----
-
-## 7. GO / NO-GO Decision Logic
-
-```python
-def evaluate_go_nogo(result: OntologyAlignmentResult) -> OntologyAlignmentResult:
-    """Apply GO/NO-GO decision criteria."""
-
-    # --- GO conditions (ALL must hold) ---
-    go_checks = [
-        (result.alignment_mi > 0.3,
-         f"MI = {result.alignment_mi:.3f} > 0.3"),
-        (result.gated_perplexity_ratio < 2.0,
-         f"PPL ratio = {result.gated_perplexity_ratio:.2f} < 2.0"),
-        (result.gated_entropy_delta < 0.0,
-         f"Entropy delta = {result.gated_entropy_delta:.3f} < 0 (more structured)"),
-        (result.coverage_ratio > 0.3,
-         f"Coverage = {result.coverage_ratio:.1%} > 30%"),
-    ]
-
-    # --- Hard NO-GO conditions (ANY triggers) ---
-    nogo_checks = [
-        (result.alignment_mi < 0.05,
-         f"MI ≈ 0 ({result.alignment_mi:.4f}): ontology orthogonal to model"),
-        (result.gated_perplexity_ratio > 5.0,
-         f"PPL ratio = {result.gated_perplexity_ratio:.1f}: gating destroys fluency"),
-        (result.coverage_ratio < 0.1,
-         f"Coverage = {result.coverage_ratio:.1%}: ontology covers too few words"),
-    ]
-
-    result.go_reasons = [msg for ok, msg in go_checks if ok]
-    result.nogo_reasons = [msg for triggered, msg in nogo_checks if triggered]
-
-    # GO requires all go_checks pass AND no hard nogo triggered
-    all_go = all(ok for ok, _ in go_checks)
-    any_nogo = any(triggered for triggered, _ in nogo_checks)
-    result.go_decision = all_go and not any_nogo
-
+    if result.coverage_ratio < 0.1:
+        result.scenario = "C"
+        result.recommended_phase2 = "stop"
+    elif N >= 8 and mi > 0.5 and cka > 0.6:
+        result.scenario = "A"
+        result.recommended_phase2 = "build_both"
+    elif mi < 0.05 or N <= 2:
+        result.scenario = "C"
+        result.recommended_phase2 = "stop"
+    elif mi < 0.2 and gap > 0.05:
+        result.scenario = "D"
+        result.recommended_phase2 = "injection_test"
+    else:
+        result.scenario = "B"
+        result.recommended_phase2 = "meta_controller"
     return result
 ```
 
-**Decision matrix**:
-
-| Scenario | MI | PPL ratio | Entropy Δ | Coverage | Decision |
-|----------|-----|-----------|-----------|----------|----------|
-| Strong alignment | > 0.3 | < 2.0 | < 0 | > 30% | **GO** |
-| Weak alignment | 0.05–0.3 | < 2.0 | any | > 30% | INVESTIGATE |
-| Orthogonal | < 0.05 | any | any | any | **NO-GO** |
-| Destructive gating | any | > 5.0 | any | any | **NO-GO** |
-| Low coverage | any | any | any | < 10% | **NO-GO** |
-
 ---
 
-## 8. Testing Strategy
+## 5. Phase 2 Architecture Stubs
 
-### Unit tests (`tests/test_causal_subspace.py`)
+Phase 2 is NOT implemented in this PR. It's stubbed to show the interface.
+
+### Phase 2, Option 1: Meta-Controller
 
 ```python
-class TestOntologyAlignment:
+class OntologyMetaController:
+    """Parallel latent state that governs system-level decisions.
 
-    def test_build_ontology_vectors_shape(self, synthetic_hidden_states):
-        """Ontology vectors have expected shape [N, F]."""
+    H[layer] → encoder → z_ont ∈ R^N → control signals
 
-    def test_ontology_coverage(self, synthetic_hidden_states):
-        """Coverage ratio is between 0 and 1, valid_mask is boolean."""
+    Trained on validated axes only. N = number of axes that
+    survived the naming ceremony.
+    """
 
-    def test_alignment_mi_separable(self):
-        """MI is high when ontology features predict subspace projections."""
+    def __init__(self, d_model: int, n_axes: int):
+        self.encoder = nn.Sequential(
+            nn.Linear(d_model, 64),
+            nn.ReLU(),
+            nn.Linear(64, n_axes),
+            nn.Sigmoid(),        # each axis ∈ [0, 1]
+        )
 
-    def test_alignment_mi_random(self):
-        """MI is near zero when features and projections are independent."""
-
-    def test_subspace_overlap_identical(self):
-        """Overlap is 1.0 when subspaces are identical."""
-
-    def test_subspace_overlap_orthogonal(self):
-        """Overlap is 0.0 when subspaces are orthogonal."""
-
-    def test_cka_identity(self):
-        """CKA is 1.0 when representations are identical."""
-
-    def test_gate_preserves_fluency(self):
-        """Gated perplexity ratio < 2.0 with identity gate."""
-
-    def test_gate_ablation_increases_ppl(self):
-        """All-zero gate increases perplexity (subspace is load-bearing)."""
-
-    def test_discriminability_bootstrap_ci(self):
-        """Bootstrap CIs are valid (low < mean < high)."""
-
-    def test_go_nogo_all_pass(self):
-        """GO when all criteria met."""
-
-    def test_go_nogo_hard_nogo(self):
-        """NO-GO when any hard condition triggered."""
+    def forward(self, H: torch.Tensor) -> torch.Tensor:
+        # H: [batch, seq, d] → pool → [batch, d]
+        h_pool = H.mean(dim=1)
+        return self.encoder(h_pool)  # [batch, N]
 ```
 
-### Synthetic test (`test_synthetic.py`)
+### Phase 2, Option 2: Q/K Dimension Gating
 
-Add `run_part7_ontology_alignment_synthetic()` that:
-1. Creates synthetic ontology features correlated with role labels
-2. Runs the full Part 7 pipeline
-3. Verifies GO decision with synthetic aligned data
-4. Verifies NO-GO decision with random ontology features
-
-### Real test (`test_real.py`)
-
-Add validation checks:
 ```python
-# Check 7a: Ontology alignment MI
-# Check 7b: Gated perplexity
-# Check 7c: Attention entropy change
-# Check 7d: Ontology discriminability
-# Check 7e: GO/NO-GO decision
+class QKDimensionGating:
+    """Type-system constraint on attention dimensions.
+
+    Each token's ontological type determines which Q/K
+    dimensions participate in attention.
+
+    gate = σ(W_gate @ ont_per_token)
+    q' = q ⊙ gate
+    k' = k ⊙ gate
+    """
+
+    def __init__(self, n_axes: int, d_head: int):
+        self.W_gate = nn.Linear(n_axes, d_head)
+
+    def forward(
+        self,
+        Q: torch.Tensor,          # [batch, seq, d_head]
+        K: torch.Tensor,          # [batch, seq, d_head]
+        ont: torch.Tensor,        # [batch, seq, n_axes]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        gate = torch.sigmoid(self.W_gate(ont))
+        return Q * gate, K * gate
 ```
 
 ---
 
-## 9. Dependencies
+## 6. Integration
 
-**New external dependencies** (all available via pip):
+```python
+# In run_pipeline.py, after Part 6:
+
+# PART 7: Ontology Discovery
+from scripts.causal_subspace.ontology_alignment import (
+    OntologyConfig, run_ontology_discovery,
+)
+
+ont_cfg = OntologyConfig(device=device, seed=seed)
+discovery = run_ontology_discovery(
+    annotations=annotations,
+    H=annotations.hidden_states[trajectory.crystallization_layer],
+    labels=annotations.labels_role,
+    U_k=best_pca_basis,
+    cfg=ont_cfg,
+)
+results["ontology_discovery"] = asdict(discovery)
+```
+
+---
+
+## 7. Testing Strategy
+
+### Unit tests
+
+```python
+class TestOntologyDiscovery:
+    def test_build_12_axis_vectors_shape()
+    def test_naming_ceremony_aligned_data()     # synthetic: axis=PCA dir → MI high
+    def test_naming_ceremony_random_data()       # random axes → MI ≈ 0
+    def test_cka_identity()                      # CKA(X, X) = 1.0
+    def test_cka_random()                        # CKA(X, random) ≈ 0
+    def test_discriminability_bootstrap_ci()
+    def test_scenario_classification_A()         # high MI, high CKA, N=12
+    def test_scenario_classification_C()         # MI ≈ 0, N=0
+    def test_scenario_classification_D()         # low MI but concat >> emb
+```
+
+---
+
+## 8. Dependencies
 
 | Package | Purpose | Already in project? |
 |---------|---------|---------------------|
-| `nltk` (wordnet) | Hypernym depth, lexicographer files, animacy | No — add to requirements |
-| `scikit-learn` | Logistic regression, mutual_info_score | Yes (already used) |
-| `scipy` | Bootstrap, canonical correlations | Yes (already used) |
+| `nltk` (wordnet) | Axes 0, 2, 9 (abstraction, animacy, specificity) | No — optional, graceful fallback |
+| `scikit-learn` | Logistic regression, MI estimation | Yes |
+| `scipy` | CCA, bootstrap | Yes |
 
-**WordNet data** is downloaded on first use via `nltk.download('wordnet')`. The concreteness norms can be bundled as a small CSV (~40K entries, ~500KB) or fetched on first run.
-
----
-
-## 10. Computational Cost Estimate
-
-| Subpart | Operations | Estimated time (CPU, 200 seqs) |
-|---------|-----------|-------------------------------|
-| 7a. Build ontology vectors | WordNet lookups + POS + prototypes | ~10–30s |
-| 7b. Alignment metrics | MI + principal angles + CKA | ~5–15s |
-| 7c. Gate simulation | Train small MLP (30 epochs) + eval | ~30–120s |
-| 7d. Discriminability | 3 probes × 200 bootstraps | ~30–60s |
-| **Total** | | **~1.5–4 min** |
-
-This is substantially cheaper than Part 5 (causal interventions) which requires 6 forward passes per pair through the full model.
+WordNet is **optional**. Without it, axes 0/1/2/9 fall back to heuristics (POS-based concreteness proxy, dep-relation-based animacy proxy). The naming ceremony still runs on all 12 axes — it just measures whether the heuristic-based axes correspond to model directions.
 
 ---
 
-## 11. Implementation Plan
+## 9. Computational Cost
 
-| Step | Task | Files | Depends on |
-|------|------|-------|------------|
-| 1 | Create `OntologyConfig` and `OntologyAlignmentResult` dataclasses | `ontology_alignment.py` | — |
-| 2 | Implement `build_ontology_vectors()` with WordNet + POS + prototypes | `ontology_alignment.py` | Step 1 |
-| 3 | Implement `compute_alignment_mi()`, `compute_subspace_overlap()`, `compute_cka()` | `ontology_alignment.py` | Step 1 |
-| 4 | Implement `GateSimulator` and `simulate_gated_inference()` | `ontology_alignment.py` | Steps 1–2 |
-| 5 | Implement `measure_discriminability()` with bootstrap | `ontology_alignment.py` | Step 1 |
-| 6 | Implement `evaluate_go_nogo()` | `ontology_alignment.py` | Steps 1–5 |
-| 7 | Unit tests for each component | `tests/test_causal_subspace.py` | Steps 1–6 |
-| 8 | Integrate into `run_pipeline.py` as Part 7 | `run_pipeline.py` | Steps 1–6 |
-| 9 | Add synthetic test coverage | `test_synthetic.py` | Steps 7–8 |
-| 10 | Add real-model validation checks | `test_real.py` | Steps 7–8 |
-| 11 | Update `__init__.py` exports | `__init__.py` | Step 8 |
+| Step | Operations | Time |
+|------|-----------|------|
+| 7a–7b. Build 12-axis vectors | Loop over words, lookups | ~5–10s |
+| 7c. Naming ceremony | 12 axes × k PCA dirs × MI | ~10–30s |
+| 7d. Global alignment | MI + CKA + overlap | ~5–15s |
+| 7e. Discriminability | 3 probes × 200 bootstraps | ~30–60s |
+| **Total Phase 1** | | **~1–2 min** |
+
+Phase 2 (if any) adds ~1–3 min depending on architecture.
 
 ---
 
-## 12. Risk Assessment
+## 10. Open Questions (Resolved by Phase 1 Data)
 
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| WordNet coverage too low for subword tokens | Medium | Fall back to lemmatized forms; use POS + role prototypes as backup features |
-| MI estimation noisy at small N | Medium | Use k-NN MI estimator (Kraskov et al.) instead of binning; increase corpus size |
-| Gate MLP overfits on small corpus | Medium | Strong L2 regularization + early stopping; cross-validation |
-| Concreteness norms not available for all words | Low | Default to 3.0 (middle); flag low-coverage in results |
-| CKA dominated by first PCA component | Low | Use debiased CKA variant (Nguyen et al. 2021) |
-
----
-
-## 13. Open Questions
-
-1. **Which layer to target?** Current plan: crystallization layer (peak MDL compression). Alternative: run on multiple layers and report the best.
-
-2. **Ontology granularity**: Should we use coarse roles (5 classes: subject/object/root/modifier/other) or finer-grained semantic roles (agent/patient/instrument/location/...)?
-
-3. **Concreteness norms**: Bundle as CSV in repo, or download on first use? Bundling is more reliable but adds to repo size.
-
-4. **Gate architecture**: Simple linear gate (`ont → σ(W·ont + b)`) vs MLP? Linear is more interpretable but MLP has more capacity. Start with linear, escalate if alignment is weak.
+1. **How many of the 12 axes survive?** → The naming ceremony answers this.
+2. **Which architecture to use?** → Scenario classification answers this.
+3. **Is governance the right paradigm?** → Scenario D honestly admits it might not be.
+4. **Should we name axes before or after PCA?** → Before (hypothesis-driven), validated after (data-driven). The naming ceremony bridges these.
