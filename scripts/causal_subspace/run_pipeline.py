@@ -137,6 +137,9 @@ def run_full_pipeline(
     print("PART 1: PRECISION DATA COLLECTION")
     print("=" * 70)
 
+    print(f"  Loading model and running forward passes ({max_sequences} sequences)...",
+          flush=True)
+
     data_cfg = DataCollectionConfig(
         model_name=model_name,
         max_sequences=max_sequences,
@@ -206,7 +209,8 @@ def run_full_pipeline(
     sae_sparsity_distributions: Dict[int, Dict] = {}
 
     for layer_idx in active_layers:
-        print(f"\n--- Layer {layer_idx} ---")
+        print(f"\n--- Layer {layer_idx} (PCA + SAE {sae_epochs}ep + K-means) ---",
+              flush=True)
         H = annotations.hidden_states[layer_idx]
         dr = run_disentanglement(H, layer_idx, dis_cfg)
         disentanglement_results[layer_idx] = dr
