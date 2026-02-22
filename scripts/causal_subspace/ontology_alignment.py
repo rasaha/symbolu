@@ -653,6 +653,8 @@ def measure_discriminability(
     """
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import make_pipeline
 
     rng = np.random.RandomState(seed)
     n_classes = len(np.unique(labels))
@@ -671,8 +673,11 @@ def measure_discriminability(
     concat = np.hstack([ont_features, H])
 
     def _cv_accuracy(X, y):
-        """5-fold CV accuracy."""
-        clf = LogisticRegression(max_iter=500, random_state=seed, solver="lbfgs")
+        """5-fold CV accuracy with feature scaling."""
+        clf = make_pipeline(
+            StandardScaler(),
+            LogisticRegression(max_iter=2000, random_state=seed, solver="lbfgs"),
+        )
         n_folds = min(5, len(np.unique(y)))
         scores = cross_val_score(clf, X, y, cv=n_folds, scoring="accuracy")
         return float(scores.mean())
