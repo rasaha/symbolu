@@ -50,6 +50,8 @@ import json
 import logging
 import sys
 import time
+import concurrent.futures
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -129,6 +131,7 @@ def run_full_pipeline(
     device: str = "cpu",
     seed: int = 42,
     activation_source: str = "block",
+    n_workers: int = 0,
 ) -> Dict[str, Any]:
     """Run the complete causal subspace extraction and validation pipeline.
 
@@ -146,6 +149,10 @@ def run_full_pipeline(
             "activation_source": activation_source,
         },
     }
+
+    # Auto-detect parallel workers
+    if n_workers <= 0:
+        n_workers = min(os.cpu_count() or 4, 8)
 
     t0 = time.time()
 
@@ -233,14 +240,33 @@ def run_full_pipeline(
     disentanglement_results: Dict[int, DisentanglementResult] = {}
     sae_sparsity_distributions: Dict[int, Dict] = {}
 
-    for layer_idx in active_layers:
-        print(f"\n--- Layer {layer_idx} (PCA + SAE {sae_epochs}ep + K-means) ---",
-              flush=True)
+    def _disentangle_layer(layer_idx):
         H = annotations.hidden_states[layer_idx]
-        dr = run_disentanglement(H, layer_idx, dis_cfg)
-        disentanglement_results[layer_idx] = dr
+        return layer_idx, run_disentanglement(H, layer_idx, dis_cfg)
 
-        # Sparsity distribution
+    if n_workers > 1 and len(active_layers) > 1:
+        print(f"  Running {len(active_layers)} layers in parallel "
+              f"(workers={min(n_workers, len(active_layers))})...", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(n_workers, len(active_layers))
+        ) as executor:
+            futures = {
+                executor.submit(_disentangle_layer, l): l
+                for l in active_layers
+            }
+            for future in concurrent.futures.as_completed(futures):
+                layer_idx, dr = future.result()
+                disentanglement_results[layer_idx] = dr
+    else:
+        for layer_idx in active_layers:
+            print(f"\n--- Layer {layer_idx} (PCA + SAE {sae_epochs}ep + K-means) ---",
+                  flush=True)
+            _, dr = _disentangle_layer(layer_idx)
+            disentanglement_results[layer_idx] = dr
+
+    # Compute sparsity distributions after all layers complete
+    for layer_idx in sorted(disentanglement_results.keys()):
+        dr = disentanglement_results[layer_idx]
         if dr.sae_features is not None:
             l0_per_sample = (dr.sae_features > 0).sum(axis=1)
             sae_sparsity_distributions[layer_idx] = {
@@ -253,7 +279,8 @@ def run_full_pipeline(
                 "pct_active": float(l0_per_sample.mean() / dr.sae_features.shape[1] * 100),
                 "reconstruction_loss": dr.sae_reconstruction_loss,
             }
-            print(f"  SAE: {sae_sparsity_distributions[layer_idx]['pct_active']:.1f}% features active, "
+            print(f"  Layer {layer_idx} SAE: "
+                  f"{sae_sparsity_distributions[layer_idx]['pct_active']:.1f}% features active, "
                   f"recon={dr.sae_reconstruction_loss:.4f}")
 
     results["sae_sparsity_distributions"] = sae_sparsity_distributions
@@ -281,27 +308,59 @@ def run_full_pipeline(
         "dep_depth": np.clip(annotations.labels_depth, 0, 5),  # bin depths
     }
 
-    for label_name, label_arr in label_sets.items():
-        print(f"\n--- MDL Probe: {label_name} ---")
+    # Initialize result dicts
+    for label_name in label_sets:
         mdl_results[label_name] = {}
         mdl_result_objects[label_name] = {}
 
+    def _mdl_task(label_name, label_arr, layer_idx):
+        H = annotations.hidden_states[layer_idx]
+        r = run_mdl_probe(H, label_arr, layer_idx, label_name, mdl_cfg)
+        return label_name, layer_idx, r
+
+    def _store_mdl_result(label_name, layer_idx, r):
+        mdl_result_objects[label_name][layer_idx] = r
+        mdl_results[label_name][layer_idx] = {
+            "compression_ratio": r.compression_ratio,
+            "compression_vs_uniform": r.compression_vs_uniform,
+            "online_code_length": r.online_code_length,
+            "prior_code_length": r.prior_code_length,
+            "uniform_code_length": r.uniform_code_length,
+            "bits_per_label": r.online_code_length / max(r.n_samples, 1),
+            "n_classes": r.n_classes,
+        }
+
+    # Build flat task list: all (label, layer) pairs are independent
+    mdl_tasks = []
+    for label_name, label_arr in label_sets.items():
         for layer_idx in active_layers:
-            H = annotations.hidden_states[layer_idx]
-            r = run_mdl_probe(H, label_arr, layer_idx, label_name, mdl_cfg)
-            mdl_result_objects[label_name][layer_idx] = r
-            mdl_results[label_name][layer_idx] = {
-                "compression_ratio": r.compression_ratio,
-                "compression_vs_uniform": r.compression_vs_uniform,
-                "online_code_length": r.online_code_length,
-                "prior_code_length": r.prior_code_length,
-                "uniform_code_length": r.uniform_code_length,
-                "bits_per_label": r.online_code_length / max(r.n_samples, 1),
-                "n_classes": r.n_classes,
-            }
-            print(f"  Layer {layer_idx}: compression={r.compression_ratio:.2f}x (vs prior), "
-                  f"{r.compression_vs_uniform:.2f}x (vs uniform), "
-                  f"bits/label={r.online_code_length / max(r.n_samples, 1):.3f}")
+            mdl_tasks.append((label_name, label_arr, layer_idx))
+
+    n_mdl = len(mdl_tasks)
+    if n_workers > 1 and n_mdl > 1:
+        print(f"\n  Running {n_mdl} MDL probes in parallel "
+              f"(workers={min(n_workers, n_mdl)})...", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(n_workers, n_mdl)
+        ) as executor:
+            futures = [executor.submit(_mdl_task, *t) for t in mdl_tasks]
+            for future in concurrent.futures.as_completed(futures):
+                ln, li, r = future.result()
+                _store_mdl_result(ln, li, r)
+    else:
+        for label_name, label_arr, layer_idx in mdl_tasks:
+            ln, li, r = _mdl_task(label_name, label_arr, layer_idx)
+            _store_mdl_result(ln, li, r)
+
+    # Print results summary
+    for label_name in label_sets:
+        print(f"\n--- MDL Probe: {label_name} ---")
+        for layer_idx in active_layers:
+            if layer_idx in mdl_results[label_name]:
+                m = mdl_results[label_name][layer_idx]
+                print(f"  Layer {layer_idx}: compression={m['compression_ratio']:.2f}x (vs prior), "
+                      f"{m['compression_vs_uniform']:.2f}x (vs uniform), "
+                      f"bits/label={m['bits_per_label']:.3f}")
 
     results["mdl_compression_ratios"] = mdl_results
 
@@ -320,6 +379,7 @@ def run_full_pipeline(
     optimal_k, k_results, best_pca_basis = select_top_k_components(
         H_best, annotations.labels_role, best_layer,
         "grammatical_role", candidate_ks, mdl_cfg,
+        n_workers=n_workers,
     )
     print(f"  Optimal k = {optimal_k}")
     results["optimal_k"] = optimal_k
@@ -700,8 +760,8 @@ def main():
         help="Max token length per sequence",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=8,
-        help="Batch size for forward passes",
+        "--batch-size", type=int, default=32,
+        help="Batch size for forward passes (increase for large GPUs)",
     )
     parser.add_argument(
         "--sae-epochs", type=int, default=50,
@@ -766,6 +826,10 @@ def main():
              "'attention' (attention sublayer output, no MLP)",
     )
     parser.add_argument(
+        "--workers", type=int, default=0,
+        help="Parallel workers for Parts 3/4 (0 = auto-detect from CPU count)",
+    )
+    parser.add_argument(
         "--quick", action="store_true",
         help="Quick smoke test (reduced data, fewer epochs)",
     )
@@ -810,6 +874,7 @@ def main():
         device=args.device,
         seed=args.seed,
         activation_source=args.activation_source,
+        n_workers=args.workers,
     )
 
     if args.output:
