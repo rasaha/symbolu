@@ -14,9 +14,9 @@ Phase 1 (this module):
     7e. Discriminability (ont vs H vs concat)
     7f. Scenario classification (A / B / C / D)
 
-Phase 2 (stubs only — architecture depends on Phase 1 outcome):
-    Option 1: Parallel latent state meta-controller
-    Option 2: Q/K dimension gating
+Phase 2 (implemented):
+    Path 1: OntologyMonitor — Observatory (read hidden states, classify)
+    Path 2: OntologyInjector — Content injection (enrich prompts)
 """
 
 from __future__ import annotations
@@ -813,60 +813,537 @@ def classify_scenario(result: DiscoveryResult) -> DiscoveryResult:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 Stubs
+# Phase 2: OntologyMonitor (Path 1 — Observatory)
 # ---------------------------------------------------------------------------
 
-class OntologyMetaController:
-    """Phase 2, Option 1: Parallel latent state meta-controller.
+# The 4 robust axes validated across both L1 and L7
+ROBUST_AXES: List[str] = [
+    "concreteness",        # idx 1 in AXIS_NAMES
+    "relational_role",     # idx 7
+    "modificational_load", # idx 8
+    "categorical_type",    # idx 11
+]
 
-    NOT IMPLEMENTED — stub showing the interface.
+ROBUST_AXIS_INDICES: List[int] = [
+    AXIS_NAMES.index(a) for a in ROBUST_AXES
+]
 
-    H[layer] → encoder → z_ont ∈ R^N → control signals
+N_ROBUST = len(ROBUST_AXES)
 
-    Trained on validated axes only. N = number of axes that
-    survived the naming ceremony.
+
+@dataclass
+class MonitorResult:
+    """Output of the OntologyMonitor on a batch of sequences."""
+
+    # Per-sequence ontological state [batch, 4]
+    z_ont: Any = None  # np.ndarray or torch.Tensor
+
+    # Human-readable axis names
+    axis_names: List[str] = field(default_factory=lambda: list(ROBUST_AXES))
+
+    # Monitoring signals derived from z_ont
+    domain_label: str = ""           # "concrete" / "abstract" / "mixed"
+    structure_label: str = ""        # "simple" / "complex"
+    intent_label: str = ""           # "informational" / "action" / "modification"
+    confidence: float = 0.0          # mean activation magnitude
+
+    # Drift detection: distance from training distribution centroid
+    drift_score: float = 0.0
+
+
+@dataclass
+class MonitorTrainResult:
+    """Training metrics for the OntologyMonitor."""
+    epochs_trained: int = 0
+    final_train_loss: float = 0.0
+    final_val_loss: float = 0.0
+    r2_per_axis: Dict[str, float] = field(default_factory=dict)
+    r2_mean: float = 0.0
+
+
+class OntologyMonitor:
+    """Phase 2, Path 1: Real-time observatory of model internal state.
+
+    Reads hidden states at a target layer (typically L7 = best alignment),
+    predicts the 4 robust ontological axis values, and produces monitoring
+    signals (drift alerts, confidence, routing classification).
+
+    Architecture:
+        H[layer] → mean_pool → Linear(d, 128) → ReLU → Dropout(0.1)
+                 → Linear(128, 64) → ReLU → Linear(64, 4) → Sigmoid
+
+    Training: Supervised regression on Phase 1 ontology vectors (robust axes only).
+    Loss: MSE(predicted, ground_truth) for the 4 robust axes.
     """
 
-    def __init__(self, d_model: int, n_axes: int):
+    def __init__(self, d_model: int, n_axes: int = N_ROBUST, dropout: float = 0.1):
+        import torch
         import torch.nn as nn
+
+        self.d_model = d_model
+        self.n_axes = n_axes
         self.encoder = nn.Sequential(
-            nn.Linear(d_model, 64),
+            nn.Linear(d_model, 128),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, n_axes),
             nn.Sigmoid(),
         )
+        # Training distribution centroid for drift detection
+        self._centroid: Optional[np.ndarray] = None
+        self._centroid_std: Optional[np.ndarray] = None
 
-    def forward(self, H):
-        """H: [batch, seq, d] → [batch, N] ontological state."""
-        import torch
-        h_pool = H.mean(dim=1)
-        return self.encoder(h_pool)
+    def forward(self, H) -> Any:
+        """Predict ontological state from hidden states.
 
+        Parameters
+        ----------
+        H : torch.Tensor
+            Either [batch, seq, d] (sequence-level) → mean-pools over seq
+            or [batch, d] (already pooled).
 
-class QKDimensionGating:
-    """Phase 2, Option 2: Q/K dimension gating.
-
-    NOT IMPLEMENTED — stub showing the interface.
-
-    gate = σ(W_gate @ ont_per_token)
-    q' = q ⊙ gate
-    k' = k ⊙ gate
-    """
-
-    def __init__(self, n_axes: int, d_head: int):
-        import torch.nn as nn
-        self.W_gate = nn.Linear(n_axes, d_head)
-
-    def forward(self, Q, K, ont):
-        """Gate Q and K based on ontological features.
-
-        Q, K: [batch, seq, d_head]
-        ont: [batch, seq, n_axes]
-        Returns gated (Q', K').
+        Returns
+        -------
+        z_ont : torch.Tensor [batch, n_axes]
+            Predicted axis values in [0, 1].
         """
         import torch
-        gate = torch.sigmoid(self.W_gate(ont))
-        return Q * gate, K * gate
+
+        if H.dim() == 3:
+            h_pool = H.mean(dim=1)
+        elif H.dim() == 2:
+            h_pool = H
+        else:
+            raise ValueError(f"Expected 2D or 3D tensor, got {H.dim()}D")
+
+        return self.encoder(h_pool)
+
+    def predict(self, H_np: np.ndarray) -> MonitorResult:
+        """Predict ontological state from numpy hidden states.
+
+        Parameters
+        ----------
+        H_np : np.ndarray [N, d] or [batch, seq, d]
+
+        Returns
+        -------
+        MonitorResult with z_ont and derived labels.
+        """
+        import torch
+
+        was_training = self.encoder.training
+        self.encoder.eval()
+
+        with torch.no_grad():
+            H_t = torch.from_numpy(H_np.astype(np.float32))
+            z = self.forward(H_t).cpu().numpy()
+
+        if was_training:
+            self.encoder.train()
+
+        result = MonitorResult(z_ont=z, axis_names=list(ROBUST_AXES))
+
+        # Derive labels from mean axis values
+        z_mean = z.mean(axis=0) if z.ndim == 2 else z
+
+        # concreteness → domain
+        if z_mean[0] > 0.6:
+            result.domain_label = "concrete"
+        elif z_mean[0] < 0.4:
+            result.domain_label = "abstract"
+        else:
+            result.domain_label = "mixed"
+
+        # modificational_load → structure complexity
+        result.structure_label = "complex" if z_mean[2] > 0.5 else "simple"
+
+        # categorical_type → intent
+        cat_val = z_mean[3]
+        if cat_val < 0.2:
+            result.intent_label = "informational"  # noun-like
+        elif cat_val < 0.5:
+            result.intent_label = "action"          # verb-like
+        else:
+            result.intent_label = "modification"    # modifier/function
+
+        # confidence = mean activation magnitude
+        result.confidence = float(np.mean(np.abs(z_mean)))
+
+        # drift detection
+        if self._centroid is not None:
+            diff = z_mean - self._centroid
+            # Normalized Mahalanobis-like distance
+            std = np.maximum(self._centroid_std, 1e-6)
+            result.drift_score = float(np.mean(np.abs(diff) / std))
+
+        return result
+
+    def train_monitor(
+        self,
+        H: np.ndarray,
+        ont_features: np.ndarray,
+        valid_mask: np.ndarray,
+        n_epochs: int = 100,
+        lr: float = 1e-3,
+        batch_size: int = 256,
+        val_split: float = 0.2,
+        seed: int = 42,
+    ) -> MonitorTrainResult:
+        """Train the monitor on Phase 1 ontology vectors.
+
+        Parameters
+        ----------
+        H : np.ndarray [N_w, d]
+            Hidden states at the target layer.
+        ont_features : np.ndarray [N_w, 12]
+            Full 12-axis ontology vectors from Phase 1.
+        valid_mask : np.ndarray [N_w] bool
+            Which words have valid ontology features.
+        n_epochs : int
+            Training epochs.
+        lr : float
+            Learning rate.
+        batch_size : int
+        val_split : float
+            Fraction of data for validation.
+        seed : int
+
+        Returns
+        -------
+        MonitorTrainResult with training metrics.
+        """
+        import torch
+        import torch.nn as nn
+
+        rng = np.random.RandomState(seed)
+
+        # Filter to valid words and extract robust axes only
+        H_valid = H[valid_mask].astype(np.float32)
+        targets = ont_features[valid_mask][:, ROBUST_AXIS_INDICES].astype(np.float32)
+
+        N = H_valid.shape[0]
+        if N < 20:
+            logger.warning("Too few valid samples (%d) to train monitor", N)
+            return MonitorTrainResult()
+
+        # Train/val split
+        perm = rng.permutation(N)
+        n_val = max(int(N * val_split), 1)
+        val_idx = perm[:n_val]
+        train_idx = perm[n_val:]
+
+        H_train = torch.from_numpy(H_valid[train_idx])
+        y_train = torch.from_numpy(targets[train_idx])
+        H_val = torch.from_numpy(H_valid[val_idx])
+        y_val = torch.from_numpy(targets[val_idx])
+
+        # Store centroid for drift detection
+        self._centroid = targets[train_idx].mean(axis=0)
+        self._centroid_std = targets[train_idx].std(axis=0)
+
+        # Training
+        optimizer = torch.optim.Adam(self.encoder.parameters(), lr=lr)
+        criterion = nn.MSELoss()
+
+        self.encoder.train()
+        train_loss = 0.0
+        val_loss = 0.0
+
+        for epoch in range(n_epochs):
+            # Shuffle training data
+            idx = torch.randperm(len(train_idx))
+            epoch_loss = 0.0
+            n_batches = 0
+
+            for start in range(0, len(train_idx), batch_size):
+                batch_idx = idx[start:start + batch_size]
+                H_batch = H_train[batch_idx]
+                y_batch = y_train[batch_idx]
+
+                pred = self.encoder(H_batch)
+                loss = criterion(pred, y_batch)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                n_batches += 1
+
+            train_loss = epoch_loss / max(n_batches, 1)
+
+            if (epoch + 1) % 20 == 0 or epoch == n_epochs - 1:
+                self.encoder.eval()
+                with torch.no_grad():
+                    val_pred = self.encoder(H_val)
+                    val_loss = criterion(val_pred, y_val).item()
+                self.encoder.train()
+                logger.info(
+                    "  Monitor epoch %d/%d: train_loss=%.4f, val_loss=%.4f",
+                    epoch + 1, n_epochs, train_loss, val_loss,
+                )
+
+        # Final evaluation
+        self.encoder.eval()
+        with torch.no_grad():
+            val_pred = self.encoder(H_val).cpu().numpy()
+            val_true = y_val.cpu().numpy()
+
+        # R² per axis
+        r2_per_axis = {}
+        for i, axis_name in enumerate(ROBUST_AXES):
+            ss_res = np.sum((val_true[:, i] - val_pred[:, i]) ** 2)
+            ss_tot = np.sum((val_true[:, i] - val_true[:, i].mean()) ** 2)
+            r2 = 1.0 - ss_res / max(ss_tot, 1e-10)
+            r2_per_axis[axis_name] = float(r2)
+
+        r2_mean = float(np.mean(list(r2_per_axis.values())))
+
+        logger.info(
+            "Monitor training complete: R²=%.3f (per-axis: %s)",
+            r2_mean,
+            ", ".join(f"{k}={v:.3f}" for k, v in r2_per_axis.items()),
+        )
+
+        return MonitorTrainResult(
+            epochs_trained=n_epochs,
+            final_train_loss=train_loss,
+            final_val_loss=val_loss,
+            r2_per_axis=r2_per_axis,
+            r2_mean=r2_mean,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: OntologyInjector (Path 2 — Content Injection)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class InjectionMetadata:
+    """Structured ontological metadata for prompt injection."""
+
+    domain: str = "mixed"              # concrete / abstract / mixed
+    structure: str = "simple"          # simple / complex
+    intent: str = "informational"      # informational / action / modification
+    confidence: str = "medium"         # high / medium / low
+    primary_role: str = "unknown"      # subject / object / root / modifier
+    raw_scores: Dict[str, float] = field(default_factory=dict)
+
+    def format_tag(self) -> str:
+        """Format as structured tag for prompt injection."""
+        lines = [
+            "[ONTOLOGY]",
+            f"domain: {self.domain}",
+            f"structure: {self.structure}",
+            f"intent: {self.intent}",
+            f"confidence: {self.confidence}",
+            f"primary_role: {self.primary_role}",
+            "[/ONTOLOGY]",
+        ]
+        return "\n".join(lines)
+
+
+class OntologyInjector:
+    """Phase 2, Path 2: Classify input text and inject ontological metadata.
+
+    Works at the API boundary — no hidden-state access required. Parses
+    input text using dependency parsing (same as Phase 1), computes the
+    4 robust axis features, and formats them as structured metadata that
+    gets prepended to the LLM system prompt.
+
+    Compatible with any LLM API (Claude, GPT-4, local models).
+    """
+
+    def classify(self, text: str) -> InjectionMetadata:
+        """Classify input text along the 4 robust ontological axes.
+
+        Parameters
+        ----------
+        text : str
+            Input text to classify.
+
+        Returns
+        -------
+        InjectionMetadata with domain, structure, intent, confidence.
+        """
+        # Tokenize into words (simple whitespace split)
+        words = text.split()
+        if not words:
+            return InjectionMetadata()
+
+        # Compute per-word features using dependency heuristics
+        # (mirrors Phase 1's build_ontology_vectors but without a model)
+        concreteness_scores = []
+        role_scores = []
+        mod_scores = []
+        cat_scores = []
+
+        for word in words:
+            w_lower = word.lower().strip(".,!?;:\"'()[]{}—-")
+            if not w_lower:
+                continue
+
+            # Concreteness heuristic: nouns are concrete, function words are abstract
+            conc = self._word_concreteness(w_lower)
+            concreteness_scores.append(conc)
+
+            # Relational role heuristic based on position and word type
+            role = self._word_role_score(w_lower, len(concreteness_scores) - 1, len(words))
+            role_scores.append(role)
+
+            # Modificational load: adjectives/adverbs are modifiers
+            mod = self._word_mod_load(w_lower)
+            mod_scores.append(mod)
+
+            # Categorical type
+            cat = self._word_category(w_lower)
+            cat_scores.append(cat)
+
+        if not concreteness_scores:
+            return InjectionMetadata()
+
+        # Aggregate to document level
+        scores = {
+            "concreteness": float(np.mean(concreteness_scores)),
+            "relational_role": float(np.mean(role_scores)),
+            "modificational_load": float(np.mean(mod_scores)),
+            "categorical_type": float(np.mean(cat_scores)),
+        }
+
+        meta = InjectionMetadata(raw_scores=scores)
+
+        # Domain
+        if scores["concreteness"] > 0.6:
+            meta.domain = "concrete"
+        elif scores["concreteness"] < 0.4:
+            meta.domain = "abstract"
+        else:
+            meta.domain = "mixed"
+
+        # Structure complexity
+        meta.structure = "complex" if scores["modificational_load"] > 0.5 else "simple"
+
+        # Intent
+        cat = scores["categorical_type"]
+        if cat < 0.2:
+            meta.intent = "informational"
+        elif cat < 0.5:
+            meta.intent = "action"
+        else:
+            meta.intent = "modification"
+
+        # Confidence based on score dispersion
+        score_vals = list(scores.values())
+        dispersion = float(np.std(score_vals))
+        if dispersion > 0.2:
+            meta.confidence = "high"  # differentiated signal
+        elif dispersion > 0.1:
+            meta.confidence = "medium"
+        else:
+            meta.confidence = "low"   # undifferentiated
+
+        # Primary role
+        if scores["relational_role"] > 0.6:
+            meta.primary_role = "core_argument"
+        elif scores["relational_role"] > 0.4:
+            meta.primary_role = "root"
+        else:
+            meta.primary_role = "modifier"
+
+        return meta
+
+    def inject(self, system_prompt: str, user_input: str) -> str:
+        """Classify user input and prepend ontological metadata to system prompt.
+
+        Parameters
+        ----------
+        system_prompt : str
+            Original system prompt.
+        user_input : str
+            User's input message.
+
+        Returns
+        -------
+        enriched_prompt : str
+            System prompt with ontological metadata prepended.
+        """
+        meta = self.classify(user_input)
+        tag = meta.format_tag()
+        return f"{tag}\n\n{system_prompt}"
+
+    # --- Word-level heuristics ---
+
+    # Common function words (abstract)
+    _FUNCTION_WORDS = frozenset({
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "must", "need", "dare",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+        "into", "through", "during", "before", "after", "above", "below",
+        "between", "out", "off", "over", "under", "again", "further", "then",
+        "once", "and", "but", "or", "nor", "not", "so", "yet", "both",
+        "either", "neither", "each", "every", "all", "any", "few", "more",
+        "most", "other", "some", "such", "no", "only", "own", "same", "than",
+        "too", "very", "just", "because", "if", "when", "while", "although",
+        "that", "which", "who", "whom", "whose", "this", "these", "those",
+        "it", "its", "he", "she", "they", "them", "we", "us", "you", "i",
+        "me", "my", "your", "his", "her", "our", "their",
+    })
+
+    # Common concrete nouns
+    _CONCRETE_NOUNS = frozenset({
+        "car", "house", "dog", "cat", "tree", "water", "food", "book", "door",
+        "table", "chair", "phone", "computer", "road", "city", "person", "hand",
+        "face", "eye", "head", "body", "room", "wall", "floor", "window",
+        "sun", "moon", "earth", "fire", "stone", "metal", "wood", "glass",
+    })
+
+    # Common action verbs
+    _ACTION_VERBS = frozenset({
+        "run", "walk", "jump", "eat", "drink", "write", "read", "build",
+        "break", "throw", "catch", "push", "pull", "open", "close", "move",
+        "turn", "start", "stop", "give", "take", "make", "put", "get",
+        "go", "come", "see", "look", "find", "keep", "tell", "say",
+        "think", "know", "feel", "try", "leave", "call", "ask", "work",
+    })
+
+    def _word_concreteness(self, w: str) -> float:
+        if w in self._CONCRETE_NOUNS:
+            return 0.9
+        if w in self._FUNCTION_WORDS:
+            return 0.1
+        if w in self._ACTION_VERBS:
+            return 0.5
+        # Length heuristic: longer words tend to be more specific/concrete
+        return min(0.3 + len(w) * 0.05, 0.8)
+
+    def _word_role_score(self, w: str, pos: int, total: int) -> float:
+        # SVO heuristic: early words are more likely subjects (core args)
+        position_score = 1.0 - (pos / max(total, 1))
+        if w in self._FUNCTION_WORDS:
+            return 0.1
+        return min(position_score * 0.7 + 0.2, 1.0)
+
+    def _word_mod_load(self, w: str) -> float:
+        if w in self._FUNCTION_WORDS:
+            return 0.1
+        # Words ending in common modifier suffixes
+        if w.endswith(("ly", "ful", "less", "ous", "ive", "able", "ible")):
+            return 0.8
+        if w.endswith(("er", "est", "ing")):
+            return 0.6
+        return 0.4
+
+    def _word_category(self, w: str) -> float:
+        if w in self._FUNCTION_WORDS:
+            return 1.0
+        if w in self._ACTION_VERBS:
+            return 0.33
+        if w.endswith(("ly", "ful", "less", "ous", "ive")):
+            return 0.67
+        return 0.0  # default: noun-like
 
 
 # ---------------------------------------------------------------------------
@@ -1165,3 +1642,148 @@ def run_multi_layer_discovery(
     logger.info("  Overall scenario: %s → %s", multi.scenario, multi.recommended_phase2)
 
     return multi
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 Runner
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Phase2Result:
+    """Output of Phase 2: Observatory + Injection prototype."""
+
+    # Monitor training results
+    monitor_trained: bool = False
+    monitor_r2_mean: float = 0.0
+    monitor_r2_per_axis: Dict[str, float] = field(default_factory=dict)
+    monitor_train_loss: float = 0.0
+    monitor_val_loss: float = 0.0
+
+    # Monitor inference test
+    monitor_sample_predictions: List[Dict[str, float]] = field(default_factory=list)
+
+    # Injector classification tests
+    injector_test_results: List[Dict[str, str]] = field(default_factory=list)
+
+
+def run_phase2(
+    annotations,
+    hidden_states: Dict[int, np.ndarray],
+    labels: np.ndarray,
+    ont_features: np.ndarray,
+    valid_mask: np.ndarray,
+    read_layer: int,
+    n_epochs: int = 100,
+    seed: int = 42,
+) -> Phase2Result:
+    """Run Phase 2: train monitor and test injector.
+
+    Parameters
+    ----------
+    annotations : StructuralAnnotations
+        Word annotations from Phase 1.
+    hidden_states : dict[int, np.ndarray]
+        Per-layer hidden states.
+    labels : np.ndarray [N_w]
+        Grammatical role labels.
+    ont_features : np.ndarray [N_w, 12]
+        Full 12-axis ontology vectors from Phase 1.
+    valid_mask : np.ndarray [N_w] bool
+        Which words have valid ontology features.
+    read_layer : int
+        Layer to read hidden states from (typically best alignment layer).
+    n_epochs : int
+        Training epochs for the monitor.
+    seed : int
+
+    Returns
+    -------
+    Phase2Result with training metrics and test outputs.
+    """
+    result = Phase2Result()
+
+    H = hidden_states[read_layer]
+    d_model = H.shape[1]
+
+    # --- Path 1: Train OntologyMonitor ---
+    logger.info("=" * 60)
+    logger.info("PHASE 2, PATH 1: Training OntologyMonitor")
+    logger.info("=" * 60)
+    logger.info("  d_model=%d, n_axes=%d, read_layer=L%d", d_model, N_ROBUST, read_layer)
+
+    monitor = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
+
+    train_result = monitor.train_monitor(
+        H=H,
+        ont_features=ont_features,
+        valid_mask=valid_mask,
+        n_epochs=n_epochs,
+        seed=seed,
+    )
+
+    result.monitor_trained = True
+    result.monitor_r2_mean = train_result.r2_mean
+    result.monitor_r2_per_axis = train_result.r2_per_axis
+    result.monitor_train_loss = train_result.final_train_loss
+    result.monitor_val_loss = train_result.final_val_loss
+
+    logger.info("  Monitor R²=%.3f (per-axis: %s)",
+                train_result.r2_mean,
+                ", ".join(f"{k}={v:.3f}" for k, v in train_result.r2_per_axis.items()))
+
+    # Run monitor inference on a few samples
+    logger.info("  Running monitor inference on sample data...")
+    H_valid = H[valid_mask]
+    n_samples = min(5, H_valid.shape[0])
+    for i in range(n_samples):
+        h_sample = H_valid[i:i + 1]
+        monitor_out = monitor.predict(h_sample)
+        sample_dict = {
+            axis: float(monitor_out.z_ont[0, j])
+            for j, axis in enumerate(ROBUST_AXES)
+        }
+        sample_dict["domain"] = monitor_out.domain_label
+        sample_dict["structure"] = monitor_out.structure_label
+        sample_dict["intent"] = monitor_out.intent_label
+        result.monitor_sample_predictions.append(sample_dict)
+
+    # --- Path 2: Test OntologyInjector ---
+    logger.info("=" * 60)
+    logger.info("PHASE 2, PATH 2: Testing OntologyInjector")
+    logger.info("=" * 60)
+
+    injector = OntologyInjector()
+
+    test_inputs = [
+        "The cat sat on the mat.",
+        "Implement a distributed database with eventual consistency.",
+        "Running quickly through the heavily forested area.",
+        "Is this good or bad?",
+        "Build, test, and deploy the application to production servers.",
+    ]
+
+    for text in test_inputs:
+        meta = injector.classify(text)
+        test_dict = {
+            "input": text,
+            "domain": meta.domain,
+            "structure": meta.structure,
+            "intent": meta.intent,
+            "confidence": meta.confidence,
+            "primary_role": meta.primary_role,
+        }
+        test_dict.update({f"score_{k}": f"{v:.3f}" for k, v in meta.raw_scores.items()})
+        result.injector_test_results.append(test_dict)
+        logger.info("  Input: %s", text[:50])
+        logger.info("    → domain=%s, structure=%s, intent=%s, confidence=%s",
+                     meta.domain, meta.structure, meta.intent, meta.confidence)
+
+    # Test injection formatting
+    sample_enriched = injector.inject(
+        "You are a helpful assistant.",
+        test_inputs[0],
+    )
+    logger.info("  Sample enriched prompt:\n%s", sample_enriched)
+
+    logger.info("Phase 2 complete.")
+    return result

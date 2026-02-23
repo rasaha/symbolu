@@ -1,7 +1,7 @@
 # Part 7: Ontology Alignment — Discovery & Validation
 
-**Status**: Discovery phase
-**Date**: 2026-02-22
+**Status**: Phase 1 COMPLETE. Phase 2 prototype COMPLETE.
+**Date**: 2026-02-23 (Phase 2 update)
 **Depends on**: Parts 1–6 of causal subspace pipeline (validated)
 
 ---
@@ -911,3 +911,205 @@ Performance improvements from parallelization:
 - Part 4: 24 probes sequential (~12 min for 6 in `--quick`) → parallel 8 workers (~32s) = **~22× speedup**
 - Part 7d: CKA O(N^3) hang → Frobenius trick O(N·d^2) = **0.3s** (from infinite)
 - Part 7e: 3000 LogisticRegression fits → 23 SGDClassifier fits on 2K subsample = **~12s** (from infinite)
+
+---
+
+## 12. Phase 1 Final Conclusions
+
+**Date**: 2026-02-23
+
+Phase 1 is COMPLETE. The discovery process answered both questions from Section 0:
+
+### 12.1 Do the model's structural directions correspond to nameable ontological axes?
+
+**Yes, partially.** 6 of 12 proposed axes passed the naming ceremony, with 4 robust across both layers:
+
+| Axis | Status | Evidence |
+|------|--------|----------|
+| `relational_role` | **Robust** | MI=0.473 at L1 (strongest signal) |
+| `concreteness` | **Robust** | MI=0.306 at L1, stable across layers |
+| `categorical_type` | **Robust** | MI=0.188, consistent PCA mapping |
+| `modificational_load` | **Robust** | MI=0.151, identical across layers |
+| `temporal_anchoring` | Layer-specific | MI=0.144 at L1 only, consumed by L7 |
+| `structural_depth` | Layer-specific | MI=0.124 at L1 only, consumed by L7 |
+| `abstraction_level` | **Failed** | Zero MI — WordNet hypernym depth is noise |
+| `semantic_specificity` | **Failed** | Zero MI — synset count is noise |
+| `animacy` | **Failed** | MI=0.022, below threshold |
+| `agency` | **Failed** | MI=0.024, below threshold |
+| `information_density` | **Failed** | MI=0.043, identical to positional_salience |
+| `positional_salience` | **Failed** | MI=0.043, redundant with information_density |
+
+### 12.2 Which architecture should the ontological layer use?
+
+**Neither the meta-controller-as-governor NOR Q/K gating.** The data ruled out both original options:
+
+- **Q/K gating is ruled out** — CKA ≈ 0 means no linear alignment between ontological type and attention dimensions. The gating signal has nothing to gate on.
+- **Meta-controller-as-governor is ruled out** — 0% causal success at encoding layers means you cannot steer the model by swapping the structural subspace. The structural subspace is informational, not cleanly causal.
+
+### 12.3 What the data DOES support
+
+The data supports two architectures that were NOT in the original design:
+
+1. **Observatory (Monitoring + Classification)**: Read hidden states at L7, classify the model's internal state along the 4 robust axes, produce real-time monitoring signals. The model cannot be governed through this channel, but it CAN be observed through it.
+
+2. **Content Injection**: The ontology knows things the model doesn't (98.8% vs 74.5% classification accuracy). Feed the ontological classification as structured context into the model's input, enriching its prompt with information it wouldn't otherwise have.
+
+### 12.4 Key insight: The original framing was wrong
+
+The original design asked: "Can the ontology GOVERN the model?" The answer is no — the structural subspace is informational but not cleanly causal. The correct question is: "Can the ontology INFORM the model?" The answer is yes, via content injection. And: "Can the ontology OBSERVE the model?" Also yes, via L7 monitoring.
+
+**The ontology is a sensor, not a steering wheel.**
+
+---
+
+## 13. Phase 2 Architecture (Revised)
+
+**Date**: 2026-02-23
+**Decision**: Build Observatory (Path 1) + Content Injection (Path 2)
+**Drop**: Q/K gating (insufficient signal), Meta-controller-as-governor (no causal pathway)
+
+### 13.1 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  PATH 1: OBSERVATORY (Monitoring)                                    │
+│                                                                      │
+│  H[L7] ──→ OntologyMonitor ──→ z_ont ∈ R^4                         │
+│             (nonlinear encoder,    │                                  │
+│              trained on 4 robust    ├──→ drift alerts                │
+│              axes)                  ├──→ confidence signals           │
+│                                     ├──→ routing classification      │
+│  Reads model state. Does NOT       └──→ audit trail                 │
+│  modify model behavior.                                              │
+│                                                                      │
+│  Training: Supervised on ontology vectors from Phase 1.              │
+│  Loss: MSE(predicted_axes, ground_truth_axes)                        │
+│  Input: mean-pooled H[L7] ∈ R^d                                     │
+│  Output: z_ont ∈ R^4 (concreteness, relational_role,                │
+│           modificational_load, categorical_type)                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  PATH 2: CONTENT INJECTION                                           │
+│                                                                      │
+│  user_input ──→ OntologyInjector ──→ enriched_prompt                │
+│                  │                                                    │
+│                  ├─ classify input along 4 axes                      │
+│                  ├─ format as structured routing metadata             │
+│                  └─ prepend to LLM system prompt                     │
+│                                                                      │
+│  The ontology TELLS the model what it observed.                      │
+│  The model can use (or ignore) this information.                     │
+│                                                                      │
+│  No hidden-state access required at inference.                       │
+│  Works with any LLM API (not just GPT-2).                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 13.2 OntologyMonitor (Path 1)
+
+The monitor is a small nonlinear encoder trained to predict ontology axis values from hidden states. It serves as a **real-time sensor** of the model's internal structural state.
+
+```python
+class OntologyMonitor:
+    """Read hidden states at L7, predict 4-axis ontological state.
+
+    Architecture:
+        H[L7] → mean_pool → Linear(d, 128) → ReLU → Dropout
+              → Linear(128, 64) → ReLU → Linear(64, 4) → Sigmoid
+
+    Output interpretation:
+        z_ont[0] = concreteness      (0=abstract, 1=concrete)
+        z_ont[1] = relational_role   (0=peripheral, 1=core argument)
+        z_ont[2] = modificational_load (0=leaf, 1=head)
+        z_ont[3] = categorical_type  (0=noun-like, 1=function word)
+
+    Training: Supervised regression on Phase 1 ontology vectors.
+    Loss: MSE + optional L1 for sparsity.
+    """
+```
+
+**Why nonlinear?** CKA ≈ 0 but MI = 0.375 — the correspondence between hidden states and ontological axes is nonlinear. A linear encoder would fail. The ReLU network can capture the nonlinear mapping.
+
+**Why 128→64→4?** The bottleneck forces the encoder to learn a compressed representation. Going from 768 (GPT-2 hidden dim) directly to 4 would lose too much information. Two hidden layers with moderate width provide enough capacity for the nonlinear mapping without overfitting.
+
+### 13.3 OntologyInjector (Path 2)
+
+The injector classifies input text along the 4 robust axes and formats the result as structured metadata that gets prepended to the LLM prompt.
+
+```python
+class OntologyInjector:
+    """Classify input text and inject ontological metadata into prompt.
+
+    Pipeline:
+        1. Parse input text (dependency parse)
+        2. Compute 4-axis ontology features per word
+        3. Aggregate to document-level summary
+        4. Format as structured routing metadata
+        5. Prepend to system prompt
+
+    Output format:
+        [ONTOLOGY]
+        domain: concrete/abstract
+        structure: simple/complex
+        intent: informational/action/modification
+        confidence: high/medium/low
+        [/ONTOLOGY]
+    """
+```
+
+**Why text-level, not hidden-state-level?** Content injection works at the API boundary — you don't need access to hidden states. This makes it compatible with any LLM provider (Claude, GPT-4, etc.), not just models where you can hook into intermediate layers.
+
+### 13.4 Evaluation Plan
+
+| Metric | Path 1 (Observatory) | Path 2 (Injection) |
+|--------|---------------------|-------------------|
+| **Primary** | Axis prediction R² | Downstream task accuracy delta |
+| **Secondary** | Drift detection AUC | Routing precision/recall |
+| **Ablation** | Monitor vs random baseline | With-injection vs without |
+| **Runtime** | < 10ms per sequence | < 5ms per classification |
+
+### 13.5 What Success Looks Like
+
+**Path 1 (Observatory):**
+- R² > 0.5 on held-out axis prediction → monitor reads real signal
+- Drift detection AUC > 0.7 → monitor catches distribution shifts
+- < 10ms inference → usable as real-time monitor
+
+**Path 2 (Injection):**
+- Statistically significant accuracy improvement on routing tasks
+- No degradation on tasks where injection is irrelevant
+- Classification agrees with Phase 1 ground truth > 80%
+
+### 13.6 What This Does NOT Accomplish
+
+To be explicit about limitations:
+- The monitor CANNOT steer the model (0% causal success at encoding layers)
+- The injector relies on the LLM choosing to use the metadata (not guaranteed)
+- Neither path provides deterministic governance (the original vision)
+- The 4 robust axes may conflate (3 of 4 map to PCA dir 4 at L7)
+
+These limitations are real. Phase 2 is scoped to what the data supports, not what we originally hoped for.
+
+---
+
+## 14. Implementation Status
+
+| Component | Status | Lines | Notes |
+|-----------|--------|-------|-------|
+| Phase 1: Discovery (7a–7f) | COMPLETE | ~1000 | All metrics computed, scenarios classified |
+| Phase 1: Multi-layer discovery | COMPLETE | ~170 | READ/ACT dissociation detected |
+| Phase 2: OntologyMonitor | **COMPLETE** | ~200 | Nonlinear encoder, training loop, evaluation |
+| Phase 2: OntologyInjector | **COMPLETE** | ~150 | Text classification, prompt formatting |
+| Phase 2: Pipeline integration | **COMPLETE** | ~80 | `--run-phase2` flag in run_pipeline.py |
+| Phase 2: Synthetic tests | **COMPLETE** | ~100 | Validates monitor training + injector formatting |
+
+---
+
+## 15. Next Steps (Post Phase 2 Prototype)
+
+1. **Validate on real data**: Run Phase 2 on WikiText with GPT-2 (not just synthetic)
+2. **Benchmark injection**: A/B test injected vs non-injected prompts on classification tasks
+3. **Scale causal methodology**: 50+ intervention pairs at L8–L10 with KL divergence metrics
+4. **Larger SAE dictionary**: 3072 → 16k features for better mechanistic interpretability
+5. **Cross-model transfer**: Test whether the 4 robust axes generalize beyond GPT-2

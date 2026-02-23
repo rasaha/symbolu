@@ -106,10 +106,17 @@ from scripts.causal_subspace.ontology_alignment import (
     OntologyConfig,
     DiscoveryResult,
     MultiLayerDiscoveryResult,
+    Phase2Result,
     run_multi_layer_discovery,
     run_ontology_discovery,
+    run_phase2,
+    build_ontology_vectors,
+    OntologyMonitor,
+    OntologyInjector,
     AXIS_NAMES,
     N_AXES,
+    ROBUST_AXES,
+    N_ROBUST,
 )
 
 logger = logging.getLogger("causal_subspace")
@@ -134,6 +141,8 @@ def run_full_pipeline(
     layers: Optional[List[int]] = None,
     skip_interventions: bool = False,
     run_ontology: bool = False,
+    run_phase2_flag: bool = False,
+    phase2_epochs: int = 100,
     ontology_mi_threshold: float = 0.1,
     device: str = "cpu",
     seed: int = 42,
@@ -651,6 +660,74 @@ def run_full_pipeline(
         print("\n  (Part 7 ontology alignment skipped — use --run-ontology to enable)")
 
     # ===================================================================
+    # PHASE 2: Observatory + Injection Prototype (optional)
+    # ===================================================================
+    phase2_result: Optional[Phase2Result] = None
+
+    if run_phase2_flag:
+        if not run_ontology or ontology_result is None:
+            print("\n  Phase 2 requires --run-ontology. Running ontology discovery first...")
+            run_ontology = True
+            # Re-run ontology if needed (this branch handles --run-phase2 without --run-ontology)
+            if ontology_result is None:
+                print("  ERROR: Cannot run Phase 2 without Phase 1 results. Add --run-ontology.")
+        else:
+            print("\n" + "=" * 70)
+            print("PHASE 2: OBSERVATORY + INJECTION PROTOTYPE")
+            print("=" * 70)
+
+            # Determine read layer (best alignment layer from Phase 1)
+            read_layer = ontology_result.best_alignment_layer
+            print(f"  Monitor read layer: L{read_layer} (best alignment)")
+            print(f"  Training epochs: {phase2_epochs}")
+            print(f"  Robust axes: {', '.join(ROBUST_AXES)}")
+
+            # Build ontology vectors for the read layer
+            H_read = annotations.hidden_states[read_layer]
+            ont_features_read, valid_mask_read = build_ontology_vectors(
+                annotations.words, H_read, annotations.labels_role,
+            )
+
+            phase2_result = run_phase2(
+                annotations=annotations,
+                hidden_states={read_layer: H_read},
+                labels=annotations.labels_role,
+                ont_features=ont_features_read,
+                valid_mask=valid_mask_read,
+                read_layer=read_layer,
+                n_epochs=phase2_epochs,
+                seed=seed,
+            )
+
+            # Print Phase 2 summary
+            print(f"\n  --- Phase 2 Results ---")
+            print(f"  Monitor trained: {phase2_result.monitor_trained}")
+            print(f"  Monitor R² (mean): {phase2_result.monitor_r2_mean:.3f}")
+            for axis, r2 in phase2_result.monitor_r2_per_axis.items():
+                print(f"    {axis}: R²={r2:.3f}")
+            print(f"  Monitor train loss: {phase2_result.monitor_train_loss:.4f}")
+            print(f"  Monitor val loss: {phase2_result.monitor_val_loss:.4f}")
+
+            print(f"\n  Injector test results:")
+            for test in phase2_result.injector_test_results:
+                print(f"    '{test['input'][:40]}...'")
+                print(f"      → {test['domain']}/{test['structure']}/{test['intent']} "
+                      f"(confidence={test['confidence']})")
+
+            # Store in results
+            results["phase2"] = {
+                "monitor_trained": phase2_result.monitor_trained,
+                "monitor_r2_mean": phase2_result.monitor_r2_mean,
+                "monitor_r2_per_axis": phase2_result.monitor_r2_per_axis,
+                "monitor_train_loss": phase2_result.monitor_train_loss,
+                "monitor_val_loss": phase2_result.monitor_val_loss,
+                "monitor_sample_predictions": phase2_result.monitor_sample_predictions,
+                "injector_test_results": phase2_result.injector_test_results,
+            }
+    else:
+        print("\n  (Phase 2 skipped — use --run-phase2 to enable)")
+
+    # ===================================================================
     # FINAL REPORT
     # ===================================================================
     elapsed = time.time() - t0
@@ -722,6 +799,13 @@ def run_full_pipeline(
             print(f"   -> Q/K gating: L{ontology_result.qk_gating_layer}")
         for ev in ontology_result.scenario_evidence:
             print(f"   {ev}")
+
+    if phase2_result is not None:
+        print(f"\n7. Phase 2 Prototype:")
+        print(f"   Monitor R² (mean): {phase2_result.monitor_r2_mean:.3f}")
+        for axis, r2 in phase2_result.monitor_r2_per_axis.items():
+            print(f"     {axis}: R²={r2:.3f}")
+        print(f"   Injector classifications: {len(phase2_result.injector_test_results)} texts tested")
 
     print(f"\nTotal pipeline elapsed: {elapsed:.1f}s")
     print("=" * 70)
@@ -811,6 +895,15 @@ def main():
         help="Run Part 7: ontology alignment discovery",
     )
     parser.add_argument(
+        "--run-phase2", action="store_true",
+        help="Run Phase 2: Observatory monitor + content injection prototype "
+             "(requires --run-ontology)",
+    )
+    parser.add_argument(
+        "--phase2-epochs", type=int, default=100,
+        help="Training epochs for the ontology monitor (default: 100)",
+    )
+    parser.add_argument(
         "--ontology-mi-threshold", type=float, default=0.1,
         help="MI threshold for naming ceremony axis validation (default: 0.1)",
     )
@@ -861,6 +954,11 @@ def main():
         args.sae_epochs = min(args.sae_epochs, 10)
         args.n_pairs = min(args.n_pairs, 10)
         args.layers = args.layers or [0, 5, 11]
+        args.phase2_epochs = min(args.phase2_epochs, 20)
+
+    # --run-phase2 implies --run-ontology
+    if args.run_phase2:
+        args.run_ontology = True
 
     results = run_full_pipeline(
         model_name=args.model,
@@ -877,6 +975,8 @@ def main():
         layers=args.layers,
         skip_interventions=args.skip_interventions,
         run_ontology=args.run_ontology,
+        run_phase2_flag=args.run_phase2,
+        phase2_epochs=args.phase2_epochs,
         ontology_mi_threshold=args.ontology_mi_threshold,
         device=args.device,
         seed=args.seed,

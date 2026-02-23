@@ -67,6 +67,15 @@ from scripts.causal_subspace.trajectory import (
     compute_layer_trajectory,
     plot_trajectory_ascii,
 )
+from scripts.causal_subspace.ontology_alignment import (
+    OntologyMonitor,
+    OntologyInjector,
+    MonitorResult,
+    InjectionMetadata,
+    ROBUST_AXES,
+    N_ROBUST,
+    ROBUST_AXIS_INDICES,
+)
 
 logger = logging.getLogger("causal_subspace.synthetic")
 
@@ -326,6 +335,104 @@ def run_part5_intervention_synthetic(
 
 
 # ---------------------------------------------------------------------------
+# Part 7+: Phase 2 — Monitor and Injector
+# ---------------------------------------------------------------------------
+
+def run_phase2_synthetic(
+    states: Dict[int, np.ndarray],
+    labels: np.ndarray,
+    d_model: int,
+    read_layer: int,
+    n_epochs: int = 50,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Phase 2: Train OntologyMonitor on synthetic data, test OntologyInjector.
+
+    Generates synthetic ontology features (4 robust axes) that correlate
+    with the class labels, trains the monitor to predict them from hidden
+    states, and validates the injector's text classification.
+    """
+    rng = np.random.RandomState(seed)
+    H = states[read_layer]
+    N = H.shape[0]
+
+    # Generate synthetic ontology features for the 4 robust axes
+    # Make them correlate with the class labels (so the monitor has real signal)
+    n_classes = len(np.unique(labels))
+    class_profiles = rng.rand(n_classes, N_ROBUST).astype(np.float32)
+
+    # Full 12-axis ontology (only robust axes have signal, rest is noise)
+    ont_features = rng.rand(N, 12).astype(np.float32) * 0.3 + 0.35  # base noise around 0.5
+    for i in range(N):
+        for j, ax_idx in enumerate(ROBUST_AXIS_INDICES):
+            # Signal: class profile + noise
+            ont_features[i, ax_idx] = class_profiles[labels[i], j] + rng.randn() * 0.1
+    ont_features = np.clip(ont_features, 0.0, 1.0)
+    valid_mask = np.ones(N, dtype=bool)  # all valid in synthetic
+
+    results: Dict[str, Any] = {}
+
+    # --- Path 1: Train Monitor ---
+    print(f"\n  Training OntologyMonitor (d={d_model}, layer={read_layer}, "
+          f"epochs={n_epochs})...")
+
+    monitor = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
+    train_result = monitor.train_monitor(
+        H=H,
+        ont_features=ont_features,
+        valid_mask=valid_mask,
+        n_epochs=n_epochs,
+        batch_size=min(128, N),
+        seed=seed,
+    )
+
+    results["monitor_r2_mean"] = train_result.r2_mean
+    results["monitor_r2_per_axis"] = train_result.r2_per_axis
+    results["monitor_train_loss"] = train_result.final_train_loss
+    results["monitor_val_loss"] = train_result.final_val_loss
+
+    print(f"  Monitor R² (mean): {train_result.r2_mean:.3f}")
+    for axis, r2 in train_result.r2_per_axis.items():
+        print(f"    {axis}: R²={r2:.3f}")
+
+    # Test inference
+    sample_h = H[:3]
+    monitor_out = monitor.predict(sample_h)
+    print(f"  Monitor inference: domain={monitor_out.domain_label}, "
+          f"structure={monitor_out.structure_label}, "
+          f"intent={monitor_out.intent_label}")
+    results["monitor_inference_ok"] = monitor_out.z_ont is not None
+
+    # --- Path 2: Test Injector ---
+    print(f"\n  Testing OntologyInjector...")
+    injector = OntologyInjector()
+
+    test_texts = [
+        "The quick brown fox jumps over the lazy dog.",
+        "Implement distributed consensus using Raft protocol.",
+        "She quickly and carefully examined the results.",
+    ]
+
+    injector_results = []
+    for text in test_texts:
+        meta = injector.classify(text)
+        enriched = injector.inject("You are helpful.", text)
+        injector_results.append({
+            "text": text[:40],
+            "domain": meta.domain,
+            "structure": meta.structure,
+            "intent": meta.intent,
+            "has_tag": "[ONTOLOGY]" in enriched,
+        })
+        print(f"    '{text[:40]}...' → {meta.domain}/{meta.structure}/{meta.intent}")
+
+    results["injector_results"] = injector_results
+    results["injector_format_ok"] = all(r["has_tag"] for r in injector_results)
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Main synthetic pipeline
 # ---------------------------------------------------------------------------
 
@@ -342,6 +449,8 @@ def run_synthetic_pipeline(
     subspace_k: int = 8,
     layers: Optional[List[int]] = None,
     parts: Optional[List[int]] = None,
+    run_phase2: bool = False,
+    phase2_epochs: int = 50,
     seed: int = 42,
 ) -> Dict[str, Any]:
     """Run the causal subspace pipeline on synthetic data.
@@ -474,6 +583,19 @@ def run_synthetic_pipeline(
             "peak_compression": trajectory.peak_compression,
         }
 
+    # --- Phase 2: Monitor + Injector ---
+    if run_phase2 or 7 in parts_to_run:
+        print("\n" + "=" * 70)
+        print("PHASE 2: OBSERVATORY + INJECTION (SYNTHETIC)")
+        print("=" * 70)
+
+        # Use the best layer (latest with good signal)
+        read_layer = active_layers[-1] if active_layers else 0
+        results["phase2"] = run_phase2_synthetic(
+            states, labels, d_model, read_layer,
+            n_epochs=phase2_epochs, seed=seed,
+        )
+
     # --- Summary ---
     elapsed = time.time() - t0
     print("\n" + "=" * 70)
@@ -538,6 +660,32 @@ def run_synthetic_pipeline(
         if passed:
             n_pass += 1
         print(f"  [{status}] Crystallization layer: {crystal}")
+
+    # Check: Phase 2 monitor R² > 0 (learned something)
+    if "phase2" in results:
+        r2 = results["phase2"].get("monitor_r2_mean", -1)
+        passed = r2 > 0.0
+        status = "PASS" if passed else "WARN"
+        n_checks += 1
+        if passed:
+            n_pass += 1
+        print(f"  [{status}] Phase 2 Monitor R²: {r2:.3f}")
+
+        # Check: Injector format is valid
+        fmt_ok = results["phase2"].get("injector_format_ok", False)
+        status = "PASS" if fmt_ok else "WARN"
+        n_checks += 1
+        if fmt_ok:
+            n_pass += 1
+        print(f"  [{status}] Phase 2 Injector format: {'valid' if fmt_ok else 'invalid'}")
+
+        # Check: Monitor inference produces output
+        inf_ok = results["phase2"].get("monitor_inference_ok", False)
+        status = "PASS" if inf_ok else "WARN"
+        n_checks += 1
+        if inf_ok:
+            n_pass += 1
+        print(f"  [{status}] Phase 2 Monitor inference: {'ok' if inf_ok else 'failed'}")
 
     print(f"\n  Checks: {n_pass}/{n_checks} passed")
     print(f"  Elapsed: {elapsed:.1f}s")
@@ -624,7 +772,16 @@ Examples:
     )
     parser.add_argument(
         "--parts", type=int, nargs="*", default=None,
-        help="Specific pipeline parts to run (3=disentangle, 4=MDL, 5=intervention, 6=trajectory)",
+        help="Specific pipeline parts to run (3=disentangle, 4=MDL, 5=intervention, "
+             "6=trajectory, 7=phase2)",
+    )
+    parser.add_argument(
+        "--run-phase2", action="store_true",
+        help="Run Phase 2: OntologyMonitor + OntologyInjector tests",
+    )
+    parser.add_argument(
+        "--phase2-epochs", type=int, default=50,
+        help="Training epochs for Phase 2 monitor (default: 50)",
     )
     parser.add_argument(
         "--seed", type=int, default=42,
@@ -658,6 +815,7 @@ Examples:
         args.sae_epochs = min(args.sae_epochs, 3)
         args.n_pairs = min(args.n_pairs, 5)
         args.n_clusters = min(args.n_clusters, 4)
+        args.phase2_epochs = min(args.phase2_epochs, 10)
 
     results = run_synthetic_pipeline(
         n_samples=args.n_samples,
@@ -672,6 +830,8 @@ Examples:
         subspace_k=args.subspace_k,
         layers=args.layers,
         parts=args.parts,
+        run_phase2=args.run_phase2,
+        phase2_epochs=args.phase2_epochs,
         seed=args.seed,
     )
 
