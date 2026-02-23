@@ -154,6 +154,12 @@ def run_full_pipeline(
     if n_workers <= 0:
         n_workers = min(os.cpu_count() or 4, 8)
 
+    # Prevent OpenBLAS deadlock when using ThreadPoolExecutor
+    # (OpenBLAS uses its own OpenMP threads which conflict with Python threads)
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+
     t0 = time.time()
 
     # ===================================================================

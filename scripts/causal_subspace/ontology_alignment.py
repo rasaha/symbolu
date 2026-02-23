@@ -555,6 +555,8 @@ def compute_subspace_overlap(
     """Compute principal angle overlap between ontology and model subspaces.
 
     Returns value in [0, 1]: 0 = orthogonal, 1 = aligned.
+
+    Uses vectorized correlation matrix instead of per-pair pearsonr loops.
     """
     from sklearn.decomposition import PCA
 
@@ -575,23 +577,22 @@ def compute_subspace_overlap(
     # Project H onto structural subspace
     H_proj = H @ U_k  # [N, k]
 
-    # Canonical correlations between ont_proj and H_proj
-    from scipy.stats import pearsonr
-
+    # Vectorized correlation: corrcoef on the concatenated columns
     n_pairs = min(ont_proj.shape[1], H_proj.shape[1])
-    correlations = []
-    for i in range(n_pairs):
-        for j in range(H_proj.shape[1]):
-            if ont_proj.shape[0] > 2:
-                r, _ = pearsonr(ont_proj[:, i], H_proj[:, j])
-                correlations.append(abs(r))
-
-    if not correlations:
+    if N <= 2 or n_pairs < 1:
         return 0.0
 
-    # Mean of top-k correlations (principal angles)
-    correlations.sort(reverse=True)
-    top_k = correlations[:n_pairs]
+    # Standardize columns
+    ont_std = (ont_proj - ont_proj.mean(axis=0)) / (ont_proj.std(axis=0, ddof=1) + 1e-10)
+    h_std = (H_proj - H_proj.mean(axis=0)) / (H_proj.std(axis=0, ddof=1) + 1e-10)
+
+    # Cross-correlation matrix: [k_ont, k] — all correlations at once
+    corr_matrix = np.abs(ont_std.T @ h_std) / (N - 1)  # [k_ont, k]
+
+    # Top-k correlations (principal angle proxies)
+    all_corrs = corr_matrix.ravel()
+    all_corrs.sort()
+    top_k = all_corrs[-n_pairs:]
     return float(np.mean(top_k))
 
 
@@ -603,6 +604,10 @@ def compute_cka(
     """Centered Kernel Alignment between two representation matrices.
 
     CKA in [0, 1]: 1 = identical representational structure.
+
+    Uses the efficient Frobenius-norm formulation for linear CKA:
+        trace(K_X @ K_Y) = ||X^T @ Y||_F^2
+    which avoids materializing the N×N kernel matrices (O(N*d^2) vs O(N^3)).
     """
     N = X.shape[0]
     if N < 3:
@@ -613,13 +618,16 @@ def compute_cka(
     Y = Y - Y.mean(axis=0, keepdims=True)
 
     if kernel == "linear":
-        K_X = X @ X.T  # [N, N]
-        K_Y = Y @ Y.T
+        # Efficient formulation: trace(K_X K_Y) = ||X^T Y||_F^2
+        # where K_X = X X^T, K_Y = Y Y^T
+        # This is O(N * d_x * d_y) instead of O(N^2 * d + N^3)
+        M_xy = X.T @ Y   # [d_x, d_y]
+        M_xx = X.T @ X   # [d_x, d_x]
+        M_yy = Y.T @ Y   # [d_y, d_y]
 
-        # HSIC
-        hsic_xy = np.trace(K_X @ K_Y) / ((N - 1) ** 2)
-        hsic_xx = np.trace(K_X @ K_X) / ((N - 1) ** 2)
-        hsic_yy = np.trace(K_Y @ K_Y) / ((N - 1) ** 2)
+        hsic_xy = float(np.sum(M_xy ** 2)) / ((N - 1) ** 2)
+        hsic_xx = float(np.sum(M_xx ** 2)) / ((N - 1) ** 2)
+        hsic_yy = float(np.sum(M_yy ** 2)) / ((N - 1) ** 2)
 
         denom = math.sqrt(hsic_xx * hsic_yy)
         if denom < 1e-10:
