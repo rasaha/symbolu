@@ -45,13 +45,20 @@ Deliverables:
 
 from __future__ import annotations
 
+import os
+
+# Prevent OpenBLAS/MKL thread deadlocks when using Python ThreadPoolExecutor.
+# MUST be set before numpy (or any library that loads BLAS) is imported.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import argparse
 import json
 import logging
 import sys
 import time
 import concurrent.futures
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -153,12 +160,6 @@ def run_full_pipeline(
     # Auto-detect parallel workers
     if n_workers <= 0:
         n_workers = min(os.cpu_count() or 4, 8)
-
-    # Prevent OpenBLAS deadlock when using ThreadPoolExecutor
-    # (OpenBLAS uses its own OpenMP threads which conflict with Python threads)
-    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-    os.environ.setdefault("MKL_NUM_THREADS", "1")
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
 
     t0 = time.time()
 
