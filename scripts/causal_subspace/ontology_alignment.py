@@ -660,7 +660,7 @@ def measure_discriminability(
     Returns dict with accuracies and bootstrap CI.
     """
     from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import cross_val_score
+    from sklearn.model_selection import cross_val_score, StratifiedShuffleSplit
     from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import make_pipeline
 
@@ -677,16 +677,30 @@ def measure_discriminability(
             "ci_high": 0.0,
         }
 
+    N = len(labels)
+
+    # Subsample for speed when N is large.  5000 samples is more than
+    # enough for logistic-regression accuracy estimates.
+    MAX_SAMPLES = 5000
+    if N > MAX_SAMPLES:
+        idx_sub = rng.choice(N, size=MAX_SAMPLES, replace=False)
+        ont_features = ont_features[idx_sub]
+        H = H[idx_sub]
+        labels = labels[idx_sub]
+        N = MAX_SAMPLES
+
     # Concatenated features
     concat = np.hstack([ont_features, H])
 
     def _cv_accuracy(X, y):
-        """5-fold CV accuracy with feature scaling."""
+        """3-fold stratified CV accuracy with feature scaling."""
         clf = make_pipeline(
             StandardScaler(),
-            LogisticRegression(max_iter=2000, random_state=seed, solver="lbfgs"),
+            LogisticRegression(
+                max_iter=500, random_state=seed, solver="saga", tol=1e-3,
+            ),
         )
-        n_folds = min(5, len(np.unique(y)))
+        n_folds = min(3, len(np.unique(y)))
         scores = cross_val_score(clf, X, y, cv=n_folds, scoring="accuracy")
         return float(scores.mean())
 
@@ -695,12 +709,12 @@ def measure_discriminability(
     concat_acc = _cv_accuracy(concat, labels)
     gap = concat_acc - emb_acc
 
-    # Bootstrap CI on the gap
+    # Bootstrap CI on the gap — use small subsample per bootstrap for speed
     gaps = []
-    N = len(labels)
-    for _ in range(n_bootstrap):
-        idx = rng.choice(N, size=N, replace=True)
-        boot_ont = _cv_accuracy(ont_features[idx], labels[idx])
+    n_boot = min(n_bootstrap, 50)  # cap at 50 iterations
+    boot_size = min(N, 2000)
+    for _ in range(n_boot):
+        idx = rng.choice(N, size=boot_size, replace=True)
         boot_emb = _cv_accuracy(H[idx], labels[idx])
         boot_concat = _cv_accuracy(concat[idx], labels[idx])
         gaps.append(boot_concat - boot_emb)
