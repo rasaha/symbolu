@@ -652,17 +652,17 @@ def measure_discriminability(
 ) -> Dict[str, float]:
     """Compare role classification: ontology features vs model embeddings.
 
-    Three linear probes:
-    1. ont_features → labels
-    2. H (model embeddings) → labels
-    3. [ont_features; H] → labels (concatenated)
+    Uses a single stratified train/test split with SGDClassifier (linear SVM)
+    for speed.  The discriminability gap only needs to determine whether the
+    ontology adds information beyond the model embeddings — a single split
+    on a subsample is more than adequate for that go/no-go decision.
 
-    Returns dict with accuracies and bootstrap CI.
+    Returns dict with accuracies and approximate CI.
     """
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import cross_val_score, StratifiedShuffleSplit
+    from sklearn.linear_model import SGDClassifier
+    from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
-    from sklearn.pipeline import make_pipeline
+    from sklearn.metrics import accuracy_score
 
     rng = np.random.RandomState(seed)
     n_classes = len(np.unique(labels))
@@ -678,46 +678,50 @@ def measure_discriminability(
         }
 
     N = len(labels)
+    logger.info("  7e: N=%d samples, %d classes, subsampling...", N, n_classes)
 
-    # Subsample for speed when N is large.  5000 samples is more than
-    # enough for logistic-regression accuracy estimates.
-    MAX_SAMPLES = 5000
+    # Subsample aggressively — 2000 samples is plenty for a linear probe
+    MAX_SAMPLES = 2000
     if N > MAX_SAMPLES:
         idx_sub = rng.choice(N, size=MAX_SAMPLES, replace=False)
         ont_features = ont_features[idx_sub]
         H = H[idx_sub]
         labels = labels[idx_sub]
         N = MAX_SAMPLES
+        logger.info("  7e: Subsampled to %d", N)
 
     # Concatenated features
     concat = np.hstack([ont_features, H])
 
-    def _cv_accuracy(X, y):
-        """3-fold stratified CV accuracy with feature scaling."""
-        clf = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(
-                max_iter=500, random_state=seed, solver="saga", tol=1e-3,
-            ),
+    def _split_accuracy(X, y, name=""):
+        """Single train/test split accuracy with SGDClassifier."""
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X, y, test_size=0.2, random_state=seed, stratify=y,
         )
-        n_folds = min(3, len(np.unique(y)))
-        scores = cross_val_score(clf, X, y, cv=n_folds, scoring="accuracy")
-        return float(scores.mean())
+        scaler = StandardScaler()
+        X_tr = scaler.fit_transform(X_tr)
+        X_te = scaler.transform(X_te)
+        clf = SGDClassifier(
+            loss="hinge", max_iter=200, tol=1e-3, random_state=seed,
+        )
+        clf.fit(X_tr, y_tr)
+        acc = accuracy_score(y_te, clf.predict(X_te))
+        logger.info("  7e: %s accuracy = %.1f%%", name, acc * 100)
+        return float(acc)
 
-    ont_acc = _cv_accuracy(ont_features, labels)
-    emb_acc = _cv_accuracy(H, labels)
-    concat_acc = _cv_accuracy(concat, labels)
+    ont_acc = _split_accuracy(ont_features, labels, "ontology")
+    emb_acc = _split_accuracy(H, labels, "embedding")
+    concat_acc = _split_accuracy(concat, labels, "concat")
     gap = concat_acc - emb_acc
 
-    # Bootstrap CI on the gap — use small subsample per bootstrap for speed
+    # Quick bootstrap CI on the gap — 10 resampled splits, no CV
+    logger.info("  7e: Running %d bootstrap resamples for CI...", 10)
     gaps = []
-    n_boot = min(n_bootstrap, 50)  # cap at 50 iterations
-    boot_size = min(N, 2000)
-    for _ in range(n_boot):
-        idx = rng.choice(N, size=boot_size, replace=True)
-        boot_emb = _cv_accuracy(H[idx], labels[idx])
-        boot_concat = _cv_accuracy(concat[idx], labels[idx])
-        gaps.append(boot_concat - boot_emb)
+    for i in range(10):
+        idx = rng.choice(N, size=N, replace=True)
+        b_emb = _split_accuracy(H[idx], labels[idx], f"boot{i+1}-emb")
+        b_concat = _split_accuracy(concat[idx], labels[idx], f"boot{i+1}-cat")
+        gaps.append(b_concat - b_emb)
 
     alpha = (1 - ci) / 2
     ci_low = float(np.percentile(gaps, alpha * 100))
@@ -902,14 +906,20 @@ def run_ontology_discovery(
 
     result = DiscoveryResult(layer_idx=layer_idx)
 
+    import time as _time
+
     # 7b: Build ontology vectors
-    logger.info("7b: Building 12-axis ontology vectors...")
+    _t = _time.time()
+    logger.info("7b: Building 12-axis ontology vectors (H shape=%s)...", H.shape)
     ont_features, valid_mask = build_ontology_vectors(
         annotations.words, H, labels,
     )
 
     result.n_words_with_ontology = int(valid_mask.sum())
     result.coverage_ratio = float(valid_mask.mean()) if len(valid_mask) > 0 else 0.0
+    logger.info("7b: Done in %.1fs — %d/%d words valid (%.0f%%)",
+                _time.time() - _t, valid_mask.sum(), len(valid_mask),
+                result.coverage_ratio * 100)
 
     # Filter to valid words
     ont_valid = ont_features[valid_mask]
@@ -925,8 +935,11 @@ def run_ontology_discovery(
 
     # Project onto structural subspace
     H_proj = H_valid @ U_k  # [N, k]
+    logger.info("  Projected: H_valid %s @ U_k %s → H_proj %s",
+                H_valid.shape, U_k.shape, H_proj.shape)
 
     # 7c: Naming ceremony
+    _t = _time.time()
     logger.info("7c: Running naming ceremony...")
     per_axis_mi, per_axis_best_pca, validated = run_naming_ceremony(
         ont_valid, H_proj, cfg.mi_n_bins, cfg.naming_mi_threshold,
@@ -935,19 +948,30 @@ def run_ontology_discovery(
     result.per_axis_best_pca = per_axis_best_pca
     result.n_validated_axes = len(validated)
     result.validated_axes = validated
+    logger.info("7c: Done in %.1fs — %d axes validated: %s",
+                _time.time() - _t, len(validated), validated)
 
     # 7d: Global alignment
-    logger.info("7d: Computing global alignment metrics...")
+    _t = _time.time()
+    logger.info("7d: Computing global alignment metrics (ont=%s, H_proj=%s)...",
+                ont_valid.shape, H_proj.shape)
     mi_raw, mi_norm = compute_alignment_mi(
         ont_valid, H_proj, labels_valid, cfg.mi_n_bins,
     )
     result.alignment_mi = mi_raw
     result.alignment_mi_normalized = mi_norm
+    logger.info("  7d: MI done (raw=%.4f, norm=%.4f)", mi_raw, mi_norm)
     result.subspace_overlap = compute_subspace_overlap(ont_valid, U_k, H_valid)
+    logger.info("  7d: Subspace overlap done (%.4f)", result.subspace_overlap)
     result.cka_similarity = compute_cka(H_proj, ont_valid, cfg.cka_kernel)
+    logger.info("7d: Done in %.1fs — MI=%.4f, overlap=%.4f, CKA=%.4f",
+                _time.time() - _t, mi_raw, result.subspace_overlap,
+                result.cka_similarity)
 
     # 7e: Discriminability
-    logger.info("7e: Measuring discriminability...")
+    _t = _time.time()
+    logger.info("7e: Measuring discriminability (ont=%s, H=%s, %d classes)...",
+                ont_valid.shape, H_valid.shape, len(np.unique(labels_valid)))
     disc = measure_discriminability(
         ont_valid, H_valid, labels_valid,
         cfg.n_bootstrap, cfg.bootstrap_ci, cfg.seed,
@@ -958,6 +982,7 @@ def run_ontology_discovery(
     result.discriminability_gap = disc["gap"]
     result.accuracy_ci_low = disc["ci_low"]
     result.accuracy_ci_high = disc["ci_high"]
+    logger.info("7e: Done in %.1fs — gap=%.1f%%", _time.time() - _t, disc["gap"] * 100)
 
     # 7f: Scenario classification
     logger.info("7f: Classifying scenario...")
