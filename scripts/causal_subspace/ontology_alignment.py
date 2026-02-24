@@ -154,12 +154,47 @@ class MultiLayerDiscoveryResult:
 # 7b. Build 12-axis ontology vectors
 # ---------------------------------------------------------------------------
 
+def _ensure_wordnet() -> bool:
+    """Download WordNet corpus if missing. Returns True on success."""
+    try:
+        import nltk
+        from nltk.corpus import wordnet as wn
+    except ImportError:
+        return False
+    try:
+        # Trigger lazy load to check availability
+        wn.synsets("test")
+        return True
+    except LookupError:
+        nltk.download("wordnet", quiet=True)
+        # Reload the corpus reader after downloading
+        try:
+            wn._LazyCorpusLoader__load()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        # Verify it works now
+        try:
+            wn.synsets("test")
+            return True
+        except LookupError:
+            return False
+
+
+_wordnet_ready: Optional[bool] = None
+
+
 def _try_wordnet_features(word: str) -> Tuple[float, float, float]:
     """Try to get WordNet-based features for a word.
 
     Returns (hypernym_depth_normalized, animacy, semantic_specificity).
     All NaN if WordNet unavailable or word not found.
     """
+    global _wordnet_ready
+    if _wordnet_ready is None:
+        _wordnet_ready = _ensure_wordnet()
+    if not _wordnet_ready:
+        return (float("nan"), float("nan"), float("nan"))
+
     try:
         from nltk.corpus import wordnet as wn
     except ImportError:
