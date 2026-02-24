@@ -39,7 +39,17 @@ Usage::
         --checkpoint checkpoints/best.pt \\
         --run-phase1 --run-phase3 --output results_symbolu.json
 
-    # Full pipeline (all three phases), quick mode
+    # Hybrid health eval only (anchor + learned refinement)
+    python scripts/causal_subspace/run_symbolu_ontology.py \\
+        --checkpoint checkpoints/best.pt \\
+        --run-hybrid --output results_hybrid.json
+
+    # Hybrid with custom loss weights
+    python scripts/causal_subspace/run_symbolu_ontology.py \\
+        --checkpoint checkpoints/best.pt \\
+        --run-hybrid --hybrid-alpha 1.0 --hybrid-beta 0.2 --hybrid-gamma 0.1
+
+    # Full pipeline (all phases + hybrid health), quick mode
     python scripts/causal_subspace/run_symbolu_ontology.py \\
         --checkpoint checkpoints/best.pt \\
         --run-all --quick --output results_symbolu.json
@@ -136,6 +146,66 @@ class BridgeAlignmentResult:
     bridge_role_accuracy: float = 0.0
     hidden_role_accuracy: float = 0.0
     bridge_discriminability_gap: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Hybrid Health Result
+# ---------------------------------------------------------------------------
+
+@dataclass
+class HybridHealthResult:
+    """Hybrid Anchor + Learned Refinement evaluation.
+
+    Measures the three-part loss decomposition:
+        L = α·L_alignment + β·L_diversity + γ·L_entropy
+
+    And classifies the hybrid health scenario:
+        A (Healthy Alignment): 6-8 axes correlated, structured but not rigid
+        B (Partial Drift):     Model reinterprets 2-3 axes beyond heuristics
+        C (Collapse):          Multiple axes map to same PCA direction, MI low
+    """
+
+    # --- Loss decomposition (computed on bridge output vs external axes) ---
+    L_alignment: float = 0.0       # MSE between bridge 12D and external 12D (lower = better)
+    L_diversity: float = 0.0       # 1 - normalized entropy of axis activations (0 = diverse)
+    L_entropy: float = 0.0         # Mean per-token entropy deficit (0 = balanced)
+    L_total: float = 0.0           # α·L_alignment + β·L_diversity + γ·L_entropy
+    alpha: float = 1.0
+    beta: float = 0.1
+    gamma: float = 0.05
+
+    # --- Per-axis alignment ---
+    per_axis_alignment: Dict[str, float] = field(default_factory=dict)  # MSE per axis
+    per_axis_corr: Dict[str, float] = field(default_factory=dict)       # Pearson r per axis
+    per_axis_deviation: Dict[str, float] = field(default_factory=dict)  # Where bridge != anchor
+
+    # --- Diversity metrics ---
+    axis_entropy: float = 0.0           # Entropy of mean axis activations (bits)
+    max_entropy: float = 0.0            # log2(12) = max possible
+    axis_covariance_penalty: float = 0.0  # Off-diagonal cov magnitude (orthogonality)
+    collapsed_axes: List[str] = field(default_factory=list)  # Axes with near-zero variance
+
+    # --- Entropy balance ---
+    per_token_entropy_mean: float = 0.0   # Mean entropy across tokens
+    per_token_entropy_std: float = 0.0    # Std of per-token entropy (uniformity)
+    dominant_axis_fraction: float = 0.0   # Fraction of tokens where one axis > 50%
+
+    # --- Hybrid health classification ---
+    scenario: str = "C"                    # A (Healthy) / B (Partial Drift) / C (Collapse)
+    scenario_confidence: float = 0.0
+    n_strongly_aligned: int = 0            # Axes with r > 0.5
+    n_partially_aligned: int = 0           # Axes with 0.2 < r < 0.5
+    n_drifted: int = 0                     # Axes where bridge deviates meaningfully
+    n_collapsed: int = 0                   # Axes with near-zero variance
+
+    # --- Deviation analysis ---
+    drift_axes: List[str] = field(default_factory=list)      # Axes where bridge > anchor
+    drift_descriptions: Dict[str, str] = field(default_factory=dict)  # Why each drifted
+
+    # --- Expected training trajectory markers ---
+    alignment_saturated: bool = False      # CKA ≈ 1.0 → overfitting to heuristics
+    geometry_random: bool = False           # CKA ≈ 0.0 → no alignment at all
+    structured_nonlinear: bool = False     # 0.2 < CKA < 0.8 → ideal hybrid zone
 
 
 # ---------------------------------------------------------------------------
@@ -510,6 +580,257 @@ def _annotate_tokens(
 
 
 # ---------------------------------------------------------------------------
+# Hybrid Health Evaluation
+# ---------------------------------------------------------------------------
+
+def run_hybrid_health_eval(
+    bridge_output: np.ndarray,
+    ont_features: np.ndarray,
+    valid_mask: np.ndarray,
+    alpha: float = 1.0,
+    beta: float = 0.1,
+    gamma: float = 0.05,
+    strong_threshold: float = 0.5,
+    partial_threshold: float = 0.2,
+    collapse_var_threshold: float = 0.01,
+    n_bins: int = 20,
+) -> HybridHealthResult:
+    """Evaluate the hybrid anchor + learned refinement health.
+
+    Measures the three-loss decomposition that governs the OntologicalBridge:
+        L = α·L_alignment + β·L_diversity + γ·L_entropy
+
+    Then classifies hybrid health:
+        A (Healthy):       6+ axes strongly aligned, CKA in [0.2, 0.8]
+        B (Partial Drift): 3-5 strong, 2+ drifted (bridge reinterprets)
+        C (Collapse):      <3 aligned, or axes collapsed to same direction
+
+    Parameters
+    ----------
+    bridge_output : np.ndarray [N, 12]
+        OntologicalBridge output for each token.
+    ont_features : np.ndarray [N, 12]
+        Static external 12-axis ontology vectors.
+    valid_mask : np.ndarray [N] bool
+        Which tokens have valid annotations.
+    alpha, beta, gamma : float
+        Loss weights for alignment, diversity, entropy.
+    strong_threshold : float
+        Pearson r threshold for "strongly aligned" (default 0.5).
+    partial_threshold : float
+        Pearson r threshold for "partially aligned" (default 0.2).
+    collapse_var_threshold : float
+        Variance threshold below which an axis is "collapsed".
+    n_bins : int
+        Bins for MI estimation.
+    """
+    from scripts.causal_subspace.ontology_alignment import _compute_binned_mi
+
+    result = HybridHealthResult(alpha=alpha, beta=beta, gamma=gamma)
+
+    bridge_valid = bridge_output[valid_mask]
+    ont_valid = ont_features[valid_mask]
+    N = bridge_valid.shape[0]
+
+    if N < 20:
+        logger.warning("Too few valid tokens (%d) for hybrid eval", N)
+        return result
+
+    logger.info("Hybrid health eval: N=%d valid tokens", N)
+
+    # ===================================================================
+    # L_alignment: Per-axis MSE + Pearson correlation
+    # ===================================================================
+    # Normalize both to [0, 1] range for fair comparison
+    def _safe_normalize(x: np.ndarray) -> np.ndarray:
+        mn, mx = x.min(axis=0), x.max(axis=0)
+        rng = mx - mn
+        rng[rng < 1e-10] = 1.0
+        return (x - mn) / rng
+
+    bridge_norm = _safe_normalize(bridge_valid)
+    ont_norm = _safe_normalize(ont_valid)
+
+    per_axis_mse = np.mean((bridge_norm - ont_norm) ** 2, axis=0)  # [12]
+    result.L_alignment = float(per_axis_mse.mean())
+
+    for i, name in enumerate(AXIS_NAMES):
+        result.per_axis_alignment[name] = float(per_axis_mse[i])
+
+        # Pearson correlation per axis
+        b_col = bridge_valid[:, i]
+        o_col = ont_valid[:, i]
+        b_std, o_std = b_col.std(), o_col.std()
+        if b_std > 1e-8 and o_std > 1e-8:
+            r = float(np.corrcoef(b_col, o_col)[0, 1])
+            if np.isnan(r):
+                r = 0.0
+        else:
+            r = 0.0
+        result.per_axis_corr[name] = r
+
+        # Deviation: where bridge meaningfully disagrees with anchor
+        # Use residual MSE after accounting for linear fit
+        if b_std > 1e-8 and o_std > 1e-8:
+            # Residual after best linear fit
+            coeffs = np.polyfit(o_col, b_col, 1)
+            predicted = np.polyval(coeffs, o_col)
+            residual_var = np.var(b_col - predicted)
+            total_var = np.var(b_col)
+            deviation = residual_var / max(total_var, 1e-10)
+        else:
+            deviation = 1.0
+        result.per_axis_deviation[name] = float(deviation)
+
+    logger.info("  L_alignment = %.4f (mean MSE across 12 axes)", result.L_alignment)
+
+    # ===================================================================
+    # L_diversity: Axis specialization / orthogonality
+    # ===================================================================
+    aspect_means = np.mean(np.abs(bridge_valid), axis=0)  # [12]
+    aspect_probs = aspect_means / (aspect_means.sum() + 1e-10)
+    axis_entropy = -np.sum(aspect_probs * np.log2(aspect_probs + 1e-10))
+    max_ent = np.log2(12)
+    result.axis_entropy = float(axis_entropy)
+    result.max_entropy = float(max_ent)
+    result.L_diversity = float(1.0 - axis_entropy / max_ent)  # 0 = perfectly diverse
+
+    # Covariance penalty: off-diagonal magnitude
+    cov_matrix = np.cov(bridge_valid.T)  # [12, 12]
+    diag_mask = ~np.eye(12, dtype=bool)
+    off_diag = np.abs(cov_matrix[diag_mask])
+    result.axis_covariance_penalty = float(off_diag.mean())
+
+    # Collapsed axes: variance too low
+    axis_vars = np.var(bridge_valid, axis=0)
+    for i, name in enumerate(AXIS_NAMES):
+        if axis_vars[i] < collapse_var_threshold:
+            result.collapsed_axes.append(name)
+    result.n_collapsed = len(result.collapsed_axes)
+
+    logger.info("  L_diversity = %.4f (entropy=%.2f/%.2f bits, cov_penalty=%.4f)",
+                result.L_diversity, result.axis_entropy, result.max_entropy,
+                result.axis_covariance_penalty)
+    if result.collapsed_axes:
+        logger.info("  Collapsed axes: %s", ", ".join(result.collapsed_axes))
+
+    # ===================================================================
+    # L_entropy: Per-token axis balance
+    # ===================================================================
+    # For each token, compute entropy of its 12D activation distribution
+    token_abs = np.abs(bridge_valid) + 1e-10  # [N, 12]
+    token_probs = token_abs / token_abs.sum(axis=1, keepdims=True)
+    token_entropies = -np.sum(token_probs * np.log2(token_probs), axis=1)  # [N]
+
+    result.per_token_entropy_mean = float(token_entropies.mean())
+    result.per_token_entropy_std = float(token_entropies.std())
+
+    # Entropy deficit: how far below max entropy
+    entropy_deficit = max_ent - token_entropies.mean()
+    result.L_entropy = float(max(0.0, entropy_deficit / max_ent))
+
+    # Dominant axis fraction: tokens where one axis > 50% of total activation
+    max_frac = token_probs.max(axis=1)  # [N]
+    result.dominant_axis_fraction = float(np.mean(max_frac > 0.5))
+
+    logger.info("  L_entropy = %.4f (token_entropy=%.2f±%.2f, dominant_frac=%.1f%%)",
+                result.L_entropy, result.per_token_entropy_mean,
+                result.per_token_entropy_std, result.dominant_axis_fraction * 100)
+
+    # ===================================================================
+    # Total loss
+    # ===================================================================
+    result.L_total = (alpha * result.L_alignment +
+                      beta * result.L_diversity +
+                      gamma * result.L_entropy)
+
+    logger.info("  L_total = %.4f (α=%.2f, β=%.2f, γ=%.2f)",
+                result.L_total, alpha, beta, gamma)
+
+    # ===================================================================
+    # Classify axes: strongly aligned / partially aligned / drifted
+    # ===================================================================
+    for name in AXIS_NAMES:
+        r = result.per_axis_corr[name]
+        dev = result.per_axis_deviation[name]
+
+        if r >= strong_threshold:
+            result.n_strongly_aligned += 1
+        elif r >= partial_threshold:
+            result.n_partially_aligned += 1
+
+        # Drift: bridge correlates moderately but deviation is high
+        # (it's capturing something the heuristic doesn't)
+        if r >= partial_threshold and dev > 0.5:
+            result.n_drifted += 1
+            result.drift_axes.append(name)
+            result.drift_descriptions[name] = (
+                f"r={r:.3f} but residual_dev={dev:.3f} — bridge encodes "
+                f"beyond heuristic {name.split('_')[1].lower()}"
+            )
+
+    logger.info("  Axis classification: %d strong, %d partial, %d drifted, %d collapsed",
+                result.n_strongly_aligned, result.n_partially_aligned,
+                result.n_drifted, result.n_collapsed)
+
+    # ===================================================================
+    # Hybrid health scenario classification
+    # ===================================================================
+    cka = float(compute_cka(bridge_valid, ont_valid))
+
+    # CKA regime detection
+    result.alignment_saturated = cka > 0.95   # Near-perfect = just regressing to heuristics
+    result.geometry_random = cka < 0.05       # No alignment at all
+    result.structured_nonlinear = 0.2 <= cka <= 0.95  # Ideal hybrid zone
+
+    total_meaningful = result.n_strongly_aligned + result.n_partially_aligned
+
+    # Scenario A (Healthy Alignment):
+    #   6+ strong axes AND total meaningful (strong+partial) >= 8
+    #   This means most of the ontology is embedded, possibly with some
+    #   partial alignment on abstract axes (O9-O12). Not brittle.
+    n_weak = 12 - total_meaningful
+    if (result.n_strongly_aligned >= 6 and
+            total_meaningful >= 8 and
+            result.n_collapsed <= 2 and
+            not result.geometry_random):
+        result.scenario = "A"
+        result.scenario_confidence = min(1.0, total_meaningful / 10.0)
+    # Scenario B (Partial Drift):
+    #   3+ strong axes but total meaningful < 8, OR drift detected
+    #   Mid-training or bridge is reinterpreting some axes
+    elif (result.n_strongly_aligned >= 3 and
+          not result.geometry_random):
+        result.scenario = "B"
+        result.scenario_confidence = min(1.0, total_meaningful / 8.0)
+    else:
+        result.scenario = "C"
+        # Confidence scales with how far from healthy
+        result.scenario_confidence = max(0.0, 1.0 - total_meaningful / 6.0)
+
+    scenario_names = {
+        "A": "Healthy Alignment",
+        "B": "Partial Drift (good hybrid behavior)",
+        "C": "Collapse / Pre-training",
+    }
+    logger.info("  Hybrid scenario: %s — %s (confidence=%.2f, CKA=%.4f)",
+                result.scenario, scenario_names[result.scenario],
+                result.scenario_confidence, cka)
+
+    if result.drift_axes:
+        logger.info("  Drifted axes (bridge reinterpretation):")
+        for ax in result.drift_axes:
+            logger.info("    %s: %s", ax, result.drift_descriptions[ax])
+
+    if result.alignment_saturated:
+        logger.warning("  WARNING: CKA=%.3f — bridge may be overfitting to heuristics", cka)
+    if result.geometry_random:
+        logger.warning("  WARNING: CKA=%.3f — no alignment, α may be too low or bridge untrained", cka)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Phase 3: Bridge Alignment Analysis
 # ---------------------------------------------------------------------------
 
@@ -659,10 +980,14 @@ def run_symbolu_ontology_pipeline(
     run_phase1: bool = True,
     run_phase2_flag: bool = False,
     run_phase3_flag: bool = False,
+    run_hybrid_flag: bool = False,
     phase2_epochs: int = 100,
     ontology_mi_threshold: float = 0.1,
     subspace_k: int = 16,
     compare_gpt2: bool = False,
+    hybrid_alpha: float = 1.0,
+    hybrid_beta: float = 0.1,
+    hybrid_gamma: float = 0.05,
     device: Optional[str] = None,
     seed: int = 42,
     override_n_layer: Optional[int] = None,
@@ -1051,6 +1376,152 @@ def run_symbolu_ontology_pipeline(
             }
 
     # ===================================================================
+    # HYBRID HEALTH: Anchor + Learned Refinement Evaluation
+    # ===================================================================
+    if run_hybrid_flag:
+        if "bridge_output" not in data and not ont_features_cache:
+            print("\n  Hybrid eval requires bridge output OR Phase 1 ontology vectors. Skipping.")
+        else:
+            print("\n" + "=" * 70)
+            print("HYBRID HEALTH: ANCHOR + LEARNED REFINEMENT EVALUATION")
+            print("=" * 70)
+            print(f"  Loss weights: α={hybrid_alpha}, β={hybrid_beta}, γ={hybrid_gamma}")
+            print(f"  L = α·L_alignment + β·L_diversity + γ·L_entropy")
+
+            ont_features = ont_features_cache["ont_features"]
+            valid_mask = ont_features_cache["valid_mask"]
+
+            if "bridge_output" in data:
+                # Use actual OntologicalBridge output
+                bridge_for_hybrid = data["bridge_output"]
+                hybrid_source = "OntologicalBridge"
+            else:
+                # No bridge — use top-12 PCA directions as proxy
+                # This lets us evaluate hybrid health even before bridge is trained
+                from sklearn.decomposition import PCA
+                H_read = ont_features_cache["H_read"]
+                pca_12 = PCA(n_components=12).fit_transform(H_read)
+                bridge_for_hybrid = pca_12
+                hybrid_source = "PCA-12 proxy (no bridge)"
+
+            print(f"  Source: {hybrid_source}")
+
+            # Align shapes
+            n_tokens = min(bridge_for_hybrid.shape[0], ont_features.shape[0],
+                           len(valid_mask))
+            bridge_for_hybrid = bridge_for_hybrid[:n_tokens]
+            ont_features_h = ont_features[:n_tokens]
+            valid_mask_h = valid_mask[:n_tokens]
+
+            hybrid_result = run_hybrid_health_eval(
+                bridge_output=bridge_for_hybrid,
+                ont_features=ont_features_h,
+                valid_mask=valid_mask_h,
+                alpha=hybrid_alpha,
+                beta=hybrid_beta,
+                gamma=hybrid_gamma,
+            )
+
+            # Print results
+            scenario_names = {
+                "A": "Healthy Alignment",
+                "B": "Partial Drift (good hybrid behavior)",
+                "C": "Collapse / Pre-training",
+            }
+
+            print(f"\n  --- Hybrid Health Results ---")
+            print(f"  Scenario: {hybrid_result.scenario} — "
+                  f"{scenario_names.get(hybrid_result.scenario, '?')} "
+                  f"(confidence={hybrid_result.scenario_confidence:.2f})")
+            print(f"\n  Loss decomposition:")
+            print(f"    L_alignment = {hybrid_result.L_alignment:.4f} "
+                  f"(α·L = {hybrid_alpha * hybrid_result.L_alignment:.4f})")
+            print(f"    L_diversity = {hybrid_result.L_diversity:.4f} "
+                  f"(β·L = {hybrid_beta * hybrid_result.L_diversity:.4f})")
+            print(f"    L_entropy   = {hybrid_result.L_entropy:.4f} "
+                  f"(γ·L = {hybrid_gamma * hybrid_result.L_entropy:.4f})")
+            print(f"    L_total     = {hybrid_result.L_total:.4f}")
+
+            print(f"\n  Axis diversity:")
+            print(f"    Entropy: {hybrid_result.axis_entropy:.2f} / {hybrid_result.max_entropy:.2f} bits")
+            print(f"    Covariance penalty: {hybrid_result.axis_covariance_penalty:.4f}")
+            if hybrid_result.collapsed_axes:
+                print(f"    COLLAPSED: {', '.join(hybrid_result.collapsed_axes)}")
+
+            print(f"\n  Token-level entropy balance:")
+            print(f"    Mean entropy: {hybrid_result.per_token_entropy_mean:.2f} bits")
+            print(f"    Entropy std:  {hybrid_result.per_token_entropy_std:.2f}")
+            print(f"    Dominant axis fraction: {hybrid_result.dominant_axis_fraction:.1%}")
+
+            print(f"\n  Axis classification:")
+            print(f"    Strongly aligned (r≥0.5):  {hybrid_result.n_strongly_aligned}")
+            print(f"    Partially aligned (r≥0.2): {hybrid_result.n_partially_aligned}")
+            print(f"    Drifted (reinterpreted):   {hybrid_result.n_drifted}")
+            print(f"    Collapsed (var≈0):         {hybrid_result.n_collapsed}")
+
+            print(f"\n  Per-axis detail:")
+            print(f"    {'Axis':25s} {'r':>8s} {'MSE':>8s} {'Dev':>8s} {'Status'}")
+            print(f"    {'-'*25} {'-'*8} {'-'*8} {'-'*8} {'-'*20}")
+            for name in AXIS_NAMES:
+                r = hybrid_result.per_axis_corr.get(name, 0.0)
+                mse = hybrid_result.per_axis_alignment.get(name, 0.0)
+                dev = hybrid_result.per_axis_deviation.get(name, 0.0)
+                if name in hybrid_result.collapsed_axes:
+                    status = "COLLAPSED"
+                elif name in hybrid_result.drift_axes:
+                    status = "DRIFTED"
+                elif r >= 0.5:
+                    status = "STRONG"
+                elif r >= 0.2:
+                    status = "PARTIAL"
+                else:
+                    status = "weak"
+                print(f"    {name:25s} {r:>8.3f} {mse:>8.4f} {dev:>8.3f} {status}")
+
+            if hybrid_result.drift_axes:
+                print(f"\n  Drift analysis (bridge reinterpretation beyond heuristics):")
+                for ax in hybrid_result.drift_axes:
+                    print(f"    {ax}: {hybrid_result.drift_descriptions[ax]}")
+
+            # CKA regime
+            regime = "IDEAL (structured nonlinear)" if hybrid_result.structured_nonlinear else \
+                     "SATURATED (overfitting to heuristics)" if hybrid_result.alignment_saturated else \
+                     "RANDOM (no alignment)" if hybrid_result.geometry_random else "intermediate"
+            print(f"\n  CKA regime: {regime}")
+
+            # Store results
+            results["hybrid_health"] = {
+                "scenario": hybrid_result.scenario,
+                "scenario_confidence": hybrid_result.scenario_confidence,
+                "source": hybrid_source,
+                "L_alignment": hybrid_result.L_alignment,
+                "L_diversity": hybrid_result.L_diversity,
+                "L_entropy": hybrid_result.L_entropy,
+                "L_total": hybrid_result.L_total,
+                "alpha": hybrid_alpha,
+                "beta": hybrid_beta,
+                "gamma": hybrid_gamma,
+                "axis_entropy": hybrid_result.axis_entropy,
+                "max_entropy": hybrid_result.max_entropy,
+                "axis_covariance_penalty": hybrid_result.axis_covariance_penalty,
+                "collapsed_axes": hybrid_result.collapsed_axes,
+                "per_token_entropy_mean": hybrid_result.per_token_entropy_mean,
+                "per_token_entropy_std": hybrid_result.per_token_entropy_std,
+                "dominant_axis_fraction": hybrid_result.dominant_axis_fraction,
+                "n_strongly_aligned": hybrid_result.n_strongly_aligned,
+                "n_partially_aligned": hybrid_result.n_partially_aligned,
+                "n_drifted": hybrid_result.n_drifted,
+                "n_collapsed": hybrid_result.n_collapsed,
+                "drift_axes": hybrid_result.drift_axes,
+                "per_axis_corr": hybrid_result.per_axis_corr,
+                "per_axis_alignment": hybrid_result.per_axis_alignment,
+                "per_axis_deviation": hybrid_result.per_axis_deviation,
+                "alignment_saturated": hybrid_result.alignment_saturated,
+                "geometry_random": hybrid_result.geometry_random,
+                "structured_nonlinear": hybrid_result.structured_nonlinear,
+            }
+
+    # ===================================================================
     # OPTIONAL: GPT-2 Comparison
     # ===================================================================
     if compare_gpt2:
@@ -1136,6 +1607,24 @@ def run_symbolu_ontology_pipeline(
         print(f"    CKA={results['phase3']['global_cka']:.4f}, "
               f"MI={results['phase3']['global_mi']:.4f}")
 
+    if "hybrid_health" in results:
+        hh = results["hybrid_health"]
+        hybrid_scenario_names = {
+            "A": "Healthy Alignment",
+            "B": "Partial Drift",
+            "C": "Collapse/Pre-training",
+        }
+        print(f"\n  Hybrid Health: Scenario {hh['scenario']} "
+              f"({hybrid_scenario_names.get(hh['scenario'], '?')})")
+        print(f"    L_total={hh['L_total']:.4f} "
+              f"(align={hh['L_alignment']:.4f}, "
+              f"div={hh['L_diversity']:.4f}, "
+              f"ent={hh['L_entropy']:.4f})")
+        print(f"    Axes: {hh['n_strongly_aligned']} strong, "
+              f"{hh['n_partially_aligned']} partial, "
+              f"{hh['n_drifted']} drifted, "
+              f"{hh['n_collapsed']} collapsed")
+
     print(f"\n  Total elapsed: {elapsed:.1f}s")
     print("=" * 70)
 
@@ -1217,8 +1706,26 @@ Examples:
         help="Run Phase 3: Bridge alignment (SymbolU-specific, requires OntologicalBridge)",
     )
     parser.add_argument(
+        "--run-hybrid", action="store_true",
+        help="Run Hybrid Health eval: L=α·L_alignment + β·L_diversity + γ·L_entropy",
+    )
+    parser.add_argument(
         "--run-all", action="store_true",
-        help="Run all three phases",
+        help="Run all phases including hybrid health",
+    )
+
+    # Hybrid loss weights
+    parser.add_argument(
+        "--hybrid-alpha", type=float, default=1.0,
+        help="Weight for alignment loss in hybrid eval (default: 1.0)",
+    )
+    parser.add_argument(
+        "--hybrid-beta", type=float, default=0.1,
+        help="Weight for diversity loss in hybrid eval (default: 0.1)",
+    )
+    parser.add_argument(
+        "--hybrid-gamma", type=float, default=0.05,
+        help="Weight for entropy loss in hybrid eval (default: 0.05)",
     )
 
     # Data collection
@@ -1276,18 +1783,19 @@ Examples:
         datefmt="%H:%M:%S",
     )
 
-    # --run-all implies all phases
+    # --run-all implies all phases + hybrid
     if args.run_all:
         args.run_phase1 = True
         args.run_phase2 = True
         args.run_phase3 = True
+        args.run_hybrid = True
 
-    # --run-phase2 and --run-phase3 require --run-phase1
-    if (args.run_phase2 or args.run_phase3) and not args.run_phase1:
+    # --run-phase2, --run-phase3, --run-hybrid require --run-phase1
+    if (args.run_phase2 or args.run_phase3 or args.run_hybrid) and not args.run_phase1:
         args.run_phase1 = True
 
     # Default: at least run phase1
-    if not (args.run_phase1 or args.run_phase2 or args.run_phase3):
+    if not (args.run_phase1 or args.run_phase2 or args.run_phase3 or args.run_hybrid):
         args.run_phase1 = True
 
     # Handle checkpoint: --no-checkpoint or missing file
@@ -1315,10 +1823,14 @@ Examples:
         run_phase1=args.run_phase1,
         run_phase2_flag=args.run_phase2,
         run_phase3_flag=args.run_phase3,
+        run_hybrid_flag=args.run_hybrid,
         phase2_epochs=args.phase2_epochs,
         ontology_mi_threshold=args.ontology_mi_threshold,
         subspace_k=args.subspace_k,
         compare_gpt2=args.compare_gpt2,
+        hybrid_alpha=args.hybrid_alpha,
+        hybrid_beta=args.hybrid_beta,
+        hybrid_gamma=args.hybrid_gamma,
         device=args.device,
         seed=args.seed,
         override_n_layer=args.n_layer,
