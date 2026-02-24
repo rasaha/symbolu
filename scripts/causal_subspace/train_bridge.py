@@ -74,10 +74,13 @@ from scripts.causal_subspace.ontology_alignment import (
     N_ROBUST,
     ROBUST_AXES,
     ROBUST_AXIS_INDICES,
+    OntologyMonitor,
 )
 from scripts.causal_subspace.jepa_observatory import (
     OntologyBridge,
     compute_alignment_matrix,
+    compute_detection_auc,
+    generate_synthetic_anomalies,
     _spearman_rank_correlation,
 )
 from scripts.causal_subspace.check_alignment import (
@@ -85,6 +88,7 @@ from scripts.causal_subspace.check_alignment import (
     SOVEREIGN_DIM_NAMES,
 )
 from symbolu.jepa.state_projector import SovereignStateProjector
+from symbolu.jepa.predictor import VrittiValidatedPredictor
 
 logger = logging.getLogger("train_bridge")
 
@@ -554,6 +558,781 @@ def sanity_condition_number(
     }
 
 
+# ── Feature 1: Enriched Witnesses Bridge ──────────────────────────────────
+
+META_FEATURE_NAMES = [
+    "residual_mean",   # Mean |S_pred - S|
+    "residual_max",    # Max |S_pred - S|
+    "residual_std",    # Std |S_pred - S|
+    "cosine_sim",      # cos(S_pred, S)
+    "vritti_entropy",  # H(Vritti distribution)
+    "state_variance",  # Var(S) over prediction steps
+]
+N_META = len(META_FEATURE_NAMES)
+
+
+def compute_meta_features(
+    S: np.ndarray,
+    predictor: VrittiValidatedPredictor,
+    state_dim: int = 32,
+) -> np.ndarray:
+    """Compute meta-state features that capture dynamics beyond static S.
+
+    Witnessing (O9) is inherently about meta-observation — noticing change,
+    uncertainty, surprise. Static Sovereign State snapshots miss this. These
+    features capture the dynamic signals:
+
+      - JEPA prediction residuals (surprise / uncertainty)
+      - Cosine similarity (directional coherence of predictions)
+      - Vritti entropy (cognitive mode stability)
+      - State variance over prediction steps (trajectory turbulence)
+
+    Args:
+        S: Sovereign State vectors [N, state_dim]
+        predictor: PhaseJEPA predictor (trained or untrained)
+        state_dim: Sovereign State dimension
+
+    Returns:
+        meta_features: [N, 6] array of meta-state features
+    """
+    S_tensor = torch.from_numpy(S.astype(np.float32))
+
+    with torch.no_grad():
+        s_pred, delta_list = predictor(S_tensor)
+
+    s_pred_np = s_pred.cpu().numpy()
+
+    # 1. JEPA prediction residuals: |S_pred - S|
+    residual_abs = np.abs(s_pred_np - S)
+    residual_mean = residual_abs.mean(axis=1, keepdims=True)  # [N, 1]
+    residual_max = residual_abs.max(axis=1, keepdims=True)    # [N, 1]
+    residual_std = residual_abs.std(axis=1, keepdims=True)    # [N, 1]
+
+    # 2. Cosine similarity between predicted and actual
+    dot = np.sum(S * s_pred_np, axis=1, keepdims=True)
+    norm_a = np.linalg.norm(S, axis=1, keepdims=True) + 1e-8
+    norm_b = np.linalg.norm(s_pred_np, axis=1, keepdims=True) + 1e-8
+    cosine_sim = dot / (norm_a * norm_b)  # [N, 1]
+
+    # 3. Entropy of Vritti distribution (dims 17:22, softmax-normalized)
+    vritti = S[:, 17:22]  # [N, 5]
+    vritti_clipped = np.clip(vritti, 1e-8, 1.0)
+    vritti_entropy = -np.sum(
+        vritti_clipped * np.log(vritti_clipped), axis=1, keepdims=True
+    )  # [N, 1]
+
+    # 4. Variance of S over k prediction steps (trajectory turbulence)
+    cum_states = [S.copy()]
+    current = S.copy()
+    for delta in delta_list:
+        current = current + delta.cpu().numpy()
+        cum_states.append(current.copy())
+    cum_states_arr = np.stack(cum_states, axis=1)  # [N, k+1, 32]
+    state_variance = cum_states_arr.var(axis=1).mean(axis=1, keepdims=True)  # [N, 1]
+
+    return np.concatenate([
+        residual_mean,   # surprise magnitude
+        residual_max,    # worst-case surprise
+        residual_std,    # surprise spread
+        cosine_sim,      # directional coherence
+        vritti_entropy,  # cognitive mode stability
+        state_variance,  # trajectory turbulence
+    ], axis=1)  # [N, 6]
+
+
+class EnrichedBridge(nn.Module):
+    """Bridge with meta-state features for improved Witnesses prediction.
+
+    Input:  (S[32], meta[6]) -> 38D
+    Output: z_ont[4]
+
+    The meta features (JEPA residuals, entropy, variance) capture the
+    *dynamic* aspects of Witnessing that static state snapshots miss.
+    """
+
+    def __init__(
+        self,
+        state_dim: int = 32,
+        n_meta: int = N_META,
+        n_axes: int = N_ROBUST,
+        hidden_dim: int = 64,
+    ):
+        super().__init__()
+        self.state_dim = state_dim
+        self.n_meta = n_meta
+        self.n_axes = n_axes
+        input_dim = state_dim + n_meta
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, n_axes),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, s: torch.Tensor, meta: torch.Tensor) -> torch.Tensor:
+        x = torch.cat([s, meta], dim=-1)
+        return self.net(x)
+
+    def train_bridge(
+        self,
+        S: np.ndarray,
+        meta: np.ndarray,
+        z_ont: np.ndarray,
+        n_epochs: int = 300,
+        lr: float = 1e-3,
+        batch_size: int = 256,
+        val_split: float = 0.2,
+        seed: int = 42,
+    ) -> Dict[str, Any]:
+        """Train enriched bridge on (S, meta) -> z_ont."""
+        rng = np.random.RandomState(seed)
+        N = S.shape[0]
+        perm = rng.permutation(N)
+        n_val = max(int(N * val_split), 1)
+        val_idx, train_idx = perm[:n_val], perm[n_val:]
+
+        S_train = torch.from_numpy(S[train_idx].astype(np.float32))
+        m_train = torch.from_numpy(meta[train_idx].astype(np.float32))
+        z_train = torch.from_numpy(z_ont[train_idx].astype(np.float32))
+        S_val = torch.from_numpy(S[val_idx].astype(np.float32))
+        m_val = torch.from_numpy(meta[val_idx].astype(np.float32))
+        z_val = torch.from_numpy(z_ont[val_idx].astype(np.float32))
+
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        criterion = nn.MSELoss()
+
+        self.train()
+        train_loss = 0.0
+
+        for epoch in range(n_epochs):
+            idx = torch.randperm(len(train_idx))
+            epoch_loss, n_batches = 0.0, 0
+            for start in range(0, len(train_idx), batch_size):
+                bi = idx[start:start + batch_size]
+                pred = self.forward(S_train[bi], m_train[bi])
+                loss = criterion(pred, z_train[bi])
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+                n_batches += 1
+            train_loss = epoch_loss / max(n_batches, 1)
+
+        self.eval()
+        with torch.no_grad():
+            val_pred = self.forward(S_val, m_val).cpu().numpy()
+            val_true = z_val.cpu().numpy()
+
+        r2_per_axis = {}
+        for i in range(self.n_axes):
+            axis_name = ROBUST_AXES[i] if i < len(ROBUST_AXES) else f"axis_{i}"
+            ss_res = np.sum((val_true[:, i] - val_pred[:, i]) ** 2)
+            ss_tot = np.sum((val_true[:, i] - val_true[:, i].mean()) ** 2)
+            r2_per_axis[axis_name] = float(1.0 - ss_res / max(ss_tot, 1e-10))
+
+        return {
+            "r2_mean": float(np.mean(list(r2_per_axis.values()))),
+            "r2_per_axis": r2_per_axis,
+            "train_loss": train_loss,
+            "n_train": len(train_idx),
+            "n_val": n_val,
+        }
+
+
+def run_enriched_witnesses_test(
+    S: np.ndarray,
+    z_ont_robust: np.ndarray,
+    baseline_r2: Dict[str, float],
+    state_dim: int = 32,
+    hidden_dim: int = 64,
+    n_epochs: int = 300,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Train enriched bridge (S + meta-features) and compare with baseline.
+
+    Tests whether adding JEPA residuals, entropy, and variance improves
+    the Witnesses axis R² — the weakest axis in the static bridge.
+    """
+    logger.info("  Computing meta-state features...")
+
+    # Create predictor for meta-feature computation
+    torch.manual_seed(seed + 5555)
+    predictor = VrittiValidatedPredictor(
+        state_dim=state_dim, hidden_dim=128, prediction_steps=2,
+    )
+    meta = compute_meta_features(S, predictor, state_dim)
+    logger.info("  Meta features shape=%s, mean=%.4f, std=%.4f",
+                meta.shape, meta.mean(), meta.std())
+
+    # Train enriched bridge
+    enriched = EnrichedBridge(
+        state_dim=state_dim, n_meta=N_META, n_axes=N_ROBUST,
+        hidden_dim=hidden_dim,
+    )
+    enriched_metrics = enriched.train_bridge(
+        S, meta, z_ont_robust, n_epochs=n_epochs, seed=seed,
+    )
+
+    # Also train MLP baseline (same capacity, no meta features) for fair comparison
+    mlp_baseline = MLPBridge(
+        state_dim=state_dim, n_axes=N_ROBUST, hidden_dim=hidden_dim,
+    )
+    mlp_metrics = mlp_baseline.train_bridge(
+        S, z_ont_robust, n_epochs=n_epochs, seed=seed,
+    )
+
+    # Per-axis comparison
+    per_axis_delta = {}
+    for ax in ROBUST_AXES:
+        enriched_r2 = enriched_metrics["r2_per_axis"].get(ax, 0.0)
+        mlp_r2 = mlp_metrics["r2_per_axis"].get(ax, 0.0)
+        per_axis_delta[ax] = enriched_r2 - mlp_r2
+
+    witnesses_key = "O9_WITNESSES"
+    witnesses_baseline = baseline_r2.get(witnesses_key, 0.0)
+    witnesses_mlp = mlp_metrics["r2_per_axis"].get(witnesses_key, 0.0)
+    witnesses_enriched = enriched_metrics["r2_per_axis"].get(witnesses_key, 0.0)
+    witnesses_lift = witnesses_enriched - witnesses_mlp
+
+    # Check which meta features contribute most (leave-one-out ablation)
+    # Only run if enough samples to get stable estimates
+    meta_importance = {}
+    if S.shape[0] >= 5000:
+        for feat_idx, feat_name in enumerate(META_FEATURE_NAMES):
+            meta_ablated = meta.copy()
+            meta_ablated[:, feat_idx] = 0.0  # Zero out one feature
+
+            ablated_bridge = EnrichedBridge(
+                state_dim=state_dim, n_meta=N_META, n_axes=N_ROBUST,
+                hidden_dim=hidden_dim,
+            )
+            ablated_metrics = ablated_bridge.train_bridge(
+                S, meta_ablated, z_ont_robust, n_epochs=n_epochs, seed=seed,
+            )
+            # Importance = drop in Witnesses R² when this feature is removed
+            ablated_witnesses = ablated_metrics["r2_per_axis"].get(witnesses_key, 0.0)
+            meta_importance[feat_name] = witnesses_enriched - ablated_witnesses
+
+    passed = witnesses_lift > 0.0  # Any improvement counts
+
+    return {
+        "name": "Enriched Witnesses Bridge",
+        "passed": passed,
+        "enriched_r2_per_axis": enriched_metrics["r2_per_axis"],
+        "enriched_r2_mean": enriched_metrics["r2_mean"],
+        "mlp_baseline_r2_per_axis": mlp_metrics["r2_per_axis"],
+        "mlp_baseline_r2_mean": mlp_metrics["r2_mean"],
+        "per_axis_delta_vs_mlp": per_axis_delta,
+        "witnesses_linear": witnesses_baseline,
+        "witnesses_mlp": witnesses_mlp,
+        "witnesses_enriched": witnesses_enriched,
+        "witnesses_lift": witnesses_lift,
+        "meta_feature_importance": meta_importance,
+        "meta_feature_stats": {
+            name: {"mean": float(meta[:, i].mean()), "std": float(meta[:, i].std())}
+            for i, name in enumerate(META_FEATURE_NAMES)
+        },
+        "detail": (
+            f"Witnesses: linear={witnesses_baseline:.4f} "
+            f"{ARROW_R} MLP={witnesses_mlp:.4f} "
+            f"{ARROW_R} enriched={witnesses_enriched:.4f} "
+            f"(lift={witnesses_lift:+.4f})"
+        ),
+    }
+
+
+# ── Feature 2: Generalization Split ──────────────────────────────────────
+
+def run_generalization_test(
+    bridge_type: str = "linear",
+    n_samples: int = 5000,
+    d_model: int = 768,
+    state_dim: int = 32,
+    mlp_hidden_dim: int = 64,
+    n_epochs: int = 200,
+    train_seed: int = 42,
+    test_seed: int = 123,
+) -> Dict[str, Any]:
+    """Train on seed A, test on seed B — checks generalization.
+
+    If MLP collapses on the cross-seed test but linear holds,
+    the MLP is memorizing structure artifacts, not learning real signal.
+
+    Returns R² on:
+      - IID validation (same distribution, held-out split)
+      - Cross-seed test (different random class structure)
+    """
+    logger.info("  Generating training data (seed=%d)...", train_seed)
+    H_train, ont_train, mask_train = generate_synthetic_hidden_states(
+        n_samples=n_samples, d_model=d_model, seed=train_seed,
+    )
+    H_train_valid = H_train[mask_train]
+    z_train_robust = ont_train[mask_train][:, ROBUST_AXIS_INDICES]
+
+    logger.info("  Generating test data (seed=%d)...", test_seed)
+    H_test, ont_test, mask_test = generate_synthetic_hidden_states(
+        n_samples=n_samples, d_model=d_model, seed=test_seed,
+    )
+    H_test_valid = H_test[mask_test]
+    z_test_robust = ont_test[mask_test][:, ROBUST_AXIS_INDICES]
+
+    # Project BOTH through same projector (trained on seed A)
+    torch.manual_seed(train_seed)
+    projector = SovereignStateProjector(hidden_dim=d_model, state_dim=state_dim)
+    with torch.no_grad():
+        S_train = projector(torch.from_numpy(H_train_valid.astype(np.float32))).cpu().numpy()
+        S_test = projector(torch.from_numpy(H_test_valid.astype(np.float32))).cpu().numpy()
+
+    # Train bridge on training data (with internal val split for IID R²)
+    logger.info("  Training %s bridge on seed %d data...", bridge_type, train_seed)
+    if bridge_type == "mlp":
+        bridge = MLPBridge(state_dim=state_dim, n_axes=N_ROBUST, hidden_dim=mlp_hidden_dim)
+    else:
+        bridge = OntologyBridge(state_dim=state_dim, n_axes=N_ROBUST)
+
+    iid_metrics = bridge.train_bridge(
+        S_train, z_train_robust, n_epochs=n_epochs, seed=train_seed,
+    )
+
+    # Evaluate on cross-seed test data
+    logger.info("  Evaluating on seed %d data...", test_seed)
+    bridge.eval()
+    with torch.no_grad():
+        test_pred = bridge(torch.from_numpy(S_test.astype(np.float32))).cpu().numpy()
+
+    cross_r2 = {}
+    for i in range(N_ROBUST):
+        axis_name = ROBUST_AXES[i]
+        ss_res = np.sum((z_test_robust[:, i] - test_pred[:, i]) ** 2)
+        ss_tot = np.sum((z_test_robust[:, i] - z_test_robust[:, i].mean()) ** 2)
+        cross_r2[axis_name] = float(1.0 - ss_res / max(ss_tot, 1e-10))
+
+    iid_r2_mean = iid_metrics["r2_mean"]
+    cross_r2_mean = float(np.mean(list(cross_r2.values())))
+    gap = iid_r2_mean - cross_r2_mean
+
+    passed = gap < 0.15  # Generalization gap < 15%
+
+    return {
+        "name": f"Generalization ({bridge_type})",
+        "passed": passed,
+        "iid_r2_per_axis": iid_metrics["r2_per_axis"],
+        "iid_r2_mean": iid_r2_mean,
+        "cross_r2_per_axis": cross_r2,
+        "cross_r2_mean": cross_r2_mean,
+        "generalization_gap": gap,
+        "bridge_type": bridge_type,
+        "train_seed": train_seed,
+        "test_seed": test_seed,
+        "n_train": len(S_train),
+        "n_test": len(S_test),
+        "detail": (
+            f"IID R²={iid_r2_mean:.4f}, Cross R²={cross_r2_mean:.4f}, "
+            f"gap={gap:.4f} ({'OK' if passed else 'OVERFIT'})"
+        ),
+    }
+
+
+# ── Feature 3: Learned Combiner ──────────────────────────────────────────
+
+class LearnedCombiner(nn.Module):
+    """Learns optimal fusion weights for anomaly score combination.
+
+    Instead of hand-tuned w_j=0.5, w_o=0.5, learns:
+        logit = w_j * jepa + w_o * ont + w_r * residual + bias
+        score = sigmoid(logit)
+
+    where residual = |bridge(S) - z_ont_from_monitor| — a novel signal
+    that neither system provides alone.
+
+    Uses logit output for BCEWithLogitsLoss (numerically stable) during
+    training; sigmoid applied at inference only.
+    """
+
+    def __init__(self, n_inputs: int = 3):
+        super().__init__()
+        self.linear = nn.Linear(n_inputs, 1)
+        # Initialize with positive weights (higher score = more anomalous)
+        nn.init.constant_(self.linear.weight, 1.0)
+        nn.init.constant_(self.linear.bias, -1.0)  # slight negative bias
+
+    def forward_logits(self, scores: torch.Tensor) -> torch.Tensor:
+        """Return raw logits (for BCEWithLogitsLoss during training)."""
+        return self.linear(scores).squeeze(-1)
+
+    def forward(self, scores: torch.Tensor) -> torch.Tensor:
+        """Return probabilities (for inference / AUC computation)."""
+        return torch.sigmoid(self.forward_logits(scores))
+
+
+def run_learned_combiner_test(
+    H_valid: np.ndarray,
+    ont_features: np.ndarray,
+    S: np.ndarray,
+    state_dim: int = 32,
+    d_model: int = 768,
+    n_epochs_combiner: int = 200,
+    n_epochs_monitor: int = 100,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Train a learned combiner and compare with naive fusion.
+
+    Computes three score channels:
+      1. JEPA prediction error (trajectory surprise)
+      2. Ontological drift from centroid (semantic drift)
+      3. Bridge residual |bridge(S) - z_ont_monitor| (cross-system inconsistency)
+
+    Then learns optimal weights vs naive 50/50 fusion.
+    """
+    N = H_valid.shape[0]
+    z_ont_robust = ont_features[:, ROBUST_AXIS_INDICES]
+
+    # Train components
+    logger.info("  Training OntologyMonitor...")
+    torch.manual_seed(seed)
+    projector = SovereignStateProjector(hidden_dim=d_model, state_dim=state_dim)
+    with torch.no_grad():
+        S_recomputed = projector(torch.from_numpy(H_valid.astype(np.float32))).cpu().numpy()
+
+    monitor = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
+    monitor.train_monitor(
+        H=H_valid, ont_features=ont_features,
+        valid_mask=np.ones(N, dtype=bool),
+        n_epochs=n_epochs_monitor, seed=seed,
+    )
+
+    logger.info("  Training OntologyBridge...")
+    bridge = OntologyBridge(state_dim=state_dim, n_axes=N_ROBUST)
+    bridge.train_bridge(S_recomputed, z_ont_robust, n_epochs=200, seed=seed)
+
+    predictor = VrittiValidatedPredictor(
+        state_dim=state_dim, hidden_dim=128, prediction_steps=2,
+    )
+
+    # Run across multiple anomaly types
+    all_type_results = {}
+
+    for anomaly_type in ["trajectory_break", "domain_shift", "subtle_drift", "adversarial"]:
+        logger.info("  Testing %s anomalies...", anomaly_type)
+        anomalous, labels = generate_synthetic_anomalies(H_valid, anomaly_type, seed=seed)
+
+        if labels.sum() == 0:
+            continue
+
+        # 1. JEPA scores
+        with torch.no_grad():
+            s_anom = projector(torch.from_numpy(anomalous.astype(np.float32)))
+            s_pred, _ = predictor(s_anom)
+            jepa_error = ((s_pred - s_anom) ** 2).mean(dim=-1)
+            if jepa_error.dim() > 1:
+                jepa_error = jepa_error.mean(dim=-1)
+            jepa_scores = jepa_error.cpu().numpy()
+
+        # 2. Ontology drift scores
+        anom_result = monitor.predict(anomalous)
+        if monitor._centroid is not None:
+            ont_scores = np.mean(
+                np.abs(anom_result.z_ont - monitor._centroid)
+                / np.maximum(monitor._centroid_std, 1e-6),
+                axis=1,
+            )
+        else:
+            ont_scores = np.zeros(N)
+
+        # 3. Bridge residual scores
+        bridge.eval()
+        with torch.no_grad():
+            s_anom_np = s_anom.cpu().numpy()
+            bridge_pred = bridge(
+                torch.from_numpy(s_anom_np.astype(np.float32))
+            ).cpu().numpy()
+        bridge_residual = np.mean(np.abs(bridge_pred - anom_result.z_ont), axis=1)
+
+        # Normalize to [0, 1]
+        jepa_norm = jepa_scores / (np.max(jepa_scores) + 1e-10)
+        ont_norm = ont_scores / (np.max(ont_scores) + 1e-10)
+        residual_norm = bridge_residual / (np.max(bridge_residual) + 1e-10)
+
+        # Naive baselines
+        naive_2way = 0.5 * jepa_norm + 0.5 * ont_norm
+        naive_3way = (jepa_norm + ont_norm + residual_norm) / 3.0
+
+        naive_2way_auc = compute_detection_auc(naive_2way, labels)
+        naive_3way_auc = compute_detection_auc(naive_3way, labels)
+
+        # Train learned combiner
+        X = np.stack([jepa_norm, ont_norm, residual_norm], axis=1).astype(np.float32)
+        y = labels.astype(np.float32)
+
+        rng = np.random.RandomState(seed)
+        perm = rng.permutation(N)
+        n_val = N // 5
+        train_idx, val_idx = perm[n_val:], perm[:n_val]
+
+        combiner = LearnedCombiner(n_inputs=3)
+        optimizer = torch.optim.Adam(combiner.parameters(), lr=1e-3)
+        # Class-weighted loss: anomalies are ~20%, so upweight positives
+        n_pos = max(float(y[train_idx].sum()), 1.0)
+        n_neg = max(float(len(train_idx) - n_pos), 1.0)
+        pos_weight = torch.tensor([n_neg / n_pos])
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
+        X_train_t = torch.from_numpy(X[train_idx])
+        y_train_t = torch.from_numpy(y[train_idx])
+
+        combiner.train()
+        for epoch in range(n_epochs_combiner):
+            logits = combiner.forward_logits(X_train_t)
+            loss = criterion(logits, y_train_t)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        combiner.eval()
+        with torch.no_grad():
+            learned_scores = combiner(torch.from_numpy(X)).cpu().numpy()
+
+        learned_auc = compute_detection_auc(learned_scores, labels)
+
+        # Get learned weights
+        w = combiner.linear.weight.detach().cpu().numpy().flatten()
+        b = combiner.linear.bias.detach().item()
+
+        all_type_results[anomaly_type] = {
+            "jepa_auc": float(compute_detection_auc(jepa_scores, labels)),
+            "ontology_auc": float(compute_detection_auc(ont_scores, labels)),
+            "residual_auc": float(compute_detection_auc(bridge_residual, labels)),
+            "naive_2way_auc": float(naive_2way_auc),
+            "naive_3way_auc": float(naive_3way_auc),
+            "learned_auc": float(learned_auc),
+            "improvement_over_naive": float(learned_auc - naive_2way_auc),
+            "learned_weights": {
+                "w_jepa": float(w[0]),
+                "w_ontology": float(w[1]),
+                "w_residual": float(w[2]),
+                "bias": float(b),
+            },
+        }
+
+    # Aggregate across anomaly types
+    if all_type_results:
+        avg_naive = float(np.mean([r["naive_2way_auc"] for r in all_type_results.values()]))
+        avg_learned = float(np.mean([r["learned_auc"] for r in all_type_results.values()]))
+        avg_improvement = avg_learned - avg_naive
+    else:
+        avg_naive = avg_learned = avg_improvement = 0.0
+
+    # Use trajectory_break as the representative for the summary
+    tb = all_type_results.get("trajectory_break", {})
+
+    passed = avg_improvement > -0.02  # Learned should not be much worse
+
+    return {
+        "name": "Learned Combiner",
+        "passed": passed,
+        "per_anomaly_type": all_type_results,
+        "avg_naive_2way_auc": avg_naive,
+        "avg_learned_auc": avg_learned,
+        "avg_improvement": avg_improvement,
+        "representative_weights": tb.get("learned_weights", {}),
+        "detail": (
+            f"Avg naive AUC={avg_naive:.4f}, learned AUC={avg_learned:.4f}, "
+            f"delta={avg_improvement:+.4f}"
+        ),
+    }
+
+
+# ── Extension runner ──────────────────────────────────────────────────────
+
+def run_extensions(
+    S: np.ndarray,
+    z_ont_robust: np.ndarray,
+    H_valid: np.ndarray,
+    ont_features: np.ndarray,
+    baseline_r2: Dict[str, float],
+    state_dim: int = 32,
+    d_model: int = 768,
+    mlp_hidden_dim: int = 64,
+    n_epochs: int = 200,
+    seed: int = 42,
+    run_enriched: bool = False,
+    run_generalization: bool = False,
+    run_combiner: bool = False,
+    bridge_type: str = "linear",
+) -> Dict[str, Any]:
+    """Run the three extension tests.
+
+    Returns dict with results for each enabled extension.
+    """
+    results: Dict[str, Any] = {}
+
+    if run_enriched:
+        logger.info("Extension 1: Enriched Witnesses Bridge...")
+        results["enriched_witnesses"] = run_enriched_witnesses_test(
+            S, z_ont_robust, baseline_r2,
+            state_dim=state_dim, hidden_dim=mlp_hidden_dim,
+            n_epochs=n_epochs + 100,  # Enriched benefits from more epochs
+            seed=seed,
+        )
+
+    if run_generalization:
+        logger.info("Extension 2: Generalization Split...")
+        # Test both linear and MLP
+        results["generalization_linear"] = run_generalization_test(
+            bridge_type="linear", n_samples=len(S),
+            d_model=d_model, state_dim=state_dim,
+            mlp_hidden_dim=mlp_hidden_dim, n_epochs=n_epochs,
+            train_seed=seed, test_seed=seed + 81,
+        )
+        results["generalization_mlp"] = run_generalization_test(
+            bridge_type="mlp", n_samples=len(S),
+            d_model=d_model, state_dim=state_dim,
+            mlp_hidden_dim=mlp_hidden_dim, n_epochs=n_epochs + 100,
+            train_seed=seed, test_seed=seed + 81,
+        )
+
+    if run_combiner:
+        logger.info("Extension 3: Learned Combiner...")
+        results["learned_combiner"] = run_learned_combiner_test(
+            H_valid, ont_features, S,
+            state_dim=state_dim, d_model=d_model,
+            n_epochs_combiner=200, n_epochs_monitor=100,
+            seed=seed,
+        )
+
+    return results
+
+
+# ── Extension report rendering ────────────────────────────────────────────
+
+def render_extensions_report(ext_results: Dict[str, Any], w: int = 76) -> str:
+    """Render extension test results."""
+    lines = []
+
+    if not ext_results:
+        return ""
+
+    lines.append(f"{T_RIGHT}{H_LINE * (w - 2)}{T_LEFT}")
+    lines.append(f"{V_LINE}{'  EXTENSIONS':^{w - 2}}{V_LINE}")
+    lines.append(f"{T_RIGHT}{H_LINE * (w - 2)}{T_LEFT}")
+
+    # ── Enriched Witnesses ──
+    ew = ext_results.get("enriched_witnesses")
+    if ew:
+        icon = CHECK if ew["passed"] else CROSS_MARK
+        lines.append(f"{V_LINE}  {icon} Enriched Witnesses Bridge{'':<{w - 32}}{V_LINE}")
+
+        # Show progression: linear → MLP → enriched
+        w_lin = ew["witnesses_linear"]
+        w_mlp = ew["witnesses_mlp"]
+        w_enr = ew["witnesses_enriched"]
+        lift = ew["witnesses_lift"]
+        progression = (
+            f"    Witnesses: linear={w_lin:.4f} {ARROW_R} MLP={w_mlp:.4f} "
+            f"{ARROW_R} enriched={w_enr:.4f} (lift={lift:+.4f})"
+        )
+        # Wrap if needed
+        if len(progression) > w - 4:
+            lines.append(f"{V_LINE}    Witnesses: linear={w_lin:.4f} {ARROW_R} MLP={w_mlp:.4f}{'':<{w - 50}}{V_LINE}")
+            lines.append(f"{V_LINE}    {ARROW_R} enriched={w_enr:.4f} (lift={lift:+.4f}){'':<{w - 42}}{V_LINE}")
+        else:
+            lines.append(f"{V_LINE}{progression:<{w - 2}}{V_LINE}")
+
+        # Per-axis comparison (enriched vs MLP)
+        for ax in ROBUST_AXES:
+            enr = ew["enriched_r2_per_axis"].get(ax, 0.0)
+            mlp = ew["mlp_baseline_r2_per_axis"].get(ax, 0.0)
+            delta = ew["per_axis_delta_vs_mlp"].get(ax, 0.0)
+            short = ax.replace("O", "").replace("_", " ")
+            sign = "+" if delta >= 0 else ""
+            line = f"    {short:<18s} MLP={mlp:.4f} {ARROW_R} enriched={enr:.4f} ({sign}{delta:.4f})"
+            lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+        # Meta feature importance
+        importance = ew.get("meta_feature_importance", {})
+        if importance:
+            lines.append(f"{V_LINE}    Meta-feature importance (Witnesses R² drop when removed):{'':<{w - 62}}{V_LINE}")
+            sorted_imp = sorted(importance.items(), key=lambda x: -abs(x[1]))
+            for feat_name, imp in sorted_imp:
+                bar_len = 15
+                filled = int(min(max(abs(imp) * 100, 0), bar_len))
+                bar = BAR_FULL * filled + BAR_LIGHT * (bar_len - filled)
+                line = f"      {feat_name:<18s} {imp:+.4f} {bar}"
+                lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+        lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
+
+    # ── Generalization ──
+    gen_lin = ext_results.get("generalization_linear")
+    gen_mlp = ext_results.get("generalization_mlp")
+    if gen_lin or gen_mlp:
+        lines.append(f"{V_LINE}  Generalization Split (train seed {ARROW_R} test seed){'':<{w - 52}}{V_LINE}")
+
+        for gen, label in [(gen_lin, "linear"), (gen_mlp, "mlp")]:
+            if gen is None:
+                continue
+            icon = CHECK if gen["passed"] else CROSS_MARK
+            iid = gen["iid_r2_mean"]
+            cross = gen["cross_r2_mean"]
+            gap = gen["generalization_gap"]
+            line = (
+                f"    {icon} {label:<7s} IID={iid:.4f}, cross-seed={cross:.4f}, "
+                f"gap={gap:.4f} ({'OK' if gen['passed'] else 'OVERFIT'})"
+            )
+            lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+            # Per-axis breakdown
+            for ax in ROBUST_AXES:
+                iid_ax = gen["iid_r2_per_axis"].get(ax, 0.0)
+                cross_ax = gen["cross_r2_per_axis"].get(ax, 0.0)
+                ax_gap = iid_ax - cross_ax
+                short = ax.replace("O", "").replace("_", " ")
+                line = f"      {short:<18s} {iid_ax:.4f} {ARROW_R} {cross_ax:.4f} (gap={ax_gap:.4f})"
+                lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+        lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
+
+    # ── Learned Combiner ──
+    lc = ext_results.get("learned_combiner")
+    if lc:
+        icon = CHECK if lc["passed"] else CROSS_MARK
+        lines.append(f"{V_LINE}  {icon} Learned Combiner{'':<{w - 23}}{V_LINE}")
+
+        avg_naive = lc["avg_naive_2way_auc"]
+        avg_learned = lc["avg_learned_auc"]
+        avg_imp = lc["avg_improvement"]
+        summary = f"    Avg AUC: naive={avg_naive:.4f}, learned={avg_learned:.4f} (delta={avg_imp:+.4f})"
+        lines.append(f"{V_LINE}{summary:<{w - 2}}{V_LINE}")
+
+        # Per anomaly type
+        for atype, ares in lc.get("per_anomaly_type", {}).items():
+            atype_short = atype.replace("_", " ")
+            j_auc = ares.get("jepa_auc", 0.0)
+            o_auc = ares.get("ontology_auc", 0.0)
+            r_auc = ares.get("residual_auc", 0.0)
+            n_auc = ares.get("naive_2way_auc", 0.0)
+            l_auc = ares.get("learned_auc", 0.0)
+            line = (
+                f"    {atype_short:<20s} J={j_auc:.3f} O={o_auc:.3f} R={r_auc:.3f} "
+                f"| naive={n_auc:.3f} learned={l_auc:.3f}"
+            )
+            lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+        # Show learned weights for representative type
+        rw = lc.get("representative_weights", {})
+        if rw:
+            wj = rw.get("w_jepa", 0.0)
+            wo = rw.get("w_ontology", 0.0)
+            wr = rw.get("w_residual", 0.0)
+            bias = rw.get("bias", 0.0)
+            line = f"    Learned weights: JEPA={wj:.3f}, Ont={wo:.3f}, Residual={wr:.3f}, bias={bias:.3f}"
+            lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+        lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
+
+    return "\n".join(lines)
+
+
 # ── Terminal rendering ────────────────────────────────────────────────────
 
 def render_report(
@@ -664,11 +1443,12 @@ def run_bridge_training_and_validation(
     mlp_hidden_dim: int = 64,
     n_epochs: int = 200,
     seed: int = 42,
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, np.ndarray]]:
     """Run full bridge training pipeline with all sanity tests.
 
     Returns:
-        (bridge_metrics, sanity_results)
+        (bridge_metrics, sanity_results, intermediates)
+        where intermediates has keys: S, z_ont_robust, H_valid, ont_valid
     """
     logger.info("=" * 60)
     logger.info("BRIDGE TRAINING + VALIDATION: N=%d, type=%s", n_samples, bridge_type)
@@ -767,7 +1547,13 @@ def run_bridge_training_and_validation(
         status = "PASS" if r["passed"] else "FAIL"
         logger.info("    [%s] %s: %s", status, r["name"], r.get("detail", ""))
 
-    return bridge_metrics, sanity_results
+    intermediates = {
+        "S": S,
+        "z_ont_robust": z_ont_robust,
+        "H_valid": H_valid,
+        "ont_valid": ont_valid,
+    }
+    return bridge_metrics, sanity_results, intermediates
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────
@@ -792,10 +1578,17 @@ Sanity Tests:
   7. Centering     Mean/std diagnostics
   8. Condition #   Covariance matrix stability
 
+Extensions (ChatGPT feedback, Feb 2026):
+  --enriched-witnesses   Meta-state features for Witnesses axis
+  --generalization       Cross-seed generalization split
+  --learned-combiner     Learned fusion weights for anomaly detection
+  --all-extensions       Run all three
+
 Examples:
   python scripts/causal_subspace/train_bridge.py
   python scripts/causal_subspace/train_bridge.py --n-samples 25000 --output bridge.json
   python scripts/causal_subspace/train_bridge.py --bridge-type mlp --hidden-dim 64
+  python scripts/causal_subspace/train_bridge.py --all-extensions --n-samples 10000
         """,
     )
 
@@ -809,6 +1602,16 @@ Examples:
     parser.add_argument("--output", type=str, default=None, help="Save results to JSON")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
+    # Extension flags
+    parser.add_argument("--enriched-witnesses", action="store_true",
+                        help="Run enriched Witnesses bridge with JEPA residuals, entropy, variance")
+    parser.add_argument("--generalization", action="store_true",
+                        help="Run cross-seed generalization test (train seed A, test seed B)")
+    parser.add_argument("--learned-combiner", action="store_true",
+                        help="Train learned fusion combiner for anomaly detection")
+    parser.add_argument("--all-extensions", action="store_true",
+                        help="Run all three extensions")
+
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.WARNING
@@ -818,9 +1621,15 @@ Examples:
         datefmt="%H:%M:%S",
     )
 
+    # Resolve extension flags
+    do_enriched = args.enriched_witnesses or args.all_extensions
+    do_generalization = args.generalization or args.all_extensions
+    do_combiner = args.learned_combiner or args.all_extensions
+    any_extensions = do_enriched or do_generalization or do_combiner
+
     t0 = time.time()
 
-    bridge_metrics, sanity_results = run_bridge_training_and_validation(
+    bridge_metrics, sanity_results, intermediates = run_bridge_training_and_validation(
         n_samples=args.n_samples,
         d_model=args.d_model,
         state_dim=args.state_dim,
@@ -830,10 +1639,43 @@ Examples:
         seed=args.seed,
     )
 
+    # ── Run extensions (if requested) ──
+    ext_results = {}
+    if any_extensions:
+        ext_results = run_extensions(
+            S=intermediates["S"],
+            z_ont_robust=intermediates["z_ont_robust"],
+            H_valid=intermediates["H_valid"],
+            ont_features=intermediates["ont_valid"],
+            baseline_r2=bridge_metrics["r2_per_axis"],
+            state_dim=args.state_dim,
+            d_model=args.d_model,
+            mlp_hidden_dim=args.hidden_dim,
+            n_epochs=args.bridge_epochs,
+            seed=args.seed,
+            run_enriched=do_enriched,
+            run_generalization=do_generalization,
+            run_combiner=do_combiner,
+            bridge_type=args.bridge_type,
+        )
+
     elapsed = time.time() - t0
 
     # ── Render ──
     report = render_report(bridge_metrics, sanity_results, args.bridge_type, args.n_samples, elapsed)
+    # Insert extension report before the closing box if extensions were run
+    if ext_results:
+        ext_report = render_extensions_report(ext_results)
+        # Insert before the verdict line (last 3 lines of base report)
+        report_lines = report.split("\n")
+        # Find the verdict separator (T_RIGHT line just before verdict)
+        insert_idx = len(report_lines)
+        for i in range(len(report_lines) - 1, -1, -1):
+            if report_lines[i].startswith(T_RIGHT):
+                insert_idx = i
+                break
+        report_lines.insert(insert_idx, ext_report)
+        report = "\n".join(report_lines)
     print(report)
 
     # ── Save JSON ──
@@ -869,6 +1711,8 @@ Examples:
                 "seed": args.seed,
             },
         }
+        if ext_results:
+            result_dict["extensions"] = ext_results
 
         with open(output_path, "w") as f:
             json.dump(result_dict, f, indent=2, default=_serialize)
