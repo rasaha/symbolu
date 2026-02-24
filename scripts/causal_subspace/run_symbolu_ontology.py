@@ -276,32 +276,82 @@ def _load_symbolu_model(
             logger.info("No checkpoint specified — using random initialization")
 
     # Create model using the factory function
-    try:
-        from train_unified_llm import UnifiedTrainingConfig, create_model
-        training_cfg = UnifiedTrainingConfig(
-            model_type=config_dict["model_type"],
-            model_size=config_dict["model_size"],
-            vocab_size=config_dict["vocab_size"],
-        )
-        # Apply overrides
-        if override_n_embd:
-            training_cfg.n_embd = override_n_embd
-        if override_n_layer:
-            training_cfg.n_layer = override_n_layer
-        if override_n_head:
-            training_cfg.n_head = override_n_head
+    # Support both train_unified_llm (OntologicalHybrid) and train_hard_probes
+    # (HybridLMTransformer / BindingCacheLMTransformer) checkpoint formats.
+    source = None
+    if checkpoint is not None and isinstance(checkpoint.get("config"), dict):
+        source = checkpoint["config"].get("source", "")
 
-        model = create_model(training_cfg, device_t)
-    except Exception as e:
-        logger.warning("create_model failed (%s), trying direct construction", e)
-        # Fallback: construct model directly
-        from symbolu.phase_transformer import HybridPhaseTransformer
-        model = HybridPhaseTransformer(
-            vocab_size=config_dict["vocab_size"],
-            embed_dim=config_dict["embed_dim"],
-            num_layers=config_dict["num_layers"],
-            num_heads=config_dict["num_heads"],
-        )
+    model = None
+    if source == "train_hard_probes.py":
+        # Hard probes checkpoint — create the matching model directly
+        saved_cfg = checkpoint["config"]
+        try:
+            from scripts.phase_probes.hard_probes.train_hard_probes import (
+                HybridLMTransformer, BindingCacheLMTransformer,
+            )
+            ckpt_model_type = saved_cfg.get("model_type", "hybrid")
+            if ckpt_model_type == "binding_cache":
+                model = BindingCacheLMTransformer(
+                    vocab_size=saved_cfg.get("vocab_size", vocab_size),
+                    d_model=saved_cfg.get("d_model", embed_dim),
+                    num_heads=saved_cfg.get("num_heads", num_heads),
+                    num_layers=saved_cfg.get("num_layers", num_layers),
+                    d_ff=saved_cfg.get("d_ff", embed_dim * 2),
+                    dropout=0.1,
+                    max_seq_len=saved_cfg.get("seq_len", 256),
+                    window_size=64,
+                    top_k=64,
+                    decay_gamma=0.9,
+                    phase_ratios=[0.3] * saved_cfg.get("num_layers", num_layers),
+                    local_ratios=[0.4] * saved_cfg.get("num_layers", num_layers),
+                    quad_ratios=[0.3] * saved_cfg.get("num_layers", num_layers),
+                )
+            else:
+                curriculum = [0.5] * saved_cfg.get("num_layers", num_layers)
+                model = HybridLMTransformer(
+                    vocab_size=saved_cfg.get("vocab_size", vocab_size),
+                    d_model=saved_cfg.get("d_model", embed_dim),
+                    num_heads=saved_cfg.get("num_heads", num_heads),
+                    num_layers=saved_cfg.get("num_layers", num_layers),
+                    d_ff=saved_cfg.get("d_ff", embed_dim * 2),
+                    dropout=0.1,
+                    max_seq_len=saved_cfg.get("seq_len", 256),
+                    curriculum=curriculum,
+                    bounded_phase=saved_cfg.get("bounded_phase", True),
+                )
+            logger.info("Created %s model from train_hard_probes checkpoint", ckpt_model_type)
+        except Exception as e:
+            logger.warning("Could not create hard_probes model (%s), falling back", e)
+            model = None
+
+    if model is None:
+        try:
+            from train_unified_llm import UnifiedTrainingConfig, create_model
+            training_cfg = UnifiedTrainingConfig(
+                model_type=config_dict["model_type"],
+                model_size=config_dict["model_size"],
+                vocab_size=config_dict["vocab_size"],
+            )
+            # Apply overrides
+            if override_n_embd:
+                training_cfg.n_embd = override_n_embd
+            if override_n_layer:
+                training_cfg.n_layer = override_n_layer
+            if override_n_head:
+                training_cfg.n_head = override_n_head
+
+            model = create_model(training_cfg, device_t)
+        except Exception as e:
+            logger.warning("create_model failed (%s), trying direct construction", e)
+            # Fallback: construct model directly
+            from symbolu.phase_transformer import HybridPhaseTransformer
+            model = HybridPhaseTransformer(
+                vocab_size=config_dict["vocab_size"],
+                embed_dim=config_dict["embed_dim"],
+                num_layers=config_dict["num_layers"],
+                num_heads=config_dict["num_heads"],
+            )
 
     # Load weights from checkpoint if available
     if checkpoint is not None:

@@ -156,6 +156,7 @@ Date: January 2026
 """
 
 import math
+import os
 import random
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Optional, Set
@@ -9814,6 +9815,41 @@ def train_real_language(
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
+    # Checkpoint saving setup
+    checkpoint_dir = getattr(args, 'checkpoint_dir', None)
+    save_every = getattr(args, 'save_every', 0)
+    if checkpoint_dir:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        print(f"\n  Checkpoint dir: {checkpoint_dir}")
+        if save_every > 0:
+            print(f"  Save every: {save_every} steps")
+
+    def _save_checkpoint(model, optimizer, step, val_ppl, tag="best"):
+        """Save checkpoint in format compatible with run_symbolu_ontology.py eval."""
+        if not checkpoint_dir:
+            return
+        ckpt = {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "step": step,
+            "val_ppl": val_ppl,
+            "config": {
+                "model_type": "hybrid" if not use_binding_cache else "binding_cache",
+                "d_model": config.d_model,
+                "embed_dim": config.d_model,
+                "num_layers": config.num_layers,
+                "num_heads": config.num_heads,
+                "d_ff": config.d_ff,
+                "vocab_size": getattr(args, 'lm_vocab_size', 50257),
+                "seq_len": args.seq_len,
+                "bounded_phase": config.bounded_phase,
+                "source": "train_hard_probes.py",
+            },
+        }
+        path = os.path.join(checkpoint_dir, f"{tag}.pt")
+        torch.save(ckpt, path)
+        print(f"  💾 Saved {tag} checkpoint → {path} (step={step}, PPL={val_ppl:.2f})")
+
     # Training loop
     print(f"\nTraining for {config.num_steps} steps...")
     model.train()
@@ -9916,6 +9952,10 @@ def train_real_language(
         total_deep_loss += deep_loss_value  # V10.5.1: Track deep loss separately
         step += 1
 
+        # Periodic checkpoint save
+        if save_every > 0 and step % save_every == 0:
+            _save_checkpoint(model, optimizer, step, best_val_ppl, tag=f"step_{step}")
+
         # V10.5.4: Soft routing warmup schedule
         if soft_routing_warmup > 0 and not soft_routing_always and step == soft_routing_warmup:
             if hasattr(model, 'set_soft_routing'):
@@ -10006,6 +10046,7 @@ def train_real_language(
             if val_ppl < best_val_ppl:
                 best_val_ppl = val_ppl
                 print(f"      ★ New best Val PPL!")
+                _save_checkpoint(model, optimizer, step, val_ppl, tag="best")
 
             # V10.3.2: Protected Phase health monitoring
             if use_protected_phase and hasattr(model, 'get_phase_health'):
@@ -10666,6 +10707,9 @@ def train_real_language(
             elif dominant_idx == 3:  # VOID
                 print(f"\n    ⚠️ High uncertainty (VOID) detected")
                 print(f"      → Model may need more training or clearer inputs")
+
+    # Save final checkpoint
+    _save_checkpoint(model, optimizer, step, best_val_ppl, tag="last")
 
     return model, best_val_ppl
 
@@ -12193,6 +12237,12 @@ Examples:
     parser.add_argument("--num-steps", type=int, default=15000)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--checkpoint-dir", type=str, default=None,
+                        help="Directory to save model checkpoints. "
+                             "Saves best.pt (best val PPL) and last.pt (final step). "
+                             "Checkpoint format is compatible with run_symbolu_ontology.py eval.")
+    parser.add_argument("--save-every", type=int, default=0,
+                        help="Save periodic checkpoint every N steps (0 = disabled)")
 
     # Dataset
     parser.add_argument("--train-samples", type=int, default=20000)
