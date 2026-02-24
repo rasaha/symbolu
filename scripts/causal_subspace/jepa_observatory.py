@@ -1544,11 +1544,14 @@ class DisagreementGovernor:
         self.trajectory_threshold = trajectory_threshold
         self.residual_threshold = residual_threshold
         self._calibrated = False
+        self._s_centroid: Optional[np.ndarray] = None
+        self._s_std: Optional[np.ndarray] = None
 
     def calibrate(self, normal_hidden_states: np.ndarray, multiplier: float = 2.0) -> None:
         """Calibrate thresholds from normal (non-anomalous) data.
 
-        Sets thresholds to ``multiplier * mean(signal_on_normal_data)``
+        Computes the S-space centroid and standard deviation from normal
+        data, then sets thresholds to ``multiplier * mean(signal_on_normal_data)``
         so that normal data falls below threshold by construction.
 
         Args:
@@ -1567,11 +1570,19 @@ class DisagreementGovernor:
 
         h_tensor = torch.from_numpy(normal_hidden_states.astype(np.float32))
         with torch.no_grad():
-            s = self.state_projector(h_tensor)
-            s_pred, _ = self.predictor(s)
-            traj_raw = float(((s_pred - s) ** 2).mean())
+            s = self.state_projector(h_tensor).cpu().numpy()
 
-            s_for_bridge = s
+        # Compute S-space centroid for trajectory dispersion signal
+        self._s_centroid = s.mean(axis=0)
+        self._s_std = np.maximum(s.std(axis=0), 1e-6)
+
+        # Trajectory signal: mean standardized distance from S-centroid
+        traj_raw = float(np.mean(
+            np.abs(s - self._s_centroid) / self._s_std
+        ))
+
+        with torch.no_grad():
+            s_for_bridge = torch.from_numpy(s.astype(np.float32))
             if s_for_bridge.dim() == 3:
                 s_for_bridge = s_for_bridge.mean(dim=1)
             bridge_pred = self.bridge(s_for_bridge).cpu().numpy()
@@ -1616,19 +1627,27 @@ class DisagreementGovernor:
         else:
             ont_raw = 0.0
 
-        # Signal 2: JEPA trajectory prediction error
+        # Signal 2: Trajectory dispersion — how far is this batch from the
+        # normal S-space centroid?  Uses standardized distance so that
+        # dims with low variance count proportionally.  Works without a
+        # trained JEPA predictor; with a trained predictor, prediction
+        # error could replace this for finer-grained detection.
         h_tensor = torch.from_numpy(hidden_states.astype(np.float32))
         with torch.no_grad():
-            s = self.state_projector(h_tensor)
-            s_pred, _ = self.predictor(s)
+            s = self.state_projector(h_tensor).cpu().numpy()
 
-            jepa_error = ((s_pred - s) ** 2).mean()
-            trajectory_raw = float(jepa_error)
+        if self._s_centroid is not None:
+            trajectory_raw = float(np.mean(
+                np.abs(s - self._s_centroid) / self._s_std
+            ))
+        else:
+            # Fallback: use batch variance as proxy
+            trajectory_raw = float(np.mean(np.std(s, axis=0)))
 
         # Signal 3: Bridge residual (disagreement between bridge prediction
         # of ontology and actual ontology)
         with torch.no_grad():
-            s_for_bridge = s
+            s_for_bridge = torch.from_numpy(s.astype(np.float32))
             if s_for_bridge.dim() == 3:
                 s_for_bridge = s_for_bridge.mean(dim=1)
             bridge_pred = self.bridge(s_for_bridge).cpu().numpy()
