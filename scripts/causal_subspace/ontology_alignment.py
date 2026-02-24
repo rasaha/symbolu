@@ -36,18 +36,18 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 AXIS_NAMES: List[str] = [
-    "abstraction_level",     # 0: WordNet hypernym depth
-    "concreteness",          # 1: Brysbaert norms or POS heuristic
-    "animacy",               # 2: WordNet hypernym chain → organism
-    "agency",                # 3: dep_relation + animacy
-    "temporal_anchoring",    # 4: verb tense / dep type
-    "structural_depth",      # 5: dep_depth from Part 2
-    "information_density",   # 6: word frequency proxy
-    "relational_role",       # 7: distance to grammatical role centroids
-    "modificational_load",   # 8: number of dependents (heuristic)
-    "semantic_specificity",  # 9: 1/n_synsets (WordNet)
-    "positional_salience",   # 10: position in sentence
-    "categorical_type",      # 11: POS category compressed to scalar
+    "O1_POTENTIAL",         # 0: Latent capacity — unrealized, dormant tokens
+    "O2_IDENTITY",          # 1: Classification — naming, labeling, reference
+    "O3_EXECUTION",         # 2: Action — verbs, behaviors, output
+    "O4_STRUCTURE",         # 3: Form — physical patterns, embodiment
+    "O5_COGNITION",         # 4: Perception — attention, emotion, mental movement
+    "O6_AGENCY",            # 5: Control — intent, authorship, steering
+    "O7_REASONING",         # 6: Discrimination — logic, inference, analysis
+    "O8_PURPOSE",           # 7: Meaning — motivation, intrinsic direction
+    "O9_WITNESSES",         # 8: Meta-observation — awareness, reflection
+    "O10_UNIFYING",         # 9: Coherence — synthesis, harmony, integration
+    "O11_INTEGRATION",      # 10: Resolution — consolidation, completion
+    "O12_ABSOLVING",        # 11: Termination — release, dissolution, boundary
 ]
 
 N_AXES = len(AXIS_NAMES)
@@ -162,17 +162,14 @@ def _ensure_wordnet() -> bool:
     except ImportError:
         return False
     try:
-        # Trigger lazy load to check availability
         wn.synsets("test")
         return True
     except LookupError:
         nltk.download("wordnet", quiet=True)
-        # Reload the corpus reader after downloading
         try:
             wn._LazyCorpusLoader__load()  # type: ignore[attr-defined]
         except Exception:
             pass
-        # Verify it works now
         try:
             wn.synsets("test")
             return True
@@ -183,108 +180,260 @@ def _ensure_wordnet() -> bool:
 _wordnet_ready: Optional[bool] = None
 
 
-def _try_wordnet_features(word: str) -> Tuple[float, float, float]:
-    """Try to get WordNet-based features for a word.
+# ── Bhava feature helpers ──────────────────────────────────────────────────
+# Each function returns a [0, 1] score for a single token's activation on
+# the corresponding Bhava dimension, using dependency relation, position,
+# sentence depth, and optionally WordNet.
 
-    Returns (hypernym_depth_normalized, animacy, semantic_specificity).
-    All NaN if WordNet unavailable or word not found.
+def _bhava_potential(dep: str, position_norm: float, depth_norm: float) -> float:
+    """O1_POTENTIAL — Latent capacity: unrealized, dormant tokens.
+
+    High for function words, determiners, latent placeholders — tokens that
+    carry structural potential but have not yet resolved into meaning.
     """
-    global _wordnet_ready
-    if _wordnet_ready is None:
-        _wordnet_ready = _ensure_wordnet()
-    if not _wordnet_ready:
-        return (float("nan"), float("nan"), float("nan"))
-
-    try:
-        from nltk.corpus import wordnet as wn
-    except ImportError:
-        return (float("nan"), float("nan"), float("nan"))
-
-    synsets = wn.synsets(word.lower())
-    if not synsets:
-        return (float("nan"), float("nan"), float("nan"))
-
-    # Use most common synset (first)
-    ss = synsets[0]
-
-    # Hypernym depth (normalized by max ~20)
-    depth = ss.min_depth()
-    depth_norm = min(depth / 20.0, 1.0)
-
-    # Animacy: check if hypernym chain contains 'organism'
-    animacy = 0.0
-    hypernym_paths = ss.hypernym_paths()
-    for path in hypernym_paths:
-        for ancestor in path:
-            if "organism" in ancestor.name() or "animal" in ancestor.name():
-                animacy = 1.0
-                break
-        if animacy > 0:
-            break
-
-    # Semantic specificity: fewer synsets = more specific
-    n_synsets = len(synsets)
-    specificity = 1.0 / n_synsets
-
-    return (depth_norm, animacy, specificity)
+    # Function words carry latent potential (they enable but don't express)
+    latent_deps = {"det", "mark", "case", "cc", "punct", "expl"}
+    if dep in latent_deps:
+        return 0.8
+    # Sentence-initial tokens carry more unrealized potential
+    pos_score = max(0.0, 1.0 - position_norm)  # early = high
+    if dep in ("aux", "auxpass"):
+        return 0.6 + 0.2 * pos_score
+    return 0.1 + 0.2 * pos_score
 
 
-def _concreteness_heuristic(dep_relation: str, pos_guess: str) -> float:
-    """Heuristic concreteness based on dependency relation and POS.
+def _bhava_identity(dep: str, word: str) -> float:
+    """O2_IDENTITY — Naming, labeling, classification, reference.
 
-    Nouns are more concrete than verbs, which are more concrete
-    than function words. Returns [0, 1].
+    High for nouns, proper nouns, nominal subjects — tokens that name things.
     """
-    if dep_relation in ("nsubj", "nsubjpass", "dobj", "iobj", "obj", "pobj"):
-        return 0.7  # core arguments tend to be concrete
-    if dep_relation in ("ROOT", "root"):
-        return 0.4  # verbs: medium
-    if dep_relation in ("amod", "nummod"):
-        return 0.6  # modifiers: somewhat concrete
-    if dep_relation in ("det", "aux", "mark", "cc", "punct", "case"):
-        return 0.2  # function words: abstract
-    return 0.5  # default
+    # Nouns/subjects = identity-bearing
+    identity_deps = {"nsubj", "nsubjpass", "nmod", "pobj", "appos", "attr"}
+    if dep in identity_deps:
+        return 0.9
+    if dep in ("dobj", "iobj", "obj"):
+        return 0.7  # objects name things too
+    if dep in ("compound", "flat", "name"):
+        return 0.8
+    # Proper-noun-like heuristic: capitalized
+    if word and word[0].isupper():
+        return 0.7
+    return 0.1
 
 
-def _agency_score(dep_relation: str, animacy: float) -> float:
-    """Agency = subject AND animate. Graded score."""
-    is_subject = dep_relation in ("nsubj", "nsubjpass", "csubj")
-    if is_subject and animacy > 0.5:
-        return 1.0
-    if is_subject:
-        return 0.5  # inanimate subject — lower agency
-    if animacy > 0.5:
-        return 0.3  # animate but not subject
-    return 0.0
+def _bhava_execution(dep: str) -> float:
+    """O3_EXECUTION — Action, behaviors, output, karma.
 
-
-def _temporal_anchoring(dep_relation: str) -> float:
-    """Temporal anchoring: verbs get higher scores."""
-    if dep_relation in ("ROOT", "root"):
-        return 0.7  # main verb
-    if dep_relation in ("aux", "auxpass"):
-        return 0.5  # auxiliary verb
-    if dep_relation in ("advcl", "xcomp", "ccomp"):
-        return 0.6  # clausal complement
-    return 0.0  # non-verbal
-
-
-def _categorical_type(dep_relation: str) -> float:
-    """Compress POS-like info to a single scalar.
-
-    noun-like=0.0, verb-like=0.33, adj/adv-like=0.67, function=1.0
+    High for verbs, predicates — tokens that denote doing/happening.
     """
-    noun_deps = {"nsubj", "nsubjpass", "dobj", "iobj", "obj", "pobj", "nmod"}
-    verb_deps = {"ROOT", "root", "aux", "auxpass", "xcomp", "ccomp", "advcl"}
-    mod_deps = {"amod", "advmod", "nummod"}
+    if dep in ("ROOT", "root"):
+        return 1.0  # main predicate = pure action
+    if dep in ("xcomp", "ccomp", "advcl", "relcl", "parataxis"):
+        return 0.8  # clausal complements are secondary actions
+    if dep in ("aux", "auxpass"):
+        return 0.5  # auxiliaries support action
+    if dep in ("conj",) and False:  # placeholder for verb conj detection
+        return 0.7
+    return 0.05
 
-    if dep_relation in noun_deps:
-        return 0.0
-    if dep_relation in verb_deps:
-        return 0.33
-    if dep_relation in mod_deps:
-        return 0.67
-    return 1.0
+
+def _bhava_structure(dep: str, depth_norm: float) -> float:
+    """O4_STRUCTURE — Form, physical patterns, embodiment, foundation.
+
+    High for tokens that provide structural scaffolding: depth, nesting,
+    compounds, prepositional frameworks.
+    """
+    # Deep structural nesting = high structure
+    struct_score = depth_norm * 0.6
+    if dep in ("prep", "case", "mark"):
+        struct_score += 0.4  # structural connectors
+    elif dep in ("compound", "flat", "fixed"):
+        struct_score += 0.3  # compound structure
+    elif dep in ("cc", "conj"):
+        struct_score += 0.2  # coordination structure
+    elif dep in ("punct",):
+        struct_score += 0.3  # punctuation is structural scaffolding
+    return min(struct_score, 1.0)
+
+
+def _bhava_cognition(dep: str, word: str) -> float:
+    """O5_COGNITION — Perception, attention, emotion, mental movement.
+
+    High for sensory/cognitive verbs, adjectives expressing perception
+    or emotion, attention-directing words.
+    """
+    w = word.lower().strip(".,!?;:\"'()[]{}—-")
+    # Cognitive/perceptual vocabulary (common set)
+    cognitive_words = {
+        "think", "know", "believe", "feel", "see", "hear", "notice",
+        "understand", "realize", "perceive", "sense", "recognize",
+        "imagine", "wonder", "consider", "expect", "hope", "fear",
+        "love", "hate", "like", "want", "need", "wish", "prefer",
+        "remember", "forget", "learn", "discover", "observe", "watch",
+    }
+    if w in cognitive_words:
+        return 0.9
+    # Adjectives with emotional/perceptual content
+    if dep in ("amod",):
+        return 0.4  # modifiers can express perception
+    # Adverbs of manner (perception-modulating)
+    if dep in ("advmod",):
+        return 0.3
+    return 0.05
+
+
+def _bhava_agency(dep: str, position_norm: float) -> float:
+    """O6_AGENCY — Control, intent, authorship, steering.
+
+    High for subjects of active verbs, imperative markers, directive words.
+    Agents that steer meaning.
+    """
+    if dep in ("nsubj",):
+        return 0.9  # active subject = agent
+    if dep in ("nsubjpass", "csubj"):
+        return 0.5  # passive/clausal subject = reduced agency
+    if dep in ("ROOT", "root"):
+        return 0.6  # predicate controls sentence flow
+    if dep in ("dobj", "obj"):
+        return 0.2  # objects are acted upon
+    # Sentence-initial position correlates with topic/agent
+    if position_norm < 0.15:
+        return 0.5
+    return 0.1
+
+
+def _bhava_reasoning(dep: str, word: str) -> float:
+    """O7_REASONING — Logic, discrimination, inference, analysis.
+
+    High for logical connectives, comparative/analytical words, subordination.
+    """
+    w = word.lower().strip(".,!?;:\"'()[]{}—-")
+    reasoning_words = {
+        "because", "therefore", "however", "although", "if", "unless",
+        "since", "thus", "hence", "while", "whereas", "whether",
+        "but", "yet", "despite", "moreover", "furthermore", "indeed",
+        "consequently", "nevertheless", "rather", "instead", "otherwise",
+        "than", "compared", "between", "among", "versus", "either",
+        "neither", "both", "nor", "so", "then",
+    }
+    if w in reasoning_words:
+        return 0.9
+    if dep in ("mark", "cc"):
+        return 0.6  # structural markers of logical relations
+    if dep in ("advcl", "ccomp"):
+        return 0.5  # clausal complements often express reasoning
+    if dep in ("nummod",):
+        return 0.4  # numerical = analytical
+    return 0.05
+
+
+def _bhava_purpose(dep: str, word: str) -> float:
+    """O8_PURPOSE — Meaning, motivation, intrinsic direction, transformation.
+
+    High for purposive constructions, infinitival complements, goal-words.
+    """
+    w = word.lower().strip(".,!?;:\"'()[]{}—-")
+    purpose_words = {
+        "to", "for", "towards", "into", "become", "achieve", "aim",
+        "goal", "purpose", "reason", "cause", "why", "order", "sake",
+        "mean", "meaning", "means", "intend", "plan", "seek", "strive",
+        "transform", "change", "create", "build", "develop", "grow",
+    }
+    if w in purpose_words:
+        return 0.8
+    if dep in ("xcomp",):
+        return 0.7  # infinitival complements express purpose
+    if dep in ("advcl",):
+        return 0.4  # adverbial clauses can express purpose
+    if dep in ("prep",) and w in ("for", "to", "towards"):
+        return 0.7
+    return 0.05
+
+
+def _bhava_witnesses(dep: str, word: str, depth_norm: float) -> float:
+    """O9_WITNESSES — Meta-observation, awareness, reflection, monitoring.
+
+    High for meta-linguistic markers, discourse markers, evaluative adverbs,
+    parentheticals, and deeply embedded reflexive structures.
+    """
+    w = word.lower().strip(".,!?;:\"'()[]{}—-")
+    meta_words = {
+        "apparently", "perhaps", "maybe", "probably", "clearly",
+        "obviously", "certainly", "actually", "really", "indeed",
+        "basically", "essentially", "supposedly", "reportedly",
+        "literally", "arguably", "seemingly", "presumably",
+        "note", "recall", "observe", "reflect", "itself", "themselves",
+    }
+    if w in meta_words:
+        return 0.9
+    if dep in ("parataxis", "intj"):
+        return 0.7  # parenthetical = meta-commentary
+    if dep in ("advmod",) and depth_norm > 0.5:
+        return 0.5  # deep adverbs tend to be evaluative
+    return 0.05
+
+
+def _bhava_unifying(dep: str, position_norm: float, depth_norm: float) -> float:
+    """O10_UNIFYING — Coherence, synthesis, harmony, integration.
+
+    High for coordinating conjunctions, summary positions, tokens that
+    bring together disparate elements.
+    """
+    if dep in ("cc", "conj"):
+        return 0.8  # coordination = unification
+    if dep in ("ROOT", "root") and position_norm > 0.7:
+        return 0.6  # late predicates synthesize
+    # Low depth + late position = summary/unifying
+    synthesis = position_norm * 0.4 + (1.0 - depth_norm) * 0.3
+    if dep in ("appos",):
+        synthesis += 0.3  # appositives integrate information
+    return min(synthesis, 1.0)
+
+
+def _bhava_integration(dep: str, position_norm: float) -> float:
+    """O11_INTEGRATION — Resolution, consolidation, completion of parts.
+
+    High for sentence-final elements, completive constructions, objects
+    that complete the predicate.
+    """
+    # Late position = resolution
+    resolve_score = position_norm * 0.5
+    if dep in ("dobj", "obj", "iobj"):
+        resolve_score += 0.4  # objects complete the action
+    elif dep in ("attr", "oprd"):
+        resolve_score += 0.3  # predicate complements resolve meaning
+    elif dep in ("pobj",):
+        resolve_score += 0.3  # prepositional objects complete phrases
+    elif dep in ("punct",) and position_norm > 0.9:
+        resolve_score += 0.3  # final punctuation = closure
+    return min(resolve_score, 1.0)
+
+
+def _bhava_absolving(dep: str, word: str, position_norm: float) -> float:
+    """O12_ABSOLVING — Termination, release, dissolution, final boundary.
+
+    High for sentence-ending tokens, terminators, negation (dissolution
+    of meaning), and boundary markers.
+    """
+    w = word.lower().strip(".,!?;:\"'()[]{}—-")
+    # Terminal punctuation
+    if dep in ("punct",) and position_norm > 0.9:
+        return 0.9
+    # Negation = dissolution of meaning
+    if dep in ("neg",):
+        return 0.8
+    dissolution_words = {
+        "not", "never", "no", "none", "nothing", "neither", "nowhere",
+        "end", "stop", "finish", "terminate", "cancel", "remove",
+        "delete", "destroy", "lose", "lost", "gone", "done", "over",
+        "finally", "last", "ultimate", "complete", "final",
+    }
+    if w in dissolution_words:
+        return 0.8
+    # Very late position = boundary
+    if position_norm > 0.95:
+        return 0.5
+    return 0.05
 
 
 def build_ontology_vectors(
@@ -292,7 +441,24 @@ def build_ontology_vectors(
     H: np.ndarray,
     labels: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Build 12-axis ontology feature vectors for annotated words.
+    """Build 12-axis Bhava ontology vectors (O1–O12) for annotated words.
+
+    Each token receives a 12D activation vector where each dimension
+    corresponds to one of the 12 ontological Bhavas from the SymbolU
+    architecture:
+
+        [0] O1_POTENTIAL    — latent capacity, unrealized
+        [1] O2_IDENTITY     — naming, labeling, classification
+        [2] O3_EXECUTION    — action, behavior, output
+        [3] O4_STRUCTURE    — form, patterns, foundation
+        [4] O5_COGNITION    — perception, attention, emotion
+        [5] O6_AGENCY       — control, intent, steering
+        [6] O7_REASONING    — logic, inference, analysis
+        [7] O8_PURPOSE      — meaning, motivation, direction
+        [8] O9_WITNESSES    — meta-observation, reflection
+        [9] O10_UNIFYING    — coherence, synthesis
+        [10] O11_INTEGRATION — resolution, consolidation
+        [11] O12_ABSOLVING  — termination, release, boundary
 
     Parameters
     ----------
@@ -306,24 +472,12 @@ def build_ontology_vectors(
     Returns
     -------
     ont_features : np.ndarray [N_w, 12]
-        Ontology feature vectors. NaN for unavailable axes.
+        Bhava activation vectors per token (all values in [0, 1]).
     valid_mask : np.ndarray [N_w] bool
-        True where ≥ 8 of 12 axes have values.
+        Always True (all 12 axes are computed for every token).
     """
     N = len(words)
-    ont = np.full((N, N_AXES), np.nan, dtype=np.float32)
-
-    # Pre-compute role centroids for axis 7 (relational_role)
-    unique_labels = np.unique(labels)
-    centroids = {}
-    for lbl in unique_labels:
-        mask = labels == lbl
-        if mask.sum() > 0:
-            centroids[lbl] = H[mask].mean(axis=0)
-
-    # Normalize H for distance computation
-    H_norms = np.linalg.norm(H, axis=1, keepdims=True)
-    H_norms = np.maximum(H_norms, 1e-8)
+    ont = np.zeros((N, N_AXES), dtype=np.float32)
 
     # Max sentence length for normalization
     max_pos = max((w.position_in_sentence for w in words), default=1)
@@ -335,87 +489,31 @@ def build_ontology_vectors(
 
     for i, w in enumerate(words):
         dep = w.dep_relation
+        pos_norm = w.position_in_sentence / max_pos
+        depth_norm = w.dep_depth / max_depth
 
-        # WordNet-based axes (may be NaN)
-        wn_depth, wn_animacy, wn_specificity = _try_wordnet_features(w.word)
-        ont[i, 0] = wn_depth               # abstraction_level
-        ont[i, 9] = wn_specificity          # semantic_specificity
+        ont[i, 0] = _bhava_potential(dep, pos_norm, depth_norm)
+        ont[i, 1] = _bhava_identity(dep, w.word)
+        ont[i, 2] = _bhava_execution(dep)
+        ont[i, 3] = _bhava_structure(dep, depth_norm)
+        ont[i, 4] = _bhava_cognition(dep, w.word)
+        ont[i, 5] = _bhava_agency(dep, pos_norm)
+        ont[i, 6] = _bhava_reasoning(dep, w.word)
+        ont[i, 7] = _bhava_purpose(dep, w.word)
+        ont[i, 8] = _bhava_witnesses(dep, w.word, depth_norm)
+        ont[i, 9] = _bhava_unifying(dep, pos_norm, depth_norm)
+        ont[i, 10] = _bhava_integration(dep, pos_norm)
+        ont[i, 11] = _bhava_absolving(dep, w.word, pos_norm)
 
-        # Concreteness (heuristic fallback if no norms)
-        if not np.isnan(wn_depth):
-            # More specific (deeper) = more concrete, roughly
-            ont[i, 1] = wn_depth
-        else:
-            ont[i, 1] = _concreteness_heuristic(dep, "")
-
-        # Animacy
-        if not np.isnan(wn_animacy):
-            ont[i, 2] = wn_animacy
-        else:
-            # Heuristic: subjects of action verbs are more likely animate
-            ont[i, 2] = 0.5 if dep in ("nsubj",) else 0.0
-
-        # Agency (depends on animacy)
-        animacy_val = ont[i, 2] if not np.isnan(ont[i, 2]) else 0.0
-        ont[i, 3] = _agency_score(dep, animacy_val)
-
-        # Temporal anchoring
-        ont[i, 4] = _temporal_anchoring(dep)
-
-        # Structural depth (always available from Part 2)
-        ont[i, 5] = w.dep_depth / max_depth
-
-        # Information density (proxy: position-based, later words are rarer)
-        # Real implementation would use word frequency. This is a placeholder.
-        ont[i, 6] = min(w.position_in_sentence / max(max_pos, 1), 1.0)
-
-        # Relational role (distance to centroids)
-        if centroids:
-            dists = []
-            for lbl in sorted(centroids.keys()):
-                d = np.linalg.norm(H[i] - centroids[lbl])
-                dists.append(d)
-            if dists:
-                max_d = max(dists) if max(dists) > 0 else 1.0
-                # Normalized: closer to own centroid = higher score
-                own_label = labels[i]
-                if own_label in centroids:
-                    own_dist = np.linalg.norm(H[i] - centroids[own_label])
-                    ont[i, 7] = 1.0 - (own_dist / max_d)
-                else:
-                    ont[i, 7] = 0.5
-
-        # Modificational load (heuristic: modifiers get lower, heads get higher)
-        if dep in ("ROOT", "root"):
-            ont[i, 8] = 1.0
-        elif dep in ("nsubj", "dobj", "obj"):
-            ont[i, 8] = 0.6
-        elif dep in ("amod", "advmod", "nummod", "det"):
-            ont[i, 8] = 0.2
-        else:
-            ont[i, 8] = 0.4
-
-        # Positional salience
-        ont[i, 10] = w.position_in_sentence / max(max_pos, 1)
-
-        # Categorical type
-        ont[i, 11] = _categorical_type(dep)
-
-    # Valid mask: word has ≥ 8 non-NaN axes
-    valid_count = np.sum(~np.isnan(ont), axis=1)
-    valid_mask = valid_count >= 8
-
-    # Replace remaining NaNs with 0.5 (neutral) for valid words
-    ont_clean = ont.copy()
-    nan_mask = np.isnan(ont_clean)
-    ont_clean[nan_mask] = 0.5
+    # All 12 axes are always computed — every token is valid
+    valid_mask = np.ones(N, dtype=bool)
 
     logger.info(
         "Ontology vectors: %d/%d words valid (%.1f%%), %d axes",
         valid_mask.sum(), N, valid_mask.mean() * 100, N_AXES,
     )
 
-    return ont_clean, valid_mask
+    return ont, valid_mask
 
 
 # ---------------------------------------------------------------------------
@@ -851,12 +949,13 @@ def classify_scenario(result: DiscoveryResult) -> DiscoveryResult:
 # Phase 2: OntologyMonitor (Path 1 — Observatory)
 # ---------------------------------------------------------------------------
 
-# The 4 robust axes validated across both L1 and L7
+# The 4 robust Bhava axes for Phase 2 monitoring — these span the
+# spectrum from concrete identity through action to meta-observation.
 ROBUST_AXES: List[str] = [
-    "concreteness",        # idx 1 in AXIS_NAMES
-    "relational_role",     # idx 7
-    "modificational_load", # idx 8
-    "categorical_type",    # idx 11
+    "O2_IDENTITY",         # idx 1 — naming/classification
+    "O3_EXECUTION",        # idx 2 — action/behavior
+    "O6_AGENCY",           # idx 5 — control/steering
+    "O9_WITNESSES",        # idx 8 — meta-observation/reflection
 ]
 
 ROBUST_AXIS_INDICES: List[int] = [
@@ -1181,18 +1280,18 @@ class InjectionMetadata:
 
 
 class OntologyInjector:
-    """Phase 2, Path 2: Classify input text and inject ontological metadata.
+    """Phase 2, Path 2: Classify input text and inject Bhava metadata.
 
-    Works at the API boundary — no hidden-state access required. Parses
-    input text using dependency parsing (same as Phase 1), computes the
-    4 robust axis features, and formats them as structured metadata that
-    gets prepended to the LLM system prompt.
+    Works at the API boundary — no hidden-state access required. Computes
+    the 4 robust Bhava axis scores (O2_IDENTITY, O3_EXECUTION, O6_AGENCY,
+    O9_WITNESSES) using lightweight word-level heuristics, and formats them
+    as structured metadata prepended to the LLM system prompt.
 
     Compatible with any LLM API (Claude, GPT-4, local models).
     """
 
     def classify(self, text: str) -> InjectionMetadata:
-        """Classify input text along the 4 robust ontological axes.
+        """Classify input text along the 4 robust Bhava axes.
 
         Parameters
         ----------
@@ -1203,91 +1302,143 @@ class OntologyInjector:
         -------
         InjectionMetadata with domain, structure, intent, confidence.
         """
-        # Tokenize into words (simple whitespace split)
         words = text.split()
         if not words:
             return InjectionMetadata()
 
-        # Compute per-word features using dependency heuristics
-        # (mirrors Phase 1's build_ontology_vectors but without a model)
-        concreteness_scores = []
-        role_scores = []
-        mod_scores = []
-        cat_scores = []
+        # Per-word Bhava activation scores (lightweight — no dep parse)
+        identity_scores = []
+        execution_scores = []
+        agency_scores = []
+        witness_scores = []
 
-        for word in words:
-            w_lower = word.lower().strip(".,!?;:\"'()[]{}—-")
-            if not w_lower:
+        n_words = len(words)
+        for idx, word in enumerate(words):
+            w = word.lower().strip(".,!?;:\"'()[]{}—-")
+            if not w:
                 continue
+            pos_norm = idx / max(n_words - 1, 1)
 
-            # Concreteness heuristic: nouns are concrete, function words are abstract
-            conc = self._word_concreteness(w_lower)
-            concreteness_scores.append(conc)
+            # O2_IDENTITY — naming/classification
+            identity_scores.append(self._word_identity(w))
 
-            # Relational role heuristic based on position and word type
-            role = self._word_role_score(w_lower, len(concreteness_scores) - 1, len(words))
-            role_scores.append(role)
+            # O3_EXECUTION — action/behavior
+            execution_scores.append(self._word_execution(w))
 
-            # Modificational load: adjectives/adverbs are modifiers
-            mod = self._word_mod_load(w_lower)
-            mod_scores.append(mod)
+            # O6_AGENCY — control/steering
+            agency_scores.append(self._word_agency(w, pos_norm))
 
-            # Categorical type
-            cat = self._word_category(w_lower)
-            cat_scores.append(cat)
+            # O9_WITNESSES — meta-observation
+            witness_scores.append(self._word_witnesses(w))
 
-        if not concreteness_scores:
+        if not identity_scores:
             return InjectionMetadata()
 
-        # Aggregate to document level
         scores = {
-            "concreteness": float(np.mean(concreteness_scores)),
-            "relational_role": float(np.mean(role_scores)),
-            "modificational_load": float(np.mean(mod_scores)),
-            "categorical_type": float(np.mean(cat_scores)),
+            "O2_IDENTITY": float(np.mean(identity_scores)),
+            "O3_EXECUTION": float(np.mean(execution_scores)),
+            "O6_AGENCY": float(np.mean(agency_scores)),
+            "O9_WITNESSES": float(np.mean(witness_scores)),
         }
 
         meta = InjectionMetadata(raw_scores=scores)
 
-        # Domain
-        if scores["concreteness"] > 0.6:
+        # Domain: identity-dominant = concrete, witness-dominant = abstract
+        if scores["O2_IDENTITY"] > scores["O9_WITNESSES"] + 0.15:
             meta.domain = "concrete"
-        elif scores["concreteness"] < 0.4:
+        elif scores["O9_WITNESSES"] > scores["O2_IDENTITY"] + 0.15:
             meta.domain = "abstract"
         else:
             meta.domain = "mixed"
 
-        # Structure complexity
-        meta.structure = "complex" if scores["modificational_load"] > 0.5 else "simple"
+        # Structure: high agency = directed/complex
+        meta.structure = "complex" if scores["O6_AGENCY"] > 0.4 else "simple"
 
-        # Intent
-        cat = scores["categorical_type"]
-        if cat < 0.2:
-            meta.intent = "informational"
-        elif cat < 0.5:
+        # Intent: dominated by execution vs identity vs witness
+        dominant = max(scores, key=scores.get)  # type: ignore[arg-type]
+        if dominant == "O3_EXECUTION":
             meta.intent = "action"
+        elif dominant == "O9_WITNESSES":
+            meta.intent = "reflection"
+        elif dominant == "O2_IDENTITY":
+            meta.intent = "informational"
         else:
-            meta.intent = "modification"
+            meta.intent = "directive"
 
-        # Confidence based on score dispersion
+        # Confidence from score dispersion
         score_vals = list(scores.values())
         dispersion = float(np.std(score_vals))
         if dispersion > 0.2:
-            meta.confidence = "high"  # differentiated signal
+            meta.confidence = "high"
         elif dispersion > 0.1:
             meta.confidence = "medium"
         else:
-            meta.confidence = "low"   # undifferentiated
+            meta.confidence = "low"
 
-        # Primary role
-        if scores["relational_role"] > 0.6:
-            meta.primary_role = "core_argument"
-        elif scores["relational_role"] > 0.4:
-            meta.primary_role = "root"
-        else:
-            meta.primary_role = "modifier"
+        # Primary Bhava
+        meta.primary_role = dominant
 
         return meta
+
+    # ── Lightweight per-word Bhava heuristics (no dep parse) ──────────
+
+    @staticmethod
+    def _word_identity(w: str) -> float:
+        """O2_IDENTITY: naming/classification potential."""
+        # Capitalized or long words tend to be identity-bearing
+        if w[0:1].isupper():
+            return 0.8
+        # Short function words are not identity-bearing
+        if len(w) <= 2:
+            return 0.1
+        if len(w) >= 6:
+            return 0.5  # longer words more likely nouns
+        return 0.3
+
+    @staticmethod
+    def _word_execution(w: str) -> float:
+        """O3_EXECUTION: action/behavior potential."""
+        action_suffixes = ("ing", "ed", "ize", "ify", "ate")
+        action_words = {
+            "run", "make", "do", "get", "set", "go", "put", "take",
+            "build", "create", "implement", "deploy", "test", "send",
+            "write", "read", "start", "stop", "move", "change",
+        }
+        if w in action_words:
+            return 0.9
+        if any(w.endswith(s) for s in action_suffixes):
+            return 0.6
+        return 0.1
+
+    @staticmethod
+    def _word_agency(w: str, pos_norm: float) -> float:
+        """O6_AGENCY: control/steering potential."""
+        agent_words = {
+            "i", "we", "you", "he", "she", "they", "it",
+            "must", "should", "will", "can", "need", "want",
+        }
+        if w in agent_words:
+            return 0.8
+        # Early position = more agentive
+        if pos_norm < 0.15:
+            return 0.5
+        return 0.15
+
+    @staticmethod
+    def _word_witnesses(w: str) -> float:
+        """O9_WITNESSES: meta-observation/reflection potential."""
+        meta_words = {
+            "apparently", "perhaps", "maybe", "probably", "clearly",
+            "obviously", "actually", "really", "indeed", "basically",
+            "essentially", "note", "recall", "observe", "seems",
+            "appears", "might", "could", "would", "somehow",
+        }
+        if w in meta_words:
+            return 0.9
+        # Question words are reflective
+        if w in ("why", "how", "what", "whether", "if"):
+            return 0.6
+        return 0.05
 
     def inject(self, system_prompt: str, user_input: str) -> str:
         """Classify user input and prepend ontological metadata to system prompt.
@@ -1344,41 +1495,7 @@ class OntologyInjector:
         "think", "know", "feel", "try", "leave", "call", "ask", "work",
     })
 
-    def _word_concreteness(self, w: str) -> float:
-        if w in self._CONCRETE_NOUNS:
-            return 0.9
-        if w in self._FUNCTION_WORDS:
-            return 0.1
-        if w in self._ACTION_VERBS:
-            return 0.5
-        # Length heuristic: longer words tend to be more specific/concrete
-        return min(0.3 + len(w) * 0.05, 0.8)
-
-    def _word_role_score(self, w: str, pos: int, total: int) -> float:
-        # SVO heuristic: early words are more likely subjects (core args)
-        position_score = 1.0 - (pos / max(total, 1))
-        if w in self._FUNCTION_WORDS:
-            return 0.1
-        return min(position_score * 0.7 + 0.2, 1.0)
-
-    def _word_mod_load(self, w: str) -> float:
-        if w in self._FUNCTION_WORDS:
-            return 0.1
-        # Words ending in common modifier suffixes
-        if w.endswith(("ly", "ful", "less", "ous", "ive", "able", "ible")):
-            return 0.8
-        if w.endswith(("er", "est", "ing")):
-            return 0.6
-        return 0.4
-
-    def _word_category(self, w: str) -> float:
-        if w in self._FUNCTION_WORDS:
-            return 1.0
-        if w in self._ACTION_VERBS:
-            return 0.33
-        if w.endswith(("ly", "ful", "less", "ous", "ive")):
-            return 0.67
-        return 0.0  # default: noun-like
+    # (Old generic helpers removed — Bhava-specific helpers are above)
 
 
 # ---------------------------------------------------------------------------
