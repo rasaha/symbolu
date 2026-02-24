@@ -20,6 +20,14 @@ Phase 2 (Part 7):
   - OntologyInjector evaluation on 49 diverse sentences
   - SNR sensitivity analysis
 
+Part 8: JEPA-Observatory Integration:
+  - Alignment matrix [4 x 32] between ontological axes and Sovereign State
+  - OntologyBridge linear probe training (S -> z_ont)
+  - Synthetic anomaly detection (domain shift, trajectory break, etc.)
+  - Integration scenario classification (E/F/G)
+  - CascadeObservatory / ParallelObservatory test
+  - Domain-adaptive Vritti thresholds
+
 No model download, GPU, or internet connection required.
 
 Usage::
@@ -90,6 +98,9 @@ from scripts.causal_subspace.ontology_alignment import (
     ROBUST_AXES,
     N_ROBUST,
     ROBUST_AXIS_INDICES,
+)
+from scripts.causal_subspace.jepa_observatory import (
+    run_integration_evaluation,
 )
 
 logger = logging.getLogger("causal_subspace.synthetic")
@@ -793,6 +804,35 @@ def run_phase2_comprehensive(
         print(f"    SNR={snr:.1f}  ->  test R²={test_m['mean_r2']:.3f}")
     all_results["snr_sensitivity"] = snr_results
 
+    # --- Step 9: JEPA-Observatory Integration (Part 8) ---
+    print(f"\n  JEPA-Observatory Integration (Part 8)...")
+
+    integration_results = run_integration_evaluation(
+        hidden_states=train_ds.hidden_states,
+        ont_features=train_ds.ont_features,
+        valid_mask=train_ds.valid_mask,
+        d_model=d_model,
+        state_dim=32,
+        n_epochs_bridge=min(n_epochs, 100),
+        n_epochs_monitor=min(n_epochs, 80),
+        seed=seed,
+    )
+    all_results["jepa_integration"] = integration_results
+
+    int_scenario = integration_results.get("scenario", {})
+    print(f"  Integration scenario: {int_scenario.get('classification', '?')} "
+          f"({int_scenario.get('recommended_architecture', '?')})")
+    for ev in int_scenario.get("evidence", []):
+        print(f"    {ev}")
+
+    bridge_r2 = integration_results.get("bridge", {}).get("r2_mean", 0.0)
+    print(f"  Bridge R²: {bridge_r2:.3f}")
+
+    for anom_type, anom_data in integration_results.get("anomaly_detection", {}).items():
+        print(f"    {anom_type:20s}  JEPA={anom_data['jepa_auc']:.3f}  "
+              f"Ont={anom_data['ontology_auc']:.3f}  "
+              f"Combined={anom_data['combined_auc']:.3f}")
+
     # --- Collect Phase 2 checks ---
     checks: List[Tuple[str, bool, str]] = []
 
@@ -834,6 +874,14 @@ def run_phase2_comprehensive(
     if dom_acc["total"] > 0:
         checks.append(("Injector domain accuracy > 50%", dom_acc["rate"] > 0.5,
                         f"{dom_acc['correct']}/{dom_acc['total']} ({dom_acc['rate']:.0%})"))
+
+    # Part 8: JEPA-Observatory Integration checks
+    for int_check in integration_results.get("checks", []):
+        checks.append((
+            f"[Part 8] {int_check['name']}",
+            int_check["passed"],
+            int_check.get("detail", ""),
+        ))
 
     all_results["checks"] = [
         {"name": n, "passed": p, "detail": d} for n, p, d in checks
@@ -1000,8 +1048,8 @@ def run_synthetic_pipeline(
             "peak_compression": trajectory.peak_compression,
         }
 
-    # --- Phase 2: Comprehensive Monitor + Injector evaluation ---
-    if run_phase2 or 7 in parts_to_run:
+    # --- Phase 2: Comprehensive Monitor + Injector evaluation (Parts 7-8) ---
+    if run_phase2 or 7 in parts_to_run or 8 in parts_to_run:
         print("\n" + "=" * 70)
         print("PHASE 2: COMPREHENSIVE MONITOR + INJECTOR EVALUATION")
         print("=" * 70)
@@ -1125,7 +1173,7 @@ Examples:
     parser.add_argument("--subspace-k", type=int, default=8)
     parser.add_argument("--layers", type=int, nargs="*", default=None)
     parser.add_argument("--parts", type=int, nargs="*", default=None,
-                        help="Parts to run (3-6=Phase1, 7=Phase2)")
+                        help="Parts to run (3-6=Phase1, 7=Phase2, 8=JEPA Integration)")
     # Phase 2 args
     parser.add_argument("--run-phase2", action="store_true",
                         help="Run Phase 2 comprehensive evaluation")
