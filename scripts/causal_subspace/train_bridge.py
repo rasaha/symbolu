@@ -965,6 +965,42 @@ class LearnedCombiner(nn.Module):
         return torch.sigmoid(self.forward_logits(scores))
 
 
+class GatedCombiner(nn.Module):
+    """Nonlinear combiner that can learn score interactions.
+
+    The linear combiner assigns fixed weights to each channel.
+    Adversarial anomalies exploit this: they corrupt ontology,
+    making the residual noisy — but the linear combiner can't
+    learn "ignore residual when ontology is already screaming."
+
+    The gated combiner learns:
+        [jepa, ont, residual] → MLP(3 → hidden → 1) → logit
+
+    With hidden_dim=8 this adds only 41 parameters but can learn
+    to suppress residual when ont alone is a strong signal.
+    """
+
+    def __init__(self, n_inputs: int = 3, hidden_dim: int = 8):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_inputs, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+        )
+        # Initialize so higher input scores → higher output (correct direction)
+        # Positive first-layer weights ensure inputs flow forward monotonically
+        nn.init.uniform_(self.net[0].weight, 0.1, 0.5)
+        nn.init.zeros_(self.net[0].bias)
+        nn.init.uniform_(self.net[2].weight, 0.1, 0.3)
+        nn.init.constant_(self.net[2].bias, -1.0)
+
+    def forward_logits(self, scores: torch.Tensor) -> torch.Tensor:
+        return self.net(scores).squeeze(-1)
+
+    def forward(self, scores: torch.Tensor) -> torch.Tensor:
+        return torch.sigmoid(self.forward_logits(scores))
+
+
 def run_learned_combiner_test(
     H_valid: np.ndarray,
     ont_features: np.ndarray,
@@ -1060,7 +1096,7 @@ def run_learned_combiner_test(
         naive_2way_auc = compute_detection_auc(naive_2way, labels)
         naive_3way_auc = compute_detection_auc(naive_3way, labels)
 
-        # Train learned combiner
+        # Train learned combiners (linear + gated)
         X = np.stack([jepa_norm, ont_norm, residual_norm], axis=1).astype(np.float32)
         y = labels.astype(np.float32)
 
@@ -1069,8 +1105,6 @@ def run_learned_combiner_test(
         n_val = N // 5
         train_idx, val_idx = perm[n_val:], perm[:n_val]
 
-        combiner = LearnedCombiner(n_inputs=3)
-        optimizer = torch.optim.Adam(combiner.parameters(), lr=1e-3)
         # Class-weighted loss: anomalies are ~20%, so upweight positives
         n_pos = max(float(y[train_idx].sum()), 1.0)
         n_neg = max(float(len(train_idx) - n_pos), 1.0)
@@ -1079,24 +1113,45 @@ def run_learned_combiner_test(
 
         X_train_t = torch.from_numpy(X[train_idx])
         y_train_t = torch.from_numpy(y[train_idx])
+        X_full_t = torch.from_numpy(X)
+
+        # --- Linear combiner ---
+        combiner = LearnedCombiner(n_inputs=3)
+        opt_linear = torch.optim.Adam(combiner.parameters(), lr=1e-3)
 
         combiner.train()
         for epoch in range(n_epochs_combiner):
             logits = combiner.forward_logits(X_train_t)
             loss = criterion(logits, y_train_t)
-            optimizer.zero_grad()
+            opt_linear.zero_grad()
             loss.backward()
-            optimizer.step()
+            opt_linear.step()
 
         combiner.eval()
         with torch.no_grad():
-            learned_scores = combiner(torch.from_numpy(X)).cpu().numpy()
+            linear_scores = combiner(X_full_t).cpu().numpy()
+        linear_auc = compute_detection_auc(linear_scores, labels)
 
-        learned_auc = compute_detection_auc(learned_scores, labels)
-
-        # Get learned weights
         w = combiner.linear.weight.detach().cpu().numpy().flatten()
         b = combiner.linear.bias.detach().item()
+
+        # --- Gated combiner (nonlinear, can learn score interactions) ---
+        gated = GatedCombiner(n_inputs=3, hidden_dim=8)
+        opt_gated = torch.optim.Adam(gated.parameters(), lr=5e-4)
+
+        gated.train()
+        n_gated_epochs = n_epochs_combiner * 2  # More capacity needs more epochs
+        for epoch in range(n_gated_epochs):
+            logits = gated.forward_logits(X_train_t)
+            loss = criterion(logits, y_train_t)
+            opt_gated.zero_grad()
+            loss.backward()
+            opt_gated.step()
+
+        gated.eval()
+        with torch.no_grad():
+            gated_scores = gated(X_full_t).cpu().numpy()
+        gated_auc = compute_detection_auc(gated_scores, labels)
 
         all_type_results[anomaly_type] = {
             "jepa_auc": float(compute_detection_auc(jepa_scores, labels)),
@@ -1104,9 +1159,11 @@ def run_learned_combiner_test(
             "residual_auc": float(compute_detection_auc(bridge_residual, labels)),
             "naive_2way_auc": float(naive_2way_auc),
             "naive_3way_auc": float(naive_3way_auc),
-            "learned_auc": float(learned_auc),
-            "improvement_over_naive": float(learned_auc - naive_2way_auc),
-            "learned_weights": {
+            "linear_auc": float(linear_auc),
+            "gated_auc": float(gated_auc),
+            "improvement_linear": float(linear_auc - naive_2way_auc),
+            "improvement_gated": float(gated_auc - naive_2way_auc),
+            "linear_weights": {
                 "w_jepa": float(w[0]),
                 "w_ontology": float(w[1]),
                 "w_residual": float(w[2]),
@@ -1117,27 +1174,32 @@ def run_learned_combiner_test(
     # Aggregate across anomaly types
     if all_type_results:
         avg_naive = float(np.mean([r["naive_2way_auc"] for r in all_type_results.values()]))
-        avg_learned = float(np.mean([r["learned_auc"] for r in all_type_results.values()]))
-        avg_improvement = avg_learned - avg_naive
+        avg_linear = float(np.mean([r["linear_auc"] for r in all_type_results.values()]))
+        avg_gated = float(np.mean([r["gated_auc"] for r in all_type_results.values()]))
     else:
-        avg_naive = avg_learned = avg_improvement = 0.0
+        avg_naive = avg_linear = avg_gated = 0.0
 
     # Use trajectory_break as the representative for the summary
     tb = all_type_results.get("trajectory_break", {})
 
-    passed = avg_improvement > -0.02  # Learned should not be much worse
+    # Best combiner should not be much worse than naive
+    avg_best = max(avg_linear, avg_gated)
+    passed = (avg_best - avg_naive) > -0.02
 
     return {
         "name": "Learned Combiner",
         "passed": passed,
         "per_anomaly_type": all_type_results,
         "avg_naive_2way_auc": avg_naive,
-        "avg_learned_auc": avg_learned,
-        "avg_improvement": avg_improvement,
-        "representative_weights": tb.get("learned_weights", {}),
+        "avg_linear_auc": avg_linear,
+        "avg_gated_auc": avg_gated,
+        "avg_improvement_linear": avg_linear - avg_naive,
+        "avg_improvement_gated": avg_gated - avg_naive,
+        "representative_weights": tb.get("linear_weights", {}),
         "detail": (
-            f"Avg naive AUC={avg_naive:.4f}, learned AUC={avg_learned:.4f}, "
-            f"delta={avg_improvement:+.4f}"
+            f"Avg AUC: naive={avg_naive:.4f}, linear={avg_linear:.4f} "
+            f"({avg_linear - avg_naive:+.4f}), gated={avg_gated:.4f} "
+            f"({avg_gated - avg_naive:+.4f})"
         ),
     }
 
@@ -1296,25 +1358,42 @@ def render_extensions_report(ext_results: Dict[str, Any], w: int = 76) -> str:
     lc = ext_results.get("learned_combiner")
     if lc:
         icon = CHECK if lc["passed"] else CROSS_MARK
-        lines.append(f"{V_LINE}  {icon} Learned Combiner{'':<{w - 23}}{V_LINE}")
+        lines.append(f"{V_LINE}  {icon} Learned Combiner (linear + gated){'':<{w - 40}}{V_LINE}")
 
         avg_naive = lc["avg_naive_2way_auc"]
-        avg_learned = lc["avg_learned_auc"]
-        avg_imp = lc["avg_improvement"]
-        summary = f"    Avg AUC: naive={avg_naive:.4f}, learned={avg_learned:.4f} (delta={avg_imp:+.4f})"
-        lines.append(f"{V_LINE}{summary:<{w - 2}}{V_LINE}")
+        avg_lin = lc.get("avg_linear_auc", 0.0)
+        avg_gated = lc.get("avg_gated_auc", 0.0)
+        summary = (
+            f"    Avg AUC: naive={avg_naive:.4f}, "
+            f"linear={avg_lin:.4f} ({avg_lin - avg_naive:+.4f}), "
+            f"gated={avg_gated:.4f} ({avg_gated - avg_naive:+.4f})"
+        )
+        # Wrap if needed
+        if len(summary) > w - 4:
+            lines.append(f"{V_LINE}    Avg AUC: naive={avg_naive:.4f}, linear={avg_lin:.4f} ({avg_lin - avg_naive:+.4f}){'':<{w - 62}}{V_LINE}")
+            lines.append(f"{V_LINE}    gated={avg_gated:.4f} ({avg_gated - avg_naive:+.4f}){'':<{w - 37}}{V_LINE}")
+        else:
+            lines.append(f"{V_LINE}{summary:<{w - 2}}{V_LINE}")
 
-        # Per anomaly type
+        # Per anomaly type table
+        header = f"    {'type':<20s} {'J':>5s} {'O':>5s} {'R':>5s} {'naive':>6s} {'lin':>5s} {'gate':>5s}"
+        lines.append(f"{V_LINE}{header:<{w - 2}}{V_LINE}")
         for atype, ares in lc.get("per_anomaly_type", {}).items():
             atype_short = atype.replace("_", " ")
             j_auc = ares.get("jepa_auc", 0.0)
             o_auc = ares.get("ontology_auc", 0.0)
             r_auc = ares.get("residual_auc", 0.0)
             n_auc = ares.get("naive_2way_auc", 0.0)
-            l_auc = ares.get("learned_auc", 0.0)
+            l_auc = ares.get("linear_auc", 0.0)
+            g_auc = ares.get("gated_auc", 0.0)
+            # Mark best combiner for this type
+            best = max(n_auc, l_auc, g_auc)
+            n_mark = "*" if n_auc == best else " "
+            l_mark = "*" if l_auc == best else " "
+            g_mark = "*" if g_auc == best else " "
             line = (
-                f"    {atype_short:<20s} J={j_auc:.3f} O={o_auc:.3f} R={r_auc:.3f} "
-                f"| naive={n_auc:.3f} learned={l_auc:.3f}"
+                f"    {atype_short:<20s} {j_auc:5.3f} {o_auc:5.3f} {r_auc:5.3f} "
+                f"{n_auc:5.3f}{n_mark} {l_auc:4.3f}{l_mark} {g_auc:4.3f}{g_mark}"
             )
             lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
 
@@ -1325,7 +1404,7 @@ def render_extensions_report(ext_results: Dict[str, Any], w: int = 76) -> str:
             wo = rw.get("w_ontology", 0.0)
             wr = rw.get("w_residual", 0.0)
             bias = rw.get("bias", 0.0)
-            line = f"    Learned weights: JEPA={wj:.3f}, Ont={wo:.3f}, Residual={wr:.3f}, bias={bias:.3f}"
+            line = f"    Linear weights: JEPA={wj:.3f}, Ont={wo:.3f}, Resid={wr:.3f}, b={bias:.3f}"
             lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
 
         lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
