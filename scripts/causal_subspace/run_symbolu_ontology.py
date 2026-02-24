@@ -143,7 +143,7 @@ class BridgeAlignmentResult:
 # ---------------------------------------------------------------------------
 
 def _load_symbolu_model(
-    checkpoint_path: str,
+    checkpoint_path: Optional[str],
     model_type: str = "ontological_hybrid",
     model_size: str = "small",
     device: str = "cpu",
@@ -152,7 +152,11 @@ def _load_symbolu_model(
     override_n_head: Optional[int] = None,
     override_n_embd: Optional[int] = None,
 ) -> Tuple[nn.Module, Dict[str, Any]]:
-    """Load a trained SymbolU model from checkpoint.
+    """Load a SymbolU model from checkpoint, or create a fresh one.
+
+    When checkpoint_path is None (or the file does not exist), the model is
+    created with random initialization.  This is useful for measuring the
+    architectural prior before any training has occurred.
 
     Returns (model, config_dict) where config_dict has model architecture info.
     """
@@ -171,24 +175,33 @@ def _load_symbolu_model(
         "num_layers": num_layers,
         "num_heads": num_heads,
         "vocab_size": vocab_size,
+        "from_checkpoint": False,
     }
 
     device_t = torch.device(device)
 
-    # Load checkpoint
-    logger.info("Loading checkpoint: %s", checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location=device_t, weights_only=False)
+    # Load checkpoint if provided and exists
+    checkpoint = None
+    if checkpoint_path and os.path.isfile(checkpoint_path):
+        logger.info("Loading checkpoint: %s", checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device_t, weights_only=False)
+        config_dict["from_checkpoint"] = True
 
-    # Try to infer model type from checkpoint
-    if "config" in checkpoint:
-        saved_cfg = checkpoint["config"]
-        if isinstance(saved_cfg, dict):
-            config_dict["model_type"] = saved_cfg.get("model_type", model_type)
-            config_dict["model_size"] = saved_cfg.get("model_size", model_size)
-            config_dict["embed_dim"] = saved_cfg.get("embed_dim", embed_dim)
-            config_dict["num_layers"] = saved_cfg.get("num_layers", num_layers)
-            config_dict["num_heads"] = saved_cfg.get("num_heads", num_heads)
-            config_dict["vocab_size"] = saved_cfg.get("vocab_size", vocab_size)
+        # Try to infer model type from checkpoint
+        if "config" in checkpoint:
+            saved_cfg = checkpoint["config"]
+            if isinstance(saved_cfg, dict):
+                config_dict["model_type"] = saved_cfg.get("model_type", model_type)
+                config_dict["model_size"] = saved_cfg.get("model_size", model_size)
+                config_dict["embed_dim"] = saved_cfg.get("embed_dim", embed_dim)
+                config_dict["num_layers"] = saved_cfg.get("num_layers", num_layers)
+                config_dict["num_heads"] = saved_cfg.get("num_heads", num_heads)
+                config_dict["vocab_size"] = saved_cfg.get("vocab_size", vocab_size)
+    else:
+        if checkpoint_path:
+            logger.warning("Checkpoint not found: %s — using random initialization", checkpoint_path)
+        else:
+            logger.info("No checkpoint specified — using random initialization")
 
     # Create model using the factory function
     try:
@@ -218,16 +231,19 @@ def _load_symbolu_model(
             num_heads=config_dict["num_heads"],
         )
 
-    # Load weights
-    state_dict_key = "model_state_dict" if "model_state_dict" in checkpoint else "state_dict"
-    if state_dict_key in checkpoint:
-        try:
-            model.load_state_dict(checkpoint[state_dict_key], strict=False)
-            logger.info("Loaded model weights (strict=False)")
-        except Exception as e:
-            logger.warning("Could not load state dict: %s", e)
+    # Load weights from checkpoint if available
+    if checkpoint is not None:
+        state_dict_key = "model_state_dict" if "model_state_dict" in checkpoint else "state_dict"
+        if state_dict_key in checkpoint:
+            try:
+                model.load_state_dict(checkpoint[state_dict_key], strict=False)
+                logger.info("Loaded model weights (strict=False)")
+            except Exception as e:
+                logger.warning("Could not load state dict: %s", e)
+        else:
+            logger.warning("No state_dict found in checkpoint, using initialized weights")
     else:
-        logger.warning("No state_dict found in checkpoint, using initialized weights")
+        logger.info("Using randomly initialized weights (no checkpoint)")
 
     model.to(device_t)
     model.eval()
@@ -235,12 +251,13 @@ def _load_symbolu_model(
         p.requires_grad_(False)
 
     logger.info(
-        "Model loaded: %s (%s), %d layers, %d-dim, %.1fM params",
+        "Model loaded: %s (%s), %d layers, %d-dim, %.1fM params%s",
         config_dict["model_type"],
         config_dict["model_size"],
         config_dict["num_layers"],
         config_dict["embed_dim"],
         sum(p.numel() for p in model.parameters()) / 1e6,
+        "" if config_dict["from_checkpoint"] else " [random init]",
     )
 
     return model, config_dict
@@ -677,10 +694,13 @@ def run_symbolu_ontology_pipeline(
         override_n_embd=override_n_embd,
     )
     results["model_config"] = config_dict
-    print(f"  Model: {config_dict['model_type']} ({config_dict['model_size']})")
+    init_mode = "from checkpoint" if config_dict["from_checkpoint"] else "random init"
+    print(f"  Model: {config_dict['model_type']} ({config_dict['model_size']}) [{init_mode}]")
     print(f"  Architecture: {config_dict['num_layers']}L / {config_dict['embed_dim']}D / "
           f"{config_dict['num_heads']}H")
     print(f"  Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
+    if checkpoint_path:
+        print(f"  Checkpoint: {checkpoint_path}")
 
     has_bridge = hasattr(model, 'onto_bridge') and model.onto_bridge is not None
     print(f"  OntologicalBridge: {'Present' if has_bridge else 'Not present'}")
@@ -1086,8 +1106,9 @@ def run_symbolu_ontology_pipeline(
     print("FINAL REPORT")
     print("=" * 70)
 
-    print(f"\n  Model: {config_dict['model_type']} ({config_dict['model_size']})")
-    print(f"  Checkpoint: {checkpoint_path}")
+    print(f"\n  Model: {config_dict['model_type']} ({config_dict['model_size']}) [{init_mode}]")
+    if checkpoint_path:
+        print(f"  Checkpoint: {checkpoint_path}")
     print(f"  Tokens analyzed: {len(data['tokens'])}")
 
     if ontology_result:
@@ -1138,13 +1159,23 @@ Examples:
   # Compare with GPT-2
   python scripts/causal_subspace/run_symbolu_ontology.py \\
       --checkpoint checkpoints/best.pt --run-all --compare-gpt2
+
+  # No checkpoint — evaluate random-init architecture priors
+  python scripts/causal_subspace/run_symbolu_ontology.py \\
+      --no-checkpoint --model-type ontological_hybrid --model-size small --run-all
         """,
     )
 
-    # Required
+    # Checkpoint (optional — omit or use --no-checkpoint for random init)
     parser.add_argument(
-        "--checkpoint", type=str, required=True,
-        help="Path to trained SymbolU model checkpoint (.pt file)",
+        "--checkpoint", type=str, default=None,
+        help="Path to trained SymbolU model checkpoint (.pt file). "
+             "Omit or use --no-checkpoint to evaluate with random initialization.",
+    )
+    parser.add_argument(
+        "--no-checkpoint", action="store_true",
+        help="Evaluate a randomly initialized model (no trained weights). "
+             "Useful for measuring the architecture's structural prior.",
     )
 
     # Model architecture
@@ -1246,13 +1277,23 @@ Examples:
     if not (args.run_phase1 or args.run_phase2 or args.run_phase3):
         args.run_phase1 = True
 
+    # Handle checkpoint: --no-checkpoint or missing file
+    checkpoint_path = args.checkpoint
+    if args.no_checkpoint:
+        checkpoint_path = None
+    elif checkpoint_path and not os.path.isfile(checkpoint_path):
+        print(f"  WARNING: Checkpoint not found: {checkpoint_path}")
+        print(f"  Proceeding with random initialization (same as --no-checkpoint).")
+        print(f"  This evaluates the architecture's structural prior before training.\n")
+        checkpoint_path = None
+
     # Quick mode overrides
     if args.quick:
         args.max_sequences = min(args.max_sequences, 50)
         args.phase2_epochs = min(args.phase2_epochs, 20)
 
     results = run_symbolu_ontology_pipeline(
-        checkpoint_path=args.checkpoint,
+        checkpoint_path=checkpoint_path,
         model_type=args.model_type,
         model_size=args.model_size,
         max_sequences=args.max_sequences,
