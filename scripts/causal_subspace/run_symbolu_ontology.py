@@ -146,7 +146,7 @@ def _load_symbolu_model(
     checkpoint_path: Optional[str],
     model_type: str = "ontological_hybrid",
     model_size: str = "small",
-    device: str = "cpu",
+    device: Optional[str] = None,
     vocab_size: int = 50257,
     override_n_layer: Optional[int] = None,
     override_n_head: Optional[int] = None,
@@ -178,6 +178,8 @@ def _load_symbolu_model(
         "from_checkpoint": False,
     }
 
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     device_t = torch.device(device)
 
     # Load checkpoint if provided and exists
@@ -273,7 +275,7 @@ def _collect_symbolu_hidden_states(
     max_sequences: int = 500,
     max_seq_len: int = 256,
     batch_size: int = 8,
-    device: str = "cpu",
+    device: Optional[str] = None,
     seed: int = 42,
 ) -> Dict[str, Any]:
     """Collect hidden states from a SymbolU model on WikiText data.
@@ -288,6 +290,8 @@ def _collect_symbolu_hidden_states(
     """
     from train_unified_llm import HiddenStateExtractor
 
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     device_t = torch.device(device)
     num_layers = config_dict["num_layers"]
     embed_dim = config_dict["embed_dim"]
@@ -646,7 +650,7 @@ def run_phase3_bridge_alignment(
 # ---------------------------------------------------------------------------
 
 def run_symbolu_ontology_pipeline(
-    checkpoint_path: str,
+    checkpoint_path: Optional[str],
     model_type: str = "ontological_hybrid",
     model_size: str = "small",
     max_sequences: int = 500,
@@ -659,7 +663,7 @@ def run_symbolu_ontology_pipeline(
     ontology_mi_threshold: float = 0.1,
     subspace_k: int = 16,
     compare_gpt2: bool = False,
-    device: str = "cpu",
+    device: Optional[str] = None,
     seed: int = 42,
     override_n_layer: Optional[int] = None,
     override_n_head: Optional[int] = None,
@@ -669,9 +673,14 @@ def run_symbolu_ontology_pipeline(
 
     Returns a dict containing all results.
     """
+    # Auto-detect GPU
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
     results: Dict[str, Any] = {
         "model": "symbolu",
         "checkpoint": checkpoint_path,
+        "device": device,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -681,7 +690,7 @@ def run_symbolu_ontology_pipeline(
     # STEP 1: Load Model
     # ===================================================================
     print("\n" + "=" * 70)
-    print("STEP 1: LOADING SYMBOLU MODEL")
+    print(f"STEP 1: LOADING SYMBOLU MODEL  [device: {device}]")
     print("=" * 70)
 
     model, config_dict = _load_symbolu_model(
@@ -1247,7 +1256,11 @@ Examples:
     )
 
     # General
-    parser.add_argument("--device", type=str, default="cpu", help="Device: cpu or cuda")
+    _default_device = "cuda" if torch.cuda.is_available() else "cpu"
+    parser.add_argument(
+        "--device", type=str, default=_default_device,
+        help=f"Device: cpu or cuda (default: auto-detected → {_default_device})",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--output", type=str, default=None, help="Save results to JSON file")
     parser.add_argument("--quick", action="store_true", help="Quick smoke test (reduced data)")
