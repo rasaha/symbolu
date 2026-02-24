@@ -81,6 +81,7 @@ from scripts.causal_subspace.jepa_observatory import (
     compute_alignment_matrix,
     compute_detection_auc,
     generate_synthetic_anomalies,
+    run_governance_evaluation,
     _spearman_rank_correlation,
 )
 from scripts.causal_subspace.check_alignment import (
@@ -1412,6 +1413,66 @@ def render_extensions_report(ext_results: Dict[str, Any], w: int = 76) -> str:
     return "\n".join(lines)
 
 
+def render_governance_report(gov_results: Dict[str, Any], w: int = 76) -> str:
+    """Render governance evaluation results."""
+    lines = []
+
+    if not gov_results:
+        return ""
+
+    lines.append(f"{T_RIGHT}{H_LINE * (w - 2)}{T_LEFT}")
+    lines.append(f"{V_LINE}{'  GOVERNANCE EVALUATION':^{w - 2}}{V_LINE}")
+    lines.append(f"{T_RIGHT}{H_LINE * (w - 2)}{T_LEFT}")
+
+    all_passed = gov_results.get("all_passed", False)
+    icon = CHECK if all_passed else CROSS_MARK
+    lines.append(f"{V_LINE}  {icon} All governance tests {'passed' if all_passed else 'FAILED'}{'':<{w - 40}}{V_LINE}")
+    lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
+
+    # Coherence loss
+    cl = gov_results.get("coherence_loss", {})
+    if cl:
+        icon = CHECK if cl.get("passed") else CROSS_MARK
+        line = (
+            f"  {icon} TrajectoryCoherenceLoss: "
+            f"loss={cl.get('coherence_loss_raw', 0):.4f}, "
+            f"step_dist={cl.get('mean_step_distance', 0):.4f}"
+        )
+        lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+    # Mismatch detector
+    md = gov_results.get("mismatch_detector", {})
+    if md:
+        icon = CHECK if md.get("passed") else CROSS_MARK
+        ratio = md.get("ratio", 0)
+        line = (
+            f"  {icon} TrajectoryMismatchDetector: "
+            f"normal={md.get('mean_normal_score', 0):.4f}, "
+            f"break={md.get('break_score', 0):.4f} ({ratio:.1f}x)"
+        )
+        lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+        if md.get("top_deviating_dims"):
+            dims_str = ", ".join(f"dim{d}={v:.3f}" for d, v in md["top_deviating_dims"][:3])
+            line2 = f"    Top deviating: {dims_str}"
+            lines.append(f"{V_LINE}{line2:<{w - 2}}{V_LINE}")
+
+    # Disagreement governor
+    dg = gov_results.get("disagreement_governor", {})
+    if dg:
+        icon = CHECK if dg.get("passed") else CROSS_MARK
+        lines.append(f"{V_LINE}  {icon} DisagreementGovernor:{'':<{w - 28}}{V_LINE}")
+
+        for label, prefix in [("normal", "  Normal"), ("break", "  Break"), ("domain", "  Domain")]:
+            regime = dg.get(f"{label}_regime", "?")
+            score = dg.get(f"{label}_disagreement", 0)
+            line = f"    {prefix:<10s} regime={regime:<17s} score={score:.3f}"
+            lines.append(f"{V_LINE}{line:<{w - 2}}{V_LINE}")
+
+    lines.append(f"{V_LINE}{'':<{w - 2}}{V_LINE}")
+
+    return "\n".join(lines)
+
+
 # ── Terminal rendering ────────────────────────────────────────────────────
 
 def render_report(
@@ -1690,6 +1751,8 @@ Examples:
                         help="Train learned fusion combiner for anomaly detection")
     parser.add_argument("--all-extensions", action="store_true",
                         help="Run all three extensions")
+    parser.add_argument("--governance", action="store_true",
+                        help="Run governance evaluation (coherence loss, mismatch detector, disagreement governor)")
 
     args = parser.parse_args()
 
@@ -1738,6 +1801,21 @@ Examples:
             bridge_type=args.bridge_type,
         )
 
+    # ── Run governance evaluation (if requested) ──
+    gov_results = {}
+    if args.governance or args.all_extensions:
+        logger.info("Running governance evaluation...")
+        gov_results = run_governance_evaluation(
+            hidden_states=intermediates["H_valid"],
+            ont_features=intermediates["ont_valid"],
+            valid_mask=np.ones(len(intermediates["H_valid"]), dtype=bool),
+            d_model=args.d_model,
+            state_dim=args.state_dim,
+            n_epochs_bridge=args.bridge_epochs,
+            n_epochs_monitor=100,
+            seed=args.seed,
+        )
+
     elapsed = time.time() - t0
 
     # ── Render ──
@@ -1754,6 +1832,16 @@ Examples:
                 insert_idx = i
                 break
         report_lines.insert(insert_idx, ext_report)
+        report = "\n".join(report_lines)
+    if gov_results:
+        gov_report = render_governance_report(gov_results)
+        report_lines = report.split("\n")
+        insert_idx = len(report_lines)
+        for i in range(len(report_lines) - 1, -1, -1):
+            if report_lines[i].startswith(T_RIGHT):
+                insert_idx = i
+                break
+        report_lines.insert(insert_idx, gov_report)
         report = "\n".join(report_lines)
     print(report)
 
@@ -1792,6 +1880,8 @@ Examples:
         }
         if ext_results:
             result_dict["extensions"] = ext_results
+        if gov_results:
+            result_dict["governance"] = gov_results
 
         with open(output_path, "w") as f:
             json.dump(result_dict, f, indent=2, default=_serialize)

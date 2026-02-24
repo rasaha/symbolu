@@ -760,3 +760,176 @@ No new external dependencies. All building blocks exist.
 - Combined AUC > 0.85 on synthetic anomalies
 - Domain-adaptive thresholds measurably reduce false positives vs fixed thresholds
 - CognitiveAnomalyReport correctly identifies anomaly type in > 80% of cases
+
+---
+
+## 15. JEPA's Meaningful Contribution — Training, Inference, and Governance
+
+### 15a. What JEPA Is (Plain Language)
+
+JEPA is not a second language model. It is a **trajectory predictor**.
+
+Instead of asking "What word comes next?" it asks "**Where is the model's internal thinking headed next?**" It predicts the movement of thought, not the content.
+
+This distinction matters because the OntologyMonitor takes a snapshot — "what is being represented right now" — while JEPA tracks the **dynamics** — "is the flow of representations coherent over time?"
+
+### 15b. During Training: Smoothness Pressure
+
+Without JEPA, the model optimizes token prediction loss alone. This allows erratic internal state transitions: the model can jump between unrelated internal representations between adjacent tokens as long as the output logits are correct. There is no incentive for temporal coherence in the hidden state trajectory.
+
+With JEPA's `TrajectoryCoherenceLoss`, we add a second optimization pressure:
+
+> "Your internal state at step t+1 must be predictable from your state at step t."
+
+This penalizes:
+- Erratic jumps in Sovereign State space
+- Oscillation between contradictory internal representations
+- Discontinuities in reasoning trajectories
+
+What it does NOT do: change what the model thinks. It changes **how consistently** the model transitions between thoughts.
+
+**Concrete mechanism**: `TrajectoryCoherenceLoss` computes `||s_pred(t) - s_actual(t+1)||²` across a sequence and adds it (weighted by `lambda_coherence`) to the total training loss. The JEPA predictor learns the manifold of valid state transitions; the coherence loss pushes the base model to stay on that manifold.
+
+```python
+# Training loop with coherence pressure
+token_loss = cross_entropy(logits, targets)
+coherence_loss = trajectory_coherence_loss(s_sequence, predictor)
+total_loss = token_loss + lambda_coherence * coherence_loss
+```
+
+### 15c. During Inference: Trajectory Mismatch Detection
+
+At inference time the model is frozen. JEPA provides a **real-time internal consistency monitor**:
+
+1. Predict where internal state should go: `s_pred = JEPA(s_t)`
+2. Observe where it actually goes: `s_actual = StateProjector(H_{t+1})`
+3. Measure mismatch: `mismatch = ||s_pred - s_actual||²`
+
+If the model suddenly "jumps" in its thinking, JEPA notices. That jump signals:
+- **Trajectory break**: random internal failure
+- **Domain shift**: unexpected topic transition
+- **Adversarial manipulation**: external perturbation
+- **Reasoning instability**: the model's internal logic contradicts itself
+
+The `TrajectoryMismatchDetector` wraps this into a streaming interface with exponential moving average baseline, adaptive thresholds, and per-dimension mismatch breakdown (which Sovereign State dimensions deviated most).
+
+JEPA is not telling you what is correct. It is telling you **what is internally inconsistent**.
+
+### 15d. During External Reasoning: Three-Signal Disagreement Governance
+
+The real power emerges when we combine three independent signals:
+
+| Signal | Question It Answers | Analogy |
+|--------|-------------------|---------|
+| **Ontology Monitor** | What is being thought? | Thermometer |
+| **JEPA Trajectory** | Where is it heading? | Weather forecast |
+| **Bridge Residual** | Is the trajectory coherent with the ontology? | Is the forecast failing? |
+
+When all three agree, the system is operating normally:
+- Ontology says "structured reasoning"
+- JEPA predicted "structured reasoning"
+- Residual is small → coherent
+
+When they disagree, that disagreement is a **governance signal**:
+- Ontology says "structured"
+- JEPA predicted "unstructured"
+- Residual is large → **instability detected**
+
+The `DisagreementGovernor` formalizes this:
+
+```
+disagreement_score = f(ont_signal, jepa_signal, residual_signal)
+```
+
+Three disagreement regimes:
+1. **Trajectory-only** (JEPA deviates, ontology stable): The model's reasoning flow broke but its semantic content is intact. Typical of momentary processing hiccups.
+2. **Ontology-only** (ontology deviates, JEPA predicted correctly): The model shifted semantic domain but its internal trajectory was smooth. Typical of genuine topic transitions — often NOT an anomaly.
+3. **Both** (all signals fire): Something fundamentally changed. Both the content and the flow are disrupted. This is the highest-confidence anomaly signal.
+
+### 15e. Why JEPA Is Not Redundant
+
+If JEPA overlapped completely with ontology, the bridge residual would be zero everywhere and the combined AUC would equal max(individual AUCs).
+
+The distributed encoding result (Bridge R² ≈ 0.29, not 0.0 and not 1.0) proves:
+- JEPA encodes **predictive manifold structure** (dynamics)
+- Ontology encodes **semantic structure** (content)
+- Their disagreement produces **new information** that neither provides alone
+
+This is confirmed by the anomaly detection results:
+
+| Anomaly Type | Ontology AUC | JEPA AUC | Bridge Residual AUC | Best Single | Gated Combined |
+|-------------|-------------|----------|---------------------|------------|----------------|
+| trajectory_break | 0.717 | 0.515 | **0.793** | 0.793 | 0.775 |
+| domain_shift | 0.534 | 0.546 | **0.671** | 0.671 | 0.626 |
+| adversarial | **0.668** | 0.491 | 0.570 | 0.668 | 0.634 |
+| subtle_drift | 0.511 | 0.489 | 0.506 | 0.511 | 0.510 |
+
+The bridge residual provides the best single-channel signal for trajectory breaks and domain shifts — exactly the anomaly types that create disagreement between dynamics and semantics.
+
+### 15f. What JEPA Does NOT Do
+
+It does not:
+- Automatically create rationality
+- Replace ontological monitoring
+- Add moral reasoning
+- Guarantee correctness
+
+It adds: **predictive continuity awareness** — the ability to detect when internal thought flow diverges from what the semantic content predicts, and vice versa.
+
+### 15g. The Adversarial Weakness
+
+Adversarial anomalies add noise in high-variance PCA directions, which directly perturbs the ontology signal. The bridge residual (`|bridge(S) - z_ont_monitor|`) becomes noisy because *both* the bridge input (S) and the monitor output (z_ont) are corrupted by the same perturbation — so the residual isn't informative.
+
+The `GatedCombiner` (2-layer MLP, 41 parameters) partially addresses this by learning nonlinear score interactions: "suppress residual when ontology alone is a strong signal." Full resolution requires either per-anomaly-type routing or a classification head that first identifies the perturbation regime.
+
+---
+
+## 16. Implementation: Three New Components
+
+### 16a. TrajectoryCoherenceLoss (Training-Time)
+
+```python
+class TrajectoryCoherenceLoss(nn.Module):
+    """Penalizes erratic state transitions during training.
+
+    loss = mean_t ||JEPA_predict(s_t) - s_{t+1}||²
+
+    Added to total loss as: total = token_loss + lambda * coherence_loss
+    """
+```
+
+Operates on sequences of Sovereign State vectors. For each consecutive pair `(s_t, s_{t+1})`, predicts `s_{t+1}` from `s_t` via the JEPA predictor and penalizes the mismatch. The gradient flows through the state projector to the LLM, encouraging smoother hidden state trajectories.
+
+### 16b. TrajectoryMismatchDetector (Inference-Time)
+
+```python
+class TrajectoryMismatchDetector:
+    """Streaming detector for internal state inconsistencies.
+
+    Maintains EMA baseline of prediction error.
+    Fires when error exceeds adaptive threshold.
+    Reports per-dimension breakdown.
+    """
+```
+
+Designed for real-time monitoring. Each call to `detect()` updates the internal EMA and returns a `MismatchEvent` with:
+- Overall mismatch score (0-1)
+- Per-dimension breakdown (which Sovereign State dims deviated)
+- Adaptive threshold at time of detection
+- Whether the mismatch is statistically significant vs baseline
+
+### 16c. DisagreementGovernor (Governance)
+
+```python
+class DisagreementGovernor:
+    """Detects when ontology, trajectory, and residual disagree.
+
+    Three signals → disagreement classification:
+    - trajectory_only: JEPA says problem, ontology says fine
+    - ontology_only: ontology says problem, JEPA says fine
+    - both: all signals fire
+    - none: all quiet
+    """
+```
+
+The governor computes a disagreement vector from the three normalized scores, classifies the regime, and produces a human-readable governance report.

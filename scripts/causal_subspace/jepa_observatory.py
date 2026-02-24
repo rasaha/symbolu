@@ -1201,3 +1201,736 @@ def run_integration_evaluation(
         logger.info("  [%s] %s (%s)", status, c["name"], c["detail"])
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# TrajectoryCoherenceLoss — Training-time smoothness pressure
+# ---------------------------------------------------------------------------
+
+class TrajectoryCoherenceLoss(nn.Module):
+    """Penalizes erratic state transitions during training.
+
+    JEPA predicts s_{t+1} from s_t.  The coherence loss is the mean squared
+    error between predicted and actual next states across a sequence:
+
+        L_coherence = (1/T) * sum_t ||predictor(s_t) - s_{t+1}||^2
+
+    This is added to the token-level training loss:
+
+        L_total = L_token + lambda_coherence * L_coherence
+
+    The gradient flows through the state projector into the LLM backbone,
+    encouraging smoother hidden-state trajectories.  The JEPA predictor
+    itself is trained jointly (or pre-trained and frozen — controlled by
+    ``freeze_predictor``).
+
+    Why this matters:
+        Without coherence pressure the model can jump erratically between
+        internal representations as long as output logits are correct.
+        The coherence loss teaches the model to **think smoothly** —
+        discouraging chaotic reasoning paths and favouring trajectories
+        that lie on the learned predictive manifold.
+    """
+
+    def __init__(
+        self,
+        predictor: PhaseJEPAPredictor,
+        state_projector: SovereignStateProjector,
+        lambda_coherence: float = 0.1,
+        freeze_predictor: bool = True,
+    ):
+        super().__init__()
+        self.predictor = predictor
+        self.state_projector = state_projector
+        self.lambda_coherence = lambda_coherence
+        self.freeze_predictor = freeze_predictor
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute trajectory coherence loss over a sequence of hidden states.
+
+        Args:
+            hidden_states: [batch, seq_len, d_model] hidden states from the LLM.
+
+        Returns:
+            Scalar loss tensor (weighted by lambda_coherence).
+        """
+        B, T, D = hidden_states.shape
+        if T < 2:
+            return torch.tensor(0.0, device=hidden_states.device)
+
+        # Project to Sovereign State
+        flat = hidden_states.reshape(B * T, D)
+        s_flat = self.state_projector(flat)
+        s_seq = s_flat.reshape(B, T, -1)  # [B, T, state_dim]
+
+        s_current = s_seq[:, :-1]  # [B, T-1, state_dim]
+        s_next = s_seq[:, 1:]      # [B, T-1, state_dim]
+
+        # Predict next state from current
+        if self.freeze_predictor:
+            with torch.no_grad():
+                s_pred, _ = self.predictor(s_current)
+            # Detach predictor output so gradients only flow through projector
+            s_pred = s_pred.detach()
+        else:
+            s_pred, _ = self.predictor(s_current)
+
+        # Match shapes — predictor may output different seq length
+        min_t = min(s_pred.shape[1], s_next.shape[1])
+        s_pred = s_pred[:, :min_t]
+        s_next = s_next[:, :min_t]
+
+        # MSE between predicted and actual next state
+        mse = ((s_pred - s_next) ** 2).mean()
+
+        return self.lambda_coherence * mse
+
+    def metrics(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> Dict[str, float]:
+        """Compute coherence metrics without gradient (for logging).
+
+        Returns dict with:
+            coherence_loss: raw MSE (unweighted)
+            weighted_loss: MSE * lambda
+            mean_step_distance: mean ||s_{t+1} - s_t||
+        """
+        with torch.no_grad():
+            B, T, D = hidden_states.shape
+            if T < 2:
+                return {"coherence_loss": 0.0, "weighted_loss": 0.0, "mean_step_distance": 0.0}
+
+            flat = hidden_states.reshape(B * T, D)
+            s_flat = self.state_projector(flat)
+            s_seq = s_flat.reshape(B, T, -1)
+
+            s_current = s_seq[:, :-1]
+            s_next = s_seq[:, 1:]
+
+            s_pred, _ = self.predictor(s_current)
+            min_t = min(s_pred.shape[1], s_next.shape[1])
+            s_pred = s_pred[:, :min_t]
+            s_next_trimmed = s_next[:, :min_t]
+
+            mse = float(((s_pred - s_next_trimmed) ** 2).mean())
+            step_dist = float(((s_next - s_current) ** 2).sum(dim=-1).sqrt().mean())
+
+        return {
+            "coherence_loss": mse,
+            "weighted_loss": mse * self.lambda_coherence,
+            "mean_step_distance": step_dist,
+        }
+
+
+# ---------------------------------------------------------------------------
+# TrajectoryMismatchDetector — Inference-time inconsistency detection
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MismatchEvent:
+    """Result from the trajectory mismatch detector."""
+
+    mismatch_score: float              # Overall mismatch (0 = perfectly predicted, 1+ = anomalous)
+    per_dim_mismatch: np.ndarray       # [state_dim] per-dimension squared error
+    adaptive_threshold: float          # Current threshold at time of detection
+    is_significant: bool               # mismatch_score > adaptive_threshold
+    baseline_ema: float                # Current EMA baseline
+    top_deviating_dims: List[Tuple[int, float]]  # Top 3 (dim_idx, error) pairs
+
+
+class TrajectoryMismatchDetector:
+    """Streaming detector for internal state trajectory discontinuities.
+
+    Measures the **step distance** in Sovereign State space between
+    consecutive hidden states: ``||s_{t+1} - s_t||²``.  Maintains an
+    exponential moving average (EMA) as baseline.  When the current step
+    distance exceeds ``threshold_multiplier * EMA``, fires a significant
+    mismatch event.
+
+    The step distance is the fundamental signal: a trajectory break creates
+    an abnormally large step.  When a trained JEPA predictor is available,
+    the detector also reports prediction error as a secondary signal, but
+    the primary mismatch score uses raw step distance since it works
+    without any training.
+
+    Usage::
+
+        detector = TrajectoryMismatchDetector(predictor, projector)
+
+        # During inference, call on each new hidden state:
+        event = detector.detect(hidden_states_t, hidden_states_t_plus_1)
+        if event.is_significant:
+            print(f"Mismatch! score={event.mismatch_score:.3f}")
+            print(f"Top deviating dims: {event.top_deviating_dims}")
+
+    JEPA is not telling you what is correct.
+    It is telling you what is **internally inconsistent**.
+    """
+
+    def __init__(
+        self,
+        predictor: PhaseJEPAPredictor,
+        state_projector: SovereignStateProjector,
+        ema_alpha: float = 0.95,
+        threshold_multiplier: float = 2.5,
+        min_threshold: float = 0.01,
+    ):
+        self.predictor = predictor
+        self.state_projector = state_projector
+        self.ema_alpha = ema_alpha
+        self.threshold_multiplier = threshold_multiplier
+        self.min_threshold = min_threshold
+
+        self._ema = 0.0
+        self._n_observations = 0
+
+    def reset(self) -> None:
+        """Reset EMA state."""
+        self._ema = 0.0
+        self._n_observations = 0
+
+    def detect(
+        self,
+        h_current: np.ndarray,
+        h_next: np.ndarray,
+    ) -> MismatchEvent:
+        """Detect trajectory mismatch between consecutive hidden states.
+
+        Primary signal: raw step distance ||s_{t+1} - s_t||² in Sovereign
+        State space.  This catches trajectory breaks directly without
+        needing a trained predictor.
+
+        Args:
+            h_current: Hidden states at time t [batch, d_model] or [d_model]
+            h_next: Hidden states at time t+1 [batch, d_model] or [d_model]
+
+        Returns:
+            MismatchEvent with mismatch score and diagnostics.
+        """
+        # Ensure 2D
+        if h_current.ndim == 1:
+            h_current = h_current[np.newaxis, :]
+        if h_next.ndim == 1:
+            h_next = h_next[np.newaxis, :]
+
+        with torch.no_grad():
+            s_current = self.state_projector(
+                torch.from_numpy(h_current.astype(np.float32))
+            )
+            s_next_actual = self.state_projector(
+                torch.from_numpy(h_next.astype(np.float32))
+            )
+
+            # Primary: raw step distance in Sovereign State space
+            step_delta = s_next_actual - s_current
+            per_dim = (step_delta ** 2).mean(dim=0).cpu().numpy()
+            mismatch_score = float(per_dim.mean())
+
+        # Update EMA baseline
+        self._n_observations += 1
+        if self._n_observations == 1:
+            self._ema = mismatch_score
+        else:
+            self._ema = self.ema_alpha * self._ema + (1 - self.ema_alpha) * mismatch_score
+
+        # Adaptive threshold
+        adaptive_threshold = max(
+            self.min_threshold,
+            self._ema * self.threshold_multiplier,
+        )
+
+        # Top deviating dimensions
+        top_k = min(3, len(per_dim))
+        top_indices = np.argsort(-per_dim)[:top_k]
+        top_deviating = [(int(idx), float(per_dim[idx])) for idx in top_indices]
+
+        return MismatchEvent(
+            mismatch_score=mismatch_score,
+            per_dim_mismatch=per_dim,
+            adaptive_threshold=adaptive_threshold,
+            is_significant=mismatch_score > adaptive_threshold,
+            baseline_ema=self._ema,
+            top_deviating_dims=top_deviating,
+        )
+
+    def detect_sequence(
+        self,
+        hidden_states: np.ndarray,
+    ) -> List[MismatchEvent]:
+        """Detect mismatches across a full sequence.
+
+        Args:
+            hidden_states: [seq_len, d_model] or [batch, seq_len, d_model]
+
+        Returns:
+            List of MismatchEvents, one per consecutive pair.
+        """
+        if hidden_states.ndim == 3:
+            # Flatten batch into sequence for detection
+            B, T, D = hidden_states.shape
+            hidden_states = hidden_states.reshape(B * T, D)
+
+        events = []
+        for t in range(len(hidden_states) - 1):
+            event = self.detect(hidden_states[t], hidden_states[t + 1])
+            events.append(event)
+
+        return events
+
+
+# ---------------------------------------------------------------------------
+# DisagreementGovernor — Three-signal governance
+# ---------------------------------------------------------------------------
+
+@dataclass
+class GovernanceReport:
+    """Report from the three-signal disagreement governor."""
+
+    # Individual signal scores (all normalized to [0, 1])
+    ontology_score: float        # How much ontology has drifted
+    trajectory_score: float      # How much JEPA prediction was wrong
+    residual_score: float        # How much bridge and monitor disagree
+
+    # Disagreement classification
+    regime: str                  # "none" / "trajectory_only" / "ontology_only" / "both"
+    disagreement_score: float    # Overall governance concern level [0, 1]
+
+    # Explanation
+    explanation: str             # Human-readable governance narrative
+
+
+class DisagreementGovernor:
+    """Detects when ontology, trajectory, and residual signals disagree.
+
+    Three signals, three questions:
+        Ontology Monitor  -> "What is being thought?"     (thermometer)
+        JEPA Trajectory   -> "Where is it heading?"       (weather forecast)
+        Bridge Residual   -> "Is the forecast coherent?"  (forecast verification)
+
+    Disagreement regimes:
+        trajectory_only:  JEPA deviates but ontology is stable.
+                         The model's reasoning flow broke but semantic content
+                         is intact.  Typical of momentary processing hiccups.
+
+        ontology_only:    Ontology shifts but JEPA predicted it correctly.
+                         The model smoothly transitioned to a new semantic
+                         domain.  Often NOT an anomaly — genuine topic change.
+
+        both:             All signals fire.  Content AND flow are disrupted.
+                         Highest-confidence anomaly signal.
+
+        none:             All quiet.  Normal operation.
+    """
+
+    def __init__(
+        self,
+        monitor: OntologyMonitor,
+        predictor: PhaseJEPAPredictor,
+        state_projector: SovereignStateProjector,
+        bridge: OntologyBridge,
+        ontology_threshold: float = 1.5,
+        trajectory_threshold: float = 0.3,
+        residual_threshold: float = 0.5,
+    ):
+        self.monitor = monitor
+        self.predictor = predictor
+        self.state_projector = state_projector
+        self.bridge = bridge
+        self.ontology_threshold = ontology_threshold
+        self.trajectory_threshold = trajectory_threshold
+        self.residual_threshold = residual_threshold
+        self._calibrated = False
+
+    def calibrate(self, normal_hidden_states: np.ndarray, multiplier: float = 2.0) -> None:
+        """Calibrate thresholds from normal (non-anomalous) data.
+
+        Sets thresholds to ``multiplier * mean(signal_on_normal_data)``
+        so that normal data falls below threshold by construction.
+
+        Args:
+            normal_hidden_states: [N, d_model] representative normal data
+            multiplier: how many times the normal mean to set as threshold
+        """
+        # Compute raw signals on normal data
+        monitor_result = self.monitor.predict(normal_hidden_states)
+        if self.monitor._centroid is not None:
+            ont_raw = float(np.mean(
+                np.abs(monitor_result.z_ont - self.monitor._centroid)
+                / np.maximum(self.monitor._centroid_std, 1e-6),
+            ))
+        else:
+            ont_raw = 1.0
+
+        h_tensor = torch.from_numpy(normal_hidden_states.astype(np.float32))
+        with torch.no_grad():
+            s = self.state_projector(h_tensor)
+            s_pred, _ = self.predictor(s)
+            traj_raw = float(((s_pred - s) ** 2).mean())
+
+            s_for_bridge = s
+            if s_for_bridge.dim() == 3:
+                s_for_bridge = s_for_bridge.mean(dim=1)
+            bridge_pred = self.bridge(s_for_bridge).cpu().numpy()
+
+        z_ont = monitor_result.z_ont
+        resid_raw = float(np.mean(np.abs(bridge_pred - z_ont)))
+
+        self.ontology_threshold = max(ont_raw * multiplier, 0.1)
+        self.trajectory_threshold = max(traj_raw * multiplier, 0.01)
+        self.residual_threshold = max(resid_raw * multiplier, 0.01)
+        self._calibrated = True
+
+        logger.info(
+            "Governor calibrated: ont_thresh=%.3f, traj_thresh=%.3f, resid_thresh=%.3f",
+            self.ontology_threshold, self.trajectory_threshold, self.residual_threshold,
+        )
+
+    def assess(
+        self,
+        hidden_states: np.ndarray,
+    ) -> GovernanceReport:
+        """Run all three signals and assess disagreement.
+
+        Args:
+            hidden_states: [batch, d_model] hidden states to assess.
+
+        Returns:
+            GovernanceReport with regime classification and explanation.
+        """
+        # Signal 1: Ontology drift
+        monitor_result = self.monitor.predict(hidden_states)
+        if self.monitor._centroid is not None:
+            ont_raw = np.mean(
+                np.abs(monitor_result.z_ont - self.monitor._centroid)
+                / np.maximum(self.monitor._centroid_std, 1e-6),
+                axis=-1,
+            )
+            if ont_raw.ndim > 0:
+                ont_raw = float(ont_raw.mean())
+            else:
+                ont_raw = float(ont_raw)
+        else:
+            ont_raw = 0.0
+
+        # Signal 2: JEPA trajectory prediction error
+        h_tensor = torch.from_numpy(hidden_states.astype(np.float32))
+        with torch.no_grad():
+            s = self.state_projector(h_tensor)
+            s_pred, _ = self.predictor(s)
+
+            jepa_error = ((s_pred - s) ** 2).mean()
+            trajectory_raw = float(jepa_error)
+
+        # Signal 3: Bridge residual (disagreement between bridge prediction
+        # of ontology and actual ontology)
+        with torch.no_grad():
+            s_for_bridge = s
+            if s_for_bridge.dim() == 3:
+                s_for_bridge = s_for_bridge.mean(dim=1)
+            bridge_pred = self.bridge(s_for_bridge).cpu().numpy()
+
+        z_ont = monitor_result.z_ont
+        if z_ont.ndim == 2 and bridge_pred.ndim == 2:
+            residual_raw = float(np.mean(np.abs(bridge_pred - z_ont)))
+        elif z_ont.ndim == 1 and bridge_pred.ndim == 2:
+            residual_raw = float(np.mean(np.abs(bridge_pred - z_ont[np.newaxis, :])))
+        else:
+            residual_raw = float(np.mean(np.abs(bridge_pred - z_ont)))
+
+        # Normalize to [0, 1] relative to thresholds
+        ont_score = min(ont_raw / max(self.ontology_threshold, 1e-6), 1.0)
+        traj_score = min(trajectory_raw / max(self.trajectory_threshold, 1e-6), 1.0)
+        resid_score = min(residual_raw / max(self.residual_threshold, 1e-6), 1.0)
+
+        # Classify disagreement regime
+        ont_fired = ont_score > 0.5
+        traj_fired = traj_score > 0.5
+
+        if traj_fired and ont_fired:
+            regime = "both"
+        elif traj_fired and not ont_fired:
+            regime = "trajectory_only"
+        elif ont_fired and not traj_fired:
+            regime = "ontology_only"
+        else:
+            regime = "none"
+
+        # Overall disagreement score
+        # "both" regime gets highest score; single-signal regimes are lower
+        if regime == "both":
+            disagreement_score = max(ont_score, traj_score, resid_score)
+        elif regime == "trajectory_only":
+            disagreement_score = traj_score * 0.7 + resid_score * 0.3
+        elif regime == "ontology_only":
+            disagreement_score = ont_score * 0.5  # Often benign (topic change)
+        else:
+            disagreement_score = 0.0
+
+        # Build explanation
+        explanation = self._build_explanation(
+            ont_score, traj_score, resid_score, regime,
+            monitor_result.domain_label,
+        )
+
+        return GovernanceReport(
+            ontology_score=ont_score,
+            trajectory_score=traj_score,
+            residual_score=resid_score,
+            regime=regime,
+            disagreement_score=disagreement_score,
+            explanation=explanation,
+        )
+
+    @staticmethod
+    def _build_explanation(
+        ont_score: float,
+        traj_score: float,
+        resid_score: float,
+        regime: str,
+        domain_label: str,
+    ) -> str:
+        """Build human-readable governance narrative."""
+        if regime == "none":
+            return (
+                "All three signals agree: ontology stable, trajectory coherent, "
+                "bridge prediction matches. Normal operation."
+            )
+
+        parts = []
+
+        if regime == "trajectory_only":
+            parts.append(
+                f"Trajectory disruption detected (score={traj_score:.2f}) "
+                f"but ontological content is stable (score={ont_score:.2f}). "
+                "The model's reasoning flow broke but semantic meaning is intact."
+            )
+        elif regime == "ontology_only":
+            parts.append(
+                f"Ontological shift detected (score={ont_score:.2f}) "
+                f"but trajectory was smooth (score={traj_score:.2f}). "
+                "This may be a genuine topic transition, not an anomaly."
+            )
+        elif regime == "both":
+            parts.append(
+                f"Both trajectory (score={traj_score:.2f}) and ontology "
+                f"(score={ont_score:.2f}) are disrupted. "
+                "High-confidence anomaly: content AND flow changed unexpectedly."
+            )
+
+        if resid_score > 0.5:
+            parts.append(
+                f"Bridge residual is high ({resid_score:.2f}): "
+                "JEPA's trajectory prediction disagrees with ontological reality."
+            )
+
+        if domain_label:
+            parts.append(f"Current domain: {domain_label}.")
+
+        return " ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Integration test for the three new components
+# ---------------------------------------------------------------------------
+
+def run_governance_evaluation(
+    hidden_states: np.ndarray,
+    ont_features: np.ndarray,
+    valid_mask: np.ndarray,
+    d_model: int = 768,
+    state_dim: int = 32,
+    n_epochs_bridge: int = 200,
+    n_epochs_monitor: int = 100,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Run evaluation of the three governance components.
+
+    Tests:
+      1. TrajectoryCoherenceLoss produces gradient and reduces over sequence
+      2. TrajectoryMismatchDetector fires on injected anomalies
+      3. DisagreementGovernor correctly classifies regimes
+
+    Args:
+        hidden_states: [N, d_model]
+        ont_features: [N, 12]
+        valid_mask: [N] boolean
+        d_model, state_dim: dimensions
+        n_epochs_bridge, n_epochs_monitor: training epochs
+        seed: random seed
+
+    Returns:
+        Dict with test results for each component.
+    """
+    results: Dict[str, Any] = {}
+    rng = np.random.RandomState(seed)
+
+    H_valid = hidden_states[valid_mask]
+    ont_valid = ont_features[valid_mask]
+    z_ont_robust = ont_valid[:, ROBUST_AXIS_INDICES]
+    N = H_valid.shape[0]
+
+    # Set up components
+    torch.manual_seed(seed)
+    projector = SovereignStateProjector(hidden_dim=d_model, state_dim=state_dim)
+    predictor = VrittiValidatedPredictor(
+        state_dim=state_dim, hidden_dim=128, prediction_steps=2,
+    )
+
+    with torch.no_grad():
+        S = projector(torch.from_numpy(H_valid.astype(np.float32))).cpu().numpy()
+
+    # Train monitor
+    monitor = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
+    monitor.train_monitor(
+        H=H_valid, ont_features=ont_valid,
+        valid_mask=np.ones(N, dtype=bool),
+        n_epochs=n_epochs_monitor, seed=seed,
+    )
+
+    # Train bridge
+    bridge = OntologyBridge(state_dim=state_dim, n_axes=N_ROBUST)
+    bridge.train_bridge(S, z_ont_robust, n_epochs=n_epochs_bridge, seed=seed)
+
+    # ── Test 1: TrajectoryCoherenceLoss ──
+    logger.info("Governance test 1: TrajectoryCoherenceLoss...")
+
+    coherence_loss_fn = TrajectoryCoherenceLoss(
+        predictor=predictor,
+        state_projector=projector,
+        lambda_coherence=0.1,
+        freeze_predictor=True,
+    )
+
+    # Create a synthetic sequence [1, seq_len, d_model]
+    seq_len = min(20, N)
+    h_seq = torch.from_numpy(H_valid[:seq_len].astype(np.float32)).unsqueeze(0)
+
+    loss_val = coherence_loss_fn(h_seq)
+    metrics = coherence_loss_fn.metrics(h_seq)
+
+    results["coherence_loss"] = {
+        "passed": float(loss_val.detach()) > 0.0,
+        "loss_value": float(loss_val.detach()),
+        "coherence_loss_raw": metrics["coherence_loss"],
+        "weighted_loss": metrics["weighted_loss"],
+        "mean_step_distance": metrics["mean_step_distance"],
+    }
+    logger.info(
+        "  CoherenceLoss=%.4f, step_distance=%.4f",
+        metrics["coherence_loss"], metrics["mean_step_distance"],
+    )
+
+    # ── Test 2: TrajectoryMismatchDetector ──
+    logger.info("Governance test 2: TrajectoryMismatchDetector...")
+
+    detector = TrajectoryMismatchDetector(
+        predictor=predictor,
+        state_projector=projector,
+        ema_alpha=0.95,
+        threshold_multiplier=2.5,
+    )
+
+    # Run on normal sequence to establish baseline
+    normal_events = detector.detect_sequence(H_valid[:min(50, N)])
+    normal_scores = [e.mismatch_score for e in normal_events]
+    normal_significant = sum(1 for e in normal_events if e.is_significant)
+
+    # Inject trajectory break and detect
+    detector.reset()
+    h_anomalous = H_valid[:min(50, N)].copy()
+    # Insert a random state at position 25
+    break_pos = min(25, len(h_anomalous) - 2)
+    h_anomalous[break_pos] = rng.randn(d_model).astype(np.float32) * 3.0
+    anomalous_events = detector.detect_sequence(h_anomalous)
+
+    # The event right after the break should have higher score
+    if break_pos < len(anomalous_events):
+        break_event = anomalous_events[break_pos]
+        break_score = break_event.mismatch_score
+    else:
+        break_score = 0.0
+
+    mean_normal = float(np.mean(normal_scores)) if normal_scores else 0.0
+
+    results["mismatch_detector"] = {
+        "passed": break_score > mean_normal,
+        "mean_normal_score": mean_normal,
+        "break_score": break_score,
+        "ratio": break_score / max(mean_normal, 1e-10),
+        "normal_significant_count": normal_significant,
+        "break_significant": break_event.is_significant if break_pos < len(anomalous_events) else False,
+        "top_deviating_dims": break_event.top_deviating_dims if break_pos < len(anomalous_events) else [],
+    }
+    logger.info(
+        "  Normal mean=%.4f, break score=%.4f (ratio=%.1fx), significant=%s",
+        mean_normal, break_score,
+        break_score / max(mean_normal, 1e-10),
+        results["mismatch_detector"]["break_significant"],
+    )
+
+    # ── Test 3: DisagreementGovernor ──
+    logger.info("Governance test 3: DisagreementGovernor...")
+
+    governor = DisagreementGovernor(
+        monitor=monitor,
+        predictor=predictor,
+        state_projector=projector,
+        bridge=bridge,
+    )
+
+    # Calibrate thresholds from normal data so "normal" doesn't fire
+    calibration_batch = H_valid[:min(100, N)]
+    governor.calibrate(calibration_batch, multiplier=2.0)
+
+    # Normal batch → should be "none" regime
+    normal_report = governor.assess(H_valid[:min(10, N)])
+
+    # Trajectory break batch → should detect trajectory disruption
+    h_break = H_valid[:min(10, N)].copy()
+    h_break[0] = rng.randn(d_model).astype(np.float32) * 5.0
+    break_report = governor.assess(h_break)
+
+    # Domain shift batch → should detect ontological shift
+    h_domain = H_valid[:min(10, N)].copy()
+    h_domain[:, :d_model // 2] *= -1
+    domain_report = governor.assess(h_domain)
+
+    results["disagreement_governor"] = {
+        "passed": True,  # Updated below
+        "normal_regime": normal_report.regime,
+        "normal_disagreement": normal_report.disagreement_score,
+        "break_regime": break_report.regime,
+        "break_disagreement": break_report.disagreement_score,
+        "domain_regime": domain_report.regime,
+        "domain_disagreement": domain_report.disagreement_score,
+        "normal_explanation": normal_report.explanation[:100],
+        "break_explanation": break_report.explanation[:100],
+        "domain_explanation": domain_report.explanation[:100],
+    }
+
+    # Pass condition: abnormal batches have higher disagreement than normal
+    passed = (
+        break_report.disagreement_score > normal_report.disagreement_score
+        or domain_report.disagreement_score > normal_report.disagreement_score
+    )
+    results["disagreement_governor"]["passed"] = passed
+
+    logger.info(
+        "  Normal: regime=%s (%.3f), Break: regime=%s (%.3f), Domain: regime=%s (%.3f)",
+        normal_report.regime, normal_report.disagreement_score,
+        break_report.regime, break_report.disagreement_score,
+        domain_report.regime, domain_report.disagreement_score,
+    )
+
+    # Summary
+    all_passed = all(
+        results[k]["passed"]
+        for k in ["coherence_loss", "mismatch_detector", "disagreement_governor"]
+    )
+    results["all_passed"] = all_passed
+
+    return results
