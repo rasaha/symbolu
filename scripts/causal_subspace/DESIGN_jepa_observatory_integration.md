@@ -1132,3 +1132,199 @@ In synthetic data, all three signals are measuring variations of the same thing:
 4. **Phase 4**: Live deployment with TrajectoryMismatchDetector in streaming inference. This tests real-time detection latency and false positive rates under production distributions.
 
 The expectation is that Phase 2 will resolve the Bridge R² ceiling and adversarial regression, and Phase 3 will resolve subtle drift detection (because the JEPA predictor will have learned what "normal" looks like).
+
+---
+
+## 20. Phase 2 Implementation — Real LLM Hidden States
+
+### 20a. Architecture
+
+Three new files implement the Phase 2 pipeline:
+
+```
+extract_real_states.py          eval_real_data.py              run_phase2.py
+┌─────────────────────┐    ┌──────────────────────────┐    ┌────────────────────┐
+│ Behavioral corpus    │    │ Build ontology vectors   │    │ Unified CLI        │
+│ (5 categories)       │    │ (spaCy or heuristic)     │    │ chains 1→2         │
+│        ↓             │    │        ↓                 │    │ auto-detect GPU    │
+│ Tokenize + forward   │    │ Project H → S (32D)      │    │ cache support      │
+│ pass through LLM     │    │        ↓                 │    │ JSON output        │
+│        ↓             │    │ Train bridge (S → z_ont)  │    └────────────────────┘
+│ Extract hidden states│    │ Train monitor (H → z_ont) │
+│ at target layer      │    │        ↓                 │
+│        ↓             │    │ AUC per category          │
+│ Save .pt cache       │    │ Governance eval           │
+│ with labels          │    │ Synthetic comparison      │
+└─────────────────────┘    └──────────────────────────┘
+```
+
+### 20b. Behavioral Categories → Anomaly Type Mapping
+
+| Category | Built-in Texts | HuggingFace Source | Maps to Anomaly Type |
+|----------|---------------|-------------------|---------------------|
+| `normal` | 25 encyclopedic | WikiText-103 (test split) | Baseline |
+| `domain_shift` | 10 cross-domain pairs | — (constructed) | domain_shift |
+| `trajectory_break` | 15 jailbreak prompts | rubend18/ChatGPT-Jailbreak-Prompts | trajectory_break |
+| `adversarial` | 15 factual errors | truthful_qa (incorrect answers) | adversarial |
+| `subtle_drift` | 15 sycophantic texts | Anthropic/hh-rlhf (rejected) | subtle_drift |
+
+Built-in texts are always available (no download). HuggingFace datasets are fetched on demand and provide 200-500 samples per category.
+
+### 20c. CLI Commands for GPU Testing
+
+**Quick test (CPU, no downloads, ~2 min):**
+```bash
+python scripts/causal_subspace/run_phase2.py --model gpt2 --quick
+```
+
+**Standard GPU run (GPT-2 Medium, ~5 min):**
+```bash
+python scripts/causal_subspace/run_phase2.py \
+    --model gpt2-medium --device cuda
+```
+
+**Full evaluation with governance + synthetic comparison (~10 min):**
+```bash
+python scripts/causal_subspace/run_phase2.py \
+    --model gpt2-medium --device cuda \
+    --governance --compare-synthetic \
+    --max-sequences 1000 --output results/phase2.json
+```
+
+**Large model (Llama-2-7B, ~20 min):**
+```bash
+python scripts/causal_subspace/run_phase2.py \
+    --model meta-llama/Llama-2-7b-hf --device cuda \
+    --layer 16 --governance --compare-synthetic \
+    --batch-size 4 --max-sequences 500 \
+    --output results/phase2_llama2.json
+```
+
+**MLP bridge (nonlinear mapping test):**
+```bash
+python scripts/causal_subspace/run_phase2.py \
+    --model gpt2 --device cuda \
+    --bridge-type mlp --hidden-dim 128 --n-epochs 500 \
+    --governance
+```
+
+**Step-by-step (separate extraction and evaluation):**
+```bash
+# Step 1: Extract and cache hidden states
+python scripts/causal_subspace/extract_real_states.py \
+    --model gpt2-medium --device cuda \
+    --max-sequences 2000 --output states_gpt2m.pt
+
+# Step 2: Evaluate (can re-run with different configs without re-extracting)
+python scripts/causal_subspace/eval_real_data.py \
+    --input states_gpt2m.pt --governance --compare-synthetic \
+    --output results_gpt2m.json
+
+# Step 2b: Try MLP bridge on same cached states
+python scripts/causal_subspace/eval_real_data.py \
+    --input states_gpt2m.pt --bridge-type mlp --hidden-dim 128 \
+    --n-epochs 500 --output results_gpt2m_mlp.json
+```
+
+**With caching (reuse states across runs):**
+```bash
+python scripts/causal_subspace/run_phase2.py \
+    --model gpt2-medium --device cuda \
+    --cache-dir .cache/phase2 \
+    --governance --compare-synthetic
+```
+
+### 20d. GPU Requirements
+
+| Model | Params | VRAM | Time (500 seqs) |
+|-------|--------|------|-----------------|
+| gpt2 | 124M | ~500 MB | ~2 min |
+| gpt2-medium | 345M | ~1.5 GB | ~5 min |
+| gpt2-large | 774M | ~3 GB | ~8 min |
+| gpt2-xl | 1.5B | ~6 GB | ~15 min |
+| Llama-2-7B | 7B | ~14 GB (fp16) | ~20 min |
+| Llama-2-13B | 13B | ~26 GB (fp16) | ~35 min |
+
+### 20e. Dependencies
+
+```bash
+# Core (required)
+pip install torch transformers
+
+# Datasets (optional, for HuggingFace behavioral corpus)
+pip install datasets
+
+# Better ontology vectors (optional, falls back to heuristics)
+pip install spacy && python -m spacy download en_core_web_sm
+```
+
+### 20f. Realistic Expected Outcomes
+
+The move from synthetic to real data provides **opportunity**, not guaranteed improvement. The actual outcome depends on whether ontology axes are primary drivers of representation (not just post-hoc readouts), whether the 32D bottleneck preserves them, and whether the JEPA predictor has learned a meaningful manifold.
+
+**Honest expectation table** (revised per ChatGPT's analysis):
+
+| Metric | Synthetic (Phase 1) | Realistic Real Data | Optimistic | Depends On |
+|--------|--------------------|--------------------|-----------|------------|
+| Bridge R² mean | 0.36 | 0.45–0.65 | 0.7+ | Whether ontology is structural vs descriptive |
+| trajectory_break AUC | 0.77 | 0.75–0.85 | 0.85+ | Signal is already strong in synthetic |
+| domain_shift AUC | 0.62 | 0.70–0.80 | 0.80+ | Real domains create cleaner shifts |
+| subtle_drift AUC | 0.45 | 0.55–0.70 | 0.75+ | JEPA predictor training depth |
+| adversarial AUC | 0.63 | 0.65–0.75 | 0.75+ | Attack realism; sophisticated attacks maintain manifold consistency |
+
+**Why R² might NOT reach 0.7+ without retraining:**
+1. Ontology axes may be descriptive but not structural — the model may solve next-token prediction using other features
+2. The 32D JEPA bottleneck may discard ontology-relevant components in favor of trajectory dynamics
+3. Axes like Witness/Purpose/Agency are emergent and entangled with style, confidence, and discourse features
+4. Heuristic ontology labels are noisy — any bridge to a noisy target has a ceiling
+5. Without backbone objectives that reward ontological alignment, the bridge is a decoder not a channel
+
+**The critical variable:** Is JEPA trained as a serious manifold learner or a shallow predictor? If shallow → modest gains. If deeply trained → major gains. The limiting factor is manifold quality, not synthetic vs real.
+
+### 20g. Experimental Controls (Anti-Self-Confirmation)
+
+The experiment must prove generalization and causal contribution, not just IID performance. The following controls are mandatory:
+
+**Negative controls (must pass):**
+
+| Control | What It Tests | Expected Result |
+|---------|-------------|-----------------|
+| Label shuffle | Ontology labels randomly permuted | R² collapses to ~0. If >0.05 → leakage |
+| Time shuffle | JEPA temporal order broken | Trajectory AUC drops. If unchanged → JEPA isn't using dynamics |
+| Feature knockout | Remove residual channel | trajectory_break AUC drops if residual is real |
+| Random projector | Re-initialize SovereignStateProjector | R² drops to synthetic baseline |
+
+**Orthogonal baselines (must beat):**
+
+| Baseline | How It Works | Why We Must Beat It |
+|----------|-------------|-------------------|
+| Perplexity delta | Next-token perplexity spike | Simplest trajectory anomaly detector |
+| Embedding distance | L2 from centroid in raw H-space | Tests whether 32D projection adds value |
+| Entropy detector | Attention entropy spike | Tests whether JEPA adds value over attention patterns |
+| Linear classifier on H | LogisticRegression(H → label) | Tests whether bridge/ontology adds value over raw features |
+
+If our system doesn't beat these on the anomaly types it claims to detect, the integration is not yet meaningful.
+
+**Data split requirements:**
+
+1. **IID split** — standard train/val/test (already done)
+2. **Cross-seed split** — different random seeds for projector/bridge (already done)
+3. **Domain shift split** — train on WikiText, test on code/chat/news. If performance only shows on IID, it's not real structure
+
+**Calibration metrics (beyond AUC):**
+
+- False positive rate at fixed 80% recall
+- Precision at operational threshold
+- Threshold stability across domains (if thresholds swing wildly, not deployable)
+- Confidence calibration (predicted score vs actual anomaly rate)
+
+### 20h. When to Declare Phase 2 Success vs Failure
+
+| Outcome | Bridge R² | Combined AUC | Interpretation | Next Step |
+|---------|-----------|-------------|----------------|-----------|
+| **Strong success** | >0.55 on 3+ axes | >0.75 on 3+ types | Ontology is structural | Phase 3 (training) |
+| **Moderate success** | 0.40–0.55 | 0.65–0.75 | Ontology is recoverable | Try MLP bridge, deeper projector |
+| **Marginal** | 0.36–0.45 | 0.55–0.65 | Marginal over synthetic | Retrain projector with auxiliary loss |
+| **Failure** | <0.36 | <0.55 | Real data didn't help | Ontology is descriptive not structural; need backbone retraining |
+
+The honest answer is: we don't know yet. Phase 2 is a measurement, not an assumption.
