@@ -1085,3 +1085,50 @@ python scripts/causal_subspace/train_bridge.py --all-extensions --governance
 # With learned combiner comparison
 python scripts/causal_subspace/train_bridge.py --learned-combiner --governance
 ```
+
+---
+
+## 19. Limitation: Synthetic-Domain Validation vs General-Intelligence Validation
+
+All empirical results in Sections 17-18 are **synthetic-domain validated** — generated from random Gaussian embeddings projected through random matrices. This is a fundamental limitation that bounds three key metrics.
+
+### What Synthetic Validation Proves
+
+The plumbing works:
+- Gradients flow through TrajectoryCoherenceLoss to the projector
+- Lambda scaling is exactly linear
+- EMA baseline stabilizes, adaptive thresholds calibrate
+- Governor regime classification produces correct logical outputs
+- Gated combiner learns to weight signals
+- All 20/20 checks pass structurally
+
+### What Synthetic Validation Cannot Prove
+
+Detection power on real semantic structure. Random subspaces have no learned manifold, no semantic clusters, no temporal coherence — the components are measuring accidental correlation in noise.
+
+### Impact on Remaining Weaknesses
+
+| Weakness | Synthetic Result | Real-Data Expectation | Root Cause of Gap |
+|----------|-----------------|----------------------|-------------------|
+| Bridge R² ceiling | 0.36 (max axis) | 0.6-0.8+ | Random projections have no learnable structure; real Sovereign State dims encode semantic features that correlate with ontological axes by construction |
+| Adversarial regression | Naive 0.666 > Gated 0.634 | Gated > Naive (0.75+) | Bridge residual is uninformative when bridge maps random→random; with real correlations, adversarial perturbations *break* those correlations, making the residual a strong signal |
+| Subtle drift AUC | 0.45 (near chance) | 0.70+ | Gradual rotation of random vectors is indistinguishable from normal random variation; a trained JEPA predictor that knows the normal trajectory manifold can detect small deviations from expected patterns |
+
+### Why This Matters Architecturally
+
+The three-signal governance design (ontology + trajectory + residual) is premised on each signal capturing a **different aspect of real semantic structure**:
+
+1. **Ontology signal** — detects shifts in *what the model is representing* (content). Requires real semantic axes to be meaningful.
+2. **Trajectory signal** — detects shifts in *how the model transitions between states* (dynamics). Requires a learned trajectory manifold to distinguish normal from anomalous transitions.
+3. **Residual signal** — detects *disagreement between bridge and monitor* (cross-validation). Requires both to have learned real correlations that break differently under different anomaly types.
+
+In synthetic data, all three signals are measuring variations of the same thing: distance from a random centroid. The regime classifications work (trajectory_break→"both", adversarial→"ontology_only") because the synthetic anomalies are structurally different enough to create different distance patterns. But the **diagnostic power** — the ability to distinguish a sycophantic drift from a hallucination from a jailbreak — requires real semantic structure.
+
+### Path to General-Intelligence Validation
+
+1. **Phase 1 (current)**: Synthetic validation confirms structural correctness. ✅ Complete.
+2. **Phase 2**: Run on frozen LLM hidden states from a small model (e.g., GPT-2, Llama-2-7B) with known behavioral shifts (prompt injection, persona drift, topic switching). This tests whether the bridge can learn real S→O correlations.
+3. **Phase 3**: End-to-end training with TrajectoryCoherenceLoss in the LLM fine-tuning loop. This tests whether the smoothness pressure actually improves trajectory quality.
+4. **Phase 4**: Live deployment with TrajectoryMismatchDetector in streaming inference. This tests real-time detection latency and false positive rates under production distributions.
+
+The expectation is that Phase 2 will resolve the Bridge R² ceiling and adversarial regression, and Phase 3 will resolve subtle drift detection (because the JEPA predictor will have learned what "normal" looks like).
