@@ -1,31 +1,43 @@
 #!/usr/bin/env python3
 """
-Synthetic Subspace Validation — No Model Download Required
-============================================================
+End-to-End Synthetic Evaluation — Phase 1 + Phase 2
+=====================================================
 
-Runs the full 6-part causal subspace pipeline on purely synthetic data.
-This tests every algorithm (PCA, SAE, MDL, activation patching, trajectory)
-without needing a HuggingFace model, GPU, or internet connection.
+Runs the complete causal subspace pipeline on purely synthetic data:
+
+Phase 1 (Parts 3-6):
+  - Feature disentanglement (PCA + SAE + K-means)
+  - MDL probing (information-theoretic validation)
+  - Causal interchange intervention (toy transformer)
+  - Layer trajectory mapping
+
+Phase 2 (Part 7):
+  - Controlled ground-truth dataset with subspace structure
+  - OntologyMonitor training with train/val/test splits
+  - Per-axis R², MAE, rank correlation with bootstrap 95% CIs
+  - Robustness under distribution shift (noise, scale, rotate)
+  - Drift detection validation
+  - OntologyInjector evaluation on 49 diverse sentences
+  - SNR sensitivity analysis
+
+No model download, GPU, or internet connection required.
 
 Usage::
 
-    # Default: 6-layer toy model, 500 samples, 5 classes
+    # Phase 1 only (default)
     python scripts/causal_subspace/test_synthetic.py
 
-    # Larger test
-    python scripts/causal_subspace/test_synthetic.py --n-samples 2000 --n-layers 12 --d-model 128
+    # Phase 1 + Phase 2
+    python scripts/causal_subspace/test_synthetic.py --run-phase2
 
     # Quick smoke test
-    python scripts/causal_subspace/test_synthetic.py --quick
+    python scripts/causal_subspace/test_synthetic.py --quick --run-phase2
 
-    # Save results to JSON
-    python scripts/causal_subspace/test_synthetic.py --output results_synthetic.json
+    # Phase 2 only
+    python scripts/causal_subspace/test_synthetic.py --parts 7
 
-    # Test specific parts only
-    python scripts/causal_subspace/test_synthetic.py --parts 3 4 5
-
-    # Verbose logging
-    python scripts/causal_subspace/test_synthetic.py -v
+    # Save results
+    python scripts/causal_subspace/test_synthetic.py --run-phase2 --output results.json
 """
 
 from __future__ import annotations
@@ -36,8 +48,9 @@ import logging
 import math
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -68,6 +81,8 @@ from scripts.causal_subspace.trajectory import (
     plot_trajectory_ascii,
 )
 from scripts.causal_subspace.ontology_alignment import (
+    AXIS_NAMES,
+    N_AXES,
     OntologyMonitor,
     OntologyInjector,
     MonitorResult,
@@ -81,7 +96,7 @@ logger = logging.getLogger("causal_subspace.synthetic")
 
 
 # ---------------------------------------------------------------------------
-# Synthetic data generators
+# Phase 1: Synthetic data generators
 # ---------------------------------------------------------------------------
 
 def generate_synthetic_hidden_states(
@@ -97,39 +112,15 @@ def generate_synthetic_hidden_states(
 
     Later layers have stronger class signal (mimicking how real transformers
     crystallize structure in middle-to-late layers).
-
-    Parameters
-    ----------
-    n_samples : int
-        Number of token positions.
-    d_model : int
-        Hidden dimension.
-    n_layers : int
-        Number of simulated layers.
-    n_classes : int
-        Number of structural classes.
-    signal_growth : float
-        Signal strength grows as base + layer * signal_growth.
-    noise_decay : float
-        Noise strength decays as base - layer * noise_decay.
-    seed : int
-
-    Returns
-    -------
-    states : dict[int, np.ndarray]  (layer → [N, d])
-    labels : np.ndarray [N]  (integer class labels)
     """
     rng = np.random.RandomState(seed)
     labels = rng.randint(0, n_classes, size=n_samples).astype(np.int32)
-
-    # Class means: each class has a distinct direction in R^d
     class_means = rng.randn(n_classes, d_model).astype(np.float32)
 
     states: Dict[int, np.ndarray] = {}
     for layer in range(n_layers):
         signal = 0.3 + layer * signal_growth
-        noise = 2.5 - layer * noise_decay
-        noise = max(noise, 0.1)
+        noise = max(2.5 - layer * noise_decay, 0.1)
 
         H = np.zeros((n_samples, d_model), dtype=np.float32)
         for i in range(n_samples):
@@ -140,13 +131,10 @@ def generate_synthetic_hidden_states(
 
 
 class _ToyTransformerBlock(nn.Module):
-    """A minimal transformer block that applies a linear projection."""
-
     def __init__(self, d_model: int):
         super().__init__()
         self.proj = nn.Linear(d_model, d_model, bias=False)
         nn.init.eye_(self.proj.weight)
-        # Add small random perturbation
         with torch.no_grad():
             self.proj.weight.add_(torch.randn_like(self.proj.weight) * 0.01)
 
@@ -155,12 +143,7 @@ class _ToyTransformerBlock(nn.Module):
 
 
 class _ToyTransformer(nn.Module):
-    """A toy transformer that returns logits and has hookable blocks.
-
-    Has the same interface expected by the activation patching code:
-    - transformer.h is a ModuleList of blocks
-    - forward returns an object with .logits attribute
-    """
+    """Toy transformer with hookable blocks for activation patching tests."""
 
     def __init__(self, d_model: int, n_layers: int, vocab_size: int = 1000):
         super().__init__()
@@ -175,8 +158,7 @@ class _ToyTransformer(nn.Module):
         h = self.embed(input_ids)
         for block in self.transformer.h:
             h = block(h)
-        logits = self.lm_head(h)
-        return _LogitOutput(logits)
+        return _LogitOutput(self.lm_head(h))
 
 
 class _LogitOutput:
@@ -185,8 +167,6 @@ class _LogitOutput:
 
 
 class _ToyTokenizer:
-    """Minimal tokenizer interface for synthetic tests."""
-
     def __init__(self, vocab_size: int = 1000):
         self.vocab_size = vocab_size
         self.pad_token = "<pad>"
@@ -195,7 +175,6 @@ class _ToyTokenizer:
         self.eos_token_id = 1
 
     def encode(self, text: str, add_special_tokens: bool = False) -> List[int]:
-        # Deterministic encoding based on characters
         return [ord(c) % self.vocab_size for c in text if c.strip()]
 
     def decode(self, ids) -> str:
@@ -203,7 +182,354 @@ class _ToyTokenizer:
 
 
 # ---------------------------------------------------------------------------
-# Part runners
+# Phase 2: Controlled dataset with known subspace structure
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EvalDataset:
+    """Controlled dataset with known ground-truth ontology structure."""
+    hidden_states: np.ndarray   # [N, d_model]
+    ont_features: np.ndarray    # [N, 12]
+    valid_mask: np.ndarray      # [N] bool
+    labels: np.ndarray          # [N] int
+    split: str = "train"
+
+    @property
+    def N(self) -> int:
+        return self.hidden_states.shape[0]
+
+    @property
+    def d_model(self) -> int:
+        return self.hidden_states.shape[1]
+
+
+def generate_controlled_dataset(
+    n_samples: int = 5000,
+    d_model: int = 768,
+    n_classes: int = 5,
+    signal_snr: float = 3.0,
+    seed: int = 42,
+    val_frac: float = 0.15,
+    test_frac: float = 0.15,
+) -> Tuple[EvalDataset, EvalDataset, EvalDataset]:
+    """Generate train/val/test splits with known ontological structure.
+
+    For each robust axis j, a random 10-dim subspace S_j encodes the axis
+    value along its first principal direction, scaled by signal_snr.
+    """
+    rng = np.random.RandomState(seed)
+    labels = rng.randint(0, n_classes, size=n_samples).astype(np.int32)
+
+    # Class profiles on all 12 axes
+    class_profiles = np.zeros((n_classes, N_AXES), dtype=np.float32)
+    for c in range(n_classes):
+        for j, ax_idx in enumerate(ROBUST_AXIS_INDICES):
+            class_profiles[c, ax_idx] = 0.15 + 0.7 * (c * N_ROBUST + j) / (n_classes * N_ROBUST)
+        for ax_idx in range(N_AXES):
+            if ax_idx not in ROBUST_AXIS_INDICES:
+                class_profiles[c, ax_idx] = rng.uniform(0.3, 0.7)
+
+    ont_features = np.zeros((n_samples, N_AXES), dtype=np.float32)
+    for i in range(n_samples):
+        c = labels[i]
+        for ax_idx in range(N_AXES):
+            noise_std = 0.05 if ax_idx in ROBUST_AXIS_INDICES else 0.15
+            ont_features[i, ax_idx] = class_profiles[c, ax_idx] + rng.randn() * noise_std
+    ont_features = np.clip(ont_features, 0.0, 1.0)
+
+    # Subspace bases for each robust axis
+    subspace_dim = min(10, d_model // (N_ROBUST + 1))
+    subspace_bases = {}
+    for ax_idx in ROBUST_AXIS_INDICES:
+        raw = rng.randn(d_model, subspace_dim).astype(np.float32)
+        Q, _ = np.linalg.qr(raw)
+        subspace_bases[ax_idx] = Q[:, :subspace_dim]
+
+    # Hidden states: noise + signal in each subspace
+    H = rng.randn(n_samples, d_model).astype(np.float32)
+    for ax_idx in ROBUST_AXIS_INDICES:
+        basis = subspace_bases[ax_idx]
+        for i in range(n_samples):
+            signal_vec = basis[:, 0] * ont_features[i, ax_idx] * signal_snr
+            for k in range(1, min(3, subspace_dim)):
+                signal_vec += basis[:, k] * rng.randn() * 0.3
+            H[i] += signal_vec
+
+    valid_mask = np.ones(n_samples, dtype=bool)
+
+    # Split
+    perm = rng.permutation(n_samples)
+    n_test = int(n_samples * test_frac)
+    n_val = int(n_samples * val_frac)
+    n_train = n_samples - n_val - n_test
+
+    def _make(indices, name):
+        return EvalDataset(
+            hidden_states=H[indices].copy(),
+            ont_features=ont_features[indices].copy(),
+            valid_mask=valid_mask[indices].copy(),
+            labels=labels[indices].copy(),
+            split=name,
+        )
+
+    return _make(perm[:n_train], "train"), _make(perm[n_train:n_train + n_val], "val"), _make(perm[n_train + n_val:], "test")
+
+
+def generate_shifted_dataset(
+    base: EvalDataset,
+    shift_type: str = "noise",
+    seed: int = 99,
+) -> EvalDataset:
+    """Generate a distribution-shifted version of the dataset."""
+    rng = np.random.RandomState(seed)
+    H = base.hidden_states.copy()
+
+    if shift_type == "noise":
+        H += rng.randn(*H.shape).astype(np.float32) * 2.0
+    elif shift_type == "scale":
+        H *= 0.5
+    elif shift_type == "rotate":
+        d = H.shape[1]
+        A = rng.randn(d, d).astype(np.float32) * 0.1
+        H = H @ (np.eye(d, dtype=np.float32) + (A - A.T) * 0.05)
+    else:
+        raise ValueError(f"Unknown shift_type: {shift_type}")
+
+    return EvalDataset(
+        hidden_states=H, ont_features=base.ont_features.copy(),
+        valid_mask=base.valid_mask.copy(), labels=base.labels.copy(),
+        split=f"shifted_{shift_type}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Evaluation metrics
+# ---------------------------------------------------------------------------
+
+def compute_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - y_true.mean()) ** 2)
+    return float(1.0 - ss_res / max(ss_tot, 1e-10))
+
+
+def compute_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return float(np.mean(np.abs(y_true - y_pred)))
+
+
+def compute_rank_correlation(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    n = len(y_true)
+    if n < 3:
+        return 0.0
+    ranks_true = np.argsort(np.argsort(y_true)).astype(float)
+    ranks_pred = np.argsort(np.argsort(y_pred)).astype(float)
+    d = ranks_true - ranks_pred
+    return float(1.0 - 6.0 * np.sum(d ** 2) / (n * (n ** 2 - 1)))
+
+
+def bootstrap_ci(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    metric_fn,
+    n_bootstrap: int = 500,
+    ci: float = 0.95,
+    seed: int = 42,
+) -> Tuple[float, float, float]:
+    """Returns (point_estimate, ci_low, ci_high)."""
+    rng = np.random.RandomState(seed)
+    n = len(y_true)
+    point = metric_fn(y_true, y_pred)
+    boot_vals = []
+    for _ in range(n_bootstrap):
+        idx = rng.randint(0, n, size=n)
+        boot_vals.append(metric_fn(y_true[idx], y_pred[idx]))
+    alpha = (1 - ci) / 2
+    return point, float(np.percentile(boot_vals, alpha * 100)), float(np.percentile(boot_vals, (1 - alpha) * 100))
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Monitor evaluation
+# ---------------------------------------------------------------------------
+
+def evaluate_monitor(
+    monitor: OntologyMonitor,
+    dataset: EvalDataset,
+    n_bootstrap: int = 500,
+    seed: int = 42,
+) -> Dict[str, Any]:
+    """Per-axis R², MAE, rank correlation with 95% CIs."""
+    result = monitor.predict(dataset.hidden_states)
+    pred = result.z_ont
+    gt = dataset.ont_features[:, ROBUST_AXIS_INDICES]
+
+    metrics: Dict[str, Any] = {"split": dataset.split, "n_samples": dataset.N, "per_axis": {}}
+    r2_vals, mae_vals, rho_vals = [], [], []
+
+    for j, axis_name in enumerate(ROBUST_AXES):
+        y_true, y_pred = gt[:, j], pred[:, j]
+        r2, r2_lo, r2_hi = bootstrap_ci(y_true, y_pred, compute_r2, n_bootstrap, seed=seed + j)
+        mae, mae_lo, mae_hi = bootstrap_ci(y_true, y_pred, compute_mae, n_bootstrap, seed=seed + j + 100)
+        rho, rho_lo, rho_hi = bootstrap_ci(y_true, y_pred, compute_rank_correlation, n_bootstrap, seed=seed + j + 200)
+        metrics["per_axis"][axis_name] = {
+            "r2": r2, "r2_ci": [r2_lo, r2_hi],
+            "mae": mae, "mae_ci": [mae_lo, mae_hi],
+            "rank_corr": rho, "rank_corr_ci": [rho_lo, rho_hi],
+        }
+        r2_vals.append(r2); mae_vals.append(mae); rho_vals.append(rho)
+
+    metrics["mean_r2"] = float(np.mean(r2_vals))
+    metrics["mean_mae"] = float(np.mean(mae_vals))
+    metrics["mean_rank_corr"] = float(np.mean(rho_vals))
+    return metrics
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Injector evaluation
+# ---------------------------------------------------------------------------
+
+INJECTOR_TEST_CASES: List[Dict[str, Any]] = [
+    # Concrete
+    {"text": "The cat sat on the mat.", "expected_domain": "concrete"},
+    {"text": "Water flows downhill through the rocky canyon.", "expected_domain": "concrete"},
+    {"text": "The red car is parked in front of the house.", "expected_domain": "concrete"},
+    {"text": "A dog chased the ball across the green field.", "expected_domain": "concrete"},
+    {"text": "The stone wall crumbled under the weight.", "expected_domain": "concrete"},
+    {"text": "She placed the book on the wooden table.", "expected_domain": "concrete"},
+    {"text": "The fire burned through the dry wood quickly.", "expected_domain": "concrete"},
+    {"text": "Rain fell on the metal roof all night.", "expected_domain": "concrete"},
+    # Abstract
+    {"text": "Democracy requires the consent of the governed.", "expected_domain": "abstract"},
+    {"text": "The concept of justice varies across cultures.", "expected_domain": "abstract"},
+    {"text": "If the hypothesis holds, then the theory is validated.", "expected_domain": "abstract"},
+    {"text": "Freedom and responsibility are fundamentally intertwined.", "expected_domain": "abstract"},
+    {"text": "The epistemological foundations of science require careful scrutiny.", "expected_domain": "abstract"},
+    {"text": "Although the correlation is strong, causation is not established.", "expected_domain": "abstract"},
+    {"text": "Every theoretical framework has implicit assumptions.", "expected_domain": "abstract"},
+    # Action-oriented
+    {"text": "Run the tests and deploy to production.", "expected_intent": "action"},
+    {"text": "Build the Docker container and push to the registry.", "expected_intent": "action"},
+    {"text": "Find all broken links and fix them immediately.", "expected_intent": "action"},
+    {"text": "Open the door, walk through, and close it behind you.", "expected_intent": "action"},
+    {"text": "Write a function that sorts the array in place.", "expected_intent": "action"},
+    {"text": "Start the server, run migrations, and seed the database.", "expected_intent": "action"},
+    {"text": "Take the keys, go to the store, and buy milk.", "expected_intent": "action"},
+    # Modification-heavy
+    {"text": "The extremely carefully crafted beautifully ornate design.", "expected_structure": "complex"},
+    {"text": "Running quickly and silently through heavily forested areas.", "expected_structure": "complex"},
+    {"text": "The remarkably impressive overwhelmingly positive results.", "expected_structure": "complex"},
+    {"text": "Slowly, deliberately, and thoughtfully he composed his response.", "expected_structure": "complex"},
+    # Technical / mixed
+    {"text": "Implement a distributed database with eventual consistency.", "expected_domain": "mixed"},
+    {"text": "The algorithm has O(n log n) time complexity.", "expected_domain": "mixed"},
+    {"text": "Configure the load balancer for round-robin distribution.", "expected_domain": "mixed"},
+    {"text": "The neural network converges after 100 epochs.", "expected_domain": "mixed"},
+    {"text": "Optimize the SQL query by adding composite indexes.", "expected_domain": "mixed"},
+    # Short / minimal
+    {"text": "Hello.", "expected_confidence": "low"},
+    {"text": "Yes or no?", "expected_confidence": "low"},
+    {"text": "Why?", "expected_confidence": "low"},
+    # Long / rich
+    {"text": "The ancient oak tree, standing tall and majestic in the center of the village square, "
+             "had witnessed generations of celebrations, mourning, and quiet contemplation beneath "
+             "its sprawling branches.", "expected_domain": "concrete"},
+    {"text": "Despite numerous philosophical objections and deeply held reservations about the "
+             "fundamental epistemological limitations of purely empirical approaches to understanding "
+             "consciousness, the research program has yielded surprisingly actionable insights.",
+     "expected_domain": "abstract"},
+    # Questions
+    {"text": "What is the meaning of life?", "expected_domain": "abstract"},
+    {"text": "Where is the nearest gas station?", "expected_domain": "concrete"},
+    {"text": "How does photosynthesis work?", "expected_domain": "mixed"},
+    {"text": "Can you explain quantum entanglement?", "expected_domain": "abstract"},
+    # Imperative
+    {"text": "Stop the process immediately.", "expected_intent": "action"},
+    {"text": "Please read this document carefully.", "expected_intent": "action"},
+    {"text": "Make sure to close all open connections.", "expected_intent": "action"},
+    # Emotional / reflective
+    {"text": "I feel overwhelmed by the complexity of it all.", "expected_domain": "abstract"},
+    {"text": "The sunset over the ocean was breathtakingly beautiful.", "expected_domain": "concrete"},
+    {"text": "Happiness is not something you find but something you create.", "expected_domain": "abstract"},
+    # Mixed domain
+    {"text": "The computer crashed because of a memory leak in the garbage collector.", "expected_domain": "concrete"},
+    {"text": "We need to rethink our approach to sustainable urban development.", "expected_domain": "abstract"},
+    {"text": "The bridge between theory and practice is built through experimentation.", "expected_domain": "abstract"},
+]
+
+
+def evaluate_injector(injector: OntologyInjector) -> Dict[str, Any]:
+    """Evaluate OntologyInjector on diverse English text."""
+    results: Dict[str, Any] = {
+        "n_test_cases": len(INJECTOR_TEST_CASES),
+        "classifications": [],
+        "format_checks": {"all_valid_tags": True, "all_valid_scores": True},
+        "accuracy": {"domain": {"correct": 0, "total": 0},
+                     "intent": {"correct": 0, "total": 0},
+                     "structure": {"correct": 0, "total": 0}},
+        "consistency_check": True,
+        "coverage": 0,
+    }
+    n_ok = 0
+
+    for case in INJECTOR_TEST_CASES:
+        text = case["text"]
+        try:
+            meta = injector.classify(text)
+            enriched = injector.inject("You are helpful.", text)
+
+            results["classifications"].append({
+                "text": text[:60], "domain": meta.domain, "structure": meta.structure,
+                "intent": meta.intent, "confidence": meta.confidence,
+                "primary_role": meta.primary_role,
+                "scores": {k: round(v, 4) for k, v in meta.raw_scores.items()},
+            })
+
+            if "[ONTOLOGY]" not in enriched or "[/ONTOLOGY]" not in enriched:
+                results["format_checks"]["all_valid_tags"] = False
+            for v in meta.raw_scores.values():
+                if not (0.0 <= v <= 1.0):
+                    results["format_checks"]["all_valid_scores"] = False
+
+            for key in ("domain", "intent", "structure"):
+                if f"expected_{key}" in case:
+                    results["accuracy"][key]["total"] += 1
+                    if getattr(meta, key) == case[f"expected_{key}"]:
+                        results["accuracy"][key]["correct"] += 1
+
+            meta2 = injector.classify(text)
+            if meta.domain != meta2.domain or meta.intent != meta2.intent or meta.structure != meta2.structure:
+                results["consistency_check"] = False
+
+            n_ok += 1
+        except Exception as e:
+            results["classifications"].append({"text": text[:60], "error": str(e)})
+
+    results["coverage"] = n_ok / max(len(INJECTOR_TEST_CASES), 1)
+    for key in ("domain", "intent", "structure"):
+        acc = results["accuracy"][key]
+        acc["rate"] = acc["correct"] / max(acc["total"], 1)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Drift detection
+# ---------------------------------------------------------------------------
+
+def evaluate_drift_detection(
+    monitor: OntologyMonitor,
+    in_dist: EvalDataset,
+    shifted: EvalDataset,
+) -> Dict[str, Any]:
+    in_result = monitor.predict(in_dist.hidden_states)
+    shifted_result = monitor.predict(shifted.hidden_states)
+    return {
+        "in_distribution_drift": in_result.drift_score,
+        "shifted_drift": shifted_result.drift_score,
+        "drift_ratio": shifted_result.drift_score / max(in_result.drift_score, 1e-6),
+        "shift_detected": shifted_result.drift_score > in_result.drift_score * 1.5,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: Part runners
 # ---------------------------------------------------------------------------
 
 def run_part3_disentanglement(
@@ -268,7 +594,6 @@ def run_part4_mdl(
               f"{r.compression_vs_uniform:.2f}x (vs uniform), "
               f"bits/label={r.online_code_length / max(r.n_samples, 1):.3f}")
 
-    # Find best layer and optimal k
     best_layer = max(mdl_results, key=lambda l: mdl_results[l]["compression_ratio"])
     H_best = states[best_layer]
     candidate_ks = [4, 8, 16, 32]
@@ -290,31 +615,24 @@ def run_part5_intervention_synthetic(
     n_pairs: int = 20,
     seed: int = 42,
 ) -> Dict[int, Dict]:
-    """Part 5: Causal intervention using a toy transformer.
-
-    Builds a toy model, constructs the subspace basis from synthetic states,
-    and runs activation patching on template-generated sentence pairs.
-    """
+    """Part 5: Causal intervention using a toy transformer."""
     from scripts.causal_subspace.causal_intervention import (
         InterventionConfig,
         run_causal_intervention,
     )
 
-    # Build toy model
     model = _ToyTransformer(d_model, n_layers)
     model.eval()
     for p in model.parameters():
         p.requires_grad_(False)
 
     tokenizer = _ToyTokenizer()
-
     cfg = InterventionConfig(n_pairs=n_pairs, device="cpu", seed=seed)
     results = {}
 
     for layer_idx in layers:
         H = states[layer_idx]
         U_k = build_pca_basis(H, subspace_k)
-
         ir = run_causal_intervention(model, tokenizer, U_k, layer_idx, cfg)
         results[layer_idx] = {
             "n_pairs": ir.n_pairs_tested,
@@ -335,105 +653,203 @@ def run_part5_intervention_synthetic(
 
 
 # ---------------------------------------------------------------------------
-# Part 7+: Phase 2 — Monitor and Injector
+# Phase 2: Comprehensive evaluation runner
 # ---------------------------------------------------------------------------
 
-def run_phase2_synthetic(
-    states: Dict[int, np.ndarray],
-    labels: np.ndarray,
+def run_phase2_comprehensive(
     d_model: int,
-    read_layer: int,
-    n_epochs: int = 50,
+    n_samples: int = 5000,
+    n_classes: int = 5,
+    signal_snr: float = 3.0,
+    n_epochs: int = 150,
+    n_bootstrap: int = 500,
     seed: int = 42,
 ) -> Dict[str, Any]:
-    """Phase 2: Train OntologyMonitor on synthetic data, test OntologyInjector.
+    """Run the comprehensive Phase 2 evaluation suite.
 
-    Generates synthetic ontology features (4 robust axes) that correlate
-    with the class labels, trains the monitor to predict them from hidden
-    states, and validates the injector's text classification.
+    Generates a controlled dataset at the given d_model, trains the monitor,
+    and evaluates with CIs, robustness, drift, injector, and SNR analysis.
     """
-    rng = np.random.RandomState(seed)
-    H = states[read_layer]
-    N = H.shape[0]
+    all_results: Dict[str, Any] = {
+        "config": {
+            "d_model": d_model, "n_samples": n_samples,
+            "n_classes": n_classes, "signal_snr": signal_snr,
+            "n_epochs": n_epochs, "n_bootstrap": n_bootstrap,
+        },
+    }
 
-    # Generate synthetic ontology features for the 4 robust axes
-    # Make them correlate with the class labels (so the monitor has real signal)
-    n_classes = len(np.unique(labels))
-    class_profiles = rng.rand(n_classes, N_ROBUST).astype(np.float32)
+    # --- Step 1: Generate controlled dataset ---
+    print(f"\n  Generating controlled dataset (N={n_samples}, d={d_model}, SNR={signal_snr})...")
 
-    # Full 12-axis ontology (only robust axes have signal, rest is noise)
-    ont_features = rng.rand(N, 12).astype(np.float32) * 0.3 + 0.35  # base noise around 0.5
-    for i in range(N):
-        for j, ax_idx in enumerate(ROBUST_AXIS_INDICES):
-            # Signal: class profile + noise
-            ont_features[i, ax_idx] = class_profiles[labels[i], j] + rng.randn() * 0.1
-    ont_features = np.clip(ont_features, 0.0, 1.0)
-    valid_mask = np.ones(N, dtype=bool)  # all valid in synthetic
+    train_ds, val_ds, test_ds = generate_controlled_dataset(
+        n_samples=n_samples, d_model=d_model, n_classes=n_classes,
+        signal_snr=signal_snr, seed=seed,
+    )
+    print(f"  Train: {train_ds.N}  Val: {val_ds.N}  Test: {test_ds.N}")
 
-    results: Dict[str, Any] = {}
+    all_results["dataset"] = {
+        "train_n": train_ds.N, "val_n": val_ds.N, "test_n": test_ds.N,
+    }
 
-    # --- Path 1: Train Monitor ---
-    print(f"\n  Training OntologyMonitor (d={d_model}, layer={read_layer}, "
-          f"epochs={n_epochs})...")
+    # --- Step 2: Train OntologyMonitor ---
+    print(f"\n  Training OntologyMonitor (epochs={n_epochs})...")
 
     monitor = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
     train_result = monitor.train_monitor(
-        H=H,
-        ont_features=ont_features,
-        valid_mask=valid_mask,
-        n_epochs=n_epochs,
-        batch_size=min(128, N),
-        seed=seed,
+        H=train_ds.hidden_states, ont_features=train_ds.ont_features,
+        valid_mask=train_ds.valid_mask, n_epochs=n_epochs,
+        batch_size=256, val_split=0.0, seed=seed,
+    )
+    print(f"  Train loss: {train_result.final_train_loss:.4f}, "
+          f"R² (internal): {train_result.r2_mean:.3f}")
+
+    all_results["training"] = {
+        "epochs": train_result.epochs_trained,
+        "train_loss": train_result.final_train_loss,
+        "r2_internal": train_result.r2_mean,
+    }
+
+    # --- Step 3: Val evaluation ---
+    print(f"\n  Validation evaluation...")
+    val_metrics = evaluate_monitor(monitor, val_ds, n_bootstrap=n_bootstrap, seed=seed)
+    print(f"  Val R²={val_metrics['mean_r2']:.3f}  MAE={val_metrics['mean_mae']:.4f}  "
+          f"rho={val_metrics['mean_rank_corr']:.3f}")
+    for axis, m in val_metrics["per_axis"].items():
+        print(f"    {axis:25s}  R²={m['r2']:.3f} [{m['r2_ci'][0]:.3f}, {m['r2_ci'][1]:.3f}]"
+              f"  MAE={m['mae']:.4f}  rho={m['rank_corr']:.3f}")
+    all_results["val_metrics"] = val_metrics
+
+    # --- Step 4: Test evaluation (held-out) ---
+    print(f"\n  Test evaluation (held-out)...")
+    test_metrics = evaluate_monitor(monitor, test_ds, n_bootstrap=n_bootstrap, seed=seed + 1)
+    print(f"  Test R²={test_metrics['mean_r2']:.3f}  MAE={test_metrics['mean_mae']:.4f}  "
+          f"rho={test_metrics['mean_rank_corr']:.3f}")
+    for axis, m in test_metrics["per_axis"].items():
+        print(f"    {axis:25s}  R²={m['r2']:.3f} [{m['r2_ci'][0]:.3f}, {m['r2_ci'][1]:.3f}]"
+              f"  MAE={m['mae']:.4f}  rho={m['rank_corr']:.3f}")
+    all_results["test_metrics"] = test_metrics
+
+    # --- Step 5: Robustness under distribution shift ---
+    print(f"\n  Robustness under distribution shift...")
+    shift_results = {}
+    for shift_type in ["noise", "scale", "rotate"]:
+        shifted_ds = generate_shifted_dataset(test_ds, shift_type=shift_type, seed=seed + 10)
+        shift_m = evaluate_monitor(monitor, shifted_ds, n_bootstrap=min(n_bootstrap, 200), seed=seed + 20)
+        shift_results[shift_type] = shift_m
+        drop = test_metrics["mean_r2"] - shift_m["mean_r2"]
+        print(f"    {shift_type:8s}  R²={shift_m['mean_r2']:.3f}  (drop={drop:+.3f})")
+    all_results["robustness"] = shift_results
+
+    # --- Step 6: Drift detection ---
+    print(f"\n  Drift detection validation...")
+    drift_results = {}
+    for shift_type in ["noise", "scale", "rotate"]:
+        shifted_ds = generate_shifted_dataset(test_ds, shift_type=shift_type, seed=seed + 30)
+        drift = evaluate_drift_detection(monitor, test_ds, shifted_ds)
+        drift_results[shift_type] = drift
+        detected = "YES" if drift["shift_detected"] else "NO"
+        print(f"    {shift_type:8s}  in={drift['in_distribution_drift']:.3f}  "
+              f"shifted={drift['shifted_drift']:.3f}  "
+              f"ratio={drift['drift_ratio']:.2f}x  detected={detected}")
+    all_results["drift_detection"] = drift_results
+
+    # --- Step 7: Injector evaluation ---
+    print(f"\n  OntologyInjector evaluation ({len(INJECTOR_TEST_CASES)} sentences)...")
+    injector = OntologyInjector()
+    injector_results = evaluate_injector(injector)
+
+    print(f"  Coverage: {injector_results['coverage']:.0%}  "
+          f"Tags: {injector_results['format_checks']['all_valid_tags']}  "
+          f"Deterministic: {injector_results['consistency_check']}")
+    for key in ("domain", "intent", "structure"):
+        acc = injector_results["accuracy"][key]
+        if acc["total"] > 0:
+            print(f"    {key:12s} accuracy: {acc['correct']}/{acc['total']} ({acc['rate']:.0%})")
+
+    print(f"\n  Sample classifications:")
+    for entry in injector_results["classifications"][:6]:
+        if "error" not in entry:
+            print(f"    '{entry['text'][:45]:45s}' -> "
+                  f"{entry['domain']}/{entry['structure']}/{entry['intent']} "
+                  f"({entry['confidence']})")
+    all_results["injector"] = injector_results
+
+    # --- Step 8: SNR sensitivity ---
+    print(f"\n  SNR sensitivity analysis...")
+    snr_results = {}
+    for snr in [0.5, 1.0, 2.0, 3.0, 5.0]:
+        train_s, _, test_s = generate_controlled_dataset(
+            n_samples=min(n_samples, 2000), d_model=d_model,
+            n_classes=n_classes, signal_snr=snr, seed=seed + int(snr * 10),
+        )
+        m = OntologyMonitor(d_model=d_model, n_axes=N_ROBUST)
+        m.train_monitor(
+            H=train_s.hidden_states, ont_features=train_s.ont_features,
+            valid_mask=train_s.valid_mask, n_epochs=min(n_epochs, 80),
+            batch_size=256, val_split=0.0, seed=seed,
+        )
+        test_m = evaluate_monitor(m, test_s, n_bootstrap=min(n_bootstrap, 100), seed=seed)
+        snr_results[snr] = test_m["mean_r2"]
+        print(f"    SNR={snr:.1f}  ->  test R²={test_m['mean_r2']:.3f}")
+    all_results["snr_sensitivity"] = snr_results
+
+    # --- Collect Phase 2 checks ---
+    checks: List[Tuple[str, bool, str]] = []
+
+    test_r2 = test_metrics["mean_r2"]
+    checks.append(("Monitor test R² > 0.3", test_r2 > 0.3, f"R²={test_r2:.3f}"))
+
+    all_positive = all(m["r2"] > 0 for m in test_metrics["per_axis"].values())
+    checks.append(("All per-axis R² > 0", all_positive, ""))
+
+    gap = abs(val_metrics["mean_r2"] - test_metrics["mean_r2"])
+    checks.append(("Val-test R² gap < 0.1", gap < 0.1, f"gap={gap:.3f}"))
+
+    rho = test_metrics["mean_rank_corr"]
+    checks.append(("Test rank corr > 0.3", rho > 0.3, f"rho={rho:.3f}"))
+
+    if "noise" in shift_results:
+        noise_r2 = shift_results["noise"]["mean_r2"]
+        drop_pct = (test_r2 - noise_r2) / max(abs(test_r2), 1e-6)
+        checks.append(("Noise robustness (R² drop < 50%)", drop_pct < 0.5, f"drop={drop_pct:.0%}"))
+
+    n_detected = sum(1 for d in drift_results.values() if d["shift_detected"])
+    checks.append(("Drift detection fires (>=2/3)", n_detected >= 2, f"{n_detected}/3"))
+
+    checks.append(("Injector 100% coverage", injector_results["coverage"] >= 1.0,
+                    f"{injector_results['coverage']:.0%}"))
+    checks.append(("Injector deterministic", injector_results["consistency_check"], ""))
+    checks.append(("Injector format valid",
+                    injector_results["format_checks"]["all_valid_tags"]
+                    and injector_results["format_checks"]["all_valid_scores"], ""))
+
+    snr_vals = sorted(snr_results.keys())
+    if len(snr_vals) >= 3:
+        checks.append(("R² increases with SNR",
+                        snr_results[snr_vals[-1]] > snr_results[snr_vals[0]],
+                        f"SNR={snr_vals[0]:.0f}->{snr_results[snr_vals[0]]:.3f}, "
+                        f"SNR={snr_vals[-1]:.0f}->{snr_results[snr_vals[-1]]:.3f}"))
+
+    dom_acc = injector_results["accuracy"]["domain"]
+    if dom_acc["total"] > 0:
+        checks.append(("Injector domain accuracy > 50%", dom_acc["rate"] > 0.5,
+                        f"{dom_acc['correct']}/{dom_acc['total']} ({dom_acc['rate']:.0%})"))
+
+    all_results["checks"] = [
+        {"name": n, "passed": p, "detail": d} for n, p, d in checks
+    ]
+    all_results["monitor_r2_mean"] = test_r2
+    all_results["monitor_inference_ok"] = True
+    all_results["injector_format_ok"] = (
+        injector_results["format_checks"]["all_valid_tags"]
+        and injector_results["format_checks"]["all_valid_scores"]
     )
 
-    results["monitor_r2_mean"] = train_result.r2_mean
-    results["monitor_r2_per_axis"] = train_result.r2_per_axis
-    results["monitor_train_loss"] = train_result.final_train_loss
-    results["monitor_val_loss"] = train_result.final_val_loss
-
-    print(f"  Monitor R² (mean): {train_result.r2_mean:.3f}")
-    for axis, r2 in train_result.r2_per_axis.items():
-        print(f"    {axis}: R²={r2:.3f}")
-
-    # Test inference
-    sample_h = H[:3]
-    monitor_out = monitor.predict(sample_h)
-    print(f"  Monitor inference: domain={monitor_out.domain_label}, "
-          f"structure={monitor_out.structure_label}, "
-          f"intent={monitor_out.intent_label}")
-    results["monitor_inference_ok"] = monitor_out.z_ont is not None
-
-    # --- Path 2: Test Injector ---
-    print(f"\n  Testing OntologyInjector...")
-    injector = OntologyInjector()
-
-    test_texts = [
-        "The quick brown fox jumps over the lazy dog.",
-        "Implement distributed consensus using Raft protocol.",
-        "She quickly and carefully examined the results.",
-    ]
-
-    injector_results = []
-    for text in test_texts:
-        meta = injector.classify(text)
-        enriched = injector.inject("You are helpful.", text)
-        injector_results.append({
-            "text": text[:40],
-            "domain": meta.domain,
-            "structure": meta.structure,
-            "intent": meta.intent,
-            "has_tag": "[ONTOLOGY]" in enriched,
-        })
-        print(f"    '{text[:40]}...' → {meta.domain}/{meta.structure}/{meta.intent}")
-
-    results["injector_results"] = injector_results
-    results["injector_format_ok"] = all(r["has_tag"] for r in injector_results)
-
-    return results
+    return all_results
 
 
 # ---------------------------------------------------------------------------
-# Main synthetic pipeline
+# Main pipeline
 # ---------------------------------------------------------------------------
 
 def run_synthetic_pipeline(
@@ -451,49 +867,55 @@ def run_synthetic_pipeline(
     parts: Optional[List[int]] = None,
     run_phase2: bool = False,
     phase2_epochs: int = 50,
+    phase2_samples: int = 5000,
+    phase2_snr: float = 3.0,
+    phase2_bootstrap: int = 500,
     seed: int = 42,
 ) -> Dict[str, Any]:
-    """Run the causal subspace pipeline on synthetic data.
+    """Run the full causal subspace pipeline on synthetic data.
 
-    Returns a dict containing all results and diagnostics.
+    Phase 1 (Parts 3-6) tests disentanglement, MDL, intervention, trajectory.
+    Phase 2 (Part 7) tests monitor + injector with comprehensive evaluation.
     """
     parts_to_run = set(parts) if parts else {3, 4, 5, 6}
 
     results: Dict[str, Any] = {
         "mode": "synthetic",
         "config": {
-            "n_samples": n_samples,
-            "d_model": d_model,
-            "n_layers": n_layers,
-            "n_classes": n_classes,
+            "n_samples": n_samples, "d_model": d_model,
+            "n_layers": n_layers, "n_classes": n_classes,
             "subspace_k": subspace_k,
         },
     }
 
     t0 = time.time()
 
-    # --- Generate synthetic data ---
-    print("\n" + "=" * 70)
-    print("GENERATING SYNTHETIC DATA")
-    print("=" * 70)
+    # --- Generate Phase 1 synthetic data ---
+    run_phase1 = bool(parts_to_run & {3, 4, 5, 6})
 
-    states, labels = generate_synthetic_hidden_states(
-        n_samples, d_model, n_layers, n_classes, seed=seed,
-    )
-    active_layers = layers if layers else list(range(n_layers))
-    active_layers = [l for l in active_layers if l < n_layers]
+    if run_phase1:
+        print("\n" + "=" * 70)
+        print("GENERATING SYNTHETIC DATA")
+        print("=" * 70)
 
-    unique, counts = np.unique(labels, return_counts=True)
-    dist = ", ".join(f"class_{u}={c}" for u, c in zip(unique, counts))
-    print(f"  Samples: {n_samples}, Dimension: {d_model}, Layers: {n_layers}")
-    print(f"  Classes: {n_classes} — {dist}")
-    print(f"  Active layers: {active_layers}")
+        states, labels = generate_synthetic_hidden_states(
+            n_samples, d_model, n_layers, n_classes, seed=seed,
+        )
+        active_layers = layers if layers else list(range(n_layers))
+        active_layers = [l for l in active_layers if l < n_layers]
 
-    results["data"] = {
-        "n_samples": n_samples,
-        "n_layers": n_layers,
-        "class_distribution": {int(u): int(c) for u, c in zip(unique, counts)},
-    }
+        unique, counts = np.unique(labels, return_counts=True)
+        dist = ", ".join(f"class_{u}={c}" for u, c in zip(unique, counts))
+        print(f"  Samples: {n_samples}, Dimension: {d_model}, Layers: {n_layers}")
+        print(f"  Classes: {n_classes} — {dist}")
+        print(f"  Active layers: {active_layers}")
+
+        results["data"] = {
+            "n_samples": n_samples, "n_layers": n_layers,
+            "class_distribution": {int(u): int(c) for u, c in zip(unique, counts)},
+        }
+    else:
+        active_layers = []
 
     # --- Part 3: Disentanglement ---
     optimal_k = subspace_k
@@ -523,10 +945,8 @@ def run_synthetic_pipeline(
         print("=" * 70)
 
         mdl_cfg = MDLProbeConfig(
-            n_portions=mdl_portions,
-            probe_epochs=15,
-            seed=seed,
-            device="cpu",
+            n_portions=mdl_portions, probe_epochs=15,
+            seed=seed, device="cpu",
         )
         mdl_results, mdl_objects, optimal_k = run_part4_mdl(
             states, labels, active_layers, mdl_cfg,
@@ -540,7 +960,6 @@ def run_synthetic_pipeline(
         print("PART 5: CAUSAL INTERCHANGE INTERVENTION (THE ACID TEST)")
         print("=" * 70)
 
-        # Pick a subset of layers for interventions (expensive)
         if len(active_layers) > 3:
             mid = len(active_layers) // 2
             int_layers = [active_layers[0], active_layers[mid], active_layers[-1]]
@@ -559,10 +978,8 @@ def run_synthetic_pipeline(
         print("=" * 70)
 
         mdl_cfg = MDLProbeConfig(
-            n_portions=mdl_portions,
-            probe_epochs=15,
-            seed=seed,
-            device="cpu",
+            n_portions=mdl_portions, probe_epochs=15,
+            seed=seed, device="cpu",
         )
         trajectory = compute_layer_trajectory(
             hidden_states={l: states[l] for l in active_layers},
@@ -583,111 +1000,76 @@ def run_synthetic_pipeline(
             "peak_compression": trajectory.peak_compression,
         }
 
-    # --- Phase 2: Monitor + Injector ---
+    # --- Phase 2: Comprehensive Monitor + Injector evaluation ---
     if run_phase2 or 7 in parts_to_run:
         print("\n" + "=" * 70)
-        print("PHASE 2: OBSERVATORY + INJECTION (SYNTHETIC)")
+        print("PHASE 2: COMPREHENSIVE MONITOR + INJECTOR EVALUATION")
         print("=" * 70)
 
-        # Use the best layer (latest with good signal)
-        read_layer = active_layers[-1] if active_layers else 0
-        results["phase2"] = run_phase2_synthetic(
-            states, labels, d_model, read_layer,
-            n_epochs=phase2_epochs, seed=seed,
+        results["phase2"] = run_phase2_comprehensive(
+            d_model=d_model,
+            n_samples=phase2_samples,
+            n_classes=n_classes,
+            signal_snr=phase2_snr,
+            n_epochs=phase2_epochs,
+            n_bootstrap=phase2_bootstrap,
+            seed=seed,
         )
 
-    # --- Summary ---
+    # --- Unified Summary ---
     elapsed = time.time() - t0
     print("\n" + "=" * 70)
-    print("SYNTHETIC VALIDATION SUMMARY")
+    print("UNIFIED VALIDATION SUMMARY")
     print("=" * 70)
 
     n_checks = 0
     n_pass = 0
 
-    # Check: MDL compression > 1 on later layers (signal should be learnable)
+    def _check(name: str, passed: bool, detail: str = ""):
+        nonlocal n_checks, n_pass
+        n_checks += 1
+        if passed:
+            n_pass += 1
+        status = "PASS" if passed else "FAIL"
+        detail_str = f"  ({detail})" if detail else ""
+        print(f"  [{status}] {name}{detail_str}")
+
+    # Phase 1 checks
     if "mdl_probing" in results:
         for layer_idx in active_layers:
             if layer_idx in results["mdl_probing"]:
                 comp = results["mdl_probing"][layer_idx]["compression_ratio"]
-                passed = comp > 1.0
-                status = "PASS" if passed else "WARN"
-                n_checks += 1
-                if passed:
-                    n_pass += 1
-                print(f"  [{status}] Layer {layer_idx} MDL compression: {comp:.2f}x")
+                _check(f"Layer {layer_idx} MDL compression > 1", comp > 1.0, f"{comp:.2f}x")
 
-    # Check: Later layers compress better than early layers
     if "mdl_probing" in results and len(active_layers) >= 4:
-        first_half = [
-            results["mdl_probing"][l]["compression_ratio"]
-            for l in active_layers[:len(active_layers)//2]
-            if l in results["mdl_probing"]
-        ]
-        second_half = [
-            results["mdl_probing"][l]["compression_ratio"]
-            for l in active_layers[len(active_layers)//2:]
-            if l in results["mdl_probing"]
-        ]
+        first_half = [results["mdl_probing"][l]["compression_ratio"]
+                      for l in active_layers[:len(active_layers)//2]
+                      if l in results["mdl_probing"]]
+        second_half = [results["mdl_probing"][l]["compression_ratio"]
+                       for l in active_layers[len(active_layers)//2:]
+                       if l in results["mdl_probing"]]
         if first_half and second_half:
-            passed = np.mean(second_half) > np.mean(first_half)
-            status = "PASS" if passed else "WARN"
-            n_checks += 1
-            if passed:
-                n_pass += 1
-            print(f"  [{status}] Later layers compress better: "
-                  f"first_half={np.mean(first_half):.2f}x, "
-                  f"second_half={np.mean(second_half):.2f}x")
+            _check("Later layers compress better",
+                   np.mean(second_half) > np.mean(first_half),
+                   f"first={np.mean(first_half):.2f}x, second={np.mean(second_half):.2f}x")
 
-    # Check: SAE sparsity is reasonable
     if "disentanglement" in results:
         for layer_idx in active_layers:
             if layer_idx in results["disentanglement"]:
                 pct = results["disentanglement"][layer_idx].get("pct_active", 100)
-                passed = 0.5 < pct < 95
-                status = "PASS" if passed else "WARN"
-                n_checks += 1
-                if passed:
-                    n_pass += 1
-                print(f"  [{status}] Layer {layer_idx} SAE sparsity: {pct:.1f}% active")
+                _check(f"Layer {layer_idx} SAE sparsity", 0.5 < pct < 95, f"{pct:.1f}% active")
 
-    # Check: Trajectory found crystallization
     if "trajectory" in results:
         crystal = results["trajectory"]["crystallization_layer"]
-        passed = crystal >= 0
-        status = "PASS" if passed else "WARN"
-        n_checks += 1
-        if passed:
-            n_pass += 1
-        print(f"  [{status}] Crystallization layer: {crystal}")
+        _check("Crystallization layer found", crystal >= 0, f"layer {crystal}")
 
-    # Check: Phase 2 monitor R² > 0 (learned something)
+    # Phase 2 checks
     if "phase2" in results:
-        r2 = results["phase2"].get("monitor_r2_mean", -1)
-        passed = r2 > 0.0
-        status = "PASS" if passed else "WARN"
-        n_checks += 1
-        if passed:
-            n_pass += 1
-        print(f"  [{status}] Phase 2 Monitor R²: {r2:.3f}")
+        p2 = results["phase2"]
+        for chk in p2.get("checks", []):
+            _check(chk["name"], chk["passed"], chk["detail"])
 
-        # Check: Injector format is valid
-        fmt_ok = results["phase2"].get("injector_format_ok", False)
-        status = "PASS" if fmt_ok else "WARN"
-        n_checks += 1
-        if fmt_ok:
-            n_pass += 1
-        print(f"  [{status}] Phase 2 Injector format: {'valid' if fmt_ok else 'invalid'}")
-
-        # Check: Monitor inference produces output
-        inf_ok = results["phase2"].get("monitor_inference_ok", False)
-        status = "PASS" if inf_ok else "WARN"
-        n_checks += 1
-        if inf_ok:
-            n_pass += 1
-        print(f"  [{status}] Phase 2 Monitor inference: {'ok' if inf_ok else 'failed'}")
-
-    print(f"\n  Checks: {n_pass}/{n_checks} passed")
+    print(f"\n  Result: {n_pass}/{n_checks} checks passed")
     print(f"  Elapsed: {elapsed:.1f}s")
     print("=" * 70)
 
@@ -706,99 +1088,61 @@ def run_synthetic_pipeline(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Test causal subspace pipeline on synthetic data (no model download)",
+        description="End-to-end synthetic evaluation (Phase 1 + Phase 2)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Default synthetic test
+  # Phase 1 only
   python scripts/causal_subspace/test_synthetic.py
 
-  # Quick smoke test
-  python scripts/causal_subspace/test_synthetic.py --quick
+  # Phase 1 + Phase 2
+  python scripts/causal_subspace/test_synthetic.py --run-phase2
 
-  # Large-scale synthetic test
-  python scripts/causal_subspace/test_synthetic.py --n-samples 2000 --d-model 128 --n-layers 12
+  # Quick smoke test (both phases)
+  python scripts/causal_subspace/test_synthetic.py --quick --run-phase2
 
-  # Test only MDL + trajectory
-  python scripts/causal_subspace/test_synthetic.py --parts 4 6
+  # Phase 2 only
+  python scripts/causal_subspace/test_synthetic.py --parts 7
 
-  # Save results to JSON
-  python scripts/causal_subspace/test_synthetic.py --output results.json
+  # Save results
+  python scripts/causal_subspace/test_synthetic.py --run-phase2 --output results.json
         """,
     )
-    parser.add_argument(
-        "--n-samples", type=int, default=500,
-        help="Number of synthetic token samples (default: 500)",
-    )
-    parser.add_argument(
-        "--d-model", type=int, default=64,
-        help="Hidden dimension (default: 64)",
-    )
-    parser.add_argument(
-        "--n-layers", type=int, default=6,
-        help="Number of simulated transformer layers (default: 6)",
-    )
-    parser.add_argument(
-        "--n-classes", type=int, default=5,
-        help="Number of structural classes (default: 5)",
-    )
-    parser.add_argument(
-        "--sae-epochs", type=int, default=10,
-        help="SAE training epochs (default: 10)",
-    )
-    parser.add_argument(
-        "--sae-expansion", type=int, default=2,
-        help="SAE expansion factor (default: 2)",
-    )
-    parser.add_argument(
-        "--n-clusters", type=int, default=8,
-        help="K-means clusters (default: 8)",
-    )
-    parser.add_argument(
-        "--mdl-portions", type=int, default=8,
-        help="MDL prequential portions (default: 8)",
-    )
-    parser.add_argument(
-        "--n-pairs", type=int, default=20,
-        help="Number of intervention pairs (default: 20)",
-    )
-    parser.add_argument(
-        "--subspace-k", type=int, default=8,
-        help="Subspace dimensionality (default: 8)",
-    )
-    parser.add_argument(
-        "--layers", type=int, nargs="*", default=None,
-        help="Specific layers to test (default: all)",
-    )
-    parser.add_argument(
-        "--parts", type=int, nargs="*", default=None,
-        help="Specific pipeline parts to run (3=disentangle, 4=MDL, 5=intervention, "
-             "6=trajectory, 7=phase2)",
-    )
-    parser.add_argument(
-        "--run-phase2", action="store_true",
-        help="Run Phase 2: OntologyMonitor + OntologyInjector tests",
-    )
-    parser.add_argument(
-        "--phase2-epochs", type=int, default=50,
-        help="Training epochs for Phase 2 monitor (default: 50)",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42,
-        help="Random seed (default: 42)",
-    )
-    parser.add_argument(
-        "--output", type=str, default=None,
-        help="Save results to JSON file",
-    )
-    parser.add_argument(
-        "--quick", action="store_true",
-        help="Quick smoke test (reduced data)",
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true",
-        help="Verbose logging",
-    )
+    # Phase 1 args
+    parser.add_argument("--n-samples", type=int, default=500,
+                        help="Phase 1 token samples (default: 500)")
+    parser.add_argument("--d-model", type=int, default=64,
+                        help="Hidden dimension (default: 64)")
+    parser.add_argument("--n-layers", type=int, default=6,
+                        help="Simulated transformer layers (default: 6)")
+    parser.add_argument("--n-classes", type=int, default=5,
+                        help="Structural classes (default: 5)")
+    parser.add_argument("--sae-epochs", type=int, default=10)
+    parser.add_argument("--sae-expansion", type=int, default=2)
+    parser.add_argument("--n-clusters", type=int, default=8)
+    parser.add_argument("--mdl-portions", type=int, default=8)
+    parser.add_argument("--n-pairs", type=int, default=20)
+    parser.add_argument("--subspace-k", type=int, default=8)
+    parser.add_argument("--layers", type=int, nargs="*", default=None)
+    parser.add_argument("--parts", type=int, nargs="*", default=None,
+                        help="Parts to run (3-6=Phase1, 7=Phase2)")
+    # Phase 2 args
+    parser.add_argument("--run-phase2", action="store_true",
+                        help="Run Phase 2 comprehensive evaluation")
+    parser.add_argument("--phase2-epochs", type=int, default=150,
+                        help="Phase 2 monitor training epochs (default: 150)")
+    parser.add_argument("--phase2-samples", type=int, default=5000,
+                        help="Phase 2 controlled dataset size (default: 5000)")
+    parser.add_argument("--phase2-snr", type=float, default=3.0,
+                        help="Phase 2 signal-to-noise ratio (default: 3.0)")
+    parser.add_argument("--phase2-bootstrap", type=int, default=500,
+                        help="Bootstrap resamples for CIs (default: 500)")
+    # Common
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--quick", action="store_true",
+                        help="Quick smoke test (reduced data)")
+    parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
 
@@ -815,7 +1159,9 @@ Examples:
         args.sae_epochs = min(args.sae_epochs, 3)
         args.n_pairs = min(args.n_pairs, 5)
         args.n_clusters = min(args.n_clusters, 4)
-        args.phase2_epochs = min(args.phase2_epochs, 10)
+        args.phase2_epochs = min(args.phase2_epochs, 50)
+        args.phase2_samples = min(args.phase2_samples, 1000)
+        args.phase2_bootstrap = min(args.phase2_bootstrap, 100)
 
     results = run_synthetic_pipeline(
         n_samples=args.n_samples,
@@ -832,6 +1178,9 @@ Examples:
         parts=args.parts,
         run_phase2=args.run_phase2,
         phase2_epochs=args.phase2_epochs,
+        phase2_samples=args.phase2_samples,
+        phase2_snr=args.phase2_snr,
+        phase2_bootstrap=args.phase2_bootstrap,
         seed=args.seed,
     )
 
@@ -851,7 +1200,6 @@ Examples:
             json.dump(results, f, indent=2, default=_serialize)
         print(f"\nResults saved to {output_path}")
 
-    # Exit with error if checks failed
     summary = results.get("summary", {})
     if summary.get("checks_passed", 0) < summary.get("checks_total", 0):
         sys.exit(1)

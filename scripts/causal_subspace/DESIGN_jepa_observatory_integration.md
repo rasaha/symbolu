@@ -1,0 +1,762 @@
+# JEPA-Observatory Integration — Bridging Trajectory Prediction to Ontological Monitoring
+
+**Status**: Design COMPLETE. Implementation PENDING.
+**Date**: 2026-02-23
+**Depends on**: Parts 1-7 of causal subspace pipeline (validated), Phase-JEPA predictor (implemented), HYBRID_PHASE_JEPA_DESIGN.md
+
+---
+
+## 0. Problem Framing
+
+### The Gap Between Two Working Systems
+
+SymbolU has two independently validated systems that analyze LLM hidden states from complementary angles:
+
+**System A: Causal Subspace Pipeline (Parts 1-7)**
+- Reads hidden states at specific layers
+- Classifies into 4 robust ontological axes (concreteness, relational_role, modificational_load, categorical_type)
+- Detects drift via centroid distance
+- Static: asks "what does this representation mean right now?"
+- Validated: 1.77x MDL compression, 28.98x intervention specificity, R² > 0.3 on synthetic eval
+
+**System B: Phase-JEPA Predictor**
+- Operates in 32D Sovereign State space (projected from hidden states)
+- Predicts state deltas via phase-amplitude attention
+- Multi-step autoregressive rollout (k=4 steps)
+- Dynamic: asks "what should this representation become?"
+- Validated: all tests passing including Phase 3 gradient bridge
+
+Neither system knows the other exists. The OntologyMonitor reads a single-layer snapshot with no temporal context. The JEPA predictor forecasts state trajectories but doesn't connect to the ontological axes that tell us *what* a deviation means in human-interpretable terms.
+
+### The Core Integration Question
+
+> If the JEPA predictor expects the model's state at step t+k to be S_hat, and the actual state is S, how should the ontological monitor interpret the residual S - S_hat?
+
+This is not "should we build JEPA?" (it exists). This is: **how do we wire these two systems together so that trajectory prediction amplifies ontological monitoring?**
+
+### Three Scenarios for the Integration
+
+Based on what we measure, the integration will fall into one of three regimes:
+
+```
+Scenario E: Aligned Dynamics
+  JEPA prediction error correlates with ontological drift score
+  → Simple: use JEPA error as early warning, ontology as diagnosis
+  Condition: rank_corr(JEPA_error, drift_score) > 0.4
+
+Scenario F: Complementary Dynamics
+  JEPA catches trajectory deviations that ontology misses (and vice versa)
+  → Powerful: combined detector outperforms either alone
+  Condition: combined_AUC > max(JEPA_AUC, ontology_AUC) + 0.05
+
+Scenario G: Redundant Dynamics
+  Both systems detect the same anomalies with no complementary signal
+  → Integration adds complexity without value; keep separate
+  Condition: combined_AUC ≈ max(JEPA_AUC, ontology_AUC) ± 0.02
+```
+
+We set these thresholds now, before seeing the data. Phase 1 of this design will determine which scenario holds.
+
+---
+
+## 1. Motivation: Why Integration Matters
+
+### 1a. What the OntologyMonitor Cannot Do Alone
+
+The monitor reads a single-layer hidden state snapshot and produces:
+- `z_ont`: 4-axis ontological vector in [0, 1]
+- `drift_score`: Mahalanobis-like distance from training centroid
+- Labels: domain/structure/intent
+
+Its blind spots:
+1. **No temporal context.** A hidden state might be "abstract" because the model is transitioning from concrete→abstract reasoning (normal) or because the model lost the plot (anomalous). The monitor cannot distinguish these.
+2. **Drift score is global.** It measures distance from the centroid of all training data, not distance from *expected* state given the current context. A valid but unusual prompt will trigger drift as easily as an actual failure.
+3. **Single-layer.** Reads from one layer (typically the crystallization layer). Cannot detect cross-layer inconsistencies.
+
+### 1b. What the JEPA Predictor Cannot Do Alone
+
+The predictor operates in 32D Sovereign State space and produces:
+- `s_pred`: predicted future state [B, T, 32]
+- `delta_list`: list of intermediate deltas
+- Vritti diagnostics: pramana/viparyaya/vikalpa/nidra/smriti
+
+Its blind spots:
+1. **No domain semantics.** A prediction error of 0.3 at dimension 7 tells you "something deviated" but not that "the model shifted from concrete to abstract reasoning." The Sovereign State dimensions (Bhavas, Koshas, Vrittis, Gunas) are learned end-to-end with no guaranteed alignment to human ontological categories.
+2. **Creative vs erroneous ambiguity.** The VrittiValidatedPredictor gates on viparyaya (error) vs vikalpa (imagination), but these thresholds are fixed. A domain-aware system would know that vikalpa=0.8 is expected for poetry but alarming for contract summarization.
+3. **No direct connection to the 4 validated ontological axes** that Phase 1 discovery proved exist in GPT-2's residual stream.
+
+### 1c. What the Combined System Enables
+
+| Capability | Monitor Alone | JEPA Alone | Combined |
+|-----------|--------------|-----------|----------|
+| "Model is in abstract domain" | Yes | No | Yes |
+| "Model is about to shift domain" | No | Partial | Yes |
+| "Domain shift is anomalous for this context" | No | No | Yes |
+| "Hallucination precursor detected" | No | Partial | Yes + diagnosis |
+| "Which ontological axis deviated" | Static only | No | Dynamic + axis |
+| "Context-appropriate Vritti thresholds" | No | Fixed thresholds | Domain-adaptive |
+
+---
+
+## 2. Architecture: The Trajectory-Annotated Observatory
+
+### 2a. Two Integration Paths
+
+Like the ontology alignment design, we propose two options and let the data choose.
+
+### Option 1: Cascade (JEPA Error → Ontology Diagnosis)
+
+The JEPA predictor runs continuously. When prediction error exceeds a threshold, the OntologyMonitor is invoked to diagnose *what* deviated.
+
+```
+                    Hidden States (Layer L)
+                           |
+                    StateProjector
+                           |
+                    s_context [32D]
+                           |
+                  PhaseJEPAPredictor
+                      |         |
+                   s_pred    s_actual (from target encoder)
+                      |         |
+                      +----+----+
+                           |
+                    prediction_error = ||s_pred - s_actual||²
+                           |
+                    threshold check
+                      |         |
+                   < thresh    > thresh
+                      |         |
+                   [quiet]   OntologyMonitor(H_L)
+                                    |
+                              MonitorResult
+                                    |
+                           CognitiveAnomaly(
+                               error=prediction_error,
+                               domain=domain_label,
+                               drift=drift_score,
+                               axis_deltas=z_ont_pred - z_ont_actual,
+                               vritti=get_vritti_diagnostics()
+                           )
+```
+
+**Pros:**
+- Cheap: ontology monitor only runs when JEPA flags something
+- Clear causal chain: "prediction error triggered, ontology diagnosed"
+- JEPA threshold is context-free; ontology provides context
+
+**Cons:**
+- Two-step latency (JEPA → threshold → monitor)
+- Misses cases where ontology drift is high but JEPA error is low
+
+### Option 2: Parallel Fusion (Both Run, Scores Combined)
+
+Both systems run on every forward pass. Their scores are fused into a single anomaly signal.
+
+```
+                    Hidden States (Layer L)
+                     |                |
+              StateProjector    OntologyMonitor
+                     |                |
+              s_context [32D]    z_ont [4D]
+                     |                |
+           PhaseJEPAPredictor    drift_score
+                     |                |
+              prediction_error   ont_anomaly
+                     |                |
+                     +------+---------+
+                            |
+                     AnomalyFusion(
+                         jepa_error,
+                         drift_score,
+                         z_ont_delta,
+                         vritti_diagnostics,
+                     )
+                            |
+                     combined_score ∈ [0, 1]
+                            |
+                     CognitiveAnomaly (if > threshold)
+```
+
+**Pros:**
+- Catches everything: no blind spots from either system
+- Single-pass latency
+- Can learn fusion weights from labeled anomaly data
+
+**Cons:**
+- Higher compute: both systems run every step
+- More complex: fusion function must be calibrated
+
+### Which Option for Which Scenario
+
+| Scenario | Recommended Option | Rationale |
+|---------|-------------------|-----------|
+| E (Aligned) | Option 1: Cascade | Redundant signals; use cheaper JEPA as trigger |
+| F (Complementary) | Option 2: Parallel | Each catches different anomalies; must run both |
+| G (Redundant) | Neither: keep separate | Integration adds no value |
+
+---
+
+## 3. The Interface Boundary
+
+### 3a. What the OntologyMonitor Outputs (Existing)
+
+```python
+@dataclass
+class MonitorResult:
+    z_ont: np.ndarray           # [batch, 4] — axis values in [0, 1]
+    axis_names: List[str]       # ["concreteness", "relational_role", ...]
+    domain_label: str           # "concrete" / "abstract" / "mixed"
+    structure_label: str        # "simple" / "complex"
+    intent_label: str           # "informational" / "action" / "modification"
+    confidence: float           # mean activation magnitude
+    drift_score: float          # distance from training centroid
+```
+
+### 3b. What the JEPA Predictor Outputs (Existing)
+
+```python
+# From PhaseJEPAPredictor.forward()
+s_pred: torch.Tensor            # [B, T, 32] — predicted future state
+delta_list: List[torch.Tensor]  # k intermediate deltas
+
+# From VrittiValidatedPredictor.get_vritti_diagnostics()
+diagnostics: Dict[str, torch.Tensor] = {
+    'pramana': Tensor,          # Valid cognition [0, 1]
+    'viparyaya': Tensor,        # Error/misconception [0, 1]
+    'vikalpa': Tensor,          # Imagination/fantasy [0, 1]
+    'nidra': Tensor,            # Sleep/dormancy [0, 1]
+    'smriti': Tensor,           # Memory [0, 1]
+    'error_violation': bool,    # viparyaya > threshold
+    'imagination_violation': bool,  # vikalpa > threshold (factual only)
+}
+```
+
+### 3c. The New Combined Output (Proposed)
+
+```python
+@dataclass
+class CognitiveAnomalyReport:
+    """Unified output combining trajectory prediction and ontological monitoring."""
+
+    # Trajectory signal
+    prediction_error: float         # ||s_pred - s_actual||² (JEPA residual)
+    prediction_error_per_dim: np.ndarray  # [32] — per Sovereign State dimension
+    trajectory_coherent: bool       # prediction_error < adaptive_threshold
+
+    # Ontological signal
+    z_ont: np.ndarray               # [4] — axis values from monitor
+    z_ont_expected: np.ndarray      # [4] — axis values predicted by JEPA→ontology bridge
+    ont_delta: np.ndarray           # [4] — |z_ont - z_ont_expected| per axis
+    domain_label: str
+    structure_label: str
+    intent_label: str
+    drift_score: float
+
+    # Vritti signal (from JEPA's state prediction)
+    pramana: float                  # Valid cognition confidence
+    viparyaya: float                # Error level
+    vikalpa: float                  # Imagination level
+
+    # Combined anomaly
+    anomaly_score: float            # Fused score in [0, 1]
+    anomaly_type: str               # "none" / "trajectory" / "ontological" / "both"
+    explanation: str                # Human-readable: "Domain shifted from concrete→abstract
+                                    #   with high prediction error (0.42) at step 3/12"
+```
+
+---
+
+## 4. The Missing Bridge: Sovereign State ↔ Ontological Axes
+
+### 4a. The Dimensional Mismatch
+
+The JEPA operates in 32D Sovereign State space:
+- [0:12] Bhavas (ontological aspects, softmax)
+- [12:17] Koshas (consciousness sheaths, sigmoid)
+- [17:22] Vrittis (mental modifications, softmax)
+- [22:28] Gunas (energy states, sigmoid)
+- [28:32] Reserved/Sankalpa (goal encoding, tanh)
+
+The OntologyMonitor operates on 4 robust axes validated by Phase 1:
+- concreteness (index 1 in 12-axis ontology)
+- relational_role (index 7)
+- modificational_load (index 8)
+- categorical_type (index 11)
+
+These are **different ontological frameworks** applied to the same hidden states. The Sovereign State's 12 Bhavas are not the same as the 12 proposed axes from the causal subspace pipeline (and only 4 of those survived validation).
+
+### 4b. The Alignment Hypothesis
+
+We hypothesize that the 4 validated ontological axes have correlates in the Sovereign State, but we must discover this empirically (exactly as the naming ceremony discovered which of the 12 proposed axes survive in the hidden states).
+
+The alignment test:
+
+```
+For a set of hidden states H:
+  z_ont = OntologyMonitor(H)                       # [N, 4]
+  s = StateProjector(H)                             # [N, 32]
+
+  For each ontological axis j in {0, 1, 2, 3}:
+    For each Sovereign State dimension k in {0, ..., 31}:
+      corr[j, k] = rank_correlation(z_ont[:, j], s[:, k])
+
+  alignment_map = {j: argmax_k(|corr[j, k]|) for j in range(4)}
+  alignment_strength = {j: max_k(|corr[j, k]|) for j in range(4)}
+```
+
+**Four possible outcomes:**
+
+| Outcome | Condition | Implication |
+|---------|-----------|-------------|
+| Strong alignment | All 4 axes have |corr| > 0.5 with some Sovereign dim | JEPA predictions directly translate to ontological predictions |
+| Partial alignment | 1-3 axes align, rest don't | Bridge works for aligned axes; monitor needed for the rest |
+| Distributed encoding | Each axis correlates with multiple dims (|corr| < 0.3 individually, but linear combination R² > 0.5) | Need a learned bridge (small MLP) |
+| Orthogonal | No correlation | Systems are truly complementary; fusion only, no translation |
+
+### 4c. The Ontology Bridge (if alignment exists)
+
+If partial or strong alignment is found, we build a lightweight bridge:
+
+```python
+class OntologyBridge(nn.Module):
+    """Maps JEPA's Sovereign State predictions to ontological axis predictions.
+
+    This allows the JEPA to predict not just "where the state is going"
+    but "what the model will be thinking about" in ontological terms.
+    """
+
+    def __init__(self, state_dim: int = 32, n_axes: int = 4):
+        super().__init__()
+        # Linear probe — intentionally simple to test if the mapping
+        # is already present vs needs to be learned
+        self.probe = nn.Linear(state_dim, n_axes)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
+        """Map Sovereign State → ontological axes [0, 1]."""
+        return self.sigmoid(self.probe(s))
+```
+
+The bridge is trained on paired data: `(s, z_ont)` where both come from the same hidden states. If a linear probe achieves R² > 0.5, the alignment is strong enough to use. If it needs an MLP, the encoding is distributed but recoverable. If neither works, the systems stay separate.
+
+---
+
+## 5. Phase 1: Alignment Discovery
+
+### 5a. What We Need to Measure
+
+Before building anything, we need empirical answers:
+
+| Question | Method | Success Criterion |
+|---------|--------|-------------------|
+| Do Sovereign State dims correlate with ontological axes? | Rank correlation matrix [4 × 32] | Any |corr| > 0.3 |
+| Can a linear probe map S → z_ont? | Linear regression on held-out test set | R² > 0.3 |
+| Does JEPA prediction error correlate with ontological drift? | Rank correlation on synthetic anomalies | |corr| > 0.4 |
+| Does the combined signal outperform either alone? | AUC on labeled anomaly detection | ΔAUC > 0.05 |
+| Which Sovereign State dims carry ontological information? | Mutual Information (same as naming ceremony) | MI > 0.1 for at least 2 dims |
+
+### 5b. Experimental Protocol
+
+```
+Step 1: Generate synthetic dataset with known ontological structure
+        (use generate_controlled_dataset from test_synthetic.py)
+
+Step 2: Run both systems on the same hidden states
+        - OntologyMonitor → z_ont, drift_score
+        - StateProjector → s, then PhaseJEPAPredictor → s_pred
+        - Compute prediction_error = ||s_pred - s_actual||²
+
+Step 3: Compute alignment matrix
+        corr[j, k] = rank_correlation(z_ont[:, j], s[:, k]) for all j, k
+
+Step 4: Train linear bridge and measure R²
+        probe: s → z_ont, evaluated on held-out test
+
+Step 5: Inject synthetic anomalies (distribution shift)
+        - Measure: does JEPA error spike?
+        - Measure: does ontological drift score spike?
+        - Measure: does combining them improve detection?
+
+Step 6: Classify into Scenario E/F/G
+```
+
+### 5c. Synthetic Anomaly Types
+
+We need controlled anomalies to test detection:
+
+| Anomaly Type | How Generated | What Should Fire |
+|-------------|---------------|------------------|
+| Domain shift | Swap hidden states between concrete/abstract classes | Ontology: domain_label changes. JEPA: prediction error spikes |
+| Trajectory break | Insert random hidden state into coherent sequence | JEPA: massive prediction error. Ontology: may or may not detect |
+| Subtle drift | Gradually rotate hidden states by small angle per step | JEPA: slow error accumulation. Ontology: drift score rises |
+| Adversarial | Add targeted noise to flip ontological classification | Ontology: labels flip. JEPA: depends on if noise is in predicted subspace |
+| Creative deviation | Large but coherent state transition (mimics novel reasoning) | JEPA: high error. Ontology: stable labels. Combined: should NOT flag |
+
+The creative deviation test is critical. A good combined system must **not** flag valid creative reasoning as anomalous.
+
+---
+
+## 6. Phase 2: Integration Implementation
+
+### 6a. Option 1 Implementation: Cascade
+
+```python
+class CascadeObservatory:
+    """JEPA prediction triggers ontological diagnosis when error exceeds threshold."""
+
+    def __init__(
+        self,
+        monitor: OntologyMonitor,
+        predictor: PhaseJEPAPredictor,
+        state_projector: SovereignStateProjector,
+        bridge: Optional[OntologyBridge] = None,
+        error_threshold: float = 0.3,
+    ):
+        self.monitor = monitor
+        self.predictor = predictor
+        self.state_projector = state_projector
+        self.bridge = bridge
+        self.error_threshold = error_threshold
+        self._error_ema = 0.0
+        self._error_ema_alpha = 0.95
+
+    def observe(
+        self,
+        hidden_states: np.ndarray,
+        s_actual: Optional[torch.Tensor] = None,
+    ) -> CognitiveAnomalyReport:
+        """Run observation pipeline.
+
+        1. Project to Sovereign State
+        2. Predict next state (JEPA)
+        3. If prediction error > threshold → run ontology monitor
+        4. If bridge exists → compute expected ontological axes from JEPA
+        5. Return combined report
+        """
+        # Step 1: Project
+        s_context = self.state_projector(
+            torch.tensor(hidden_states, dtype=torch.float32)
+        )
+
+        # Step 2: Predict
+        s_pred, delta_list = self.predictor(s_context)
+
+        # Step 3: Compute prediction error
+        if s_actual is not None:
+            error = float(torch.mean((s_pred - s_actual) ** 2))
+        else:
+            error = float(torch.mean(torch.stack(
+                [d.abs().mean() for d in delta_list]
+            )))
+
+        # Adaptive threshold via EMA
+        self._error_ema = (
+            self._error_ema_alpha * self._error_ema
+            + (1 - self._error_ema_alpha) * error
+        )
+        adaptive_thresh = max(self.error_threshold, self._error_ema * 2.0)
+
+        # Step 4: Conditional ontology diagnosis
+        trajectory_coherent = error < adaptive_thresh
+
+        if not trajectory_coherent:
+            monitor_result = self.monitor.predict(hidden_states)
+            z_ont = monitor_result.z_ont
+            domain_label = monitor_result.domain_label
+            structure_label = monitor_result.structure_label
+            intent_label = monitor_result.intent_label
+            drift_score = monitor_result.drift_score
+        else:
+            z_ont = None
+            domain_label = ""
+            structure_label = ""
+            intent_label = ""
+            drift_score = 0.0
+
+        # Step 5: Bridge prediction (if available)
+        z_ont_expected = None
+        if self.bridge is not None:
+            z_ont_expected = self.bridge(s_pred).detach().numpy()
+
+        # Step 6: Vritti diagnostics
+        vritti = {}
+        if isinstance(self.predictor, VrittiValidatedPredictor):
+            vritti = self.predictor.get_vritti_diagnostics(s_pred)
+
+        # Assemble report
+        return CognitiveAnomalyReport(
+            prediction_error=error,
+            trajectory_coherent=trajectory_coherent,
+            z_ont=z_ont,
+            z_ont_expected=z_ont_expected,
+            domain_label=domain_label,
+            structure_label=structure_label,
+            intent_label=intent_label,
+            drift_score=drift_score,
+            pramana=float(vritti.get('pramana', torch.tensor(0.0)).mean()),
+            viparyaya=float(vritti.get('viparyaya', torch.tensor(0.0)).mean()),
+            vikalpa=float(vritti.get('vikalpa', torch.tensor(0.0)).mean()),
+            anomaly_score=error / max(adaptive_thresh, 1e-6),
+            anomaly_type=self._classify_anomaly(
+                error, adaptive_thresh, drift_score
+            ),
+        )
+```
+
+### 6b. Option 2 Implementation: Parallel Fusion
+
+```python
+class ParallelObservatory:
+    """Both systems run every step; scores are fused."""
+
+    def __init__(
+        self,
+        monitor: OntologyMonitor,
+        predictor: PhaseJEPAPredictor,
+        state_projector: SovereignStateProjector,
+        bridge: Optional[OntologyBridge] = None,
+        fusion_weights: Optional[np.ndarray] = None,
+    ):
+        self.monitor = monitor
+        self.predictor = predictor
+        self.state_projector = state_projector
+        self.bridge = bridge
+        # Default: equal weight JEPA error and drift score
+        self.fusion_weights = fusion_weights or np.array([0.5, 0.3, 0.2])
+        # [jepa_error_weight, drift_weight, vritti_weight]
+
+    def observe(
+        self,
+        hidden_states: np.ndarray,
+        s_actual: Optional[torch.Tensor] = None,
+    ) -> CognitiveAnomalyReport:
+        """Run both systems in parallel and fuse scores."""
+        # Run ontology monitor
+        monitor_result = self.monitor.predict(hidden_states)
+
+        # Run JEPA prediction
+        s_context = self.state_projector(
+            torch.tensor(hidden_states, dtype=torch.float32)
+        )
+        s_pred, delta_list = self.predictor(s_context)
+
+        # Compute JEPA error
+        if s_actual is not None:
+            error = float(torch.mean((s_pred - s_actual) ** 2))
+        else:
+            error = float(torch.mean(torch.stack(
+                [d.abs().mean() for d in delta_list]
+            )))
+
+        # Vritti
+        vritti = {}
+        if isinstance(self.predictor, VrittiValidatedPredictor):
+            vritti = self.predictor.get_vritti_diagnostics(s_pred)
+
+        viparyaya = float(vritti.get('viparyaya', torch.tensor(0.0)).mean())
+
+        # Fuse scores
+        raw_scores = np.array([
+            min(error / 0.5, 1.0),               # normalize JEPA error
+            min(monitor_result.drift_score / 3.0, 1.0),  # normalize drift
+            min(viparyaya / 0.4, 1.0),            # normalize viparyaya
+        ])
+        anomaly_score = float(np.dot(self.fusion_weights, raw_scores))
+
+        return CognitiveAnomalyReport(
+            prediction_error=error,
+            trajectory_coherent=error < 0.3,
+            z_ont=monitor_result.z_ont,
+            z_ont_expected=(
+                self.bridge(s_pred).detach().numpy()
+                if self.bridge else None
+            ),
+            domain_label=monitor_result.domain_label,
+            structure_label=monitor_result.structure_label,
+            intent_label=monitor_result.intent_label,
+            drift_score=monitor_result.drift_score,
+            pramana=float(vritti.get('pramana', torch.tensor(0.0)).mean()),
+            viparyaya=viparyaya,
+            vikalpa=float(vritti.get('vikalpa', torch.tensor(0.0)).mean()),
+            anomaly_score=anomaly_score,
+            anomaly_type=self._classify_anomaly(anomaly_score),
+        )
+```
+
+---
+
+## 7. Domain-Adaptive Vritti Thresholds
+
+One concrete enhancement the integration enables: the OntologyMonitor's domain classification can modulate the JEPA's Vritti thresholds.
+
+Currently, VrittiValidatedPredictor uses fixed thresholds:
+- viparyaya_threshold = 0.4 (all tasks)
+- vikalpa_threshold = 0.6 (factual) or 1.0 (creative)
+
+With the ontology monitor, we can do:
+
+```python
+DOMAIN_VRITTI_PROFILES = {
+    "concrete": {
+        "viparyaya_threshold": 0.3,  # Stricter: concrete facts are verifiable
+        "vikalpa_threshold": 0.4,    # Low imagination expected
+    },
+    "abstract": {
+        "viparyaya_threshold": 0.5,  # More tolerant: abstract reasoning is uncertain
+        "vikalpa_threshold": 0.8,    # Higher imagination is natural
+    },
+    "mixed": {
+        "viparyaya_threshold": 0.4,  # Default
+        "vikalpa_threshold": 0.6,    # Default
+    },
+}
+
+# In the observatory:
+domain = monitor_result.domain_label
+profile = DOMAIN_VRITTI_PROFILES[domain]
+s_pred, deltas = predictor(
+    s_context,
+    validate=True,
+    task_type='factual' if domain == 'concrete' else 'creative',
+)
+# Override thresholds based on domain
+predictor.viparyaya_threshold = profile["viparyaya_threshold"]
+predictor.vikalpa_threshold = profile["vikalpa_threshold"]
+```
+
+This is the smallest, highest-value integration: ontological context makes the JEPA's anomaly detection domain-appropriate.
+
+---
+
+## 8. Testing Strategy
+
+### 8a. Unit Tests
+
+```python
+def test_ontology_bridge_linear_probe():
+    """Linear bridge recovers ontological axes from Sovereign State."""
+
+def test_cascade_observatory_quiet_on_normal():
+    """Cascade doesn't invoke monitor when JEPA error is low."""
+
+def test_cascade_observatory_triggers_on_anomaly():
+    """Cascade invokes monitor when JEPA error exceeds threshold."""
+
+def test_parallel_fusion_weights():
+    """Fusion produces score in [0, 1] for all input combinations."""
+
+def test_domain_adaptive_thresholds():
+    """Vritti thresholds change based on ontological domain."""
+
+def test_creative_deviation_not_flagged():
+    """Large but coherent state transitions are not flagged as anomalies."""
+
+def test_combined_auc_vs_individual():
+    """Combined anomaly detection AUC ≥ max of individual AUCs."""
+```
+
+### 8b. Integration into test_synthetic.py
+
+Add as Part 8 (after existing Phase 2 evaluation):
+
+```
+Part 8: JEPA-Observatory Integration
+  Step 8a. Compute alignment matrix [4 × 32] between z_ont and Sovereign State
+  Step 8b. Train linear bridge, measure R²
+  Step 8c. Inject synthetic anomalies, measure detection AUC
+  Step 8d. Classify into Scenario E/F/G
+  Step 8e. Run winning architecture (cascade or parallel) on anomaly suite
+```
+
+### 8c. Checks
+
+| Check | Criterion | Type |
+|-------|-----------|------|
+| Bridge R² > 0 | Linear probe recovers some signal | PASS/WARN |
+| JEPA error spikes on trajectory break | error > 3× baseline | PASS/FAIL |
+| Ontology drift spikes on domain shift | drift > 2× baseline | PASS/FAIL |
+| Combined AUC > individual AUC | ΔAUC > 0 | PASS/WARN |
+| Creative deviation not flagged | anomaly_score < threshold | PASS/FAIL |
+| Domain-adaptive thresholds change behavior | concrete stricter than abstract | PASS/FAIL |
+
+---
+
+## 9. Dependencies
+
+| Dependency | Source | Status |
+|-----------|--------|--------|
+| OntologyMonitor | scripts/causal_subspace/ontology_alignment.py | Complete |
+| PhaseJEPAPredictor | symbolu/jepa/predictor.py | Complete |
+| VrittiValidatedPredictor | symbolu/jepa/predictor.py | Complete |
+| SovereignStateProjector | symbolu/jepa/state_projector.py | Complete |
+| generate_controlled_dataset | scripts/causal_subspace/test_synthetic.py | Complete |
+| compute_rank_correlation | scripts/causal_subspace/test_synthetic.py | Complete |
+| bootstrap_ci | scripts/causal_subspace/test_synthetic.py | Complete |
+
+No new external dependencies. All building blocks exist.
+
+---
+
+## 10. Computational Cost
+
+| Step | Estimated Cost | Notes |
+|------|---------------|-------|
+| Alignment discovery (Step 5) | ~5s on CPU | Correlation matrix + linear probe |
+| Bridge training | ~10s on CPU | Small linear model, few epochs |
+| Anomaly detection eval | ~30s on CPU | Generate anomalies + run both systems |
+| Cascade observatory (runtime) | ~2ms per batch | JEPA only; monitor on trigger (~5% of batches) |
+| Parallel observatory (runtime) | ~5ms per batch | Both systems every batch |
+
+---
+
+## 11. Open Questions (Resolved by Phase 1 Data)
+
+1. **Do the Sovereign State's Bhava dimensions [0:12] correlate with the 4 validated ontological axes?** The Bhavas were designed as "ontological aspects" but trained end-to-end — they may or may not align with the axes discovered by the causal subspace pipeline.
+
+2. **Is the JEPA prediction error signal fast enough?** If the JEPA needs 4 autoregressive steps (k=4) to produce a prediction, can it still serve as an "early warning" or is it inherently delayed?
+
+3. **Does the StateProjector's 768→32 compression preserve the ontological structure?** The causal subspace pipeline validated that 4 axes exist in 768D hidden states. After compression to 32D, they might be lost.
+
+4. **What is the false positive rate of the combined detector?** The creative deviation test will answer this, but it's the key question for enterprise deployment.
+
+---
+
+## 12. What This Does NOT Accomplish
+
+1. **Does not make JEPA predictions interpretable by default.** The bridge is a post-hoc linear probe. It works if the alignment exists; it doesn't force the alignment to exist.
+
+2. **Does not replace either system.** Both the OntologyMonitor and PhaseJEPAPredictor continue to function independently. The integration is additive, not substitutive.
+
+3. **Does not solve the causal intervention gap.** The L0/L2 dissociation (structure encoded at L0, consumed at L2) is a property of the LLM, not of our monitoring system. The observatory reads and reports but does not steer.
+
+4. **Does not guarantee hallucination detection.** The "pre-generation hallucination flag" is a hypothesis about what prediction error means, not a proven fact. Phase 1 of this design will test that hypothesis empirically.
+
+---
+
+## 13. Implementation Plan
+
+| Phase | What | Deliverable | Depends On |
+|-------|------|-------------|-----------|
+| Phase 1a | Alignment discovery | Correlation matrix [4 × 32], scenario classification | Both systems working independently |
+| Phase 1b | Bridge training | OntologyBridge with measured R² | Phase 1a data |
+| Phase 1c | Anomaly detection eval | AUC comparison (individual vs combined) | Phase 1b bridge |
+| Phase 2a | Implement winning option | CascadeObservatory or ParallelObservatory | Phase 1c scenario |
+| Phase 2b | Domain-adaptive thresholds | Modified VrittiValidatedPredictor | Phase 2a observatory |
+| Phase 2c | Integration test in test_synthetic.py | Part 8 checks all passing | Phase 2a + 2b |
+
+---
+
+## 14. Success Criteria
+
+**Minimum viable integration:**
+- Bridge R² > 0.2 on at least 2 of 4 ontological axes
+- Combined anomaly detection AUC > max(individual) on synthetic anomalies
+- Creative deviation false positive rate < 10%
+- All 6 new checks pass in test_synthetic.py
+
+**Full success:**
+- Bridge R² > 0.5 on all 4 axes (Scenario E: strong alignment)
+- Combined AUC > 0.85 on synthetic anomalies
+- Domain-adaptive thresholds measurably reduce false positives vs fixed thresholds
+- CognitiveAnomalyReport correctly identifies anomaly type in > 80% of cases
