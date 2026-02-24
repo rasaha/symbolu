@@ -276,32 +276,82 @@ def _load_symbolu_model(
             logger.info("No checkpoint specified — using random initialization")
 
     # Create model using the factory function
-    try:
-        from train_unified_llm import UnifiedTrainingConfig, create_model
-        training_cfg = UnifiedTrainingConfig(
-            model_type=config_dict["model_type"],
-            model_size=config_dict["model_size"],
-            vocab_size=config_dict["vocab_size"],
-        )
-        # Apply overrides
-        if override_n_embd:
-            training_cfg.n_embd = override_n_embd
-        if override_n_layer:
-            training_cfg.n_layer = override_n_layer
-        if override_n_head:
-            training_cfg.n_head = override_n_head
+    # Support both train_unified_llm (OntologicalHybrid) and train_hard_probes
+    # (HybridLMTransformer / BindingCacheLMTransformer) checkpoint formats.
+    source = None
+    if checkpoint is not None and isinstance(checkpoint.get("config"), dict):
+        source = checkpoint["config"].get("source", "")
 
-        model = create_model(training_cfg, device_t)
-    except Exception as e:
-        logger.warning("create_model failed (%s), trying direct construction", e)
-        # Fallback: construct model directly
-        from symbolu.phase_transformer import HybridPhaseTransformer
-        model = HybridPhaseTransformer(
-            vocab_size=config_dict["vocab_size"],
-            embed_dim=config_dict["embed_dim"],
-            num_layers=config_dict["num_layers"],
-            num_heads=config_dict["num_heads"],
-        )
+    model = None
+    if source == "train_hard_probes.py":
+        # Hard probes checkpoint — create the matching model directly
+        saved_cfg = checkpoint["config"]
+        try:
+            from scripts.phase_probes.hard_probes.train_hard_probes import (
+                HybridLMTransformer, BindingCacheLMTransformer,
+            )
+            ckpt_model_type = saved_cfg.get("model_type", "hybrid")
+            if ckpt_model_type == "binding_cache":
+                model = BindingCacheLMTransformer(
+                    vocab_size=saved_cfg.get("vocab_size", vocab_size),
+                    d_model=saved_cfg.get("d_model", embed_dim),
+                    num_heads=saved_cfg.get("num_heads", num_heads),
+                    num_layers=saved_cfg.get("num_layers", num_layers),
+                    d_ff=saved_cfg.get("d_ff", embed_dim * 2),
+                    dropout=0.1,
+                    max_seq_len=saved_cfg.get("seq_len", 256),
+                    window_size=64,
+                    top_k=64,
+                    decay_gamma=0.9,
+                    phase_ratios=[0.3] * saved_cfg.get("num_layers", num_layers),
+                    local_ratios=[0.4] * saved_cfg.get("num_layers", num_layers),
+                    quad_ratios=[0.3] * saved_cfg.get("num_layers", num_layers),
+                )
+            else:
+                curriculum = [0.5] * saved_cfg.get("num_layers", num_layers)
+                model = HybridLMTransformer(
+                    vocab_size=saved_cfg.get("vocab_size", vocab_size),
+                    d_model=saved_cfg.get("d_model", embed_dim),
+                    num_heads=saved_cfg.get("num_heads", num_heads),
+                    num_layers=saved_cfg.get("num_layers", num_layers),
+                    d_ff=saved_cfg.get("d_ff", embed_dim * 2),
+                    dropout=0.1,
+                    max_seq_len=saved_cfg.get("seq_len", 256),
+                    curriculum=curriculum,
+                    bounded_phase=saved_cfg.get("bounded_phase", True),
+                )
+            logger.info("Created %s model from train_hard_probes checkpoint", ckpt_model_type)
+        except Exception as e:
+            logger.warning("Could not create hard_probes model (%s), falling back", e)
+            model = None
+
+    if model is None:
+        try:
+            from train_unified_llm import UnifiedTrainingConfig, create_model
+            training_cfg = UnifiedTrainingConfig(
+                model_type=config_dict["model_type"],
+                model_size=config_dict["model_size"],
+                vocab_size=config_dict["vocab_size"],
+            )
+            # Apply overrides
+            if override_n_embd:
+                training_cfg.n_embd = override_n_embd
+            if override_n_layer:
+                training_cfg.n_layer = override_n_layer
+            if override_n_head:
+                training_cfg.n_head = override_n_head
+
+            model = create_model(training_cfg, device_t)
+        except Exception as e:
+            logger.warning("create_model failed (%s), trying direct construction", e)
+            # Fallback: construct model directly
+            from symbolu.phase_transformer import HybridPhaseTransformer
+            model = HybridPhaseTransformer(
+                vocab_size=config_dict["vocab_size"],
+                embed_dim=config_dict["embed_dim"],
+                num_layers=config_dict["num_layers"],
+                num_heads=config_dict["num_heads"],
+            )
 
     # Load weights from checkpoint if available
     if checkpoint is not None:
@@ -1214,14 +1264,21 @@ def run_symbolu_ontology_pipeline(
             print(f"\n  Layer {layer_idx}:")
             print(f"    Scenario: {r.scenario} (confidence={r.scenario_confidence:.2f})")
             print(f"    MI: {r.alignment_mi:.4f}, CKA: {r.cka_similarity:.4f}")
-            print(f"    Validated: {r.n_validated_axes}/12 ({', '.join(r.validated_axes) or 'none'})")
+            validated_str = ', '.join(r.validated_axes) or 'none'
+            borderline_str = f" (+{len(r.borderline_axes)} borderline)" if r.borderline_axes else ""
+            print(f"    Validated: {r.n_validated_axes}/12 ({validated_str}){borderline_str}")
             print(f"    Discriminability gap: {r.discriminability_gap:.1%}")
 
             # Per-axis MI table
             print(f"    Per-axis MI:")
             for axis_name in AXIS_NAMES:
                 mi = r.per_axis_mi.get(axis_name, 0.0)
-                status = "PASS" if mi > ontology_mi_threshold else "fail"
+                if mi > ontology_mi_threshold:
+                    status = "PASS"
+                elif axis_name in r.borderline_axes:
+                    status = "NEAR"
+                else:
+                    status = "fail"
                 pca_dir = r.per_axis_best_pca.get(axis_name, -1)
                 print(f"      [{status:4s}] {axis_name:25s}: MI={mi:.4f} (PCA dir={pca_dir})")
 
@@ -1255,6 +1312,7 @@ def run_symbolu_ontology_pipeline(
                 "cka_similarity": r.cka_similarity,
                 "n_validated_axes": r.n_validated_axes,
                 "validated_axes": r.validated_axes,
+                "borderline_axes": r.borderline_axes,
                 "per_axis_mi": r.per_axis_mi,
                 "discriminability_gap": r.discriminability_gap,
                 "ontology_role_accuracy": r.ontology_role_accuracy,
