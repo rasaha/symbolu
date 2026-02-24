@@ -1214,14 +1214,21 @@ def run_symbolu_ontology_pipeline(
             print(f"\n  Layer {layer_idx}:")
             print(f"    Scenario: {r.scenario} (confidence={r.scenario_confidence:.2f})")
             print(f"    MI: {r.alignment_mi:.4f}, CKA: {r.cka_similarity:.4f}")
-            print(f"    Validated: {r.n_validated_axes}/12 ({', '.join(r.validated_axes) or 'none'})")
+            validated_str = ', '.join(r.validated_axes) or 'none'
+            borderline_str = f" (+{len(r.borderline_axes)} borderline)" if r.borderline_axes else ""
+            print(f"    Validated: {r.n_validated_axes}/12 ({validated_str}){borderline_str}")
             print(f"    Discriminability gap: {r.discriminability_gap:.1%}")
 
             # Per-axis MI table
             print(f"    Per-axis MI:")
             for axis_name in AXIS_NAMES:
                 mi = r.per_axis_mi.get(axis_name, 0.0)
-                status = "PASS" if mi > ontology_mi_threshold else "fail"
+                if mi > ontology_mi_threshold:
+                    status = "PASS"
+                elif axis_name in r.borderline_axes:
+                    status = "NEAR"
+                else:
+                    status = "fail"
                 pca_dir = r.per_axis_best_pca.get(axis_name, -1)
                 print(f"      [{status:4s}] {axis_name:25s}: MI={mi:.4f} (PCA dir={pca_dir})")
 
@@ -1255,6 +1262,7 @@ def run_symbolu_ontology_pipeline(
                 "cka_similarity": r.cka_similarity,
                 "n_validated_axes": r.n_validated_axes,
                 "validated_axes": r.validated_axes,
+                "borderline_axes": r.borderline_axes,
                 "per_axis_mi": r.per_axis_mi,
                 "discriminability_gap": r.discriminability_gap,
                 "ontology_role_accuracy": r.ontology_role_accuracy,

@@ -96,6 +96,7 @@ class DiscoveryResult:
     per_axis_best_pca: Dict[str, int] = field(default_factory=dict)
     n_validated_axes: int = 0
     validated_axes: List[str] = field(default_factory=list)
+    borderline_axes: List[str] = field(default_factory=list)  # MI within margin of threshold
 
     # 7d: Global alignment
     alignment_mi: float = 0.0
@@ -135,7 +136,7 @@ class MultiLayerDiscoveryResult:
     best_causal_layer: int = -1          # highest causal effect — where to ACT
     dissociation: bool = False           # True if read_layer != act_layer
 
-    # Merged scenario (from best alignment layer)
+    # Merged scenario (reclassified using union of axes + best metrics)
     scenario: str = ""
     scenario_evidence: List[str] = field(default_factory=list)
     recommended_phase2: str = ""
@@ -574,7 +575,8 @@ def run_naming_ceremony(
     H_proj: np.ndarray,
     n_bins: int = 20,
     threshold: float = 0.1,
-) -> Tuple[Dict[str, float], Dict[str, int], List[str]]:
+    borderline_margin: float = 0.01,
+) -> Tuple[Dict[str, float], Dict[str, int], List[str], List[str]]:
     """For each of the 12 axes, compute MI with each PCA direction.
 
     Parameters
@@ -587,6 +589,9 @@ def run_naming_ceremony(
         Bins for MI estimation.
     threshold : float
         Axis survives if max MI > threshold.
+    borderline_margin : float
+        Axes with MI in [threshold - margin, threshold] are reported as
+        borderline (near-misses that may validate with more data or training).
 
     Returns
     -------
@@ -596,6 +601,8 @@ def run_naming_ceremony(
         axis_name → which PCA direction it best maps to
     validated_axes : list
         Names of axes that passed the threshold
+    borderline_axes : list
+        Names of axes within borderline_margin below the threshold
     """
     n_axes = ont_features.shape[1]
     k = H_proj.shape[1]
@@ -619,18 +626,28 @@ def run_naming_ceremony(
         per_axis_best_pca[ax_name] = best_dir
 
     validated = [name for name, mi in per_axis_mi.items() if mi > threshold]
+    borderline_lo = threshold - borderline_margin
+    borderline = [
+        name for name, mi in per_axis_mi.items()
+        if borderline_lo <= mi <= threshold and name not in validated
+    ]
 
     logger.info(
-        "Naming ceremony: %d/%d axes validated (threshold=%.2f)",
-        len(validated), len(AXIS_NAMES), threshold,
+        "Naming ceremony: %d/%d axes validated (threshold=%.2f), %d borderline (margin=%.3f)",
+        len(validated), len(AXIS_NAMES), threshold, len(borderline), borderline_margin,
     )
     for name in AXIS_NAMES:
-        status = "PASS" if name in validated else "FAIL"
         mi_val = per_axis_mi.get(name, 0.0)
         pca_dir = per_axis_best_pca.get(name, -1)
+        if name in validated:
+            status = "PASS"
+        elif name in borderline:
+            status = "NEAR"
+        else:
+            status = "FAIL"
         logger.info("  [%s] %s: MI=%.4f (best PCA dir=%d)", status, name, mi_val, pca_dir)
 
-    return per_axis_mi, per_axis_best_pca, validated
+    return per_axis_mi, per_axis_best_pca, validated, borderline
 
 
 # ---------------------------------------------------------------------------
@@ -923,7 +940,7 @@ def classify_scenario(result: DiscoveryResult) -> DiscoveryResult:
         result.scenario_confidence = max(1.0 - mi / 0.05, 1.0 - N / 3.0, 0.0)
 
     # --- Scenario D: Complementary ---
-    elif mi < 0.2 and gap > 0.05:
+    elif mi <= 0.2 and gap > 0.05:
         result.scenario = "D"
         evidence.append(f"MI={mi:.3f} low but discriminability gap={gap:.1%}")
         evidence.append("Ontology adds info the model doesn't have")
@@ -1570,15 +1587,17 @@ def run_ontology_discovery(
     # 7c: Naming ceremony
     _t = _time.time()
     logger.info("7c: Running naming ceremony...")
-    per_axis_mi, per_axis_best_pca, validated = run_naming_ceremony(
+    per_axis_mi, per_axis_best_pca, validated, borderline = run_naming_ceremony(
         ont_valid, H_proj, cfg.mi_n_bins, cfg.naming_mi_threshold,
     )
     result.per_axis_mi = per_axis_mi
     result.per_axis_best_pca = per_axis_best_pca
     result.n_validated_axes = len(validated)
     result.validated_axes = validated
-    logger.info("7c: Done in %.1fs — %d axes validated: %s",
-                _time.time() - _t, len(validated), validated)
+    result.borderline_axes = borderline
+    logger.info("7c: Done in %.1fs — %d axes validated: %s%s",
+                _time.time() - _t, len(validated), validated,
+                f" ({len(borderline)} borderline: {borderline})" if borderline else "")
 
     # 7d: Global alignment
     _t = _time.time()
@@ -1729,18 +1748,62 @@ def run_multi_layer_discovery(
 
     # --- Merge validated axes (union across layers) ---
     all_axes = set()
+    all_borderline = set()
     for result in multi.per_layer.values():
         all_axes.update(result.validated_axes)
+        all_borderline.update(result.borderline_axes)
+    # Borderline axes that are validated at another layer shouldn't stay borderline
+    all_borderline -= all_axes
     multi.all_validated_axes = sorted(all_axes, key=lambda a: AXIS_NAMES.index(a) if a in AXIS_NAMES else 99)
     multi.n_validated_axes = len(multi.all_validated_axes)
 
-    # --- Use best alignment layer's scenario as the overall scenario ---
+    # --- Re-classify overall scenario using merged multi-layer evidence ---
+    # Instead of copying one layer's scenario, use the union of validated axes
+    # and best metrics across all layers. This prevents edge cases where an axis
+    # barely fails at the best-MI layer but passes at another, changing N and
+    # cascading into a wrong scenario.
     best_result = multi.per_layer[multi.best_alignment_layer]
-    multi.scenario = best_result.scenario
-    multi.recommended_phase2 = best_result.recommended_phase2
+    merged = DiscoveryResult(layer_idx=-1)  # synthetic merged result
+    merged.n_validated_axes = multi.n_validated_axes  # union count
+    merged.validated_axes = multi.all_validated_axes
+    merged.alignment_mi = max(r.alignment_mi for r in multi.per_layer.values())
+    merged.cka_similarity = max(r.cka_similarity for r in multi.per_layer.values())
+    merged.coverage_ratio = max(r.coverage_ratio for r in multi.per_layer.values())
+    merged.discriminability_gap = max(r.discriminability_gap for r in multi.per_layer.values())
+    # Merge per-axis MI: take the best MI for each axis across all layers
+    merged_per_axis_mi: Dict[str, float] = {}
+    for r in multi.per_layer.values():
+        for ax_name, mi_val in r.per_axis_mi.items():
+            merged_per_axis_mi[ax_name] = max(merged_per_axis_mi.get(ax_name, 0.0), mi_val)
+    merged.per_axis_mi = merged_per_axis_mi
+    merged = classify_scenario(merged)
+
+    multi.scenario = merged.scenario
+    multi.recommended_phase2 = merged.recommended_phase2
+
+    # Log if merged scenario differs from best layer's per-layer scenario
+    if merged.scenario != best_result.scenario:
+        logger.info(
+            "Multi-layer reclassification: %s → %s "
+            "(best layer L%d had %s with N=%d, merged N=%d)",
+            best_result.scenario, merged.scenario,
+            multi.best_alignment_layer, best_result.scenario,
+            best_result.n_validated_axes, multi.n_validated_axes,
+        )
 
     # --- Build evidence incorporating dissociation ---
-    evidence = list(best_result.scenario_evidence)
+    evidence = list(merged.scenario_evidence)
+    if merged.scenario != best_result.scenario:
+        evidence.append(
+            f"RECLASSIFIED: Best layer L{multi.best_alignment_layer} was Scenario "
+            f"{best_result.scenario} (N={best_result.n_validated_axes}), but merged "
+            f"union has N={multi.n_validated_axes} → Scenario {merged.scenario}"
+        )
+    if all_borderline:
+        bl_sorted = sorted(all_borderline, key=lambda a: AXIS_NAMES.index(a) if a in AXIS_NAMES else 99)
+        evidence.append(
+            f"Borderline axes (near threshold): {', '.join(bl_sorted)}"
+        )
 
     if multi.dissociation:
         align_layer = multi.best_alignment_layer
