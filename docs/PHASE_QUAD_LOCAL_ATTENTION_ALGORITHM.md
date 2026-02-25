@@ -29,6 +29,34 @@
 
 ---
 
+## How to Read This Document (Plain English Guide)
+
+Imagine you're building a brain that reads text one word at a time and needs to understand what it's reading. A normal AI brain (a standard transformer) does this by having every word look at every other word to figure out what's important — but that gets extremely expensive when texts get long (cost grows as the square of the text length).
+
+This architecture solves that problem by splitting the "paying attention" job into **three specialists**, each with a different talent:
+
+1. **Phase** — The **diary keeper**. It reads each word and writes a compressed summary into a running journal. It never forgets, and it does this cheaply by just adding to a running total (not comparing every word to every other word).
+
+2. **Quad** — The **librarian**. When the model needs to recall something specific, Quad searches through Phase's journal and pulls out the most relevant entries. It doesn't read the whole journal — just the top-k most promising entries.
+
+3. **Local** — The **proofreader**. It looks at just the nearby words (like the last 256) with full precision to get grammar, word order, and syntax right. "The cat sat on the..." — Local knows the next word should be "mat" because it sees the exact recent context.
+
+The sections below describe each specialist in mathematical detail. Here's the plain-English roadmap of how they connect:
+
+> **Section 1** (Architecture) shows the big picture — how the three paths fit together.
+> **Section 2** (Math) explains the trick that makes Phase so cheap — using angles on a circle instead of comparing every pair of words.
+> **Section 3** (Phase) details how the diary keeper writes its journal.
+> **Section 4** (Quad) details how the librarian searches that journal.
+> **Section 5** (Local) details how the proofreader checks nearby words.
+> **Section 6** (Fusion) explains how their answers are combined.
+> **Section 7** (FFN) is the "thinking step" after attention — a simple neural net that transforms the combined signal.
+> **Section 8** (Block) shows one complete layer: all three paths + fusion + thinking.
+> **Section 9** (Model) stacks many blocks and adds the input/output wiring.
+> **Sections 10–15** cover training tricks, control systems, long-document handling, and health monitoring.
+> **Sections 16–18** cover cost analysis, safety rules, and tuning knobs.
+
+---
+
 ## 1. Architecture Overview
 
 The Phase-Quad Local Attention model is a three-path transformer architecture where each path has an **exclusive, non-competing role**:
@@ -64,6 +92,11 @@ Input x [B, N, D]
 - Phase **writes** to memory state (accumulator)
 - Quad **reads** from memory state (querier)
 - Local provides **uncompressed** token-level detail
+
+---
+
+> **In Plain English — What Section 1 told us:**
+> The model has three workers. Local handles nearby words (like a proofreader), Phase keeps a running journal of everything seen so far (like a diary keeper), and Quad searches that journal when the model needs to remember something specific (like a librarian). The critical discovery was that these three must have *separate, protected jobs*. When Phase and Quad were allowed to share the same workspace, Phase became useless — it added nothing. But when each had its own exclusive role (Phase only writes, Quad only reads), Phase became essential. This is the architectural foundation everything else builds on.
 
 ---
 
@@ -114,6 +147,11 @@ The O(n) complexity arises from the Kuramoto mean-field approximation:
 ```
 
 Instead of computing all O(n²) pairwise interactions, we accumulate into a global state and query it.
+
+---
+
+> **In Plain English — What Section 2 told us:**
+> Normal attention works like a room full of people where *everyone* shakes hands with *everyone else* to see who's relevant — that's expensive (n-squared comparisons). Phase attention instead gives each word an **angle** (like a direction on a compass) and a **loudness** (amplitude). Two words "pay attention" to each other when their compass needles point the same way — `cos(angle_A - angle_B)` is high when angles are similar, low when they're different. The mathematical trick (Euler's formula) lets us compute this with a simple running total instead of pairwise comparisons. Think of it like this: instead of asking "how similar is word 5 to words 1, 2, 3, 4?" individually, we keep a single summary vector that accumulates all past words, and word 5 just checks against that one summary. That's the O(n) magic.
 
 ---
 
@@ -192,6 +230,15 @@ offset_h = 2π · h / H    for h = 0, 1, ..., H-1
 ```
 
 These are **fixed** (non-learnable) buffers that diversify the phase manifold each head explores.
+
+---
+
+> **In Plain English — What Section 3 told us:**
+> Phase is the diary keeper. Here's what it actually does step by step: (1) It takes each word and converts it into two things: an **angle** (phase — "what kind of thing is this?") and a **loudness** (amplitude — "how important is this?"). (2) It wraps the angle into the range [-180, +180] degrees so it can't drift off to infinity. (3) Each of the model's 12 "attention heads" starts at a different angle on the compass (like 12 people facing 12 different directions) so they don't all learn the same thing. (4) It forms a complex number from the angle and loudness (like an arrow with a direction and length), multiplies it by the word's content, and adds it to a running total. This running total IS the memory — it's a compressed summary of everything seen so far.
+>
+> The **decay** option controls how quickly old memories fade. With decay=1.0, the model never forgets (infinite memory). With decay=0.95, memories from 20+ words ago are mostly gone. The "learned decay" option lets each head choose its own forgetting speed — some heads remember 2 words back (syntax), others remember 2,000 words back (plot of a story).
+>
+> **How this connects to the next section:** Phase has now produced a `memory_state` — a compressed journal of everything seen so far. But this journal is compressed, lossy. You can't look up a specific fact from 500 words ago with precision. That's Quad's job.
 
 ---
 
@@ -280,6 +327,17 @@ if confidence > threshold:
 
 ---
 
+> **In Plain English — What Section 4 told us:**
+> Quad is the librarian. Phase wrote a journal, but it's compressed — you can't just look up "what was the character's name from paragraph 3?" directly. Quad fixes this by doing a focused search. Here's how: (1) It takes the current word and asks "what am I looking for?" (a query). (2) It takes Phase's memory and asks "what's stored here?" (keys and values). (3) It computes a relevance score between the query and every memory entry. (4) Instead of looking at ALL entries (which would be expensive), it picks only the top-k most relevant ones (like a librarian pulling the 64 most relevant books from a library of thousands). (5) It does a precise weighted average over just those top-k entries. This reduces cost from n-squared to n-times-k.
+>
+> There's a clever detail: **binding salience**. The system can tell Quad "these words are more important" (like highlighting key sentences in a textbook). This biases *which* entries get selected for the top-k, but it does NOT change *how* the attention math works on those entries. The selection is biased, but the weighting is pure — this prevents the control system from injecting arbitrary content into the attention.
+>
+> In **proposal mode**, Quad doesn't blend the results itself — instead it hands Phase a list of candidates ("I found these 64 possibilities") and Phase picks which ones to integrate. If Phase is already confident about what it knows, Quad is skipped entirely to save computation.
+>
+> **How this connects to the next section:** Phase and Quad handle global memory (the whole document). But neither is great at fine-grained local patterns like "the → cat" or "is → running" — that requires exact token-level detail from nearby words. That's Local's job.
+
+---
+
 ## 5. Path 3 — Local Window Attention (O(n·w) Syntax)
 
 **Class**: `LocalWindowAttention`
@@ -344,6 +402,15 @@ GQA (Grouped Query Attention) support:
 
 ---
 
+> **In Plain English — What Section 5 told us:**
+> Local is the proofreader. It does traditional attention (the kind normal transformers use) but only within a small window — say, the last 256 words. For the word at position 1000, it only looks at words 744–1000, ignoring everything before that. Within that window, it does full-precision attention: every word compares to every other word in the window. This gives it perfect knowledge of recent grammar, word order, and syntax patterns.
+>
+> The window size adjusts automatically — for short sequences, it covers half the text; for long sequences, it caps at the configured maximum (256 by default). Multiple computational backends are supported (FlashAttention for speed, manual implementation for compatibility).
+>
+> **How this connects to the next section:** We now have three outputs — Local's syntax signal, Phase's memory signal (via Quad's retrieval). How do we combine them?
+
+---
+
 ## 6. Three-Path Fusion
 
 ### 6.1 Binding Cache Block (Protected Architecture)
@@ -368,6 +435,15 @@ The three paths are complementary, not alternatives:
 
 ---
 
+> **In Plain English — What Section 6 told us:**
+> The answer is surprisingly simple: just **add them together**. `output = local_signal + memory_signal`. No learned gating, no competition, no "choose which one matters more." Why? Because experiments showed that when you make Phase and Quad compete (via gates or learned weights), Phase always loses — the model learns to ignore it. But when you just add them, each path contributes its unique signal without interference. This is the "protected architecture" principle: each specialist does their job, and their contributions stack.
+>
+> Think of it like a team report: the proofreader marks grammar fixes, the diary keeper adds context from earlier chapters, and the librarian adds specific referenced facts. You don't pick one — you merge all three annotations onto the same document.
+>
+> **How this connects to the next section:** After combining the three attention signals, the result goes through a "thinking" step — the feed-forward network.
+
+---
+
 ## 7. Feed-Forward Network
 
 Standard pre-norm FFN with GELU activation:
@@ -380,6 +456,13 @@ FFN(x) = dropout(W₂(GELU(W₁(LayerNorm(x))))) + x
     W₁: D → 4D    (expansion)
     W₂: 4D → D    (projection)
 ```
+
+---
+
+> **In Plain English — What Section 7 told us:**
+> The FFN is the "thinking" step. After the three attention paths figured out *what to pay attention to*, the FFN transforms that information — it's a simple two-layer neural network that first expands the signal to 4x its size (giving it room to compute), then compresses it back down. Think of it like the model taking notes from the attention results and writing a refined summary. Every transformer in the world has this same structure. It handles the non-linear reasoning that attention alone can't do.
+>
+> **How this connects to the next section:** One attention step + one FFN step = one "block." The next section shows how these pieces fit together in a single block.
 
 ---
 
@@ -419,6 +502,15 @@ ALGORITHM: BindingCacheBlock.forward(x, intent_phase, binding_salience, enable_s
 
 RETURN x
 ```
+
+---
+
+> **In Plain English — What Section 8 told us:**
+> This is the complete recipe for one layer. Step by step: (1) First, check that any external control signals are valid (safety check). (2) Run Local attention on the raw input — get syntax patterns. (3) Run Phase on the raw input — build/update the memory journal. (4) Run Quad to search Phase's journal — get retrieved memories. (5) Add Local + Quad results together. (6) Add that sum back to the original input (residual connection — a skip-wire that prevents information loss). (7) Run through the FFN for non-linear processing. Output goes to the next layer.
+>
+> The "enable_slots_read" control is interesting: it lets the system turn OFF Quad's retrieval without stopping Phase's journaling. Phase always writes (you always want the diary updated), but sometimes you don't need to search it.
+>
+> **How this connects to the next section:** One block is one layer of processing. The full model stacks 12–32 of these blocks, adds word embeddings at the start and a vocabulary predictor at the end.
 
 ---
 
@@ -472,6 +564,15 @@ When `tie_embeddings=False` (e.g., Sanskrit/CSR injection):
 ```
 lm_head.weight ← copy(token_embed.weight)   # Initial alignment, then diverge
 ```
+
+---
+
+> **In Plain English — What Section 9 told us:**
+> The full model: (1) Turn words into numbers (embeddings) and add position information ("this is the 5th word"). (2) Pass through 12 blocks (each doing Local + Phase + Quad + FFN). (3) At the end, project the result back to vocabulary size to predict the next word. The "logit scale" dampens the model's early confidence so it doesn't become overconfident before it's learned anything useful.
+>
+> Weight tying means the input word table and output word predictor share the same parameters — this is standard practice that saves memory and helps generalization. It's disabled when injecting non-standard tokens (like Sanskrit phonemes) because those would corrupt the output predictor.
+>
+> **How this connects to the next section:** The model structure is complete. But during training, Phase has a tendency to "collapse" — all its angles converge to the same value, making it useless. Section 10 introduces the regularization that prevents this.
 
 ---
 
@@ -536,6 +637,17 @@ enable_phase_diversity_capture(model, False)
 
 ---
 
+> **In Plain English — What Section 10 told us:**
+> Phase collapse is the biggest training risk. Imagine all 12 compass needles (attention heads) slowly drifting until they all point the same direction. When that happens, `cos(angle_A - angle_B) ≈ 1` for every pair of words — everything looks equally relevant, and Phase loses all selectivity. It becomes a uniform amplifier instead of a selective filter.
+>
+> The fix: during training, we add a penalty that measures "how spread out are the phases?" Think of it like this: if you average all the compass arrows and the result is a strong vector pointing in one direction, the phases are collapsed (penalty is high). If the average arrow is near zero (arrows cancel out because they point in all directions), phases are nicely spread (penalty is low). We compute this with complex exponentials — `exp(i*angle)` gives a unit arrow, and averaging those arrows and measuring the result length tells us how collapsed/spread the distribution is.
+>
+> Two penalties work together: the uniformity loss (are phases spread around the circle?) and the entropy proxy (is there enough diversity?). Start with gentle penalties (0.001) and ramp up over training.
+>
+> **How this connects to the next section:** Section 10 addressed a training problem. Section 11 addresses a *speed* problem — the running-total accumulation (EMA) that Phase uses can be slow if done one word at a time. The parallel scan makes it fast.
+
+---
+
 ## 11. Parallel EMA Scan (Optimized Accumulation)
 
 **Function**: `parallel_ema_scan`
@@ -592,6 +704,15 @@ Above threshold → vectorized path (fast, stable)
 
 ---
 
+> **In Plain English — What Section 11 told us:**
+> Phase's memory uses a "running average with decay" — each new word adds to the total, but old entries slowly fade. Computing this one word at a time in Python is painfully slow (2,048 loop iterations for a 2,048-token sequence). The parallel EMA scan is an optimization: it groups 64 words at a time and processes each group with fast vectorized math (matrix operations the GPU is good at). This turns 2,048 iterations into 32 — a 32x speedup.
+>
+> There's a numerical trap: the vectorized math requires computing `(1/decay)^63`, which is fine when decay is close to 1 (like 0.95) but explodes to infinity when decay is small (like 0.5). So the algorithm checks: if the decay factor is >= 0.9, use the fast vectorized path; otherwise, fall back to the safe-but-slow sequential loop.
+>
+> **How this connects to the next section:** Sections 3–11 covered the core attention machinery and training. Section 12 introduces the *control system* — how external signals (like "this topic is about science" or "focus on content words") can steer the attention without corrupting it.
+
+---
+
 ## 12. Ontological Control Plane
 
 ### 12.1 OntoControl Interface (V10.6.4)
@@ -633,6 +754,19 @@ Control signals must satisfy:
 
 ---
 
+> **In Plain English — What Section 12 told us:**
+> The ontological control plane is how higher-level understanding steers the attention system. Think of it like a manager who tells the workers "pay more attention to scientific terms" or "this paragraph is about history." It does this through two main signals:
+>
+> **Binding salience** is like a highlighter pen — it marks certain words as more important (`[B, N]` — one importance score per word). This biases *which* words Quad puts in its top-k shortlist, but it does NOT change the attention math on those words. It's like telling the librarian "check the science section first" vs. "change how you read the books."
+>
+> **Intent phase** is a small rotation signal (`[B, H]` — one angle per attention head) that shifts what Phase considers "similar." It's like rotating everyone's compass slightly so they pay attention to different things based on the current understanding context.
+>
+> The **no-write contract** is a safety rule: control signals must be small and simple (a few numbers per head or per word). They must NEVER be big enough to encode arbitrary content (like a full word embedding). This prevents the control system from secretly injecting words into the attention — it can only steer, not override.
+>
+> **How this connects to the next section:** Section 12 showed how intent can steer attention. But a naive implementation just adds intent to the content phase — and intent can overpower content, making the model attend to what it "wants" rather than what's actually relevant. Section 13 fixes this with a two-channel design.
+
+---
+
 ## 13. Dual-Channel Attention (V10.3.8)
 
 ### 13.1 Problem
@@ -661,6 +795,17 @@ Where:
 The Binding Cache architecture **already** implements dual-channel naturally:
 - `BindingCachePhaseState` handles Key phasor (backward, `-iφ_k`) → **SRK influences storage**
 - `BindingCacheQuadQuery` handles Query projection (forward) → **JEPA influences retrieval**
+
+---
+
+> **In Plain English — What Section 13 told us:**
+> The problem: if you mix "what the words actually say" (content) with "what the model wants to find" (intent) into a single score, intent can dominate. Imagine a search engine where your *desire* for a result overrides the actual *relevance* of documents — you'd get confirmation bias.
+>
+> The solution: keep two separate scores. **Content score** = "how similar are these words?" (based on their actual phases). **Alignment score** = "does my intent agree with my understanding?" (based on the JEPA sensor vs. the SRK master). The final score multiplies them: `content × (1 + small_factor × alignment)`. This means content always drives the main ranking, and intent can only gently boost or suppress — it can never override.
+>
+> In the protected architecture (Phase writes, Quad reads), this dual-channel separation happens *naturally*: Phase controls how things are stored (the key side — SRK/Master), and Quad controls how things are searched (the query side — JEPA/Sensor). They're already separate by design.
+>
+> **How this connects to the next section:** All the above assumes the entire text fits in memory at once. But what about very long documents (millions of tokens)? The model has to process them in chunks. Section 14 explains how Phase's memory survives across chunk boundaries.
 
 ---
 
@@ -713,6 +858,19 @@ global_state_t = γ^(t+1) · prev_state + Σ_{j≤t} γ^(t-j) · KV_j
 
 ---
 
+> **In Plain English — What Section 14 told us:**
+> When a document is too long to fit in one pass, we split it into chunks (say, 2,048 words each). The problem: if Phase's memory resets at each chunk boundary, it can't remember anything from earlier chunks — it becomes useless for long-range understanding.
+>
+> The fix: at the end of each chunk, save Phase's final memory state (a single complex vector per head). When processing the next chunk, *start* Phase's accumulation from that saved state instead of from zero. It's like the diary keeper closing one notebook and opening the next one, but copying the last entry forward as a summary.
+>
+> For the decay version (EMA), the math is more nuanced: the old state decays exponentially as new words arrive, so the model naturally forgets the oldest information while preserving recent context.
+>
+> **Critical rule**: gradients must flow through the saved state. If you "detach" it (cut the gradient connection), the model can't learn to write good summaries at chunk boundaries — training breaks silently.
+>
+> **How this connects to the next section:** We've covered the full architecture, training, control, and long-document handling. But how do you know if the model is healthy during training? Section 15 introduces the diagnostic dashboard.
+
+---
+
 ## 15. Diagnostic & Health Monitoring
 
 ### 15.1 Health Dashboard (V9.9.12c)
@@ -744,6 +902,20 @@ health = compute_phase_health_dashboard(model)
 # Disable capture
 enable_health_diagnostics_capture(model, False)
 ```
+
+---
+
+> **In Plain English — What Section 15 told us:**
+> This is the model's health dashboard — read-only checks that don't affect training. The key metrics:
+>
+> - **R_k (phase collapse)**: Measures whether all the compass needles have converged to the same direction. Healthy = near 0 (diverse directions). Unhealthy = near 1 (all pointing the same way). This is the single most important metric.
+> - **Amplitude-phase correlation**: If Phase is "cheating" by using amplitude to compensate for collapsed phases (making important things loud instead of distinguishing them by angle), this correlation will be high.
+> - **Head redundancy**: Are the 12 attention heads learning different things, or have they all converged to the same behavior? High redundancy = wasted capacity.
+> - **Phase drift**: Are the phases changing over time (token to token)? If drift is zero, Phase is frozen — it's not actually using its phase as a dynamic state variable. If drift is huge, it's unstable. Small, steady drift is ideal.
+>
+> These metrics are computed by capturing internal tensors during a forward pass (without gradients), computing statistics, and discarding the captures. No effect on training whatsoever.
+>
+> **How this connects to the next section:** We've covered *what* the model does and *how to monitor it*. Section 16 answers "how expensive is it?" — the computational cost analysis.
 
 ---
 
@@ -787,6 +959,17 @@ For n > ~3,000 tokens, Phase-Quad-Local is cheaper than standard attention.
 
 ---
 
+> **In Plain English — What Section 16 told us:**
+> The cost breakdown reveals where computation goes. Surprisingly, the FFN (the "thinking" step) dominates — it costs about 2.4 million operations per word. Phase is the cheapest attention path at 768 ops per word (just a running total). Quad costs about 4,096 ops per word (searching 64 candidates). Local costs about 16,384 ops per word (comparing against 256 recent words).
+>
+> The key comparison: a standard transformer's attention costs n-squared (every word vs. every word). For a 3,000-word document, that's 9 million comparisons. Phase-Quad-Local's combined attention costs about 21,000 ops per word regardless of document length — it's linear, not quadratic. So for documents longer than ~3,000 words, this architecture is cheaper. For a 100,000-word document, it's 3,000x cheaper.
+>
+> Memory savings are even more dramatic: a standard transformer stores an n×n attention map (huge for long documents). This architecture stores only an n×k map for Quad (where k=64 is much smaller than n).
+>
+> **How this connects to the next section:** Section 17 codifies the safety rules — the invariants that must never be violated, or the architecture breaks.
+
+---
+
 ## 17. Invariants & Contracts
 
 ### 17.1 Architectural Invariants
@@ -810,6 +993,24 @@ INV-8:  Gradients MUST flow through prev_state (no detach)
 | Alignment signal shape | V10.6.3 | `assert_alignment_signal_shape()` — hard-fail |
 | OntoControl interface | V10.6.4 | `OntoControl.validate()` |
 | Forward-pass enforcement | V10.6.6 | Block and Transformer level |
+
+---
+
+> **In Plain English — What Section 17 told us:**
+> These are the "commandments" of the architecture — rules that, if broken, cause the model to degrade silently (the most dangerous kind of bug). The 8 invariants in plain language:
+>
+> 1. **Phase only writes** — it builds the journal, never produces a direct output.
+> 2. **Quad only reads** — it searches the journal, never writes to it.
+> 3. **Local is independent** — it never touches the journal, only looks at nearby words.
+> 4. **Control signals are small** — a few numbers per head, never full word embeddings.
+> 5. **Salience steers selection, not weights** — it biases WHICH memories to check, not HOW to weight them.
+> 6. **Phase always writes** — even when retrieval is turned off, the journal is always updated.
+> 7. **Memory carries across chunks** — the journal never resets mid-document.
+> 8. **Gradients flow through saved state** — the training signal must reach across chunk boundaries.
+>
+> These are enforced by runtime assertions that crash the training immediately if violated — better to crash loudly than to train a subtly broken model for days.
+>
+> **How this connects to the next section:** Section 18 is the reference table for all the knobs you can turn.
 
 ---
 
@@ -863,6 +1064,11 @@ INV-8:  Gradients MUST flow through prev_state (no detach)
 
 ---
 
+> **In Plain English — What Section 18 told us:**
+> This is the tuning guide. The most important takeaways: (1) `bounded_phase=True` is **mandatory** — without it, phases drift to infinity and collapse. (2) Start with `decay_gamma=1.0` (infinite memory) and only reduce it if Phase is overwhelming Local. (3) `top_k=64` is a good default for Quad — larger values give better retrieval but cost more. (4) `local_window_size=256` covers about a paragraph of text — enough for syntax but not so much that it overlaps with Phase/Quad's job. (5) The diversity loss weights (0.001) should ramp up during training if phase collapse is observed.
+
+---
+
 ## Appendix A: 32D Sovereign State Mapping
 
 The Sovereign State is a principled 32-dimensional vector organized into three planes:
@@ -888,6 +1094,11 @@ LEARNING PLANE (4D → training-time feedback):
 
 ---
 
+> **In Plain English — Appendix A:**
+> The Sovereign State is the model's "self-awareness" vector — 32 numbers that describe what the model currently "is" and "feels." Only the first 12 (Bhavas — modes of being like "cognition," "agency," "purpose") actually affect the phase rotation in attention. The remaining 20 are control/learning signals routed elsewhere. This separation is critical: you don't want the model's "nervousness level" (a Guna dynamic) to randomly rotate attention phases — only its fundamental mode of understanding (Bhavas) should do that.
+
+---
+
 ## Appendix B: Cosine Mode Comparison
 
 | Mode | Range | Formula | Pros | Cons |
@@ -895,6 +1106,11 @@ LEARNING PLANE (4D → training-time feedback):
 | `standard` | [-1, +1] | cos(φ_q − φ_k) | Original, symmetric | Destructive interference |
 | `shifted` | [0, 2] | 1 + cos(φ_q − φ_k) | Positive signal, no cancellation | Less selective |
 | `complex` | ℂ → ℝ | W·[Re, Im]^T | Asymmetric ("the→cat" ≠ "cat→the") | +memory, extra projection |
+
+---
+
+> **In Plain English — Appendix B:**
+> Three ways to compute "how similar are two words' phases": (1) **Standard** (`cos`) — ranges from -1 to +1, meaning two words can actively cancel each other out (destructive interference). Most selective but can cause signal collapse. (2) **Shifted** (`1 + cos`) — ranges from 0 to 2, so all contributions are positive. Less selective but more stable when training stalls. (3) **Complex** — uses both the cosine (symmetric: "A relates to B the same as B relates to A") and sine (asymmetric: "the → cat" is different from "cat → the") components. Most expressive but costs more memory.
 
 ---
 
@@ -909,6 +1125,11 @@ LEARNING PLANE (4D → training-time feedback):
 | Selectivity mechanism | Softmax | Selection gates | Token shift | cos(φ_q − φ_k) phase sync |
 | Per-head memory span | All same | Learned | Learned decay | Learned (2–2048 tokens) |
 | Interpretability | Attention maps | Opaque | Opaque | Phase angles, R_k metrics |
+
+---
+
+> **In Plain English — Appendix C:**
+> How does this compare to other architectures? Standard Transformers (GPT-4, etc.) do everything with one expensive O(n^2) attention mechanism — it works but scales poorly. Mamba and RWKV use a single cheap O(n) recurrence — efficient but has no dedicated retrieval or local syntax handling. Phase-Quad-Local is unique in having **three explicit specialists**: cheap global memory (Phase), targeted retrieval (Quad), and precise local syntax (Local). It's also the most interpretable — you can literally measure the phase angles and diagnose what each head is doing, which is impossible with Mamba's opaque state-space dynamics.
 
 ---
 
