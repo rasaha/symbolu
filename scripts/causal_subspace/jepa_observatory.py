@@ -1487,6 +1487,51 @@ class TrajectoryMismatchDetector:
 # ---------------------------------------------------------------------------
 
 @dataclass
+class CognitiveDissonance:
+    """Quantifies the conflict between the latent 'unconscious' stream (JEPA
+    prediction / Sovereign State) and the 'conscious' token stream (actual
+    transformer hidden states).
+
+    Inspired by the psychological concept of cognitive dissonance — the mental
+    discomfort when holding contradictory beliefs.  In this architecture the
+    two 'beliefs' are:
+        - Stream B's prediction of where meaning is heading  (JEPA / Sovereign State)
+        - Stream A's actual trajectory through hidden-state space  (transformer)
+
+    When these diverge, the system experiences *dissonance* — measurable as
+    a scalar intensity plus a per-axis conflict vector that shows WHICH
+    semantic dimensions are 'arguing'.
+
+    Levels:
+        low   (< 0.3):  Fluent alignment.  'Flow state.'
+        mid   (0.3–0.7): Minor semantic drift. 'Searching for the right word.'
+        high  (> 0.7):  Major trajectory break. 'Wait, what was I talking about?'
+                        Probable hallucination or topic derailment.
+    """
+
+    # Scalar dissonance intensity [0, 1]
+    total_dissonance: float
+
+    # Per-axis conflict on the 4 validated ontological axes
+    # Shows WHICH dimension is 'arguing' most
+    axis_conflict: Dict[str, float]
+
+    # KL divergence between predicted and actual Vritti distributions
+    # High KL → the system's cognitive mode shifted unexpectedly
+    vritti_kl: float
+
+    # KL divergence between predicted and actual Kosha distributions
+    # High KL → processing depth shifted unexpectedly
+    kosha_kl: float
+
+    # Qualitative level: "low" / "medium" / "high"
+    level: str
+
+    # Human-readable interpretation
+    interpretation: str
+
+
+@dataclass
 class GovernanceReport:
     """Report from the three-signal disagreement governor."""
 
@@ -1501,6 +1546,217 @@ class GovernanceReport:
 
     # Explanation
     explanation: str             # Human-readable governance narrative
+
+    # Cognitive dissonance (the 'GSR' of the system — optional, present when
+    # the governor has enough state history to compute temporal dissonance)
+    dissonance: Optional[CognitiveDissonance] = None
+
+
+class CognitiveDissonanceMetric:
+    """Computes the 'cognitive dissonance' between the latent semantic stream
+    (JEPA / Sovereign State) and the token stream (transformer hidden states).
+
+    This is the system's 'Galvanic Skin Response' — an involuntary signal that
+    reveals internal tension the token generator doesn't control.
+
+    Three components are measured:
+        1. Trajectory dissonance (Euclidean):  How far did the actual state
+           land from where JEPA predicted?  Raw 'surprise' magnitude.
+        2. Semantic dissonance (ontology-projected):  Which of the 4 validated
+           ontological axes is experiencing the most conflict?  Tells us WHAT
+           the dissonance is about.
+        3. Distributional dissonance (KL divergence):  Did the cognitive MODE
+           (Vritti) or processing DEPTH (Kosha) shift unexpectedly?  Catches
+           cases where the trajectory looks smooth but the system quietly
+           switched from analytical to imaginative processing.
+
+    The combination is strictly more informative than any individual signal:
+        - High trajectory + low KL = sudden topic shift, same cognitive mode
+        - Low trajectory + high KL = smooth text but cognitive mode flipped
+        - High trajectory + high KL = full dissonance (hallucination candidate)
+    """
+
+    # Sovereign State dimension slices (must match SovereignStateProjector)
+    KOSHA_SLICE = slice(12, 17)
+    VRITTI_SLICE = slice(17, 22)
+
+    # Ontological axis names for reporting
+    AXIS_NAMES = ["concreteness", "relational_role", "categorical_type", "modific_load"]
+
+    def __init__(
+        self,
+        low_threshold: float = 0.3,
+        high_threshold: float = 0.7,
+    ):
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
+
+    @staticmethod
+    def _safe_kl_divergence(p: np.ndarray, q: np.ndarray) -> float:
+        """KL(p || q) with numerical safety.
+
+        Both p and q are treated as unnormalized logits — softmax is applied
+        before computing KL.  This handles the case where the raw Sovereign
+        State slices haven't been explicitly normalized.
+        """
+        # Softmax normalize
+        def _softmax(x: np.ndarray) -> np.ndarray:
+            e = np.exp(x - np.max(x, axis=-1, keepdims=True))
+            return e / np.sum(e, axis=-1, keepdims=True)
+
+        p_norm = _softmax(p.astype(np.float64))
+        q_norm = _softmax(q.astype(np.float64))
+
+        # Clip to avoid log(0)
+        p_norm = np.clip(p_norm, 1e-10, 1.0)
+        q_norm = np.clip(q_norm, 1e-10, 1.0)
+
+        kl = float(np.sum(p_norm * np.log(p_norm / q_norm)))
+        return max(kl, 0.0)  # KL is non-negative; clip numerical artifacts
+
+    def compute(
+        self,
+        actual_state: np.ndarray,
+        predicted_state: np.ndarray,
+        ontology_bridge: "OntologyBridge",
+    ) -> CognitiveDissonance:
+        """Compute the cognitive dissonance between predicted and actual states.
+
+        Args:
+            actual_state: z_{t+k} — the Sovereign State at time t+k as actually
+                observed from the transformer's hidden states.  Shape [32] or [B, 32].
+            predicted_state: z_hat_{t+k} — the JEPA predictor's forecast of what
+                z_{t+k} should have been.  Same shape as actual_state.
+            ontology_bridge: The OntologyBridge that projects 32D → 4D ontological axes.
+
+        Returns:
+            CognitiveDissonance with all diagnostic fields populated.
+        """
+        # Handle batched vs single
+        if actual_state.ndim == 1:
+            actual_state = actual_state[np.newaxis, :]
+            predicted_state = predicted_state[np.newaxis, :]
+
+        # --- 1. Trajectory dissonance (Euclidean 'surprise') ---
+        raw_error = actual_state - predicted_state
+        traj_dissonance = float(np.mean(np.linalg.norm(raw_error, axis=-1)))
+
+        # --- 2. Semantic dissonance (ontology-projected conflict) ---
+        error_tensor = torch.from_numpy(raw_error.astype(np.float32))
+        with torch.no_grad():
+            semantic_error = ontology_bridge(error_tensor).cpu().numpy()
+        axis_conflict_raw = np.mean(np.abs(semantic_error), axis=0)
+
+        axis_conflict = {}
+        for i, name in enumerate(self.AXIS_NAMES):
+            if i < len(axis_conflict_raw):
+                axis_conflict[name] = float(axis_conflict_raw[i])
+
+        # --- 3. Distributional dissonance (KL on Vritti and Kosha) ---
+        actual_vritti = np.mean(actual_state[:, self.VRITTI_SLICE], axis=0)
+        predicted_vritti = np.mean(predicted_state[:, self.VRITTI_SLICE], axis=0)
+        vritti_kl = self._safe_kl_divergence(actual_vritti, predicted_vritti)
+
+        actual_kosha = np.mean(actual_state[:, self.KOSHA_SLICE], axis=0)
+        predicted_kosha = np.mean(predicted_state[:, self.KOSHA_SLICE], axis=0)
+        kosha_kl = self._safe_kl_divergence(actual_kosha, predicted_kosha)
+
+        # --- Composite dissonance score ---
+        # Weight: trajectory (0.4) + max axis conflict (0.3) + KL terms (0.3)
+        max_axis = max(axis_conflict.values()) if axis_conflict else 0.0
+        kl_component = (vritti_kl + kosha_kl) / 2.0
+
+        # Normalize components to ~[0,1] range using sigmoid-like scaling
+        traj_normed = min(traj_dissonance / 2.0, 1.0)  # 2.0 = high dissonance
+        kl_normed = min(kl_component / 1.0, 1.0)  # KL > 1.0 is very high
+
+        total = 0.4 * traj_normed + 0.3 * max_axis + 0.3 * kl_normed
+        total = min(max(total, 0.0), 1.0)
+
+        # --- Classify level ---
+        if total < self.low_threshold:
+            level = "low"
+        elif total < self.high_threshold:
+            level = "medium"
+        else:
+            level = "high"
+
+        # --- Build interpretation ---
+        interpretation = self._interpret(
+            level, traj_dissonance, axis_conflict, vritti_kl, kosha_kl,
+        )
+
+        return CognitiveDissonance(
+            total_dissonance=total,
+            axis_conflict=axis_conflict,
+            vritti_kl=vritti_kl,
+            kosha_kl=kosha_kl,
+            level=level,
+            interpretation=interpretation,
+        )
+
+    @staticmethod
+    def _interpret(
+        level: str,
+        traj: float,
+        axis_conflict: Dict[str, float],
+        vritti_kl: float,
+        kosha_kl: float,
+    ) -> str:
+        """Build human-readable interpretation of dissonance."""
+        if level == "low":
+            return (
+                "Fluent alignment. The latent semantic stream and token stream "
+                "agree on content, trajectory, and cognitive mode. Flow state."
+            )
+
+        # Find the most conflicted axis
+        top_axis = max(axis_conflict, key=axis_conflict.get) if axis_conflict else "unknown"
+        top_val = axis_conflict.get(top_axis, 0.0)
+
+        parts = []
+
+        if level == "medium":
+            parts.append("Minor semantic drift detected.")
+        else:
+            parts.append("Major dissonance: latent and token streams are in conflict.")
+
+        # Trajectory component
+        if traj > 1.0:
+            parts.append(
+                f"Trajectory surprise is high ({traj:.2f}): the model went somewhere "
+                f"the JEPA predictor did not expect."
+            )
+
+        # Axis component
+        if top_val > 0.3:
+            parts.append(
+                f"Primary conflict axis: {top_axis} ({top_val:.2f}). "
+                f"This semantic dimension shows the largest gap between "
+                f"prediction and reality."
+            )
+
+        # KL components
+        if vritti_kl > 0.5:
+            parts.append(
+                f"Cognitive mode shifted unexpectedly (Vritti KL={vritti_kl:.3f}). "
+                f"The system may have switched from e.g. analytical to creative "
+                f"processing without the trajectory predicting it."
+            )
+        if kosha_kl > 0.5:
+            parts.append(
+                f"Processing depth shifted unexpectedly (Kosha KL={kosha_kl:.3f}). "
+                f"The system moved to a different cognitive layer."
+            )
+
+        if level == "high" and traj > 1.0 and vritti_kl > 0.5:
+            parts.append(
+                "Full dissonance: content, trajectory, AND cognitive mode all "
+                "diverge. This is a hallucination candidate — the token stream "
+                "is generating fluently but the semantic anchor has been lost."
+            )
+
+        return " ".join(parts)
 
 
 class DisagreementGovernor:
@@ -1546,6 +1802,13 @@ class DisagreementGovernor:
         self._calibrated = False
         self._s_centroid: Optional[np.ndarray] = None
         self._s_std: Optional[np.ndarray] = None
+
+        # Cognitive dissonance metric — the system's 'GSR'
+        self.dissonance_metric = CognitiveDissonanceMetric()
+        # State history for temporal dissonance (stores the last projected state
+        # so the next assess() call can compute predicted-vs-actual dissonance)
+        self._prev_state: Optional[np.ndarray] = None
+        self._prev_predicted_state: Optional[np.ndarray] = None
 
     def calibrate(self, normal_hidden_states: np.ndarray, multiplier: float = 2.0) -> None:
         """Calibrate thresholds from normal (non-anomalous) data.
@@ -1695,6 +1958,27 @@ class DisagreementGovernor:
             monitor_result.domain_label,
         )
 
+        # Cognitive dissonance: compute if we have a previous prediction to
+        # compare against (requires at least 2 assess() calls)
+        dissonance = None
+        if self._prev_predicted_state is not None:
+            # The previous call predicted where this state SHOULD be.
+            # Now we compare that prediction against where it ACTUALLY is.
+            dissonance = self.dissonance_metric.compute(
+                actual_state=s,
+                predicted_state=self._prev_predicted_state,
+                ontology_bridge=self.bridge,
+            )
+
+        # Predict where the NEXT state should be (for the next assess() call)
+        with torch.no_grad():
+            s_tensor = torch.from_numpy(s.astype(np.float32))
+            if s_tensor.dim() == 1:
+                s_tensor = s_tensor.unsqueeze(0)
+            predicted_delta = self.predictor(s_tensor).cpu().numpy()
+            self._prev_predicted_state = s + predicted_delta
+        self._prev_state = s.copy()
+
         return GovernanceReport(
             ontology_score=ont_score,
             trajectory_score=traj_score,
@@ -1702,6 +1986,7 @@ class DisagreementGovernor:
             regime=regime,
             disagreement_score=disagreement_score,
             explanation=explanation,
+            dissonance=dissonance,
         )
 
     @staticmethod

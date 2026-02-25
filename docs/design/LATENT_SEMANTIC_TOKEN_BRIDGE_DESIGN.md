@@ -946,13 +946,109 @@ The anti-collapse guarantees:
 
 ---
 
-## 8. Key Research Questions (Phase-Gated)
+## 8a. Cognitive Dissonance: The System's Galvanic Skin Response
+
+**Concept origin**: Proposed as a formal metric by Gemini (Feb 2025), building on the existing `DisagreementGovernor` architecture. In psychology, cognitive dissonance is the mental discomfort experienced when holding contradictory beliefs. In this architecture, the two "beliefs" are:
+
+- **Stream B (latent/unconscious)**: The JEPA predictor's forecast of where meaning should be heading
+- **Stream A (token/conscious)**: The transformer's actual trajectory through hidden-state space
+
+When these diverge, the system experiences measurable *dissonance*.
+
+**Implementation**: `CognitiveDissonanceMetric` in `jepa_observatory.py`
+
+### The Dissonance Formula
+
+Three components measured simultaneously:
+
+```
+D_t = 0.4 × D_trajectory + 0.3 × D_semantic + 0.3 × D_distributional
+
+Where:
+  D_trajectory    = ||z_{t+k} - z_hat_{t+k}||₂     (Euclidean 'surprise')
+  D_semantic      = max(|OntBridge(z_actual - z_predicted)|)  (which axis argues most)
+  D_distributional = (KL(vritti_actual || vritti_predicted)
+                    + KL(kosha_actual || kosha_predicted)) / 2
+```
+
+### Why Three Components
+
+Each catches different failure modes:
+
+| Situation | Trajectory | KL(Vritti) | KL(Kosha) | Meaning |
+|---|---|---|---|---|
+| Flow state | Low | Low | Low | Full alignment |
+| Topic shift | High | Low | Low | New content, same cognitive mode |
+| Mode flip | Low | **High** | Low | Smooth text but quietly switched from analytical → creative |
+| Depth shift | Low | Low | **High** | Same topic but processing depth changed (surface → deep) |
+| Hallucination | **High** | **High** | High | Everything diverges — token stream lost the semantic anchor |
+
+### What KL Divergence Adds Beyond Euclidean Distance
+
+The existing `DisagreementGovernor` uses Euclidean distance on the raw 32D state and L1 distance on the 4D ontological projection. The KL divergence on Vritti/Kosha distributions catches a case these miss:
+
+```
+Example: Legal text generation
+
+Step t:   Vritti = [pramana=0.9, viparyaya=0.02, vikalpa=0.05, smrti=0.02, nidra=0.01]
+Step t+5: Vritti = [pramana=0.3, viparyaya=0.05, vikalpa=0.6,  smrti=0.03, nidra=0.02]
+
+Euclidean distance on z_t[17:22]: 0.85 (captured by trajectory signal)
+KL(actual_vritti || predicted_vritti): 1.2 (very high)
+
+The KL tells us something the Euclidean distance doesn't:
+NOT just "the state changed by 0.85 units" but specifically
+"the system shifted from VALID COGNITION to IMAGINATION mode."
+
+For legal text, this is alarming. For creative writing, it's expected.
+The domain-adaptive Vritti thresholds adjust the dissonance interpretation.
+```
+
+### Dissonance Levels
+
+| Level | Score | Human Analog | System Experience |
+|---|---|---|---|
+| **Low** (< 0.3) | Flow state | "I know exactly what I'm saying" | Fluent alignment between streams |
+| **Medium** (0.3-0.7) | Searching | "Let me think about how to phrase this" | Minor semantic drift, recoverable |
+| **High** (> 0.7) | Disorientation | "Wait, what was I talking about?" | Major break — hallucination candidate |
+
+### Why This Proves Non-Parrot Behavior
+
+A pure "stochastic parrot" — a model that only follows token-level statistics — would never register dissonance. It would generate the next most likely token regardless of semantic trajectory. By measuring dissonance, we give the system a diagnostic that reveals whether its **internal representation of meaning** (Stream B) is coherent with its **external generation of text** (Stream A).
+
+When the dissonance is high and the model continues generating fluently, that is the precise signature of hallucination: the model "sounds right" but has lost its semantic anchor. The dissonance metric is the **first signal** that something is wrong, appearing before the hallucination manifests in the token stream.
+
+### Integration with DisagreementGovernor
+
+The `CognitiveDissonanceMetric` is now integrated directly into `DisagreementGovernor.assess()`. On each call:
+
+1. The governor computes all three existing signals (ontology, trajectory, residual)
+2. If a previous JEPA prediction exists, the dissonance metric compares it against the current actual state
+3. The governor produces a JEPA prediction for the NEXT step (stored for the following call)
+4. The `GovernanceReport` includes the `CognitiveDissonance` dataclass with total score, per-axis conflicts, Vritti/Kosha KL values, level classification, and human-readable interpretation
+
+```python
+report = governor.assess(hidden_states)
+
+if report.dissonance and report.dissonance.level == "high":
+    print(f"DISSONANCE: {report.dissonance.total_dissonance:.3f}")
+    print(f"Top conflict: {max(report.dissonance.axis_conflict, key=report.dissonance.axis_conflict.get)}")
+    print(f"Vritti KL: {report.dissonance.vritti_kl:.3f}")
+    print(f"Kosha KL: {report.dissonance.kosha_kl:.3f}")
+    print(f"Interpretation: {report.dissonance.interpretation}")
+```
+
+---
+
+## 8b. Key Research Questions (Phase-Gated)
 
 ### Phase 2 Questions (Validation, Current)
 1. Does R² on real GPT-2 hidden states exceed 0.6? (Synthetic baseline: 0.44)
 2. Does three-signal governance detect real anomalies at AUC > 0.75?
 3. Which layers provide best signal for which components?
 4. Does the L0/L7 dissociation replicate?
+5. Does cognitive dissonance score correlate with actual hallucination events? (Measure: Spearman ρ between dissonance and human-labeled hallucination instances)
+6. Does KL(Vritti) add detection power above Euclidean trajectory alone? (Measure: AUC improvement from adding Vritti KL to the feature set)
 
 ### Phase 3 Questions (Causal Conditioning)
 5. Does phase-rotation conditioning improve text coherence? (Perplexity + human eval)
@@ -2428,4 +2524,101 @@ Standalone, clean flow charts for every major model, pipeline, and mechanism in 
    ─────────────────────────────────────────
    Phase 3 would: apply θ rotation to bias toward legal/analytical terms
    Phase 4 would: check entropy, potentially loop if uncertain
+```
+
+---
+
+### C14. Cognitive Dissonance Metric: The System's GSR
+
+```
+═══════════════════════════════════════════════════════════════════════════
+    COGNITIVE DISSONANCE: Measuring Stream A ↔ Stream B Conflict
+═══════════════════════════════════════════════════════════════════════════
+
+   The "Galvanic Skin Response" of the system — an involuntary signal
+   that reveals internal tension the token generator doesn't control.
+
+
+   TEMPORAL FLOW (across two consecutive assess() calls):
+
+   assess() call at time t:                assess() call at time t+k:
+   ┌──────────────────────┐                ┌──────────────────────┐
+   │ h_t (hidden states)  │                │ h_{t+k} (hidden st.) │
+   │        │              │                │        │              │
+   │        ▼              │                │        ▼              │
+   │ z_t (Sovereign State) │                │ z_{t+k} (actual)     │
+   │        │              │                │        │              │
+   │        ▼              │                │        │              │
+   │ JEPA predicts z_hat   │                │ Compare z_{t+k} vs   │
+   │ (stored for next call)│───────────────►│ z_hat from last call  │
+   │                       │   prediction   │        │              │
+   └──────────────────────┘   carried       │        ▼              │
+                              forward       │ DISSONANCE COMPUTED   │
+                                            └──────────────────────┘
+
+
+   THREE DISSONANCE COMPONENTS:
+
+   ┌─────────────────────────────────────────────────────────────────┐
+   │                                                                  │
+   │  z_{t+k} (actual)        z_hat_{t+k} (predicted)               │
+   │       │                        │                                │
+   │       └──────────┬─────────────┘                                │
+   │                  │                                               │
+   │                  ▼                                               │
+   │   ┌─────────────────────────────┐                               │
+   │   │  error = actual - predicted  │                               │
+   │   └──────────┬──────────────────┘                               │
+   │              │                                                   │
+   │       ┌──────┼──────────────────────┐                           │
+   │       │      │                      │                           │
+   │       ▼      ▼                      ▼                           │
+   │                                                                  │
+   │   D_trajectory    D_semantic        D_distributional             │
+   │   ─────────────   ──────────        ────────────────             │
+   │   ||error||₂      |OntBridge(      KL(vritti_actual ||           │
+   │                    error)|          vritti_predicted)             │
+   │   "How FAR off?"  "WHICH axis      + KL(kosha_actual ||         │
+   │                    argues?"         kosha_predicted)              │
+   │                                                                  │
+   │   Weight: 0.4     Weight: 0.3      Weight: 0.3                  │
+   │                                                                  │
+   │       │              │                  │                        │
+   │       └──────────────┼──────────────────┘                        │
+   │                      │                                           │
+   │                      ▼                                           │
+   │   D_total = 0.4×D_traj + 0.3×max(axis) + 0.3×mean(KLs)        │
+   │                      │                                           │
+   │                      ▼                                           │
+   │   ┌────────────────────────────────────────────┐                │
+   │   │  Level classification:                      │                │
+   │   │                                             │                │
+   │   │  D < 0.3  → LOW    "Flow state"            │                │
+   │   │  D < 0.7  → MEDIUM "Searching"             │                │
+   │   │  D ≥ 0.7  → HIGH   "Hallucination risk"    │                │
+   │   └────────────────────────────────────────────┘                │
+   │                                                                  │
+   └─────────────────────────────────────────────────────────────────┘
+
+
+   DETECTION MATRIX — What Each Component Catches:
+
+   ┌──────────────┬──────────┬────────────┬─────────────┬─────────────────┐
+   │ Scenario     │ D_traj   │ D_semantic │ KL(Vritti)  │ Diagnosis        │
+   ├──────────────┼──────────┼────────────┼─────────────┼─────────────────┤
+   │ Flow state   │ low      │ low        │ low         │ All aligned      │
+   │ Topic shift  │ HIGH     │ high       │ low         │ New content,     │
+   │              │          │            │             │ same mode        │
+   │ Mode flip    │ low      │ low        │ HIGH        │ ★ ONLY KL        │
+   │              │          │            │             │ catches this!    │
+   │ Hallucinate  │ HIGH     │ high       │ HIGH        │ Full dissonance  │
+   │ Word search  │ medium   │ medium     │ low         │ Temporary drift  │
+   └──────────────┴──────────┴────────────┴─────────────┴─────────────────┘
+
+   KEY INSIGHT: The "mode flip" row — where D_trajectory is low but
+   KL(Vritti) is high — is INVISIBLE to the existing three-signal
+   governor.  The text looks smooth and the trajectory is on track,
+   but the system quietly shifted from Pramana (valid cognition)
+   to Vikalpa (imagination).  Only the KL divergence catches this.
+   This is Gemini's core contribution to the architecture.
 ```
