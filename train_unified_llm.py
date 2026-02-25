@@ -240,6 +240,9 @@ from symbolu.phase_transformer import (
     # D.1: OntoControl formalized interface
     OntoControl,
     onto_control_from_salience,
+    # V10.7: TBPTT chunked training + inference cache
+    PhaseStateCache,
+    forward_chunked_tbptt,
 )
 
 # Import ontological models
@@ -9536,6 +9539,7 @@ class UnifiedTrainingConfig:
     no_protected_phase: bool = False  # Disable protected phase (legacy parallel mode)
     run_chunk_diagnostic: bool = False  # Run chunk continuity diagnostic at start
     chunk_diagnostic_seq_len: int = 2048  # Sequence length for chunk diagnostic
+    enable_tbptt: bool = False  # V10.7: Truncated BPTT (detach state between chunks, memory O(C))
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
@@ -15488,6 +15492,8 @@ def train(config: UnifiedTrainingConfig):
             # V9.9.12c: Phase diversity loss tensor for re-adding after SRK
             phase_div_loss_tensor = None
             phase_div_weight_for_srk = 0.0
+            # V10.7: TBPTT backward tracking
+            tbptt_backward_done = False
 
             if config.model_type == "ontological":
                 outputs = model(x)
@@ -15543,12 +15549,34 @@ def train(config: UnifiedTrainingConfig):
                 # Phase state persists across chunks, Local resets per chunk
                 use_chunking = (
                     hasattr(config, 'enable_chunking') and
-                    config.enable_chunking and
+                    (config.enable_chunking or getattr(config, 'enable_tbptt', False)) and
                     config.model_type == 'hybrid' and
                     x.shape[1] > config.chunk_size  # Only chunk if sequence > chunk_size
                 )
 
-                if use_chunking:
+                # V10.7: TBPTT flag — backward happens inside forward_chunked_tbptt
+                tbptt_backward_done = False
+
+                if use_chunking and getattr(config, 'enable_tbptt', False):
+                    # V10.7: TBPTT chunked training — forward+backward per chunk
+                    # Memory: O(C) instead of O(N). Backward is done inside.
+                    tbptt_result = forward_chunked_tbptt(
+                        model=model,
+                        input_ids=x,
+                        targets=y,
+                        chunk_size=config.chunk_size,
+                        loss_fn=lambda logits, targets: compute_phase_loss(logits, targets, config),
+                        accumulate_grad=True,
+                        grad_scaler=scaler,
+                        autocast_dtype=autocast_dtype if config.mixed_precision != "none" else None,
+                    )
+                    # Create synthetic outputs/loss for downstream logging
+                    loss = torch.tensor(tbptt_result['total_loss'], device=device)
+                    metrics = tbptt_result['metrics']
+                    logits = None  # Not available in TBPTT (freed per-chunk)
+                    outputs = {'logits': None}
+                    tbptt_backward_done = True
+                elif use_chunking:
                     # Chunked forward: splits sequence, maintains Phase state
                     outputs = forward_chunked(
                         model, x,
@@ -15559,13 +15587,14 @@ def train(config: UnifiedTrainingConfig):
                     # Standard forward: process full sequence at once
                     outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
 
-                if isinstance(outputs, dict):
-                    logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
-                else:
-                    logits = outputs
+                if not tbptt_backward_done:
+                    if isinstance(outputs, dict):
+                        logits = outputs.get('logits', outputs.get('output', outputs.get('last_hidden_state')))
+                    else:
+                        logits = outputs
 
                 # DEBUG: Check logits on step 50 (matches first log output)
-                if global_step == 50 and accumulation_step == 0:
+                if global_step == 50 and accumulation_step == 0 and logits is not None:
                     print(f"\n[DEBUG LOGITS] Step 50 diagnostic:")
                     print(f"  logits shape: {logits.shape}")
                     print(f"  logits dtype: {logits.dtype}")
@@ -15587,10 +15616,11 @@ def train(config: UnifiedTrainingConfig):
                     manual_loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), y.view(-1), ignore_index=-100)
                     print(f"  manual CE loss: {manual_loss.item():.4f}")
 
-                loss, metrics = compute_phase_loss(logits, y, config)
+                if not tbptt_backward_done:
+                    loss, metrics = compute_phase_loss(logits, y, config)
 
                 # Entropy-Based Logit Scale Control (train-time)
-                if entropy_scale_module is not None:
+                if entropy_scale_module is not None and not tbptt_backward_done:
                     scaled_logits = entropy_scale_module(logits)
                     loss, entropy_metrics = entropy_scale_module.compute_loss(scaled_logits, loss)
                     metrics.update({f'ec_{k}': v for k, v in entropy_metrics.items() if isinstance(v, (int, float))})
@@ -16906,11 +16936,12 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  🕵️ [STEER DEBUG Step {global_step}] Loss: {loss.item() * config.gradient_accumulation:.4f} | Steering: ✓ | Val: {steer_val:.6f}", flush=True)
             # --- END DEBUG ---
 
-        # Backward pass
-        if scaler is not None:
-            scaler.scale(loss).backward()
-        else:
-            loss.backward()
+        # Backward pass (skip if TBPTT already did backward per-chunk)
+        if not tbptt_backward_done:
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
         running_loss += loss.item() * config.gradient_accumulation
         accumulation_step += 1
@@ -19428,6 +19459,11 @@ def main():
                             "Verifies: Phase continuity, attention source, amplitude health.")
     parser.add_argument("--chunk_diagnostic_seq_len", type=int, default=2048,
                        help="Sequence length for chunk diagnostic test")
+    parser.add_argument("--enable_tbptt", action="store_true",
+                       help="V10.7: Use Truncated BPTT for chunked training. "
+                            "Detaches state between chunks to reduce training memory from O(N) to O(C). "
+                            "Implies --enable_chunking. Slight compute overhead (~10-20%%) but "
+                            "dramatic memory reduction for long sequences.")
 
     # Alpha decay schedule (for phase/hybrid attention)
     parser.add_argument("--alpha_phase_start", type=float, default=0.6,
