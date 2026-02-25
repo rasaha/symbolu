@@ -102,15 +102,34 @@ The correct framing: Kosha provides the *where* (which cognitive layer), Vritti 
 
 ### 2a. JEPA Family — Latent Predictive World Models
 
-| System | Modality | Key Innovation | Year |
-|--------|----------|---------------|------|
-| I-JEPA | Images | Predict masked patch representations in latent space | 2023 |
-| V-JEPA | Video | Spatiotemporal block prediction; world-model framing | 2024 |
-| VLA-JEPA proposals | Vision-Language-Action | Shared latent space across modalities | 2024-25 |
+| System | Modality | Key Innovation | Year | Venue |
+|--------|----------|---------------|------|-------|
+| I-JEPA | Images | Predict masked patch representations in latent space | 2023 | CVPR |
+| V-JEPA | Video | Spatiotemporal block prediction; world-model framing | 2024 | Meta |
+| A-JEPA | Audio | Time-frequency aware curriculum masking on spectrograms | 2024 | Independent |
+| V-JEPA 2 | Video + Robotics | 1.2B params; SOTA physical reasoning; robot manipulation | 2025 | Meta |
+| **LLM-JEPA** | **Language** | **First JEPA objective for LLMs; hybrid NTP + embedding loss** | **Sep 2025** | **arXiv 2509.14252** |
+| **VL-JEPA** | **Vision-Language** | **Predicts text embeddings not tokens; 50% fewer params** | **Dec 2025** | **arXiv 2512.10942** |
+| LeJEPA | Theory | Complete mathematical axioms for JEPAs (LeCun & Balestriero) | Nov 2025 | Preprint |
+| Speech JEPA | Speech | JEPA + density-adaptive attention; 47.5 tokens/sec compressed | 2025 | Independent |
 
-**Gap**: No production JEPA for language exists. Meta's roadmap (LeCun, 2022-2025) consistently positions language-JEPA as the end goal but has not published one. SymbolU's Phase-JEPA is one of the few implementations that applies JEPA principles to text via the Sovereign State Delta.
+**CRITICAL UPDATE**: The gap has closed. **LLM-JEPA** (Huang, LeCun, Balestriero, Sep 2025) is the first JEPA objective applied directly to language models. It adds an embedding-space prediction loss to standard next-token prediction as a hybrid objective. Key findings:
+- The JEPA loss does NOT emerge implicitly from standard LLM training — it must be explicitly added
+- Adding it does NOT degrade generative capability but significantly improves abstraction
+- Up to **14.17 percentage point accuracy gains** on NL-to-Regex tasks
+- Trained on paired "views" (e.g., natural language ↔ code/SQL), predicting one view's embedding from another
 
-**Why language-JEPA is hard**: Unlike images/video where spatial structure provides clear masking targets, language has discrete tokens with sharp information boundaries. Masking a word removes all information about it — there's no "low-frequency component" to reconstruct from. The solution SymbolU takes: mask at the SEMANTIC level (state transitions), not the token level. Predict "the meaning will shift from concrete → abstract" rather than "the word will be 'analysis'."
+**VL-JEPA** (Meta FAIR, Dec 2025) extends this to vision-language: with only 1.6B params and 50% fewer trainable parameters, it matches or exceeds classical VLMs by predicting continuous text embeddings rather than autoregressively generating tokens.
+
+**LeJEPA** (LeCun & Balestriero, Nov 2025) provides the theoretical foundation: two axioms — (1) solve the prediction task, (2) enforce isotropic Gaussian distribution on embeddings. This is the recipe for principled JEPA extension to any modality.
+
+**Implication for SymbolU**: LLM-JEPA validates the core hypothesis of `HYBRID_PHASE_JEPA_DESIGN.md` — that a JEPA prediction loss is complementary to (not competing with) next-token prediction. However, LLM-JEPA operates on paired cross-modal views, while SymbolU's Phase-JEPA predicts WITHIN a single modality (state delta prediction in Sovereign State space). These are different architectural choices:
+- LLM-JEPA: predict View B's embedding from View A's context (cross-modal alignment)
+- SymbolU: predict future state from current state (temporal trajectory prediction)
+
+Both may be needed. Cross-modal alignment captures "what does this text MEAN in semantic space," while temporal prediction captures "where is the meaning HEADING."
+
+**Why language-JEPA remained hard until 2025**: Unlike images/video where spatial structure provides clear masking targets, language has discrete tokens with sharp information boundaries. LLM-JEPA's solution: don't mask tokens at all — instead, use PAIRED VIEWS (NL ↔ code) as the prediction target. SymbolU's solution: mask at the SEMANTIC level (state transitions), not the token level.
 
 ### 2b. Coconut — Chain of Continuous Thought (Meta FAIR, Dec 2024)
 
@@ -130,6 +149,17 @@ Coconut:        h_t → h_{t+1}  (continuous, no information loss)
 
 **Critical difference**: Coconut operates in the FULL hidden-state dimensionality (768D+ for GPT-2, 4096D+ for Llama). SymbolU compresses to 32D structured state. The question is whether 32D is sufficient or whether the 768→32 compression bottleneck loses critical reasoning information. Phase 2 validation will answer this.
 
+**Related latent reasoning work (2025)**:
+- **Token Assorted** (Su et al., ICML 2025 poster): Uses VQ-VAE to compress reasoning trace prefixes into discrete latent tokens, then mixes them with text tokens. A literal hybrid of latent and token spaces within a single trace. Achieves comparable performance with ~17% fewer tokens. Includes a VQ-VAE decoder for interpretability.
+- **TokenBridge** (Wang et al., ICCV 2025): Post-training dimension-wise quantization to bridge continuous and discrete tokens for visual generation. Achieves continuous-level quality with standard autoregressive cross-entropy loss.
+- **Latent Reasoning as Vocabulary-Space Superposition** (arXiv 2510.15522, Oct 2025): Formalizes three desiderata for latent tokens: semantically compact (replace multiple tokens), semantically compatible (stay in the same space as explicit tokens), and semantically correct (produce right answers).
+- **Dual-Architecture Latent Reasoning** (Coda-Forno et al., 2025): Tests System 1/System 2 coprocessor architectures. **Cautionary finding**: a unified soft-embedding baseline nearly matches joint finetuning, suggesting current dual designs mostly add compute without qualitative reasoning improvement. This is a direct risk for SymbolU's dual-stream architecture — Phase 3 must prove the semantic stream adds signal beyond what a single larger model provides.
+
+**Surveys**: Three major surveys (2025) cover 100+ papers on latent reasoning:
+- "Reasoning Beyond Language" (Chen et al., May 2025, arXiv 2505.16782)
+- "A Survey on Latent Reasoning" (Jul 2025, arXiv 2507.06203)
+- "Implicit Reasoning in Large Language Models" (Sep 2025, arXiv 2509.02350)
+
 ### 2c. Continuous Autoregressive Models without VQ (ICLR 2025)
 
 Multiple independent papers demonstrate that vector quantization is NOT necessary for autoregressive sequence modeling:
@@ -141,30 +171,44 @@ Multiple independent papers demonstrate that vector quantization is NOT necessar
 
 **Implication for SymbolU**: The phoneme CSR system's 10D continuous phoneme vectors are on the right side of this trend. The field is moving AWAY from discrete tokenization (VQ-VAE, SoundStream) toward continuous latent prediction. The Sovereign State Delta prediction is aligned with this direction.
 
-### 2d. Representation Engineering (Zou, Hendrycks et al., 2023–2025)
+### 2d. Representation Engineering and Alignment (2023–2025)
 
 Steer LLM behavior by directly manipulating hidden-state activations:
 - Extract "concept vectors" (honesty, sycophancy, toxicity) via activation contrasts
 - Add/subtract vectors during inference to steer behavior
 - Anthropic's Persona Vectors: directional vectors for traits from paired prompts
 
-**Connection**: The 4 validated ontological axes from the naming ceremony ARE concept vectors discovered empirically. The Vritti/Guna modulation system operates on the same principle — steering via activation manipulation.
+**Key new work**:
+- **REPA** (Yu et al., ICLR 2025 Oral): Aligns noisy internal states in diffusion transformers with pretrained self-supervised representations (DINOv2). Speeds up SiT training by **17.5x** and achieves SOTA FID=1.42. Core argument: the bottleneck in generative models is learning good representations, and this can be shortcut by alignment with external representation spaces. This directly validates the OntologyBridge approach — aligning the SovereignStateProjector's output with externally validated ontological axes.
+- **LIRA** (ICLR 2025): Trains LLMs to change instruction interpretation at the REPRESENTATION level, not output behavior level. Blocks >99% of jailbreaks and removes backdoors with negligible capability loss. Demonstrates that latent-space interventions generalize far better than token-space interventions.
+- **Re2-Align Workshop** (ICLR 2025): Dedicated workshop on representational alignment across intelligence systems. The academic home for this exact bridging question.
+
+**Connection**: The 4 validated ontological axes from the naming ceremony ARE concept vectors discovered empirically. The Vritti/Guna modulation system operates on the same principle — steering via activation manipulation. REPA's 17.5x speedup from representation alignment suggests that aligning the Sovereign State with validated external axes (our naming ceremony protocol) could similarly accelerate Phase-JEPA training.
 
 **Limitation**: RepE is read-from or write-to, not both simultaneously. SymbolU's Phase Attention provides bidirectional flow: read state from hidden states, predict next state, write back via phase rotation.
 
-### 2e. Propositional Probes (ICLR 2025 Spotlight)
+### 2e. Hidden-State Probing Beyond Linear Probes (ICLR 2025+)
 
-LLMs encode faithful world models internally even when they respond unfaithfully. Prompt injections, backdoors, and biases are detectable via hidden-state probes even when outputs appear normal.
+**Propositional Probes** (ICLR 2025 Spotlight): LLMs encode faithful world models internally even when they respond unfaithfully. Prompt injections, backdoors, and biases are detectable via hidden-state probes even when outputs appear normal.
 
-**Connection**: This IS the three-signal governance system. When ontology signal says "content shifted" but trajectory signal says "smooth flow," the disagreement reveals that the model knows it's drifting but continues generating. The `DisagreementGovernor` classifies these regimes.
+**PING** (2025): Open-source framework training lightweight probes on frozen transformer hidden states. Matches or exceeds generative accuracy on MMLU while reducing calibration error by 96%. Most striking finding: on a safety-tuned LLM that refuses medical questions, **PING recovers 87% of lost MedMCQA performance from the latent space** — the model "knows" more than it "says."
+
+**Latent Space Chain-of-Embedding** (ICLR 2025): Hidden state changes across layers mirror interpretable progressive thinking. Lower layers encode morphological/syntactic info, higher layers encode semantic info — confirming the L0/L7 dissociation pattern.
+
+**Latent Space Geometry Studies** (2025): Supervised Multi-Dimensional Scaling reveals structured manifolds in LLM latent spaces: circular manifolds for dates/times, linear for quantities, clusters for categories. GPT-2 and LLaMA show nearly orthogonal syntactic and semantic manifolds in attention vs. MLP subspaces.
+
+**Connection**: PING's finding — that the latent space contains richer information than token-space output — is the fundamental justification for the bridge. If the model already "knows" the answer in latent space but fails to express it in tokens, then a system that reads the latent space directly (our OntologyBridge + DisagreementGovernor) can catch failures that token-level monitoring misses.
 
 ### 2f. Speech-Language Model Bridging (2024–2025)
 
 - **SpeechLM**: Bridges speech and text via shared semantic space using phoneme-unit + hidden-unit tokenizers
 - **Layer-wise hierarchy**: Lower layers encode phonemic features, upper layers encode semantics
 - **Decoupled tokenizers** (separating semantic, prosody, timbre) outperform coupled ones
+- **Emergence of Phonemic Representations** (arXiv 2601.18617, Jan 2025): Wav2Vec 2.0 models encode articulatory feature structure as a geometric subspace within hidden states — phonemic structure is not just present but geometrically organized, with larger models encoding it more clearly
+- **Speech JEPA** (2025): Two-stage framework combining JEPA with density-adaptive attention. Stage 1 learns semantic audio features via masked prediction (fully decoupled from waveform reconstruction). Stage 2 produces compressed tokens at 47.5 tokens/sec. Discovers hierarchical speech structure at 2.5 Hz — explicitly designed as a bridge between acoustic latent representations and language model token spaces
+- **Discrete vs. Continuous Speech Tokens** (arXiv 2508.17863, 2025): Discrete tokens integrate into LLM vocabularies and show textual similarity at earlier layers; continuous features support more gradual layer-by-layer alignment
 
-**Connection**: SymbolU's L0/L7 dissociation finding is directly consistent: structure crystallizes at L1 (phonemic/syntactic level), best semantic alignment at L7. The phoneme resonance engine operating at the input layer mirrors this hierarchy.
+**Connection**: SymbolU's L0/L7 dissociation finding is directly consistent: structure crystallizes at L1 (phonemic/syntactic level), best semantic alignment at L7. The phoneme resonance engine operating at the input layer mirrors this hierarchy. Speech JEPA's two-stage approach (semantic features → compressed tokens) parallels SymbolU's two-stage extraction (hidden states → Sovereign State → ontological axes).
 
 ### 2g. Neuro-Symbolic AI (2024–2025 Systematic Reviews)
 
@@ -172,8 +216,23 @@ The broader field converges on:
 - "Dual-process" architectures: System 1 (fast/neural) + System 2 (slow/symbolic)
 - Joint training is the "holy grail" — the chicken-and-egg problem where neural nets need accurate symbolic rules for training signals, but symbolic rules need accurate neural predictions
 - Meta-cognition (self-awareness, reflective reasoning) is the least explored area (5% of papers)
+- **NeusymBridge Workshop** (AAAI 2026): Dedicated workshop on "Bridging Neurons and Symbols for NLP and KG Reasoning" — frames the symbolic-neural gap as the "glass ceiling of deep learning for NLP"
+- **NeuroSymbolicNeuro** (arXiv 2502.11269, Feb 2025): Replaces traditional activation functions (ReLU, sigmoid) with mechanisms incorporating symbolic reasoning at the neuron level — the deepest integration: the bridge is not between systems but within the neuron's activation function itself
+- Amazon deployed neurosymbolic AI in production (Vulcan warehouse robots, Rufus shopping assistant) to address LLM hallucination — signal that the bridge is moving from research to production
 
 **Connection**: The Kosha Gyroscope IS the meta-cognitive layer. Vijnana-gated transitions implement reflective reasoning. The acoustic Vritti (System 1, fast phoneme processing) / cognitive Vritti (System 2, slow deliberative reasoning) distinction maps directly onto dual-process theory.
+
+### 2h. Emerging Convergence: Three Independent Research Programs → One Target
+
+Across all research areas, a coherent pattern emerges. Three independent programs are converging on the same target architecture:
+
+1. **JEPA program** (LeCun): Start from representation learning, ask "what if we predict in embedding space instead of token/pixel space?" → I-JEPA → V-JEPA → LLM-JEPA → LeJEPA (theory)
+2. **Latent reasoning program** (Meta FAIR, various): Start from language models, ask "what if we stop decoding intermediate reasoning steps to tokens?" → Coconut → Token Assorted → latent CoT surveys
+3. **Representation engineering program** (Zou, Hendrycks, Anthropic): Start from alignment, ask "what if we read/steer the hidden state directly instead of using prompts?" → RepE → REPA → LIRA → Persona Vectors
+
+All three converge on: **a system that learns AND reasons in latent space, using tokens only for I/O.**
+
+SymbolU's architecture sits at the intersection of all three — it has the JEPA prediction (Phase-JEPA), the latent reasoning infrastructure (Sovereign State + Vijnana-gated entropy loop), and the representation engineering (ontological axes + phase rotation steering). The question is whether the 32D structured bottleneck is a strength (interpretability, efficiency) or a weakness (information loss).
 
 ---
 
@@ -448,7 +507,357 @@ From the naming ceremony (Phase 1 discovery):
 
 ---
 
-## 7. The Bridge Loop: Integrated Architecture
+## 7. Complete Pipeline Workflow: How All Systems Fit Together
+
+This section provides the definitive workflow showing how Ontology, JEPA, CSR (Phoneme Resonance), Kosha, Vritti, and Guna interact as a unified pipeline. Each subsystem has a specific role, specific inputs/outputs, and specific trigger conditions.
+
+### 7a. End-to-End Pipeline Flow
+
+```
+════════════════════════════════════════════════════════════════════════════════
+                        COMPLETE SYSTEM PIPELINE
+                    Ontology / JEPA / CSR / Kosha / Vritti / Guna
+════════════════════════════════════════════════════════════════════════════════
+
+STAGE 0: INPUT PROCESSING (Phoneme CSR Layer)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  Raw Text                                          │  PHONEME CSR ENGINE  │
+  "The contract specifies delivery by March"        │  (Parameter-Free)    │
+       │                                            │                      │
+       ▼                                            │  Roles:              │
+  Phoneme Decomposition                             │  • Pre-filter        │
+  → ARPABET tokens: [DH, AX, K, AA, N, ...]       │  • Speed (82% FLOP↓) │
+       │                                            │  • Auditability      │
+       ▼                                            │  • Cross-validation  │
+  10D Resonance Vectors (per word)                  │                      │
+  Each phoneme → 10D ontological affinity:          │  NOT a soft gate.    │
+    Plosives (K,T,P) → O3_EXECUTION ↑              │  NOT trainable.      │
+    Nasals (N,M)     → O5_COGNITION ↑              │  Hard constraint     │
+    Fricatives (S,F) → O7_REASONING ↑              │  eliminator.         │
+    Diphthongs       → O8_PURPOSE ↑                │                      │
+    Long vowels      → O9_WITNESSES ↑              └──────────────────────┘
+       │
+       ▼
+  Resonance Score: cosine similarity between word vectors
+  → Harmonic (≥0.7): proceed to transformer
+  → Neutral (0.3-0.7): route to decision gate
+  → Dissonant (≤0.3): resolve locally (no transformer needed)
+       │
+       │  OUTPUT: Filtered candidates + 10D phoneme ontology profile z_p
+       ▼
+
+STAGE 1: TOKEN PROCESSING (Standard Transformer)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  Filtered tokens → Embeddings                      │  TRANSFORMER (LLM)   │
+       │                                            │  (External: GPT-2,   │
+       ▼                                            │   Llama, etc.)       │
+  Layer 0 (Embedding)                               │                      │
+       │                                            │  SymbolU does NOT    │
+       ▼                                            │  own this component. │
+  Layer 1 ─── ★ STRUCTURE CRYSTALLIZES ★            │  We READ from it.    │
+  (MDL 1.77x, relational_role MI=0.473)             │                      │
+       │     │                                      │  Phase 3: we also    │
+       │     └──→ Extract h_L1 for structure        │  WRITE to it via     │
+       ▼                                            │  phase rotation.     │
+  Layers 2-6                                        │                      │
+       │                                            └──────────────────────┘
+       ▼
+  Layer 7 ─── ★ BEST SEMANTIC ALIGNMENT ★
+  (MI=0.375, 4 validated ontological axes)
+       │     │
+       │     └──→ Extract h_L7 for semantics
+       ▼
+  Layers 8-11 (structure CONSUMED, used for output)
+       │
+       │  OUTPUT: h_L1 ∈ ℝ^768, h_L7 ∈ ℝ^768, token logits
+       ▼
+
+STAGE 2: BRIDGE — Sovereign State Projection
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  h_L7 (primary) + h_L1 (auxiliary)                 │  SOVEREIGN STATE     │
+       │                                            │  PROJECTOR           │
+       ▼                                            │  (MLP, trainable)    │
+  SovereignStateProjector                           │                      │
+  MLP: ℝ^768 → ℝ^intermediate → ℝ^32               │  The central         │
+       │                                            │  bottleneck.         │
+       ▼                                            │  768D → 32D.         │
+  z_t ∈ ℝ^32 — THE SOVEREIGN STATE                 │                      │
+                                                    │  Phase 2 question:   │
+  ┌─────────────────────────────────────────┐       │  Is 32D enough?      │
+  │  Indices [0:12]  — BHAVAS (softmax)     │       │  R² > 0.6 = yes.    │
+  │  12 ontological aspects                  │       └──────────────────────┘
+  │  "What kind of content is this?"         │
+  │                                          │
+  │  Indices [12:17] — KOSHAS (sigmoid)      │
+  │  5 consciousness sheaths                 │
+  │  "At what cognitive depth?"              │
+  │                                          │
+  │  Indices [17:22] — VRITTIS (softmax)     │
+  │  5 mental modifications                  │
+  │  "What mode of cognition?"               │
+  │                                          │
+  │  Indices [22:28] — GUNAS (sigmoid)       │
+  │  3×2 energy states                       │
+  │  "What activation pattern?"              │
+  │                                          │
+  │  Indices [28:32] — SANKALPA (tanh)       │
+  │  4 goal/intent dimensions                │
+  │  "What is the system aiming for?"        │
+  └─────────────────────────────────────────┘
+       │
+       │  OUTPUT: z_t ∈ ℝ^32 (structured, interpretable)
+       ▼
+
+STAGE 3: PARALLEL PROCESSING — Four Concurrent Subsystems
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  z_t fans out to four processors simultaneously:
+
+  ┌─────────────────┐  ┌────────────────┐  ┌──────────────┐  ┌───────────────┐
+  │ A) JEPA          │  │ B) ONTOLOGY    │  │ C) KOSHA     │  │ D) GUNA       │
+  │    PREDICTOR     │  │    BRIDGE      │  │    GYROSCOPE │  │    MODULATOR  │
+  │                  │  │                │  │              │  │               │
+  │ Input: z_t       │  │ Input: z_t     │  │ Input:       │  │ Input:        │
+  │                  │  │                │  │  z_t[12:17]  │  │  z_t[22:28]   │
+  │ Role:            │  │ Role:          │  │              │  │               │
+  │ Predict WHERE    │  │ Classify WHAT  │  │ Role:        │  │ Role:         │
+  │ the state is     │  │ the content    │  │ Balance HOW  │  │ Modulate      │
+  │ heading          │  │ represents     │  │ processing   │  │ energy/drive  │
+  │                  │  │                │  │ occurs       │  │ patterns      │
+  │ Computes:        │  │ Computes:      │  │              │  │               │
+  │ ΔS = predict(z_t)│  │ o_t ∈ ℝ^4     │  │ Computes:    │  │ Computes:     │
+  │ z_hat = z_t + ΔS │  │ [concreteness, │  │ Balance      │  │ [sattva,      │
+  │                  │  │  relational,   │  │ pressure     │  │  rajas,       │
+  │ Also outputs:    │  │  categorical,  │  │ across 5     │  │  tamas] ×2    │
+  │ • vritti diag    │  │  modific.]     │  │ sheaths      │  │               │
+  │   (pramana,      │  │                │  │              │  │ Adjusts:      │
+  │    viparyaya,    │  │ Also:          │  │ Detects:     │  │ • Learning    │
+  │    vikalpa)      │  │ • domain label │  │ • Looping    │  │   rate        │
+  │ • confidence     │  │ • drift score  │  │ • Fixation   │  │ • Exploration │
+  │                  │  │ • centroid dist│  │ • Collapse   │  │   vs exploit  │
+  │ Key:             │  │                │  │              │  │ • Activation  │
+  │ TEMPORAL         │  │ Key:           │  │ Key:         │  │   energy      │
+  │ (trajectory)     │  │ SEMANTIC       │  │ HOMEOSTATIC  │  │               │
+  │                  │  │ (meaning)      │  │ (stability)  │  │ Key:          │
+  │ File:            │  │                │  │              │  │ ENERGETIC     │
+  │ predictor.py     │  │ File:          │  │ File:        │  │ (drive)       │
+  │                  │  │ jepa_          │  │ KOSHA_       │  │               │
+  │                  │  │ observatory.py │  │ GYROSCOPE_   │  │ File:         │
+  │                  │  │                │  │ DESIGN.md    │  │ vritti_       │
+  └────────┬────────┘  └───────┬────────┘  └──────┬───────┘  │ config.json   │
+           │                   │                   │          └───────┬───────┘
+           │                   │                   │                  │
+           ▼                   ▼                   ▼                  ▼
+
+STAGE 4: VRITTI INTEGRATION — Epistemological Classification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  Vritti state z_t[17:22] + JEPA diagnostics        │  VRITTI CLASSIFIER   │
+       │                                            │  (Cognitive Mode)    │
+       ▼                                            │                      │
+  Cognitive Vritti Distribution:                    │  Acoustic Vrittis    │
+  ┌─────────────────────────────────────────┐       │  (v2.7, implemented):│
+  │  Pramāṇa  (valid cognition)  = 0.65    │       │  Inertia, Activation │
+  │  Viparyaya (misperception)   = 0.05    │       │  Oscillation, Tension│
+  │  Vikalpa  (imagination)      = 0.20    │       │  Release             │
+  │  Smṛti    (memory recall)    = 0.08    │       │                      │
+  │  Nidrā    (dormancy)         = 0.02    │       │  Cognitive Vrittis   │
+  └─────────────────────────────────────────┘       │  (v2.8, designed):   │
+       │                                            │  Pramana, Viparyaya  │
+       │  CRITICAL DISTINCTION:                     │  Vikalpa, Smrti,     │
+       │  Viparyaya = error (model is WRONG)        │  Nidra               │
+       │  Vikalpa = imagination (model is CREATING) │                      │
+       │  Same prediction error, different meaning!  │  R[v,a] coupling:    │
+       │                                            │  NOT YET IMPLEMENTED │
+       │                                            └──────────────────────┘
+       │
+       │  OUTPUT: cognitive mode + domain-adaptive thresholds
+       ▼
+
+STAGE 5: GOVERNANCE — Three-Signal Disagreement Detection
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  Three signals converge:                           │  DISAGREEMENT        │
+                                                    │  GOVERNOR            │
+  Signal 1: TRAJECTORY (from JEPA)                  │                      │
+  "Where is the model heading?"                     │  The core innovation:│
+  error = ||z_{t+k} - z_hat_{t+k}||                │  Neither signal      │
+       │                                            │  alone is as good as │
+  Signal 2: ONTOLOGY (from Bridge)                  │  the RESIDUAL of     │
+  "What does this represent?"                       │  their disagreement. │
+  drift = ||o_{t+k} - centroid||                    │                      │
+       │                                            │  AUC (synthetic):    │
+  Signal 3: RESIDUAL (Bridge applied to JEPA error) │  trajectory: 0.515   │
+  "Is the trajectory coherent with semantics?"      │  ontology:   0.717   │
+  residual = ontology_bridge(z_actual - z_predicted)│  RESIDUAL:   0.793   │
+       │                                            │                      │
+       ▼                                            └──────────────────────┘
+  Regime Classification:
+  ┌──────────────────────────────────────────────────────────────────┐
+  │                                                                  │
+  │  trajectory_only  → "Processing hiccup"                         │
+  │  (flow broke, content intact)                                   │
+  │  Action: log, continue                                          │
+  │                                                                  │
+  │  ontology_only    → "Genuine topic transition"                  │
+  │  (content shifted, flow smooth)                                 │
+  │  Action: update centroids, adjust Vritti thresholds             │
+  │                                                                  │
+  │  BOTH             → "High-confidence anomaly"                   │
+  │  (all signals fire)                                             │
+  │  Action: flag, steer (Phase 3), or halt                        │
+  │                                                                  │
+  │  NEITHER           → "Normal generation"                        │
+  │  Action: nothing                                                │
+  │                                                                  │
+  └──────────────────────────────────────────────────────────────────┘
+       │
+       │  OUTPUT: anomaly classification + confidence + explanation
+       ▼
+
+STAGE 6: WRITE-BACK — Latent → Token Conditioning (Phase 3+)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  State delta ΔS from JEPA predictor                │  INTENT PHASE        │
+  + Governance decision                             │  PROJECTOR           │
+  + Guna energy modulation                          │                      │
+       │                                            │  The WRITE channel.  │
+       ▼                                            │  Translates latent   │
+  IntentPhaseProjector                              │  semantics back into │
+  θ = tanh(W_proj · ΔS) × π                        │  attention patterns. │
+       │                                            │                      │
+       ▼                                            │  Phase rotation:     │
+  Phase Rotation applied to transformer attention   │  Same token, same    │
+  Q = a_q × e^{i(φ_q + θ)}                         │  position — but      │
+       │                                            │  DIFFERENT MEANING   │
+       │  The same word "bank" with different θ     │  based on cognitive  │
+       │  attends to different context words        │  state.              │
+       ▼                                            │                      │
+  Modified attention → biased token logits          │  NOT IMPLEMENTED     │
+  → Token generated under semantic constraint       │  END-TO-END YET.     │
+                                                    └──────────────────────┘
+
+STAGE 7: ENTROPY GATE — Vijnana Check (Phase 4+)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    ┌──────────────────────┐
+  After each latent reasoning step:                 │  VIJNANA GATE        │
+                                                    │  (Kosha Gyroscope)   │
+  H_total = H(z_kosha) + H(z_vritti)               │                      │
+       │                                            │  "Am I stable enough │
+       ├── If H_total < τ:                          │   to commit?"        │
+       │   → STABLE: render to tokens               │                      │
+       │   (equivalent to Coconut's <eot>)          │  The meta-cognitive  │
+       │                                            │  check. Prevents     │
+       ├── If H_total ≥ τ:                          │  "blind jump failure │
+       │   → UNSTABLE: continue latent refinement   │   mode" where the    │
+       │   (equivalent to Coconut's latent loop)    │  model commits to a  │
+       │   LOOP back to Stage 3                     │  token before it has │
+       │                                            │  resolved ambiguity. │
+       └── If looping > N times:                    │                      │
+           → FORCE render (prevent infinite loops)   │  Gyroscope handles   │
+           Flag: possible mode collapse              │  the degeneracies.   │
+                                                    └──────────────────────┘
+
+════════════════════════════════════════════════════════════════════════════════
+```
+
+### 7b. Subsystem Interaction Matrix
+
+This matrix shows how each subsystem feeds into, constrains, or validates every other:
+
+```
+                    CSR     LLM    Bridge   JEPA    Ontology  Kosha   Vritti   Guna
+                    ─────   ─────  ──────   ─────   ────────  ─────   ──────   ─────
+Phoneme CSR         ────    feeds  cross-   ─────   cross-    ─────   feeds    ─────
+                            into   checks           checks            acoustic
+                                                                      vrittis
+
+Transformer LLM     reads   ────   h_t      h_t     h_t       h_t     ─────    ─────
+                    from           source   source  source    source
+                    CSR            for      for     for       for
+
+Sovereign Bridge    ─────   reads  ────     feeds   feeds     feeds   feeds    feeds
+                            h_t            z_t     z_t[0:12] z[12:17] z[17:22] z[22:28]
+
+Phase-JEPA          ─────   ─────  reads   ────    residual  ─────   diagnoses ─────
+Predictor                          z_t             signal            viparyaya
+                                                                     vs vikalpa
+
+Ontology Monitor    cross-  ─────  reads   reads   ────      adapts  domain-   ─────
+                    checks         o_t     residual          thresholds adaptive
+
+Kosha Gyroscope     ─────   ─────  reads   ─────   reads     ────    resonance entropy
+                                   z[12:17]        domain           map       gate
+                                                   context
+
+Vritti Classifier   reads   ─────  reads   reads   reads     reads   ────     drives
+                    acoustic       z[17:22] diag   domain    resonance        modulation
+
+Guna Modulator      ─────   steers reads   ─────   ─────     reads   reads    ────
+                            lr/    z[22:28]                  energy  energy
+                            explore                          state   state
+```
+
+### 7c. What Runs When — Temporal Ordering
+
+```
+TIME →
+─────────────────────────────────────────────────────────────────────────────
+
+t=0  INPUT ARRIVES
+     │
+     ├── CSR: phoneme decompose (O(10) per word, ~0.1ms)
+     │   └── Pre-filter: 82% of candidates pruned
+     │
+     ├── Tokenizer: encode surviving candidates
+     │
+t=1  TRANSFORMER FORWARD PASS (external LLM)
+     │   └── Extract h_L1, h_L7 (hooks or output_hidden_states=True)
+     │
+t=2  BRIDGE PROJECTION (SovereignStateProjector)
+     │   └── h_L7 → z_t ∈ ℝ^32 (~0.01ms, single MLP pass)
+     │
+t=3  PARALLEL PROCESSING (all concurrent)
+     │   ├── JEPA: predict z_hat_{t+k} from z_t
+     │   ├── Ontology: classify o_t from z_t
+     │   ├── Kosha: compute balance pressure from z_t[12:17]
+     │   ├── Guna: compute energy modulation from z_t[22:28]
+     │   └── Vritti: classify cognitive mode from z_t[17:22]
+     │
+t=4  GOVERNANCE (DisagreementGovernor)
+     │   ├── Combine three signals
+     │   ├── Classify regime (trajectory/ontology/both/neither)
+     │   └── Apply domain-adaptive Vritti thresholds
+     │
+t=5  DECISION
+     ├── Phase 2 (current): Log anomaly report → proceed to next token
+     ├── Phase 3 (future): Write-back via phase rotation → bias next token
+     └── Phase 4 (frontier): Entropy gate → loop or render
+```
+
+### 7d. Complementarity Summary
+
+Each subsystem answers a different question about the same generation step:
+
+| Question | Subsystem | Output | Latency |
+|---|---|---|---|
+| "Can I skip the transformer for this?" | **Phoneme CSR** | Resonance score, pruned candidates | ~0.1ms |
+| "What is the raw neural representation?" | **Transformer** | h_t ∈ ℝ^768 per layer | ~10ms (GPT-2) |
+| "What does this mean in structured terms?" | **Sovereign Bridge** | z_t ∈ ℝ^32 | ~0.01ms |
+| "Where is cognition heading?" | **JEPA Predictor** | z_hat_{t+k}, state delta | ~0.1ms |
+| "What semantic category is this?" | **Ontology Monitor** | o_t ∈ ℝ^4, domain label | ~0.01ms |
+| "Is cognitive processing balanced?" | **Kosha Gyroscope** | Balance pressure, collapse detection | ~0.01ms |
+| "What mode of thinking is active?" | **Vritti Classifier** | [pramana, viparyaya, vikalpa, smrti, nidra] | ~0.01ms |
+| "What's the energy/drive state?" | **Guna Modulator** | [sattva, rajas, tamas] × 2 | ~0.01ms |
+| "Are all signals consistent?" | **Disagreement Governor** | Regime classification + anomaly report | ~0.01ms |
+
+Total overhead on top of transformer: < 1ms. The transformer forward pass dominates (~10ms for GPT-2, ~100ms for larger models). The semantic pipeline is negligible in comparison.
+
+---
+
+## 8. The Bridge Loop: Integrated Architecture
 
 Combining all subsystems into the complete bridge:
 
@@ -563,11 +972,16 @@ The anti-collapse guarantees:
 | Approach | Latent Dim | Structured? | Bidirectional? | Anti-Collapse | Production? |
 |---|---|---|---|---|---|
 | **SymbolU (this system)** | 32D | Yes (Kosha/Vritti/Guna) | Yes (Phase rotation) | Planned (VICReg + structured) | Phase 2 |
-| Coconut (Meta FAIR) | 768D+ | No (raw hidden state) | No (read-only loop) | Implicit (training signal) | Research |
+| LLM-JEPA (Huang, LeCun) | Model dim | No (embedding space) | No (hybrid loss only) | Implicit (JEPA loss) | Research (Sep 2025) |
+| Coconut (Meta FAIR) | 768D+ | No (raw hidden state) | Yes (hidden→hidden loop) | Implicit (training signal) | Research (ICLR 2025) |
+| VL-JEPA (Meta) | Model dim | No | No (discriminative only) | VICReg | Research (Dec 2025) |
+| Token Assorted (Su et al.) | VQ-VAE | Partial (discrete codes) | Yes (VQ-VAE decoder) | VQ bottleneck | Research (ICML 2025) |
+| REPA (Yu et al.) | Model dim | No | No (alignment loss only) | Alignment regularizer | Research (ICLR 2025 Oral) |
 | RepE (Zou/Hendrycks) | ~10-50D | Partial (concept vectors) | Write-only (steering) | No | Research |
-| V-JEPA (Meta) | 384D | No | No (vision only) | VICReg | Research |
+| LIRA | Model dim | No | Yes (representation-level) | Blocks >99% jailbreaks | Research (ICLR 2025) |
 | SpeechLM | Variable | Partial (phoneme units) | Yes (speech↔text) | Pre-training | Research |
-| Neuro-Symbolic (various) | Variable | Yes (logic) | Joint training attempted | Problem-specific | Limited |
+| Speech JEPA | Compressed | No | No (tokenizer) | JEPA prediction | Research (2025) |
+| Neuro-Symbolic (various) | Variable | Yes (logic) | Joint training attempted | Problem-specific | Production (Amazon) |
 
 **SymbolU's unique position**: The only system that combines:
 1. Structured latent state (32D with named, validated dimensions)
@@ -628,17 +1042,72 @@ The risk is that this complexity is premature — that a simpler system (like Co
 
 ## Appendix B: External Research References
 
-| Paper | Venue | Key Insight |
+### JEPA Family
+
+| Paper | Venue/Year | Key Insight |
 |---|---|---|
-| Coconut (Hao et al.) | ICLR/COLM 2024 | Continuous latent reasoning > token-level CoT for planning |
 | I-JEPA (Assran et al.) | CVPR 2023 | Predict latent representations, not pixels |
-| V-JEPA (Bardes et al.) | 2024 | Spatiotemporal JEPA = world model |
-| GMM-LM | ICLR 2025 | Continuous autoregressive without VQ |
-| MELLE | ACL 2025 | Direct mel-spectrogram prediction from text |
+| V-JEPA (Bardes et al.) | Meta 2024 | Spatiotemporal JEPA = world model for video |
+| V-JEPA 2 | Meta 2025 | 1.2B params; SOTA physical reasoning; robot manipulation |
+| **LLM-JEPA** (Huang, LeCun, Balestriero) | **arXiv 2509.14252, Sep 2025** | **First JEPA objective for language; hybrid NTP+embedding loss; +14.17pp on NL-to-Regex** |
+| **VL-JEPA** (Meta FAIR) | **arXiv 2512.10942, Dec 2025** | **Predicts text embeddings not tokens; 50% fewer trainable params; matches/beats classical VLMs** |
+| **LeJEPA** (LeCun, Balestriero) | **Nov 2025** | **Complete mathematical theory for JEPAs via two axioms** |
+| A-JEPA | 2024 | JEPA for audio spectrograms; SOTA audio classification |
+| Speech JEPA | 2025 | JEPA + density-adaptive attention; 47.5 tokens/sec compressed output |
+
+### Latent Reasoning
+
+| Paper | Venue/Year | Key Insight |
+|---|---|---|
+| Coconut (Hao et al.) | ICLR 2025 | Continuous latent reasoning > token-level CoT for planning; BFS-style search |
+| **Token Assorted** (Su et al.) | **ICML 2025** | **VQ-VAE compresses reasoning traces into latent tokens; literal hybrid of latent+token** |
+| **TokenBridge** (Wang et al.) | **ICCV 2025** | **Dimension-wise quantization bridges continuous↔discrete tokens for visual generation** |
+| **Latent Reasoning as Superposition** | **arXiv 2510.15522, Oct 2025** | **Formalizes desiderata: compact, compatible, correct latent tokens** |
+| **Dual-Architecture Latent Reasoning** (Coda-Forno et al.) | **2025** | **Cautionary: unified baseline nearly matches dual design; dual adds compute not quality** |
+
+### Representation Engineering & Alignment
+
+| Paper | Venue/Year | Key Insight |
+|---|---|---|
 | RepE (Zou, Hendrycks et al.) | NeurIPS 2023 | Concept vectors steer LLM behavior via activation manipulation |
 | Persona Vectors (Anthropic) | 2024 | Directional vectors for behavioral traits |
+| **REPA** (Yu et al.) | **ICLR 2025 Oral** | **Align generative model states with pretrained representations; 17.5x speedup; SOTA FID=1.42** |
+| **LIRA** | **ICLR 2025** | **Representation-level alignment; blocks >99% jailbreaks; negligible capability loss** |
+| **Re2-Align Workshop** | **ICLR 2025** | **Dedicated venue for cross-system representational alignment** |
+
+### Hidden-State Probing
+
+| Paper | Venue/Year | Key Insight |
+|---|---|---|
 | Propositional Probes | ICLR 2025 Spotlight | LLMs encode truth internally even when outputs lie |
+| **PING** | **2025** | **Probes on frozen hidden states recover 87% of safety-suppressed performance; models "know" more than they "say"** |
+| **Latent Space Chain-of-Embedding** | **ICLR 2025** | **Hidden state changes across layers mirror progressive thinking** |
 | ReDeEP | ICLR 2025 | Mechanistic interpretability for hallucination detection |
-| SpeechLM | ICLR 2023 | Shared semantic space for speech and text |
 | Factuality Probes | EMNLP 2025 | >80% accuracy detecting hallucination via probes |
+| **LLM Latent Space Geometry** | **2025** | **Structured manifolds (circular for dates, linear for quantities) in GPT-2/LLaMA** |
+
+### Speech & Phoneme
+
+| Paper | Venue/Year | Key Insight |
+|---|---|---|
+| SpeechLM | ICLR 2023 | Shared semantic space for speech and text |
+| **Emergence of Phonemic Representations** | **arXiv 2601.18617, Jan 2025** | **Articulatory features emerge as geometric subspace in Wav2Vec 2.0** |
+| **Discrete vs Continuous Speech Tokens** | **arXiv 2508.17863, 2025** | **Discrete tokens show textual similarity at earlier layers; continuous features align gradually** |
+| GMM-LM | ICLR 2025 | Continuous autoregressive without VQ; outperforms VALL-E at 10.3% params |
+| MELLE | ACL 2025 | Direct mel-spectrogram prediction from text |
+
+### Neuro-Symbolic
+
+| Paper | Venue/Year | Key Insight |
+|---|---|---|
 | NeSy AI Systematic Review | arXiv Jan 2025 | Meta-cognition is least explored area (5% of papers) |
+| **NeusymBridge Workshop** | **AAAI 2026** | **Dedicated workshop: "Bridging Neurons and Symbols for NLP"** |
+| **NeuroSymbolicNeuro** | **arXiv Feb 2025** | **Symbolic reasoning embedded in activation functions, not bolted on** |
+
+### Surveys on Latent Reasoning
+
+| Paper | Date | Coverage |
+|---|---|---|
+| "Reasoning Beyond Language" (Chen et al.) | May 2025 | 100+ papers taxonomized |
+| "A Survey on Latent Reasoning" | Jul 2025 | Activation-based recurrence, hidden state propagation |
+| "Implicit Reasoning in LLMs" | Sep 2025 | Unified framework for latent-state modeling |
