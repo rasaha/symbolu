@@ -1111,3 +1111,1321 @@ The risk is that this complexity is premature — that a simpler system (like Co
 | "Reasoning Beyond Language" (Chen et al.) | May 2025 | 100+ papers taxonomized |
 | "A Survey on Latent Reasoning" | Jul 2025 | Activation-based recurrence, hidden state propagation |
 | "Implicit Reasoning in LLMs" | Sep 2025 | Unified framework for latent-state modeling |
+
+---
+
+## Appendix C: Architecture Flow Charts
+
+Standalone, clean flow charts for every major model, pipeline, and mechanism in the system. Each chart is self-contained and can be read independently.
+
+---
+
+### C1. High-Level System Overview (30,000-Foot View)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SymbolU: HIGH-LEVEL OVERVIEW                        │
+│                                                                         │
+│   Two parallel streams process language, connected by a bridge:         │
+│                                                                         │
+│                                                                         │
+│   ┌───────────────────────┐         ┌───────────────────────┐          │
+│   │   STREAM A: TOKENS    │         │  STREAM B: SEMANTICS  │          │
+│   │   (External LLM)      │         │  (SymbolU Sovereign    │          │
+│   │                        │         │   State System)        │          │
+│   │  Input: token IDs      │         │  Input: h_t from LLM   │          │
+│   │  Process: self-attn    │  BRIDGE │  Process: project,     │          │
+│   │  Output: next token    │◄───────►│  predict, classify     │          │
+│   │                        │         │  Output: anomaly       │          │
+│   │  Owns: generation      │   32D   │  flags, phase rotation │          │
+│   │  Cannot: explain why   │ Sovereign│ Owns: meaning          │          │
+│   │                        │  State  │  Cannot: generate text  │          │
+│   └───────────────────────┘         └───────────────────────┘          │
+│                                                                         │
+│                                                                         │
+│   Stream A generates.  Stream B understands.  The bridge connects them. │
+│                                                                         │
+│                                                                         │
+│   PHASE PROGRESSION:                                                    │
+│   ─────────────────                                                     │
+│                                                                         │
+│   Phase 2 (current)    Phase 3 (next)       Phase 4 (frontier)         │
+│   ┌──────────────┐    ┌───────────────┐    ┌────────────────┐          │
+│   │  READ-ONLY   │    │   CAUSAL      │    │   LATENT       │          │
+│   │  Stream B     │───►│   Stream B     │───►│   REASONING    │          │
+│   │  observes A   │    │   steers A    │    │   Loop in B    │          │
+│   │  and reports  │    │   via phase   │    │   then render  │          │
+│   │              │    │   rotation    │    │   to A         │          │
+│   └──────────────┘    └───────────────┘    └────────────────┘          │
+│                                                                         │
+│   Kill gate: R²<0.3   Kill gate: no        Kill gate: 32D→768D        │
+│   on real data         perplexity gain      inverse unsolvable          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C2. Three Architecture Options (A / B / C)
+
+```
+═══════════════════════════════════════════════════════════════════════════
+   OPTION A: READ-ONLY              Currently being validated (Phase 2)
+═══════════════════════════════════════════════════════════════════════════
+
+   LLM (frozen)
+   ┌─────────────────┐
+   │ tokens → h_t    │ ─── normal generation ──► output tokens
+   │ (L0 → L11)      │
+   └────────┬────────┘
+            │ extract h_L1, h_L7
+            ▼
+   ┌─────────────────┐
+   │ Sovereign State  │
+   │ Projector        │
+   │ h_L7 → z_t ∈ R³²│
+   └────────┬────────┘
+            │
+      ┌─────┴─────┐
+      ▼           ▼
+   ┌──────┐   ┌──────────┐
+   │ JEPA │   │ Ontology │
+   │predict│   │ Bridge   │
+   │z_hat  │   │ o_t ∈ R⁴ │
+   └───┬──┘   └────┬─────┘
+       │           │
+       ▼           ▼
+   ┌─────────────────────┐
+   │ Disagreement        │
+   │ Governor             │
+   │                      │
+   │ trajectory + ontology│
+   │ + residual signals   │
+   └──────────┬──────────┘
+              │
+              ▼
+   ┌─────────────────┐
+   │   LOG / FLAG    │     (no feedback to LLM)
+   │   anomaly report│
+   └─────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+   OPTION B: CAUSAL CONDITIONING        Phase 3 target
+═══════════════════════════════════════════════════════════════════════════
+
+   LLM (fine-tuned with phase rotation)
+   ┌─────────────────┐
+   │ tokens → h_t    │
+   │ (L0 → L11)      │
+   └────────┬────────┘
+            │ extract h_L7
+            ▼
+   ┌─────────────────┐
+   │ Sovereign State  │
+   │ Projector        │
+   │ h_L7 → z_t ∈ R³²│
+   └────────┬────────┘
+            │
+            ▼
+   ┌─────────────────┐
+   │ JEPA Predictor   │
+   │ z_t → ΔS        │      ΔS = predicted state delta
+   └────────┬────────┘
+            │
+            ▼
+   ┌─────────────────┐
+   │ Intent Phase     │
+   │ Projector        │
+   │ ΔS → θ          │      θ = tanh(W·ΔS) × π
+   └────────┬────────┘
+            │
+            ▼
+   ┌─────────────────┐       ┌─────────────────────────────┐
+   │ Phase Rotation   │       │  Q = a_q × e^{i(φ_q + θ)}  │
+   │ on Attention     │──────►│  Same tokens, same position │
+   │                  │       │  DIFFERENT attention pattern │
+   └────────┬────────┘       └─────────────────────────────┘
+            │
+            ▼
+   ┌─────────────────┐
+   │ Biased token     │     (semantically constrained generation)
+   │ logits → output  │
+   └─────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+   OPTION C: LATENT REASONING LOOP        Phase 4 frontier
+═══════════════════════════════════════════════════════════════════════════
+
+   Input tokens → Embeddings → h_0
+            │
+            ▼
+   ┌─────────────────┐
+   │ Project to       │
+   │ Sovereign State  │
+   │ h_0 → z_0 ∈ R³² │
+   └────────┬────────┘
+            │
+            ▼
+   ┌────────────────────────────────────────┐
+   │            LATENT REASONING LOOP        │
+   │                                         │
+   │   ┌─────────────────────┐              │
+   │   │  z_n                │              │
+   │   │  │                  │              │
+   │   │  ▼                  │              │
+   │   │  JEPA predict       │              │
+   │   │  z_{n+1} = z_n + ΔS │              │
+   │   │  │                  │              │
+   │   │  ▼                  │              │
+   │   │  Entropy check      │              │
+   │   │  H(kosha)+H(vritti) │              │
+   │   │  │                  │              │
+   │   │  ├─ H < τ: STABLE ──┼──► EXIT     │
+   │   │  │                  │    LOOP      │
+   │   │  └─ H ≥ τ: UNSTABLE─┼──► ITERATE  │
+   │   │     (loop back)     │              │
+   │   └─────────────────────┘              │
+   │                                         │
+   │   Max iterations: N (prevent infinite)  │
+   │   Like Coconut but in 32D structured    │
+   │   space instead of 768D raw space       │
+   └───────────────────┬────────────────────┘
+                       │
+                       ▼
+   ┌──────────────────────────┐
+   │ Inverse project           │
+   │ z_N → h_N ∈ R^768        │       (underdetermined: 32D → 768D)
+   │ (the hardest problem)     │
+   └─────────────┬────────────┘
+                 │
+                 ▼
+   ┌──────────────────────────┐
+   │ Decode to tokens          │
+   │ (standard LM head)        │
+   └──────────────────────────┘
+```
+
+---
+
+### C3. The 32D Sovereign State: Internal Structure
+
+```
+═══════════════════════════════════════════════════════════════════════════
+          THE 32-DIMENSIONAL SOVEREIGN STATE VECTOR
+═══════════════════════════════════════════════════════════════════════════
+
+   z_t ∈ R³² decomposed into 5 structured subspaces:
+
+   Index:  0                  12    17    22    28    32
+           │                   │     │     │     │     │
+           ▼                   ▼     ▼     ▼     ▼     ▼
+          ┌────────────────────┬─────┬─────┬──────┬────┐
+     z_t= │     BHAVAS         │KOSHA│VRITT│ GUNA │SANK│
+          │   12 dimensions    │  5  │  5  │  6   │ 4  │
+          └────────────────────┴─────┴─────┴──────┴────┘
+
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  BHAVAS [0:12] — Ontological Aspects                        │
+   │  Activation: softmax (sum to 1)                              │
+   │  Question: "WHAT kind of content is this?"                   │
+   │                                                              │
+   │  12 aspects representing the nature of the content.          │
+   │  Example: a legal text activates different bhavas than       │
+   │  a poem or a technical manual.                               │
+   │                                                              │
+   │  Source: naming ceremony discovery (empirically validated)   │
+   └──────────────────────────────────────────────────────────────┘
+           │
+           ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  KOSHAS [12:17] — Consciousness Sheaths                      │
+   │  Activation: sigmoid (each independent, 0-1)                 │
+   │  Question: "At what DEPTH is processing occurring?"          │
+   │                                                              │
+   │  [12] Annamaya  ─── literal / physical / surface             │
+   │  [13] Pranamaya ─── energy / momentum / flow                 │
+   │  [14] Manomaya  ─── pattern / memory / association           │
+   │  [15] Vijnanamaya── discernment / logic / analysis           │
+   │  [16] Anandamaya ── creative / expansive / generative        │
+   │                                                              │
+   │  Multiple sheaths active simultaneously (sigmoid, not softmax)│
+   │  Gyroscope regulates balance across sheaths                   │
+   └──────────────────────────────────────────────────────────────┘
+           │
+           ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  VRITTIS [17:22] — Mental Modifications                      │
+   │  Activation: softmax (one dominant mode)                     │
+   │  Question: "In what MODE is cognition operating?"            │
+   │                                                              │
+   │  [17] Pramana   ─── valid cognition (accurate, reliable)     │
+   │  [18] Viparyaya ─── misperception (ERROR — model is WRONG)   │
+   │  [19] Vikalpa   ─── imagination (CREATING — model diverges)  │
+   │  [20] Smrti     ─── memory recall (retrieving stored info)   │
+   │  [21] Nidra     ─── dormancy (absence of active content)     │
+   │                                                              │
+   │  CRITICAL: Viparyaya vs Vikalpa distinction                   │
+   │  Same prediction error, DIFFERENT epistemological meaning!    │
+   │  Error (wrong) vs Imagination (creative) must be separated.   │
+   └──────────────────────────────────────────────────────────────┘
+           │
+           ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  GUNAS [22:28] — Energy States                               │
+   │  Activation: sigmoid (each independent)                      │
+   │  Question: "What ENERGY pattern is driving processing?"      │
+   │                                                              │
+   │  3 qualities × 2 channels = 6 dimensions:                    │
+   │  [22-23] Sattva ─── clarity, harmony, balance                │
+   │  [24-25] Rajas  ─── activity, passion, drive                 │
+   │  [26-27] Tamas  ─── inertia, stability, resistance           │
+   │                                                              │
+   │  Modulates: learning rate, exploration vs exploitation,       │
+   │  activation energy of the entire system                       │
+   └──────────────────────────────────────────────────────────────┘
+           │
+           ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  SANKALPA [28:32] — Goal / Intent                            │
+   │  Activation: tanh (range -1 to +1)                           │
+   │  Question: "What is the system AIMING for?"                  │
+   │                                                              │
+   │  4 intent dimensions, unbounded in direction:                 │
+   │  Positive = pursuing, Negative = avoiding                     │
+   │  Used by IntentPhaseProjector for write-back                  │
+   └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C4. Phoneme CSR Pre-Filter Pipeline
+
+```
+═══════════════════════════════════════════════════════════════════════════
+           PHONEME CSR: CONSTRAINT SATISFACTION & RESONANCE
+           (Parameter-Free, Operates BEFORE the Transformer)
+═══════════════════════════════════════════════════════════════════════════
+
+   Raw Text Input
+   "The contract specifies delivery by March"
+        │
+        ▼
+   ┌───────────────────────────────────────┐
+   │  STEP 1: Phoneme Decomposition        │
+   │                                        │
+   │  Word-level → ARPABET phoneme tokens   │
+   │                                        │
+   │  "contract" → [K, AA, N, T, R, AE,    │
+   │                K, T]                    │
+   │  "delivery" → [D, IH, L, IH, V, ER,   │
+   │                IY]                      │
+   │  "March"    → [M, AA, R, CH]           │
+   └──────────────────┬────────────────────┘
+                      │
+                      ▼
+   ┌───────────────────────────────────────┐
+   │  STEP 2: 10D Resonance Vectors        │
+   │                                        │
+   │  Each phoneme maps to a 10D vector     │
+   │  via the Sanskrit varna system:        │
+   │                                        │
+   │  Phoneme Class    Ontological Affinity  │
+   │  ─────────────    ────────────────────  │
+   │  Plosives (K,T,P) → O3_EXECUTION ↑    │
+   │  Nasals (N,M,NG)  → O5_COGNITION ↑    │
+   │  Fricatives (S,F) → O7_REASONING ↑    │
+   │  Diphthongs       → O8_PURPOSE ↑      │
+   │  Long vowels      → O9_WITNESSES ↑    │
+   │                                        │
+   │  Per-word vector = mean of phonemes    │
+   └──────────────────┬────────────────────┘
+                      │
+                      ▼
+   ┌───────────────────────────────────────┐
+   │  STEP 3: Resonance Scoring            │
+   │                                        │
+   │  Pairwise cosine similarity between    │
+   │  adjacent word vectors:                │
+   │                                        │
+   │  score = cos(v_word_i, v_word_{i+1})   │
+   └──────────────────┬────────────────────┘
+                      │
+           ┌──────────┼──────────┐
+           ▼          ▼          ▼
+   ┌─────────────┐ ┌────────┐ ┌──────────────┐
+   │  HARMONIC   │ │NEUTRAL │ │  DISSONANT   │
+   │  score≥0.7  │ │0.3-0.7 │ │  score≤0.3   │
+   │             │ │        │ │              │
+   │  Proceed    │ │Decision│ │  Resolve     │
+   │  directly   │ │ Gate   │ │  locally     │
+   │  to LLM     │ │        │ │  (no LLM)   │
+   │             │ │ May or │ │              │
+   │  ~18% of    │ │ may not│ │  Phoneme     │
+   │  candidates │ │ need   │ │  features    │
+   │             │ │ LLM    │ │  sufficient  │
+   └──────┬──────┘ └───┬────┘ └──────┬───────┘
+          │            │             │
+          ▼            ▼             ▼
+   ┌───────────────────────────────────────┐
+   │  RESULT:                               │
+   │  82% FLOP reduction on attention       │
+   │  5.6x speedup on attention compute     │
+   │  O(10) per comparison                  │
+   │                                        │
+   │  OUTPUT: filtered candidates            │
+   │        + z_p (10D phoneme profile)      │
+   │        + cross-validation signal for    │
+   │          ontology bridge                │
+   └───────────────────────────────────────┘
+
+   CROSS-VALIDATION EXAMPLE:
+   ┌───────────────────────────────────────────────────────┐
+   │                                                        │
+   │  MLP bridge says: "O3_EXECUTION = high"               │
+   │  Phoneme CSR says: "No plosives detected"             │
+   │                    ─────────────────────               │
+   │  DISAGREEMENT → flag as bridge calibration signal     │
+   │                                                        │
+   │  MLP bridge says: "O3_EXECUTION = high"               │
+   │  Phoneme CSR says: "Strong plosives (K, T, P)"       │
+   │                    ─────────────────────────           │
+   │  AGREEMENT → high confidence in classification         │
+   │                                                        │
+   └───────────────────────────────────────────────────────┘
+```
+
+---
+
+### C5. JEPA Prediction Engine
+
+```
+═══════════════════════════════════════════════════════════════════════════
+          PHASE-JEPA PREDICTOR: Temporal State Trajectory Forecast
+═══════════════════════════════════════════════════════════════════════════
+
+   At each timestep t, the JEPA predictor forecasts the NEXT state.
+
+   ┌─────────────────────────────────────────────────────────┐
+   │                                                          │
+   │   z_t (current Sovereign State, 32D)                     │
+   │   │                                                      │
+   │   ▼                                                      │
+   │   ┌──────────────────────────┐                           │
+   │   │  PhaseJEPAPredictor      │                           │
+   │   │  (Learned MLP)           │                           │
+   │   │                          │                           │
+   │   │  z_t ──► ΔS ∈ R³²       │   ΔS = predicted delta    │
+   │   │        (state delta)     │                           │
+   │   └────────────┬─────────────┘                           │
+   │                │                                          │
+   │                ▼                                          │
+   │   z_hat_{t+k} = z_t + ΔS     (predicted future state)   │
+   │                │                                          │
+   │                │         ┌──────────────────────┐        │
+   │                │         │  z_{t+k} (ACTUAL     │        │
+   │                │         │  future state from    │        │
+   │                │         │  LLM hidden states    │        │
+   │                │         │  at time t+k)         │        │
+   │                │         └──────────┬───────────┘        │
+   │                │                    │                     │
+   │                ▼                    ▼                     │
+   │   ┌────────────────────────────────────────┐             │
+   │   │  RESIDUAL COMPUTATION                   │             │
+   │   │                                          │             │
+   │   │  r_t = z_{t+k} - z_hat_{t+k}            │             │
+   │   │      = (actual) - (predicted)            │             │
+   │   │                                          │             │
+   │   │  Small residual → trajectory on track    │             │
+   │   │  Large residual → trajectory broke       │             │
+   │   └──────────────────┬─────────────────────┘             │
+   │                      │                                    │
+   │               ┌──────┴──────┐                            │
+   │               ▼             ▼                            │
+   │   ┌────────────────┐ ┌───────────────────┐              │
+   │   │ Raw residual   │ │ Ontology-projected │              │
+   │   │ ||r_t||        │ │ residual           │              │
+   │   │                │ │ o_r = Bridge(r_t)  │              │
+   │   │ → trajectory   │ │ → WHAT changed     │              │
+   │   │   signal       │ │   on which axis    │              │
+   │   │   (magnitude)  │ │   (interpretation) │              │
+   │   └───────┬────────┘ └────────┬──────────┘              │
+   │           │                   │                          │
+   │           ▼                   ▼                          │
+   │   ┌─────────────────────────────────────┐               │
+   │   │  → DisagreementGovernor (Stage 5)   │               │
+   │   └─────────────────────────────────────┘               │
+   │                                                          │
+   └─────────────────────────────────────────────────────────┘
+
+
+   TRAINING (with EMA target encoder):
+
+   ┌─────────────────────────────────────────────────────────┐
+   │                                                          │
+   │   Online Encoder                  Target Encoder (EMA)   │
+   │   ┌──────────┐                    ┌──────────┐          │
+   │   │ h_t → z_t │                    │ h_{t+k}  │          │
+   │   └─────┬────┘                    │ → z_tgt  │          │
+   │         │                          └─────┬────┘          │
+   │         ▼                                │               │
+   │   ┌───────────┐                          │               │
+   │   │ Predictor  │                          │               │
+   │   │ z_t → ΔS   │                          │               │
+   │   └─────┬─────┘                          │               │
+   │         │                                │               │
+   │         ▼                                ▼               │
+   │   ┌────────────────────────────────────────────┐        │
+   │   │  L_JEPA = MSE(z_t + ΔS, z_tgt)            │        │
+   │   │                                             │        │
+   │   │  Target encoder updated via EMA:            │        │
+   │   │  θ_tgt ← τ·θ_tgt + (1-τ)·θ_online         │        │
+   │   │  (prevents representation collapse)          │        │
+   │   └────────────────────────────────────────────┘        │
+   │                                                          │
+   └─────────────────────────────────────────────────────────┘
+
+
+   VRITTI DIAGNOSTIC OUTPUT:
+
+   ┌─────────────────────────────────────────────────────────┐
+   │  The JEPA predictor also outputs Vritti diagnostics:     │
+   │                                                          │
+   │  Large residual + ontology says "same domain"            │
+   │  → Viparyaya (error: model wrong about trajectory)       │
+   │                                                          │
+   │  Large residual + ontology says "shifted to creative"    │
+   │  → Vikalpa (imagination: model creatively diverged)      │
+   │                                                          │
+   │  Small residual + ontology stable                        │
+   │  → Pramana (valid cognition: on track)                   │
+   │                                                          │
+   │  Small residual + strong pattern match                   │
+   │  → Smrti (memory recall: retrieving known content)       │
+   │                                                          │
+   │  Flat state + zero residual + zero drift                 │
+   │  → Nidra (dormancy: no active content)                   │
+   └─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C6. Three-Signal Disagreement Governor
+
+```
+═══════════════════════════════════════════════════════════════════════════
+         THREE-SIGNAL GOVERNANCE: The Core Anomaly Detection System
+═══════════════════════════════════════════════════════════════════════════
+
+   The governor's power comes from DISAGREEMENT between signals,
+   not from any individual signal's magnitude.
+
+
+   INPUT: Three independent signals computed in parallel
+   ─────────────────────────────────────────────────────
+
+   Signal 1                Signal 2               Signal 3
+   TRAJECTORY              ONTOLOGY               RESIDUAL
+   (from JEPA)             (from Bridge)          (Bridge × JEPA)
+
+   ┌──────────────┐       ┌──────────────┐       ┌──────────────┐
+   │ ||z_{t+k}    │       │ ||o_{t+k}    │       │ OntBridge(   │
+   │ - z_hat||    │       │ - centroid|| │       │  z_actual    │
+   │              │       │              │       │  - z_predict)│
+   │ "Did the     │       │ "Did the     │       │ "Does the    │
+   │  trajectory  │       │  semantic    │       │  trajectory  │
+   │  deviate?"   │       │  category   │       │  error make  │
+   │              │       │  change?"   │       │  semantic    │
+   │ Standalone   │       │ Standalone   │       │  sense?"     │
+   │ AUC: 0.515  │       │ AUC: 0.717  │       │              │
+   └──────┬───────┘       └──────┬───────┘       │ COMBINED     │
+          │                      │               │ AUC: 0.793   │
+          │                      │               └──────┬───────┘
+          │                      │                      │
+          ▼                      ▼                      ▼
+   ┌────────────────────────────────────────────────────────────┐
+   │                  DISAGREEMENT GOVERNOR                      │
+   │                                                             │
+   │  Apply domain-adaptive thresholds from Vritti state:        │
+   │                                                             │
+   │  if vritti[vikalpa] > 0.5:   (creative mode)               │
+   │      trajectory_threshold × 1.5  (more tolerant)            │
+   │      ontology_threshold × 1.3                               │
+   │                                                             │
+   │  if vritti[pramana] > 0.5:   (analytical mode)              │
+   │      trajectory_threshold × 0.7  (more strict)              │
+   │      ontology_threshold × 0.8                               │
+   └───────────────────────┬────────────────────────────────────┘
+                           │
+               ┌───────────┼───────────┐
+               │           │           │
+               ▼           ▼           ▼
+
+   ┌─────────────────────────────────────────────────────────┐
+   │                 REGIME CLASSIFICATION                     │
+   │                                                           │
+   │  Trajectory  Ontology   Regime          Action            │
+   │  ─────────── ─────────  ──────          ──────            │
+   │                                                           │
+   │     ✗          ✗        NORMAL          Continue          │
+   │                         generation      normally          │
+   │                                                           │
+   │     ✓          ✗        TRAJECTORY      Log.              │
+   │                         ONLY            Flow hiccup,      │
+   │                         "processing     content intact.   │
+   │                         glitch"         Likely recovers.  │
+   │                                                           │
+   │     ✗          ✓        ONTOLOGY        Update centroids. │
+   │                         ONLY            Genuine topic     │
+   │                         "topic shift"   transition.       │
+   │                                         Adjust Vritti     │
+   │                                         thresholds.       │
+   │                                                           │
+   │     ✓          ✓        BOTH FIRE       ★ ANOMALY ★      │
+   │                         "high-confidence Flag immediately. │
+   │                         anomaly"        Phase 3: steer.   │
+   │                                         Phase 4: halt.    │
+   │                                                           │
+   └───────────────────────────┬─────────────────────────────┘
+                               │
+                               ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  OUTPUT:                                                  │
+   │  • regime: str  ("normal" / "trajectory_only" / ...)     │
+   │  • confidence: float (based on residual magnitude)        │
+   │  • explanation: dict {axis: delta for each ontological    │
+   │                       axis that contributed}              │
+   │  • anomaly_type: str (via Vritti diagnostic)              │
+   └─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C7. Phase Rotation Write-Back (Phase 3)
+
+```
+═══════════════════════════════════════════════════════════════════════════
+         PHASE ROTATION: How Latent Semantics Steer Token Generation
+═══════════════════════════════════════════════════════════════════════════
+
+   The WRITE channel: translating structured meaning back into
+   transformer attention patterns.
+
+   ┌──────────────────────────────────────────────────┐
+   │  JEPA Predictor output: ΔS ∈ R³²                │
+   │  (predicted state delta — "where meaning is      │
+   │   heading next")                                  │
+   │                                                   │
+   │  + Guna modulation from z_t[22:28]               │
+   │    (energy scaling factor)                        │
+   │                                                   │
+   │  + Governance decision                            │
+   │    (should we steer? how strongly?)               │
+   └────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+   ┌──────────────────────────────────────────────────┐
+   │  INTENT PHASE PROJECTOR                           │
+   │                                                   │
+   │  θ = tanh(W_proj · ΔS) × π                       │
+   │                                                   │
+   │  θ ∈ [-π, +π]  (a rotation angle per head)       │
+   │                                                   │
+   │  tanh ensures bounded rotation                    │
+   │  π scaling gives full angular range               │
+   │  W_proj is learned (32D → num_heads)              │
+   └────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+   ┌──────────────────────────────────────────────────┐
+   │  PHASE ATTENTION MODIFICATION                     │
+   │                                                   │
+   │  Standard attention:                              │
+   │  Q_j = a_q × e^{i·φ_q}                           │
+   │                                                   │
+   │  Phase-rotated attention:                         │
+   │  Q_j' = a_q × e^{i·(φ_q + θ_j)}                 │
+   │                ──────────────                     │
+   │                the θ rotation                     │
+   │                                                   │
+   │  Same token amplitude.                            │
+   │  Same positional encoding.                        │
+   │  DIFFERENT angular relationship to other tokens.  │
+   └────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+   ┌──────────────────────────────────────────────────┐
+   │  EFFECT ON ATTENTION PATTERN                      │
+   │                                                   │
+   │  Example: the word "bank"                         │
+   │                                                   │
+   │  Without θ rotation:                              │
+   │  "bank" attends to → [money, account, deposit]    │
+   │                                                   │
+   │  With θ rotation (ΔS points toward O3_EXECUTION): │
+   │  "bank" attends to → [river, shore, steep]        │
+   │                                                   │
+   │  Same word. Same position. Different meaning      │
+   │  selected by the latent semantic state.            │
+   └────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+   ┌──────────────────────────────────────────────────┐
+   │  BIASED TOKEN LOGITS                              │
+   │                                                   │
+   │  The modified attention produces different         │
+   │  hidden states → different logits → different     │
+   │  token selected by the LM head.                   │
+   │                                                   │
+   │  Token generation is now SEMANTICALLY              │
+   │  CONSTRAINED by the Sovereign State.              │
+   │                                                   │
+   │  Status: Architecture designed.                    │
+   │  NOT yet trained end-to-end with a real LM.       │
+   └──────────────────────────────────────────────────┘
+
+
+   WHY PHASE ROTATION (not additive bias or gating):
+
+   ┌──────────────────────────────────────────────────┐
+   │                                                   │
+   │  Additive bias:  h' = h + b                       │
+   │  → Shifts magnitude. Can push off manifold.       │
+   │  → Norm changes → layer norm interaction.         │
+   │                                                   │
+   │  Gating:  h' = h ⊙ g                              │
+   │  → Zeros out dimensions. Information destruction.  │
+   │  → Cannot ADD new relationships, only suppress.    │
+   │                                                   │
+   │  Phase rotation:  Q' = a × e^{i(φ + θ)}          │
+   │  → Changes relationships, not magnitudes.          │
+   │  → Norm-preserving. Stays on manifold.             │
+   │  → Can both strengthen AND weaken associations.    │
+   │  → O(n) complexity (linear in sequence length).    │
+   │                                                   │
+   └──────────────────────────────────────────────────┘
+```
+
+---
+
+### C8. Vijnana Entropy Gate (Latent Reasoning Loop — Phase 4)
+
+```
+═══════════════════════════════════════════════════════════════════════════
+         VIJNANA GATE: "Am I Stable Enough to Commit to Tokens?"
+═══════════════════════════════════════════════════════════════════════════
+
+   The meta-cognitive check. Analogous to Coconut's <bot>/<eot> markers,
+   but governed by structured entropy rather than learned markers.
+
+
+         z_t (current Sovereign State)
+          │
+          ▼
+   ┌─────────────────────────────────┐
+   │  ENTROPY COMPUTATION             │
+   │                                   │
+   │  H_kosha = -Σ z_k·log(z_k)      │  (over indices 12:17)
+   │  H_vritti = -Σ z_v·log(z_v)     │  (over indices 17:22)
+   │                                   │
+   │  H_total = H_kosha + H_vritti    │
+   └──────────────┬──────────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────────────────────────┐
+   │                                                   │
+   │         H_total < τ ?                             │
+   │                                                   │
+   │         ┌─────────┐    ┌──────────┐              │
+   │         │  YES    │    │   NO     │              │
+   │         │ (STABLE)│    │(UNSTABLE)│              │
+   │         └────┬────┘    └────┬─────┘              │
+   │              │              │                     │
+   └──────────────┼──────────────┼────────────────────┘
+                  │              │
+                  ▼              ▼
+   ┌──────────────────┐   ┌──────────────────────────┐
+   │  RENDER TO TOKENS │   │  CONTINUE LATENT         │
+   │                    │   │  REFINEMENT              │
+   │  z_t → inverse     │   │                          │
+   │  project → h_t     │   │  ┌────────────────────┐ │
+   │  → LM head         │   │  │ JEPA predict next   │ │
+   │  → token output     │   │  │ z_{t+1} = z_t + ΔS │ │
+   │                    │   │  └─────────┬──────────┘ │
+   │  (Coconut's <eot>) │   │            │            │
+   │                    │   │            ▼            │
+   │                    │   │  Loop counter += 1      │
+   │                    │   │            │            │
+   │                    │   │            ▼            │
+   │                    │   │  counter > N ?          │
+   │                    │   │  ├── NO: loop back ─────┤
+   │                    │   │  │   to entropy check   │
+   │                    │   │  │                      │
+   │                    │   │  └── YES: FORCE render  │
+   │                    │   │      (prevent infinite  │
+   │                    │   │       loop)             │
+   │                    │   │      Flag: possible     │
+   │                    │   │      mode collapse      │
+   │                    │   └──────────────────────────┘
+   └──────────────────┘
+
+
+   ENTROPY INTERPRETATION:
+
+   ┌──────────────────────────────────────────────────┐
+   │                                                   │
+   │  LOW H_kosha + LOW H_vritti                       │
+   │  → Single dominant sheath + single cognitive mode │
+   │  → System is FOCUSED. Safe to commit to tokens.   │
+   │  → Example: analytical text processing clearly    │
+   │    in Vijnanamaya (logic) + Pramana (valid).      │
+   │                                                   │
+   │  HIGH H_kosha + LOW H_vritti                      │
+   │  → Multiple sheaths active, but mode is clear     │
+   │  → System processing at multiple cognitive depths │
+   │  → May benefit from one more iteration.           │
+   │                                                   │
+   │  LOW H_kosha + HIGH H_vritti                      │
+   │  → Single depth, but uncertain cognitive mode     │
+   │  → The system doesn't know if it's perceiving     │
+   │    accurately or hallucinating.                    │
+   │  → DEFINITELY needs more latent refinement.        │
+   │                                                   │
+   │  HIGH H_kosha + HIGH H_vritti                     │
+   │  → System is confused on all fronts                │
+   │  → Multiple loops needed or flag as unresolvable  │
+   │                                                   │
+   └──────────────────────────────────────────────────┘
+
+
+   COMPARISON WITH COCONUT:
+
+   ┌─────────────────────┐    ┌─────────────────────────┐
+   │  COCONUT             │    │  SymbolU VIJNANA GATE    │
+   │                      │    │                          │
+   │  768D hidden state   │    │  32D Sovereign State     │
+   │  Unstructured        │    │  Structured (named dims) │
+   │  <bot>/<eot> learned │    │  H(kosha)+H(vritti)      │
+   │  markers             │    │  computed analytically   │
+   │  No interpretation   │    │  Interpretable:           │
+   │  of when/why to stop │    │  WHY it's unstable       │
+   │  Black box loop      │    │  maps to cognitive       │
+   │                      │    │  dimensions              │
+   │  Proven to work      │    │  NOT yet validated       │
+   │  at scale            │    │                          │
+   └─────────────────────┘    └─────────────────────────┘
+```
+
+---
+
+### C9. Training Loss Architecture (Phase 3)
+
+```
+═══════════════════════════════════════════════════════════════════════════
+         TRAINING LOSS: Five Objectives Working Together
+═══════════════════════════════════════════════════════════════════════════
+
+   L_total = L_tok + α·L_JEPA + β·L_VICReg + γ·L_structured + δ·L_contrastive
+
+
+   Input batch of token sequences
+        │
+        ▼
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │  FORWARD PASS                                                       │
+   │                                                                     │
+   │  Tokens ──► Transformer ──► hidden states h_t ──► logits ──► p(x)  │
+   │                  │                                                  │
+   │                  │  extract h_L7                                     │
+   │                  ▼                                                  │
+   │  h_L7 ──► SovereignStateProjector ──► z_t ∈ R³²                    │
+   │                  │                                                  │
+   │            ┌─────┴─────────┐                                        │
+   │            ▼               ▼                                        │
+   │       JEPA predict    OntologyBridge                                │
+   │       z_t → z_hat     z_t → o_t                                    │
+   │                                                                     │
+   │  Target Encoder (EMA):  h_{t+k} → z_tgt (stop gradient)           │
+   └─────────────────────────────────────────────────────────────────────┘
+        │
+        │  Five loss terms computed:
+        ▼
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │                                                                     │
+   │  ┌───────────────────────────────────────────────────────────────┐  │
+   │  │  L_tok = -Σ log p(x_{t+1} | x_{<t}, z_t)                    │  │
+   │  │                                                               │  │
+   │  │  Standard next-token cross-entropy.                           │  │
+   │  │  Conditioned on z_t via phase rotation.                       │  │
+   │  │  Ensures the model still generates fluent text.               │  │
+   │  │                                                               │  │
+   │  │  Role: GENERATION QUALITY                                     │  │
+   │  └───────────────────────────────────────────────────────────────┘  │
+   │                          +                                          │
+   │  ┌───────────────────────────────────────────────────────────────┐  │
+   │  │  L_JEPA = MSE(z_hat_{t+k}, z_tgt_{t+k})                     │  │
+   │  │                                                               │  │
+   │  │  JEPA prediction matches EMA target.                          │  │
+   │  │  Forces predictor to learn temporal dynamics.                 │  │
+   │  │  EMA target prevents representation collapse.                 │  │
+   │  │                                                               │  │
+   │  │  Role: TEMPORAL COHERENCE                                     │  │
+   │  └───────────────────────────────────────────────────────────────┘  │
+   │                          +                                          │
+   │  ┌───────────────────────────────────────────────────────────────┐  │
+   │  │  L_VICReg = λ·Var(z) + μ·Inv(z_i, z_j) + ν·Cov(z)          │  │
+   │  │                                                               │  │
+   │  │  Variance:   each dim maintains spread (no collapse to point) │  │
+   │  │  Invariance: similar inputs → similar states                  │  │
+   │  │  Covariance: dims are decorrelated (no redundancy)            │  │
+   │  │                                                               │  │
+   │  │  Role: ANTI-COLLAPSE (dimensional)                            │  │
+   │  └───────────────────────────────────────────────────────────────┘  │
+   │                          +                                          │
+   │  ┌───────────────────────────────────────────────────────────────┐  │
+   │  │  L_structured = KL(z_kosha || kosha_target)                   │  │
+   │  │              + KL(z_vritti || vritti_target)                   │  │
+   │  │              + CE(z_bhava, bhava_label)                        │  │
+   │  │                                                               │  │
+   │  │  Targets from naming ceremony validated axes.                  │  │
+   │  │  Acoustic Vrittis from vritti_mapper.py.                       │  │
+   │  │  Domain labels from ontology monitor.                          │  │
+   │  │  Anchors each dim to a meaningful concept.                     │  │
+   │  │                                                               │  │
+   │  │  Role: ANTI-COLLAPSE (semantic) + INTERPRETABILITY             │  │
+   │  └───────────────────────────────────────────────────────────────┘  │
+   │                          +                                          │
+   │  ┌───────────────────────────────────────────────────────────────┐  │
+   │  │  L_contrastive = InfoNCE(z_i, z_j+, z_k-)                    │  │
+   │  │                                                               │  │
+   │  │  z_i, z_j+ from paraphrase pairs (same meaning)              │  │
+   │  │  z_k- from unrelated text (different meaning)                 │  │
+   │  │  "Same meaning → similar state" without cycle-consistency.    │  │
+   │  │                                                               │  │
+   │  │  Role: SEMANTIC ALIGNMENT                                     │  │
+   │  └───────────────────────────────────────────────────────────────┘  │
+   │                                                                     │
+   └───────────────────────────────────────┬─────────────────────────────┘
+                                           │
+                                           ▼
+
+   ANTI-COLLAPSE GUARANTEE SUMMARY:
+
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │                                                                     │
+   │  Failure Mode              Which Loss Prevents It                   │
+   │  ────────────              ──────────────────────                   │
+   │  Dimensional collapse      L_VICReg (variance term)                │
+   │  (all dims same value)                                              │
+   │                                                                     │
+   │  Representational collapse L_JEPA (EMA target diverges if online    │
+   │  (all inputs → same z)    collapses)                                │
+   │                                                                     │
+   │  Semantic drift            L_structured (KL anchors to known axes)  │
+   │  (dims lose meaning)                                                │
+   │                                                                     │
+   │  Bridge ignored            L_tok conditioned on z (if the bridge    │
+   │  (LLM bypasses stream B)  is ignored, L_tok gets worse)            │
+   │                                                                     │
+   │  Meaning conflation        L_contrastive (paraphrases must map      │
+   │  (different meanings       close, unrelated text must map far)      │
+   │   → same state)                                                     │
+   │                                                                     │
+   └─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C10. Research Convergence: Three Programs → One Target
+
+```
+═══════════════════════════════════════════════════════════════════════════
+    THREE INDEPENDENT RESEARCH PROGRAMS CONVERGING ON THE SAME TARGET
+═══════════════════════════════════════════════════════════════════════════
+
+   PROGRAM 1: JEPA                PROGRAM 2: LATENT         PROGRAM 3:
+   (LeCun / Meta)                 REASONING                 REPRESENTATION
+                                  (Meta FAIR /              ENGINEERING
+                                   various)                 (Zou / Hendrycks
+                                                             / Anthropic)
+
+   Starting question:             Starting question:        Starting question:
+   "What if we predict in         "What if we stop         "What if we read
+    embedding space instead        decoding reasoning        and steer hidden
+    of pixel/token space?"         steps to tokens?"        states directly?"
+
+   ┌──────────────┐              ┌──────────────┐          ┌──────────────┐
+   │  I-JEPA      │              │  Standard CoT │          │  Linear      │
+   │  (images)    │              │  (token-level) │          │  Probes      │
+   │  2023        │              │  2022          │          │  2022        │
+   └──────┬───────┘              └──────┬────────┘          └──────┬───────┘
+          │                             │                          │
+          ▼                             ▼                          ▼
+   ┌──────────────┐              ┌──────────────┐          ┌──────────────┐
+   │  V-JEPA      │              │  Coconut     │          │  RepE        │
+   │  (video)     │              │  (continuous  │          │  (concept    │
+   │  2024        │              │   thought)   │          │   vectors)   │
+   │              │              │  ICLR 2025   │          │  NeurIPS 2023│
+   └──────┬───────┘              └──────┬────────┘          └──────┬───────┘
+          │                             │                          │
+          ▼                             ▼                          ▼
+   ┌──────────────┐              ┌──────────────┐          ┌──────────────┐
+   │  V-JEPA 2    │              │Token Assorted │          │  REPA        │
+   │  (robotics)  │              │ (hybrid latent│          │  (17.5x      │
+   │  2025        │              │  + text)      │          │   speedup)   │
+   │              │              │ ICML 2025     │          │  ICLR 2025   │
+   └──────┬───────┘              └──────┬────────┘          └──────┬───────┘
+          │                             │                          │
+          ▼                             ▼                          ▼
+   ┌──────────────┐              ┌──────────────┐          ┌──────────────┐
+   │ ★ LLM-JEPA ★ │              │  Latent       │          │  LIRA        │
+   │  (language!) │              │  Reasoning    │          │  (repr-level │
+   │  Sep 2025    │              │  Superposition│          │   alignment) │
+   │              │              │  Oct 2025     │          │  ICLR 2025   │
+   └──────┬───────┘              └──────┬────────┘          └──────┬───────┘
+          │                             │                          │
+          └──────────────┬──────────────┘                          │
+                         │                                         │
+                         └──────────────┬──────────────────────────┘
+                                        │
+                                        ▼
+                         ┌────────────────────────────────┐
+                         │                                 │
+                         │       CONVERGENCE TARGET:       │
+                         │                                 │
+                         │   A system that LEARNS and      │
+                         │   REASONS in latent space,      │
+                         │   using tokens only for I/O.    │
+                         │                                 │
+                         │   • Predict in embedding space  │
+                         │   • Reason without decoding     │
+                         │   • Steer via representation    │
+                         │                                 │
+                         └─────────────┬───────────────────┘
+                                       │
+                                       ▼
+                         ┌────────────────────────────────┐
+                         │                                 │
+                         │     SymbolU sits at the         │
+                         │     INTERSECTION of all three:  │
+                         │                                 │
+                         │  JEPA:  Phase-JEPA predictor    │
+                         │  Latent: Sovereign State +      │
+                         │         Vijnana entropy gate    │
+                         │  RepE:  Ontological axes +      │
+                         │         phase rotation steering │
+                         │                                 │
+                         │  Open question:                 │
+                         │  Is the 32D structured          │
+                         │  bottleneck a STRENGTH          │
+                         │  (interpretability, efficiency) │
+                         │  or a WEAKNESS                  │
+                         │  (information loss)?            │
+                         │                                 │
+                         └────────────────────────────────┘
+```
+
+---
+
+### C11. JEPA Family Evolution Timeline
+
+```
+═══════════════════════════════════════════════════════════════════════════
+                 JEPA FAMILY: From Vision to Language
+═══════════════════════════════════════════════════════════════════════════
+
+                         Core Principle (LeCun 2022):
+                  "Predict in EMBEDDING space, not input space"
+
+   2023          2024          2025                    2025-26
+   ─────────────────────────────────────────────────────────────────
+
+   ┌─────────┐
+   │ I-JEPA  │   Images
+   │ (CVPR)  │   Masked patch prediction in latent space
+   └────┬────┘
+        │
+        │   ┌─────────┐
+        ├──►│ V-JEPA  │   Video
+        │   │ (Meta)  │   Spatiotemporal block prediction
+        │   └────┬────┘
+        │        │
+        │        │   ┌─────────┐
+        │        ├──►│ A-JEPA  │   Audio
+        │        │   │(Indep.) │   Time-frequency masking on spectrograms
+        │        │   └─────────┘
+        │        │
+        │        │   ┌─────────┐
+        │        ├──►│V-JEPA 2 │   Video + Robotics
+        │        │   │ (Meta)  │   1.2B params, robot manipulation
+        │        │   └─────────┘
+        │        │
+        │        │   ┌──────────┐
+        │        ├──►│ Speech   │   Speech
+        │        │   │ JEPA     │   Density-adaptive attn, 47.5 tok/s
+        │        │   │(Indep.)  │
+        │        │   └──────────┘
+        │        │
+        │        │   ┌──────────────┐
+        │        ├──►│ ★ LLM-JEPA ★ │   Language ← FIRST FOR TEXT
+        │        │   │(LeCun et al.)│   Hybrid NTP + JEPA embedding loss
+        │        │   │ Sep 2025     │   +14.17pp on NL-to-Regex
+        │        │   └──────────────┘
+        │        │
+        │        │   ┌──────────────┐
+        │        ├──►│ VL-JEPA      │   Vision-Language
+        │        │   │ (Meta FAIR)  │   Predicts text embeddings
+        │        │   │ Dec 2025     │   50% fewer trainable params
+        │        │   └──────────────┘
+        │        │
+        │        │   ┌──────────────┐
+        │        └──►│ LeJEPA       │   Theory
+        │            │(LeCun &      │   Complete mathematical axioms
+        │            │ Balestriero) │   Two axioms: prediction + isotropic
+        │            │ Nov 2025     │   Gaussian embedding constraint
+        │            └──────────────┘
+        │
+        │
+        │        ┌──────────────────────────────────────────────────┐
+        │        │  SymbolU Phase-JEPA (this system)                │
+        └───────►│                                                  │
+                 │  Modality: Text (semantic state trajectories)    │
+                 │  Prediction target: 32D Sovereign State deltas   │
+                 │  Unique: structured dimensions, not raw embeds   │
+                 │  Unique: Vritti epistemological classification    │
+                 │  Status: Implemented, synthetic validation only  │
+                 └──────────────────────────────────────────────────┘
+
+
+   KEY ARCHITECTURAL DIFFERENCES:
+
+   ┌────────────────────┬─────────────────┬─────────────────────────┐
+   │                    │ LLM-JEPA        │ SymbolU Phase-JEPA       │
+   │                    │ (Huang/LeCun)   │ (this system)            │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Prediction target  │ View B embed    │ State delta ΔS          │
+   │                    │ from View A     │ (temporal)               │
+   │                    │ (cross-modal)   │                         │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Dimensionality     │ Model dim       │ 32D structured           │
+   │                    │ (768-4096D)     │                         │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Structure          │ None (learned)  │ Named dims (Kosha,      │
+   │                    │                 │  Vritti, Guna, Bhava)   │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Write-back         │ None (loss only)│ Phase rotation on attn  │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Governance         │ None            │ 3-signal disagreement   │
+   ├────────────────────┼─────────────────┼─────────────────────────┤
+   │ Validated at scale │ Yes (+14.17pp)  │ No (synthetic only)     │
+   └────────────────────┴─────────────────┴─────────────────────────┘
+```
+
+---
+
+### C12. Kosha Gyroscope: Homeostatic Balance System
+
+```
+═══════════════════════════════════════════════════════════════════════════
+        KOSHA GYROSCOPE: Maintaining Cognitive Balance Across Sheaths
+═══════════════════════════════════════════════════════════════════════════
+
+   The gyroscope prevents the system from getting "stuck" in a single
+   cognitive sheath or oscillating chaotically between them.
+
+
+   z_t[12:17] — the 5 Kosha activations
+        │
+        ▼
+   ┌───────────────────────────────────────────────────────────┐
+   │  CURRENT KOSHA DISTRIBUTION                                │
+   │                                                            │
+   │  Annamaya  ██░░░░░░░░  0.15  (literal/surface)            │
+   │  Pranamaya ████░░░░░░  0.35  (energy/flow)                │
+   │  Manomaya  ██████░░░░  0.55  (pattern/memory)    ← dominant│
+   │  Vijnanamaya████░░░░░  0.40  (logic/analysis)             │
+   │  Anandamaya █░░░░░░░░  0.10  (creative/expansive)         │
+   │                                                            │
+   └──────────────────────┬────────────────────────────────────┘
+                          │
+                          ▼
+   ┌───────────────────────────────────────────────────────────┐
+   │  BALANCE PRESSURE COMPUTATION                              │
+   │                                                            │
+   │  For each sheath pair, compute pressure:                   │
+   │                                                            │
+   │  Adjacent sheaths should have smooth transitions.           │
+   │  Large jumps → imbalance pressure → correction needed.     │
+   │                                                            │
+   │  pressure_i = |kosha_i - kosha_{i+1}| - smooth_threshold  │
+   │                                                            │
+   │  Total pressure = Σ max(0, pressure_i)                     │
+   └──────────────────────┬────────────────────────────────────┘
+                          │
+                 ┌────────┴────────┐
+                 ▼                 ▼
+   ┌──────────────────┐  ┌──────────────────────┐
+   │  BALANCED         │  │  IMBALANCED           │
+   │  (pressure < τ)   │  │  (pressure ≥ τ)       │
+   │                    │  │                       │
+   │  Continue          │  │  Detect pathology:    │
+   │  normally          │  │                       │
+   └──────────────────┘  │  ┌─────────────────┐  │
+                          │  │ LOOPING          │  │
+                          │  │ Same sheaths     │  │
+                          │  │ oscillating      │  │
+                          │  │ → dampen by      │  │
+                          │  │   averaging      │  │
+                          │  └─────────────────┘  │
+                          │                       │
+                          │  ┌─────────────────┐  │
+                          │  │ FIXATION         │  │
+                          │  │ Stuck in one     │  │
+                          │  │ sheath too long  │  │
+                          │  │ → nudge toward   │  │
+                          │  │   adjacent       │  │
+                          │  └─────────────────┘  │
+                          │                       │
+                          │  ┌─────────────────┐  │
+                          │  │ COLLAPSE         │  │
+                          │  │ All sheaths at   │  │
+                          │  │ same activation  │  │
+                          │  │ → lost structure │  │
+                          │  │ → flag as error  │  │
+                          │  └─────────────────┘  │
+                          └──────────────────────┘
+
+
+   GYROSCOPE FEEDBACK LOOP:
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │                                                              │
+   │   z_t[12:17]                                                 │
+   │       │                                                      │
+   │       ▼                                                      │
+   │   Gyroscope computes pressure ──► adjustment signal          │
+   │                                        │                     │
+   │                                        ▼                     │
+   │                              ┌──────────────────┐           │
+   │                              │ Adjusts thresholds│           │
+   │                              │ for governance:   │           │
+   │                              │                   │           │
+   │                              │ • Vritti anomaly  │           │
+   │                              │   thresholds      │           │
+   │                              │ • Ontology drift  │           │
+   │                              │   sensitivity     │           │
+   │                              │ • Entropy gate τ  │           │
+   │                              └──────────────────┘           │
+   │                                                              │
+   │   "The gyroscope doesn't change WHAT is processed,          │
+   │    it changes HOW SENSITIVELY the system responds."          │
+   │                                                              │
+   └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### C13. Complete Data Flow: One Token's Journey Through the System
+
+```
+═══════════════════════════════════════════════════════════════════════════
+   ONE TOKEN'S JOURNEY: Tracing "contract" Through Every Subsystem
+═══════════════════════════════════════════════════════════════════════════
+
+   Input: "The contract specifies delivery by March"
+   Focus: token "contract" at position t=2
+
+
+   STAGE 0: PHONEME CSR
+   ─────────────────────
+   "contract" → [K, AA, N, T, R, AE, K, T]
+                     │
+                     ▼
+   Phoneme profile:  Plosives(K,T): O3_EXECUTION ↑
+                     Nasal(N): O5_COGNITION ↑
+   Resonance with "specifies": 0.72 (HARMONIC)
+   Decision: proceed to transformer ✓
+   z_p = [0.1, 0.0, 0.7, 0.1, 0.4, 0.0, 0.2, 0.0, 0.1, 0.0]
+          ───                 ─────       ───
+          low O1              high O3     mid O5
+
+
+   STAGE 1: TRANSFORMER
+   ─────────────────────
+   Token "contract" → embedding → 12 layers
+        │
+        ├── Layer 1: h_L1 ∈ R^768
+        │   relational_role: "nominal subject" (MI=0.473)
+        │   Structure crystallized: this is a noun acting as subject
+        │
+        └── Layer 7: h_L7 ∈ R^768
+            concreteness: 0.72 (concrete concept)
+            categorical_type: "legal/institutional"
+            Best semantic alignment (MI=0.375)
+
+
+   STAGE 2: BRIDGE
+   ────────────────
+   h_L7 → SovereignStateProjector → z_t ∈ R³²
+
+   z_t = [Bhavas: legal=0.4, institutional=0.3, ...  |  ← [0:12]
+          Koshas: anna=0.1, prana=0.2, mano=0.6,     |  ← [12:17]
+                  vijna=0.7, ananda=0.1               |
+          Vrittis: pramana=0.8, viparyaya=0.02,       |  ← [17:22]
+                   vikalpa=0.05, smrti=0.1, nidra=0.03|
+          Gunas: sattva=0.6, rajas=0.3, tamas=0.1    |  ← [22:28]
+          Sankalpa: [0.2, 0.5, -0.1, 0.3]            ]  ← [28:32]
+
+
+   STAGE 3: PARALLEL PROCESSING
+   ─────────────────────────────
+
+   A) JEPA:        z_t → ΔS = [+0.02, -0.01, ...]
+                   z_hat_{t+1} predicts "specifies" will
+                   maintain legal domain, shift slightly
+                   toward action/execution
+
+   B) Ontology:    z_t → o_t = [concreteness=0.72,
+                                 relational=0.85,
+                                 categorical=legal,
+                                 modific_load=0.15]
+                   → centroid distance: 0.12 (within "legal" cluster)
+
+   C) Kosha:       z_t[12:17] → balance pressure = 0.08 (low, balanced)
+                   Dominant: Vijnanamaya (analytical processing)
+
+   D) Guna:        z_t[22:28] → sattva-dominant (clear, focused)
+                   No adjustment needed
+
+   E) Vritti:      z_t[17:22] → Pramana dominant (0.8)
+                   Valid cognition: model confident and accurate
+
+
+   STAGE 4: GOVERNANCE
+   ────────────────────
+   Signal 1 (trajectory): ||z_{t+1} - z_hat|| = 0.05  (small, on track)
+   Signal 2 (ontology):   ||o_{t+1} - legal_centroid|| = 0.12  (stable)
+   Signal 3 (residual):   Bridge(z_actual - z_predicted) = [0.01, ...]
+
+   REGIME: NORMAL (neither signal fires)
+   ACTION: continue generation
+
+   Cross-check with CSR:
+   CSR says O3_EXECUTION = high (plosives K,T)
+   Bridge says legal/institutional = high
+   AGREEMENT ✓ (legal text with executive force)
+
+
+   STAGE 5: OUTPUT (Phase 2)
+   ──────────────────────────
+   Anomaly report: {regime: "normal", confidence: 0.95}
+   Next token generated normally by LLM
+
+
+   STAGES 6-7 (Phase 3/4, NOT YET ACTIVE):
+   ─────────────────────────────────────────
+   Phase 3 would: apply θ rotation to bias toward legal/analytical terms
+   Phase 4 would: check entropy, potentially loop if uncertain
+```
