@@ -17881,7 +17881,11 @@ def train(config: UnifiedTrainingConfig):
                                 health_batch = cached_val_batches[0]
                             else:
                                 health_batch = next(iter(val_loader))
-                            health_x = health_batch[0][:4].to(device)  # Small batch for efficiency
+                            # V11.2: Truncate to avoid OOM — full seq_len forward
+                            # pass without TBPTT allocates [B,H,N,N] attention
+                            # (~25 GiB at N=32768). 512 tokens is plenty for
+                            # phase health metrics (collapse, drift, redundancy).
+                            health_x = health_batch[0][:1, :512].to(device)
                             _ = model(health_x)
                         health_metrics = compute_phase_health_diagnostics(model)
                         enable_health_diagnostics_capture(model, False)
