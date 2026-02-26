@@ -564,11 +564,24 @@ def _print_summary(results, args):
     print("  Speed     = % throughput change (tok/s) from Standard to TBPTT")
     print()
     print("EXPECTED at same batch size:")
-    print("  - TBPTT saves memory at cost of ~10-20% speed")
-    print("  - Memory savings grow with seq_len / chunk_size ratio")
+    print("  - Memory savings scale with seq_len/chunk_size ratio:")
+    print("      1:1 ratio  → ~0%    (no chunking benefit)")
+    print("      2:1 ratio  → ~30%")
+    print("      4:1 ratio  → ~60%")
+    print("      8:1 ratio  → ~80%+")
+    print("  - Speed overhead also scales with ratio:")
+    print("      1:1 ratio  → <5%   overhead")
+    print("      2:1 ratio  → ~30-50% overhead")
+    print("      4:1+ ratio → ~50-85% overhead (more chunks = more passes)")
+    print("  - TBPTT peak memory plateaus at O(chunk_size), not O(seq_len)")
     print()
-    print("REAL WIN: use --batch_sweep to see how freed memory enables")
-    print("  larger batches → higher throughput → fewer GPUs needed")
+    print("REAL WIN — memory savings → larger batches → higher throughput:")
+    print("  Use --batch_sweep to demonstrate. Best shown when Standard OOMs")
+    print("  at large batch sizes but TBPTT still fits. Recommended configs:")
+    print("    - Larger model: --embed_dim 512 --num_layers 12 --num_heads 8")
+    print("    - Longer seqs:  --seq_lengths 4096 8192 16384")
+    print("    - Smaller GPU:  16GB T4/V100 instead of 80GB A100")
+    print("    - Wide sweep:   --batch_sweep 1 2 4 8 16 32 64 128")
 
 
 def _print_batch_sweep_summary(std_results, tbptt_results, seq_len, args):
@@ -600,10 +613,33 @@ def _print_batch_sweep_summary(std_results, tbptt_results, seq_len, args):
         if speedup > 1:
             gpu_equiv = 1.0 / speedup
             print(f"  -> Equivalent GPU savings: {(1 - gpu_equiv) * 100:.0f}% fewer GPUs needed")
+    # Same-batch comparison at highest common batch size
+    common = set(r['bs'] for r in std_results if r['status'] == 'OK') & \
+             set(r['bs'] for r in tbptt_results if r['status'] == 'OK')
+    if common:
+        max_common = max(common)
+        std_at_common = next(r for r in std_results if r['bs'] == max_common)
+        tbptt_at_common = next(r for r in tbptt_results if r['bs'] == max_common)
+        if (std_at_common['tps'] and tbptt_at_common['tps']
+                and std_at_common['tps'] > 0):
+            overhead = (1 - tbptt_at_common['tps'] / std_at_common['tps']) * 100
+            print(f"  Same-BS overhead at BS={max_common}: "
+                  f"{overhead:+.0f}% (TBPTT vs Standard)")
+
     print()
     print("INTERPRETATION:")
-    print("  At the SAME batch size, TBPTT is slightly slower (chunking overhead).")
-    print("  But TBPTT fits LARGER batches → higher total throughput → fewer GPUs.")
+    print("  At the SAME batch size, TBPTT is slower (chunking overhead scales")
+    print("  with seq_len/chunk_size ratio — expect 30-85% at ratios 2:1–8:1).")
+    if max_std > 0 and max_tbptt > max_std:
+        print("  But TBPTT fits LARGER batches → higher total throughput → fewer GPUs.")
+    elif max_std == max_tbptt:
+        print("  Both modes fit all tested batch sizes — this GPU has ample memory.")
+        print("  To see TBPTT's throughput win, try a larger model or longer sequences")
+        print("  so Standard OOMs before TBPTT does.")
+    print()
+    print("  Recommended configs to demonstrate the throughput advantage:")
+    print("    --embed_dim 512 --num_layers 12 --num_heads 8 --seq_lengths 4096")
+    print("    --batch_sweep 1 2 4 8 16 32 64 128")
 
 
 # ---------------------------------------------------------------------------
