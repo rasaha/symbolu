@@ -15574,6 +15574,7 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  [TBPTT] ACTIVE: seq={x.shape[1]}, chunk={config.chunk_size}, "
                               f"chunks={((x.shape[1] + config.chunk_size - 1) // config.chunk_size)}")
                     if device.type == 'cuda':
+                        _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
                     tbptt_result = forward_chunked_tbptt(
                         model=model,
@@ -15594,7 +15595,10 @@ def train(config: UnifiedTrainingConfig):
                     # Log peak allocated memory on first iteration (actual tensor memory, not pool)
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                        print(f"  [TBPTT] Peak allocated memory: {peak_alloc:.2f} GB")
+                        _tbptt_delta = peak_alloc - _mem_baseline
+                        print(f"  [TBPTT] Memory: baseline={_mem_baseline:.2f} GB (model+optim), "
+                              f"peak={peak_alloc:.2f} GB, delta={_tbptt_delta:.2f} GB (activations)")
+                        _mem_baseline = 0.0  # cleanup
                 elif use_chunking:
                     # Chunked forward: splits sequence, maintains Phase state
                     outputs = forward_chunked(
@@ -15605,6 +15609,7 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     # Standard forward: process full sequence at once
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
+                        _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
                     outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
 
@@ -16972,7 +16977,10 @@ def train(config: UnifiedTrainingConfig):
             # V10.7.1: Report peak allocated on first iteration for standard path
             if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                 peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                print(f"  [Standard] Peak allocated memory: {peak_alloc:.2f} GB")
+                _std_delta = peak_alloc - _mem_baseline
+                print(f"  [Standard] Memory: baseline={_mem_baseline:.2f} GB (model+optim), "
+                      f"peak={peak_alloc:.2f} GB, delta={_std_delta:.2f} GB (activations)")
+                _mem_baseline = 0.0  # cleanup
 
         running_loss += loss.item() * config.gradient_accumulation
         accumulation_step += 1
@@ -17450,14 +17458,14 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage — show peak allocated (captures forward+backward max)
-                    # V10.7.1: Peak allocated is what TBPTT actually reduces;
-                    # current allocated post-backward is same for both (model+optim only)
+                    # V10.7.2: Show true total peak (no reset between steps)
+                    # mem_alloc = current allocated (model+optim+residual)
+                    # mem_peak = all-time peak (captures forward+backward max)
                     if device.type == "cuda":
+                        mem_alloc = torch.cuda.memory_allocated() / (1024**3)
                         mem_peak = torch.cuda.max_memory_allocated() / (1024**3)
                         mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                        mem_str = f" | Peak: {mem_peak:.1f}GB/{mem_total:.1f}GB"
-                        torch.cuda.reset_peak_memory_stats()
+                        mem_str = f" | Mem: {mem_alloc:.1f}GB, Peak: {mem_peak:.1f}GB/{mem_total:.1f}GB"
                     else:
                         mem_str = ""
 
