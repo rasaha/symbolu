@@ -21237,6 +21237,7 @@ def main():
         no_protected_phase=args.no_protected_phase,
         run_chunk_diagnostic=args.run_chunk_diagnostic,
         chunk_diagnostic_seq_len=args.chunk_diagnostic_seq_len,
+        enable_tbptt=args.enable_tbptt,
         # BCVF Contrastive Structural Pressure on Representations
         use_bcvf_contrastive=args.use_bcvf_contrastive,
         bcvf_contrastive_lambda=args.bcvf_contrastive_lambda,
