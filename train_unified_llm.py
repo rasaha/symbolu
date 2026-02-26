@@ -9640,6 +9640,7 @@ class UnifiedTrainingConfig:
     # Checkpointing
     checkpoint_dir: str = "checkpoints_unified"
     save_every: int = 1000
+    no_save: bool = False  # Skip all checkpoint saving (useful for benchmark runs)
     eval_every: int = 100
     log_every: int = 10
 
@@ -10811,9 +10812,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         # Create SymbolU12 with Bhava
         bhava_config = SymbolU12BhavaConfig(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
+            embed_dim=embed_dim,
             max_seq_len=config.max_seq_len,
-            num_heads=preset["num_heads"],
+            num_heads=num_heads,
             bhava_embed_dim=config.bhava_embed_dim,
             num_drishti_heads=config.num_drishti_heads,
         )
@@ -10832,10 +10833,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = PhaseTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             sync_steps=config.sync_steps,
@@ -10854,10 +10855,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         use_protected_phase = config.protected_phase and not config.no_protected_phase
         model = HybridPhaseTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             local_layers=config.local_layers,
@@ -10899,18 +10900,18 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.use_9_3_split:
             gen2_num_layers = config.authority_layers + config.sensory_layers
         else:
-            gen2_num_layers = preset["num_layers"]
+            gen2_num_layers = num_layers
 
         # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
         gen2_config = SymbolU12Gen2Config(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_heads=preset["num_heads"],
+            embed_dim=embed_dim,
+            num_heads=num_heads,
             num_layers=gen2_num_layers,
             complex_dim=64,  # Complex embedding dimension
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
-            ffn_mult=preset["ff_dim"] / preset["embed_dim"],
+            ffn_mult=ff_dim / embed_dim,
         )
 
         model = SymbolU12Gen2(gen2_config)
@@ -10925,10 +10926,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = StandardTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             tie_embeddings=tie_emb,
@@ -13056,11 +13057,22 @@ def compute_phase_loss(
     )
 
     # Compute entropy for Sattvic controller (prevents variance=0.0 stagnation bug)
+    # V10.7.2: Chunk over sequence dim to avoid OOM at long sequences
+    # (full softmax [B,N,V] = B*N*V*4 bytes, e.g. 24GB at seq=32k, V=50k)
     with torch.no_grad():
-        probs = F.softmax(logits, dim=-1)
-        token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        chunk_size = max(1, min(1024, N))  # Process 1024 tokens at a time
+        entropy_sum = 0.0
+        token_count = 0
+        for start in range(0, N, chunk_size):
+            end = min(start + chunk_size, N)
+            chunk_logits = logits[:, start:end, :]  # [B, chunk, V]
+            probs = F.softmax(chunk_logits, dim=-1)
+            token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+            entropy_sum += token_entropy.sum().item()
+            token_count += token_entropy.numel()
+            del probs, token_entropy, chunk_logits
         max_entropy = math.log(V)
-        normalized_entropy = (token_entropy / max_entropy).mean().item()
+        normalized_entropy = (entropy_sum / token_count) / max_entropy
 
     metrics = {
         "lm_loss": lm_loss.item(),
@@ -15574,6 +15586,7 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  [TBPTT] ACTIVE: seq={x.shape[1]}, chunk={config.chunk_size}, "
                               f"chunks={((x.shape[1] + config.chunk_size - 1) // config.chunk_size)}")
                     if device.type == 'cuda':
+                        _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
                     tbptt_result = forward_chunked_tbptt(
                         model=model,
@@ -15594,7 +15607,10 @@ def train(config: UnifiedTrainingConfig):
                     # Log peak allocated memory on first iteration (actual tensor memory, not pool)
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                        print(f"  [TBPTT] Peak allocated memory: {peak_alloc:.2f} GB")
+                        _tbptt_delta = peak_alloc - _mem_baseline
+                        print(f"  [TBPTT] Memory: baseline={_mem_baseline:.2f} GB (model+optim), "
+                              f"peak={peak_alloc:.2f} GB, delta={_tbptt_delta:.2f} GB (activations)")
+                        _mem_baseline = 0.0  # cleanup
                 elif use_chunking:
                     # Chunked forward: splits sequence, maintains Phase state
                     outputs = forward_chunked(
@@ -15605,6 +15621,7 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     # Standard forward: process full sequence at once
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
+                        _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
                     outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
 
@@ -16972,7 +16989,10 @@ def train(config: UnifiedTrainingConfig):
             # V10.7.1: Report peak allocated on first iteration for standard path
             if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                 peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                print(f"  [Standard] Peak allocated memory: {peak_alloc:.2f} GB")
+                _std_delta = peak_alloc - _mem_baseline
+                print(f"  [Standard] Memory: baseline={_mem_baseline:.2f} GB (model+optim), "
+                      f"peak={peak_alloc:.2f} GB, delta={_std_delta:.2f} GB (activations)")
+                _mem_baseline = 0.0  # cleanup
 
         running_loss += loss.item() * config.gradient_accumulation
         accumulation_step += 1
@@ -17450,14 +17470,14 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage — show peak allocated (captures forward+backward max)
-                    # V10.7.1: Peak allocated is what TBPTT actually reduces;
-                    # current allocated post-backward is same for both (model+optim only)
+                    # V10.7.2: Show true total peak (no reset between steps)
+                    # mem_alloc = current allocated (model+optim+residual)
+                    # mem_peak = all-time peak (captures forward+backward max)
                     if device.type == "cuda":
+                        mem_alloc = torch.cuda.memory_allocated() / (1024**3)
                         mem_peak = torch.cuda.max_memory_allocated() / (1024**3)
                         mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                        mem_str = f" | Peak: {mem_peak:.1f}GB/{mem_total:.1f}GB"
-                        torch.cuda.reset_peak_memory_stats()
+                        mem_str = f" | Mem: {mem_alloc:.1f}GB, Peak: {mem_peak:.1f}GB/{mem_total:.1f}GB"
                     else:
                         mem_str = ""
 
@@ -17862,7 +17882,11 @@ def train(config: UnifiedTrainingConfig):
                                 health_batch = cached_val_batches[0]
                             else:
                                 health_batch = next(iter(val_loader))
-                            health_x = health_batch[0][:4].to(device)  # Small batch for efficiency
+                            # V11.2: Truncate to avoid OOM — full seq_len forward
+                            # pass without TBPTT allocates [B,H,N,N] attention
+                            # (~25 GiB at N=32768). 512 tokens is plenty for
+                            # phase health metrics (collapse, drift, redundancy).
+                            health_x = health_batch[0][:1, :512].to(device)
                             _ = model(health_x)
                         health_metrics = compute_phase_health_diagnostics(model)
                         enable_health_diagnostics_capture(model, False)
@@ -18705,28 +18729,29 @@ def train(config: UnifiedTrainingConfig):
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    # V9.8.10: Restore scheduled alpha before saving checkpoint
-                    # (InvertedLayerCurriculum may have modified it during validation)
-                    update_alpha_schedule(model, global_step, config)
-                    save_checkpoint(
-                        model, optimizer, scheduler, global_step, best_val_loss,
-                        ckpt_dir / "best.pt",
-                        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
-                        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
-                        sgp_state=sgp_controller.get_state() if sgp_controller else None,
-                        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
-                        srk_state=srk.get_checkpoint_state() if srk else None,
-                        scaler_state=scaler.state_dict() if scaler else None,
-                        # V9.8.6: Three-Phase Curriculum states
-                        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
-                        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
-                        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
-                        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
-                        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
-                        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
-                        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
-                    )
-                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                    if not config.no_save:
+                        # V9.8.10: Restore scheduled alpha before saving checkpoint
+                        # (InvertedLayerCurriculum may have modified it during validation)
+                        update_alpha_schedule(model, global_step, config)
+                        save_checkpoint(
+                            model, optimizer, scheduler, global_step, best_val_loss,
+                            ckpt_dir / "best.pt",
+                            hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                            drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                            sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                            sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+                            srk_state=srk.get_checkpoint_state() if srk else None,
+                            scaler_state=scaler.state_dict() if scaler else None,
+                            # V9.8.6: Three-Phase Curriculum states
+                            csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                            kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                            onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                            pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                            kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                            evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                            kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+                        )
+                        print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -18752,7 +18777,7 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
             # Save checkpoint (overwrites last.pt each time)
-            if global_step % config.save_every == 0:
+            if global_step % config.save_every == 0 and not config.no_save:
                 # V9.8.10: Ensure scheduled alpha is applied before saving
                 update_alpha_schedule(model, global_step, config)
                 save_checkpoint(
@@ -18773,35 +18798,36 @@ def train(config: UnifiedTrainingConfig):
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                 )
-                print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
+                print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.save_state()
 
     # Final save
-    # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
-    update_alpha_schedule(model, global_step, config)
-    save_checkpoint(
-        model, optimizer, scheduler, global_step, best_val_loss,
-        ckpt_dir / "final.pt",
-        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
-        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
-        sgp_state=sgp_controller.get_state() if sgp_controller else None,
-        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
-        srk_state=srk.get_checkpoint_state() if srk else None,
-        scaler_state=scaler.state_dict() if scaler else None,
-        # V9.8.6: Three-Phase Curriculum states
-        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
-        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
-        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
-        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
-        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
-        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
-        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
-    )
-    # v2.7 Training State Tracker: Save final state
-    if training_state_tracker is not None and training_state_tracker.enabled:
-        training_state_tracker.save_state()
+    if not config.no_save:
+        # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
+        update_alpha_schedule(model, global_step, config)
+        save_checkpoint(
+            model, optimizer, scheduler, global_step, best_val_loss,
+            ckpt_dir / "final.pt",
+            hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+            drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+            sgp_state=sgp_controller.get_state() if sgp_controller else None,
+            sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+            srk_state=srk.get_checkpoint_state() if srk else None,
+            scaler_state=scaler.state_dict() if scaler else None,
+            # V9.8.6: Three-Phase Curriculum states
+            csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+            kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+            onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+            pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+            kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+            evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+            kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+        )
+        # v2.7 Training State Tracker: Save final state
+        if training_state_tracker is not None and training_state_tracker.enabled:
+            training_state_tracker.save_state()
 
     # Close TensorBoard
     if tb_writer is not None:
@@ -18815,7 +18841,10 @@ def train(config: UnifiedTrainingConfig):
     print(f"  Best Val PPL: {math.exp(best_val_loss):.2f}")
     if authority_controller is not None:
         print(f"  Final Authority: {authority_controller.A:.3f}")
-    print(f"  Final Checkpoint: {ckpt_dir / 'final.pt'}")
+    if not config.no_save:
+        print(f"  Final Checkpoint: {ckpt_dir / 'final_*.pt'}")
+    else:
+        print(f"  Checkpoints: skipped (--no_save)")
 
     # ==========================================================================
     # Phase Rotation Test (if enabled)
@@ -18898,23 +18927,72 @@ def evaluate(
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
                     # V10.2.2: Support chunked evaluation
-                    use_chunking = (
-                        hasattr(config, 'enable_chunking') and
-                        config.enable_chunking and
+                    # V10.7.2: Also chunk when TBPTT is enabled (long sequences)
+                    # Chunked eval computes loss per-chunk to avoid OOM on full [B,N,V] logits
+                    use_eval_chunking = (
                         config.model_type == 'hybrid' and
-                        x.shape[1] > config.chunk_size
+                        x.shape[1] > getattr(config, 'chunk_size', 256) and
+                        (
+                            (hasattr(config, 'enable_chunking') and config.enable_chunking) or
+                            (hasattr(config, 'enable_tbptt') and config.enable_tbptt)
+                        )
                     )
 
-                    if use_chunking:
-                        output = forward_chunked(model, x, chunk_size=config.chunk_size)
+                    if use_eval_chunking:
+                        # V10.7.2: Chunked eval — compute loss per-chunk, never materialize full logits
+                        eval_chunk_size = getattr(config, 'chunk_size', 256)
+                        B_eval, N_eval = x.shape
+                        chunk_loss_sum = 0.0
+                        chunk_entropy_sum = 0.0
+                        chunk_token_count = 0
+                        layer_states_eval = None
+                        V_eval = None
+
+                        for cs in range(0, N_eval, eval_chunk_size):
+                            ce = min(cs + eval_chunk_size, N_eval)
+                            chunk_ids = x[:, cs:ce]
+                            chunk_targets = y[:, cs:ce]
+                            result, layer_states_eval = model.forward_chunk(
+                                chunk_ids, chunk_offset=cs, prev_layer_states=layer_states_eval,
+                            )
+                            chunk_logits = result['logits']  # [B, chunk, V]
+                            if V_eval is None:
+                                V_eval = chunk_logits.shape[-1]
+                            n_tokens = (chunk_targets != -100).sum().item()
+                            if n_tokens > 0:
+                                chunk_ce = F.cross_entropy(
+                                    chunk_logits.reshape(-1, V_eval),
+                                    chunk_targets.reshape(-1),
+                                    ignore_index=-100,
+                                    reduction='sum',
+                                )
+                                chunk_loss_sum += chunk_ce.item()
+                                # Entropy per chunk (for Sattvic controller)
+                                with torch.no_grad():
+                                    probs = F.softmax(chunk_logits, dim=-1)
+                                    ent = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+                                    chunk_entropy_sum += ent.sum().item()
+                                chunk_token_count += n_tokens
+                            del chunk_logits, result
+
+                        avg_ce = chunk_loss_sum / max(chunk_token_count, 1)
+                        max_ent = math.log(V_eval) if V_eval else 1.0
+                        avg_entropy = (chunk_entropy_sum / max(chunk_token_count, 1)) / max_ent
+                        loss = torch.tensor(avg_ce, device=device)
+                        metrics = {
+                            "lm_loss": avg_ce,
+                            "ppl": math.exp(min(avg_ce, 20)),
+                            "total_loss": avg_ce,
+                            "onto_entropy": avg_entropy,
+                        }
                     else:
                         output = model(x)
 
-                    if isinstance(output, dict):
-                        logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
-                    else:
-                        logits = output
-                    loss, metrics = compute_phase_loss(logits, y, config)
+                        if isinstance(output, dict):
+                            logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                        else:
+                            logits = output
+                        loss, metrics = compute_phase_loss(logits, y, config)
 
             total_loss += loss.item()
             total_batches += 1
@@ -19112,12 +19190,24 @@ def save_checkpoint(
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
-    For last.pt checkpoints, explicitly removes old file before saving new one
-    to ensure clean replacement and avoid potential corruption.
+    Uses split-file format to avoid network filesystem (RunPod MFS/FUSE) write
+    limits (~2GB per file). Saves three files:
+      {stem}_model.pt  - model state_dict
+      {stem}_optim.pt  - optimizer state_dict
+      {stem}_meta.pt   - scheduler, step, RNG states, auxiliary controller states
+
+    For backwards compatibility, load_checkpoint handles both single-file and
+    split-file formats transparently.
     """
-    checkpoint = {
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
+    stem = path.parent / path.stem  # e.g. checkpoints_unified/best
+
+    model_path = Path(f"{stem}_model.pt")
+    optim_path = Path(f"{stem}_optim.pt")
+    meta_path = Path(f"{stem}_meta.pt")
+
+    # Build metadata dict (small — always fits in a single file)
+    meta = {
+        "split_format": True,  # Sentinel for load_checkpoint
         "scheduler": scheduler.state_dict(),
         "step": step,
         "best_val_loss": best_val_loss,
@@ -19126,62 +19216,47 @@ def save_checkpoint(
 
     # Add CUDA RNG state if available
     if torch.cuda.is_available():
-        checkpoint["cuda_rng_state"] = torch.cuda.get_rng_state()
+        meta["cuda_rng_state"] = torch.cuda.get_rng_state()
 
-    # Add HGS state if provided
+    # Add auxiliary controller states
     if hgs_state is not None:
-        checkpoint["hgs_state"] = hgs_state
-
-    # Add DRC state if provided
+        meta["hgs_state"] = hgs_state
     if drc_state is not None:
-        checkpoint["drc_state"] = drc_state
-
-    # Add SGP state if provided
+        meta["drc_state"] = drc_state
     if sgp_state is not None:
-        checkpoint["sgp_state"] = sgp_state
-
-    # Add Sattvic Controller state if provided
+        meta["sgp_state"] = sgp_state
     if sattvic_state is not None:
-        checkpoint["sattvic_state"] = sattvic_state
-
-    # V9.8.0: Add SRK state if provided
+        meta["sattvic_state"] = sattvic_state
     if srk_state is not None:
-        checkpoint["srk_state"] = srk_state
-
-    # V9.8.1: Add AMP GradScaler state if provided
+        meta["srk_state"] = srk_state
     if scaler_state is not None:
-        checkpoint["scaler_state"] = scaler_state
-
-    # V9.8.6: Add Three-Phase Curriculum states
+        meta["scaler_state"] = scaler_state
     if csr_curriculum_state is not None:
-        checkpoint["csr_curriculum_state"] = csr_curriculum_state
+        meta["csr_curriculum_state"] = csr_curriculum_state
     if kosha_curriculum_state is not None:
-        checkpoint["kosha_curriculum_state"] = kosha_curriculum_state
+        meta["kosha_curriculum_state"] = kosha_curriculum_state
     if onto_curriculum_state is not None:
-        checkpoint["onto_curriculum_state"] = onto_curriculum_state
+        meta["onto_curriculum_state"] = onto_curriculum_state
     if pidv2_curriculum_state is not None:
-        checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
-    # V9.8.6: Add Kosha Gyroscope state (InvertedCurriculumController)
+        meta["pidv2_curriculum_state"] = pidv2_curriculum_state
     if kosha_gyroscope_state is not None:
-        checkpoint["kosha_gyroscope_state"] = kosha_gyroscope_state
-    # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
+        meta["kosha_gyroscope_state"] = kosha_gyroscope_state
     if evoflow_state is not None:
-        checkpoint["evoflow_state"] = evoflow_state
-
-    # Kosha-Vritti Supervision state
+        meta["evoflow_state"] = evoflow_state
     if kv_supervisor_state is not None:
-        checkpoint["kv_supervisor_state"] = kv_supervisor_state
-
-    # V9.8.6: Add dataloader position for reproducibility
+        meta["kv_supervisor_state"] = kv_supervisor_state
     if dataloader_position is not None:
-        checkpoint["dataloader_position"] = dataloader_position
+        meta["dataloader_position"] = dataloader_position
 
-    # Explicitly remove old checkpoint before saving (especially for last.pt)
-    # This ensures clean replacement and frees disk space before writing
-    if path.exists():
-        path.unlink()
+    # Remove old files before saving (both single-file and split formats)
+    for p in [path, model_path, optim_path, meta_path]:
+        if p.exists():
+            p.unlink()
 
-    torch.save(checkpoint, path)
+    # Save each component as a separate file to stay under NFS write limits
+    torch.save(model.state_dict(), model_path)
+    torch.save(optimizer.state_dict(), optim_path)
+    torch.save(meta, meta_path)
 
 
 def load_checkpoint(
@@ -19194,8 +19269,11 @@ def load_checkpoint(
 ) -> Dict[str, Any]:
     """Load training checkpoint.
 
+    Handles both single-file format (legacy) and split-file format:
+      {stem}_model.pt + {stem}_optim.pt + {stem}_meta.pt
+
     Args:
-        path: Path to checkpoint file
+        path: Path to checkpoint file (e.g. checkpoints_unified/best.pt)
         model: Model to load weights into
         optimizer: Optimizer to restore state (None if weights_only)
         scheduler: Scheduler to restore state (None if weights_only)
@@ -19205,24 +19283,42 @@ def load_checkpoint(
     Returns:
         Dict with checkpoint info (step, best_val_loss, etc.)
     """
-    if not path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {path}")
+    # Detect split-file format: check for {stem}_model.pt
+    stem = path.parent / path.stem
+    model_path = Path(f"{stem}_model.pt")
+    optim_path = Path(f"{stem}_optim.pt")
+    meta_path = Path(f"{stem}_meta.pt")
+    use_split = model_path.exists()
 
-    print(f"\n  📂 Loading checkpoint from: {path}")
+    if not use_split and not path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {path} (also checked split format at {model_path})")
+
+    if use_split:
+        print(f"\n  📂 Loading split checkpoint from: {stem}_*.pt")
+    else:
+        print(f"\n  📂 Loading checkpoint from: {path}")
 
     # Load checkpoint with error handling for corrupted files
     try:
-        checkpoint = torch.load(path, map_location=device, weights_only=False)
+        if use_split:
+            # Split format: load model state separately
+            model_state_raw = torch.load(model_path, map_location=device, weights_only=False)
+            checkpoint = torch.load(meta_path, map_location=device, weights_only=False)
+            checkpoint["model"] = model_state_raw
+            # Optimizer loaded on-demand below (only if needed)
+        else:
+            checkpoint = torch.load(path, map_location=device, weights_only=False)
     except (EOFError, pickle.UnpicklingError, RuntimeError) as e:
         # Checkpoint file is corrupted or incomplete
-        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {path}")
+        ckpt_loc = f"{stem}_*.pt" if use_split else str(path)
+        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {ckpt_loc}")
         print(f"      Error: {type(e).__name__}: {e}")
         print(f"      This typically happens if training was interrupted during checkpoint save.")
         print(f"\n  Solutions:")
-        print(f"      1. Delete the corrupted checkpoint: rm {path}")
+        print(f"      1. Delete the corrupted checkpoint: rm {ckpt_loc}")
         print(f"      2. Use a different checkpoint: --resume <path_to_valid_checkpoint>")
         print(f"      3. Start from scratch: remove --resume flag")
-        raise RuntimeError(f"Cannot load corrupted checkpoint: {path}") from e
+        raise RuntimeError(f"Cannot load corrupted checkpoint: {ckpt_loc}") from e
 
     # Load model weights
     # Filter out runtime buffers that may have been saved with tensor values
@@ -19267,9 +19363,15 @@ def load_checkpoint(
         return result
 
     # Restore optimizer state
-    if optimizer is not None and "optimizer" in checkpoint:
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        print(f"    ✓ Optimizer state restored")
+    if optimizer is not None:
+        if use_split and optim_path.exists():
+            optim_state = torch.load(optim_path, map_location=device, weights_only=False)
+            optimizer.load_state_dict(optim_state)
+            del optim_state  # Free memory immediately
+            print(f"    ✓ Optimizer state restored (from split file)")
+        elif "optimizer" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            print(f"    ✓ Optimizer state restored")
 
     # Restore scheduler state
     if scheduler is not None and "scheduler" in checkpoint:
@@ -20043,6 +20145,8 @@ def main():
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
                        help="Save checkpoint every N steps")
+    parser.add_argument("--no_save", action="store_true",
+                       help="Skip all checkpoint saving (useful for benchmark runs with limited disk)")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints_unified",
                        help="Checkpoint directory")
 
@@ -20876,6 +20980,7 @@ def main():
         onto_rampdown_steps=args.onto_rampdown_steps,
         eval_every=args.eval_every,
         save_every=args.save_every,
+        no_save=args.no_save,
         checkpoint_dir=args.checkpoint_dir,
         no_coherence_loss=args.no_coherence_loss,
         seed=args.seed,
