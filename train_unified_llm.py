@@ -15449,6 +15449,9 @@ def train(config: UnifiedTrainingConfig):
         kv_supervisor.load_state_dict(resumed_kv_supervisor_state)
         print(f"  ✓ KV Supervision state restored from checkpoint")
 
+    # V10.7.1: Track first iteration for diagnostic logging (works with resumed training)
+    _first_iter_logged = False
+
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
         # This allows VRAM to stabilize after memory reallocation
@@ -15547,12 +15550,19 @@ def train(config: UnifiedTrainingConfig):
                 # V10.2.2: Chunked training for long sequences
                 # When enable_chunking is True, process sequence in chunks
                 # Phase state persists across chunks, Local resets per chunk
-                use_chunking = (
-                    hasattr(config, 'enable_chunking') and
-                    (config.enable_chunking or getattr(config, 'enable_tbptt', False)) and
-                    config.model_type == 'hybrid' and
-                    x.shape[1] > config.chunk_size  # Only chunk if sequence > chunk_size
-                )
+                _has_chunking_attr = hasattr(config, 'enable_chunking')
+                _chunking_or_tbptt = (config.enable_chunking or getattr(config, 'enable_tbptt', False)) if _has_chunking_attr else False
+                _is_hybrid = config.model_type == 'hybrid'
+                _seq_exceeds_chunk = x.shape[1] > config.chunk_size
+                use_chunking = _has_chunking_attr and _chunking_or_tbptt and _is_hybrid and _seq_exceeds_chunk
+
+                # V10.7.1: Log chunking decision on first iteration (works with resumed training)
+                if not _first_iter_logged and accumulation_step == 0:
+                    _tbptt_requested = getattr(config, 'enable_tbptt', False)
+                    print(f"  [CHUNK DEBUG] enable_chunking={getattr(config, 'enable_chunking', 'N/A')}, "
+                          f"enable_tbptt={_tbptt_requested}, model_type={config.model_type}, "
+                          f"seq_len={x.shape[1]}, chunk_size={config.chunk_size}, "
+                          f"use_chunking={use_chunking}")
 
                 # V10.7: TBPTT flag — backward happens inside forward_chunked_tbptt
                 tbptt_backward_done = False
@@ -15560,7 +15570,7 @@ def train(config: UnifiedTrainingConfig):
                 if use_chunking and getattr(config, 'enable_tbptt', False):
                     # V10.7: TBPTT chunked training — forward+backward per chunk
                     # Memory: O(C) instead of O(N). Backward is done inside.
-                    if global_step == 1 and accumulation_step == 0:
+                    if not _first_iter_logged and accumulation_step == 0:
                         print(f"  [TBPTT] ACTIVE: seq={x.shape[1]}, chunk={config.chunk_size}, "
                               f"chunks={((x.shape[1] + config.chunk_size - 1) // config.chunk_size)}")
                     if device.type == 'cuda':
@@ -15581,10 +15591,10 @@ def train(config: UnifiedTrainingConfig):
                     logits = None  # Not available in TBPTT (freed per-chunk)
                     outputs = {'logits': None}
                     tbptt_backward_done = True
-                    # Log peak allocated memory on first step (actual tensor memory, not pool)
-                    if global_step == 1 and accumulation_step == 0 and device.type == 'cuda':
+                    # Log peak allocated memory on first iteration (actual tensor memory, not pool)
+                    if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                        print(f"  [TBPTT] Peak allocated memory (step 1): {peak_alloc:.2f} GB")
+                        print(f"  [TBPTT] Peak allocated memory: {peak_alloc:.2f} GB")
                 elif use_chunking:
                     # Chunked forward: splits sequence, maintains Phase state
                     outputs = forward_chunked(
@@ -15594,7 +15604,7 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Standard forward: process full sequence at once
-                    if global_step == 1 and accumulation_step == 0 and device.type == 'cuda':
+                    if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         torch.cuda.reset_peak_memory_stats()
                     outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
 
@@ -16953,13 +16963,16 @@ def train(config: UnifiedTrainingConfig):
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-            # V10.7.1: Report peak allocated on first step for standard path
-            if global_step == 1 and accumulation_step == 0 and device.type == 'cuda':
+            # V10.7.1: Report peak allocated on first iteration for standard path
+            if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                 peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
-                print(f"  [Standard] Peak allocated memory (step 1): {peak_alloc:.2f} GB")
+                print(f"  [Standard] Peak allocated memory: {peak_alloc:.2f} GB")
 
         running_loss += loss.item() * config.gradient_accumulation
         accumulation_step += 1
+        # V10.7.1: Mark first iteration as logged (for diagnostic messages)
+        if not _first_iter_logged:
+            _first_iter_logged = True
 
         # Update weights
         if accumulation_step % config.gradient_accumulation == 0:
@@ -17431,14 +17444,14 @@ def train(config: UnifiedTrainingConfig):
                     )
                 else:
                     # Verbose mode: Full logging (default)
-                    # Memory usage — show both allocated and reserved
-                    # V10.7.1: Show allocated (actual tensors) + reserved (pool)
-                    # TBPTT saves allocated memory; reserved stays high due to caching allocator
+                    # Memory usage — show peak allocated (captures forward+backward max)
+                    # V10.7.1: Peak allocated is what TBPTT actually reduces;
+                    # current allocated post-backward is same for both (model+optim only)
                     if device.type == "cuda":
-                        mem_alloc = torch.cuda.memory_allocated() / (1024**3)
-                        mem_reserved = torch.cuda.memory_reserved() / (1024**3)
+                        mem_peak = torch.cuda.max_memory_allocated() / (1024**3)
                         mem_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                        mem_str = f" | Alloc: {mem_alloc:.1f}GB Rsv: {mem_reserved:.1f}GB/{mem_total:.1f}GB"
+                        mem_str = f" | Peak: {mem_peak:.1f}GB/{mem_total:.1f}GB"
+                        torch.cuda.reset_peak_memory_stats()
                     else:
                         mem_str = ""
 
@@ -21224,6 +21237,7 @@ def main():
         no_protected_phase=args.no_protected_phase,
         run_chunk_diagnostic=args.run_chunk_diagnostic,
         chunk_diagnostic_seq_len=args.chunk_diagnostic_seq_len,
+        enable_tbptt=args.enable_tbptt,
         # BCVF Contrastive Structural Pressure on Representations
         use_bcvf_contrastive=args.use_bcvf_contrastive,
         bcvf_contrastive_lambda=args.bcvf_contrastive_lambda,
