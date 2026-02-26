@@ -10789,6 +10789,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
     n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
 
+    # Validate embed_dim / num_heads divisibility
+    if embed_dim % num_heads != 0:
+        raise ValueError(
+            f"n_embd ({embed_dim}) must be evenly divisible by n_head ({num_heads}). "
+            f"Got head_dim = {embed_dim}/{num_heads} = {embed_dim/num_heads:.2f} (not integer). "
+            f"Valid n_head values for n_embd={embed_dim}: "
+            f"{[h for h in [8, 12, 16, 20, 32, 64] if embed_dim % h == 0]}"
+        )
+    if n_kv_heads is not None and num_heads % n_kv_heads != 0:
+        raise ValueError(
+            f"n_head ({num_heads}) must be evenly divisible by n_kv_heads ({n_kv_heads})."
+        )
+
     # Print architecture configuration
     print(f"\n{'='*80}")
     print(f"Model Architecture: {config.model_type} ({config.model_size} preset)")
