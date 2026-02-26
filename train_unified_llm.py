@@ -10812,9 +10812,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         # Create SymbolU12 with Bhava
         bhava_config = SymbolU12BhavaConfig(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
+            embed_dim=embed_dim,
             max_seq_len=config.max_seq_len,
-            num_heads=preset["num_heads"],
+            num_heads=num_heads,
             bhava_embed_dim=config.bhava_embed_dim,
             num_drishti_heads=config.num_drishti_heads,
         )
@@ -10833,10 +10833,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = PhaseTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             sync_steps=config.sync_steps,
@@ -10855,10 +10855,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         use_protected_phase = config.protected_phase and not config.no_protected_phase
         model = HybridPhaseTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             local_layers=config.local_layers,
@@ -10900,18 +10900,18 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.use_9_3_split:
             gen2_num_layers = config.authority_layers + config.sensory_layers
         else:
-            gen2_num_layers = preset["num_layers"]
+            gen2_num_layers = num_layers
 
         # Create SymbolU12 Gen 2 (Hierarchical Complex Bhava)
         gen2_config = SymbolU12Gen2Config(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_heads=preset["num_heads"],
+            embed_dim=embed_dim,
+            num_heads=num_heads,
             num_layers=gen2_num_layers,
             complex_dim=64,  # Complex embedding dimension
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
-            ffn_mult=preset["ff_dim"] / preset["embed_dim"],
+            ffn_mult=ff_dim / embed_dim,
         )
 
         model = SymbolU12Gen2(gen2_config)
@@ -10926,10 +10926,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         tie_emb = not config.untie_embeddings
         model = StandardTransformer(
             vocab_size=config.vocab_size,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
             max_seq_len=config.max_seq_len,
             dropout=config.dropout,
             tie_embeddings=tie_emb,
