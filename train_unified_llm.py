@@ -13056,11 +13056,22 @@ def compute_phase_loss(
     )
 
     # Compute entropy for Sattvic controller (prevents variance=0.0 stagnation bug)
+    # V10.7.2: Chunk over sequence dim to avoid OOM at long sequences
+    # (full softmax [B,N,V] = B*N*V*4 bytes, e.g. 24GB at seq=32k, V=50k)
     with torch.no_grad():
-        probs = F.softmax(logits, dim=-1)
-        token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+        chunk_size = max(1, min(1024, N))  # Process 1024 tokens at a time
+        entropy_sum = 0.0
+        token_count = 0
+        for start in range(0, N, chunk_size):
+            end = min(start + chunk_size, N)
+            chunk_logits = logits[:, start:end, :]  # [B, chunk, V]
+            probs = F.softmax(chunk_logits, dim=-1)
+            token_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+            entropy_sum += token_entropy.sum().item()
+            token_count += token_entropy.numel()
+            del probs, token_entropy, chunk_logits
         max_entropy = math.log(V)
-        normalized_entropy = (token_entropy / max_entropy).mean().item()
+        normalized_entropy = (entropy_sum / token_count) / max_entropy
 
     metrics = {
         "lm_loss": lm_loss.item(),
@@ -18906,23 +18917,72 @@ def evaluate(
                 else:
                     # Phase or Hybrid - handle both tensor and dict returns
                     # V10.2.2: Support chunked evaluation
-                    use_chunking = (
-                        hasattr(config, 'enable_chunking') and
-                        config.enable_chunking and
+                    # V10.7.2: Also chunk when TBPTT is enabled (long sequences)
+                    # Chunked eval computes loss per-chunk to avoid OOM on full [B,N,V] logits
+                    use_eval_chunking = (
                         config.model_type == 'hybrid' and
-                        x.shape[1] > config.chunk_size
+                        x.shape[1] > getattr(config, 'chunk_size', 256) and
+                        (
+                            (hasattr(config, 'enable_chunking') and config.enable_chunking) or
+                            (hasattr(config, 'enable_tbptt') and config.enable_tbptt)
+                        )
                     )
 
-                    if use_chunking:
-                        output = forward_chunked(model, x, chunk_size=config.chunk_size)
+                    if use_eval_chunking:
+                        # V10.7.2: Chunked eval — compute loss per-chunk, never materialize full logits
+                        eval_chunk_size = getattr(config, 'chunk_size', 256)
+                        B_eval, N_eval = x.shape
+                        chunk_loss_sum = 0.0
+                        chunk_entropy_sum = 0.0
+                        chunk_token_count = 0
+                        layer_states_eval = None
+                        V_eval = None
+
+                        for cs in range(0, N_eval, eval_chunk_size):
+                            ce = min(cs + eval_chunk_size, N_eval)
+                            chunk_ids = x[:, cs:ce]
+                            chunk_targets = y[:, cs:ce]
+                            result, layer_states_eval = model.forward_chunk(
+                                chunk_ids, chunk_offset=cs, prev_layer_states=layer_states_eval,
+                            )
+                            chunk_logits = result['logits']  # [B, chunk, V]
+                            if V_eval is None:
+                                V_eval = chunk_logits.shape[-1]
+                            n_tokens = (chunk_targets != -100).sum().item()
+                            if n_tokens > 0:
+                                chunk_ce = F.cross_entropy(
+                                    chunk_logits.reshape(-1, V_eval),
+                                    chunk_targets.reshape(-1),
+                                    ignore_index=-100,
+                                    reduction='sum',
+                                )
+                                chunk_loss_sum += chunk_ce.item()
+                                # Entropy per chunk (for Sattvic controller)
+                                with torch.no_grad():
+                                    probs = F.softmax(chunk_logits, dim=-1)
+                                    ent = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
+                                    chunk_entropy_sum += ent.sum().item()
+                                chunk_token_count += n_tokens
+                            del chunk_logits, result
+
+                        avg_ce = chunk_loss_sum / max(chunk_token_count, 1)
+                        max_ent = math.log(V_eval) if V_eval else 1.0
+                        avg_entropy = (chunk_entropy_sum / max(chunk_token_count, 1)) / max_ent
+                        loss = torch.tensor(avg_ce, device=device)
+                        metrics = {
+                            "lm_loss": avg_ce,
+                            "ppl": math.exp(min(avg_ce, 20)),
+                            "total_loss": avg_ce,
+                            "onto_entropy": avg_entropy,
+                        }
                     else:
                         output = model(x)
 
-                    if isinstance(output, dict):
-                        logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
-                    else:
-                        logits = output
-                    loss, metrics = compute_phase_loss(logits, y, config)
+                        if isinstance(output, dict):
+                            logits = output.get('logits', output.get('output', output.get('last_hidden_state')))
+                        else:
+                            logits = output
+                        loss, metrics = compute_phase_loss(logits, y, config)
 
             total_loss += loss.item()
             total_batches += 1
