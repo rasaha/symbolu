@@ -278,7 +278,7 @@ def run_benchmark(args):
     print(f"Device: {device}")
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
-        total_mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        total_mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"GPU Memory: {total_mem_gb:.1f} GB")
 
     # Create model
@@ -425,7 +425,7 @@ def run_batch_sweep(args):
     print(f"Device: {device}")
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
-        total_mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        total_mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"GPU Memory: {total_mem_gb:.1f} GB")
 
     seq_len = args.seq_lengths[0]  # use first seq_len for sweep
