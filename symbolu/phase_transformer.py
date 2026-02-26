@@ -2162,9 +2162,11 @@ class PhaseAttentionLayer(nn.Module):
         # Q = a_q * e^(iφ_q)   - Query phasor (what I'm looking for)
         # K = a_k * e^(-iφ_k)  - Key phasor (what I represent, conjugate)
 
-        # torch.polar doesn't support BFloat16 - cast to float32 for complex ops
+        # V10.7: Always accumulate in float32 for numerical stability.
+        # torch.polar doesn't support BFloat16, and cumsum/EMA scan in fp16
+        # drifts on long sequences (>1K tokens). Force float32 for all complex ops.
         orig_dtype = phi_q.dtype
-        if orig_dtype == torch.bfloat16:
+        if orig_dtype != torch.float32:
             phi_q = phi_q.float()
             phi_k = phi_k.float()
             a_q = a_q.float()
@@ -2477,6 +2479,260 @@ class PhaseAttentionLayer(nn.Module):
 
 
 # =============================================================================
+# V10.7: PHASE STATE CACHE — Hardened O(1) Inference API
+# =============================================================================
+# At inference time, Phase Attention only needs to carry forward:
+#   - final_state:      [B, 1, H, D_h] complex — accumulated KV state
+#   - final_norm_state: [B, 1, H, D_h] real    — amplitude normalizer
+#
+# This class enforces that no O(N) allocation occurs during inference.
+# It wraps the per-layer state and provides a clean API for generate loops.
+# =============================================================================
+
+
+class PhaseStateCache:
+    """
+    O(1) inference cache for Phase Attention layers.
+
+    Stores only the final accumulated state per layer, NOT per-token K/V.
+    This is the core KV-cache reduction: memory is O(d × layers), not O(T × d × layers).
+
+    Usage:
+        cache = PhaseStateCache(num_layers=12, hybrid_layer_start=4)
+
+        for token in tokens:
+            result, cache = model.forward_with_cache(token, cache)
+
+    Internal storage per hybrid layer:
+        - final_state:      [B, 1, H, D_h] complex
+        - final_norm_state: [B, 1, H, D_h] real
+    """
+
+    def __init__(self, num_layers: int, hybrid_layer_start: int = 0):
+        self.num_layers = num_layers
+        self.hybrid_layer_start = hybrid_layer_start
+        # Maps layer_idx -> {'final_state': Tensor, 'final_norm_state': Tensor}
+        self._states: Dict[int, Dict[str, torch.Tensor]] = {}
+        self._step_count: int = 0
+
+    def get_layer_state(self, layer_idx: int) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """Get (prev_state, prev_norm_state) for a layer. Returns (None, None) if no state yet."""
+        state = self._states.get(layer_idx)
+        if state is None:
+            return None, None
+        return state['final_state'], state['final_norm_state']
+
+    def update_layer_state(self, layer_idx: int, state_dict: Dict[str, torch.Tensor]) -> None:
+        """
+        Update state for a layer from PhaseAttentionLayer's return_state output.
+
+        Enforces O(1) shape: state must be [B, 1, H, D_h].
+        Raises ValueError if state has sequence dimension > 1.
+        """
+        final_state = state_dict['final_state']
+        final_norm_state = state_dict['final_norm_state']
+
+        # Shape enforcement: must be [B, 1, H, D_h]
+        if final_state.shape[1] != 1:
+            raise ValueError(
+                f"PhaseStateCache: final_state has seq dim {final_state.shape[1]}, "
+                f"expected 1. This indicates O(N) allocation leaked into inference. "
+                f"Full shape: {final_state.shape}"
+            )
+        if final_norm_state.shape[1] != 1:
+            raise ValueError(
+                f"PhaseStateCache: final_norm_state has seq dim {final_norm_state.shape[1]}, "
+                f"expected 1. Full shape: {final_norm_state.shape}"
+            )
+
+        self._states[layer_idx] = {
+            'final_state': final_state.detach(),
+            'final_norm_state': final_norm_state.detach(),
+        }
+
+    def as_prev_layer_states(self) -> Dict[int, Dict[str, torch.Tensor]]:
+        """Convert to the dict format expected by forward_chunk(prev_layer_states=...)."""
+        return dict(self._states)
+
+    @property
+    def seq_len(self) -> int:
+        """Number of tokens processed so far."""
+        return self._step_count
+
+    def advance(self, n_tokens: int = 1) -> None:
+        """Record that n_tokens were processed."""
+        self._step_count += n_tokens
+
+    def reset(self) -> None:
+        """Clear all state (start of new sequence)."""
+        self._states.clear()
+        self._step_count = 0
+
+    def memory_bytes(self) -> int:
+        """Total memory used by cached states (should be constant regardless of seq_len)."""
+        total = 0
+        for state_dict in self._states.values():
+            for t in state_dict.values():
+                total += t.nelement() * t.element_size()
+        return total
+
+    def __repr__(self) -> str:
+        n_layers = len(self._states)
+        mem_mb = self.memory_bytes() / (1024 * 1024)
+        return (
+            f"PhaseStateCache(layers={n_layers}/{self.num_layers}, "
+            f"seq_len={self._step_count}, mem={mem_mb:.2f}MB)"
+        )
+
+
+# =============================================================================
+# V10.7: CHUNKED STATEFUL TRAINING — Truncated BPTT with Phase State Carry
+# =============================================================================
+# Unlike standard LLM chunking (which resets context between segments),
+# this carries Phase state across chunks via detached state tensors.
+#
+# Memory: O(C × d × layers) instead of O(N × d × layers)
+#   where C = chunk_size, N = full sequence length
+#
+# Key difference from forward_chunked (line 12984):
+#   forward_chunked: gradients flow through ALL chunks (memory = O(N))
+#   forward_chunked_tbptt: detaches state between chunks (memory = O(C))
+#
+# This is Truncated BPTT — the same technique used by Mamba, RWKV, RetNet
+# for training state-space models on long sequences.
+# =============================================================================
+
+
+def forward_chunked_tbptt(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    targets: torch.Tensor,
+    chunk_size: int,
+    loss_fn: callable,
+    accumulate_grad: bool = True,
+    grad_scaler: Optional[Any] = None,
+    autocast_dtype: Optional[torch.dtype] = None,
+) -> Dict[str, Any]:
+    """
+    Chunked forward + backward with Truncated BPTT for Phase state machines.
+
+    Unlike forward_chunked (which concatenates all logits and does one backward),
+    this processes each chunk independently:
+      1. Forward chunk with prev_state (detached from previous chunk)
+      2. Compute loss on this chunk's logits
+      3. Backward on this chunk (frees chunk activations)
+      4. Carry final_state to next chunk (detached)
+
+    This keeps peak memory at O(C) instead of O(N).
+
+    Args:
+        model: HybridPhaseTransformer with forward_chunk() method
+        input_ids: [B, N] full sequence token indices
+        targets: [B, N] full sequence targets
+        chunk_size: Tokens per chunk (controls memory/compute tradeoff)
+        loss_fn: Callable(logits, targets) -> (loss, metrics_dict)
+        accumulate_grad: If True, accumulates gradients across chunks.
+                        If False, steps optimizer per chunk (not recommended).
+        grad_scaler: Optional GradScaler for mixed precision
+        autocast_dtype: Optional dtype for torch.autocast (e.g. torch.bfloat16)
+
+    Returns:
+        Dict with:
+            'total_loss': scalar — mean loss across all chunks
+            'metrics': dict — averaged metrics from loss_fn
+            'num_chunks': int — number of chunks processed
+            'chunk_losses': list — per-chunk loss values
+    """
+    B, N = input_ids.shape
+    device = input_ids.device
+    num_chunks = (N + chunk_size - 1) // chunk_size
+
+    # State carry across chunks (detached — this is the TBPTT boundary)
+    layer_states = None
+
+    # Accumulate metrics
+    total_loss = 0.0
+    chunk_losses = []
+    all_metrics = {}
+
+    for chunk_idx in range(num_chunks):
+        chunk_start = chunk_idx * chunk_size
+        chunk_end = min(chunk_start + chunk_size, N)
+        chunk_ids = input_ids[:, chunk_start:chunk_end]
+        chunk_targets = targets[:, chunk_start:chunk_end]
+
+        # Forward with optional autocast
+        if autocast_dtype is not None:
+            with torch.autocast(device_type=device.type, dtype=autocast_dtype):
+                result, layer_states_new = model.forward_chunk(
+                    chunk_ids,
+                    chunk_offset=chunk_start,
+                    prev_layer_states=layer_states,
+                )
+                chunk_logits = result['logits']
+                chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+        else:
+            result, layer_states_new = model.forward_chunk(
+                chunk_ids,
+                chunk_offset=chunk_start,
+                prev_layer_states=layer_states,
+            )
+            chunk_logits = result['logits']
+            chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+
+        # Scale loss for gradient accumulation (mean across chunks)
+        scaled_loss = chunk_loss / num_chunks
+
+        # Backward on this chunk — frees chunk activations
+        if accumulate_grad:
+            if grad_scaler is not None:
+                grad_scaler.scale(scaled_loss).backward()
+            else:
+                scaled_loss.backward()
+
+        # TBPTT boundary: detach state before carrying to next chunk
+        # This is what makes memory O(C) instead of O(N)
+        layer_states = _detach_layer_states(layer_states_new)
+
+        # Track metrics
+        total_loss += chunk_loss.item()
+        chunk_losses.append(chunk_loss.item())
+        for k, v in chunk_metrics.items():
+            if k not in all_metrics:
+                all_metrics[k] = 0.0
+            all_metrics[k] += v
+
+    # Average metrics across chunks
+    avg_metrics = {k: v / num_chunks for k, v in all_metrics.items()}
+    avg_loss = total_loss / num_chunks
+
+    return {
+        'total_loss': avg_loss,
+        'metrics': avg_metrics,
+        'num_chunks': num_chunks,
+        'chunk_losses': chunk_losses,
+    }
+
+
+def _detach_layer_states(
+    layer_states: Dict[int, Dict[str, torch.Tensor]]
+) -> Dict[int, Dict[str, torch.Tensor]]:
+    """
+    Detach all tensors in layer_states to break the autograd graph.
+
+    This is the TBPTT boundary: gradients do not flow across chunks,
+    but the state values carry forward as initial conditions.
+    """
+    detached = {}
+    for layer_idx, state_dict in layer_states.items():
+        detached[layer_idx] = {
+            k: v.detach() if isinstance(v, torch.Tensor) else v
+            for k, v in state_dict.items()
+        }
+    return detached
+
+
+# =============================================================================
 # BINDING CACHE ARCHITECTURE (V10.0) - Protected Phase + Top-K Query
 # =============================================================================
 # Validated by diagnostic probe experiments:
@@ -2779,9 +3035,10 @@ class BindingCachePhaseState(nn.Module):
         if self._rotation_angle != 0.0:
             phi_k = phi_k + self._rotation_angle
 
-        # Convert to float32 for complex ops if needed
+        # V10.7: Always accumulate in float32 for numerical stability.
+        # cumsum/EMA scan in fp16 drifts on long sequences (>1K tokens).
         orig_dtype = phi_k.dtype
-        if orig_dtype == torch.bfloat16:
+        if orig_dtype != torch.float32:
             phi_k = phi_k.float()
             a_k = a_k.float()
             v = v.float()
@@ -6665,6 +6922,89 @@ class HybridPhaseTransformer(nn.Module):
 
         return result
 
+    def forward_with_cache(
+        self,
+        input_ids: torch.Tensor,
+        cache: Optional['PhaseStateCache'] = None,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> Tuple[Dict[str, torch.Tensor], 'PhaseStateCache']:
+        """
+        V10.7: Inference forward pass using PhaseStateCache.
+
+        Guarantees O(1) memory per layer regardless of total sequence length.
+        Only processes the NEW tokens (not the full sequence).
+
+        For prefill (first call), pass the full prompt as input_ids.
+        For decode (subsequent calls), pass one token at a time.
+
+        Args:
+            input_ids: [B, N] tokens to process (N=prompt_len for prefill, N=1 for decode)
+            cache: PhaseStateCache from previous call (None for first call)
+            intent_phase: Optional phase rotation
+
+        Returns:
+            (result_dict, updated_cache)
+            result_dict has 'logits': [B, N, V]
+        """
+        if cache is None:
+            cache = PhaseStateCache(
+                num_layers=len(self.blocks),
+                hybrid_layer_start=self.local_layers,
+            )
+
+        # Use forward_chunk with cache state
+        prev_layer_states = cache.as_prev_layer_states() if cache.seq_len > 0 else None
+
+        result, new_layer_states = self.forward_chunk(
+            input_ids,
+            chunk_offset=cache.seq_len,
+            prev_layer_states=prev_layer_states,
+            intent_phase=intent_phase,
+        )
+
+        # Update cache with new states (enforces O(1) shape)
+        for layer_idx, state_dict in new_layer_states.items():
+            cache.update_layer_state(layer_idx, state_dict)
+        cache.advance(input_ids.shape[1])
+
+        return result, cache
+
+    def generate_with_cache(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """
+        V10.7: Stateful generation using PhaseStateCache.
+
+        Unlike generate() which re-processes the full sequence each step,
+        this processes only the new token at each step using O(1) cached state.
+
+        Memory: O(d × layers) constant, regardless of generated length.
+        Speed: O(1) per token after prefill (no re-computation).
+        """
+        # Prefill: process the prompt
+        cache = None
+        result, cache = self.forward_with_cache(input_ids, cache)
+        generated = input_ids
+
+        for _ in range(max_new_tokens):
+            logits = result['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Decode: process only the new token with cached state
+            result, cache = self.forward_with_cache(next_token, cache)
+
+        return generated
+
     def generate(
         self,
         input_ids: torch.Tensor,
@@ -6672,7 +7012,7 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,
         top_k: int = 50,
     ) -> torch.Tensor:
-        """Simple generation loop."""
+        """Simple generation loop (legacy — re-processes full sequence each step)."""
         for _ in range(max_new_tokens):
             logits = self(input_ids)['logits'][:, -1, :]
             logits = logits / temperature
