@@ -13050,8 +13050,8 @@ def compute_phase_loss(
     B, N, V = logits.shape
 
     lm_loss = F.cross_entropy(
-        logits.view(-1, V),
-        targets.view(-1),
+        logits.reshape(-1, V),
+        targets.reshape(-1),
         ignore_index=-100,
     )
 
@@ -15795,15 +15795,21 @@ def train(config: UnifiedTrainingConfig):
                         srk_diagnostics['annealer_phase'] = srk_annealer.get_phase_name(global_step)
 
                     # Compute SRK loss (B1/U2/S8 patent formulas)
-                    srk_loss, srk_loss_metrics = srk_loss_fn(
-                        logits=logits,
-                        targets=y,
-                        hidden_states=final_hidden,
-                        karma_state=srk_karma_state,
-                        srk_diagnostics=srk_diagnostics,
-                        attention_phases=None,  # Phase extraction from hook if available
-                        mask=None,
-                    )
+                    # V10.7: Skip when logits are None (TBPTT frees per-chunk logits)
+                    if logits is not None:
+                        srk_loss, srk_loss_metrics = srk_loss_fn(
+                            logits=logits,
+                            targets=y,
+                            hidden_states=final_hidden,
+                            karma_state=srk_karma_state,
+                            srk_diagnostics=srk_diagnostics,
+                            attention_phases=None,  # Phase extraction from hook if available
+                            mask=None,
+                        )
+                    else:
+                        # TBPTT: logits freed per-chunk, use task loss already computed
+                        srk_loss = loss
+                        srk_loss_metrics = {}
 
                     # Replace or augment loss with SRK loss
                     # SRK loss includes task loss (cross-entropy) + B1/U2/S8 terms
