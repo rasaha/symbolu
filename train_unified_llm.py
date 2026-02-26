@@ -13050,8 +13050,8 @@ def compute_phase_loss(
     B, N, V = logits.shape
 
     lm_loss = F.cross_entropy(
-        logits.view(-1, V),
-        targets.view(-1),
+        logits.reshape(-1, V),
+        targets.reshape(-1),
         ignore_index=-100,
     )
 
