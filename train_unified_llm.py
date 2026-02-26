@@ -18751,7 +18751,7 @@ def train(config: UnifiedTrainingConfig):
                             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                         )
-                        print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                        print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -18798,7 +18798,7 @@ def train(config: UnifiedTrainingConfig):
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                 )
-                print(f"  💾 Checkpoint saved: last.pt (step {global_step})")
+                print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
                 if training_state_tracker is not None and training_state_tracker.enabled:
                     training_state_tracker.save_state()
@@ -18841,7 +18841,10 @@ def train(config: UnifiedTrainingConfig):
     print(f"  Best Val PPL: {math.exp(best_val_loss):.2f}")
     if authority_controller is not None:
         print(f"  Final Authority: {authority_controller.A:.3f}")
-    print(f"  Final Checkpoint: {ckpt_dir / 'final.pt'}")
+    if not config.no_save:
+        print(f"  Final Checkpoint: {ckpt_dir / 'final_*.pt'}")
+    else:
+        print(f"  Checkpoints: skipped (--no_save)")
 
     # ==========================================================================
     # Phase Rotation Test (if enabled)
@@ -19187,12 +19190,24 @@ def save_checkpoint(
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
-    For last.pt checkpoints, explicitly removes old file before saving new one
-    to ensure clean replacement and avoid potential corruption.
+    Uses split-file format to avoid network filesystem (RunPod MFS/FUSE) write
+    limits (~2GB per file). Saves three files:
+      {stem}_model.pt  - model state_dict
+      {stem}_optim.pt  - optimizer state_dict
+      {stem}_meta.pt   - scheduler, step, RNG states, auxiliary controller states
+
+    For backwards compatibility, load_checkpoint handles both single-file and
+    split-file formats transparently.
     """
-    checkpoint = {
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
+    stem = path.parent / path.stem  # e.g. checkpoints_unified/best
+
+    model_path = Path(f"{stem}_model.pt")
+    optim_path = Path(f"{stem}_optim.pt")
+    meta_path = Path(f"{stem}_meta.pt")
+
+    # Build metadata dict (small — always fits in a single file)
+    meta = {
+        "split_format": True,  # Sentinel for load_checkpoint
         "scheduler": scheduler.state_dict(),
         "step": step,
         "best_val_loss": best_val_loss,
@@ -19201,62 +19216,47 @@ def save_checkpoint(
 
     # Add CUDA RNG state if available
     if torch.cuda.is_available():
-        checkpoint["cuda_rng_state"] = torch.cuda.get_rng_state()
+        meta["cuda_rng_state"] = torch.cuda.get_rng_state()
 
-    # Add HGS state if provided
+    # Add auxiliary controller states
     if hgs_state is not None:
-        checkpoint["hgs_state"] = hgs_state
-
-    # Add DRC state if provided
+        meta["hgs_state"] = hgs_state
     if drc_state is not None:
-        checkpoint["drc_state"] = drc_state
-
-    # Add SGP state if provided
+        meta["drc_state"] = drc_state
     if sgp_state is not None:
-        checkpoint["sgp_state"] = sgp_state
-
-    # Add Sattvic Controller state if provided
+        meta["sgp_state"] = sgp_state
     if sattvic_state is not None:
-        checkpoint["sattvic_state"] = sattvic_state
-
-    # V9.8.0: Add SRK state if provided
+        meta["sattvic_state"] = sattvic_state
     if srk_state is not None:
-        checkpoint["srk_state"] = srk_state
-
-    # V9.8.1: Add AMP GradScaler state if provided
+        meta["srk_state"] = srk_state
     if scaler_state is not None:
-        checkpoint["scaler_state"] = scaler_state
-
-    # V9.8.6: Add Three-Phase Curriculum states
+        meta["scaler_state"] = scaler_state
     if csr_curriculum_state is not None:
-        checkpoint["csr_curriculum_state"] = csr_curriculum_state
+        meta["csr_curriculum_state"] = csr_curriculum_state
     if kosha_curriculum_state is not None:
-        checkpoint["kosha_curriculum_state"] = kosha_curriculum_state
+        meta["kosha_curriculum_state"] = kosha_curriculum_state
     if onto_curriculum_state is not None:
-        checkpoint["onto_curriculum_state"] = onto_curriculum_state
+        meta["onto_curriculum_state"] = onto_curriculum_state
     if pidv2_curriculum_state is not None:
-        checkpoint["pidv2_curriculum_state"] = pidv2_curriculum_state
-    # V9.8.6: Add Kosha Gyroscope state (InvertedCurriculumController)
+        meta["pidv2_curriculum_state"] = pidv2_curriculum_state
     if kosha_gyroscope_state is not None:
-        checkpoint["kosha_gyroscope_state"] = kosha_gyroscope_state
-    # V9.8.6: Add EvoFlow state (EvolutionaryIntelligenceEngine)
+        meta["kosha_gyroscope_state"] = kosha_gyroscope_state
     if evoflow_state is not None:
-        checkpoint["evoflow_state"] = evoflow_state
-
-    # Kosha-Vritti Supervision state
+        meta["evoflow_state"] = evoflow_state
     if kv_supervisor_state is not None:
-        checkpoint["kv_supervisor_state"] = kv_supervisor_state
-
-    # V9.8.6: Add dataloader position for reproducibility
+        meta["kv_supervisor_state"] = kv_supervisor_state
     if dataloader_position is not None:
-        checkpoint["dataloader_position"] = dataloader_position
+        meta["dataloader_position"] = dataloader_position
 
-    # Explicitly remove old checkpoint before saving (especially for last.pt)
-    # This ensures clean replacement and frees disk space before writing
-    if path.exists():
-        path.unlink()
+    # Remove old files before saving (both single-file and split formats)
+    for p in [path, model_path, optim_path, meta_path]:
+        if p.exists():
+            p.unlink()
 
-    torch.save(checkpoint, path)
+    # Save each component as a separate file to stay under NFS write limits
+    torch.save(model.state_dict(), model_path)
+    torch.save(optimizer.state_dict(), optim_path)
+    torch.save(meta, meta_path)
 
 
 def load_checkpoint(
@@ -19269,8 +19269,11 @@ def load_checkpoint(
 ) -> Dict[str, Any]:
     """Load training checkpoint.
 
+    Handles both single-file format (legacy) and split-file format:
+      {stem}_model.pt + {stem}_optim.pt + {stem}_meta.pt
+
     Args:
-        path: Path to checkpoint file
+        path: Path to checkpoint file (e.g. checkpoints_unified/best.pt)
         model: Model to load weights into
         optimizer: Optimizer to restore state (None if weights_only)
         scheduler: Scheduler to restore state (None if weights_only)
@@ -19280,24 +19283,42 @@ def load_checkpoint(
     Returns:
         Dict with checkpoint info (step, best_val_loss, etc.)
     """
-    if not path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {path}")
+    # Detect split-file format: check for {stem}_model.pt
+    stem = path.parent / path.stem
+    model_path = Path(f"{stem}_model.pt")
+    optim_path = Path(f"{stem}_optim.pt")
+    meta_path = Path(f"{stem}_meta.pt")
+    use_split = model_path.exists()
 
-    print(f"\n  📂 Loading checkpoint from: {path}")
+    if not use_split and not path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {path} (also checked split format at {model_path})")
+
+    if use_split:
+        print(f"\n  📂 Loading split checkpoint from: {stem}_*.pt")
+    else:
+        print(f"\n  📂 Loading checkpoint from: {path}")
 
     # Load checkpoint with error handling for corrupted files
     try:
-        checkpoint = torch.load(path, map_location=device, weights_only=False)
+        if use_split:
+            # Split format: load model state separately
+            model_state_raw = torch.load(model_path, map_location=device, weights_only=False)
+            checkpoint = torch.load(meta_path, map_location=device, weights_only=False)
+            checkpoint["model"] = model_state_raw
+            # Optimizer loaded on-demand below (only if needed)
+        else:
+            checkpoint = torch.load(path, map_location=device, weights_only=False)
     except (EOFError, pickle.UnpicklingError, RuntimeError) as e:
         # Checkpoint file is corrupted or incomplete
-        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {path}")
+        ckpt_loc = f"{stem}_*.pt" if use_split else str(path)
+        print(f"\n  ⚠️  ERROR: Checkpoint file is corrupted or incomplete: {ckpt_loc}")
         print(f"      Error: {type(e).__name__}: {e}")
         print(f"      This typically happens if training was interrupted during checkpoint save.")
         print(f"\n  Solutions:")
-        print(f"      1. Delete the corrupted checkpoint: rm {path}")
+        print(f"      1. Delete the corrupted checkpoint: rm {ckpt_loc}")
         print(f"      2. Use a different checkpoint: --resume <path_to_valid_checkpoint>")
         print(f"      3. Start from scratch: remove --resume flag")
-        raise RuntimeError(f"Cannot load corrupted checkpoint: {path}") from e
+        raise RuntimeError(f"Cannot load corrupted checkpoint: {ckpt_loc}") from e
 
     # Load model weights
     # Filter out runtime buffers that may have been saved with tensor values
@@ -19342,9 +19363,15 @@ def load_checkpoint(
         return result
 
     # Restore optimizer state
-    if optimizer is not None and "optimizer" in checkpoint:
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        print(f"    ✓ Optimizer state restored")
+    if optimizer is not None:
+        if use_split and optim_path.exists():
+            optim_state = torch.load(optim_path, map_location=device, weights_only=False)
+            optimizer.load_state_dict(optim_state)
+            del optim_state  # Free memory immediately
+            print(f"    ✓ Optimizer state restored (from split file)")
+        elif "optimizer" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            print(f"    ✓ Optimizer state restored")
 
     # Restore scheduler state
     if scheduler is not None and "scheduler" in checkpoint:
