@@ -1955,14 +1955,16 @@ class PhaseAttentionLayer(nn.Module):
         # 3. Vanishing gradients: uniform [-π,π] init instead of small normal
         #
         # This matches standard attention capacity while keeping O(n) complexity
+        #
+        # V10.8: FUSED PROJECTIONS — 2 GEMMs instead of 4
+        # Phase and amplitude are projected together then split, eliminating
+        # 2 kernel launches per layer. Checkpoint-compatible via properties.
 
-        # Separate Query projections (what am I looking for?)
-        self.W_q_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_q_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Fused Query projection: phase + amplitude in one GEMM
+        self.W_q_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
 
-        # Separate Key projections (what do I represent?)
-        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Fused Key projection: phase + amplitude in one GEMM
+        self.W_k_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
 
         # Value projection (content)
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -1976,8 +1978,9 @@ class PhaseAttentionLayer(nn.Module):
 
         # V9.6.11: Initialize phase projections with uniform [-π, π]
         # This ensures diverse phases at initialization for gradient flow
-        nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
-        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+        # V10.8: Apply to fused weight's phase half (first embed_dim rows)
+        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -3.14159, 3.14159)
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
 
         # V9.6.12: Complex-to-real projection for "complex" cosine mode
         # Projects [real, imag] → real, allowing the model to learn how to
@@ -2001,6 +2004,35 @@ class PhaseAttentionLayer(nn.Module):
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
         self.phase_embed = nn.Linear(embed_dim, num_heads)
         self.amp_gate = nn.Linear(embed_dim, num_heads)
+
+    # V10.8: Backward-compatible properties for diagnostics that access
+    # the old separate W_q_phase, W_k_phase weights (e.g., ortho loss).
+    # These return view-like objects with a .weight attribute.
+    class _FusedWeightView:
+        """Lightweight view into a slice of the fused weight matrix."""
+        def __init__(self, fused_linear, start, end):
+            self._fused = fused_linear
+            self._start = start
+            self._end = end
+        @property
+        def weight(self):
+            return self._fused.weight[self._start:self._end]
+
+    @property
+    def W_q_phase(self):
+        return self._FusedWeightView(self.W_q_fused, 0, self.embed_dim)
+
+    @property
+    def W_q_amp(self):
+        return self._FusedWeightView(self.W_q_fused, self.embed_dim, self.embed_dim * 2)
+
+    @property
+    def W_k_phase(self):
+        return self._FusedWeightView(self.W_k_fused, 0, self.embed_dim)
+
+    @property
+    def W_k_amp(self):
+        return self._FusedWeightView(self.W_k_fused, self.embed_dim, self.embed_dim * 2)
 
     def forward(
         self,
@@ -2067,13 +2099,15 @@ class PhaseAttentionLayer(nn.Module):
         # - Key: "what do I represent?"
         # This allows asymmetric attention patterns (e.g., "The" → "Empire")
 
-        # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_q_raw = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused query projection — one GEMM, then split
+        q_fused = self.W_q_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_q_raw = q_fused[:, :, 0]  # [B, N, H, D_h]
+        a_q = torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
 
-        # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused key projection — one GEMM, then split
+        k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
+        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
         # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
@@ -2612,6 +2646,7 @@ def forward_chunked_tbptt(
     accumulate_grad: bool = True,
     grad_scaler: Optional[Any] = None,
     autocast_dtype: Optional[torch.dtype] = None,
+    gradient_accumulation: int = 1,
 ) -> Dict[str, Any]:
     """
     Chunked forward + backward with Truncated BPTT for Phase state machines.
@@ -2635,6 +2670,9 @@ def forward_chunked_tbptt(
                         If False, steps optimizer per chunk (not recommended).
         grad_scaler: Optional GradScaler for mixed precision
         autocast_dtype: Optional dtype for torch.autocast (e.g. torch.bfloat16)
+        gradient_accumulation: Number of gradient accumulation steps. Loss is scaled
+                              by 1/(num_chunks * gradient_accumulation) so that
+                              TBPTT gradient magnitude matches the standard path.
 
     Returns:
         Dict with:
@@ -2647,12 +2685,18 @@ def forward_chunked_tbptt(
     device = input_ids.device
     num_chunks = (N + chunk_size - 1) // chunk_size
 
+    # V10.8: Combined loss divisor accounts for BOTH chunk averaging AND
+    # gradient accumulation. Without this, TBPTT gradients are grad_accum×
+    # too large because the standard path's `loss /= grad_accum` (in the
+    # training loop) runs AFTER backward — which TBPTT already did here.
+    loss_divisor = num_chunks * gradient_accumulation
+
     # State carry across chunks (detached — this is the TBPTT boundary)
     layer_states = None
 
-    # Accumulate metrics
-    total_loss = 0.0
-    chunk_losses = []
+    # Accumulate loss on GPU to avoid per-chunk .item() sync stalls
+    total_loss_gpu = torch.zeros(1, device=device)
+    chunk_losses_gpu = []
     all_metrics = {}
 
     for chunk_idx in range(num_chunks):
@@ -2680,8 +2724,8 @@ def forward_chunked_tbptt(
             chunk_logits = result['logits']
             chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
 
-        # Scale loss for gradient accumulation (mean across chunks)
-        scaled_loss = chunk_loss / num_chunks
+        # V10.8: Scale loss for BOTH chunk mean AND gradient accumulation
+        scaled_loss = chunk_loss / loss_divisor
 
         # Backward on this chunk — frees chunk activations
         if accumulate_grad:
@@ -2694,17 +2738,20 @@ def forward_chunked_tbptt(
         # This is what makes memory O(C) instead of O(N)
         layer_states = _detach_layer_states(layer_states_new)
 
-        # Track metrics
-        total_loss += chunk_loss.item()
-        chunk_losses.append(chunk_loss.item())
+        # Track loss on GPU (single .item() call after loop avoids sync stalls)
+        total_loss_gpu += chunk_loss.detach()
+        chunk_losses_gpu.append(chunk_loss.detach())
         for k, v in chunk_metrics.items():
             if k not in all_metrics:
                 all_metrics[k] = 0.0
             all_metrics[k] += v
 
+    # Single GPU→CPU sync for all loss values (was N syncs before)
+    avg_loss = (total_loss_gpu / num_chunks).item()
+    chunk_losses = [cl.item() for cl in chunk_losses_gpu]
+
     # Average metrics across chunks
     avg_metrics = {k: v / num_chunks for k, v in all_metrics.items()}
-    avg_loss = total_loss / num_chunks
 
     return {
         'total_loss': avg_loss,
@@ -2898,9 +2945,8 @@ class BindingCachePhaseState(nn.Module):
         self.decay_gamma = decay_gamma
         self.learned_decay = learned_decay
 
-        # Phase projections for keys (NOT queries - Quad handles queries)
-        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # V10.8: Fused key phase+amplitude projection (1 GEMM instead of 2)
+        self.W_k_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
         self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
 
         # Layer norm for input
@@ -2935,8 +2981,27 @@ class BindingCachePhaseState(nn.Module):
         # This tests whether phase encodes relational structure
         self._rotation_angle = 0.0  # in radians
 
-        # Initialize phase with uniform [-π, π]
-        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+        # Initialize phase half with uniform [-π, π]
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+
+    # V10.8: Backward-compatible properties for code accessing old separate weights
+    class _FusedWeightView:
+        """Lightweight view into a slice of the fused weight matrix."""
+        def __init__(self, fused_linear, start, end):
+            self._fused = fused_linear
+            self._start = start
+            self._end = end
+        @property
+        def weight(self):
+            return self._fused.weight[self._start:self._end]
+
+    @property
+    def W_k_phase(self):
+        return self._FusedWeightView(self.W_k_fused, 0, self.embed_dim)
+
+    @property
+    def W_k_amp(self):
+        return self._FusedWeightView(self.W_k_fused, self.embed_dim, self.embed_dim * 2)
 
     def set_ablation(self, mode: str, seed: int = 42):
         """Set ablation mode: none, scramble, freeze, off."""
@@ -2992,9 +3057,10 @@ class BindingCachePhaseState(nn.Module):
         # Pre-norm
         x_norm = self.norm(x)
 
-        # Compute phase and amplitude for keys
-        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused key projection — one GEMM, then split
+        k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
+        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
         v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim)
 
         # Bounded phase (mandatory fix from probes)

@@ -15610,6 +15610,7 @@ def train(config: UnifiedTrainingConfig):
                         accumulate_grad=True,
                         grad_scaler=scaler,
                         autocast_dtype=autocast_dtype if config.mixed_precision != "none" else None,
+                        gradient_accumulation=config.gradient_accumulation,
                     )
                     # Create synthetic outputs/loss for downstream logging
                     loss = torch.tensor(tbptt_result['total_loss'], device=device)
