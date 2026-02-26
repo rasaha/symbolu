@@ -9640,6 +9640,7 @@ class UnifiedTrainingConfig:
     # Checkpointing
     checkpoint_dir: str = "checkpoints_unified"
     save_every: int = 1000
+    no_save: bool = False  # Skip all checkpoint saving (useful for benchmark runs)
     eval_every: int = 100
     log_every: int = 10
 
@@ -18728,28 +18729,29 @@ def train(config: UnifiedTrainingConfig):
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    # V9.8.10: Restore scheduled alpha before saving checkpoint
-                    # (InvertedLayerCurriculum may have modified it during validation)
-                    update_alpha_schedule(model, global_step, config)
-                    save_checkpoint(
-                        model, optimizer, scheduler, global_step, best_val_loss,
-                        ckpt_dir / "best.pt",
-                        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
-                        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
-                        sgp_state=sgp_controller.get_state() if sgp_controller else None,
-                        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
-                        srk_state=srk.get_checkpoint_state() if srk else None,
-                        scaler_state=scaler.state_dict() if scaler else None,
-                        # V9.8.6: Three-Phase Curriculum states
-                        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
-                        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
-                        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
-                        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
-                        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
-                        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
-                        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
-                    )
-                    print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
+                    if not config.no_save:
+                        # V9.8.10: Restore scheduled alpha before saving checkpoint
+                        # (InvertedLayerCurriculum may have modified it during validation)
+                        update_alpha_schedule(model, global_step, config)
+                        save_checkpoint(
+                            model, optimizer, scheduler, global_step, best_val_loss,
+                            ckpt_dir / "best.pt",
+                            hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+                            drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+                            sgp_state=sgp_controller.get_state() if sgp_controller else None,
+                            sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+                            srk_state=srk.get_checkpoint_state() if srk else None,
+                            scaler_state=scaler.state_dict() if scaler else None,
+                            # V9.8.6: Three-Phase Curriculum states
+                            csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+                            kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+                            onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+                            pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+                            kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+                            evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+                            kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+                        )
+                        print(f"  --> New best! Saved to {ckpt_dir / 'best.pt'}", flush=True)
 
                 # LRA Validation (Long-Range Retrieval)
                 if lra_validator is not None and global_step % config.lra_validate_every == 0:
@@ -18775,7 +18777,7 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
             # Save checkpoint (overwrites last.pt each time)
-            if global_step % config.save_every == 0:
+            if global_step % config.save_every == 0 and not config.no_save:
                 # V9.8.10: Ensure scheduled alpha is applied before saving
                 update_alpha_schedule(model, global_step, config)
                 save_checkpoint(
@@ -18802,29 +18804,30 @@ def train(config: UnifiedTrainingConfig):
                     training_state_tracker.save_state()
 
     # Final save
-    # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
-    update_alpha_schedule(model, global_step, config)
-    save_checkpoint(
-        model, optimizer, scheduler, global_step, best_val_loss,
-        ckpt_dir / "final.pt",
-        hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
-        drc_state=relaxation_controller.get_state() if relaxation_controller else None,
-        sgp_state=sgp_controller.get_state() if sgp_controller else None,
-        sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
-        srk_state=srk.get_checkpoint_state() if srk else None,
-        scaler_state=scaler.state_dict() if scaler else None,
-        # V9.8.6: Three-Phase Curriculum states
-        csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
-        kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
-        onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
-        pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
-        kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
-        evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
-        kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
-    )
-    # v2.7 Training State Tracker: Save final state
-    if training_state_tracker is not None and training_state_tracker.enabled:
-        training_state_tracker.save_state()
+    if not config.no_save:
+        # V9.8.10: Ensure scheduled alpha is applied before final checkpoint
+        update_alpha_schedule(model, global_step, config)
+        save_checkpoint(
+            model, optimizer, scheduler, global_step, best_val_loss,
+            ckpt_dir / "final.pt",
+            hgs_state=gradient_scaler_hgs.get_state() if gradient_scaler_hgs else None,
+            drc_state=relaxation_controller.get_state() if relaxation_controller else None,
+            sgp_state=sgp_controller.get_state() if sgp_controller else None,
+            sattvic_state=sattvic_controller.get_state() if sattvic_controller else None,
+            srk_state=srk.get_checkpoint_state() if srk else None,
+            scaler_state=scaler.state_dict() if scaler else None,
+            # V9.8.6: Three-Phase Curriculum states
+            csr_curriculum_state=csr_curriculum.get_state() if csr_curriculum else None,
+            kosha_curriculum_state=kosha_curriculum.get_state() if kosha_curriculum else None,
+            onto_curriculum_state=onto_curriculum.get_state() if onto_curriculum else None,
+            pidv2_curriculum_state=authority_controller.get_curriculum_state() if authority_controller and hasattr(authority_controller, 'get_curriculum_state') else None,
+            kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
+            evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
+            kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+        )
+        # v2.7 Training State Tracker: Save final state
+        if training_state_tracker is not None and training_state_tracker.enabled:
+            training_state_tracker.save_state()
 
     # Close TensorBoard
     if tb_writer is not None:
@@ -20115,6 +20118,8 @@ def main():
                        help="Evaluate every N steps")
     parser.add_argument("--save_every", type=int, default=1000,
                        help="Save checkpoint every N steps")
+    parser.add_argument("--no_save", action="store_true",
+                       help="Skip all checkpoint saving (useful for benchmark runs with limited disk)")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints_unified",
                        help="Checkpoint directory")
 
@@ -20948,6 +20953,7 @@ def main():
         onto_rampdown_steps=args.onto_rampdown_steps,
         eval_every=args.eval_every,
         save_every=args.save_every,
+        no_save=args.no_save,
         checkpoint_dir=args.checkpoint_dir,
         no_coherence_loss=args.no_coherence_loss,
         seed=args.seed,
