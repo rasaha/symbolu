@@ -13490,6 +13490,7 @@ def train(config: UnifiedTrainingConfig):
             # The 5D Gyroscope can't fix this - it operates on extracted projections
             # =====================================================================
             state_reg_loss = 0.0
+            state_regularizer = None  # TODO: instantiate when enable_state_regularizer is True
             if state_regularizer is not None:
                 try:
                     # Get 32D sovereign state (already extracted for gyroscope above)
