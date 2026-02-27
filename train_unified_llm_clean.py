@@ -8958,6 +8958,7 @@ class UnifiedTrainingConfig:
     jepa_vikalpa_threshold: float = 0.6      # Max imagination (factual tasks)
     jepa_damping_factor: float = 0.5         # Damping for rejected predictions
 
+    jepa_enable_karma_injection: bool = False # Enable karma state injection for JEPA
     jepa_karma_gate_bias: float = 0.5        # Initial gate bias (0=internal, 1=external)
 
     # V10.3.7: Vritti Entropy Regularization (prevents single-vritti collapse)
