@@ -7237,6 +7237,16 @@ class OntologicalHybridTransformer(nn.Module):
         # V11.0.0: Track Bhava-only previous state for phase delta
         self.register_buffer('prev_bhava', None, persistent=False)
 
+    def gradient_checkpointing_enable(self, **kwargs):
+        """Enable gradient checkpointing on the inner hybrid model."""
+        self.hybrid.gradient_checkpointing_enable()
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self):
+        """Disable gradient checkpointing on the inner hybrid model."""
+        self.hybrid.gradient_checkpointing_disable()
+        self.gradient_checkpointing = False
+
     def _init_absolute_potential_bias(self):
         """
         Initialize state projector to bias toward "Absolute Potential" state.
@@ -7380,13 +7390,19 @@ class OntologicalHybridTransformer(nn.Module):
         # Only ontological identity (12D) modulates attention
         intent_phase = self.intent_projector(delta_bhava)  # [B, H] or [B, H, D_h]
 
+        # Detach intent_phase for the second pass to prevent gradient checkpointing
+        # recomputation issues. compute_state_delta() mutates self.prev_state/prev_bhava,
+        # so recomputing through it produces different deltas. Detaching makes
+        # intent_phase a fixed input to the checkpointed region.
+        intent_phase_for_hybrid = intent_phase.detach()
+
         # Second pass: Full forward WITH intent phase
         result = self.hybrid(
             input_ids,
             return_hidden=return_hidden,
             extract_layers=extract_layers,
             return_last_hidden=return_last_hidden,
-            intent_phase=intent_phase,
+            intent_phase=intent_phase_for_hybrid,
             return_decorr_loss=return_decorr_loss,
         )
 
