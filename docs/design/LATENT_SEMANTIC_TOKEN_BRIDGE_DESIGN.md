@@ -3047,3 +3047,448 @@ CONTROL PLANE (auxiliary signals, detached, no backbone gradients)
 ```
 
 **Key invariant**: Control-plane signals flow *downward* (from detached auxiliary outputs to runtime parameters). No gradients flow *upward* (from data-plane losses into auxiliary modules that touch backbone weights). The detach() boundary is the architectural firewall.
+
+---
+
+## Appendix E: Unified Control-Plane Governor Evaluation (Feb 2026)
+
+**Date**: 2026-02-27
+**Context**: Evaluation of a proposed unified control-plane governor architecture (ChatGPT proposal) that would consolidate all auxiliary observer signals into a single coherent decision state machine with a 3-axis latent control vector (Stability, Depth, Exploration). Evaluated against the existing governor and controller infrastructure in the codebase.
+
+---
+
+### E.1 The Proposal: One Governor, One Policy, Many Knobs
+
+The core recommendation is to replace the current "many independent observers" pattern with a single thin deterministic module that:
+
+1. Ingests detached outputs from all six auxiliary systems (Kosha, Vritti, Guna, Ontology, JEPA, CSR)
+2. Computes a compact 3-axis control state: `z_control = (S, D, E)` where S = Stability, D = Depth, E = Exploration
+3. Maps `z_control` to a concrete knob vector via a single policy function
+4. Applies hysteresis (EMA smoothing + Schmitt triggers) to prevent mode oscillation
+5. Outputs a per-step/per-chunk policy that Phase and Quad consume without conflict
+
+The proposed output vector:
+
+```
+control = {
+    phase_gamma,              # Decay / horizon
+    phase_write_scale,        # Amplitude gate
+    phase_intent_rot_scale,   # Intent rotation strength
+    quad_enabled,             # Boolean gate
+    quad_k,                   # Retrieval width
+    quad_ontology_bias,       # Structural bias strength
+    quad_jepa_bias,           # Predictive bias strength
+    hedge_mode,               # Caution / template mode
+}
+```
+
+The 3-axis derivation:
+
+| Axis | Meaning | Primary Sources | Secondary Sources |
+|------|---------|-----------------|-------------------|
+| **S** (Stability) | "How safe is it to accumulate and retrieve?" | Kosha readiness, Kosha entropy, Guna entropy | Vritti distortion likelihood, CSR resonance continuity |
+| **D** (Depth) | "How deep should we reason right now?" | Kosha layer, Ontology abstraction level | JEPA residual (structural mismatch) |
+| **E** (Exploration) | "How exploratory vs conservative should retrieval be?" | Vritti mode distribution, Guna rajas level | JEPA uncertainty |
+
+---
+
+### E.2 What Already Exists (Existing Building Blocks)
+
+The codebase already contains **substantial** control-plane infrastructure, but it is fragmented across independent controllers that do not coordinate:
+
+#### E.2.1 ResonanceStateScheduler (RSS) — `train_unified_llm.py:6353`
+
+The closest existing analog to a unified governor. RSS implements:
+- **Staged engagement**: 5 phases (FOUNDATION -> COHERENCE -> FEEDBACK -> ONTOLOGY -> SOVEREIGN) gated by PPL thresholds
+- **Permanent hysteresis**: Once a component engages, it stays engaged (prevents bounce from PPL fluctuations)
+- **Sequential dependency**: CSR must stabilize before Kosha engages ("earthquake settling")
+- **Output**: Gate weights `{evoflow, toroidal, csr, kosha}` in [0.0, 1.0]
+
+**Relation to proposal**: RSS is a *training-time* engagement sequencer — it decides *when* auxiliaries activate during the training curriculum. The proposed governor is a *runtime* policy controller — it decides *how* Phase and Quad behave each step. These are complementary, not competing. RSS controls whether auxiliaries are active; the proposed governor controls what their signals mean for the data plane.
+
+#### E.2.2 PIDGovernor — `symbolu/sovereign/pid_governor.py`
+
+A control-theoretic gating module that:
+- Maps Vritti types to PID parameters (Kp/Ki/Kd per cognitive mode)
+- Computes authority score for soft dampening between Quadratic and Phase layers
+- Tracks integral error and derivative error across steps (stateful)
+- Applies semantic body dampening when authority < 0.7
+
+**Relation to proposal**: The PID Governor already implements the "Vritti -> policy" pattern that ChatGPT proposes. The `VRITTI_PID_TABLE` maps 5 Vritti modes to control parameters:
+
+| Vritti | Kp | Ki | Kd | Behavior |
+|--------|----|----|----|----|
+| Pramana (valid) | 0.90 | 0.05 | 0.05 | High stiffness — tight tracking |
+| Viparyaya (error) | 0.70 | 0.15 | 0.15 | Corrective — moderate |
+| Vikalpa (creative) | 0.30 | 0.10 | 0.60 | Low stiffness — derivative-driven |
+| Smrti (memory) | 0.50 | 0.40 | 0.10 | Integral-heavy — memory recall |
+| Nidra (dormancy) | 0.20 | 0.70 | 0.10 | High integral — inertial |
+
+This is exactly the kind of "cognitive state -> control parameters" mapping that the 3-axis proposal would subsume. The PID approach is more nuanced in some ways (continuous Kp/Ki/Kd) but narrower in scope (only gates authority between Quad and Phase layers, doesn't control gamma/k/hedging).
+
+#### E.2.3 ConfidenceScaler — `symbolu/training/confidence_scaler.py`
+
+Per-token logit temperature control with:
+- Learned scale: s_t = softplus(Linear(D->1)) + epsilon, clamped to [0.3, 10.0]
+- Optional risk gating via Vritti: s' = s * (1 + alpha_risk * r) where r = P(Viparyaya) + P(Nidra)
+- Entropy band loss: soft constraint keeping per-token entropy in [0.10, 0.35] * log(V)
+
+**Relation to proposal**: The ConfidenceScaler is a learned module operating on the emission path only. It's trained, while the proposed governor is deterministic. However, the Vritti risk gating pattern (P(Viparyaya) + P(Nidra) -> increase uncertainty) demonstrates the same auxiliary-signal -> control-knob pattern the proposal formalizes.
+
+#### E.2.4 Kosha Gyroscope — `docs/design/KOSHA_GYROSCOPE_DESIGN.md` / `symbolu/losses/kosha_gyroscope.py`
+
+Homeostatic self-regulation that:
+- Enforces balance across 5 Kosha dimensions via R-T Quadrant Geometry
+- Implements Vijnana Gate (Intellectual verification before state transitions)
+- Uses inverted curriculum: Gyroscope active while PPL > 30, then disengages for self-regulation
+- Provides dense intrinsic reward (per-token, not sparse end-of-sequence)
+
+**Relation to proposal**: The Kosha Gyroscope is the most philosophically aligned precedent for the "above-both gate" concept. It already answers "is it safe to transition?" via the Vijnana Gate. The proposed governor would absorb this as the Stability (S) axis: Kosha readiness determines whether Phase writes freely and whether Quad fires.
+
+#### E.2.5 Sattvic Controller — `resonance/controller.py`
+
+Three-phase dynamic regulation with:
+- Knowledge-based decay: lambda_csr decays from 0.5 -> 0.1 as knowledge grows
+- Variance-based stagnation detection with 5x hysteresis
+- Emergency boost: 1.5x multiplier when entropy < 0.4 or variance collapses
+- Release conditions requiring variance > threshold * 5 before disengaging boost
+
+**Relation to proposal**: Implements variance-based hysteresis with explicit thresholds — the same Schmitt-trigger pattern ChatGPT recommends. The 5x ratio between engage and disengage thresholds (0.01 engage, 0.05 disengage) is a concrete hysteresis gap.
+
+#### E.2.6 DisagreementGovernor — `scripts/causal_subspace/jepa_observatory.py`
+
+Three-signal anomaly fusion that:
+- Combines trajectory (JEPA error), ontological (bridge drift), and Vritti signals
+- Classifies regime: trajectory_only / ontology_only / both / neither
+- Outputs `CognitiveAnomalyReport` with fused anomaly score + explanation
+
+**Relation to proposal**: The DisagreementGovernor computes a regime classification from multiple signals — conceptually the same fusion that the 3-axis governor would perform, but narrower (anomaly detection only, not full policy output).
+
+#### E.2.7 ModeSwitchController — `simulator/ctm_plus/controllers/mode_switch.py`
+
+Hysteresis-controlled mode selection with:
+- 7 EMA-smoothed workload signals
+- Softmax classification over 5 modes (SCAN, LOOP, HOTSET, CLUSTER, MIXED)
+- Schmitt trigger: switch_confidence=0.65, persistence_windows=3, min_switch_interval=2000
+- 18 parameters per mode (admission, prefetch, regret thresholds, BCVF gates, eviction weights)
+
+**Relation to proposal**: The most mature hysteresis + mode-switching implementation in the codebase. Its pattern (EMA smoothing -> softmax classification -> threshold gating -> per-mode policy vector) is architecturally identical to what the 3-axis governor would need.
+
+---
+
+### E.3 Evaluation: Strengths of the Proposal
+
+#### E.3.1 Coherence Through Reduction
+
+The strongest aspect of the proposal is **dimensional reduction**. Currently, auxiliary signals produce ~30+ independent metrics that the training loop consumes piecemeal. The 3-axis (S, D, E) formulation compresses these into a space where conflicts become geometrically impossible:
+
+- S and E have an inherent tension: high stability (S) naturally constrains exploration (E) via `write_scale = clamp(S * (1 - E), ...)`
+- D modulates both Phase and Quad but through their respective verbs: `intent_rotation_scale = D` (Phase regulatory), `ontology_bias_strength = D` (Quad structural)
+- The policy function is deterministic and auditable — every knob value is a traceable function of (S, D, E)
+
+This prevents the current failure mode where, hypothetically, Guna says "shorten gamma," Kosha says "go deeper" (which needs long gamma), and JEPA says "widen k" — three uncoordinated signals that could put Phase and Quad in contradictory states.
+
+#### E.3.2 Hysteresis Is Essential and Under-Implemented
+
+The proposal's strongest technical contribution is the hysteresis requirement (Section 5 of the recommendation). The codebase already has hysteresis in:
+- RSS: permanent engagement (one-way latch)
+- Sattvic Controller: 5x variance thresholds with 50-step minimum boost
+- ModeSwitchController: Schmitt trigger with persistence windows
+
+But the auxiliary observation systems (Kosha/Vritti/Guna) have **no hysteresis at all**. If they were naively converted to control-plane signals, step-to-step oscillation would be immediate. The proposed EMA smoothing + Schmitt trigger pattern is the correct mitigation:
+
+```
+Smoothed state:  z_bar_t = alpha * z_bar_{t-1} + (1-alpha) * z_t
+Schmitt trigger: Quad ON at S > 0.65; OFF at S < 0.55 (10% deadband)
+                 Deep mode ON at D > 0.60; OFF at D < 0.45 (15% deadband)
+```
+
+#### E.3.3 Preserves the LM-Loss-Only Regime
+
+The governor is explicitly non-trained: "It should not be trained (initially). It should not backprop to backbone." This is fully compatible with the detach() discipline documented in Appendix D.2 and aligns with `train_unified_llm.py:16002`:
+
+> "All auxiliary systems are now MONITOR-ONLY — LM loss is the ONLY training signal"
+
+The governor would consume detached signals and produce runtime parameters — no new training signal, no new gradient pathway.
+
+---
+
+### E.4 Evaluation: Risks and Concerns
+
+#### E.4.1 The 3-Axis Compression May Be Premature
+
+Three axes may not be enough to avoid information loss. Consider:
+
+- Vritti "imagination" (Vikalpa) and Vritti "misperception" (Viparyaya) both reduce Stability (S) and increase Exploration (E) — but they demand *opposite* Quad policies. Imagination should widen search with creative license. Misperception should narrow search with caution and hedging.
+- In the 3-axis space, these map to similar (S, D, E) vectors but need different downstream knobs. The proposal addresses this with the `hedge_mode` knob, but the compression means the governor must carry additional state beyond (S, D, E) or the policy function must include Vritti-specific branches.
+
+**Mitigation**: Extend to a 4th axis or add discrete mode flags alongside the continuous axes. The PID Governor's `VRITTI_PID_TABLE` shows a precedent for discrete mode lookup.
+
+#### E.4.2 Policy Function Coupling
+
+The proposed policy equations create coupling between knobs:
+
+```
+write_scale = clamp(S * (1 - E), ...)
+quad_enabled = (D > tau_D) AND (S > tau_S)
+JEPA_bias_strength = D * (1 - S)
+```
+
+While elegant, these coupling equations are design choices that embed assumptions about how the axes interact. For example, `JEPA_bias_strength = D * (1 - S)` says "JEPA matters most when depth is needed AND stability is low." But JEPA might also be critical when stability is high and depth is high (confident deep reasoning that should be steered by prediction). The coupling equations need empirical validation — they cannot be derived from first principles alone.
+
+**Mitigation**: Start with decoupled policies (each knob depends on one axis only), measure behavior, then gradually introduce coupling terms where data shows they help.
+
+#### E.4.3 Interaction with Existing RSS Sequencer
+
+The RSS controller (`ResonanceStateScheduler`) currently gates whether auxiliary signals are active at all. The proposed governor assumes all signals are always available. In early training (PPL > 100), Kosha, CSR, and even EvoFlow are gated off — there would be no signal to feed the governor.
+
+**Mitigation**: The governor must gracefully degrade. When RSS gates off an auxiliary, the corresponding contribution to (S, D, E) should default to neutral values (e.g., S=0.5 "unknown stability"). The governor should be designed with progressive activation: initially only Guna-derived signals feed S; as training progresses and RSS engages more systems, the governor's inputs grow richer.
+
+#### E.4.4 Two Governors Already Exist
+
+The PID Governor and DisagreementGovernor already perform subsets of this function:
+- PID Governor: Vritti -> control parameters -> gating authority
+- DisagreementGovernor: JEPA + Ontology + Vritti -> regime classification
+
+Adding a third "unified" governor without deprecating these creates architectural confusion about which governor has authority. The proposal must either subsume or explicitly layer on top of the existing governors.
+
+**Mitigation**: The unified governor should be positioned as the *meta-governor* that consumes the PID authority score and the DisagreementGovernor regime as inputs, alongside the raw auxiliary signals. It does not replace them — it coordinates them.
+
+---
+
+### E.5 Evaluation: Mapping to Existing Infrastructure
+
+The codebase already contains every building block the proposal needs. The actual engineering task is composition, not invention:
+
+| Proposed Component | Existing Building Block | File | Adaptation Needed |
+|---|---|---|---|
+| EMA smoothing on z_control | `EMATracker` | `symbolu_robotics/state/ema_tracker.py` | Parameterize for 3-axis vector |
+| Schmitt trigger gating | `ModeSwitchController` hysteresis | `simulator/ctm_plus/controllers/mode_switch.py` | Extract threshold logic into reusable class |
+| Vritti -> policy parameters | `PIDGovernor.VRITTI_PID_TABLE` | `symbolu/sovereign/pid_governor.py` | Extend to map Vritti -> (S, D, E) contributions |
+| Kosha readiness -> gating | `KoshaGyroscope` Vijnana Gate | `symbolu/losses/kosha_gyroscope.py` | Extract gate logic as S-axis input |
+| Guna -> energy modulation | `guna_kosha_resonance.py` observations | `symbolu/formulas/guna_kosha_resonance.py` | Route to S-axis (sattva/tamas) and E-axis (rajas) |
+| Sequential engagement | `ResonanceStateScheduler` | `train_unified_llm.py:6353` | Layer governor activation on top of RSS phases |
+| JEPA/Ontology fusion | `DisagreementGovernor` | `scripts/causal_subspace/jepa_observatory.py` | Feed regime classification into D-axis |
+| Confidence/risk gating | `ConfidenceScaler` with VrittiRiskHead | `symbolu/training/confidence_scaler.py` | Complement (operates on emission, governor operates on attention) |
+
+---
+
+### E.6 Proposed Implementation Architecture
+
+Based on the evaluation, here is the recommended architecture that integrates the ChatGPT proposal with the existing codebase:
+
+```
+UNIFIED CONTROL-PLANE GOVERNOR
+════════════════════════════════
+
+  EXISTING OBSERVERS (detached, no backbone gradients)
+  ────────────────────────────────────────────────────
+  Kosha Head ──────► kosha_dist [4-class softmax]
+  Vritti Head ─────► vritti_dist [5-class softmax]
+  Guna Metrics ────► (sattva, rajas, tamas)
+  Ontology Bridge ─► onto_repr [12D], abstraction_level
+  JEPA Predictor ──► jepa_residual, jepa_uncertainty
+  CSR Provider ────► csr_resonance, csr_confidence
+
+  RSS GATE (training-time sequencer)
+  ──────────────────────────────────
+  ResonanceStateScheduler ──► {which observers are active?}
+                              │
+                              ▼
+
+  AXIS COMPUTATION (deterministic, non-trained)
+  ────────────────────────────────────────────
+  ┌────────────────────────────────────────────────────────────┐
+  │                                                              │
+  │  S (Stability) = weighted_mean(                             │
+  │      kosha_readiness * w_K,     [if RSS.kosha active]      │
+  │      (1 - guna_entropy) * w_G,  [if guna available]       │
+  │      (1 - vritti_risk) * w_V,   [vritti_risk = P(Vipar)   │
+  │                                   + P(Nidra)]              │
+  │      csr_resonance * w_C,       [if RSS.csr active]       │
+  │  )                                                          │
+  │  with w_* normalized, missing inputs -> weight=0            │
+  │                                                              │
+  │  D (Depth) = weighted_mean(                                 │
+  │      kosha_layer_depth * w_K,   [which sheath is active]   │
+  │      onto_abstraction * w_O,    [ontology layer height]    │
+  │      jepa_residual * w_J,       [structural mismatch]      │
+  │  )                                                          │
+  │  with w_* normalized, missing inputs -> weight=0            │
+  │                                                              │
+  │  E (Exploration) = weighted_mean(                           │
+  │      vritti_exploration * w_V,  [P(Vikalpa) + 0.5*P(Smrti)]│
+  │      guna_rajas * w_G,         [activation energy]         │
+  │      jepa_uncertainty * w_J,   [prediction spread]         │
+  │  )                                                          │
+  │  with w_* normalized, missing inputs -> weight=0            │
+  │                                                              │
+  └────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  EMA SMOOTHING (anti-oscillation)
+  ────────────────────────────────
+  z_bar_t = alpha * z_bar_{t-1} + (1 - alpha) * z_t
+  Default alpha = 0.9 (10% new signal per step)
+                              │
+                              ▼
+  SCHMITT TRIGGERS (deadband gating)
+  ──────────────────────────────────
+  quad_gate:    ON at S_bar > 0.65,  OFF at S_bar < 0.55
+  deep_gate:    ON at D_bar > 0.60,  OFF at D_bar < 0.45
+  hedge_gate:   ON at S_bar < 0.40,  OFF at S_bar > 0.50
+                              │
+                              ▼
+  VRITTI MODE OVERRIDE (discrete, for Viparyaya vs Vikalpa)
+  ─────────────────────────────────────────────────────────
+  If dominant_vritti == "viparyaya":
+      hedge_gate = ON (force caution regardless of S)
+      E = clamp(E, max=0.3) (limit exploration)
+  If dominant_vritti == "nidra":
+      phase_write_scale = 0 (freeze writes)
+      quad_enabled = False (skip retrieval)
+                              │
+                              ▼
+  POLICY FUNCTION (deterministic mapping)
+  ───────────────────────────────────────
+  ┌────────────────────────────────────────────────────────────┐
+  │  PHASE KNOBS:                                               │
+  │    gamma = gamma_min + S_bar * (gamma_max - gamma_min)     │
+  │    write_scale = clamp(S_bar * (1.0 - 0.5*E_bar), 0.1, 1) │
+  │    intent_rot_scale = D_bar                                 │
+  │                                                              │
+  │  QUAD KNOBS:                                                │
+  │    enabled = quad_gate AND deep_gate                        │
+  │    k = k_min + floor(E_bar * (k_max - k_min))              │
+  │    ontology_bias = D_bar                                    │
+  │    jepa_bias = D_bar * jepa_residual (direct, not coupled)  │
+  │                                                              │
+  │  GOVERNANCE KNOBS:                                          │
+  │    hedge_mode = hedge_gate                                  │
+  │    depth_cap = floor(D_bar * max_depth)                     │
+  │                                                              │
+  └────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  OUTPUT: ControlPolicy dataclass
+  ────────────────────────────────
+  Consumed by Phase path (gamma, write_scale, intent_rot_scale)
+  Consumed by Quad path (enabled, k, ontology_bias, jepa_bias)
+  Consumed by generation (hedge_mode, depth_cap)
+  Logged for auditability
+```
+
+---
+
+### E.7 Key Design Decisions
+
+#### E.7.1 Deterministic, Not Learned (Phase 1)
+
+The governor should start as a hand-tuned deterministic function. This preserves:
+- Full auditability (every knob value is traceable to input signals)
+- The "LM loss only" regime (no new training signals)
+- Debuggability (can inspect and adjust thresholds without retraining)
+
+Phase 2 (future): Once empirical data shows which coupling terms matter, selected pathways could be made learnable via small auxiliary heads (still detached from backbone).
+
+#### E.7.2 Progressive Activation Aligned with RSS
+
+The governor must respect the RSS training curriculum. When RSS has only FOUNDATION or COHERENCE phases active, most auxiliary signals are unavailable. The governor degrades gracefully:
+
+| RSS Phase | Available Inputs | Governor Behavior |
+|-----------|-----------------|-------------------|
+| FOUNDATION (PPL > 100) | None (all auxiliaries gated) | z_control = (0.5, 0.5, 0.5) — neutral defaults |
+| COHERENCE (PPL < 100) | EvoFlow coherence metrics | S receives micro-coherence signal |
+| FEEDBACK (PPL < 60) | + Toroidal coherence | S receives toroidal stability signal |
+| ONTOLOGY (PPL < 45) | + CSR resonance | S receives CSR continuity; D receives abstraction |
+| SOVEREIGN (PPL < 35) | + Kosha readiness | Full 3-axis governor active |
+
+#### E.7.3 Vritti Mode Override Is Necessary
+
+The 3-axis (S, D, E) compression loses the distinction between Viparyaya (misperception -> clamp down) and Vikalpa (imagination -> allow exploration). Both reduce S and increase E in continuous space, but demand opposite policies. The Vritti mode override (Section E.6) handles this by adding a discrete branch that forces specific knob values when the dominant Vritti is dangerous.
+
+This mirrors the PID Governor's existing approach (`VRITTI_PID_TABLE`) and extends it to the full knob vector.
+
+#### E.7.4 The Governor Is a Meta-Governor
+
+It does not replace the existing PID Governor or DisagreementGovernor. Instead:
+- PID Governor authority score can feed into the S axis (high authority -> high stability)
+- DisagreementGovernor regime classification can feed into the D axis (anomaly detected -> increase depth)
+- The ConfidenceScaler continues to operate independently on the emission path (complementary, not overlapping)
+
+The hierarchy is:
+
+```
+Meta-Governor (this proposal)
+    ├── consumes: PID authority, DisagreementGovernor regime, raw auxiliary signals
+    ├── produces: ControlPolicy (gamma, k, write_scale, etc.)
+    └── scope: Phase and Quad runtime parameters
+
+PID Governor (existing)
+    ├── consumes: Vritti state, R-Signal
+    ├── produces: authority score, dampening factor
+    └── scope: inter-layer gating in Sovereign-1
+
+DisagreementGovernor (existing)
+    ├── consumes: JEPA error, Ontology drift, Vritti confidence
+    ├── produces: anomaly report, regime classification
+    └── scope: anomaly detection and explanation
+
+ConfidenceScaler (existing)
+    ├── consumes: hidden states, optional Vritti risk
+    ├── produces: per-token logit scale
+    └── scope: emission path only
+```
+
+---
+
+### E.8 Truth Table: Kosha x Vritti x Guna -> Policy (Reference)
+
+For rapid lookup, here is the discretized truth table mapping the dominant state of each auxiliary to the policy output. Rows are (dominant_kosha, dominant_vritti, dominant_guna) bins.
+
+#### Notation
+
+- K = Kosha dominant: P (Physical/Material), V (Vital), M (Mental), I (Intellectual), B (Blissful)
+- Vr = Vritti dominant: Pr (Pramana), Vi (Viparyaya), Vk (Vikalpa), Sm (Smrti), Ni (Nidra)
+- G = Guna dominant: Sa (Sattva), Ra (Rajas), Ta (Tamas)
+
+#### Critical State Combinations
+
+| K | Vr | G | S | D | E | gamma | write | quad | k | hedge | Notes |
+|---|---|---|---|---|---|-------|-------|------|---|-------|-------|
+| I | Pr | Sa | 0.9 | 0.8 | 0.1 | long | strong | ON | low | OFF | Ideal: deep, stable, confident reasoning |
+| M | Vk | Ra | 0.4 | 0.5 | 0.8 | short | weak | ON | high | OFF | Creative exploration: wide search, don't over-commit to Phase |
+| P | Vi | Ta | 0.1 | 0.2 | 0.1 | min | freeze | OFF | - | ON | Danger: misperception + inertia. Hedge, don't write, skip Quad |
+| B | Pr | Sa | 0.85 | 0.6 | 0.3 | long | strong | ON | med | OFF | Flow state: stable expansion, moderate search |
+| V | Sm | Ra | 0.5 | 0.4 | 0.6 | med | med | ON | med-hi | OFF | Memory recall with energy: moderate accumulation, wider search |
+| M | Vi | Ra | 0.2 | 0.5 | 0.3 | short | weak | ON | low | ON | Active misperception: constrained retrieval, hedge everything |
+| I | Vk | Sa | 0.7 | 0.8 | 0.5 | long | med | ON | med | OFF | Intellectual imagination: deep creative reasoning, stable |
+| P | Ni | Ta | 0.05 | 0.1 | 0.05 | min | freeze | OFF | - | ON | Dormancy + inertia: system near-halted, force minimum activity |
+| B | Pr | Ra | 0.7 | 0.6 | 0.5 | long | strong | ON | med | OFF | Energized flow: confident expansion with drive |
+| M | Pr | Ta | 0.5 | 0.5 | 0.2 | med | med | ON | low | OFF | Stable mental pattern-matching, conservative retrieval |
+
+The full 5x5x3 = 75 combinations can be derived from the axis equations. The above table covers the 10 most diagnostically informative states.
+
+---
+
+### E.9 Summary Verdict
+
+**Overall assessment**: The proposal is architecturally sound and well-aligned with existing infrastructure. The key contributions are:
+
+1. **Coherence through dimensional reduction** — the 3-axis (S, D, E) formulation prevents conflicting signals from producing contradictory Phase/Quad policies
+2. **Hysteresis as first-class requirement** — the codebase has hysteresis patterns (RSS, Sattvic, ModeSwitcher) but the auxiliary observation heads lack it entirely; this is a real gap
+3. **Deterministic governor preserving LM-loss-only** — fully compatible with the detach() regime
+
+**Concerns addressed**:
+
+1. **3-axis compression loses Viparyaya/Vikalpa distinction** — mitigated by discrete Vritti mode override (Section E.6)
+2. **Policy coupling equations are untested** — mitigated by starting with decoupled policies, adding coupling empirically
+3. **RSS interaction** — mitigated by progressive activation aligned with RSS phases (Section E.7.2)
+4. **Existing governor conflict** — mitigated by positioning as meta-governor that consumes, not replaces, existing controllers (Section E.7.4)
+
+**Verdict**: The proposal should be adopted as the design target for the control-plane integration. Implementation should proceed in two phases:
+
+- **Phase 1** (deterministic): Implement the governor as a non-trained module consuming detached signals, with hand-tuned thresholds and EMA smoothing. Reuse `EMATracker` and `ModeSwitchController` hysteresis patterns. Validate that it does not degrade LM loss.
+- **Phase 2** (learned): Once empirical data shows which coupling terms matter, introduce small learnable pathway for axis computation (still detached from backbone). Consider whether the PID Governor's Kp/Ki/Kd tuning can be subsumed into the policy function.
+
+The existing codebase provides all necessary building blocks. The engineering task is composition and validation, not invention.
