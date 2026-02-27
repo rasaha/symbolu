@@ -13,6 +13,13 @@ This package provides the core training infrastructure organized into focused mo
 - training_state: Training state tracking, Guna analysis, Sattvic braking
 - scheduling: Phase controllers, warmup schedulers, PPL curriculum, RSS
 - curriculum: PPL-gated curriculum, sequence length, inverted layer evolution
+- dynamic_relaxation: 9:3 -> 6:6 split transition controller
+- generation: Text generation and quality monitoring
+- losses: Ontological, sovereign, and phase loss computation
+- validation: LRA validator, phase rotation testing
+- health_check: Architecture health checking and diagnostic probe hooks
+- checkpointing: Checkpoint save/load with split-file support
+- model_factory: Model creation factory
 """
 
 # --- utilities ---
@@ -54,17 +61,17 @@ from symbolu.training.unified.vram_manager import (
 
 # --- diagnostics ---
 from symbolu.training.unified.diagnostics import (
+    compute_layer_gradient_norm,
+    apply_kosha_phase_steering,
+    compute_kosha_steering_stats,
     compute_kosha_vritti_diagnostics,
-    format_kosha_vritti_diagnostics,
+    format_kosha_diagnostic,
     compute_csr_diagnostics,
-    format_csr_diagnostics,
+    format_csr_diagnostic,
     compute_onto_bridge_diagnostics,
-    format_onto_bridge_diagnostics,
+    format_onto_bridge_diagnostic,
     compute_sovereign_state_diagnostics,
-    format_sovereign_state_diagnostics,
-    compute_evolutionary_flow_diagnostics,
-    format_evolutionary_flow_diagnostics,
-    print_comprehensive_diagnostics,
+    format_sovereign_state_diagnostic,
 )
 
 # --- ontological_flow ---
@@ -120,6 +127,52 @@ from symbolu.training.unified.curriculum import (
     InvertedLayerCurriculumController,
 )
 
+# --- dynamic_relaxation ---
+from symbolu.training.unified.dynamic_relaxation import (
+    DynamicRelaxationController,
+)
+
+# --- generation ---
+from symbolu.training.unified.generation import (
+    generate_sample,
+    compute_sample_metrics,
+    run_quality_samples,
+)
+
+# --- losses ---
+from symbolu.training.unified.losses import (
+    compute_ontological_loss,
+    _build_sovereign_state,
+    forward_chunked,
+    compute_phase_loss,
+)
+
+# --- validation ---
+from symbolu.training.unified.validation import (
+    LRAValidator,
+    run_phase_rotation_test,
+    print_phase_rotation_results,
+)
+
+# --- health_check ---
+from symbolu.training.unified.health_check import (
+    ArchitectureHealthReport,
+    run_architecture_health_check,
+    check_quad_utilization,
+    LightweightProbeHooks,
+)
+
+# --- checkpointing ---
+from symbolu.training.unified.checkpointing import (
+    save_checkpoint,
+    load_checkpoint,
+)
+
+# --- model_factory ---
+from symbolu.training.unified.model_factory import (
+    create_model,
+)
+
 __all__ = [
     # utilities
     "_SimpleByteTokenizer",
@@ -147,17 +200,17 @@ __all__ = [
     "VRAMGovernor",
     "AutoBatchSizer",
     # diagnostics
+    "compute_layer_gradient_norm",
+    "apply_kosha_phase_steering",
+    "compute_kosha_steering_stats",
     "compute_kosha_vritti_diagnostics",
-    "format_kosha_vritti_diagnostics",
+    "format_kosha_diagnostic",
     "compute_csr_diagnostics",
-    "format_csr_diagnostics",
+    "format_csr_diagnostic",
     "compute_onto_bridge_diagnostics",
-    "format_onto_bridge_diagnostics",
+    "format_onto_bridge_diagnostic",
     "compute_sovereign_state_diagnostics",
-    "format_sovereign_state_diagnostics",
-    "compute_evolutionary_flow_diagnostics",
-    "format_evolutionary_flow_diagnostics",
-    "print_comprehensive_diagnostics",
+    "format_sovereign_state_diagnostic",
     # ontological_flow
     "OntologicalBridge",
     "create_ontological_bridge",
@@ -196,4 +249,29 @@ __all__ = [
     "ThreePhaseCurriculum",
     "PerLayerPhaseController",
     "InvertedLayerCurriculumController",
+    # dynamic_relaxation
+    "DynamicRelaxationController",
+    # generation
+    "generate_sample",
+    "compute_sample_metrics",
+    "run_quality_samples",
+    # losses
+    "compute_ontological_loss",
+    "_build_sovereign_state",
+    "forward_chunked",
+    "compute_phase_loss",
+    # validation
+    "LRAValidator",
+    "run_phase_rotation_test",
+    "print_phase_rotation_results",
+    # health_check
+    "ArchitectureHealthReport",
+    "run_architecture_health_check",
+    "check_quad_utilization",
+    "LightweightProbeHooks",
+    # checkpointing
+    "save_checkpoint",
+    "load_checkpoint",
+    # model_factory
+    "create_model",
 ]
