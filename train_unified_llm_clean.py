@@ -5652,6 +5652,7 @@ class CurriculumController:
     # Phase constants
     PHASE_FOUNDATION = "FOUNDATION"      # Pure LM
     PHASE_REGULARIZATION = "REGULARIZATION"  # Light ontology
+    PHASE_GROUNDING = "GROUNDING"        # Ontological grounding
     PHASE_SOVEREIGN = "SOVEREIGN"        # Full stack
 
     def __init__(
