@@ -2622,3 +2622,428 @@ Standalone, clean flow charts for every major model, pipeline, and mechanism in 
    to Vikalpa (imagination).  Only the KL divergence catches this.
    This is Gemini's core contribution to the architecture.
 ```
+
+---
+
+## Appendix D: Phase-Quad Auxiliary Filter Audit (Feb 2026)
+
+**Date**: 2026-02-27
+**Context**: Architectural integrity audit of how auxiliary symbolic models (Ontology, JEPA, CSR, Kosha, Vritti, Guna) integrate with the Phase-Quad separation. Motivated by the question: should auxiliary filters plug into Phase, Quad, or both? The answer is *asymmetric integration* — they must integrate into both, but in fundamentally different ways that preserve the non-competing role contract.
+
+**Source Files Audited**:
+- `train_unified_llm.py` (lines 15418–16415): auxiliary filter stack in training loop
+- `symbolu/phase_transformer.py`: `BindingCachePhaseState` (line 2904), `BindingCacheQuadQuery` (line 3214), `OntologicalBindingAnnotator` (line 2808)
+- `symbolu/training/kosha_vritti_supervision.py`: `KoshaVrittiSupervisor` (line 670)
+- `symbolu/formulas/guna_kosha_resonance.py`: Guna observation metrics
+- `symbolu/jepa/transformer.py`, `symbolu/jepa/predictor.py`: Phase-JEPA architecture
+- `csr_phoneme_provider.py`: CSR embedding bridge
+
+---
+
+### D.1 The Non-Competing Roles Contract
+
+The Phase-Quad architecture's core invariant, validated by diagnostic probes:
+
+| Path | Role | Complexity | Verb |
+|------|------|------------|------|
+| **Phase** (`BindingCachePhaseState`) | Writer / Accumulator | O(n) | "How strong is the global state?" |
+| **Quad** (`BindingCacheQuadQuery`) | Reader / Selector | O(n*k) | "Which specific memory do I retrieve?" |
+| **Local** | Syntax stabilizer | O(n*w) | "What tokens fit here?" |
+
+From `phase_transformer.py:2908-2914`:
+> "Phase's EXCLUSIVE role: Accumulate key-value pairs into persistent state. This is NOT mixed with quadratic — it feeds INTO BindingCacheQuadQuery."
+>
+> "When protected, Phase shows -50% ablation drop (ESSENTIAL). When mixed with Quad, Phase shows ~0% drop (DECORATIVE)."
+
+**The governing rule**: auxiliary modules may integrate into both Phase and Quad only if they operate in different "verbs." Into Phase: they may change *how much* and *how* you accumulate (write dynamics). They must never do "which slot wins." Into Quad: they may change *which* memory slots you retrieve and *how wide* you search (selection dynamics). They must never become a second accumulator.
+
+---
+
+### D.2 Current Integration State (As-Built)
+
+All auxiliary filters currently use gradient detachment (`detach()`) to prevent backbone corruption. This was established across V9.6.5–V9.6.9 after discovering that auxiliary gradients flowing through hidden states corrupted token embeddings ("aphasia"):
+
+```
+train_unified_llm.py:16002 (governing principle):
+"All auxiliary systems are now MONITOR-ONLY — LM loss is the ONLY training signal"
+```
+
+Detachment points:
+- CSR alignment: `csr_hidden.detach()` (line 16050)
+- CSR entropy sink: `layer_0_hidden.detach()` (line 16171)
+- CSR synthesis gate: `layer_11_hidden.detach()` (line 16195)
+- KV supervision: hidden states detached before head computation (`kosha_vritti_supervision.py`)
+- Toroidal bridge: `hidden_states[-1].detach()` (line 16281)
+- EvoFlow: `[h.detach() for h in hidden_states]` (line 16381)
+
+**Current integration summary:**
+
+| Auxiliary | Phase Integration | Quad Integration | Mechanism | Gradient Flow |
+|-----------|-------------------|------------------|-----------|---------------|
+| **Ontology** | None | `binding_salience` biases Top-K | `OntologicalBindingAnnotator` → Quad | None to backbone |
+| **JEPA** | Intent rotation on phi_k (write-side) | None | `IntentPhaseProjector`: theta = tanh(W*dS)*pi | Through projector only |
+| **CSR** | Layer 2 alignment (detached) | None | Monitor-only embedding alignment | None (detached) |
+| **Kosha** | Detached auxiliary head | None | Post-backbone observation | None (detached) |
+| **Vritti** | Detached auxiliary head | None | Post-backbone observation | None (detached) |
+| **Guna** | Metric/logging only | None | No learnable params | None |
+
+---
+
+### D.3 Asymmetric Integration Design (Target Architecture)
+
+The correct design principle is not "choose Phase or Quad" but rather:
+
+- If auxiliary is **REGULATORY** (how much, how fast, how strong) --> integrate into Phase strongly
+- If auxiliary is **STRUCTURAL** (which one, what kind, what category) --> integrate into Quad strongly
+- If auxiliary is **CONTROL** (should we proceed, what mode, what depth) --> sit above both as a gate
+
+This maps to the triune brain analogy:
+- Phase = limbic regulator (smooth, continuous, non-selective)
+- Quad = neocortex selector (comparative, associative, structural)
+- Local = reptilian executor (reflexive syntax)
+
+**Target integration matrix:**
+
+| Auxiliary | Phase | Quad | Above-Both | Brain Mapping |
+|-----------|-------|------|------------|---------------|
+| **Ontology** | Light (decay modulation) | **Heavy** (salience, candidate constraints) | - | Neocortex |
+| **JEPA** | Light (phase rotation) | **Heavy** (proposal scoring, uncertainty) | - | Neocortex (predictive) |
+| **CSR** | **Moderate** (amplitude/phase bias) | Light (tie-break) | - | Limbic + Reptilian boundary |
+| **Kosha** | Gate (depth permission) | Gate (on/off, k budget) | **Control gate** | Limbic control |
+| **Vritti** | Moderate (write strength) | Moderate (retrieval policy) | Policy selector | Limbic (state tagging) |
+| **Guna** | **Heavy** (gamma, amplitude, horizon) | Threshold bias | - | Limbic (energy/arousal) |
+
+---
+
+### D.4 Per-Auxiliary Analysis: Safe Knobs and Boundaries
+
+#### D.4.1 Ontology
+
+**Brain mapping**: Neocortex (abstract structure / routing).
+
+**Current state**: Quad-only structural integration via `binding_salience` biasing Top-K. Matches the "neocortex = selection" mapping.
+
+**Safe knobs:**
+
+Quad (structural, safe):
+- Bias selection: salience shifts which memory slots are retrieved (already implemented)
+- Bias k / candidate budget: allow wider search when ontology says "cross-domain / abstract"
+
+Phase (regulatory only, safe):
+- Modulate decay horizon (gamma) as function of ontology depth: deeper abstraction -> longer horizon; execution -> shorter horizon
+
+**Boundary**: Ontology must never perform Top-K selection inside Phase or replace Phase accumulation inside Quad.
+
+**Minimal change path**: Keep salience as-is. Optionally add a stop-grad scalar that modulates Phase decay: `gamma = base_gamma * f(ontology_depth)` with f computed from detached ontology logits. Preserves Phase role (integrator), no ranking, no backprop through ontology.
+
+#### D.4.2 JEPA / VL-JEPA
+
+**Brain mapping**: Neocortex in function (predictive expectation), but produces limbic-style control signal ("intent/mood steering") when used as smooth modulator.
+
+**Current state**: JEPA influences Phase write-side by rotating key phases (intent rotation: theta_intent = tanh(W @ sovereign_state_delta) * pi). This is regulatory steering, not selection — within the safe envelope.
+
+**Safe knobs:**
+
+Phase (regulatory, safe):
+- Phase rotation offset: phi_k += theta_intent (already implemented)
+- Write amplitude scaling: a_k *= g(intent_confidence) (scalar gating only; no selection)
+
+Quad (structural, recommended next):
+- Proposal re-scoring: score += sim(z_expected, z_retrieved) using detached JEPA target
+- Widen k when JEPA uncertainty is high
+
+**Boundary**: JEPA must never perform ranking inside Phase. Ranking belongs in Quad.
+
+**Minimal change path**: Keep current Phase rotation. Add Quad-only rerank bias using JEPA's detached predictive residual: if JEPA says "representation should look like X," retrieved memory moving toward X gets +bias.
+
+#### D.4.3 CSR Phoneme / Acoustic Resonance
+
+**Brain mapping**: Mostly Limbic (tone/valence shaping), secondarily Reptilian (surface token shaping).
+
+**Current state**: Monitor-only, detached, early-layer alignment at Layer 2.
+
+**Safe knobs:**
+
+Phase (primary, safe):
+- Write amplitude: a_k *= f(csr_resonance)
+- Phase bias: phi_k += delta(csr_phase_bias)
+- Decay: gamma *= f(csr_stability) (only if CSR also acts as stability measure)
+
+Quad (light, safe):
+- Tie-break bias: score += epsilon * csr_alignment(memory_slot), epsilon small, never dominating ontology
+
+**Boundary**: CSR must not introduce candidate competition into Phase.
+
+**Minimal change path**: Turn CSR from monitor-only into pure control-plane modulator without adding training signals. Use detached CSR metrics to modulate Phase write gates (amplitude/rotation), not selection. Preserves hard-won detach discipline.
+
+#### D.4.4 Kosha (Readiness / Depth Gating)
+
+**Brain mapping**: Limbic control system (readiness, safety, depth permission).
+
+**Current state**: Observation-only auxiliary head; no gating. **This is the largest identified gap.**
+
+**Target integration**: Above both Phase and Quad (control-plane).
+
+Kosha should decide:
+- Should we go deeper (activate expensive/abstract reasoning)?
+- Should Quad fire (or be skipped)?
+- Should Phase keep long-horizon accumulation, or shorten memory to stabilize?
+
+**Safe knobs:**
+
+Above-both gates (safe):
+- `quad_enabled = kosha_readiness > tau_q`
+- `recursion_depth_cap = g(kosha_layer)`
+- `hedge_mode = (kosha_readiness < tau_hedge)`
+
+Phase (safe):
+- Decay horizon: low readiness -> shorten horizon
+- Write strength: low readiness -> reduce writes (avoid polluting memory)
+
+Quad (safe):
+- Top-k: low readiness -> smaller k, more conservative retrieval
+- Or: low readiness -> skip Quad entirely, rely on Local + Phase only
+
+**Minimal change path**: Without touching training: compute Kosha distribution (detached), use it to gate Quad invocation and adjust gamma/k thresholds. Runtime gating only. Matches design intent from Section 7 Stage 7 (Vijnana Check) where entropy/readiness gates switch modes.
+
+#### D.4.5 Vritti (Mental State Classification)
+
+**Brain mapping**: Limbic (internal mental-state tagging). Closest analogue to "amygdala + hippocampus labeling."
+
+**Current state**: Observation-only (bundled with Kosha supervisor).
+
+**Target integration**: Above-both as policy selector + moderate integration into Quad and Phase.
+
+**Safe knobs:**
+
+Quad (moderate, safe):
+- Vritti ~ "imagination" high -> widen k but increase penalties / add hedges
+- Vritti ~ "misprediction" high -> constrain retrieval to high-confidence templates
+- Vritti ~ "memory" high -> bias toward retrieving from Phase memory slots
+
+Phase (moderate, safe):
+- "noise/dormancy" -> reduce write amplitude
+- "valid cognition" -> allow stronger writes
+
+**Boundary**: Vritti must not perform selection in Phase or replace accumulation in Quad.
+
+**Minimal change path**: Start with policy-only, no gradients. Vritti distribution chooses (k, hedge_threshold, quad_enabled, gamma_scale). Gives Vritti a real limbic role without violating "LM loss only."
+
+#### D.4.6 Guna (Clarity / Activity / Inertia)
+
+**Brain mapping**: Strongly Limbic (global energy mode / arousal).
+
+**Current state**: Metric/logging only, no learnable parameters, no training signal.
+
+**Target integration**: Phase (primary) as global state regulator; Quad (light) as threshold modifier.
+
+**Safe knobs:**
+
+Phase (primary, canonical):
+- Gamma schedule:
+  - High tamas/inertia -> shorter effective horizon + lower write amplitude (avoid sticky stale state)
+  - High rajas/activity -> reduce write amplitude or add stronger decay (prevent runaway accumulation)
+  - High sattva/clarity -> longer horizon, stronger writes
+
+Quad (light):
+- High rajas -> cap k (avoid over-search), add coherence penalties
+- High sattva -> allow k to drop (fast, confident retrieval)
+
+**Boundary**: Guna entropy smoothing must not enter Quad retrieval scoring. Quad must not become mood-driven — reasoning would become unstable.
+
+**Minimal change path**: Implement Guna as pure control-plane modulation with no training. Compute Guna from detached signals (as already done), apply to (gamma, write_amplitude, quad_thresholds).
+
+---
+
+### D.5 Mathematical Risk: Over-Integration into Phase
+
+If auxiliary filters inject selection logic into Phase, the architecture degrades:
+
+**Healthy Phase behavior** (O(n) state accumulator):
+```
+S_t = gamma * S_{t-1} + u_t
+```
+where u_t is a function of (x, phase, amplitude, value). Phase is non-selective — it accumulates a coherent global field.
+
+**Over-integration failure mode**: If any auxiliary makes Phase behave like a selector/ranker:
+```
+u_t = sum_{j<=t} alpha_{t,j} * v_j  where alpha ~ softmax(q_t * k_j)
+```
+This reintroduces quadratic structure inside Phase. Even compressed, the definition requires comparisons across j, pushing toward O(n^2) or pseudo-quadratic approximations.
+
+**Symptoms of over-integration**:
+- Phase head collapse (phases align; less diversity)
+- State saturation (memory becomes near-constant vector)
+- Training brittleness (small changes in auxiliary gating blow up stability)
+- Phase ablation shows ~0% drop (Phase has become decorative)
+
+**Allowed in Phase**: adjust gamma (memory horizon), adjust amplitude gates (write strength), rotate phases (global "mood" steering).
+
+**Not allowed in Phase**: Top-K selection, ranking past tokens, explicit candidate competition.
+
+---
+
+### D.6 Entropy Feedback Routing Between Phase and Quad
+
+Entropy measures stability and should modulate behavior through negative feedback:
+
+**Step 1: Compute entropies**
+- Dimensional/aspect entropy: "Do we know what layer this is?"
+- Guna entropy: "Is the system clear vs agitated vs inert?"
+- Kosha entropy/readiness: "Is depth allowed / safe?"
+
+**Step 2: Entropy controls Phase (limbic regulation)**
+
+Phase responds by changing memory dynamics, not selection:
+- Instability high (entropy high): shorten horizon (decrease gamma), reduce write strength, increase smoothing -> prevent runaway accumulation
+- Stability high (entropy low): lengthen horizon (increase gamma), allow stronger writes -> richer global context
+
+*Interpretation*: entropy tells Phase how much to absorb.
+
+**Step 3: Entropy controls Quad (neocortex deliberation)**
+
+Quad responds by changing how much it searches/selects:
+- Instability high: increase k (more candidates) OR switch to anchor modes / safer retrieval, add hedging, rely more on ontology constraints
+- Stability high: reduce k (faster), greedy selection ok, less hedging
+
+*Interpretation*: entropy tells Quad how hard to think / how wide to search.
+
+**Step 4: Prevent deadly coupling loop**
+
+Risk: Quad uncertain -> expands search -> injects noisy retrieval -> Phase accumulates noise -> entropy rises -> Quad expands more (positive feedback).
+
+Prevention rule: when entropy high, Phase absorbs *less* while Quad searches *more* but writes *less* back into Phase (or only writes filtered proposals). When entropy low, Phase absorbs more; Quad searches less. This creates stabilizing *negative* feedback.
+
+```
+ENTROPY ROUTING (NEGATIVE FEEDBACK):
+
+  High Entropy:
+    Phase: gamma_DOWN, write_amplitude_DOWN (absorb less)
+    Quad:  k_UP, hedge_ON, filter_proposals_ON (search more, commit less)
+
+  Low Entropy:
+    Phase: gamma_UP, write_amplitude_UP (absorb more)
+    Quad:  k_DOWN, hedge_OFF (fast confident retrieval)
+
+  Result: entropy perturbation -> damped oscillation -> equilibrium
+  NOT:    entropy perturbation -> runaway amplification -> collapse
+```
+
+---
+
+### D.7 Audit Evaluation: ChatGPT Asymmetric Integration Analysis vs. Codebase Reality
+
+**Date of external analysis**: Feb 2026
+**Evaluator**: ChatGPT (GPT-4-class reasoning)
+**Subject**: Whether auxiliary symbolic models should integrate symmetrically, asymmetrically, or exclusively into Phase vs Quad
+
+#### D.7.1 Claims Validated Against Codebase
+
+| Claim | Code Evidence | Verdict |
+|-------|---------------|---------|
+| "Phase should not perform Top-K selection" | `BindingCachePhaseState` has zero selection logic; uses cumsum only | **Confirmed** |
+| "Ontology -> heavy in Quad" | `OntologicalBindingAnnotator` computes salience passed to `BindingCacheQuadQuery.get_proposals()` via `binding_salience` parameter | **Confirmed** |
+| "JEPA -> none/minimal in Phase" | JEPA rotates Phase keys via `IntentPhaseProjector` (theta = tanh(W*dS)*pi) — regulatory, not selective | **Partially confirmed** — integration exists but is correctly bounded to rotation (regulatory), not ranking (selective) |
+| "CSR -> moderate in Phase" | CSR performs embedding-level alignment at early layers (Layer 2), detached | **Confirmed** — currently monitor-only, design target is Phase modulation |
+| "Kosha -> control gate above both" | Kosha is observation-only auxiliary head with no gating behavior | **Gap confirmed** — design intent matches but implementation is absent |
+| "Vritti -> moderate/moderate" | Vritti is observation-only post-backbone | **Gap confirmed** — same as Kosha |
+| "Guna -> heavy in Phase" | Guna is metric/logging only, zero learnable params | **Gap confirmed** — no integration at all currently |
+| "Over-integrate -> pseudo-quadratic" | Codebase prevents this via detach() discipline across V9.6.5-V9.6.9 | **Confirmed** — the detach() regime is the primary defense |
+| "Entropy should route as negative feedback" | Designed in Section 7 Stage 7 (Vijnana Check) but not yet implemented end-to-end | **Designed, not implemented** |
+
+#### D.7.2 Evaluation of the Triune Brain Mapping
+
+The proposed mapping (Phase = limbic, Quad = neocortex, Local = reptilian) is architecturally sound:
+
+| Property | Phase (Limbic) | Quad (Neocortex) | Local (Reptilian) |
+|----------|----------------|-------------------|-------------------|
+| Complexity | O(n) | O(n*k) | O(n*w) |
+| Operation | Smooth accumulation | Selective retrieval | Windowed reflex |
+| Verb | "Regulate" | "Select" | "Execute" |
+| Failure when mixed | Becomes decorative (-50% -> ~0% ablation drop) | Becomes mood-driven (unstable reasoning) | N/A (always independent) |
+
+This mapping is consistent with the validated probe results documented at `phase_transformer.py:2912-2914`.
+
+#### D.7.3 Correct Triune Classification of Each Auxiliary
+
+| Auxiliary | Primary Brain Region | Integration Verb in Phase | Integration Verb in Quad |
+|-----------|---------------------|--------------------------|--------------------------|
+| **Ontology** | Neocortex | Modulate (gamma) | Route/Constrain (salience) |
+| **JEPA** | Neocortex + Limbic boundary | Rotate (phi_k) | Score/Rerank (proposals) |
+| **CSR** | Limbic + Reptilian boundary | Modulate (amplitude, phase bias) | Bias (tie-break) |
+| **Kosha** | Limbic control | Gate (write strength, horizon) | Gate (on/off, k budget) |
+| **Vritti** | Limbic | Modulate (write amplitude) | Select policy (k, hedging) |
+| **Guna** | Limbic | Regulate (gamma, amplitude) | Threshold (k cap, coherence) |
+
+#### D.7.4 Recommended Implementation Sequence
+
+Given the "LM-loss only" + detach regime currently in force, the following sequence introduces control-plane functionality without adding new training signals:
+
+1. **Kosha gating** (highest priority, largest gap): Implement above-both gate using detached Kosha outputs to control quad_enabled, depth_cap, and hedge_mode
+2. **Guna -> Phase modulation**: Compute gamma and write_amplitude as functions of detached Guna signals (sattva/rajas/tamas)
+3. **Vritti -> policy selection**: Use detached Vritti distribution to select (k, hedging_threshold, conservative_template_bias)
+4. **Ontology salience**: Keep as-is (already correctly integrated)
+5. **JEPA -> Quad proposal scoring**: Add detached JEPA predictive residual as Quad rerank bias (score += sim(z_expected, z_retrieved))
+6. **CSR -> Phase write gates**: Modulate Phase amplitude/rotation using detached CSR resonance metrics
+
+All six steps preserve the "no auxiliary gradients into backbone" principle while converting monitor-only modules into active control-plane governors.
+
+---
+
+### D.8 Clean Control-Plane Diagram
+
+```
+CONTROL PLANE (auxiliary signals, detached, no backbone gradients)
+═══════════════════════════════════════════════════════════════════
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │                     ABOVE-BOTH GATES                          │
+  │                                                                │
+  │  Kosha Readiness ──────► quad_enabled (on/off)                │
+  │                  ──────► recursion_depth_cap                   │
+  │                  ──────► hedge_mode (tone/governance)          │
+  │                                                                │
+  │  Entropy Thresholds ───► hybrid_switching (mode selection)    │
+  └──────────────┬──────────────────────┬─────────────────────────┘
+                 │                      │
+        ┌────────▼────────┐    ┌────────▼────────┐
+        │   PHASE          │    │   QUAD           │
+        │   (Writer)       │    │   (Reader)       │
+        │                  │    │                   │
+        │ REGULATORY       │    │ STRUCTURAL        │
+        │ INPUTS:          │    │ INPUTS:           │
+        │                  │    │                   │
+        │ Guna ──► gamma   │    │ Ontology ──►      │
+        │      ──► write   │    │   binding_salience│
+        │         amplitude│    │   candidate_budget│
+        │                  │    │                   │
+        │ CSR ───► phase   │    │ JEPA ─────►       │
+        │          bias    │    │   proposal_rescore│
+        │       ──► write  │    │   uncertainty_k   │
+        │          amp     │    │                   │
+        │                  │    │ Vritti ────►      │
+        │ Vritti ─► write  │    │   retrieval_policy│
+        │          strength│    │   hedging_thresh  │
+        │                  │    │                   │
+        │ JEPA ──► phi_k   │    │ CSR ──────►       │
+        │   rotation       │    │   tiebreak_bias   │
+        │                  │    │   (epsilon, small) │
+        │ Kosha ─► gamma   │    │                   │
+        │   (short if low) │    │ Kosha ────►       │
+        │       ──► write  │    │   k_budget        │
+        │   (weak if low)  │    │   (small if low)  │
+        └──────────────────┘    └───────────────────┘
+                 │                        │
+                 ▼                        ▼
+        ┌──────────────────────────────────────────┐
+        │              DATA PLANE                    │
+        │                                            │
+        │  Local: syntax reflex (reptilian)          │
+        │  Phase: global accumulator (writes state)  │
+        │  Quad: associative selector (reads state)  │
+        │                                            │
+        │  LM Cross-Entropy = ONLY training signal   │
+        └──────────────────────────────────────────┘
+```
+
+**Key invariant**: Control-plane signals flow *downward* (from detached auxiliary outputs to runtime parameters). No gradients flow *upward* (from data-plane losses into auxiliary modules that touch backbone weights). The detach() boundary is the architectural firewall.
