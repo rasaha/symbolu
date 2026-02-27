@@ -5652,6 +5652,7 @@ class CurriculumController:
     # Phase constants
     PHASE_FOUNDATION = "FOUNDATION"      # Pure LM
     PHASE_REGULARIZATION = "REGULARIZATION"  # Light ontology
+    PHASE_GROUNDING = "GROUNDING"        # Ontological grounding
     PHASE_SOVEREIGN = "SOVEREIGN"        # Full stack
 
     def __init__(
@@ -8025,6 +8026,7 @@ def generate_sample(
     repetition_penalty: float = 1.15,
     no_repeat_ngram_size: int = 3,
     entropy_controller: Optional[AdaptiveEntropyController] = None,
+    amp_dtype: Optional[torch.dtype] = None,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
@@ -8047,6 +8049,10 @@ def generate_sample(
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
     prompt_len = input_ids.shape[1]
 
+    # Set up autocast context for FlashAttention compatibility
+    _amp_enabled = amp_dtype is not None
+    _amp_ctx = torch.amp.autocast("cuda", enabled=_amp_enabled, dtype=amp_dtype or torch.float32)
+
     # Generate tokens one by one
     generated = input_ids.clone()
 
@@ -8066,8 +8072,9 @@ def generate_sample(
         return ngrams
 
     for step in range(max_new_tokens):
-        # Forward pass
-        outputs = model(generated)
+        # Forward pass (autocast for FlashAttention bf16/fp16 compatibility)
+        with _amp_ctx:
+            outputs = model(generated)
 
         # Handle different output formats (dict with 'logits', tuple, or tensor)
         if isinstance(outputs, dict):
@@ -8245,11 +8252,14 @@ def run_quality_samples(
     log(f"  📝 QUALITY SAMPLES (Step {step})")
     log("=" * 60)
 
+    # Determine AMP dtype for FlashAttention compatibility during inference
+    amp_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else (torch.float16 if config.mixed_precision == "fp16" else None)
+
     # V9.6.10 Diagnostic: Show top predicted tokens for first prompt
     try:
         diag_prompt = config.sample_prompts[0] if config.sample_prompts else "The"
         diag_ids = tokenizer.encode(diag_prompt, return_tensors="pt").to(device)
-        with torch.no_grad():
+        with torch.no_grad(), torch.amp.autocast("cuda", enabled=amp_dtype is not None, dtype=amp_dtype or torch.float32):
             diag_out = model(diag_ids)
             if isinstance(diag_out, dict):
                 diag_logits = diag_out.get('logits', diag_out.get('output'))
@@ -8303,6 +8313,7 @@ def run_quality_samples(
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
                 entropy_controller=_infer_entropy_ctrl,
+                amp_dtype=amp_dtype,
             )
             # Clean up WikiText artifacts and truncate for display
             generated = generated.strip().replace('\n', ' ')
@@ -9391,6 +9402,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     num_heads = config.n_head if config.n_head is not None else preset["num_heads"]
     ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
     n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
+    tie_emb = True  # Weight tying between input embeddings and output projection
 
     # Validate embed_dim / num_heads divisibility
     if embed_dim % num_heads != 0:
@@ -13408,6 +13420,7 @@ def train(config: UnifiedTrainingConfig):
             # Couples Entity State (Entropy/Gradients) to Representation (Embeddings)
             # =====================================================================
             # V9.8.0: RSS controls Kosha engagement based on PPL thresholds
+            kosha_should_engage = False
             if kosha_should_engage:
                 try:
                     # Compute Reality (r) and Time (t) axes from current state
@@ -13488,6 +13501,7 @@ def train(config: UnifiedTrainingConfig):
             # The 5D Gyroscope can't fix this - it operates on extracted projections
             # =====================================================================
             state_reg_loss = 0.0
+            state_regularizer = None  # TODO: instantiate when enable_state_regularizer is True
             if state_regularizer is not None:
                 try:
                     # Get 32D sovereign state (already extracted for gyroscope above)
