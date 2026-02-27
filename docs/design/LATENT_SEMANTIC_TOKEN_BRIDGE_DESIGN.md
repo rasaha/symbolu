@@ -3492,3 +3492,626 @@ The full 5x5x3 = 75 combinations can be derived from the axis equations. The abo
 - **Phase 2** (learned): Once empirical data shows which coupling terms matter, introduce small learnable pathway for axis computation (still detached from backbone). Consider whether the PID Governor's Kp/Ki/Kd tuning can be subsumed into the policy function.
 
 The existing codebase provides all necessary building blocks. The engineering task is composition and validation, not invention.
+
+---
+
+## Appendix F: Practical Implementation — Control Coherence Plane (Feb 2026)
+
+**Date**: 2026-02-27
+**Context**: Concrete implementation plan for the unified control-plane governor, grounded in the existing codebase. This appendix translates the design in Appendix E into specific files, classes, integration points, and a phased delivery schedule.
+
+---
+
+### F.1 Why Practical Means "Thin, Deterministic, Auditable"
+
+The governor must respect three hard constraints from the existing architecture:
+
+1. **LM loss is the ONLY training signal** (`train_unified_llm.py:16002`). The governor produces runtime parameters, not losses. It does not backpropagate.
+2. **All auxiliary inputs are detached**. Kosha/Vritti are post-backbone with `hidden_states.detach()`. Guna is metric-only. CSR/Ontology/JEPA outputs available from existing hooks.
+3. **RSS gates which signals exist**. In early training (PPL > 100), most auxiliaries are inactive. The governor must degrade gracefully to neutral defaults.
+
+The practical consequence: the governor is a single Python class with ~200 lines, no `nn.Module`, no `nn.Parameter`, no `.backward()`. It is a pure function: `(detached_signals, prev_state) -> (control_policy, new_state)`.
+
+---
+
+### F.2 Module Design
+
+#### F.2.1 File Location
+
+```
+symbolu/training/control_plane_governor.py
+```
+
+This sits alongside the existing auxiliary modules:
+- `symbolu/training/kosha_vritti_supervision.py` (KV supervisor)
+- `symbolu/training/confidence_scaler.py` (logit calibration)
+
+#### F.2.2 Core Data Structures
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class AuxiliarySignals:
+    """Detached signals from all auxiliary observers.
+
+    All fields are plain floats or None (if RSS has not yet engaged
+    the corresponding auxiliary). The governor treats None as "no signal"
+    and falls back to neutral axis values.
+    """
+    # Kosha (available after RSS SOVEREIGN phase, PPL < 35)
+    kosha_readiness: Optional[float] = None      # max(kosha_dist), [0,1]
+    kosha_entropy: Optional[float] = None         # H(kosha_dist), [0, log(4)]
+    kosha_dominant_idx: Optional[int] = None       # argmax of kosha 4-class head
+
+    # Vritti (available after RSS SOVEREIGN phase, PPL < 35)
+    vritti_pramana: Optional[float] = None         # P(valid cognition)
+    vritti_viparyaya: Optional[float] = None       # P(misperception)
+    vritti_vikalpa: Optional[float] = None         # P(imagination)
+    vritti_smrti: Optional[float] = None           # P(memory)
+    vritti_nidra: Optional[float] = None           # P(dormancy)
+
+    # Guna (always available — metric-only, no RSS gate)
+    guna_sattva: float = 0.33                      # clarity
+    guna_rajas: float = 0.33                       # activity
+    guna_tamas: float = 0.34                       # inertia
+
+    # CSR (available after RSS ONTOLOGY phase, PPL < 45)
+    csr_resonance: Optional[float] = None          # mean resonance continuity
+    csr_confidence: Optional[float] = None         # provider confidence
+
+    # Ontology (available when onto_bridge is active)
+    onto_abstraction: Optional[float] = None       # normalized abstraction level [0,1]
+
+    # JEPA (available when jepa_model is active)
+    jepa_residual: Optional[float] = None          # ||z_actual - z_predicted||
+    jepa_uncertainty: Optional[float] = None       # prediction spread
+
+
+@dataclass
+class ControlPolicy:
+    """Output knob vector consumed by Phase, Quad, and generation."""
+    # Phase knobs
+    phase_gamma: float = 0.95          # decay/horizon [gamma_min, gamma_max]
+    phase_write_scale: float = 1.0     # amplitude gate [0.0, 1.0]
+    phase_intent_rot_scale: float = 0.5  # intent rotation strength [0.0, 1.0]
+
+    # Quad knobs
+    quad_enabled: bool = True           # whether Quad fires this step
+    quad_k: int = 64                    # retrieval width
+    quad_ontology_bias: float = 0.5     # ontology salience strength [0.0, 1.0]
+    quad_jepa_bias: float = 0.0        # JEPA rerank strength [0.0, 1.0]
+
+    # Governance knobs
+    hedge_mode: bool = False            # caution / template mode
+    depth_cap: int = 12                 # maximum reasoning depth
+
+
+@dataclass
+class GovernorConfig:
+    """Tunable thresholds for the control-plane governor."""
+    # EMA smoothing
+    ema_alpha: float = 0.1              # new signal weight per step (0.1 = 90% old)
+
+    # Schmitt trigger thresholds (engage/disengage with deadband)
+    quad_on_threshold: float = 0.65     # S must exceed to enable Quad
+    quad_off_threshold: float = 0.55    # S must drop below to disable Quad
+    deep_on_threshold: float = 0.60     # D must exceed for deep mode
+    deep_off_threshold: float = 0.45    # D must drop below to exit deep mode
+    hedge_on_threshold: float = 0.40    # S below this triggers hedging
+    hedge_off_threshold: float = 0.50   # S above this disables hedging
+
+    # Phase parameter ranges
+    gamma_min: float = 0.90
+    gamma_max: float = 0.999
+    k_min: int = 16
+    k_max: int = 128
+    max_depth: int = 12
+
+    # Vritti override thresholds
+    viparyaya_override_threshold: float = 0.4  # force hedge if P(Vipar) > this
+    nidra_override_threshold: float = 0.5       # force freeze if P(Nidra) > this
+```
+
+#### F.2.3 Governor Implementation
+
+```python
+class ControlPlaneGovernor:
+    """
+    Unified control-plane governor for Phase-Quad architecture.
+
+    Consumes detached auxiliary signals, computes a 3-axis control state
+    (Stability, Depth, Exploration), applies EMA smoothing and Schmitt
+    triggers, and outputs a coherent ControlPolicy.
+
+    Non-trained. No nn.Module. No gradients. Pure deterministic function.
+    """
+
+    def __init__(self, config: GovernorConfig = None):
+        self.config = config or GovernorConfig()
+
+        # EMA state for 3 axes
+        self._s_ema = 0.5  # Stability
+        self._d_ema = 0.5  # Depth
+        self._e_ema = 0.5  # Exploration
+
+        # Schmitt trigger latches
+        self._quad_latch = True
+        self._deep_latch = False
+        self._hedge_latch = False
+
+        # Step counter for logging
+        self._step = 0
+
+    def step(self, signals: AuxiliarySignals) -> ControlPolicy:
+        """Compute one step of the governor. Call once per training step."""
+        self._step += 1
+
+        # --- Axis computation (weighted mean, missing -> excluded) ---
+        s_raw = self._compute_stability(signals)
+        d_raw = self._compute_depth(signals)
+        e_raw = self._compute_exploration(signals)
+
+        # --- EMA smoothing ---
+        alpha = self.config.ema_alpha
+        self._s_ema = (1 - alpha) * self._s_ema + alpha * s_raw
+        self._d_ema = (1 - alpha) * self._d_ema + alpha * d_raw
+        self._e_ema = (1 - alpha) * self._e_ema + alpha * e_raw
+
+        S, D, E = self._s_ema, self._d_ema, self._e_ema
+
+        # --- Schmitt triggers ---
+        cfg = self.config
+        self._quad_latch = self._schmitt(S, self._quad_latch,
+                                          cfg.quad_on_threshold,
+                                          cfg.quad_off_threshold)
+        self._deep_latch = self._schmitt(D, self._deep_latch,
+                                          cfg.deep_on_threshold,
+                                          cfg.deep_off_threshold)
+        self._hedge_latch = self._schmitt_inverted(S, self._hedge_latch,
+                                                     cfg.hedge_off_threshold,
+                                                     cfg.hedge_on_threshold)
+
+        # --- Vritti mode override ---
+        vritti_override = self._check_vritti_override(signals)
+
+        # --- Policy function ---
+        policy = ControlPolicy(
+            # Phase knobs
+            phase_gamma=cfg.gamma_min + S * (cfg.gamma_max - cfg.gamma_min),
+            phase_write_scale=max(0.1, min(1.0, S * (1.0 - 0.5 * E))),
+            phase_intent_rot_scale=D,
+
+            # Quad knobs
+            quad_enabled=self._quad_latch and self._deep_latch,
+            quad_k=cfg.k_min + int(E * (cfg.k_max - cfg.k_min)),
+            quad_ontology_bias=D,
+            quad_jepa_bias=D * (signals.jepa_residual or 0.0),
+
+            # Governance knobs
+            hedge_mode=self._hedge_latch,
+            depth_cap=max(1, int(D * cfg.max_depth)),
+        )
+
+        # Apply Vritti overrides (force-override dangerous states)
+        if vritti_override == "viparyaya":
+            policy.hedge_mode = True
+            policy.quad_k = min(policy.quad_k, cfg.k_min)
+            policy.phase_write_scale = min(policy.phase_write_scale, 0.3)
+        elif vritti_override == "nidra":
+            policy.phase_write_scale = 0.0
+            policy.quad_enabled = False
+
+        return policy
+
+    # --- Axis computation helpers ---
+
+    def _compute_stability(self, sig: AuxiliarySignals) -> float:
+        """S axis: how safe is it to accumulate and retrieve?"""
+        terms, weights = [], []
+
+        if sig.kosha_readiness is not None:
+            terms.append(sig.kosha_readiness)
+            weights.append(2.0)  # Kosha is primary stability signal
+
+        if sig.kosha_entropy is not None:
+            # Lower entropy -> more stable (invert and normalize)
+            max_kosha_h = 1.386  # log(4)
+            terms.append(1.0 - min(sig.kosha_entropy / max_kosha_h, 1.0))
+            weights.append(1.0)
+
+        # Guna: sattva = stability, tamas = instability
+        terms.append(sig.guna_sattva)
+        weights.append(1.5)
+        terms.append(1.0 - sig.guna_tamas)
+        weights.append(1.0)
+
+        # Vritti: risk = P(Viparyaya) + P(Nidra) reduces stability
+        if sig.vritti_viparyaya is not None and sig.vritti_nidra is not None:
+            vritti_risk = sig.vritti_viparyaya + sig.vritti_nidra
+            terms.append(1.0 - min(vritti_risk, 1.0))
+            weights.append(1.5)
+
+        # CSR resonance: high resonance = stable
+        if sig.csr_resonance is not None:
+            terms.append(min(sig.csr_resonance, 1.0))
+            weights.append(0.5)  # CSR is micro-bias only
+
+        if not terms:
+            return 0.5  # Neutral default
+        return sum(t * w for t, w in zip(terms, weights)) / sum(weights)
+
+    def _compute_depth(self, sig: AuxiliarySignals) -> float:
+        """D axis: how deep should we reason right now?"""
+        terms, weights = [], []
+
+        if sig.kosha_dominant_idx is not None:
+            # Higher kosha index = deeper: Physical=0 -> Blissful=4
+            terms.append(sig.kosha_dominant_idx / 4.0)
+            weights.append(2.0)
+
+        if sig.onto_abstraction is not None:
+            terms.append(sig.onto_abstraction)
+            weights.append(1.5)
+
+        if sig.jepa_residual is not None:
+            # High residual = mismatch = need deeper reasoning
+            # Normalize: assume residual in [0, 2], clamp
+            terms.append(min(sig.jepa_residual / 2.0, 1.0))
+            weights.append(1.0)
+
+        if not terms:
+            return 0.5
+        return sum(t * w for t, w in zip(terms, weights)) / sum(weights)
+
+    def _compute_exploration(self, sig: AuxiliarySignals) -> float:
+        """E axis: how exploratory vs conservative should retrieval be?"""
+        terms, weights = [], []
+
+        if sig.vritti_vikalpa is not None:
+            terms.append(sig.vritti_vikalpa)
+            weights.append(2.0)  # Imagination is primary exploration signal
+
+        if sig.vritti_smrti is not None:
+            terms.append(sig.vritti_smrti * 0.5)  # Memory = moderate exploration
+            weights.append(1.0)
+
+        # Guna rajas = activation energy = exploration drive
+        terms.append(sig.guna_rajas)
+        weights.append(1.5)
+
+        if sig.jepa_uncertainty is not None:
+            terms.append(min(sig.jepa_uncertainty, 1.0))
+            weights.append(1.0)
+
+        if not terms:
+            return 0.5
+        return sum(t * w for t, w in zip(terms, weights)) / sum(weights)
+
+    # --- Schmitt trigger helpers ---
+
+    @staticmethod
+    def _schmitt(value: float, latch: bool,
+                 on_threshold: float, off_threshold: float) -> bool:
+        """Standard Schmitt trigger: ON when value > on_thresh,
+        OFF when value < off_thresh. Holds state in deadband."""
+        if latch:
+            return value >= off_threshold
+        else:
+            return value > on_threshold
+
+    @staticmethod
+    def _schmitt_inverted(value: float, latch: bool,
+                          off_threshold: float, on_threshold: float) -> bool:
+        """Inverted Schmitt: ON when value < on_thresh (low = danger),
+        OFF when value > off_thresh."""
+        if latch:
+            return value <= off_threshold
+        else:
+            return value < on_threshold
+
+    def _check_vritti_override(self, sig: AuxiliarySignals) -> Optional[str]:
+        """Check if Vritti demands a hard override."""
+        cfg = self.config
+        if (sig.vritti_viparyaya is not None and
+                sig.vritti_viparyaya > cfg.viparyaya_override_threshold):
+            return "viparyaya"
+        if (sig.vritti_nidra is not None and
+                sig.vritti_nidra > cfg.nidra_override_threshold):
+            return "nidra"
+        return None
+
+    def get_diagnostics(self) -> dict:
+        """Return current governor state for logging."""
+        return {
+            'gov_S': self._s_ema,
+            'gov_D': self._d_ema,
+            'gov_E': self._e_ema,
+            'gov_quad_latch': self._quad_latch,
+            'gov_deep_latch': self._deep_latch,
+            'gov_hedge_latch': self._hedge_latch,
+            'gov_step': self._step,
+        }
+
+    def state_dict(self) -> dict:
+        """For checkpoint save/resume."""
+        return {
+            's_ema': self._s_ema,
+            'd_ema': self._d_ema,
+            'e_ema': self._e_ema,
+            'quad_latch': self._quad_latch,
+            'deep_latch': self._deep_latch,
+            'hedge_latch': self._hedge_latch,
+            'step': self._step,
+        }
+
+    def load_state_dict(self, state: dict):
+        """Restore from checkpoint."""
+        self._s_ema = state.get('s_ema', 0.5)
+        self._d_ema = state.get('d_ema', 0.5)
+        self._e_ema = state.get('e_ema', 0.5)
+        self._quad_latch = state.get('quad_latch', True)
+        self._deep_latch = state.get('deep_latch', False)
+        self._hedge_latch = state.get('hedge_latch', False)
+        self._step = state.get('step', 0)
+```
+
+---
+
+### F.3 Integration Points in `train_unified_llm.py`
+
+The governor integrates at one precise location: **after all auxiliary metrics are computed, before the backward pass**. This is around line 16415 in the current code, after the EvoFlow, Kosha steering, CSR, JEPA, and Guna computations have all run.
+
+#### F.3.1 Initialization (alongside other auxiliary modules, ~line 15420)
+
+```python
+# After KV supervisor initialization, before the training loop:
+from symbolu.training.control_plane_governor import (
+    ControlPlaneGovernor, GovernorConfig, AuxiliarySignals
+)
+
+governor = None
+if config.enable_control_plane:  # New config flag
+    gov_config = GovernorConfig(
+        gamma_min=config.phase_gamma_min,     # Wire to existing config
+        gamma_max=config.phase_gamma_max,
+        k_min=config.quad_k_min,
+        k_max=config.quad_k_max,
+    )
+    governor = ControlPlaneGovernor(gov_config)
+    print(f"\n  [GOVERNOR] Control Coherence Plane ENABLED")
+    print(f"     EMA alpha: {gov_config.ema_alpha}")
+    print(f"     Schmitt gaps: Quad [{gov_config.quad_off_threshold}, "
+          f"{gov_config.quad_on_threshold}], "
+          f"Deep [{gov_config.deep_off_threshold}, "
+          f"{gov_config.deep_on_threshold}]")
+```
+
+#### F.3.2 Signal Collection (after all auxiliary computations, ~line 16415)
+
+```python
+# After all auxiliary losses are computed but before backward:
+if governor is not None:
+    # Collect detached signals from all observers
+    gov_signals = AuxiliarySignals(
+        # Kosha/Vritti: from KV supervisor metrics (if active)
+        kosha_readiness=kv_metrics.get('kosha_readiness') if kv_metrics else None,
+        kosha_entropy=kv_metrics.get('kosha_entropy') if kv_metrics else None,
+        kosha_dominant_idx=kv_metrics.get('kosha_dominant') if kv_metrics else None,
+        vritti_pramana=kv_metrics.get('vritti_pramana') if kv_metrics else None,
+        vritti_viparyaya=kv_metrics.get('vritti_viparyaya') if kv_metrics else None,
+        vritti_vikalpa=kv_metrics.get('vritti_vikalpa') if kv_metrics else None,
+        vritti_smrti=kv_metrics.get('vritti_smrti') if kv_metrics else None,
+        vritti_nidra=kv_metrics.get('vritti_nidra') if kv_metrics else None,
+
+        # Guna: always available from TrainingGunas
+        guna_sattva=guna_s,
+        guna_rajas=guna_r,
+        guna_tamas=guna_t,
+
+        # CSR: from csr_metrics (if active)
+        csr_resonance=csr_metrics.get('csr_similarity') if csr_metrics else None,
+        csr_confidence=csr_metrics.get('csr_confidence') if csr_metrics else None,
+
+        # Ontology: from onto_bridge metrics
+        onto_abstraction=metrics.get('onto_diversity'),
+
+        # JEPA: from jepa_metrics (if active)
+        jepa_residual=jepa_metrics.get('jepa_loss') if jepa_metrics else None,
+        jepa_uncertainty=jepa_metrics.get('jepa_vicreg') if jepa_metrics else None,
+    )
+
+    # Compute policy
+    control_policy = governor.step(gov_signals)
+
+    # Log governor state periodically
+    if global_step % config.log_every == 0 and global_step > 0:
+        diag = governor.get_diagnostics()
+        print(f"  [GOV] S={diag['gov_S']:.3f} D={diag['gov_D']:.3f} "
+              f"E={diag['gov_E']:.3f} | "
+              f"quad={'ON' if control_policy.quad_enabled else 'OFF'} "
+              f"k={control_policy.quad_k} "
+              f"gamma={control_policy.phase_gamma:.4f} "
+              f"write={control_policy.phase_write_scale:.3f} "
+              f"hedge={'ON' if control_policy.hedge_mode else 'OFF'}")
+        metrics.update(diag)
+```
+
+#### F.3.3 Policy Application (Phase and Quad consume the knobs)
+
+Phase-side application requires a minimal change to `BindingCachePhaseState.forward()`:
+
+```python
+# In BindingCachePhaseState.forward(), the decay gamma is applied:
+# Currently: gamma = sigmoid(self.decay_logit) (learned, fixed per-head)
+# With governor: gamma_effective = gamma * control_policy.phase_gamma_scale
+#
+# Implementation: pass governor output as optional parameter:
+def forward(self, x, ..., gov_gamma_scale=1.0, gov_write_scale=1.0):
+    ...
+    gamma = self._get_gamma()
+    gamma = gamma * gov_gamma_scale  # Governor modulates base gamma
+    ...
+    # Write scaling:
+    v = self.W_v(x_norm)
+    v = v * gov_write_scale  # Governor modulates write amplitude
+    ...
+```
+
+Quad-side application in `BindingCacheQuadQuery.forward()`:
+
+```python
+# In BindingCacheQuadQuery.forward(), the top_k is currently fixed:
+# Currently: K = min(self.top_k, N)
+# With governor: K = min(control_policy.quad_k, N)
+#
+# The ontology_bias and jepa_bias affect selection_scores:
+def forward(self, x, memory_state, ..., gov_k=None, gov_onto_bias=0.0):
+    ...
+    K = min(gov_k or self.top_k, N)
+    ...
+    if binding_salience is not None:
+        salience_bias = binding_salience * gov_onto_bias  # Governor scales
+        selection_scores = scores + salience_bias
+    ...
+```
+
+The key point: **these are scalar multipliers on existing operations**. They do not introduce new operations, new attention patterns, or new selection logic. Phase remains a pure accumulator; Quad remains a pure selector. The governor only adjusts their operating parameters.
+
+---
+
+### F.4 What Changes vs. What Stays
+
+| Component | Changes? | What Changes |
+|-----------|----------|-------------|
+| `BindingCachePhaseState` | Minimal | Accept `gov_gamma_scale` and `gov_write_scale` as optional float args in `forward()` |
+| `BindingCacheQuadQuery` | Minimal | Accept `gov_k` and `gov_onto_bias` as optional args in `forward()` |
+| `train_unified_llm.py` | Addition | ~30 lines: governor init + signal collection + policy application + logging |
+| `KoshaVrittiSupervisor` | None | Already produces the metrics governor needs |
+| `TrainingGunas` | None | Already produces guna_s/r/t |
+| `CSR provider` | None | Already produces csr_metrics |
+| `JEPA model` | None | Already produces jepa_metrics |
+| `ResonanceStateScheduler` | None | RSS continues to gate which auxiliaries are active; governor reads what RSS allows |
+| `PIDGovernor` | None | Continues to operate independently; governor may consume its authority score as a future S-axis input |
+| LM loss | None | Governor produces no loss, no gradients |
+
+Total new code: ~250 lines (governor module) + ~30 lines (training loop integration).
+Total modified code: ~10 lines (optional parameters in Phase/Quad forward methods).
+
+---
+
+### F.5 Phased Delivery
+
+#### Phase 0: Observation Only (safest first step)
+
+Implement the governor, collect signals, compute (S, D, E), log everything, but **do not apply the policy**. This validates:
+- Signal collection works without errors
+- Axis values are in reasonable ranges
+- EMA smoothing produces stable trajectories
+- Schmitt triggers don't oscillate
+
+Duration: 1 training run (to SOVEREIGN phase, ~35 PPL).
+
+#### Phase 1: Phase Knobs Only
+
+Apply `phase_gamma` and `phase_write_scale` from the governor. These are the safest knobs — they modulate write dynamics without affecting selection. Monitor for:
+- LM loss degradation (should be zero or positive impact)
+- Phase head diversity (should not collapse)
+- State saturation (should not increase)
+
+Duration: 1-2 training runs with A/B comparison.
+
+#### Phase 2: Quad Knobs
+
+Apply `quad_enabled`, `quad_k`, and `quad_ontology_bias`. These affect retrieval behavior. Monitor for:
+- Binding cache hit rate changes
+- Quad ablation sensitivity (should remain significant)
+- Training stability at mode transitions
+
+Duration: 1-2 training runs.
+
+#### Phase 3: Full Policy + Hedge Mode
+
+Enable all knobs including `hedge_mode` and Vritti overrides. This is the complete governor. Monitor for:
+- Mode oscillation (should be damped by EMA + Schmitt triggers)
+- Vritti override frequency (should be rare, <5% of steps)
+- Overall LM loss trajectory vs. non-governed baseline
+
+#### Phase 4: Learned Axis Weights (future)
+
+Replace the hand-tuned weights in `_compute_stability/depth/exploration` with small linear layers trained via auxiliary loss (still detached from backbone). This requires:
+- Collecting enough data from Phase 3 to establish baselines
+- Defining what "good" (S, D, E) values look like for known states
+
+---
+
+### F.6 Checkpoint Integration
+
+The governor state must survive training restarts:
+
+```python
+# In checkpoint save (alongside existing kv_supervisor, srk state):
+checkpoint['governor_state'] = governor.state_dict() if governor else None
+
+# In checkpoint restore:
+if governor is not None and 'governor_state' in checkpoint:
+    governor.load_state_dict(checkpoint['governor_state'])
+    print(f"  Governor state restored (S={governor._s_ema:.3f}, "
+          f"D={governor._d_ema:.3f}, E={governor._e_ema:.3f})")
+```
+
+---
+
+### F.7 Validation Criteria
+
+The governor succeeds if:
+
+1. **No LM loss degradation**: Governed training achieves equal or better perplexity vs. ungoverned baseline
+2. **No Phase decorativeness**: Phase ablation still shows significant drop (>30%) under governor
+3. **No mode oscillation**: Schmitt triggers prevent quad_enabled from toggling more than once per 100 steps after EMA warmup
+4. **Stable (S, D, E) trajectories**: After initial transient, axes should settle to smooth curves correlated with training dynamics (PPL, gradient norm, etc.)
+5. **Vritti overrides are rare**: <5% of steps trigger viparyaya/nidra override — if more frequent, the threshold is too low or the Vritti head is miscalibrated
+6. **Auditability**: Every control decision is traceable from logged (S, D, E) values + threshold settings to the resulting knob vector
+
+---
+
+### F.8 Relationship to Existing Governors
+
+```
+GOVERNOR HIERARCHY (layered, not competing)
+════════════════════════════════════════════
+
+  TRAINING TIME (curriculum sequencing)
+  ─────────────────────────────────────
+  ResonanceStateScheduler (RSS)
+      • "Which auxiliaries are active?"
+      • PPL-gated, permanent hysteresis
+      • Unchanged by this proposal
+
+  RUNTIME (per-step policy)
+  ─────────────────────────
+  ControlPlaneGovernor (NEW — this appendix)
+      • "How should Phase and Quad behave this step?"
+      • 3-axis control state (S, D, E)
+      • Consumes detached signals + optionally PID/Disagreement outputs
+      │
+      ├── PIDGovernor (existing, Sovereign-1)
+      │   • "How much authority does the model have?"
+      │   • Vritti-based PID tuning
+      │   • Can feed authority score into S axis (future)
+      │
+      └── DisagreementGovernor (existing, JEPA Observatory)
+          • "Are trajectory + ontology + Vritti consistent?"
+          • Anomaly regime classification
+          • Can feed regime into D axis (future)
+
+  EMISSION PATH (logit calibration)
+  ─────────────────────────────────
+  ConfidenceScaler (existing)
+      • "How sharp should output distribution be?"
+      • Per-token logit temperature
+      • Operates independently on emission, complementary to governor
+```
+
+None of the existing governors are modified or removed. The new governor sits in a previously empty slot: the runtime control plane between auxiliary observers and the Phase-Quad data plane.
