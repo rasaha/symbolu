@@ -8363,6 +8363,7 @@ class UnifiedTrainingConfig:
     # Model architecture
     model_type: str = "ontological"  # ontological, phase, hybrid
     model_size: str = "small"  # tiny, small, medium, large
+    controller: str = "none"  # Controller type for display
     vocab_size: int = 50257
     max_seq_len: int = 2048
     dropout: float = 0.1
