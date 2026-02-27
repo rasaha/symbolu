@@ -1328,3 +1328,377 @@ If our system doesn't beat these on the anomaly types it claims to detect, the i
 | **Failure** | <0.36 | <0.55 | Real data didn't help | Ontology is descriptive not structural; need backbone retraining |
 
 The honest answer is: we don't know yet. Phase 2 is a measurement, not an assumption.
+
+---
+
+## 21. Open Integration Gaps: JEPA → Spatial Action Loop
+
+**Date**: 2026-02-27
+**Context**: External architectural proposals (Gemini) attempted to close the JEPA-to-spatial action loop with two modules — `SpatialPolicyPlanner` and `GovernorActionBridge`. While the direction was correct (cognitive state should eventually connect to physical action), every concrete code block was written against an imagined API rather than the actual interfaces in this codebase. This section documents the **real architectural gaps** that remain, grounded in the actual APIs, and identifies what must be solved before JEPA predictions can drive spatial interventions.
+
+**Cross-references**:
+- Appendix E of `LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md`: Unified Control-Plane Governor — the (S, D, E) 3-axis control vector and ControlPolicy dataclass define how auxiliary signals already flow to Phase and Quad runtime parameters. Any JEPA→Spatial bridge must be positioned *above* this governor, not competing with it.
+- Appendix E of `HYBRID_PHASE_JEPA_DESIGN.md`: Cross-Model Validation Dialogue — the 8 canonical decisions (DualSourcePhaseProjector, OPB Master/Sensor, VICRegLoss, ComponentWeightedAlignmentLoss, GatedKarmaInjector) establish the validated contracts for JEPA↔SRK integration. The spatial extension must respect these contracts.
+- Appendix F of `HYBRID_PHASE_JEPA_DESIGN.md`: Self-Motivation Architecture (Sankalpa) — the GoalGenerator and SovereignJEPA autonomous cycle already define how curiosity signal (prediction error) drives goal generation via reserved dimensions [28:32]. The JEPA→Spatial bridge should consume Sankalpa goal state, not reinvent it.
+- Appendix F of `LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md`: Control Coherence Plane — the `ControlPlaneGovernor` implementation provides the deterministic, non-trained policy function that maps (S, D, E) → knob vector. Spatial interventions must be gated by this governor's Stability axis.
+
+---
+
+### 21.1 The Problem: Three Systems, No Connector
+
+The codebase has three independently working systems that should eventually form a closed loop but currently have no wire between them:
+
+```
+System A: JEPA Observatory (this document, Sections 1-20)
+  Output: CognitiveAnomalyReport
+    - prediction_error: float
+    - anomaly_type: "none" / "trajectory" / "ontological" / "both"
+    - per-dim breakdown: [32] Sovereign State dimensions
+    - Vritti diagnostics: pramana/viparyaya/vikalpa/nidra/smriti
+    - explanation: str
+
+System B: Spatial Causal Module (symbolu/spatial_causal_module.py)
+  Input:  SpatialIntervention(intervention_type, obj_id, value, ...)
+  Core:   SpatialCounterfactualReasoner.reason(world, intervention, ...)
+  Output: Dict with factual_state, counterfactual_state, outcome_probability
+
+System C: Control-Plane Governor (Appendix E/F of LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md)
+  Input:  AuxiliarySignals (Kosha, Vritti, Guna, Ontology, JEPA, CSR)
+  Core:   3-axis (S, D, E) → ControlPolicy
+  Output: phase_gamma, phase_write_scale, quad_enabled, quad_k, hedge_mode, ...
+```
+
+The gaps:
+1. **A→B**: No contract maps `CognitiveAnomalyReport` fields to `SpatialIntervention` parameters
+2. **A→C→B**: The Governor produces Phase/Quad knobs but has no spatial action channel
+3. **Latent→Object**: No mechanism resolves a Sovereign State dimension index to a `SpatialObject.id`
+4. **B→A**: Counterfactual results don't feed back to the JEPA predictor
+
+---
+
+### 21.2 Gap 1: CognitiveAnomalyReport → SpatialIntervention Contract
+
+#### What exists
+
+`CognitiveAnomalyReport` (jepa_observatory.py:78):
+```python
+@dataclass
+class CognitiveAnomalyReport:
+    prediction_error: float = 0.0
+    prediction_error_per_dim: Optional[np.ndarray] = None  # [32]
+    anomaly_type: str = "none"  # "trajectory" / "ontological" / "both"
+    pramana: float = 0.0
+    viparyaya: float = 0.0
+    vikalpa: float = 0.0
+    anomaly_score: float = 0.0
+    explanation: str = ""
+```
+
+`SpatialIntervention` (spatial_causal_module.py:311):
+```python
+@dataclass
+class SpatialIntervention:
+    intervention_type: InterventionType  # MOVE, ROTATE, PLACE, REMOVE, RESIZE, CONNECT
+    obj_id: str
+    value: Optional[torch.Tensor] = None
+    reference_id: Optional[str] = None
+    relation: Optional[SpatialRelation] = None
+```
+
+#### What's missing
+
+A mapping function that translates an anomaly report into a candidate intervention. The minimum viable contract:
+
+```python
+@dataclass
+class SpatialActionProposal:
+    """Bridge between cognitive anomaly detection and spatial intervention."""
+
+    # Source: from CognitiveAnomalyReport
+    anomaly_type: str                         # "trajectory" / "ontological" / "both"
+    anomaly_score: float                      # [0, 1]
+    dominant_deviation_dims: List[int]         # top-k Sovereign State dims by |error|
+    vritti_state: str                         # dominant Vritti mode
+
+    # Target: to SpatialIntervention
+    candidate_interventions: List[SpatialIntervention]  # ranked by relevance
+    confidence: float                         # [0, 1] — how confident is the mapping
+    should_act: bool                          # gated by Governor S-axis and Vritti
+
+    # Evaluation: to SpatialCounterfactualReasoner
+    counterfactual_queries: List[Dict]        # pre-formatted for .reason()
+```
+
+#### Design constraints (from Appendix E/F)
+
+1. **Governor-gated**: The action proposal must be gated by the Control-Plane Governor's Stability axis. If `S_bar < hedge_on_threshold` (0.40), no spatial action should be taken — the system is in hedge mode. This prevents acting under uncertainty.
+2. **Vritti-overridden**: If dominant Vritti is Viparyaya (misperception), `should_act = False`. Acting on misperceived state is worse than not acting. If Vikalpa (imagination), allow action but flag as exploratory.
+3. **Sankalpa-informed**: The Sankalpa goal vector [28:32] from Appendix F of HYBRID_PHASE_JEPA_DESIGN.md provides Valence (approach/avoid), Urgency, Complexity, and Source. These should inform which intervention type is proposed: negative Valence → REMOVE or MOVE-away; positive Valence → PLACE or CONNECT; high Urgency → act immediately; high Complexity → defer to counterfactual reasoning first.
+4. **Deterministic, not learned (Phase 1)**: Following the Control-Plane Governor pattern (Appendix E, Section E.7.1), the mapping should start as a hand-tuned deterministic function for auditability.
+
+---
+
+### 21.3 Gap 2: Object Grounding — Sovereign State → SpatialObject.id
+
+This is the hardest unsolved problem in the JEPA→Spatial loop.
+
+#### The problem
+
+A JEPA `prediction_error_per_dim` tells you that dimension 14 (a Kosha dimension) deviated by 0.37. The `SpatialIntervention` requires `obj_id: str` — a reference to a specific named object in the `SpatialWorld`. There is no mechanism to bridge "Sovereign State dim 14 is off" to "object `ball_3` needs to be moved."
+
+#### Why this is hard
+
+The Sovereign State's 32 dimensions encode **abstract cognitive properties**, not object identities:
+
+| Dims | Name | What they encode |
+|------|------|-----------------|
+| [0:12] | Bhavas | Ontological aspects (identity, body, mind, ...) |
+| [12:17] | Koshas | Consciousness sheaths (physical → blissful) |
+| [17:22] | Vrittis | Mental modifications (valid cognition, error, ...) |
+| [22:28] | Gunas | Energy states (clarity, activity, inertia) |
+| [28:32] | Sankalpa | Goal encoding (valence, urgency, complexity, source) |
+
+None of these dimensions reference specific spatial objects. The mapping requires **grounding** — connecting latent abstract features to concrete entities in a spatial world model.
+
+#### Candidate approaches (not yet validated)
+
+**Approach A: Attention-Based Grounding**
+
+If the LLM has attended to tokens describing spatial objects, the attention pattern could be used to identify which object the anomaly relates to. The `SpatialWorld` would maintain a `token_span → obj_id` registry, and the highest-attended token span during the anomalous step would select the target object.
+
+```
+JEPA flags anomaly at step t
+  → Retrieve attention weights at step t from Phase/Quad layers
+  → Find token span with highest attention mass
+  → Look up obj_id in SpatialWorld.token_object_registry
+  → Target: obj_id
+```
+
+**Prerequisite**: `SpatialWorld` must track which token spans correspond to which objects (currently not implemented).
+
+**Approach B: Bhava-Mediated Grounding**
+
+The 12 Bhava dimensions [0:12] encode identity aspects. If the deviation is concentrated in specific Bhava dimensions, and if specific objects have been associated with Bhava signatures during spatial world construction, the Bhava profile can serve as an object selector.
+
+```
+Bhava deviation profile: [0.02, 0.01, 0.37, 0.00, ...] (dim 2 = "Body" deviated)
+  → Find objects whose Bhava profiles emphasize Body: physical objects
+  → Rank by Bhava similarity to deviation profile
+  → Target: obj_id with highest match
+```
+
+**Prerequisite**: Objects in `SpatialWorld` must have associated Bhava profiles (currently not implemented).
+
+**Approach C: Sankalpa-Directed Grounding**
+
+The Sankalpa goal vector [28:32] from the Self-Motivation Architecture (Appendix F, HYBRID_PHASE_JEPA_DESIGN.md) encodes Valence and Urgency. If the GoalGenerator produces a goal that corresponds to a spatial change, the goal itself could reference an object via the curiosity signal's context.
+
+This approach requires the GoalGenerator to produce structured goals rather than continuous vectors — a significant extension.
+
+**Recommendation**: Approach A (attention-based) is the most tractable first step. It requires only a registry addition to `SpatialWorld` and leverages existing attention infrastructure. Approaches B and C should be explored once attention-based grounding is validated.
+
+---
+
+### 21.4 Gap 3: JEPA Rollout → SpatialCounterfactualReasoner Adapter
+
+#### What exists on the JEPA side
+
+The JEPA predictor produces a multi-step rollout:
+
+```python
+# From PhaseJEPAPredictor.forward()
+s_pred: torch.Tensor            # [B, T, 32] predicted future state
+delta_list: List[torch.Tensor]  # k=4 intermediate deltas
+```
+
+The `SovereignJEPA.autonomous_step()` (Appendix F, HYBRID_PHASE_JEPA_DESIGN.md) produces:
+
+```python
+{
+    'logits': Tensor,
+    'jepa_states': Tensor,         # [B, T, 32]
+    'curiosity': float,            # ||s_pred - s_actual||²
+    'autonomous_action': str,      # "EXPLORE" / "PURSUE_POSITIVE" / "AVOID_NEGATIVE" / "MAINTAIN"
+    'goal_state': Tensor,          # [4] — Sankalpa vector
+}
+```
+
+#### What exists on the Spatial side
+
+`SpatialCounterfactualReasoner.reason()` (spatial_causal_module.py:1535):
+
+```python
+def reason(
+    self,
+    world: SpatialWorld,
+    intervention: SpatialIntervention,
+    observation_embedding: Optional[torch.Tensor] = None,
+    steps: int = 10,
+) -> Dict[str, Any]:
+    """
+    Returns:
+        factual_state: SpatialWorld (without intervention)
+        counterfactual_state: SpatialWorld (with intervention applied)
+        outcome_probability: float (probability that intervention changes outcome)
+    """
+```
+
+#### What's missing: the adapter
+
+A format bridge that converts JEPA rollout output into the `(world, intervention, observation_embedding)` tuple that `.reason()` expects.
+
+```python
+class JEPASpatialAdapter:
+    """Converts JEPA trajectory predictions into counterfactual reasoning queries.
+
+    Consumes:
+      - JEPA rollout (s_pred trajectory, delta_list, curiosity, autonomous_action)
+      - CognitiveAnomalyReport (if anomaly detected)
+      - Current SpatialWorld state
+
+    Produces:
+      - List of (SpatialIntervention, observation_embedding) tuples
+        ready for SpatialCounterfactualReasoner.reason()
+    """
+
+    def propose_counterfactuals(
+        self,
+        jepa_output: Dict[str, Any],
+        anomaly_report: Optional[CognitiveAnomalyReport],
+        world: SpatialWorld,
+        governor_policy: Optional[ControlPolicy] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Steps:
+          1. Extract deviation direction from JEPA rollout (which dims deviated)
+          2. Ground deviation to object(s) via object grounding (Gap 2)
+          3. Propose candidate interventions based on deviation + Sankalpa goal
+          4. Gate by governor policy (if S < threshold, return empty)
+          5. Format as SpatialCounterfactualReasoner.reason() input tuples
+        """
+        ...
+```
+
+The key design decision is what `observation_embedding` should be. The counterfactual reasoner expects a `[hidden_dim]` tensor for its `AbductionModule`. Two candidates:
+
+1. **JEPA-projected**: Use the predicted state `s_pred[-1]` (32D), upsampled to `hidden_dim` via the state projector's inverse. This represents "where the model expected to be."
+2. **Direct hidden state**: Use the actual LLM hidden state at the anomaly step. This represents "what the model actually computed."
+
+The choice determines whether the counterfactual answers "what if we had reached the predicted state?" (option 1) or "what if we intervene on the actual state?" (option 2). Option 2 is more actionable.
+
+---
+
+### 21.5 Gap 4: Architectural Constraint — Planning Layer Above Both Modules
+
+#### The principle
+
+The JEPA→Spatial bridge must be a **planning layer** that:
+- **Consumes** outputs from JEPA (CognitiveAnomalyReport, rollout trajectory, Sankalpa goal) and Spatial (SpatialWorld state, available intervention types)
+- **Does not reach into** JEPA or Spatial module internals
+- **Respects** the Control-Plane Governor's authority (gated by S/D/E axes)
+- **Produces** candidate actions that the Spatial module evaluates via counterfactual reasoning
+
+This is the same architectural principle as the Control-Plane Governor (Appendix E, Section E.7.4): the bridge is a meta-layer that coordinates existing systems without replacing or modifying them.
+
+#### The hierarchy (extended from Appendix E)
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │        SPATIAL ACTION PLANNER            │
+                    │        (this gap — not yet built)        │
+                    │                                          │
+                    │  Consumes: anomaly report, JEPA rollout, │
+                    │            governor policy, world state  │
+                    │  Produces: counterfactual queries         │
+                    │  Gated by: Governor S-axis, Vritti mode  │
+                    └──────────┬──────────────┬───────────────┘
+                               │              │
+                    ┌──────────▼──────┐ ┌─────▼──────────────┐
+                    │ JEPA Observatory │ │ Spatial Causal     │
+                    │ (Sections 1-20)  │ │ Module             │
+                    │                  │ │                    │
+                    │ CognitiveAnomaly │ │ reason(world,      │
+                    │ Report           │ │   intervention)    │
+                    └──────────┬──────┘ └─────▲──────────────┘
+                               │              │
+                    ┌──────────▼──────────────┘
+                    │ Control-Plane Governor
+                    │ (Appendix E/F of Token Bridge Design)
+                    │
+                    │ AuxiliarySignals → (S, D, E) → ControlPolicy
+                    │ Schmitt triggers, EMA smoothing, Vritti override
+                    └─────────────────────────────────────────┘
+```
+
+#### What this means for implementation
+
+1. **No new nn.Module in the spatial or JEPA modules**. The adapter is a standalone module or pure function.
+2. **No gradient flow from spatial back to JEPA**. The counterfactual results are informational (logged, used for monitoring), not used as a training signal for the JEPA predictor. (Future work may add this, but the first implementation must be inference-time only.)
+3. **The Governor has veto power**. If the Governor's ControlPolicy says `hedge_mode=True` or `phase_write_scale=0.0`, the spatial planner produces no actions. It reads the governor's output, never overrides it.
+4. **The SpatialCounterfactualReasoner already handles "test before commit"**. The proposal from the Gemini evaluation to add "rehearsal" via counterfactual reasoning is already implemented — `SpatialCounterfactualReasoner.reason()` does exactly this. The gap is only the adapter that feeds it JEPA-derived queries.
+
+---
+
+### 21.6 What Was Correctly Identified by External Proposals (and What Was Wrong)
+
+#### Correctly identified
+
+1. **Gunas should influence action selection, not physics constants.** The Guna dimensions [22:28] encode energy states (sattva/rajas/tamas). Using them to select between intervention types (e.g., rajas → MOVE, tamas → REMOVE) is architecturally sound. Using them to override `PhysicsCausalEdge.strength` would violate the immutability of the spatial physics layer.
+
+2. **JEPA prediction residuals can trigger corrective interventions.** The predict-observe-act loop described in the GovernorActionBridge concept is legitimate model-based agent behavior. The `CognitiveAnomalyReport` already provides the residual; the gap is connecting it to action selection.
+
+3. **The counterfactual reasoner should evaluate candidates before committing.** `SpatialCounterfactualReasoner.reason()` already exists and does exactly this. The infrastructure is built; only the input adapter is missing.
+
+#### Incorrectly assumed (API mismatches to avoid)
+
+| External Proposal Used | Actual API | Why It Matters |
+|---|---|---|
+| `PhysicsCausalType.APPLY_FORCE` | `InterventionType.MOVE` (force is a physics edge type, not an intervention type) | Conflates observation (physics edges model how objects interact) with action (interventions model what we do to objects). Physics types are `CONTACT`, `GRAVITY`, `COLLISION`, etc. Intervention types are `MOVE`, `ROTATE`, `PLACE`, etc. |
+| `current_world.get_focus_object_id()` | No such method on `SpatialWorld` | Hides the entire object grounding problem (Gap 2) behind a method that doesn't exist. `SpatialWorld` stores objects in `self.objects: Dict[str, SpatialObject]` and provides `get_relations(obj_id)`, `remove_object(obj_id)`, but has no concept of "focus." |
+| `jepa_rollout[-1].get_direction()` | Sovereign State is a plain `torch.Tensor`; no `.get_direction()` | Hides action parameterization behind a method that doesn't exist. A JEPA rollout produces `[B, T, 32]` tensors. Extracting a spatial direction from them requires projecting Sovereign State dims to 3D space — this is unsolved. |
+| `SpatialIntervention(type=..., parameters={...})` | `SpatialIntervention(intervention_type=InterventionType.MOVE, obj_id="ball_3", value=tensor([0,1,0]))` | Actual signature uses named fields, not a generic parameters dict. |
+| `CausalRegime.BOTH_HIGH` | `CognitiveAnomalyReport.anomaly_type = "both"` | The anomaly type is a string classification, not an enum. Regime is classified by `DisagreementGovernor` from three thresholded signals. |
+| `SovereignAxes.ACTIVITY` | No such enum. Guna dimensions are indices `[22:28]` in a plain tensor. | There is no named enum for individual Sovereign State dimensions. They are accessed by index ranges per the 32D layout. |
+
+---
+
+### 21.7 Implementation Priority and Dependencies
+
+| Priority | Gap | Prerequisite | Estimated Effort |
+|----------|-----|-------------|-----------------|
+| **P0** | Contract definition (21.2) | CognitiveAnomalyReport stable, SpatialIntervention stable | ~50 lines (dataclass + mapping function) |
+| **P1** | JEPA→Counterfactual adapter (21.4) | P0 contract, object grounding (P2) | ~150 lines |
+| **P2** | Attention-based object grounding (21.3, Approach A) | SpatialWorld token registry | ~200 lines |
+| **P3** | Governor integration (21.5) | ControlPlaneGovernor implemented (Appendix F) | ~50 lines (gating logic) |
+| **Future** | Bhava-mediated grounding (21.3, Approach B) | Bhava profiles on SpatialObjects | Research-grade |
+| **Future** | Sankalpa-directed grounding (21.3, Approach C) | Structured goal representations | Research-grade |
+| **Future** | Feedback loop: counterfactual results → JEPA (21.1, bullet 4) | End-to-end training integration | Phase 4+ |
+
+---
+
+### 21.8 Relation to Existing Governance Components
+
+The Spatial Action Planner interacts with existing governors as follows:
+
+| Existing Component | Role in Spatial Loop | Integration Point |
+|---|---|---|
+| **DisagreementGovernor** (Section 16c) | Provides `anomaly_type` and regime classification that the planner uses to decide *whether* to act | Planner reads `CognitiveAnomalyReport.anomaly_type`; acts only on "trajectory" or "both" |
+| **ControlPlaneGovernor** (Appendix E/F, Token Bridge) | Provides S-axis stability gate and hedge_mode that the planner uses to *veto* action | Planner reads `ControlPolicy.hedge_mode` and `phase_write_scale`; if hedged or frozen, no action |
+| **PIDGovernor** (sovereign/pid_governor.py) | Provides authority score between Phase/Quad layers | Not directly consumed by planner; indirectly affects S-axis via meta-governor |
+| **SovereignJEPA** (Appendix F, Phase JEPA) | Provides `autonomous_action` and `goal_state` from Sankalpa cycle | Planner consumes `autonomous_action` to decide intervention type; consumes `goal_state[28:32]` Valence/Urgency for prioritization |
+| **Kosha Gyroscope** (kosha_gyroscope.py) | Provides Vijnana Gate (intellectual verification) | If Vijnana Gate rejects state transition, planner should not propose spatial actions that would cause further state disruption |
+
+The planner does not replace any of these — it **reads their outputs** and **adds spatial action as a new output channel** alongside the existing Phase/Quad knob adjustments.
+
+---
+
+### 21.9 Success Criteria for Closing the JEPA→Spatial Loop
+
+| Criterion | Metric | Threshold |
+|-----------|--------|-----------|
+| Contract roundtrip | `CognitiveAnomalyReport` → `SpatialActionProposal` → `SpatialIntervention` without runtime errors | 100% on synthetic anomalies |
+| Object grounding accuracy | Correct `obj_id` selected for known anomaly-object associations | >70% on constructed test cases |
+| Governor veto respected | No spatial actions when `hedge_mode=True` or `S < 0.40` | 100% |
+| Counterfactual evaluation | `.reason()` produces valid factual/counterfactual comparison for JEPA-derived queries | Output structure matches expected schema |
+| False action rate | Spatial actions proposed when no anomaly exists | <5% on normal data |
+| Vritti gate | No actions under Viparyaya (misperception); exploratory flag under Vikalpa | 100% enforcement |
