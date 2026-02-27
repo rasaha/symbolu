@@ -7298,6 +7298,8 @@ def main():
         mixed_precision=args.mixed_precision,
         local_backend=args.local_backend,
         window_size=args.window_size,
+        alpha_local=args.alpha_local,
+        local_layers=args.local_layers,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
@@ -7306,14 +7308,41 @@ def main():
         # V10.3.8: Dual-Channel Attention
         dual_channel_mode=args.dual_channel_mode,
         alignment_authority=args.alignment_authority,
+        # V10.6.1: Alignment Clamp
+        alignment_clamp_min=args.alignment_clamp_min,
+        alignment_clamp_max=args.alignment_clamp_max,
+        # V10.6.2: No-Write Contract Enforcement
+        strict_control_contract=args.strict_control_contract,
+        # V10.6.3: Architecture Health Summary
+        run_architecture_health_check=args.run_architecture_health_check,
+        architecture_health_strict=args.architecture_health_strict,
+        # V10.6.5: Parameter-Matched Baseline Enforcement
+        enforce_baseline_param_match=args.enforce_baseline_param_match,
+        # V10.6.6: Quad Utilization Sanity Checks
+        enable_quad_utilization_checks=args.enable_quad_utilization_checks,
+        quad_utilization_warn_threshold=args.quad_utilization_warn_threshold,
+        quad_utilization_check_interval=args.quad_utilization_check_interval,
+        # V10.6.7: Lightweight Probe Hooks
+        enable_probe_hooks=args.enable_probe_hooks,
+        probe_hook_interval=args.probe_hook_interval,
+        probe_hook_types=args.probe_hook_types,
         # Phase Rotation Test
         phase_rotation=args.phase_rotation,
         phase_rotation_angles=args.phase_rotation_angles,
+        phase_rotation_as_diagnostic=args.phase_rotation_as_diagnostic,
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
         # V10.0: Binding Cache options
         binding_cache_top_k=args.binding_cache_top_k,
         no_binding_cache=args.no_binding_cache,
+        # V10.0: Binding Annotation (CSR/Kosha/SRK as selectors, not modifiers)
+        # V10.5: Interference-Aware Proposal Scoring
+        enable_quad_interference=args.enable_quad_interference,
+        interference_lambda_text=args.interference_lambda_text,
+        interference_min_step=args.interference_min_step,
+        interference_entropy_gate=args.interference_entropy_gate,
+        interference_auto_classify=args.interference_auto_classify and not args.no_interference_auto_classify,
+        interference_modes=args.interference_modes,
         # V10.0: Binding Annotation (CSR/Kosha/SRK as selectors, not modifiers)
         use_binding_annotator=args.use_binding_annotator and not args.no_binding_annotator,
         use_csr_annotation=args.use_csr_annotation and not args.no_csr_annotation,
@@ -7530,6 +7559,10 @@ def main():
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
+        # LRA Validation
+        lra_validate_every=args.lra_validate_every,
+        lra_haystack_lengths=args.lra_haystack_lengths,
+        lra_num_samples=args.lra_num_samples,
         resume=args.resume,
         resume_weights_only=args.resume_weights_only,
         # Formula [1331]: 9:3 Hierarchical Split
@@ -7626,6 +7659,7 @@ def main():
         csr_use_entropy_sink=args.csr_use_entropy_sink,
         csr_use_synthesis_gate=args.csr_use_synthesis_gate,
         csr_alignment_layer=args.csr_alignment_layer,
+        untie_embeddings=args.untie_embeddings,
         # V9.6.8: CSR Projector LR Scale and Gradient Warmup
         csr_projector_lr_scale=args.csr_projector_lr_scale,
         csr_gradient_warmup_steps=args.csr_gradient_warmup_steps,
