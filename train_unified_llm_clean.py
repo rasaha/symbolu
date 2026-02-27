@@ -13409,6 +13409,7 @@ def train(config: UnifiedTrainingConfig):
             # Couples Entity State (Entropy/Gradients) to Representation (Embeddings)
             # =====================================================================
             # V9.8.0: RSS controls Kosha engagement based on PPL thresholds
+            kosha_should_engage = False
             if kosha_should_engage:
                 try:
                     # Compute Reality (r) and Time (t) axes from current state
