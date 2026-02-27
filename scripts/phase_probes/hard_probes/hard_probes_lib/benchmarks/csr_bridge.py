@@ -1,17 +1,27 @@
 """
 LSTB Phoneme CSR Bridge Benchmarks (V11.0)
 
-Tests the Constant Shift Resonance phoneme grounding system:
-    1. Phoneme decomposition quality (ARPABET coverage)
-    2. 12D ontological affinity vector generation
-    3. Resonance scoring (harmonic/neutral/dissonant distribution)
-    4. Candidate pre-filtering FLOP reduction
-    5. Ontological dimension activation (plosive->O3, nasal->O10, etc.)
-    6. Cross-check with Sovereign State Bhava dimensions
+Tests the CSR phoneme system as a SEMANTIC-EMOTIONAL ENCODER (data plane).
 
-The CSR system uses 12D vectors matching the 12 ontological axes:
-    O1_POT, O2_ID, O3_EXE, O4_STR, O5_COG, O6_AGE,
-    O7_REA, O8_PUR, O9_WIT, O10_UNI, O11_INT, O12_ABS
+CSR extracts bottom-up signal from phoneme patterns:
+    - Vrtti (mental propensity) pressure encoding
+    - Emotional tendency / energy polarity
+    - Aspect distribution probabilities across 12 resonance channels
+
+CSR is NOT a governance layer. It is analogous to:
+    - CNN extracting edges from images
+    - Prosody models extracting affect
+    - Feature extractors producing distributions for downstream reasoning
+
+The ontological stack (control plane) may OBSERVE CSR output but is never
+directly selected or routed by it. Signal != Governance.
+
+Tests:
+    1. Phoneme decomposition quality (ARPABET coverage, category distribution)
+    2. 12D resonance profiles (emotional pressure, energy concentration, spread)
+    3. Resonance scoring (harmonic/neutral/dissonant for FLOP pre-filtering)
+    4. Articulatory-semantic discriminability (category separation in 12D space)
+    5. Varna emotional pressure coherence (Sanskrit vrtti grounding validation)
 
 CLI Usage::
 
@@ -19,9 +29,9 @@ CLI Usage::
     python train_hard_probes.py --test-csr-bridge --csr-ablation
 
 References:
+    - csr_phoneme_provider.py (PHONEME_MAP_ARPABET — 12D affinities)
+    - symbolu/resonance/varna_bridge.py (bridge_meaning vrtti pressures)
     - LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md §6b
-    - csr_phoneme_provider.py (PHONEME_MAP_ARPABET, 12D affinities)
-    - PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md
 """
 
 import time
@@ -45,112 +55,113 @@ except ImportError:
     CSR_AVAILABLE = False
     PHONEME_MAP_ARPABET = None
 
-# JEPA for cross-check
-try:
-    from symbolu.jepa.state_projector import SovereignStateProjector
-    JEPA_AVAILABLE = True
-except ImportError:
-    JEPA_AVAILABLE = False
+
+# =============================================================================
+# CSR RESONANCE DIMENSIONS (12 semantic-emotional channels)
+# =============================================================================
+# These are FEATURE ENCODING channels, not governance axes.
+# CSR produces aspect distribution probabilities across these channels.
+# The ontological stack (control plane) may observe this distribution
+# but CSR never routes or selects governance layers.
+
+RESONANCE_DIM = 12
 
 
 # =============================================================================
-# 12D ONTOLOGICAL AXES (O1-O12)
+# PHONEME ARTICULATORY CATEGORIES
 # =============================================================================
-# Order: O1_POT, O2_ID, O3_EXE, O4_STR, O5_COG, O6_AGE, O7_REA, O8_PUR, O9_WIT, O10_UNI, O11_INT, O12_ABS
+# Categorisation is by articulatory manner (how the sound is produced).
+# Each category has a distinct SEMANTIC-EMOTIONAL signature:
+#   Plosives   — forceful action energy, percussive pressure
+#   Fricatives — controlled sustained energy, discriminating pressure
+#   Nasals     — connective resonance, integrative flow
+#   Liquids    — structural flow, adaptive shaping
+#   Approximants — transitional glide, purposeful bridging
+#   Vowels     — consciousness states, open vibrational field
+#   Diphthongs — transformation energy, directional transition
+#   Affricates — compound boundary-setting force
 
-ONTO_AXIS_NAMES = [
-    'O1_POTENTIAL', 'O2_IDENTITY', 'O3_EXECUTION', 'O4_STRUCTURE',
-    'O5_COGNITION', 'O6_AGENCY', 'O7_REASONING', 'O8_PURPOSE',
-    'O9_WITNESS', 'O10_UNIFYING', 'O11_INTEGRATION', 'O12_ABSOLVING',
-]
-
-ONTO_DIM = 12
-
-
-# =============================================================================
-# PHONEME ONTOLOGY MAPPING (from csr_phoneme_provider.py PHONEME_MAP_ARPABET)
-# =============================================================================
-# Corrected to match actual csr_phoneme_provider.py dominant axes:
-#   Plosives   -> O3_EXECUTION dominant
-#   Fricatives -> O6_AGENCY dominant
-#   Nasals     -> O10_UNIFYING dominant
-#   Liquids    -> O4_STRUCTURE dominant
-#   Approximants -> O7_REASONING / O8_PURPOSE
-#   Short vowels -> O1_POTENTIAL / O2_IDENTITY
-#   Long vowels  -> varied (IY->O4, UW->O10, AA->O1)
-#   Diphthongs   -> O8_PURPOSE / O9_WITNESS
-
-PHONEME_ONTOLOGY_MAP = {
+PHONEME_CATEGORIES = {
     'plosive': {
         'phonemes': ['P', 'B', 'T', 'D', 'K', 'G'],
-        'primary_axis': 'O3_EXECUTION', 'axis_idx': 2,
+        'semantic_quality': 'forceful_action',
+        'varna_pressures': ['hope', 'worry', 'action', 'attachment'],
     },
     'fricative': {
         'phonemes': ['F', 'V', 'TH', 'DH', 'S', 'Z', 'SH', 'ZH', 'HH'],
-        'primary_axis': 'O6_AGENCY', 'axis_idx': 5,
+        'semantic_quality': 'controlled_agency',
+        'varna_pressures': ['material_greed', 'lust_confusion', 'escape', 'external_dharma'],
     },
     'affricate': {
         'phonemes': ['CH', 'JH'],
-        'primary_axis': 'O3_EXECUTION', 'axis_idx': 2,  # O3+O6 blend
+        'semantic_quality': 'boundary_force',
+        'varna_pressures': ['conscience', 'ego'],
     },
     'nasal': {
         'phonemes': ['M', 'N', 'NG'],
-        'primary_axis': 'O10_UNIFYING', 'axis_idx': 9,
+        'semantic_quality': 'connective_resonance',
+        'varna_pressures': ['indulgence', 'attachment', 'envy'],
     },
     'liquid': {
         'phonemes': ['L', 'R'],
-        'primary_axis': 'O4_STRUCTURE', 'axis_idx': 3,
+        'semantic_quality': 'structural_flow',
+        'varna_pressures': ['cruelty', 'destruction'],
     },
     'approximant': {
         'phonemes': ['W', 'Y'],
-        'primary_axis': 'O7_REASONING', 'axis_idx': 6,
+        'semantic_quality': 'transitional_glide',
+        'varna_pressures': ['distrust'],
     },
     'short_vowel': {
         'phonemes': ['AE', 'AH', 'EH', 'IH', 'UH'],
-        'primary_axis': 'O1_POTENTIAL', 'axis_idx': 0,
+        'semantic_quality': 'grounding_awareness',
+        'varna_states': ['birth_of_cognition', 'self_doing', 'contraction_focus'],
     },
     'long_vowel': {
         'phonemes': ['AA', 'AO', 'IY', 'UW', 'ER'],
-        'primary_axis': 'O1_POTENTIAL', 'axis_idx': 0,  # AA dominant at O1
+        'semantic_quality': 'sustained_consciousness',
+        'varna_states': ['expansion_continuity', 'specialized_identity', 'sustained_hold'],
     },
     'diphthong': {
         'phonemes': ['AY', 'AW', 'OY', 'EY', 'OW'],
-        'primary_axis': 'O8_PURPOSE', 'axis_idx': 7,
+        'semantic_quality': 'transformation_energy',
+        'varna_states': ['integrative_understanding', 'surrender_transition', 'closure_completion'],
     },
 }
 
 
 # =============================================================================
-# LOCAL 12D AFFINITY TABLE (fallback when csr_phoneme_provider not available)
+# LOCAL 12D RESONANCE TABLE (fallback when csr_phoneme_provider not available)
 # =============================================================================
-# Subset of PHONEME_MAP_ARPABET from csr_phoneme_provider.py
-# Order: O1_POT, O2_ID, O3_EXE, O4_STR, O5_COG, O6_AGE, O7_REA, O8_PUR, O9_WIT, O10_UNI, O11_INT, O12_ABS
+# These are Sanskrit-calibrated 12D semantic-emotional resonance vectors
+# from PHONEME_MAP_ARPABET. Each dimension is a resonance channel encoding
+# aspect distribution — NOT an ontological governance axis.
 
 LOCAL_PHONEME_12D = {
-    # Vowels
-    'AA': [0.9, 0.2, 0.1, 0.1, 0.3, 0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.1],
-    'AH': [0.9, 0.2, 0.1, 0.1, 0.3, 0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.1],
+    # Vowels — consciousness states, open vibrational fields
+    'AA': [0.9, 0.2, 0.1, 0.1, 0.3, 0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.1],  # primordial potential
+    'AH': [0.9, 0.2, 0.1, 0.1, 0.3, 0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.1],  # birth of cognition
     'AE': [0.7, 0.4, 0.2, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.3, 0.2, 0.1],
-    'IH': [0.2, 0.9, 0.4, 0.2, 0.3, 0.2, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1],
-    'IY': [0.1, 0.6, 0.3, 0.9, 0.2, 0.2, 0.3, 0.2, 0.2, 0.3, 0.2, 0.2],
-    'UH': [0.1, 0.2, 0.2, 0.3, 0.9, 0.3, 0.1, 0.2, 0.4, 0.7, 0.3, 0.2],
-    'UW': [0.1, 0.1, 0.1, 0.2, 0.4, 0.8, 0.2, 0.3, 0.5, 0.9, 0.4, 0.4],
-    'EH': [0.1, 0.2, 0.7, 0.3, 0.4, 0.3, 0.8, 0.4, 0.2, 0.3, 0.3, 0.2],
+    'IH': [0.2, 0.9, 0.4, 0.2, 0.3, 0.2, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1],  # I-ness / self_doing
+    'IY': [0.1, 0.6, 0.3, 0.9, 0.2, 0.2, 0.3, 0.2, 0.2, 0.3, 0.2, 0.2],  # specialized identity
+    'UH': [0.1, 0.2, 0.2, 0.3, 0.9, 0.3, 0.1, 0.2, 0.4, 0.7, 0.3, 0.2],  # contraction / cohesion
+    'UW': [0.1, 0.1, 0.1, 0.2, 0.4, 0.8, 0.2, 0.3, 0.5, 0.9, 0.4, 0.4],  # sustained hold / deep unity
+    'EH': [0.1, 0.2, 0.7, 0.3, 0.4, 0.3, 0.8, 0.4, 0.2, 0.3, 0.3, 0.2],  # intellect / aspiration
     'ER': [0.2, 0.3, 0.5, 0.4, 0.4, 0.4, 0.6, 0.4, 0.3, 0.4, 0.3, 0.3],
-    'EY': [0.1, 0.1, 0.3, 0.2, 0.3, 0.4, 0.5, 0.9, 0.4, 0.5, 0.4, 0.3],
+    'EY': [0.1, 0.1, 0.3, 0.2, 0.3, 0.4, 0.5, 0.9, 0.4, 0.5, 0.4, 0.3],  # soul intention / wisdom
     'AY': [0.2, 0.2, 0.4, 0.2, 0.3, 0.4, 0.4, 0.8, 0.4, 0.5, 0.4, 0.3],
-    'OW': [0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.4, 0.5, 0.9, 0.6, 0.8, 0.5],
+    'OW': [0.1, 0.1, 0.2, 0.2, 0.3, 0.2, 0.4, 0.5, 0.9, 0.6, 0.8, 0.5],  # observer / completion
     'AO': [0.2, 0.2, 0.2, 0.3, 0.3, 0.3, 0.4, 0.5, 0.8, 0.6, 0.7, 0.5],
     'OY': [0.2, 0.2, 0.3, 0.2, 0.3, 0.3, 0.4, 0.6, 0.8, 0.5, 0.7, 0.5],
-    'AW': [0.1, 0.1, 0.2, 0.1, 0.2, 0.3, 0.3, 0.6, 0.7, 0.4, 0.6, 0.9],
-    # Plosives
+    'AW': [0.1, 0.1, 0.2, 0.1, 0.2, 0.3, 0.3, 0.6, 0.7, 0.4, 0.6, 0.9],  # transformation / surrender
+    # Plosives — forceful action, percussive pressure
     'P':  [0.0, 0.2, 0.8, 0.4, 0.1, 0.5, 0.2, 0.1, 0.1, 0.1, 0.1, 0.0],
     'T':  [0.0, 0.2, 0.9, 0.5, 0.1, 0.6, 0.2, 0.1, 0.1, 0.1, 0.1, 0.0],
     'K':  [0.0, 0.2, 0.9, 0.4, 0.1, 0.5, 0.3, 0.1, 0.1, 0.1, 0.1, 0.0],
     'B':  [0.1, 0.3, 0.7, 0.4, 0.2, 0.4, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1],
     'D':  [0.1, 0.3, 0.8, 0.5, 0.2, 0.5, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1],
     'G':  [0.1, 0.3, 0.8, 0.4, 0.2, 0.4, 0.3, 0.1, 0.1, 0.2, 0.1, 0.1],
-    # Fricatives
+    # Fricatives — controlled sustained energy, discriminating pressure
     'F':  [0.0, 0.2, 0.3, 0.4, 0.3, 0.8, 0.5, 0.3, 0.2, 0.2, 0.2, 0.1],
     'TH': [0.0, 0.2, 0.4, 0.4, 0.3, 0.8, 0.5, 0.3, 0.2, 0.2, 0.2, 0.1],
     'S':  [0.0, 0.3, 0.3, 0.4, 0.3, 0.9, 0.6, 0.4, 0.2, 0.2, 0.2, 0.1],
@@ -160,30 +171,30 @@ LOCAL_PHONEME_12D = {
     'DH': [0.1, 0.2, 0.4, 0.4, 0.3, 0.7, 0.6, 0.4, 0.3, 0.3, 0.2, 0.1],
     'Z':  [0.0, 0.3, 0.4, 0.4, 0.3, 0.8, 0.6, 0.4, 0.2, 0.3, 0.2, 0.1],
     'ZH': [0.0, 0.2, 0.4, 0.5, 0.3, 0.7, 0.6, 0.4, 0.3, 0.4, 0.3, 0.2],
-    # Affricates
+    # Affricates — compound boundary force (plosive + fricative blend)
     'CH': [0.0, 0.2, 0.7, 0.5, 0.2, 0.7, 0.4, 0.2, 0.2, 0.2, 0.2, 0.1],
     'JH': [0.1, 0.3, 0.6, 0.5, 0.2, 0.6, 0.5, 0.3, 0.2, 0.3, 0.2, 0.1],
-    # Nasals
+    # Nasals — connective resonance, integrative flow
     'M':  [0.3, 0.3, 0.2, 0.3, 0.6, 0.2, 0.1, 0.2, 0.5, 0.9, 0.4, 0.3],
     'N':  [0.2, 0.3, 0.2, 0.2, 0.5, 0.3, 0.2, 0.2, 0.4, 0.9, 0.5, 0.3],
     'NG': [0.2, 0.3, 0.2, 0.3, 0.6, 0.2, 0.1, 0.2, 0.5, 0.9, 0.5, 0.4],
-    # Liquids
+    # Liquids — structural flow, adaptive shaping
     'L':  [0.1, 0.2, 0.2, 0.9, 0.3, 0.3, 0.3, 0.4, 0.3, 0.6, 0.5, 0.4],
     'R':  [0.1, 0.2, 0.7, 0.5, 0.4, 0.4, 0.3, 0.3, 0.3, 0.5, 0.4, 0.4],
-    # Approximants
+    # Approximants — transitional glide, purposeful bridging
     'W':  [0.2, 0.2, 0.2, 0.3, 0.4, 0.4, 0.5, 0.6, 0.4, 0.6, 0.5, 0.4],
     'Y':  [0.2, 0.3, 0.3, 0.4, 0.3, 0.4, 0.6, 0.6, 0.4, 0.5, 0.4, 0.3],
 }
 
 
-def get_phoneme_12d(phoneme: str) -> List[float]:
-    """Get 12D affinity for a phoneme, using real CSR map or local fallback."""
+def get_phoneme_resonance(phoneme: str) -> List[float]:
+    """Get 12D resonance vector for a phoneme (real CSR map or local fallback)."""
     ph = phoneme.rstrip('012')  # Strip stress markers
     if PHONEME_MAP_ARPABET is not None and ph in PHONEME_MAP_ARPABET:
         return PHONEME_MAP_ARPABET[ph]
     if ph in LOCAL_PHONEME_12D:
         return LOCAL_PHONEME_12D[ph]
-    return [0.33] * 12  # Unknown fallback
+    return [0.33] * RESONANCE_DIM  # Unknown: uniform low activation
 
 
 # =============================================================================
@@ -231,55 +242,80 @@ def simple_text_to_phonemes(text: str) -> List[str]:
 def classify_phoneme(ph: str) -> str:
     """Classify phoneme into articulatory category."""
     ph_clean = ph.rstrip('012')
-    for category, info in PHONEME_ONTOLOGY_MAP.items():
+    for category, info in PHONEME_CATEGORIES.items():
         if ph_clean in info['phonemes']:
             return category
     return 'unknown'
 
 
-def phonemes_to_12d(phonemes: List[str]) -> torch.Tensor:
+def phonemes_to_resonance(phonemes: List[str]) -> torch.Tensor:
     """
-    Convert phoneme sequence to 12D ontological affinity vector.
+    Convert phoneme sequence to 12D semantic-emotional resonance vector.
 
-    Uses the real PHONEME_MAP_ARPABET 12D vectors from csr_phoneme_provider.py.
-    Each phoneme has a Sanskrit-calibrated 12D affinity:
-        [O1_POT, O2_ID, O3_EXE, O4_STR, O5_COG, O6_AGE,
-         O7_REA, O8_PUR, O9_WIT, O10_UNI, O11_INT, O12_ABS]
-
-    The word-level vector is the mean of per-phoneme vectors.
+    Mean-aggregates per-phoneme 12D resonance vectors (Sanskrit-calibrated).
+    The result is an aspect distribution across 12 resonance channels —
+    a feature encoding, not a governance signal.
     """
     if not phonemes:
-        return torch.zeros(ONTO_DIM)
+        return torch.zeros(RESONANCE_DIM)
 
     vectors = []
     for ph in phonemes:
-        vec = get_phoneme_12d(ph)
+        vec = get_phoneme_resonance(ph)
         vectors.append(torch.tensor(vec, dtype=torch.float32))
 
-    # Mean aggregation (same as CSREmbeddingProvider)
     return torch.stack(vectors).mean(dim=0)
 
 
-def compute_resonance_score(vec_12d: torch.Tensor) -> float:
+# =============================================================================
+# RESONANCE PROFILE METRICS (semantic-emotional properties)
+# =============================================================================
+
+def resonance_energy(vec: torch.Tensor) -> float:
+    """Total resonance energy: mean activation across all channels."""
+    return vec.mean().item()
+
+
+def resonance_peak(vec: torch.Tensor) -> float:
+    """Peak resonance: maximum activation in any single channel."""
+    return vec.max().item()
+
+
+def resonance_spread(vec: torch.Tensor, threshold: float = 0.3) -> float:
+    """Resonance spread: fraction of channels activated above threshold.
+    High spread = distributed emotional energy (vowels, nasals).
+    Low spread = concentrated pressure (plosives)."""
+    return (vec > threshold).sum().item() / RESONANCE_DIM
+
+
+def energy_concentration(vec: torch.Tensor) -> float:
+    """How concentrated the energy is in few channels (inverse of entropy).
+    High = percussive/focused pressure. Low = diffuse/open resonance."""
+    # Normalise to distribution
+    p = F.softmax(vec, dim=0)
+    entropy = -(p * p.log()).sum().item()
+    max_entropy = math.log(RESONANCE_DIM)
+    return 1.0 - (entropy / max_entropy)  # 0=uniform, 1=single-channel
+
+
+def compute_resonance_score(vec: torch.Tensor) -> float:
     """
-    Compute resonance score from 12D ontological affinity vector.
+    Compute resonance score for FLOP pre-filtering.
 
     Score interpretation (from LSTB §6b):
         >= 0.7: Harmonic (proceed to transformer)
         0.3-0.7: Neutral (route to decision gate)
         <= 0.3: Dissonant (resolve locally, skip transformer)
 
-    The resonance score measures how strongly the phoneme profile activates
-    the ontological space — high activation = harmonic, low = dissonant.
+    This is a data-plane signal for the decision gate.
+    The ontological stack may observe this score but CSR does NOT
+    route governance — the decision gate does.
     """
-    # Overall activation energy: mean of all 12 axes
-    mean_activation = vec_12d.mean().item()
-    # Peak activation: how strongly the dominant axis fires
-    peak_activation = vec_12d.max().item()
-    # Spread: how many axes are activated (complexity)
-    active_axes = (vec_12d > 0.3).sum().item() / ONTO_DIM
+    energy = resonance_energy(vec)
+    peak = resonance_peak(vec)
+    spread = resonance_spread(vec)
 
-    score = 0.4 * mean_activation + 0.3 * peak_activation + 0.3 * active_axes
+    score = 0.4 * energy + 0.3 * peak + 0.3 * spread
     return max(0.0, min(1.0, score))
 
 
@@ -319,69 +355,94 @@ def test_phoneme_decomposition(device: torch.device) -> Dict[str, float]:
     results['classification_rate'] = total_classified / max(total_phonemes, 1)
     results['phonemes_per_word'] = total_phonemes / max(total_words, 1)
 
-    for cat in ['plosive', 'nasal', 'fricative', 'diphthong', 'long_vowel',
-                'short_vowel', 'liquid', 'approximant', 'affricate']:
+    for cat in ['plosive', 'fricative', 'nasal', 'liquid',
+                'short_vowel', 'long_vowel', 'diphthong', 'approximant', 'affricate']:
         results[f'pct_{cat}'] = category_counts.get(cat, 0) / max(total_phonemes, 1)
 
     return results
 
 
 # =============================================================================
-# TEST 2: 12D ONTOLOGICAL AFFINITY VECTORS
+# TEST 2: SEMANTIC-EMOTIONAL RESONANCE PROFILES
 # =============================================================================
 
-def test_12d_affinity_vectors(device: torch.device) -> Dict[str, float]:
-    """Test that 12D affinity vectors capture articulatory-ontological structure."""
-    test_cases = {
+def test_resonance_profiles(device: torch.device) -> Dict[str, float]:
+    """
+    Test that 12D resonance vectors encode correct semantic-emotional properties.
+
+    Validates the CSR feature encoder's output characteristics:
+        - Plosives: concentrated pressure, low spread (percussive force)
+        - Vowels: high energy, high spread (open vibrational field)
+        - Nasals: high spread, connective resonance (integrative flow)
+        - Fricatives: moderate concentration, sustained energy (controlled agency)
+
+    These are SIGNAL properties, not governance signals.
+    """
+    test_profiles = {
         'plosive_heavy': ['K', 'T', 'P', 'B', 'D', 'G', 'K', 'T'],
         'nasal_heavy': ['M', 'N', 'NG', 'M', 'N', 'M', 'N', 'NG'],
         'vowel_heavy': ['AA', 'IY', 'UW', 'AO', 'EY', 'OW', 'AY', 'AW'],
-        'mixed': ['K', 'AE', 'T', 'S', 'AE', 'T', 'M', 'AE', 'T'],
         'fricative_heavy': ['S', 'Z', 'F', 'V', 'TH', 'SH', 'S', 'Z'],
+        'mixed': ['K', 'AE', 'T', 'S', 'AE', 'T', 'M', 'AE', 'T'],
     }
 
     results = {}
 
-    for name, phonemes in test_cases.items():
-        vec = phonemes_to_12d(phonemes)
-        score = compute_resonance_score(vec)
-        dominant_idx = vec.argmax().item()
+    for name, phonemes in test_profiles.items():
+        vec = phonemes_to_resonance(phonemes)
+        results[f'{name}_energy'] = resonance_energy(vec)
+        results[f'{name}_peak'] = resonance_peak(vec)
+        results[f'{name}_spread'] = resonance_spread(vec)
+        results[f'{name}_concentration'] = energy_concentration(vec)
+        results[f'{name}_score'] = compute_resonance_score(vec)
 
-        results[f'{name}_score'] = score
-        results[f'{name}_dominant_axis'] = ONTO_AXIS_NAMES[dominant_idx]
-        results[f'{name}_dominant_idx'] = dominant_idx
-        results[f'{name}_peak_activation'] = vec.max().item()
-        results[f'{name}_mean_activation'] = vec.mean().item()
+    # --- Semantic-emotional structural assertions ---
 
-    # Structural checks using actual 12D dominant axes
-    # Plosives should peak at O3_EXECUTION (idx=2)
-    results['plosive_peaks_O3'] = results['plosive_heavy_dominant_idx'] == 2
-    # Nasals should peak at O10_UNIFYING (idx=9)
-    results['nasal_peaks_O10'] = results['nasal_heavy_dominant_idx'] == 9
-    # Fricatives should peak at O6_AGENCY (idx=5)
-    results['fricative_peaks_O6'] = results['fricative_heavy_dominant_idx'] == 5
+    # Vowels have higher resonance energy than plosives (open vs percussive)
+    results['vowel_energy_gt_plosive'] = (
+        results['vowel_heavy_energy'] > results['plosive_heavy_energy']
+    )
 
-    # Plosive-heavy should have lower resonance than vowel-heavy
-    results['plosive_lower_than_vowel'] = results['plosive_heavy_score'] < results['vowel_heavy_score']
+    # Vowels have higher spread than plosives (distributed vs concentrated)
+    results['vowel_spread_gt_plosive'] = (
+        results['vowel_heavy_spread'] > results['plosive_heavy_spread']
+    )
+
+    # Plosives have higher concentration than vowels (focused pressure)
+    results['plosive_more_concentrated'] = (
+        results['plosive_heavy_concentration'] > results['vowel_heavy_concentration']
+    )
+
+    # Nasals have higher spread than plosives (connective vs percussive)
+    results['nasal_spread_gt_plosive'] = (
+        results['nasal_heavy_spread'] > results['plosive_heavy_spread']
+    )
+
+    # Fricatives have higher energy than plosives (sustained vs burst)
+    results['fricative_energy_gt_plosive'] = (
+        results['fricative_heavy_energy'] > results['plosive_heavy_energy']
+    )
 
     return results
 
 
 # =============================================================================
-# TEST 3: FLOP REDUCTION VIA PRE-FILTERING
+# TEST 3: FLOP REDUCTION VIA RESONANCE PRE-FILTERING
 # =============================================================================
 
 def test_flop_reduction(device: torch.device) -> Dict[str, float]:
     """
-    Test FLOP savings from phoneme-based candidate pre-filtering.
+    Test FLOP savings from resonance-based candidate pre-filtering.
 
-    LSTB §6b claims 82% FLOP reduction via resonance-based pruning.
+    CSR resonance scoring is a DATA-PLANE signal that the decision gate
+    uses to prune candidates BEFORE the transformer processes them.
+    This is constraint elimination, not governance.
     """
     import random
     random.seed(42)
 
     all_phonemes = []
-    for info in PHONEME_ONTOLOGY_MAP.values():
+    for info in PHONEME_CATEGORIES.values():
         all_phonemes.extend(info['phonemes'])
 
     n_candidates = 1000
@@ -390,7 +451,7 @@ def test_flop_reduction(device: torch.device) -> Dict[str, float]:
     for _ in range(n_candidates):
         length = random.randint(2, 8)
         phonemes = random.choices(all_phonemes, k=length)
-        vec = phonemes_to_12d(phonemes)
+        vec = phonemes_to_resonance(phonemes)
         score = compute_resonance_score(vec)
         scores.append(score)
 
@@ -415,102 +476,158 @@ def test_flop_reduction(device: torch.device) -> Dict[str, float]:
 
 
 # =============================================================================
-# TEST 4: ONTOLOGY ACTIVATION PATTERNS
+# TEST 4: ARTICULATORY-SEMANTIC DISCRIMINABILITY
 # =============================================================================
 
-def test_ontology_activation(device: torch.device) -> Dict[str, float]:
+def test_discriminability(device: torch.device) -> Dict[str, float]:
     """
-    Test that phoneme categories activate correct 12D ontological dimensions.
+    Test that different articulatory categories produce DISTINGUISHABLE
+    12D resonance signatures.
 
-    Uses actual PHONEME_MAP_ARPABET 12D vectors:
-        Plosives (K,T,P) -> O3_EXECUTION (idx 2)
-        Fricatives (S,F)  -> O6_AGENCY (idx 5)
-        Nasals (M,N)      -> O10_UNIFYING (idx 9)
-        Liquids (L)       -> O4_STRUCTURE (idx 3)
+    A good semantic-emotional encoder should separate categories:
+        - Within-category similarity should be HIGH (coherent signal)
+        - Between-category similarity should be LOWER (distinct signals)
+
+    This validates that CSR extracts meaningful features, not noise.
     """
+    # Build resonance vectors for each phoneme
+    category_vectors = {}
+    for cat_name, info in PHONEME_CATEGORIES.items():
+        vecs = []
+        for ph in info['phonemes']:
+            vec = torch.tensor(get_phoneme_resonance(ph), dtype=torch.float32)
+            vecs.append(vec)
+        if vecs:
+            category_vectors[cat_name] = torch.stack(vecs)
+
     results = {}
 
-    for category, info in PHONEME_ONTOLOGY_MAP.items():
-        phonemes = info['phonemes'][:6]
-        if len(phonemes) < 3:
-            phonemes = phonemes * 3
+    # Within-category mean cosine similarity
+    within_sims = []
+    for cat_name, vecs in category_vectors.items():
+        if vecs.shape[0] < 2:
+            continue
+        # Pairwise cosine similarity
+        norms = F.normalize(vecs, dim=1)
+        sim_matrix = norms @ norms.T
+        # Upper triangle (exclude diagonal)
+        n = sim_matrix.shape[0]
+        mask = torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
+        pairwise = sim_matrix[mask]
+        mean_sim = pairwise.mean().item()
+        results[f'{cat_name}_within_sim'] = mean_sim
+        within_sims.append(mean_sim)
 
-        vec = phonemes_to_12d(phonemes)
-        expected_idx = info['axis_idx']
-        actual_dominant_idx = vec.argmax().item()
-        target_activation = vec[expected_idx].item()
+    # Between-category mean cosine similarity
+    between_sims = []
+    cat_names = list(category_vectors.keys())
+    for i in range(len(cat_names)):
+        for j in range(i + 1, len(cat_names)):
+            vecs_a = F.normalize(category_vectors[cat_names[i]], dim=1)
+            vecs_b = F.normalize(category_vectors[cat_names[j]], dim=1)
+            cross_sim = (vecs_a @ vecs_b.T).mean().item()
+            between_sims.append(cross_sim)
 
-        results[f'{category}_expected_axis'] = info['primary_axis']
-        results[f'{category}_expected_idx'] = expected_idx
-        results[f'{category}_actual_dominant'] = ONTO_AXIS_NAMES[actual_dominant_idx]
-        results[f'{category}_actual_idx'] = actual_dominant_idx
-        results[f'{category}_target_activation'] = target_activation
-        results[f'{category}_correct'] = actual_dominant_idx == expected_idx
+    results['mean_within_similarity'] = sum(within_sims) / max(len(within_sims), 1)
+    results['mean_between_similarity'] = sum(between_sims) / max(len(between_sims), 1)
 
-    correct = sum(1 for k, v in results.items() if k.endswith('_correct') and v)
-    total = sum(1 for k in results if k.endswith('_correct'))
-    results['activation_accuracy'] = correct / max(total, 1)
+    # Discriminability ratio: within / between > 1 means categories are separable
+    if results['mean_between_similarity'] > 0:
+        results['discriminability_ratio'] = (
+            results['mean_within_similarity'] / results['mean_between_similarity']
+        )
+    else:
+        results['discriminability_ratio'] = float('inf')
+
+    # Categories are separable if within-category > between-category
+    results['categories_separable'] = (
+        results['mean_within_similarity'] > results['mean_between_similarity']
+    )
 
     return results
 
 
 # =============================================================================
-# TEST 5: CROSS-CHECK WITH SOVEREIGN STATE
+# TEST 5: VARNA EMOTIONAL PRESSURE COHERENCE
 # =============================================================================
 
-def test_sovereign_crosscheck(device: torch.device) -> Dict[str, float]:
+def test_varna_pressure_coherence(device: torch.device) -> Dict[str, float]:
     """
-    Test that CSR 12D vectors correlate with Sovereign State Bhava[0:12].
+    Test that resonance profiles match Sanskrit varna emotional pressures.
 
-    The 12D Bhava space and 12D CSR phoneme space share the SAME
-    ontological axes (O1-O12), so there should be alignment.
+    The varna bridge maps consonants to vrtti (mental propensity) pressures:
+        ka → hope_pressure    (forward-seeking)
+        pha → fear_pressure   (contraction)
+        ra → destruction_pressure (decomposition)
+        ma → indulgence_pressure  (saturation)
+
+    Vowels map to states of consciousness:
+        a → birth_of_cognition   (primordial potential)
+        o → closure_completion   (observer / witness)
+        au → surrender_transition (transformation)
+
+    This test validates that the 12D resonance vectors correctly encode
+    these EMOTIONAL qualities — distinct pressure profiles for each
+    articulatory manner.
     """
-    if not JEPA_AVAILABLE:
-        return {'error': 'JEPA modules not available for cross-check'}
-
-    profiles = {
-        'execution': ['K', 'T', 'P', 'B', 'D', 'G'],    # O3
-        'agency': ['S', 'Z', 'F', 'V', 'TH', 'SH'],     # O6
-        'unifying': ['M', 'N', 'NG', 'M', 'N', 'NG'],    # O10
-        'purpose': ['AY', 'AW', 'OY', 'EY', 'OW', 'AY'], # O8
-        'witness': ['OW', 'AO', 'OY', 'OW', 'AO', 'OW'], # O9
-    }
-
-    phoneme_vecs = []
-    for name, phonemes in profiles.items():
-        vec = phonemes_to_12d(phonemes)
-        phoneme_vecs.append(vec)
-
-    phoneme_mat = torch.stack(phoneme_vecs)  # [5, 12]
-
-    projector = SovereignStateProjector(hidden_dim=768, state_dim=32).to(device)
-
-    with torch.no_grad():
-        bridge = torch.randn(12, 768, device=device) * 0.1
-        h = phoneme_mat.to(device) @ bridge  # [5, 768]
-        S = projector(h)  # [5, 32]
-        bhava = S[:, 0:12]  # [5, 12] — same 12 axes as CSR
-
-    expected_bhava_idx = {
-        'execution': 2,  # O3
-        'agency': 5,     # O6
-        'unifying': 9,   # O10
-        'purpose': 7,    # O8
-        'witness': 8,    # O9
-    }
-
     results = {}
-    correct = 0
-    for i, (name, exp_idx) in enumerate(expected_bhava_idx.items()):
-        actual_max = bhava[i].argmax().item()
-        activation = bhava[i, exp_idx].item()
-        results[f'{name}_expected_idx'] = exp_idx
-        results[f'{name}_actual_max_idx'] = actual_max
-        results[f'{name}_target_activation'] = activation
-        if actual_max == exp_idx:
-            correct += 1
 
-    results['bhava_alignment_accuracy'] = correct / len(expected_bhava_idx)
+    # --- Emotional pressure ordering (from Sanskrit acoustic tradition) ---
+
+    # 1. Plosives = HIGH pressure, LOW openness
+    #    Vowels = LOW pressure, HIGH openness
+    plosive_vec = phonemes_to_resonance(['K', 'T', 'P', 'B', 'D', 'G'])
+    vowel_vec = phonemes_to_resonance(['AA', 'IY', 'UW', 'AO', 'EY', 'OW'])
+
+    results['plosive_concentration'] = energy_concentration(plosive_vec)
+    results['vowel_concentration'] = energy_concentration(vowel_vec)
+    results['pressure_vs_openness'] = (
+        energy_concentration(plosive_vec) > energy_concentration(vowel_vec)
+    )
+
+    # 2. Nasals = connective (high spread, smooth distribution)
+    #    Plosives = percussive (concentrated, sharp distribution)
+    nasal_vec = phonemes_to_resonance(['M', 'N', 'NG'])
+    results['nasal_spread'] = resonance_spread(nasal_vec)
+    results['plosive_spread'] = resonance_spread(plosive_vec)
+    results['nasal_more_connective'] = (
+        resonance_spread(nasal_vec) > resonance_spread(plosive_vec)
+    )
+
+    # 3. Diphthongs = transitional energy (moderate spread + high peak)
+    #    indicating directional transformation, not static state
+    diphthong_vec = phonemes_to_resonance(['AY', 'AW', 'OY', 'EY', 'OW'])
+    short_vowel_vec = phonemes_to_resonance(['AE', 'AH', 'IH', 'UH', 'EH'])
+
+    results['diphthong_energy'] = resonance_energy(diphthong_vec)
+    results['short_vowel_energy'] = resonance_energy(short_vowel_vec)
+    results['diphthong_higher_energy'] = (
+        resonance_energy(diphthong_vec) > resonance_energy(short_vowel_vec)
+    )
+
+    # 4. Fricatives = sustained controlled energy (moderate-high energy, moderate spread)
+    fricative_vec = phonemes_to_resonance(['S', 'Z', 'F', 'V', 'TH', 'SH'])
+    results['fricative_energy'] = resonance_energy(fricative_vec)
+    results['fricative_spread'] = resonance_spread(fricative_vec)
+    results['fricative_sustained'] = (
+        resonance_energy(fricative_vec) > resonance_energy(plosive_vec)
+    )
+
+    # 5. Approximants = smooth bridging energy (high spread, moderate energy)
+    approx_vec = phonemes_to_resonance(['W', 'Y'])
+    results['approximant_energy'] = resonance_energy(approx_vec)
+    results['approximant_spread'] = resonance_spread(approx_vec)
+    results['approximant_high_spread'] = resonance_spread(approx_vec) > 0.5
+
+    # Overall coherence: count how many emotional pressure orderings hold
+    pressure_checks = [
+        results['pressure_vs_openness'],
+        results['nasal_more_connective'],
+        results['diphthong_higher_energy'],
+        results['fricative_sustained'],
+        results['approximant_high_spread'],
+    ]
+    results['pressure_coherence'] = sum(pressure_checks) / len(pressure_checks)
 
     return results
 
@@ -524,20 +641,30 @@ def run_csr_bridge_benchmarks(
     config,
     device: str,
 ) -> Dict[str, any]:
-    """Run comprehensive Phoneme CSR 12D bridge benchmarks."""
+    """
+    Run CSR phoneme semantic-emotional encoder benchmarks.
+
+    Tests CSR as a DATA PLANE feature extractor:
+        Signal properties, emotional pressure encoding, discriminability.
+    Does NOT test governance routing or ontological layer activation.
+    """
     print("\n" + "=" * 70)
-    print("V11.0: PHONEME CSR BRIDGE BENCHMARKS (12D Ontological Affinity)")
+    print("V11.0: PHONEME CSR BRIDGE — SEMANTIC-EMOTIONAL ENCODER BENCHMARKS")
     print("=" * 70)
+    print("  CSR role: Semantic-emotional feature encoder (data plane)")
+    print("  CSR is NOT a governance layer — Signal != Governance")
 
     if CSR_AVAILABLE:
         print("  CSR provider: AVAILABLE (using real PHONEME_MAP_ARPABET)")
     else:
-        print("  CSR provider: NOT AVAILABLE (using local 12D fallback table)")
+        print("  CSR provider: NOT AVAILABLE (using local 12D fallback)")
 
     device = torch.device(device)
     results = {}
 
+    # -------------------------------------------------------------------------
     # TEST 1: Phoneme Decomposition
+    # -------------------------------------------------------------------------
     print("\n--- TEST 1: Phoneme Decomposition Quality ---")
     decomp_results = test_phoneme_decomposition(device)
     results['decomposition'] = decomp_results
@@ -546,27 +673,36 @@ def run_csr_bridge_benchmarks(
     print(f"  Total phonemes: {decomp_results['total_phonemes']}")
     print(f"  Classification rate: {decomp_results['classification_rate']:.1%}")
     print(f"  Phonemes/word: {decomp_results['phonemes_per_word']:.1f}")
-    for cat in ['plosive', 'fricative', 'nasal', 'liquid', 'short_vowel', 'long_vowel', 'approximant']:
+    for cat in ['plosive', 'fricative', 'nasal', 'liquid', 'short_vowel',
+                'long_vowel', 'diphthong', 'approximant']:
         pct = decomp_results.get(f'pct_{cat}', 0)
         print(f"    {cat:15s}: {pct:.1%}")
 
-    # TEST 2: 12D Affinity Vectors
-    print("\n--- TEST 2: 12D Ontological Affinity Vectors ---")
-    vec_results = test_12d_affinity_vectors(device)
-    results['affinity_vectors'] = vec_results
+    # -------------------------------------------------------------------------
+    # TEST 2: Semantic-Emotional Resonance Profiles
+    # -------------------------------------------------------------------------
+    print("\n--- TEST 2: Semantic-Emotional Resonance Profiles ---")
+    res_results = test_resonance_profiles(device)
+    results['resonance_profiles'] = res_results
 
-    for name in ['plosive_heavy', 'nasal_heavy', 'vowel_heavy', 'mixed', 'fricative_heavy']:
-        axis = vec_results[f'{name}_dominant_axis']
-        score = vec_results[f'{name}_score']
-        peak = vec_results[f'{name}_peak_activation']
-        print(f"  {name:18s}: dominant={axis:16s} score={score:.3f} peak={peak:.2f}")
+    for name in ['plosive_heavy', 'nasal_heavy', 'vowel_heavy', 'fricative_heavy', 'mixed']:
+        energy = res_results[f'{name}_energy']
+        spread = res_results[f'{name}_spread']
+        conc = res_results[f'{name}_concentration']
+        score = res_results[f'{name}_score']
+        print(f"  {name:18s}: energy={energy:.3f} spread={spread:.2f} "
+              f"concentration={conc:.3f} score={score:.3f}")
 
-    print(f"  Plosive peaks O3: {vec_results['plosive_peaks_O3']}")
-    print(f"  Nasal peaks O10:  {vec_results['nasal_peaks_O10']}")
-    print(f"  Fricative peaks O6: {vec_results['fricative_peaks_O6']}")
+    print(f"  Vowel energy > plosive:     {res_results['vowel_energy_gt_plosive']}")
+    print(f"  Vowel spread > plosive:     {res_results['vowel_spread_gt_plosive']}")
+    print(f"  Plosive more concentrated:  {res_results['plosive_more_concentrated']}")
+    print(f"  Nasal spread > plosive:     {res_results['nasal_spread_gt_plosive']}")
+    print(f"  Fricative energy > plosive: {res_results['fricative_energy_gt_plosive']}")
 
+    # -------------------------------------------------------------------------
     # TEST 3: FLOP Reduction
-    print("\n--- TEST 3: FLOP Reduction via Pre-filtering ---")
+    # -------------------------------------------------------------------------
+    print("\n--- TEST 3: FLOP Reduction via Resonance Pre-filtering ---")
     flop_results = test_flop_reduction(device)
     results['flop_reduction'] = flop_results
 
@@ -576,45 +712,53 @@ def run_csr_bridge_benchmarks(
     print(f"    Dissonant (<0.3):   {flop_results['pct_dissonant']:.1%}")
     print(f"  Estimated FLOP reduction: {flop_results['flop_reduction_estimated']:.1%}")
 
-    # TEST 4: Ontology Activation
-    print("\n--- TEST 4: 12D Ontology Activation Patterns ---")
-    onto_results = test_ontology_activation(device)
-    results['ontology_activation'] = onto_results
+    # -------------------------------------------------------------------------
+    # TEST 4: Articulatory-Semantic Discriminability
+    # -------------------------------------------------------------------------
+    print("\n--- TEST 4: Articulatory-Semantic Discriminability ---")
+    disc_results = test_discriminability(device)
+    results['discriminability'] = disc_results
 
-    for cat in ['plosive', 'fricative', 'nasal', 'liquid', 'approximant', 'diphthong', 'short_vowel']:
-        correct = onto_results.get(f'{cat}_correct', False)
-        expected = onto_results.get(f'{cat}_expected_axis', '?')
-        actual = onto_results.get(f'{cat}_actual_dominant', '?')
-        marker = "OK" if correct else "MISS"
-        print(f"  {cat:15s}: expected={expected:16s} actual={actual:16s} [{marker}]")
+    print(f"  Within-category similarity:  {disc_results['mean_within_similarity']:.3f}")
+    print(f"  Between-category similarity: {disc_results['mean_between_similarity']:.3f}")
+    print(f"  Discriminability ratio:      {disc_results['discriminability_ratio']:.3f}")
+    print(f"  Categories separable:        {disc_results['categories_separable']}")
 
-    print(f"  Activation accuracy: {onto_results['activation_accuracy']:.0%}")
+    for cat in ['plosive', 'fricative', 'nasal', 'short_vowel', 'long_vowel', 'diphthong']:
+        sim = disc_results.get(f'{cat}_within_sim', 0)
+        print(f"    {cat:15s} within-sim: {sim:.3f}")
 
-    # TEST 5: Sovereign Cross-check
-    print("\n--- TEST 5: Sovereign State Cross-check ---")
-    cross_results = test_sovereign_crosscheck(device)
-    results['sovereign_crosscheck'] = cross_results
+    # -------------------------------------------------------------------------
+    # TEST 5: Varna Emotional Pressure Coherence
+    # -------------------------------------------------------------------------
+    print("\n--- TEST 5: Varna Emotional Pressure Coherence ---")
+    varna_results = test_varna_pressure_coherence(device)
+    results['varna_pressure'] = varna_results
 
-    if 'error' not in cross_results:
-        print(f"  Bhava alignment accuracy: {cross_results['bhava_alignment_accuracy']:.1%}")
-        print(f"  (Baseline ~8.3%, goal > 50% after training)")
-        for name in ['execution', 'agency', 'unifying', 'purpose', 'witness']:
-            exp = cross_results.get(f'{name}_expected_idx', -1)
-            act = cross_results.get(f'{name}_actual_max_idx', -1)
-            print(f"    {name:12s}: expected {ONTO_AXIS_NAMES[exp]:16s}, got {ONTO_AXIS_NAMES[act]:16s}")
-    else:
-        print(f"  {cross_results['error']}")
+    print(f"  Plosive concentration:  {varna_results['plosive_concentration']:.3f} (focused pressure)")
+    print(f"  Vowel concentration:    {varna_results['vowel_concentration']:.3f} (open resonance)")
+    print(f"  Pressure > openness:    {varna_results['pressure_vs_openness']}")
+    print(f"  Nasal spread:           {varna_results['nasal_spread']:.2f} (connective)")
+    print(f"  Plosive spread:         {varna_results['plosive_spread']:.2f} (percussive)")
+    print(f"  Nasal more connective:  {varna_results['nasal_more_connective']}")
+    print(f"  Diphthong > short vowel energy: {varna_results['diphthong_higher_energy']}")
+    print(f"  Fricative sustained:    {varna_results['fricative_sustained']}")
+    print(f"  Pressure coherence:     {varna_results['pressure_coherence']:.0%}")
 
+    # -------------------------------------------------------------------------
     # SUMMARY
+    # -------------------------------------------------------------------------
     print("\n" + "=" * 70)
-    print("CSR BRIDGE BENCHMARK SUMMARY (12D)")
+    print("CSR SEMANTIC-EMOTIONAL ENCODER SUMMARY")
     print("=" * 70)
-    print(f"  Classification rate:    {decomp_results['classification_rate']:.1%}")
-    print(f"  Plosive->O3 correct:    {vec_results['plosive_peaks_O3']}")
-    print(f"  Nasal->O10 correct:     {vec_results['nasal_peaks_O10']}")
-    print(f"  Fricative->O6 correct:  {vec_results['fricative_peaks_O6']}")
-    print(f"  FLOP reduction:         {flop_results['flop_reduction_estimated']:.1%}")
-    print(f"  Activation accuracy:    {onto_results['activation_accuracy']:.0%}")
+    print(f"  Classification rate:      {decomp_results['classification_rate']:.1%}")
+    print(f"  Vowel > plosive energy:   {res_results['vowel_energy_gt_plosive']}")
+    print(f"  Categories separable:     {disc_results['categories_separable']}")
+    print(f"  Discriminability ratio:   {disc_results['discriminability_ratio']:.3f}")
+    print(f"  Pressure coherence:       {varna_results['pressure_coherence']:.0%}")
+    print(f"  FLOP reduction:           {flop_results['flop_reduction_estimated']:.1%}")
+    print("  ---")
+    print("  CSR = data plane signal. Ontology = control plane (separate).")
 
     return results
 
