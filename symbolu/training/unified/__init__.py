@@ -280,4 +280,8 @@ __all__ = [
     # model_factory
     "create_model",
     "PerLayerPhaseController",
+    # model_factory (cont.)
+    # Note: train(), evaluate(), main() are in symbolu.training.unified.train
+    # They are NOT imported here to avoid circular imports (train.py imports from this package).
+    # Use: from symbolu.training.unified.train import train, evaluate, main
 ]
