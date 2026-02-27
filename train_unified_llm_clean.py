@@ -8726,7 +8726,7 @@ class UnifiedTrainingConfig:
     b1_lambda: float = 0.5                # Consistency Lagrangian weight [B1]
     mu_s3: float = 0.2                    # Global Coherence weight [S3]
     enable_stability_constraint: bool = False  # Enable S8 entropy anchoring
-
+    gc_floor: float = 0.65                    # Minimum Guna Coherence floor
 
     # V9.8.7: Three-phase PID engagement based on Val PPL
     # Phase 1 (Construction): PPL > engage_ppl → PID ON (aggressive correction)

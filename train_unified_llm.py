@@ -14434,22 +14434,30 @@ def train(config: UnifiedTrainingConfig):
         print(f"  LR Schedule: Adaptive warmup (until PPL < {config.warmup_until_ppl:.0f} or {config.warmup_steps} steps)")
     else:
         # Fixed-step warmup using SequentialLR
-        warmup_scheduler = LinearLR(
-            optimizer,
-            start_factor=0.1,
-            end_factor=1.0,
-            total_iters=config.warmup_steps,
-        )
-        cosine_scheduler = CosineAnnealingLR(
-            optimizer,
-            T_max=config.max_steps - config.warmup_steps,
-            eta_min=config.learning_rate * 0.1,
-        )
-        scheduler = SequentialLR(
-            optimizer,
-            schedulers=[warmup_scheduler, cosine_scheduler],
-            milestones=[config.warmup_steps],
-        )
+        # Note: PyTorch _LRScheduler.__init__ calls self.step() internally to set
+        # the initial LR. This happens before any optimizer.step() has been called,
+        # which triggers a spurious "lr_scheduler.step() before optimizer.step()"
+        # warning. This is a known PyTorch quirk (not a real ordering bug).
+        # Suppress only during scheduler construction.
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "Detected call of `lr_scheduler.step\\(\\)` before")
+            warmup_scheduler = LinearLR(
+                optimizer,
+                start_factor=0.1,
+                end_factor=1.0,
+                total_iters=config.warmup_steps,
+            )
+            cosine_scheduler = CosineAnnealingLR(
+                optimizer,
+                T_max=config.max_steps - config.warmup_steps,
+                eta_min=config.learning_rate * 0.1,
+            )
+            scheduler = SequentialLR(
+                optimizer,
+                schedulers=[warmup_scheduler, cosine_scheduler],
+                milestones=[config.warmup_steps],
+            )
         print(f"  LR Schedule: Fixed warmup ({config.warmup_steps} steps) + cosine decay")
 
     # Resume from checkpoint if specified
