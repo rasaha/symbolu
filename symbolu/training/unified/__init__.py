@@ -8,18 +8,19 @@ This package provides the core training infrastructure organized into focused mo
 - data: Dataset classes and data loading utilities
 - vram_manager: VRAM monitoring and automatic batch sizing
 - diagnostics: Kosha, CSR, Ontological, and Sovereign diagnostic functions
-- ontological_flow: Ontological/Evolutionary bridges, flow networks, EI engine
+- ontological_flow: Ontological/Evolutionary bridges, flow networks
+- intelligence_engine: MetacognitiveTracker, HiddenStateExtractor, EI engine
 - gradient_control: Hierarchical gradient scaling and weight transfer
 - training_state: Training state tracking, Guna analysis, Sattvic braking
-- scheduling: Phase controllers, warmup schedulers, PPL curriculum, RSS
+- phase_controllers: Sovereign Phase Controller, Adaptive Training Controller
+- scheduling: Window schedulers, warmup schedulers, PPL curriculum, RSS
 - curriculum: PPL-gated curriculum, sequence length, inverted layer evolution
-- dynamic_relaxation: 9:3 -> 6:6 split transition controller
-- generation: Text generation and quality monitoring
+- relaxation: 9:3 -> 6:6 split transition controller
+- evaluation: LRA validator, phase rotation testing, generation, ReadinessIndex
 - losses: Ontological, sovereign, and phase loss computation
-- validation: LRA validator, phase rotation testing
-- health_check: Architecture health checking and diagnostic probe hooks
+- control_plane: Architecture health checking and diagnostic probe hooks
 - checkpointing: Checkpoint save/load with split-file support
-- model_factory: Model creation factory
+- model_factory: Model creation factory, PerLayerPhaseController
 """
 
 # --- utilities ---
@@ -81,10 +82,14 @@ from symbolu.training.unified.ontological_flow import (
     compute_rmatrix_loss_weight,
     EvolutionaryBridge,
     ToroidalConsistencyLoss,
-    MetacognitiveTracker,
     EvolutionaryGate,
     EvolutionaryFlowNetwork,
     EvolutionaryFlowLoss,
+)
+
+# --- intelligence_engine ---
+from symbolu.training.unified.intelligence_engine import (
+    MetacognitiveTracker,
     HiddenStateExtractor,
     EvolutionaryIntelligenceEngine,
 )
@@ -103,11 +108,15 @@ from symbolu.training.unified.training_state import (
     SattvicBrake,
 )
 
+# --- phase_controllers ---
+from symbolu.training.unified.phase_controllers import (
+    SovereignPhaseController,
+    AdaptiveTrainingController,
+)
+
 # --- scheduling ---
 from symbolu.training.unified.scheduling import (
-    SovereignPhaseController,
     DynamicWindowScheduler,
-    AdaptiveTrainingController,
     AdaptiveWarmupScheduler,
     PPLAlphaCurriculum,
     ResonanceStateScheduler,
@@ -118,25 +127,27 @@ from symbolu.training.unified.scheduling import (
 from symbolu.training.unified.curriculum import (
     CurriculumController,
     SequenceLengthCurriculum,
-    ReadinessIndex,
     dampen_layer_momentum,
     on_seq_len_transition,
     should_sync_curriculum_update,
     ThreePhaseCurriculum,
-    PerLayerPhaseController,
     InvertedLayerCurriculumController,
 )
 
-# --- dynamic_relaxation ---
-from symbolu.training.unified.dynamic_relaxation import (
+# --- relaxation ---
+from symbolu.training.unified.relaxation import (
     DynamicRelaxationController,
 )
 
-# --- generation ---
-from symbolu.training.unified.generation import (
+# --- evaluation ---
+from symbolu.training.unified.evaluation import (
+    LRAValidator,
+    run_phase_rotation_test,
+    print_phase_rotation_results,
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    ReadinessIndex,
 )
 
 # --- losses ---
@@ -147,15 +158,8 @@ from symbolu.training.unified.losses import (
     compute_phase_loss,
 )
 
-# --- validation ---
-from symbolu.training.unified.validation import (
-    LRAValidator,
-    run_phase_rotation_test,
-    print_phase_rotation_results,
-)
-
-# --- health_check ---
-from symbolu.training.unified.health_check import (
+# --- control_plane ---
+from symbolu.training.unified.control_plane import (
     ArchitectureHealthReport,
     run_architecture_health_check,
     check_quad_utilization,
@@ -171,6 +175,7 @@ from symbolu.training.unified.checkpointing import (
 # --- model_factory ---
 from symbolu.training.unified.model_factory import (
     create_model,
+    PerLayerPhaseController,
 )
 
 __all__ = [
@@ -217,10 +222,11 @@ __all__ = [
     "compute_rmatrix_loss_weight",
     "EvolutionaryBridge",
     "ToroidalConsistencyLoss",
-    "MetacognitiveTracker",
     "EvolutionaryGate",
     "EvolutionaryFlowNetwork",
     "EvolutionaryFlowLoss",
+    # intelligence_engine
+    "MetacognitiveTracker",
     "HiddenStateExtractor",
     "EvolutionaryIntelligenceEngine",
     # gradient_control
@@ -231,10 +237,11 @@ __all__ = [
     "GradNormEMA",
     "TrainingGunas",
     "SattvicBrake",
-    # scheduling
+    # phase_controllers
     "SovereignPhaseController",
-    "DynamicWindowScheduler",
     "AdaptiveTrainingController",
+    # scheduling
+    "DynamicWindowScheduler",
     "AdaptiveWarmupScheduler",
     "PPLAlphaCurriculum",
     "ResonanceStateScheduler",
@@ -242,29 +249,27 @@ __all__ = [
     # curriculum
     "CurriculumController",
     "SequenceLengthCurriculum",
-    "ReadinessIndex",
     "dampen_layer_momentum",
     "on_seq_len_transition",
     "should_sync_curriculum_update",
     "ThreePhaseCurriculum",
-    "PerLayerPhaseController",
     "InvertedLayerCurriculumController",
-    # dynamic_relaxation
+    # relaxation
     "DynamicRelaxationController",
-    # generation
+    # evaluation
+    "LRAValidator",
+    "run_phase_rotation_test",
+    "print_phase_rotation_results",
     "generate_sample",
     "compute_sample_metrics",
     "run_quality_samples",
+    "ReadinessIndex",
     # losses
     "compute_ontological_loss",
     "_build_sovereign_state",
     "forward_chunked",
     "compute_phase_loss",
-    # validation
-    "LRAValidator",
-    "run_phase_rotation_test",
-    "print_phase_rotation_results",
-    # health_check
+    # control_plane
     "ArchitectureHealthReport",
     "run_architecture_health_check",
     "check_quad_utilization",
@@ -274,4 +279,5 @@ __all__ = [
     "load_checkpoint",
     # model_factory
     "create_model",
+    "PerLayerPhaseController",
 ]

@@ -429,10 +429,11 @@ from symbolu.training.unified import (
     compute_rmatrix_loss_weight,
     EvolutionaryBridge,
     ToroidalConsistencyLoss,
-    MetacognitiveTracker,
     EvolutionaryGate,
     EvolutionaryFlowNetwork,
     EvolutionaryFlowLoss,
+    # intelligence_engine
+    MetacognitiveTracker,
     HiddenStateExtractor,
     EvolutionaryIntelligenceEngine,
     # gradient_control
@@ -443,10 +444,11 @@ from symbolu.training.unified import (
     GradNormEMA,
     TrainingGunas,
     SattvicBrake,
-    # scheduling
+    # phase_controllers
     SovereignPhaseController,
-    DynamicWindowScheduler,
     AdaptiveTrainingController,
+    # scheduling
+    DynamicWindowScheduler,
     AdaptiveWarmupScheduler,
     PPLAlphaCurriculum,
     ResonanceStateScheduler,
@@ -454,29 +456,27 @@ from symbolu.training.unified import (
     # curriculum
     CurriculumController,
     SequenceLengthCurriculum,
-    ReadinessIndex,
     dampen_layer_momentum,
     on_seq_len_transition,
     should_sync_curriculum_update,
     ThreePhaseCurriculum,
-    PerLayerPhaseController,
     InvertedLayerCurriculumController,
-    # dynamic_relaxation
+    # relaxation
     DynamicRelaxationController,
-    # generation
+    # evaluation
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    LRAValidator,
+    run_phase_rotation_test,
+    print_phase_rotation_results,
+    ReadinessIndex,
     # losses
     compute_ontological_loss,
     _build_sovereign_state,
     forward_chunked,
     compute_phase_loss,
-    # validation
-    LRAValidator,
-    run_phase_rotation_test,
-    print_phase_rotation_results,
-    # health_check
+    # control_plane
     ArchitectureHealthReport,
     run_architecture_health_check,
     check_quad_utilization,
@@ -486,6 +486,7 @@ from symbolu.training.unified import (
     load_checkpoint,
     # model_factory
     create_model,
+    PerLayerPhaseController,
 )
 
 # =============================================================================
