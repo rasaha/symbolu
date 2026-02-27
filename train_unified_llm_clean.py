@@ -9391,6 +9391,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     num_heads = config.n_head if config.n_head is not None else preset["num_heads"]
     ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
     n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
+    tie_emb = True  # Weight tying between input embeddings and output projection
 
     # Validate embed_dim / num_heads divisibility
     if embed_dim % num_heads != 0:
