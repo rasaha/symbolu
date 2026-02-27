@@ -1,6 +1,6 @@
 # CTM+ (Coherence-Tier Memory Plus) — Explainer
 
-**Source:** `simulator/ctm_plus/`, `CTM_plus/`
+**Source:** `simulator/ctm_plus/`, `CTM_plus/`, `docs/design/CTM_PLUS_VALIDATION_RESULTS.md`
 **Purpose:** Explains CTM+ to someone who knows systems/ML but hasn't
 seen the codebase.
 
@@ -30,7 +30,16 @@ It decides which pages stay in fast memory using a 6-dimensional state
 vector per page, a Markov predictor, cluster detection, and online
 workload classification.
 
-It's a drop-in replacement for LRU/ARC in any two-tier memory system.
+It ships in **5 deployment targets:**
+
+| Target | Location | Purpose |
+|---|---|---|
+| **Simulator** | `simulator/ctm_plus/` | Core algorithm + validation harness |
+| **vLLM** | `CTM_plus/vLLM/` | KV cache eviction for LLM inference |
+| **Database** | `CTM_plus/Database/` | Buffer pool management (Postgres, Redis) |
+| **CUDA** | `CTM_plus/CUDA/` | GPU-native implementation |
+| **Kernel** | `CTM_plus/Kernel/` | Linux kernel module (sysfs interface) |
+| **DeepSpeed** | `CTM_plus/DeepSpeed/` | ZeRO offload + inference memory management |
 
 ---
 
@@ -114,76 +123,291 @@ before changing policy to avoid oscillation.
 
 ---
 
-## Benchmark Results
+## Benchmarks — Phase 1: Generic Cache (Simulator)
 
-### Hit Rate vs Baselines
+### Validation Results (Jan 30, 2026 — Honest Failure)
+
+The initial validation against generic synthetic workloads **failed**:
+
+**Before bug fixes (broken):**
+
+| Workload | LRU | ARC | CTM+ | vs LRU |
+|---|---|---|---|---|
+| Zipfian | 85.99% | **88.05%** | 86.41% | +0.42% |
+| Temporal | **72.91%** | 72.86% | 67.05% | **-5.86%** |
+| Mixed | 71.97% | **73.90%** | 68.00% | **-3.97%** |
+| Hotspot | 31.15% | **37.59%** | 32.94% | +1.79% |
+
+**After bug fixes (5 bugs found and fixed):**
 
 | Workload | LRU | ARC | CTM+ | vs LRU | vs ARC |
 |---|---|---|---|---|---|
-| **Zipfian** (database, power-law) | 85.1% | 87.5% | 87.2% | +2.1% | -0.3% |
-| **Hotspot** (20% pages, 80% accesses) | 76.4% | 95.1% | 94.2% | **+17.8%** | -0.9% |
-| **Temporal** (recency-biased window) | 82.3% | 82.2% | 81.5% | -0.8% | -0.7% |
-| **Mixed** (4-phase production) | 80.2% | 82.7% | 82.2% | +2.0% | -0.5% |
-| **Uniform** (random, worst case) | ~60% | ~60% | ~60% | -0.04% | -0.04% |
+| Zipfian | 85.99% | **88.05%** | 85.98% | 0% | -2.07% |
+| Temporal | 72.91% | 72.86% | 72.91% | 0% | +0.05% |
+| Mixed | 71.97% | **73.90%** | 71.97% | 0% | -1.93% |
+| Hotspot | 31.15% | **37.59%** | 31.14% | 0% | -6.45% |
 
-### Latency Improvements (Simulated)
+**Validation status: FAILED.** CTM+ matched LRU but lost to ARC on all
+generic workloads.
 
-| Metric | Database (TPC-C style) | vLLM Inference |
-|---|---|---|
-| Throughput | 142K txn/s (+13.6% vs LRU) | 2,180 tok/s (+18%) |
-| p99 latency | 8.5ms (-29% vs LRU) | 32ms (-29%) |
-| GPU memory efficiency | — | 89% (+17%) |
+### Root Cause Analysis
+
+| Issue | Problem |
+|---|---|
+| Phase Integrator weights are random | "Learning" is random projection, not trained |
+| No recency signal | CTM+ didn't directly model recency — LRU's entire strength |
+| BCVF over-rejection | 43.6% rejection rate blocked beneficial promotions |
+| Conceptual mismatch | Phase coherence != recency/frequency (what generic workloads need) |
+
+**Honest assessment from validation doc:**
+
+| Aspect | Score |
+|---|---|
+| Mathematical elegance | 9/10 |
+| Implementation quality | 8/10 |
+| Practical utility (generic workloads) | 3/10 |
+| Production readiness (generic) | 2/10 |
+
+### Post-Validation Fixes (Hybrid Approach)
+
+The fix was Option B from the validation doc — **hybrid CTM+/LRU** with
+recency as primary signal and CTM+ signals as tiebreaker:
+
+- BCVF Gate removed (zero effect on hit rate)
+- SCC Optimizer removed (depended on BCVF)
+- Admission Controller removed (hurt temporal by -3.35%)
+- Recency + frequency weighted at 70%, CTM+ signals at 30%
+- Loop pinning added for temporal workloads
+
+**After hybrid rework:**
+
+| Workload | LRU | ARC | CTM+ | vs LRU | vs ARC |
+|---|---|---|---|---|---|
+| Zipfian | 85.1% | 87.5% | 87.2% | +2.1% | -0.3% |
+| Hotspot | 76.4% | 95.1% | 94.2% | **+17.8%** | -0.9% |
+| Temporal | 82.3% | 82.2% | 81.5% | -0.8% | -0.7% |
+| Mixed | 80.2% | 82.7% | 82.2% | +2.0% | -0.5% |
+
+Still doesn't consistently beat ARC on generic workloads, but regressions
+are gone and hotspot performance is strong.
 
 ---
 
-## Ablation: What Was Removed and Why
+## Benchmarks — Phase 2: vLLM KV Cache
 
-Three components were cut after empirical testing:
+This is where CTM+ finds its domain. KV cache eviction has **semantic
+structure** that generic workloads lack — attention patterns, token
+importance, sequence roles. CTM+'s multi-signal scoring exploits this.
 
-| Component | Why Removed | Impact |
+### KV Cache: CTM+ vs LRU/FIFO/RANDOM
+
+At 50% cache ratio (1024 token sequence, 512 cache):
+
+| Workload | LRU | CTM+ | vs LRU |
+|---|---|---|---|
+| Sequential | 25.0% | **71.8%** | **+186.8%** |
+| Conversation | 25.2% | **71.9%** | **+185.2%** |
+| Document QA | 0.0% | **42.0%** | N/A (LRU = 0) |
+| Zipfian | 82.1% | **83.0%** | +1.0% |
+
+### Quality Preservation (25% cache — severe pressure)
+
+| Policy | Important Token Retention | vs LRU |
 |---|---|---|
-| **BCVF Gate** (admission control) | Zero effect on hit rate | No change |
-| **SCC Optimizer** (coherence tuner) | Depended on BCVF | Redundant |
-| **Admission Controller** | Hurt temporal workloads by -3.35% | Removal reduced temporal regression to -0.8% |
+| LRU | 12.7% | — |
+| FIFO | 12.7% | +0.0% |
+| RANDOM | 23.6% | +85.7% |
+| **CTM+** | **100.0%** | **+685.7%** |
 
-The admission controller's failure was instructive: it mistook temporal
-locality (repeating patterns) for sequential scans and blocked pages
-that should have been admitted. The lesson was to let the mode switcher
-handle workload adaptation, not a separate gate.
+CTM+ retains **all** important tokens (attention sinks, high-frequency
+references, semantic anchors) even at 25% cache — LRU retains 12.7%.
+
+### Cache Ratio Sweep (Zipfian)
+
+| Cache Ratio | LRU | CTM+ | Improvement |
+|---|---|---|---|
+| 10% | 1.0% | 16.9% | **+1,578%** |
+| 25% | 23.6% | 71.4% | +185% |
+| 50% | 25.0% | 71.4% | +185% |
+| 75% | 56.3% | 85.2% | +51% |
+| 90% | 80.7% | 98.0% | +21% |
+
+Maximum advantage at highest memory pressure — exactly when it matters.
+
+---
+
+## Benchmarks — Phase 3: Enterprise (vs Industry Baselines)
+
+Testing against what production systems actually use, not just LRU:
+
+| Policy | Description | Represents |
+|---|---|---|
+| Sink+LRU | Pinned sinks + LRU | Basic production |
+| Industry Baseline | Sinks + Attention-LRU + Ghost cache + Adaptation | Big lab approximation |
+| H2O | Heavy-Hitter Oracle (Zhang et al.) | Research baseline |
+
+### Production Demo (8K context, 25% cache)
+
+```
+Policy      Important Retention    p99 Latency    Throughput
+LRU               25.4%             0.84 us       1,705,040/s
+Sink+LRU          25.4%             1.20 us       1,475,245/s
+H2O               24.7%           437.79 us           9,557/s
+CTM+              29.5% (+16.2%)    2.35 us         267,140/s
+```
+
+CTM+ delivers +16.2% better quality than Sink+LRU at 2.35us p99 (under
+100us budget). H2O has similar quality but 437us tail latency.
+
+### Production Latency (Before vs After Optimization)
+
+| Metric | Before | After | Improvement |
+|---|---|---|---|
+| p99 latency | 277.72 us | **2.35 us** | **118x faster** |
+| Throughput | 23,884/s | **267,140/s** | **11x higher** |
+| Budget compliance | Over 100 us | **Under 100 us** | Met |
+
+Achieved via: O(1) per-token state, k=32 fixed sampling, batch eviction
+(64 tokens at 95% capacity), fast/slow path separation.
+
+### CTM+ vs Industry Baseline (12 scenarios)
+
+CTM+ wins on important token retention in **7/12 tests (58%)** vs
+industry baseline. Strongest in:
+
+| Scenario | CTM+ Advantage |
+|---|---|
+| Multi-tenant at 10% cache | **+125% hit rate** vs H2O |
+| Long-context at 10% cache | **+46% quality retention** vs industry baseline |
+| Document QA at 10% cache | **+34% important tokens** vs H2O |
+| Code at 10% cache | **+23% quality** vs H2O |
+
+### Quality Under Extreme Memory Pressure
+
+At 15% cache ratio, CTM+ achieves **49% hit rate** vs 20-22% for
+industry baseline and H2O — a breakaway result at moderate pressure.
+
+At 25%+ cache ratio, all policies converge — eviction policy matters
+less when there's ample cache.
+
+---
+
+## Benchmarks — Phase 4: Database Buffer Pool
+
+CTM+ adapted for database workloads (Postgres, Redis buffer pools):
+
+| Metric | Improvement | Confidence |
+|---|---|---|
+| Hit rate vs LRU | +2-5% | High |
+| Scan resistance | Significant | High |
+| Dirty page I/O reduction | -15-30% | Medium |
+| CPU overhead | Comparable to LRU | High |
+
+Key advantage: **scan pollution resistance** — nightly full-table scans
+don't evict hot OLTP pages, because CTM+'s mode switcher detects the
+SCAN pattern and tightens admission.
+
+---
+
+## Benchmarks — Phase 5: Cost-Benefit (Data Center Scale)
+
+### Hardware Cost (100GB working set)
+
+| Approach | HBM Required | Total Cost |
+|---|---|---|
+| All HBM (baseline) | 100 GB | $7,500 |
+| LRU tiering | 40 GB | $3,400 |
+| **CTM+ tiering** | **30 GB** | **$2,650** |
+
+### Data Center Scale (1000 GPU cluster)
+
+| Metric | Without CTM+ | With CTM+ | Savings |
+|---|---|---|---|
+| HBM per node | 80 GB | 48 GB | 40% |
+| Power (memory) | 75W | 45W | 40% |
+| Annual power cost | $657K | $394K | $263K |
+| Cooling cost | $197K | $118K | $79K |
+| **Total annual** | **$854K** | **$512K** | **$342K** |
+
+CTM+ enables **3:1 over-subscription** of fast memory (100GB working
+set in 33GB HBM + 100GB DDR), meaning 3x more models or 3x more
+concurrent users on the same hardware.
+
+---
+
+## When to Use CTM+ (and When Not To)
+
+### Use CTM+
+
+| Scenario | Expected Gain |
+|---|---|
+| Multi-tenant LLM serving | +125% hit rate at 10% cache |
+| Memory-constrained deployment (< 25% cache) | +185-1578% vs LRU |
+| Quality-critical applications (token loss matters) | 100% important token retention at 25% cache |
+| Long-context models (32K+ tokens) | +46% quality retention |
+| RAG / Document QA | +34% important token retention |
+| Database scan pollution | Significant scan resistance |
+
+### Don't Use CTM+
+
+| Scenario | Why |
+|---|---|
+| Cache ratio > 50% | Policies converge, LRU is fine |
+| Short context (< 256 tokens) | No eviction pressure |
+| Generic synthetic workloads | ARC still wins (see validation results) |
+| Ultra-tight latency (< 1us p99) | Sink+LRU is faster (0.84us vs 2.35us) |
+| Already using GQA/MQA | Structural change beats policy change |
 
 ---
 
 ## Honest Assessment
 
-**Where CTM+ wins:**
-- Hotspot workloads (+17.8% vs LRU) — its best case
-- Database/Zipfian (+2.1% vs LRU) — meaningful for OLTP
-- Scan resistance — better than LRU on sequential pollution
-- Cluster/correlated patterns — leverages neighbor tracking
+### The Two-Phase Story
 
-**Where CTM+ doesn't win:**
-- Temporal patterns — still -0.8% vs LRU (improved from -3.35% by
-  removing admission controller, further improved by loop pinning)
-- Uniform random — no patterns to exploit, performs identically
-- Never consistently beats ARC — trades off -0.3% to -0.9% on some
-  workloads while gaining on others
+**Phase 1 (generic cache replacement):** CTM+ **failed validation**.
+On synthetic recency/frequency workloads, it matched LRU and lost to
+ARC. The phase-coherence theory didn't match generic workload
+characteristics. This is documented honestly in
+`CTM_PLUS_VALIDATION_RESULTS.md`.
 
-**The positioning:** CTM+ is not trying to beat ARC on every workload.
-It's trying to be the **single algorithm that works well across all
-workload types** without manual tuning, by detecting the workload and
-adapting policy online. ARC doesn't do workload classification, cluster
-detection, or predictive prefetch.
+**Phase 2 (domain-specific KV cache):** CTM+ **found its domain**.
+LLM KV cache eviction has semantic structure (attention patterns, token
+importance, sequence roles) that generic workloads lack. CTM+'s
+multi-signal scoring exploits this structure, delivering +16.2% quality
+over Sink+LRU at acceptable latency.
+
+### Score Card
+
+| Aspect | Generic Cache | vLLM KV Cache | Database |
+|---|---|---|---|
+| vs LRU | 0% (matches) | **+186%** | +2-5% |
+| vs ARC | -2% (loses) | N/A | N/A |
+| vs Sink+LRU | N/A | **+16.2% quality** | N/A |
+| vs H2O | N/A | **+125% multi-tenant** | N/A |
+| Production ready | No | **Yes (p99=2.35us)** | Prototype |
+
+### What the Validation Failure Taught
+
+The honest failure on generic workloads led to the right design:
+recency + frequency as the 70% base (proven), with CTM+ semantic
+signals as the 30% tiebreaker (novel). The mathematical elegance of
+phase coherence wasn't wrong — it was applied to the wrong domain.
+When applied to workloads with actual semantic structure (LLM
+inference, database buffer pools), the signals become meaningful.
 
 ---
 
 ## Key Insight
 
-Most cache replacement research optimises a single scoring function.
 CTM+ separates the problem into two layers: a **workload classifier**
 (what kind of access pattern is this?) and a **mode-specific policy**
 (given this pattern, how should I score pages?). The victim selection
 weights stay constant, but the surrounding policy (admission threshold,
 prefetch budget, cluster protection strength, demotion strictness)
-adapts to what the workload actually needs. This is why it degrades
-gracefully — the 70% ARC-safe base scoring always works, and the
-mode-adaptive policy layer can only help.
+adapts to what the workload actually needs.
+
+The deeper lesson: CTM+'s value is **not** in replacing ARC on generic
+workloads. It's in domains where access patterns carry **semantic
+meaning** — attention strength, token importance, sequence role — that
+recency and frequency alone can't capture. That's why it wins on KV
+cache management but not on synthetic page traces.
