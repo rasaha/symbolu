@@ -3163,7 +3163,8 @@ def train(config: UnifiedTrainingConfig):
 
                     if _s_pred is not None:
                         # Project 32D → d_model (with gradients for projector training)
-                        jepa_prior_vec = jepa_injection_projector(_s_pred.detach())  # [B, d_model]
+                        # s_pred may be [B, 32] (summary) or [B, T_pred, 32] (per-token)
+                        jepa_prior_vec = jepa_injection_projector(_s_pred.detach())
 
                         # Get injection layer hidden state
                         layer_hs_for_jepa = hidden_state_extractor.get_hidden_states(outputs, x)
@@ -3173,9 +3174,19 @@ def train(config: UnifiedTrainingConfig):
                             )
                             jepa_hidden = layer_hs_for_jepa[jepa_inj_layer]  # [B, T, d_model]
 
-                            # Expand JEPA prior to [B, T, d_model]
+                            # Expand/align JEPA prior to [B, T, d_model]
                             T_jepa = jepa_hidden.shape[1]
-                            jepa_prior_expanded = jepa_prior_vec.unsqueeze(1).expand(-1, T_jepa, -1)
+                            if jepa_prior_vec.dim() == 3:
+                                # Per-token: [B, T_pred, d_model] → truncate/pad to T
+                                T_pred = jepa_prior_vec.shape[1]
+                                if T_pred >= T_jepa:
+                                    jepa_prior_expanded = jepa_prior_vec[:, :T_jepa, :]
+                                else:
+                                    pad = jepa_prior_vec[:, -1:, :].expand(-1, T_jepa - T_pred, -1)
+                                    jepa_prior_expanded = torch.cat([jepa_prior_vec, pad], dim=1)
+                            else:
+                                # Summary: [B, d_model] → broadcast to all positions
+                                jepa_prior_expanded = jepa_prior_vec.unsqueeze(1).expand(-1, T_jepa, -1)
 
                             # DETACH hidden state: JEPA injection is observational
                             # (projector learns, model does not backprop through this)
@@ -3359,8 +3370,8 @@ def train(config: UnifiedTrainingConfig):
                             bliss_priors['csr'] = csr_emb.detach()
 
                         # Phase 4: Add JEPA predictions as a second prior
-                        # JEPA s_pred is [B, 32D] — project to [B, d_model] then
-                        # expand to [B, T, d_model] for Bliss cosine agreement
+                        # JEPA s_pred may be [B, 32D] or [B, T_pred, 32D]
+                        # Project to d_model and align to [B, T, d_model] for Bliss cosine agreement
                         jepa_prior_projected = None
                         if (config.enable_jepa_injection
                                 and jepa_injection_projector is not None
@@ -3371,12 +3382,22 @@ def train(config: UnifiedTrainingConfig):
                                 # Project 32D → d_model (detach state for Bliss measurement)
                                 jepa_prior_projected = jepa_injection_projector(
                                     _jepa_s_pred.detach()
-                                )  # [B, d_model]
-                                # Expand to [B, T, d_model] matching hidden state seq len
-                                _T = layer_hs[0].shape[1]
-                                jepa_prior_expanded = jepa_prior_projected.unsqueeze(1).expand(
-                                    -1, _T, -1
                                 )
+                                # Align to [B, T, d_model] matching hidden state seq len
+                                _T = layer_hs[0].shape[1]
+                                if jepa_prior_projected.dim() == 3:
+                                    # Per-token: truncate/pad to match T
+                                    _T_pred = jepa_prior_projected.shape[1]
+                                    if _T_pred >= _T:
+                                        jepa_prior_expanded = jepa_prior_projected[:, :_T, :]
+                                    else:
+                                        _pad = jepa_prior_projected[:, -1:, :].expand(-1, _T - _T_pred, -1)
+                                        jepa_prior_expanded = torch.cat([jepa_prior_projected, _pad], dim=1)
+                                else:
+                                    # Summary: broadcast to all positions
+                                    jepa_prior_expanded = jepa_prior_projected.unsqueeze(1).expand(
+                                        -1, _T, -1
+                                    )
                                 bliss_priors['jepa'] = jepa_prior_expanded.detach()
 
                         # Build Kosha router weights if available
