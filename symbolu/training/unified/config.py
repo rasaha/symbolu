@@ -613,6 +613,17 @@ class UnifiedTrainingConfig:
     csr_disengage_ppl: float = 120.0         # CSR OFF above this PPL (model struggling)
     csr_rampdown_steps: int = 500            # Steps to ramp down after disengage trigger
 
+    # ==========================================================================
+    # Appendix G: Bliss Coherence Functional & Monitoring (Phase 1)
+    # Reference: docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md, §G.10
+    # ==========================================================================
+    enable_bliss_monitoring: bool = True     # Phase 1: compute & log Bliss (no gating)
+    bliss_beta: float = 0.3                 # Cross-layer stability weight in B = mean(B_A) - β·B_B
+    bliss_log_interval: int = 100           # Log Bliss metrics every N steps
+    enable_12d_health_monitor: bool = True  # Track ontology projection health (SVD, variance, drift)
+    health_monitor_interval: int = 100      # Steps between 12D health checks
+    enable_gradient_tracker: bool = True    # Track gradient variance & direction stability
+
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
 
