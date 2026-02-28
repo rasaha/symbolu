@@ -323,10 +323,12 @@ def test_viparyaya_curriculum(device: torch.device) -> Dict[str, float]:
     results = {}
 
     if KV_SUPERVISION_AVAILABLE:
-        curriculum = ViparyayaCurriculum(
-            exclude_epochs=2,
-            ramp_epochs=1,
+        config = KoshaVrittiSupervisionConfig(
+            enable=True,
+            curriculum_exclude_epochs=2,
+            curriculum_ramp_epochs=1,
         )
+        curriculum = ViparyayaCurriculum(config)
     else:
         # Local implementation of curriculum logic
         class LocalCurriculum:
@@ -481,18 +483,29 @@ def test_gyroscope_integration(device: torch.device) -> Dict[str, float]:
 
     gyroscope = KoshaGyroscopicLoss().to(device)
 
-    # Healthy state: balanced koshas
-    koshas_balanced = torch.tensor([[0.2, 0.2, 0.2, 0.2, 0.2]], device=device)
+    # Gyroscope expects [B, T, num_koshas] with T > 1 (needs std across tokens)
+    T = 16
+    # Healthy state: balanced koshas with slight variation across time
+    balanced_base = torch.tensor([0.2, 0.2, 0.2, 0.2, 0.2], device=device)
+    koshas_balanced = (balanced_base.unsqueeze(0).unsqueeze(0).expand(1, T, -1)
+                       + torch.randn(1, T, 5, device=device) * 0.02)
+    koshas_balanced = F.softmax(koshas_balanced, dim=-1)
     loss_balanced = gyroscope(koshas_balanced)
     results['loss_balanced'] = loss_balanced['total'].item() if isinstance(loss_balanced, dict) else loss_balanced.item()
 
     # Mental-trapped state (Mental > ceiling)
-    koshas_mental_trap = torch.tensor([[0.05, 0.05, 0.85, 0.03, 0.02]], device=device)
+    trapped_base = torch.tensor([0.05, 0.05, 0.85, 0.03, 0.02], device=device)
+    koshas_mental_trap = (trapped_base.unsqueeze(0).unsqueeze(0).expand(1, T, -1)
+                          + torch.randn(1, T, 5, device=device) * 0.02)
+    koshas_mental_trap = F.softmax(koshas_mental_trap, dim=-1)
     loss_trapped = gyroscope(koshas_mental_trap)
     results['loss_mental_trap'] = loss_trapped['total'].item() if isinstance(loss_trapped, dict) else loss_trapped.item()
 
     # Physical-grounded state
-    koshas_grounded = torch.tensor([[0.6, 0.15, 0.1, 0.1, 0.05]], device=device)
+    grounded_base = torch.tensor([0.6, 0.15, 0.1, 0.1, 0.05], device=device)
+    koshas_grounded = (grounded_base.unsqueeze(0).unsqueeze(0).expand(1, T, -1)
+                       + torch.randn(1, T, 5, device=device) * 0.02)
+    koshas_grounded = F.softmax(koshas_grounded, dim=-1)
     loss_grounded = gyroscope(koshas_grounded)
     results['loss_grounded'] = loss_grounded['total'].item() if isinstance(loss_grounded, dict) else loss_grounded.item()
 
