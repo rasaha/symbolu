@@ -4139,21 +4139,33 @@ A component provides a **weak ontological tendency** if and only if:
 
 Every subsystem except the Ontology Head is a weak contributor.
 
-#### G.1.2 Authority Gradient (Must Not Invert)
+#### G.1.2 Authority and Feedback Roles (Must Not Invert)
 
 ```
-AUTHORITY LEVELS (descending, never invert):
+ROLES (distinct, not ranked):
 
-  DEFINES meaning axes → Ontology Head / 12D projection
-  ─────────────────────────────────────────────────────
-  Routes/weights priors → Kosha (soft router)
-  ─────────────────────────────────────────────────────
-  Weak contributors     → CSR, JEPA, Vritti, Guna
-  ─────────────────────────────────────────────────────
-  Measured, not added   → Bliss (coherence functional)
+  AUTHORITY (defines meaning)
+  ──────────────────────────────────────────────────────────
+  Ontology Head / 12D projection — the ONLY layer that
+  defines meaning axes
+
+  ROUTING (weights priors)
+  ──────────────────────────────────────────────────────────
+  Kosha — soft router producing per-layer mixture weights
+  over weak priors
+
+  WEAK PRIORS (bounded perturbations)
+  ──────────────────────────────────────────────────────────
+  CSR, JEPA, Vritti, Guna — bias hidden-state geometry
+  with small, bounded perturbations
+
+  FEEDBACK (measures + gates)
+  ──────────────────────────────────────────────────────────
+  Bliss — coherence functional: measures integration quality
+  and gates prior injection strength via σ(γ(B−τ))
 ```
 
-The Ontology Head / 12D projection is the ONLY layer allowed to "define meaning axes." Everything else is a weak contributor. This matches the SymbolU design where symbolic distributions (aspects/vrtti/guna/kosha) modulate scoring, confidence, routing, and recursion — but are not "meaning itself."
+**Clarification**: Bliss is NOT "below" the weak priors in a hierarchy. It is a feedback loop that measures the hidden state and modulates how strongly priors can perturb it. The ordering above is functional roles, not authority ranking. The only true authority ranking is: Ontology Head defines axes; everything else does not.
 
 ---
 
@@ -4166,6 +4178,8 @@ The Ontology Head / 12D projection is the ONLY layer allowed to "define meaning 
 - **Authority**: None. CSR cannot define ontology. It provides a bottom-up acoustic tendency that biases the hidden state toward phoneme-consistent ontological regions
 - **Relationship to Ontology**: CSR ≠ Ontology. CSR is acoustic resonance (data plane). Ontology is governance (authority). They are orthogonal
 - **Pipeline**: Token → G2P → ARPABET → ARPABET_TO_VARNA → VarnaCSRBridge.get_vector() → 12D affinity → confidence_head → projection(12→d_model) × confidence → inject into hidden state as weak perturbation
+
+**Why CSR uses 12D (ontology basis)**: CSR's 12D vectors are explicit affinities to the 12 ontological layers (O1_Potential through O12_Absolving). This is intentional — the Sanskrit varna system provides a theoretically grounded mapping from phonemes to ontological aspects (e.g., plosives K/T/P → O3_Execution, nasals N/M → O10_Unifying). CSR is producing a **weak hint in the ontology basis**, not defining the basis. The 12D → d_model projection with small-std init, confidence gating, and Bliss modulation ensures CSR cannot overwrite the Ontology Head's authority. If a future CSR variant uses a different intermediate representation (e.g., articulatory features, resonance classes), the projection changes to W_m→d but the injection discipline (G.5) remains identical.
 
 **Critical correction from earlier docs**: Earlier sections (6b, 7a, C4) describe CSR as a "parameter-free hard pre-filter operating BEFORE the transformer" with "82% FLOP reduction." This described a theoretical pure-inference optimization. The actual training-time implementation is an **injection layer** that adds a small CSR-derived perturbation to transformer hidden states: `hidden_state += layer_scales[i] × λ_csr × csr_emb`. The pre-filter optimization is a future inference-time possibility that does not affect the training architecture.
 
@@ -4193,6 +4207,20 @@ The Ontology Head / 12D projection is the ONLY layer allowed to "define meaning 
 - **Role**: Predictive invariants / latent world structure
 - **Output**: State delta predictions in Sovereign State space
 - **Authority**: JEPA can be structurally strong as a learned representation, but still must enter the language hidden state as a bounded prior, not as the ontology axis definition
+
+#### G.2.6 What Counts as a "Prior" P_k^ℓ (Vector vs. Gate)
+
+Not all weak contributors produce vectors for injection. Some produce scalars or distributions used only for gating/routing. The Bliss functional only operates on **vectorized priors**.
+
+| Subsystem | Type | Representation | Injected? | In Bliss B_A? |
+|-----------|------|---------------|-----------|---------------|
+| **CSR** | Vector prior | 12D affinity → proj to d_model | Yes (hidden_state += ...) | Yes (cosine with H^ℓ) |
+| **JEPA** | Vector prior | State delta → proj to d_model | Yes (hidden_state += ...) | Yes (cosine with H^ℓ) |
+| **Vritti** | Gate/distribution | 5-dim softmax distribution | Gating only (weights templates, penalties, hedging) | No (not vectorized) |
+| **Guna** | Gate/scalar | 3-dim distribution (sattva/rajas/tamas) | Gating only (modulates energy/temperature) | No (not vectorized) |
+| **Kosha** | Router | K-dim softmax weights | Not injected — routes other priors | No (router weights, not prior) |
+
+**If Vritti is later vectorized** (e.g., embed the 5-dim distribution → proj to d_model), it would become a vector prior and enter the Bliss computation. Until then, Vritti influences the system only through gating and routing, not through hidden-state perturbation.
 
 ---
 
@@ -4251,15 +4279,34 @@ B = (1/L) Σ_{ℓ=1}^{L} B_A^ℓ  −  β · B_B
 - **B_A component**: Measures how well hidden states align with the weak priors (weighted by Kosha router)
 - **B_B component**: Penalizes representational fragmentation across layers (sudden direction changes)
 
-#### G.3.3 Hyperparameters
+#### G.3.3 Bliss Computation Scope
 
-| Parameter | Role | Suggested Range |
-|-----------|------|-----------------|
-| β | Cross-layer stability weight | 0.1 – 0.5 |
-| α_ℓ | Per-layer stability importance | Uniform initially; can be learned |
-| τ | Bliss threshold for gate activation | 0.0 (centered sigmoid) |
-| γ | Gate sharpness | 1.0 – 5.0 |
-| λ_k | Base injection strength per prior | 0.01 – 0.1 (start small) |
+**Per-layer or subset?** Computing B_A on all L layers is expensive and noisy. Recommended: compute on a subset of layers (e.g., every 4th layer, or mid+top layers only). Start with all layers, then narrow to a validated subset based on diagnostic logs.
+
+**Per-token, per-sequence, or per-batch?** B is computed as a **per-sequence scalar** (averaged over tokens within a sequence). This is stable and sufficient for gating. Optionally log per-token B values for diagnostics, but use the sequence-level scalar for the gate formula.
+
+```python
+# Recommended: per-sequence scalar
+B_A_layer = cosine_agreement.mean(dim=0)  # average over tokens → per-layer scalar
+B_A = B_A_layer.mean()                     # average over layers → sequence scalar
+B_B = stability_penalty.sum()              # sum over layers → sequence scalar
+B = B_A - beta * B_B                       # final scalar
+```
+
+#### G.3.4 Hyperparameters (Defaults)
+
+| Parameter | Role | Default | Range |
+|-----------|------|---------|-------|
+| β | Cross-layer stability weight | 0.3 | 0.1 – 0.5 |
+| α_ℓ | Per-layer stability importance | 1/L (uniform) | Can be learned |
+| τ | Bliss threshold for gate activation | running_mean(B) or 0.1 | -0.5 – 0.5 |
+| γ | Gate sharpness | 5.0 | 1.0 – 10.0 |
+| λ_CSR | Base CSR injection strength | 0.02 | 0.01 – 0.05 |
+| λ_JEPA | Base JEPA injection strength | 0.03 | 0.01 – 0.05 |
+| λ_VrttiVec | Base Vrtti vector injection (if vectorized) | 0.01 | 0.0 – 0.03 |
+| λ_min | Floor for gated injection (never fully dead) | 0.1 | 0.05 – 0.2 |
+| ε_ℓ | Per-layer injection norm cap | 0.05 × rms(H^ℓ) | Ramp from 0.01 to 0.05 |
+| warmup_steps | Steps before Bliss gating activates | 1000 | 500 – 5000 |
 
 ---
 
@@ -4271,13 +4318,17 @@ Bliss never injects content. It only modulates how strongly priors can perturb t
 
 When coherence drops (low Bliss), the system automatically reduces injection strength to prevent runaway or "prior takeover." When coherence is high, priors are allowed their full (still bounded) influence.
 
-#### G.4.2 Gate Formula
+#### G.4.2 Gate Formula (with Floor and Warmup)
 
 For each prior k with base strength λ_k:
 
 ```
-λ_{k,eff}^ℓ = λ_k · σ(γ · (B − τ))
+λ_{k,eff}^ℓ = λ_k · (λ_min + (1 - λ_min) · σ(γ · (B − τ)))
 ```
+
+The λ_min floor ensures the prior channel never goes fully dead (avoids dead priors in early training).
+
+**Warmup**: For the first `warmup_steps` training steps, bypass Bliss gating entirely (set λ_{k,eff} = λ_k). This lets priors establish themselves before coherence measurement begins gating them. Alternatively, set τ very low initially and ramp to its target value.
 
 Where:
 - σ = sigmoid function
@@ -4310,7 +4361,7 @@ This matches the general SymbolU principle of entropy feedback modulating confid
 │     B     = mean(B_A) − β·B_B                                │
 │                                                              │
 │  5. Compute effective injection strengths                    │
-│     λ_{k,eff}^ℓ = λ_k · σ(γ(B−τ))                           │
+│     λ_{k,eff}^ℓ = λ_k·(λ_min + (1-λ_min)·σ(γ(B−τ)))       │
 │                                                              │
 │  6. Inject priors (with discipline, see G.5)                 │
 │     H^ℓ += s^ℓ · λ_{k,eff}^ℓ · P_k^ℓ                       │
@@ -4320,6 +4371,82 @@ This matches the general SymbolU principle of entropy feedback modulating confid
 │  LOW B  → injection strengths decrease → stabilize           │
 │  HIGH B → injection strengths at full (bounded) → integrate  │
 └─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### G.4a Implementation Traps and Guardrails
+
+These are known failure modes that can occur even with correct documentation. Each trap has a specific guardrail that MUST be implemented.
+
+#### Trap 1: Bliss Collapse (Self-Alignment)
+
+**Problem**: If P_k^ℓ is computed from H^ℓ itself (directly or via a shallow projection), the cosine agreement B_A becomes trivially high and meaningless. The system "games" its own coherence metric.
+
+**Guardrail**: Every prior P_k^ℓ MUST be derived from a source other than the current H^ℓ:
+- CSR prior: derived from **phoneme pipeline** (external input, not hidden state)
+- JEPA prior: derived from **JEPA latent** (separate predictor, not H^ℓ)
+- If any prior MUST use hidden states (e.g., Vrtti head logits), use a **stop-gradient copy** for the Bliss metric: `P = f(H.detach())`. The prior may still use H with gradients for injection, but the Bliss cosine must use the detached version to prevent self-alignment gaming.
+
+```python
+# CORRECT: CSR prior from external source
+P_csr = csr_provider(input_ids)  # phoneme-derived, independent of H
+
+# CORRECT: If prior uses H, detach for Bliss measurement
+P_vrtti_for_injection = vrtti_head(H)         # gradients flow for injection
+P_vrtti_for_bliss = vrtti_head(H.detach())    # no self-alignment in B_A
+```
+
+#### Trap 2: Bliss Gate Kills Priors Early (Dead Channels)
+
+**Problem**: If τ and γ are mis-set, early training yields low B → λ_eff ≈ 0 → priors never learn → B stays low forever (death spiral).
+
+**Guardrail**: Use a floor λ_min (already in G.4.2) AND a warmup schedule:
+```python
+if step < warmup_steps:
+    lambda_eff = lambda_k  # bypass Bliss gating entirely
+else:
+    lambda_eff = lambda_k * (lambda_min + (1 - lambda_min) * sigmoid(gamma * (B - tau)))
+```
+
+Additionally, set τ = running_mean(B) rather than a fixed value, so the gate adapts to the system's natural coherence level rather than imposing an arbitrary threshold.
+
+**Diagnostic**: Log λ_eff per prior. If any prior has λ_eff < 1.1 × λ_min for >1000 consecutive steps after warmup, flag as potentially dead channel.
+
+#### Trap 3: Additive Prior Stacking (Multi-Prior Norm Explosion)
+
+**Problem**: Even with each λ_k ≤ 0.05, multiple priors across multiple layers can stack: K priors × L layers × λ_k = large effective perturbation. The hidden state drifts away from the LM's learned manifold.
+
+**Guardrail**: Apply a **global injection norm cap per layer**:
+```python
+# Compute total injection vector at layer ℓ
+total_injection = sum(lambda_k_eff * P_k for k in active_priors)
+
+# Cap the norm
+injection_norm = total_injection.norm(dim=-1, keepdim=True)
+max_norm = eps_layer * rms(H_layer)  # relative cap
+scale = torch.clamp(max_norm / (injection_norm + 1e-8), max=1.0)
+total_injection = total_injection * scale
+
+# Apply capped injection
+H_layer = H_layer + total_injection
+```
+
+Default: ε_ℓ starts at 0.01 × rms(H^ℓ) and ramps to 0.05 × rms(H^ℓ) over training.
+
+#### Trap 4: LN Space Mismatch (Bliss vs Injection)
+
+**Problem**: If Bliss is computed on pre-LayerNorm hidden states but injection happens post-LN (or vice versa), the metric and the control act on different spaces. The gate may over- or under-react because the norms differ.
+
+**Guardrail**: Pick ONE convention and use it everywhere:
+- **Recommended**: Compute Bliss B_A on `H_tilde = LayerNorm(H)` (post-LN representation). Inject into the residual stream post-LN. This way the metric and the injection operate in the same normalized space.
+- Log both pre-LN and post-LN Bliss if needed for diagnostics, but gate on one.
+
+```python
+# CONSISTENT: both Bliss and injection use post-LN
+H_tilde = LayerNorm(H)
+B_A_layer = cosine(H_tilde, P_k)  # Bliss measured in LN space
+H = H + total_injection            # injection into residual stream
 ```
 
 ---
@@ -4463,14 +4590,23 @@ The existing v2.6/v2.7 scoring formalization includes:
 
 ### G.8 Acceptance Tests
 
-These tests validate that the architecture behaves as specified:
+These tests validate that the architecture behaves as specified. Tests 1-6 are functional; tests 7-10 prevent regression on the implementation traps (G.4a).
+
+#### Functional Tests
 
 1. **Weak prior test — CSR off**: Turning CSR off produces a small performance drop, not collapse. The ontology head continues to function
 2. **Weak prior test — JEPA off**: Drop depends on task, but ontology head still works. No catastrophic degradation
-3. **Bliss governance test**: When B is artificially lowered, prior injection strengths (λ_k_eff) decrease automatically. System becomes more conservative
-4. **No authority inversion test**: No single prior dominates 12D ontology outputs across diverse inputs. The ontology head's learned axes remain the authority
-5. **Injection discipline test**: All priors are L2-normalized, confidence-gated, and inject post-LN. Injection magnitude bounded by λ_max
+3. **Bliss governance test**: When B is artificially lowered, prior injection strengths (λ_k_eff) decrease automatically. When B is raised, λ_k_eff increases. System responds monotonically
+4. **No authority inversion test**: Set CSR λ artificially high (10×). Confirm it degrades metrics but does NOT redefine the ontology head's axes. The ontology head's learned axes remain the authority
+5. **Injection discipline test**: All priors are L2-normalized, confidence-gated, and inject post-LN. Injection magnitude bounded by ε_ℓ cap
 6. **CSR differentiation test**: After calibration fix, distinct consonants produce distinct 12D profiles (not all peaking at O1)
+
+#### Trap Prevention Tests
+
+7. **Bliss self-alignment test**: Confirm B_A is computed with priors derived from external sources or detached hidden states. B_A should NOT be trivially close to 1.0 for random hidden states
+8. **Dead channel test**: After warmup, verify that no prior has λ_eff < 1.1 × λ_min for >1000 consecutive steps. All priors should have non-zero gradients or non-zero usage over time
+9. **Norm cap test**: At every layer, verify that the total injection norm never exceeds ε_ℓ × rms(H^ℓ). Log violations as warnings
+10. **LN consistency test**: Verify that Bliss computation and injection both operate in the same space (both post-LN or both pre-LN). No mixed conventions
 
 ---
 
@@ -4478,10 +4614,11 @@ These tests validate that the architecture behaves as specified:
 
 Execute in this order:
 
-1. **Representations**: Implement P_k^ℓ for CSR/JEPA/Vrtti-vector in model-dim space. Implement Kosha router producing w_k^ℓ
-2. **Bliss functional**: Compute B_A^ℓ (cosine agreement), Δ^ℓ (cross-layer stability), combine into B
-3. **Adaptive gate**: Implement λ_{k,eff}^ℓ = λ_k · σ(γ(B−τ))
-4. **Injection discipline**: Normalize priors, post-LN injection, small init, confidence gating
-5. **CSR calibration**: Separate origin(O1) weight from dominant resonance weight in VarnaCSRBridge
-6. **Logging**: Log B, B_A^ℓ, B_B, λ_{k,eff}^ℓ alongside existing v2.6 logs (λ_1, λ_2, Q', β, etc.)
-7. **Acceptance tests**: Validate all 6 tests from G.8
+1. **Representations**: Implement P_k^ℓ for CSR/JEPA in model-dim space. Ensure CSR prior comes from phoneme pipeline (external), JEPA prior from predictor (separate). Implement Kosha router producing w_k^ℓ
+2. **Bliss functional module** (pure measurement): Inputs: H_layers, Priors_layers, w_layers. Output: B scalar + logs (B_A by layer, Δ by layer, cosine per prior). Compute on post-LN representations
+3. **Adaptive gate with floor + warmup**: λ_{k,eff}^ℓ = λ_k · (λ_min + (1-λ_min) · σ(γ(B−τ))). Bypass gating for first warmup_steps. Use τ = running_mean(B)
+4. **Injection with global norm cap**: Compute total_injection = Σ_k λ_{k,eff} · P_k. Clip norm to ε_ℓ × rms(H^ℓ). Apply post-LN
+5. **Injection discipline**: Normalize priors (L2), small init (std=0.01), confidence gating, post-LN injection
+6. **CSR calibration**: Separate origin(O1) weight from dominant resonance weight in VarnaCSRBridge
+7. **Logging**: Log B, B_A^ℓ, B_B, λ_{k,eff}^ℓ, injection norms, cap violations alongside existing v2.6 logs
+8. **Acceptance tests**: Validate all 10 tests from G.8

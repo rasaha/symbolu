@@ -82,14 +82,17 @@ no point building a write-back channel (B).
 The bridge doesn't operate alone. Multiple systems produce signals it
 integrates, organized by an explicit **authority gradient**:
 
-### Authority Hierarchy
+### Roles (Functional, Not Ranked)
 
 ```
-DEFINES meaning  → Ontology Head (12D projection) — the ONLY authority
-ROUTES priors    → Kosha (soft router / weighting lens)
-WEAK priors      → CSR, JEPA, Vritti, Guna — bounded perturbations
-MEASURED         → Bliss (coherence functional) — never injected
+AUTHORITY  → Ontology Head (12D projection) — defines meaning axes
+ROUTING    → Kosha (soft router) — weights priors per layer
+WEAK PRIORS → CSR, JEPA, Vritti, Guna — bounded perturbations
+FEEDBACK   → Bliss (coherence functional) — measures + gates priors
 ```
+
+Bliss is NOT "below" the priors — it is a feedback loop that measures
+the hidden state and governs how strongly priors can perturb it.
 
 ### Weak Priors (Bounded Contributors)
 
