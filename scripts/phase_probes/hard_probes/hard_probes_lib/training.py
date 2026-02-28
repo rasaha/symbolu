@@ -53,6 +53,7 @@ def generate_sample(
     top_p: float = 0.95,
     top_k: int = 50,
     repetition_penalty: float = 1.15,
+    autocast_dtype: Optional[torch.dtype] = None,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
@@ -67,10 +68,16 @@ def generate_sample(
     # Generate tokens one by one
     generated = input_ids.clone()
 
+    _use_autocast = autocast_dtype is not None and device.type == 'cuda'
+
     with torch.no_grad():
         for _ in range(max_new_tokens):
-            # Forward pass
-            outputs = model(generated)
+            # Forward pass (use autocast to match training dtype for FlashAttention)
+            if _use_autocast:
+                with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                    outputs = model(generated)
+            else:
+                outputs = model(generated)
 
             # Handle different output formats
             if isinstance(outputs, dict):

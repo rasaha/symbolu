@@ -536,6 +536,7 @@ def generate_sample(
     repetition_penalty: float = 1.15,
     no_repeat_ngram_size: int = 3,
     entropy_controller: Optional[AdaptiveEntropyController] = None,
+    autocast_dtype: Optional[torch.dtype] = None,
 ) -> str:
     """
     Generate text from a prompt for quality monitoring.
@@ -576,9 +577,15 @@ def generate_sample(
             ngrams.add(tuple(seq[i:i+n].tolist()))
         return ngrams
 
+    _use_autocast = autocast_dtype is not None and device.type == 'cuda'
+
     for step in range(max_new_tokens):
-        # Forward pass
-        outputs = model(generated)
+        # Forward pass (use autocast to match training dtype for FlashAttention)
+        if _use_autocast:
+            with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                outputs = model(generated)
+        else:
+            outputs = model(generated)
 
         # Handle different output formats (dict with 'logits', tuple, or tensor)
         if isinstance(outputs, dict):
@@ -751,6 +758,15 @@ def run_quality_samples(
         else:
             print(msg)
 
+    # Derive autocast dtype from config to match training (FlashAttention requires fp16/bf16)
+    _mp = getattr(config, 'mixed_precision', 'none')
+    _autocast_dtype = None
+    if _mp == 'bf16':
+        _autocast_dtype = torch.bfloat16
+    elif _mp == 'fp16':
+        _autocast_dtype = torch.float16
+    _use_autocast = _autocast_dtype is not None and device.type == 'cuda'
+
     log("")
     log("=" * 60)
     log(f"  📝 QUALITY SAMPLES (Step {step})")
@@ -761,7 +777,11 @@ def run_quality_samples(
         diag_prompt = config.sample_prompts[0] if config.sample_prompts else "The"
         diag_ids = tokenizer.encode(diag_prompt, return_tensors="pt").to(device)
         with torch.no_grad():
-            diag_out = model(diag_ids)
+            if _use_autocast:
+                with torch.amp.autocast('cuda', dtype=_autocast_dtype):
+                    diag_out = model(diag_ids)
+            else:
+                diag_out = model(diag_ids)
             if isinstance(diag_out, dict):
                 diag_logits = diag_out.get('logits', diag_out.get('output'))
             else:
@@ -814,6 +834,7 @@ def run_quality_samples(
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
                 entropy_controller=_infer_entropy_ctrl,
+                autocast_dtype=_autocast_dtype,
             )
             # Clean up WikiText artifacts and truncate for display
             generated = generated.strip().replace('\n', ' ')
