@@ -445,6 +445,15 @@ from symbolu.training.unified import (
     PerLayerPhaseController,
 )
 
+# Appendix G: Bliss Coherence Functional & Monitoring (Phase 1)
+# Imported directly to avoid __init__.py circular dependency
+from symbolu.training.unified.bliss_coherence import (
+    BlissConfig,
+    BlissCoherenceFunctional,
+    OntologyHealthMonitor,
+    GradientVarianceTracker,
+)
+
 # =============================================================================
 # TRAINING LOOP
 # =============================================================================
@@ -749,6 +758,34 @@ def train(config: UnifiedTrainingConfig):
         print(f"       CONSTRUCTION: PPL > {config.csr_engage_ppl} (full grounding)")
         print(f"       TRANSITION:   {config.csr_disengage_ppl} < PPL < {config.csr_engage_ppl} (rampdown)")
         print(f"       POLISHING:    PPL < {config.csr_disengage_ppl} (CSR off after {config.csr_rampdown_steps} steps)")
+
+    # ==========================================================================
+    # Appendix G Phase 1: Bliss Coherence Measurement + Monitoring
+    # Bliss is computed and LOGGED but does NOT gate injection yet.
+    # OntologyHealthMonitor tracks 12D projection health.
+    # GradientVarianceTracker tracks gradient stability.
+    # ==========================================================================
+    bliss_functional = None
+    ontology_health_monitor = None
+    gradient_variance_tracker = None
+
+    if config.enable_bliss_monitoring:
+        bliss_functional = BlissCoherenceFunctional(BlissConfig(
+            beta=config.bliss_beta,
+            warmup_steps=0,  # Phase 1: no gating, so warmup irrelevant
+        ))
+        print(f"  [Appendix G] Bliss Coherence Monitoring: ENABLED (Phase 1: log only, no gating)")
+        print(f"     β={config.bliss_beta} | log_interval={config.bliss_log_interval}")
+
+    if config.enable_12d_health_monitor:
+        ontology_health_monitor = OntologyHealthMonitor(
+            check_every_n_steps=config.health_monitor_interval,
+        )
+        print(f"  [Appendix G] 12D Health Monitor: ENABLED (every {config.health_monitor_interval} steps)")
+
+    if config.enable_gradient_tracker:
+        gradient_variance_tracker = GradientVarianceTracker(window_size=100)
+        print(f"  [Appendix G] Gradient Variance Tracker: ENABLED (window=100)")
 
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
@@ -3122,6 +3159,65 @@ def train(config: UnifiedTrainingConfig):
                             metrics['onto_pramana_corr'] = onto_metrics.get('onto_pramana_corr', 0.0)
                             metrics['onto_bridge_layer'] = onto_layer
 
+            # =================================================================
+            # Appendix G Phase 1: Bliss Coherence Measurement (LOG ONLY)
+            # Computes B = mean(B_A) - β·B_B over detached hidden states.
+            # Does NOT gate injection — purely observational.
+            # =================================================================
+            if bliss_functional is not None and hidden_state_extractor is not None:
+                try:
+                    layer_hs = hidden_state_extractor.get_hidden_states(outputs, x)
+                    if layer_hs is not None and len(layer_hs) > 0:
+                        # Build priors dict from available weak priors (CSR only in Phase 1)
+                        bliss_priors = {}
+                        if csr_provider is not None and 'csr_emb' in dir() and csr_emb is not None:
+                            # CSR embedding projected to model dim (already done above)
+                            bliss_priors['csr'] = csr_emb.detach()
+
+                        if bliss_priors:
+                            bliss_metrics = bliss_functional.compute(
+                                [h.detach() for h in layer_hs],
+                                bliss_priors,
+                            )
+                            metrics['bliss_B'] = bliss_metrics.B
+                            metrics['bliss_B_A'] = bliss_metrics.B_A_mean
+                            metrics['bliss_B_B'] = bliss_metrics.B_B
+
+                            # Log at interval
+                            if global_step % config.bliss_log_interval == 0 and global_step > 0:
+                                cos_str = ', '.join(f'{k}={v:.4f}' for k, v in bliss_metrics.cosine_per_prior.items())
+                                print(f"  [Bliss] B={bliss_metrics.B:.4f} "
+                                      f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
+                                      f"tau={bliss_functional.tau:.4f} | {cos_str}", flush=True)
+
+                        # 12D Health Monitor: check onto_bridge projection weight
+                        if ontology_health_monitor is not None and onto_bridge is not None:
+                            proj_weight = None
+                            if hasattr(onto_bridge, 'projection'):
+                                proj_weight = onto_bridge.projection.weight
+                            elif hasattr(onto_bridge, 'layer_proj'):
+                                proj_weight = onto_bridge.layer_proj.weight
+
+                            if proj_weight is not None:
+                                # Get 12D output for variance check
+                                onto_12d = None
+                                if 'onto_repr' in dir() and onto_repr is not None:
+                                    onto_12d = onto_repr.get('layer_scores') if isinstance(onto_repr, dict) else onto_repr
+
+                                health = ontology_health_monitor.check(proj_weight, onto_12d)
+                                if health and health.get('alerts'):
+                                    for alert in health['alerts']:
+                                        print(f"  [12D ALERT] {alert}", flush=True)
+                                if health and global_step % config.bliss_log_interval == 0 and global_step > 0:
+                                    min_sv = health.get('min_sv', 0)
+                                    metrics['12d_min_sv'] = min_sv
+                                    if 'axis_variance' in health:
+                                        min_var = min(health['axis_variance'])
+                                        metrics['12d_min_var'] = min_var
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [Bliss] Measurement error: {e}", flush=True)
+
             # Initialize default guna values for first iteration
             # (actual values computed later in the loop, but needed here for evolutionary bridge)
             try:
@@ -3908,6 +4004,14 @@ def train(config: UnifiedTrainingConfig):
                 p.grad.norm().item() for p in model.parameters()
                 if p.grad is not None
             )
+
+            # Appendix G Phase 1: Record gradient variance (after unscale, before clip)
+            if gradient_variance_tracker is not None:
+                grad_health = gradient_variance_tracker.record(model)
+                metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
+                if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                    for alert in grad_health['alerts']:
+                        print(f"  [GRAD ALERT] {alert}", flush=True)
 
             # Gradient Norm Throttle: Reduce LR on gradient spikes
             # This physical safety layer prevents destructive weight updates
