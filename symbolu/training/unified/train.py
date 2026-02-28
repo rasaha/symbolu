@@ -1245,7 +1245,7 @@ def train(config: UnifiedTrainingConfig):
         # Phase 4: Initialize JEPA→d_model projector for weak prior injection
         # Projects 32D Sovereign State predictions to hidden dimension
         if config.enable_jepa_injection:
-            from symbolu.jepa.state_projector import SOVEREIGN_STATE_DIM
+            # SOVEREIGN_STATE_DIM (32) already imported at module level
             jepa_injection_projector = torch.nn.Sequential(
                 torch.nn.Linear(SOVEREIGN_STATE_DIM, model_dim // 2, bias=False),
                 torch.nn.GELU(),
