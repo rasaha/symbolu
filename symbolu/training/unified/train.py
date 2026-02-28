@@ -309,6 +309,15 @@ except ImportError as e:
     KOSHA_GYROSCOPE_AVAILABLE = False
     print(f"Warning: Kosha Gyroscope modules not available: {e}")
 
+# SGP (Stochastic Gradient Persistence) and Sattvic Controller
+try:
+    from symbolu.resonance.sgp import SGPController, SGPConfig
+    from symbolu.resonance.controller import SattvicConfig, SattvicController
+    SGP_AVAILABLE = True
+except ImportError as e:
+    SGP_AVAILABLE = False
+    print(f"Warning: SGP/Sattvic modules not available: {e}")
+
 # Import CSR Phoneme Provider for phoneme-ontological grounding
 try:
     from csr_phoneme_provider import (
