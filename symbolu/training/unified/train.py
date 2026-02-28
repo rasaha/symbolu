@@ -769,22 +769,31 @@ def train(config: UnifiedTrainingConfig):
         print(f"       POLISHING:    PPL < {config.csr_disengage_ppl} (CSR off after {config.csr_rampdown_steps} steps)")
 
     # ==========================================================================
-    # Appendix G Phase 1: Bliss Coherence Measurement + Monitoring
-    # Bliss is computed and LOGGED but does NOT gate injection yet.
+    # Appendix G: Bliss Coherence Measurement + Monitoring + Gating
+    # Phase 1/2: Bliss is computed and LOGGED (no gating)
+    # Phase 3:   Bliss gates CSR injection strength via σ(γ·(B−τ))
     # OntologyHealthMonitor tracks 12D projection health.
     # GradientVarianceTracker tracks gradient stability.
     # ==========================================================================
     bliss_functional = None
     ontology_health_monitor = None
     gradient_variance_tracker = None
+    bliss_lambda_eff_csr = None  # Phase 3: Bliss-gated CSR lambda (None = use config.csr_lambda)
 
     if config.enable_bliss_monitoring:
         bliss_functional = BlissCoherenceFunctional(BlissConfig(
             beta=config.bliss_beta,
-            warmup_steps=0,  # Phase 1: no gating, so warmup irrelevant
+            gamma=config.bliss_gate_gamma,
+            lambda_min=config.bliss_gate_lambda_min,
+            warmup_steps=config.bliss_gate_warmup_steps if config.enable_bliss_gating else 0,
         ))
-        print(f"  [Appendix G] Bliss Coherence Monitoring: ENABLED (Phase 1: log only, no gating)")
-        print(f"     β={config.bliss_beta} | log_interval={config.bliss_log_interval}")
+        if config.enable_bliss_gating:
+            print(f"  [Appendix G] Bliss Coherence: ENABLED (Phase 3: gating ACTIVE)")
+            print(f"     β={config.bliss_beta} | γ={config.bliss_gate_gamma} | "
+                  f"λ_min={config.bliss_gate_lambda_min} | warmup={config.bliss_gate_warmup_steps}")
+        else:
+            print(f"  [Appendix G] Bliss Coherence Monitoring: ENABLED (Phase 1/2: log only, no gating)")
+            print(f"     β={config.bliss_beta} | log_interval={config.bliss_log_interval}")
 
     if config.enable_12d_health_monitor:
         ontology_health_monitor = OntologyHealthMonitor(
@@ -3017,6 +3026,9 @@ def train(config: UnifiedTrainingConfig):
                             torch.nn.init.xavier_uniform_(model._csr_varna_projector.weight)
                             print(f"  ⚡ [CSR SPARSE] Created varna projector: {hidden_dim}D → 12D")
 
+                        # Phase 3: Use Bliss-gated λ if available (one-step lag)
+                        _csr_lambda = bliss_lambda_eff_csr if bliss_lambda_eff_csr is not None else config.csr_lambda
+
                         # Calculate sparse CSR loss
                         csr_loss, sparse_metrics = calculate_sparse_csr_loss(
                             hidden_states=csr_hidden_for_loss,
@@ -3025,7 +3037,7 @@ def train(config: UnifiedTrainingConfig):
                             content_weight=content_weight,
                             csr_projector=model._csr_varna_projector,
                             tau=config.csr_tau,
-                            lambda_csr=config.csr_lambda,
+                            lambda_csr=_csr_lambda,
                             content_word_only=config.csr_content_word_only,
                         )
 
@@ -3038,6 +3050,7 @@ def train(config: UnifiedTrainingConfig):
                         csr_metrics['csr_loss_scaled'] = csr_loss_scaled.item()
                         csr_metrics['csr_curriculum_scale'] = csr_scale
                         csr_metrics['csr_confidence'] = csr_confidence.mean().item()
+                        csr_metrics['csr_lambda_used'] = _csr_lambda
                         # Use sparse similarity metric
                         csr_metrics['csr_similarity'] = sparse_metrics.get('csr_sparse_similarity', 0.0)
 
@@ -3053,8 +3066,10 @@ def train(config: UnifiedTrainingConfig):
                         # When alignment is poor (sim ≈ 0): loss = (1-0)/0.07 ≈ 14.3 → STRONG pressure
                         # When alignment is good (sim ≈ 0.9): loss = (1-0.9)/0.07 ≈ 1.4 → mild pressure
                         # V9.6.9/V9.8.1: csr_confidence_for_loss already detached and aligned above
+                        # Phase 3: Use Bliss-gated λ if available (one-step lag)
+                        _csr_lambda = bliss_lambda_eff_csr if bliss_lambda_eff_csr is not None else config.csr_lambda
                         csr_alignment_loss = ((1 - csr_similarity) / config.csr_tau) * csr_confidence_for_loss.squeeze(-1)
-                        csr_loss = csr_alignment_loss.mean() * config.csr_lambda
+                        csr_loss = csr_alignment_loss.mean() * _csr_lambda
 
                         # V9.8.0: RSS scales CSR loss with linear warmup to prevent 14x gradient shock
                         if config.enable_rss and rss_weights['csr'] > 0:
@@ -3073,6 +3088,7 @@ def train(config: UnifiedTrainingConfig):
                         csr_metrics['csr_curriculum_scale'] = csr_scale
                         csr_metrics['csr_confidence'] = csr_confidence.mean().item()
                         csr_metrics['csr_similarity'] = csr_similarity.mean().item()
+                        csr_metrics['csr_lambda_used'] = _csr_lambda
                 else:
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
@@ -3169,35 +3185,64 @@ def train(config: UnifiedTrainingConfig):
                             metrics['onto_bridge_layer'] = onto_layer
 
             # =================================================================
-            # Appendix G Phase 1: Bliss Coherence Measurement (LOG ONLY)
+            # Appendix G: Bliss Coherence Measurement + Phase 3 Gating
             # Computes B = mean(B_A) - β·B_B over detached hidden states.
-            # Does NOT gate injection — purely observational.
+            # Phase 3: Also computes λ_eff to gate CSR injection strength.
             # =================================================================
             if bliss_functional is not None and hidden_state_extractor is not None:
                 try:
                     layer_hs = hidden_state_extractor.get_hidden_states(outputs, x)
                     if layer_hs is not None and len(layer_hs) > 0:
-                        # Build priors dict from available weak priors (CSR only in Phase 1)
+                        # Build priors dict from available weak priors
                         bliss_priors = {}
                         if csr_provider is not None and 'csr_emb' in dir() and csr_emb is not None:
-                            # CSR embedding projected to model dim (already done above)
                             bliss_priors['csr'] = csr_emb.detach()
+
+                        # Build Kosha router weights if available
+                        bliss_router_weights = None
+                        try:
+                            if 'kosha_means' in dir() and kosha_means:
+                                # Map Kosha sheath activations to prior routing weights
+                                # Physical/Material sheath → acoustic/CSR affinity
+                                _csr_kosha_w = kosha_means.get('physical', 0.5)
+                                bliss_router_weights = {'csr': _csr_kosha_w}
+                        except (NameError, AttributeError):
+                            pass
 
                         if bliss_priors:
                             bliss_metrics = bliss_functional.compute(
                                 [h.detach() for h in layer_hs],
                                 bliss_priors,
+                                router_weights=bliss_router_weights,
                             )
                             metrics['bliss_B'] = bliss_metrics.B
                             metrics['bliss_B_A'] = bliss_metrics.B_A_mean
                             metrics['bliss_B_B'] = bliss_metrics.B_B
 
+                            # Phase 3: Compute gated λ_eff for CSR
+                            # Uses sigmoid gate: λ_eff = λ · (λ_min + (1-λ_min) · σ(γ·(B−τ)))
+                            # Dead channel alerts are logged automatically by compute_lambda_eff
+                            if config.enable_bliss_gating:
+                                lambda_eff = bliss_functional.compute_lambda_eff(
+                                    bliss_metrics.B,
+                                    {'csr': config.csr_lambda},
+                                )
+                                bliss_lambda_eff_csr = lambda_eff.get('csr', config.csr_lambda)
+                                metrics['bliss_lambda_eff_csr'] = bliss_lambda_eff_csr
+
                             # Log at interval
                             if global_step % config.bliss_log_interval == 0 and global_step > 0:
                                 cos_str = ', '.join(f'{k}={v:.4f}' for k, v in bliss_metrics.cosine_per_prior.items())
-                                print(f"  [Bliss] B={bliss_metrics.B:.4f} "
-                                      f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
-                                      f"tau={bliss_functional.tau:.4f} | {cos_str}", flush=True)
+                                if config.enable_bliss_gating and bliss_lambda_eff_csr is not None:
+                                    gate_ratio = bliss_lambda_eff_csr / max(config.csr_lambda, 1e-8)
+                                    print(f"  [Bliss] B={bliss_metrics.B:.4f} "
+                                          f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
+                                          f"tau={bliss_functional.tau:.4f} | {cos_str} | "
+                                          f"λ_eff={bliss_lambda_eff_csr:.4f} ({gate_ratio:.1%})", flush=True)
+                                else:
+                                    print(f"  [Bliss] B={bliss_metrics.B:.4f} "
+                                          f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
+                                          f"tau={bliss_functional.tau:.4f} | {cos_str}", flush=True)
 
                         # 12D Health Monitor: check onto_bridge projection weight
                         if ontology_health_monitor is not None and onto_bridge is not None:
@@ -5541,6 +5586,14 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("csr/loss", csr_metrics.get('csr_loss', 0.0), global_step)
                             tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
                             tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
+
+                        # Appendix G: Bliss Coherence + Phase 3 Gating
+                        if 'bliss_B' in metrics:
+                            tb_writer.add_scalar("bliss/B", metrics['bliss_B'], global_step)
+                            tb_writer.add_scalar("bliss/B_A", metrics['bliss_B_A'], global_step)
+                            tb_writer.add_scalar("bliss/B_B", metrics['bliss_B_B'], global_step)
+                            if 'bliss_lambda_eff_csr' in metrics:
+                                tb_writer.add_scalar("bliss/lambda_eff_csr", metrics['bliss_lambda_eff_csr'], global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
 
@@ -6982,6 +7035,16 @@ def main():
     parser.add_argument("--csr_rampdown_steps", type=int, default=500,
                        help="Steps to ramp down CSR after disengage trigger")
 
+    # Appendix G Phase 3: Bliss Gating (adaptive λ_eff for CSR)
+    parser.add_argument("--enable_bliss_gating", action="store_true",
+                       help="Phase 3: Bliss modulates csr_lambda via sigmoid gate σ(γ·(B−τ))")
+    parser.add_argument("--bliss_gate_gamma", type=float, default=5.0,
+                       help="Bliss gate sharpness (higher = sharper transition)")
+    parser.add_argument("--bliss_gate_lambda_min", type=float, default=0.1,
+                       help="Floor: λ_eff never drops below this fraction of λ_base")
+    parser.add_argument("--bliss_gate_warmup_steps", type=int, default=1000,
+                       help="Steps before Bliss gating activates (full λ during warmup)")
+
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     parser.add_argument("--enable_sgp", action="store_true", default=True,
@@ -7791,6 +7854,11 @@ def main():
         csr_engage_ppl=args.csr_engage_ppl,
         csr_disengage_ppl=args.csr_disengage_ppl,
         csr_rampdown_steps=args.csr_rampdown_steps,
+        # Appendix G Phase 3: Bliss Gating
+        enable_bliss_gating=args.enable_bliss_gating,
+        bliss_gate_gamma=args.bliss_gate_gamma,
+        bliss_gate_lambda_min=args.bliss_gate_lambda_min,
+        bliss_gate_warmup_steps=args.bliss_gate_warmup_steps,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,
