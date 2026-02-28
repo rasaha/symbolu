@@ -1639,6 +1639,11 @@ def train(config: UnifiedTrainingConfig):
     scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
+    # Set autocast dtype on probe hooks (created earlier, before autocast_dtype was available)
+    if probe_hooks is not None and config.mixed_precision != "none":
+        probe_hooks.autocast_dtype = autocast_dtype
+        probe_hooks._use_ac = True
+
     # V9.8.1: Restore AMP GradScaler state from checkpoint if available
     if resumed_scaler_state is not None and scaler is not None:
         try:
@@ -4939,7 +4944,11 @@ def train(config: UnifiedTrainingConfig):
                             # (~25 GiB at N=32768). 512 tokens is plenty for
                             # phase health metrics (collapse, drift, redundancy).
                             health_x = health_batch[0][:1, :512].to(device)
-                            _ = model(health_x)
+                            if config.mixed_precision != "none":
+                                with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                                    _ = model(health_x)
+                            else:
+                                _ = model(health_x)
                         health_metrics = compute_phase_health_diagnostics(model)
                         enable_health_diagnostics_capture(model, False)
 
@@ -4968,7 +4977,8 @@ def train(config: UnifiedTrainingConfig):
                         else:
                             quad_check_batch = next(iter(val_loader))[0][:2].to(device)
                         passed, contrib, msg = check_quad_utilization(
-                            model, quad_check_batch, device, config.quad_utilization_warn_threshold
+                            model, quad_check_batch, device, config.quad_utilization_warn_threshold,
+                            autocast_dtype=autocast_dtype if config.mixed_precision != "none" else None,
                         )
                         if not passed:
                             print(f"\n  ⚠️  [QUAD CHECK] Step {global_step}: {msg}")

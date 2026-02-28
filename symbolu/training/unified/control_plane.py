@@ -251,6 +251,7 @@ def check_quad_utilization(
     input_ids: torch.Tensor,
     device: torch.device,
     threshold: float = 0.01,
+    autocast_dtype: Optional[torch.dtype] = None,
 ) -> Tuple[bool, float, str]:
     """
     V10.6.6: Check that quad path contributes to output (not bypassed).
@@ -262,16 +263,22 @@ def check_quad_utilization(
         input_ids: Sample input [B, N]
         device: Torch device
         threshold: Minimum contribution ratio (default 1%)
+        autocast_dtype: Optional dtype for torch.amp.autocast (FlashAttention requires fp16/bf16)
 
     Returns:
         Tuple of (passed, contribution_ratio, message)
     """
     model.eval()
+    _use_ac = autocast_dtype is not None and device.type == 'cuda'
 
     with torch.no_grad():
         # Forward with quad enabled
         try:
-            out_with_quad = model(input_ids)
+            if _use_ac:
+                with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                    out_with_quad = model(input_ids)
+            else:
+                out_with_quad = model(input_ids)
             if isinstance(out_with_quad, dict):
                 logits_with = out_with_quad.get('logits', out_with_quad.get('output'))
             else:
@@ -284,7 +291,11 @@ def check_quad_utilization(
             if hasattr(model, 'forward'):
                 sig = inspect.signature(model.forward)
                 if 'enable_slots_read' in sig.parameters:
-                    out_without_quad = model(input_ids, enable_slots_read=False)
+                    if _use_ac:
+                        with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                            out_without_quad = model(input_ids, enable_slots_read=False)
+                    else:
+                        out_without_quad = model(input_ids, enable_slots_read=False)
                     if isinstance(out_without_quad, dict):
                         logits_without = out_without_quad.get('logits', out_without_quad.get('output'))
                     else:
@@ -332,10 +343,13 @@ class LightweightProbeHooks:
         model: torch.nn.Module,
         config: "UnifiedTrainingConfig",
         device: torch.device,
+        autocast_dtype: Optional[torch.dtype] = None,
     ):
         self.model = model
         self.config = config
         self.device = device
+        self.autocast_dtype = autocast_dtype
+        self._use_ac = autocast_dtype is not None and device.type == 'cuda'
         self.probe_types = [p.strip() for p in config.probe_hook_types.split(",")]
 
     def run_probes(self, step: int) -> Dict[str, Tuple[bool, str]]:
@@ -376,7 +390,11 @@ class LightweightProbeHooks:
             self.model.eval()
             with torch.no_grad():
                 # Get baseline output
-                out1 = self.model(test_ids)
+                if self._use_ac:
+                    with torch.amp.autocast('cuda', dtype=self.autocast_dtype):
+                        out1 = self.model(test_ids)
+                else:
+                    out1 = self.model(test_ids)
                 if isinstance(out1, dict):
                     logits1 = out1.get('logits', out1.get('output'))
                 else:
@@ -385,7 +403,11 @@ class LightweightProbeHooks:
                 # Apply phase rotation if model supports it
                 if hasattr(self.model, 'apply_phase_rotation'):
                     self.model.apply_phase_rotation(math.pi / 4)  # 45 degrees
-                    out2 = self.model(test_ids)
+                    if self._use_ac:
+                        with torch.amp.autocast('cuda', dtype=self.autocast_dtype):
+                            out2 = self.model(test_ids)
+                    else:
+                        out2 = self.model(test_ids)
                     if isinstance(out2, dict):
                         logits2 = out2.get('logits', out2.get('output'))
                     else:
@@ -424,7 +446,11 @@ class LightweightProbeHooks:
             self.model.eval()
             with torch.no_grad():
                 # Full sequence
-                out_full = self.model(test_ids)
+                if self._use_ac:
+                    with torch.amp.autocast('cuda', dtype=self.autocast_dtype):
+                        out_full = self.model(test_ids)
+                else:
+                    out_full = self.model(test_ids)
                 if isinstance(out_full, dict):
                     logits_full = out_full.get('logits', out_full.get('output'))
                 else:
