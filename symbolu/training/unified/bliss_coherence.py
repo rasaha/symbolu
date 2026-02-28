@@ -414,7 +414,7 @@ class GradientVarianceTracker:
     to detect instability from dual injection paths and coherence feedback.
     """
 
-    def __init__(self, window_size: int = 100, variance_spike_factor: float = 2.0):
+    def __init__(self, window_size: int = 100, variance_spike_factor: float = 10.0):
         self.window_size = window_size
         self.variance_spike_factor = variance_spike_factor
 
@@ -423,6 +423,10 @@ class GradientVarianceTracker:
         self._prev_grads: Dict[str, torch.Tensor] = {}
         self._baseline_set = False
         self._step = 0
+        # V9.9.1: Rate-limit alerts per layer (only alert once per window_size steps)
+        self._last_alert_step: Dict[str, int] = {}
+        # V9.9.1: EMA factor for baseline updates (adapts to LR changes)
+        self._baseline_ema_alpha = 0.01
 
     @torch.no_grad()
     def record(self, model: torch.nn.Module) -> Dict[str, any]:
@@ -474,14 +478,27 @@ class GradientVarianceTracker:
                     continue
 
                 baseline = self._baseline_variance[name]
+
+                # V9.9.1: EMA-update the baseline so it adapts to LR changes
+                # Without this, a one-time LR boost permanently exceeds the
+                # frozen baseline and floods the log every step.
+                self._baseline_variance[name] = (
+                    (1 - self._baseline_ema_alpha) * baseline
+                    + self._baseline_ema_alpha * variance
+                )
+
                 if variance > self.variance_spike_factor * baseline:
-                    alert = (
-                        f"Gradient variance spike: {name} "
-                        f"var={variance:.6f} vs baseline={baseline:.6f} "
-                        f"({variance/baseline:.1f}x)"
-                    )
-                    results['alerts'].append(alert)
-                    logger.warning(alert)
+                    # V9.9.1: Rate-limit alerts — at most once per window_size steps per layer
+                    last_alert = self._last_alert_step.get(name, -self.window_size)
+                    if self._step - last_alert >= self.window_size:
+                        self._last_alert_step[name] = self._step
+                        alert = (
+                            f"Gradient variance spike: {name} "
+                            f"var={variance:.6f} vs baseline={baseline:.6f} "
+                            f"({variance/baseline:.1f}x)"
+                        )
+                        results['alerts'].append(alert)
+                        logger.warning(alert)
 
             # Layer-wise gradient cosine (direction stability)
             grad_flat = param.grad.detach().flatten()
