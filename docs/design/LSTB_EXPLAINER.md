@@ -77,28 +77,60 @@ no point building a write-back channel (B).
 
 ---
 
-## The Four Subsystems Feeding the Bridge
+## The Subsystems Feeding the Bridge
 
-The bridge doesn't operate alone. Four systems produce the signals it
-integrates:
+The bridge doesn't operate alone. Multiple systems produce signals it
+integrates, organized by an explicit **authority gradient**:
+
+### Authority Hierarchy
+
+```
+DEFINES meaning  → Ontology Head (12D projection) — the ONLY authority
+ROUTES priors    → Kosha (soft router / weighting lens)
+WEAK priors      → CSR, JEPA, Vritti, Guna — bounded perturbations
+MEASURED         → Bliss (coherence functional) — never injected
+```
+
+### Weak Priors (Bounded Contributors)
 
 1. **JEPA** (Joint Embedding Predictive Architecture) — predicts *where*
    the latent state is heading. Provides trajectory forecasts that detect
-   when the LLM is about to go off-track.
+   when the LLM is about to go off-track. Enters hidden state as a
+   bounded prior, not as ontology axis definition.
 
-2. **Phoneme CSR** (Constant Shift Resonance) — a parameter-free
-   pre-filter that extracts semantic-emotional features from phoneme
-   patterns. Operates as a bottom-up **data plane signal** (like a CNN
-   extracting edges). CSR feeds observations to the policy layer; it does
-   not route governance.
+2. **CSR** (Consonant-Syllable Resonance) — a weak acoustic prior that
+   extracts ontological affinity vectors from phoneme patterns via
+   Sanskrit varna semantics. CSR injects small, bounded perturbations
+   into transformer hidden states, gated by confidence and Bliss
+   coherence. CSR has NO authority — it cannot define ontology axes.
 
-3. **Kosha/Vritti** — the cognitive operating point. Koshas set
-   domain-adaptive thresholds (how deep to process); Vrittis classify the
-   epistemological mode (perceiving vs. inferring vs. remembering).
+3. **Vritti** — cognitive-mode typing (valid cognition / imagination /
+   misperception / inertness / memory). A distribution that weights
+   templates, penalties, hedging, and recursion mode.
 
-4. **Ontological Axes** — validated semantic coordinates. The 12D Bhava
+4. **Guna** — Pranamaya energy modulation. Gain/entropy/temperature-like
+   modulation (stability vs. acceleration). NOT "bliss."
+
+### Router
+
+5. **Kosha** — soft router / weighting lens. Kosha produces weights that
+   determine how much each weak prior matters ("depth emphasis"), not
+   "what is true."
+
+### Authority
+
+6. **Ontological Axes** — validated semantic coordinates. The 12D Bhava
    subspace provides interpretable dimensions for measuring where a
-   representation sits in meaning-space.
+   representation sits in meaning-space. This is the ONLY layer allowed
+   to define meaning axes.
+
+### Coherence Measure
+
+7. **Bliss** — the integrated representational surface where all weak
+   priors reconcile. Bliss is measured (not injected) as a scalar
+   functional: B = mean(cosine agreement with priors) − β·(cross-layer
+   instability). When B drops, injection strengths automatically decrease
+   to prevent runaway.
 
 ---
 
@@ -144,19 +176,42 @@ L_total = L_tok + α·L_JEPA + β·L_VICReg + γ·L_structured + δ·L_contrasti
 
 ---
 
+## Bliss Governance and Injection Discipline
+
+All weak priors (CSR, JEPA, Vritti, Guna) are injected into the hidden
+state under strict discipline:
+
+1. **Normalize** the prior vector (L2 per token)
+2. **Small init** for projection weights (std=0.01)
+3. **Confidence gate** (each prior carries a confidence scalar)
+4. **Post-LayerNorm** injection (never pre-LN)
+5. **Small λ** (start ≤ 0.05, ramp slowly)
+6. **Bliss-gated**: λ_eff = λ · σ(γ(B − τ))
+
+When Bliss (coherence) drops, injection strengths automatically decrease.
+This prevents any single prior from "taking over" the representation.
+
+Bliss is NOT another term in the loss function or relevance equation.
+It modulates the gates that feed the priors — the downstream scoring
+stack (relevance, redundancy, domain jumps) is unchanged.
+
+---
+
 ## What's Proven vs. What's Not
 
 **Validated (Phase 2):**
 - Hidden states contain extractable ontological structure (probe AUC > 0.7)
 - 32D Sovereign State dimensions are non-degenerate (VICReg holds)
 - Three-signal disagreement detection works on synthetic data
-- Phoneme CSR produces discriminable semantic-emotional features
+- Phoneme CSR produces discriminable acoustic-ontological features
 
 **Not yet proven:**
 - Whether the bridge transfers to real (non-synthetic) data
 - Whether Phase B write-back actually improves generation quality
 - Whether anti-collapse training scales
 - Whether latent reasoning (Phase C) is feasible at all
+- Whether Bliss coherence functional improves training stability
+- Whether weak-prior injection discipline prevents authority inversion
 
 The document is honest about this: each phase has an explicit kill gate.
 If the probes fail, the architecture proposal is wrong and should be

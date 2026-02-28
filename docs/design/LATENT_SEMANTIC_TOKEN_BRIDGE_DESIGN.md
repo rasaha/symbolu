@@ -443,24 +443,25 @@ The residual is the bridge's most powerful signal. When JEPA predicts one trajec
 
 **Validated**: AUC = 0.793 for trajectory_break detection (synthetic).
 
-### 6b. Phoneme CSR — The Grounded Constraint
+### 6b. Phoneme CSR — Weak Acoustic Prior
 
-**Role**: Provide parameter-free, auditable semantic grounding at the input level.
+**Role**: Provide a **weak ontological tendency** via phoneme-derived acoustic resonance. CSR biases hidden-state geometry with small, bounded perturbations grounded in Sanskrit varna semantics.
+
+> **Architectural correction (Feb 2026)**: This section previously described CSR as a "parameter-free hard pre-filter operating BEFORE the transformer." The actual training-time implementation is an injection layer that perturbs hidden states within the transformer. See Appendix G.2.1 for the canonical role definition. The pre-filter concept remains a valid future inference-time optimization but does not describe the current architecture.
 
 ```
-Input text → phoneme decomposition → 10D vectors → resonance scoring
-  → Candidate pre-filtering (82% FLOP reduction)
-  → Ontological dimension activation (O3_EXECUTION from plosives, etc.)
+Token → G2P → ARPABET → ARPABET_TO_VARNA → VarnaCSRBridge.get_vector()
+  → 12D ontological affinity → confidence_head → projection(12→d_model)
+  → × confidence → inject: hidden_state += s_ℓ × λ_csr_eff × csr_emb
 ```
 
-**Position in pipeline**: BEFORE the transformer. Layer 1 of the 3-layer hybrid:
-1. Phoneme resonance (O(10) per comparison) — prune
-2. Decision gate — route
-3. Transformer attention — process survivors
+**Position in pipeline**: Parallel to the transformer. CSR computes a per-token embedding that is injected into hidden states at configured layers (typically Layer 0 via EntropySink, Layer 11 via SynthesisGate, and intermediate layers via layer_scales).
 
-**NOT a soft gating signal. NOT a mixture-of-experts router.** It is a hard constraint eliminator that reduces the space the transformer must explore. Its value is speed (5.6x on attention computation) and auditability (every decision traceable from phoneme → ontological dimension).
+**Authority**: None. CSR is a weak prior — it cannot define ontology axes. It provides bottom-up acoustic bias that the Ontology Head may or may not integrate. Removing CSR should produce a small regularization-level performance drop, not collapse.
 
-**Unique contribution**: No external research has an equivalent. The Sanskrit varna system provides culturally-validated phoneme-meaning associations that serve as an independent validation channel for learned bridges. If the MLP bridge says a text is "high on O3_EXECUTION" but the phoneme resonance says "no plosives detected," that disagreement is informative.
+**CSR ≠ Ontology**: CSR is acoustic resonance (data plane). Ontology is governance (authority plane). They are orthogonal systems. CSR output is gated by Bliss coherence: λ_csr_eff = λ_csr · σ(γ(B−τ)).
+
+**Unique contribution**: The Sanskrit varna system provides culturally-validated phoneme-meaning associations that serve as an independent validation channel for learned bridges. If the MLP bridge says a text is "high on O3_EXECUTION" but the phoneme resonance says "no plosives detected," that disagreement is informative. CSR also provides a differentiable acoustic grounding signal that helps anchor early training.
 
 ### 6c. Kosha/Vritti — The Cognitive Operating Point
 
@@ -511,6 +512,8 @@ From the naming ceremony (Phase 1 discovery):
 
 This section provides the definitive workflow showing how Ontology, JEPA, CSR (Phoneme Resonance), Kosha, Vritti, and Guna interact as a unified pipeline. Each subsystem has a specific role, specific inputs/outputs, and specific trigger conditions.
 
+> **Architectural update (Feb 2026)**: The pipeline below describes CSR at Stage 0 as a pre-filter. This was the original theoretical design. The actual training-time architecture uses CSR as an **injection layer** — CSR computes 12D affinities in parallel and injects them as weak perturbations into transformer hidden states. See Appendix G for the canonical weak priors architecture. The pipeline stages below remain valid for describing information flow, but CSR operates ALONGSIDE the transformer (injection), not BEFORE it (pre-filter).
+
 ### 7a. End-to-End Pipeline Flow
 
 ```
@@ -519,32 +522,28 @@ This section provides the definitive workflow showing how Ontology, JEPA, CSR (P
                     Ontology / JEPA / CSR / Kosha / Vritti / Guna
 ════════════════════════════════════════════════════════════════════════════════
 
-STAGE 0: INPUT PROCESSING (Phoneme CSR Layer)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STAGE 0: CSR ACOUSTIC PRIOR (Parallel to Transformer)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                     ┌──────────────────────┐
-  Raw Text                                          │  PHONEME CSR ENGINE  │
-  "The contract specifies delivery by March"        │  (Parameter-Free)    │
-       │                                            │                      │
-       ▼                                            │  Roles:              │
-  Phoneme Decomposition                             │  • Pre-filter        │
-  → ARPABET tokens: [DH, AX, K, AA, N, ...]       │  • Speed (82% FLOP↓) │
-       │                                            │  • Auditability      │
-       ▼                                            │  • Cross-validation  │
-  10D Resonance Vectors (per word)                  │                      │
-  Each phoneme → 10D ontological affinity:          │  NOT a soft gate.    │
-    Plosives (K,T,P) → O3_EXECUTION ↑              │  NOT trainable.      │
-    Nasals (N,M)     → O5_COGNITION ↑              │  Hard constraint     │
-    Fricatives (S,F) → O7_REASONING ↑              │  eliminator.         │
-    Diphthongs       → O8_PURPOSE ↑                │                      │
-    Long vowels      → O9_WITNESSES ↑              └──────────────────────┘
+  Raw Text                                          │  CSR ENGINE          │
+  "The contract specifies delivery by March"        │  (Weak Acoustic      │
+       │                                            │   Prior)             │
+       ▼                                            │                      │
+  Phoneme Decomposition                             │  Roles:              │
+  → ARPABET tokens: [DH, AX, K, AA, N, ...]       │  • Acoustic grounding│
+       │                                            │  • Cross-validation  │
+       ▼                                            │  • Weak bias signal  │
+  12D Ontological Affinity (per token)              │                      │
+  Via VarnaCSRBridge:                               │  IS a weak prior.    │
+    ARPABET → Varna → 12D affinity vector           │  NOT authority.      │
+    Confidence head gates signal trust              │  Bounded, gated,     │
+       │                                            │  Bliss-modulated.    │
+       ▼                                            └──────────────────────┘
+  Projection + Confidence Gating
+  12D → d_model projection × confidence → csr_emb
        │
-       ▼
-  Resonance Score: cosine similarity between word vectors
-  → Harmonic (≥0.7): proceed to transformer
-  → Neutral (0.3-0.7): route to decision gate
-  → Dissonant (≤0.3): resolve locally (no transformer needed)
-       │
-       │  OUTPUT: Filtered candidates + 10D phoneme ontology profile z_p
+       │  OUTPUT: csr_emb ∈ ℝ^{T×d}, confidence ∈ [0,1]
+       │  INJECTION: hidden_state += s_ℓ × λ_csr_eff × csr_emb
        ▼
 
 STAGE 1: TOKEN PROCESSING (Standard Transformer)
@@ -2760,21 +2759,23 @@ Quad (structural, recommended next):
 
 **Brain mapping**: Mostly Limbic (tone/valence shaping), secondarily Reptilian (surface token shaping).
 
-**Current state**: Monitor-only, detached, early-layer alignment at Layer 2.
+**Current state**: Weak acoustic prior. CSR computes 12D affinity vectors from phoneme decomposition and injects them as small perturbations into transformer hidden states. Injection is gated by confidence (from learned confidence_head) and Bliss coherence (λ_csr_eff = λ_csr · σ(γ(B−τ))).
+
+> **Updated (Feb 2026)**: CSR is now classified as a **weak prior** per the authority gradient in Appendix G.1.2. It provides bounded perturbations, cannot define ontology axes, and can be removed without catastrophic degradation. All injection follows the discipline protocol in Appendix G.5.
 
 **Safe knobs:**
 
 Phase (primary, safe):
 - Write amplitude: a_k *= f(csr_resonance)
 - Phase bias: phi_k += delta(csr_phase_bias)
-- Decay: gamma *= f(csr_stability) (only if CSR also acts as stability measure)
+- Injection: hidden_state += s_ℓ × λ_csr_eff × csr_emb (canonical form, Appendix G.5.6)
 
 Quad (light, safe):
 - Tie-break bias: score += epsilon * csr_alignment(memory_slot), epsilon small, never dominating ontology
 
-**Boundary**: CSR must not introduce candidate competition into Phase.
+**Boundary**: CSR must not introduce candidate competition into Phase. CSR must not define ontology axes. CSR authority = NONE (see Appendix G.1.2).
 
-**Minimal change path**: Turn CSR from monitor-only into pure control-plane modulator without adding training signals. Use detached CSR metrics to modulate Phase write gates (amplitude/rotation), not selection. Preserves hard-won detach discipline.
+**Injection discipline**: All CSR injection must follow the protocol in Appendix G.5: L2-normalize 12D affinity before projection, small-std init for W_12→d, confidence gating via confidence_head, post-LayerNorm injection, λ_csr initially small (≤0.05), Bliss-gated via adaptive gate.
 
 #### D.4.4 Kosha (Readiness / Depth Gating)
 
@@ -4115,3 +4116,372 @@ GOVERNOR HIERARCHY (layered, not competing)
 ```
 
 None of the existing governors are modified or removed. The new governor sits in a previously empty slot: the runtime control plane between auxiliary observers and the Phase-Quad data plane.
+
+---
+
+## Appendix G: Weak Priors & Bliss Coherence Architecture (Feb 2026)
+
+**Date**: 2026-02-28
+**Status**: Architectural Contract — Approved for Implementation
+**Context**: Canonical definition of how auxiliary subsystems (CSR, JEPA, Vritti, Guna, Kosha) interact with the hidden state, and how system coherence ("Bliss") is measured and used for governance. This appendix supersedes any earlier descriptions that characterize subsystems as "authority" signals or Bliss as an injected vector.
+
+---
+
+### G.1 Core Invariants (Must Not Be Violated)
+
+#### G.1.1 "Weak Ontological Semantic Meaning" — Definition
+
+A component provides a **weak ontological tendency** if and only if:
+- It biases hidden-state geometry (small, bounded perturbation)
+- It does NOT enforce class/axis assignment
+- It does NOT override context semantics
+- Removing it does NOT collapse the ontology head (performance drop is "regularization-level," not catastrophic)
+
+Every subsystem except the Ontology Head is a weak contributor.
+
+#### G.1.2 Authority Gradient (Must Not Invert)
+
+```
+AUTHORITY LEVELS (descending, never invert):
+
+  DEFINES meaning axes → Ontology Head / 12D projection
+  ─────────────────────────────────────────────────────
+  Routes/weights priors → Kosha (soft router)
+  ─────────────────────────────────────────────────────
+  Weak contributors     → CSR, JEPA, Vritti, Guna
+  ─────────────────────────────────────────────────────
+  Measured, not added   → Bliss (coherence functional)
+```
+
+The Ontology Head / 12D projection is the ONLY layer allowed to "define meaning axes." Everything else is a weak contributor. This matches the SymbolU design where symbolic distributions (aspects/vrtti/guna/kosha) modulate scoring, confidence, routing, and recursion — but are not "meaning itself."
+
+---
+
+### G.2 Subsystem Role Map (Final)
+
+#### G.2.1 CSR (Consonant-Syllable Resonance)
+
+- **Role**: Acoustic prior — a weak signal derived from phoneme-to-varna mapping
+- **Output**: A small vector (12D ontological affinity → projected to d_model) + confidence scalar
+- **Authority**: None. CSR cannot define ontology. It provides a bottom-up acoustic tendency that biases the hidden state toward phoneme-consistent ontological regions
+- **Relationship to Ontology**: CSR ≠ Ontology. CSR is acoustic resonance (data plane). Ontology is governance (authority). They are orthogonal
+- **Pipeline**: Token → G2P → ARPABET → ARPABET_TO_VARNA → VarnaCSRBridge.get_vector() → 12D affinity → confidence_head → projection(12→d_model) × confidence → inject into hidden state as weak perturbation
+
+**Critical correction from earlier docs**: Earlier sections (6b, 7a, C4) describe CSR as a "parameter-free hard pre-filter operating BEFORE the transformer" with "82% FLOP reduction." This described a theoretical pure-inference optimization. The actual training-time implementation is an **injection layer** that adds a small CSR-derived perturbation to transformer hidden states: `hidden_state += layer_scales[i] × λ_csr × csr_emb`. The pre-filter optimization is a future inference-time possibility that does not affect the training architecture.
+
+#### G.2.2 Vritti
+
+- **Role**: Cognitive-mode typing (valid cognition / imagination / misperception / inertness / memory)
+- **Output**: A distribution over 5 vrttis; used to weight templates, penalties, hedging, recursion mode, etc.
+- **Authority**: Weak contributor. Vrtti distributions influence routing and confidence but do not define axes
+
+#### G.2.3 Guna
+
+- **Role**: Pranamaya energy modulation — gain/entropy/temperature-like modulation (stability vs. acceleration)
+- **Authority**: Weak contributor. Guna is NOT "bliss." It modulates energy characteristics of processing
+- **Clarification**: Guna → Pranamaya (energy sheath), not Anandamaya (bliss sheath). Earlier conflation between Guna energy modes and "bliss" is corrected here
+
+#### G.2.4 Kosha
+
+- **Role**: Soft router / weighting lens
+- **Output**: Weights w_k^ℓ ≥ 0, Σ_k w_k^ℓ = 1 (soft mixture over priors)
+- **Authority**: Kosha selects **how much each weak prior matters** ("depth emphasis"), not "what is true"
+- **Function**: Given K weak priors at layer ℓ, Kosha produces router weights that determine their relative influence
+
+#### G.2.5 JEPA
+
+- **Role**: Predictive invariants / latent world structure
+- **Output**: State delta predictions in Sovereign State space
+- **Authority**: JEPA can be structurally strong as a learned representation, but still must enter the language hidden state as a bounded prior, not as the ontology axis definition
+
+---
+
+### G.3 Bliss: The Coherence Functional
+
+#### G.3.1 What Bliss Is
+
+**Bliss = the integrated representational surface where all weak priors reconcile.**
+
+Bliss is NOT another injected vector. It is NOT a Kosha dimension value. It is NOT a module.
+
+Bliss is **measured, not added**. It is a scalar functional computed over hidden states and their relationship to the active weak priors. It quantifies how well the hidden state has integrated the various prior signals into a coherent representation.
+
+This aligns with the SymbolU principle: internal coherence/stability is assessed via entropy and gating, not by injecting a "bliss embedding."
+
+**Note on terminology**: The term "Bliss" (Anandamaya) also refers to the 5th Kosha dimension at index [16] of the 32D Sovereign State (see `KOSHA_GYROSCOPE_DESIGN.md`). These are DISTINCT concepts:
+- **Kosha[Anandamaya]** = The blissful sheath dimension in the Sovereign State. A scalar value in [0,1] representing how much processing operates in the creative/expansive mode. This continues to exist as sovereign_state[16].
+- **Bliss Functional (B)** = The coherence metric defined below. A scalar measuring hidden-state integration quality. This is a NEW concept that does not replace the Kosha dimension.
+
+#### G.3.2 Mathematical Definition
+
+Let:
+- H^ℓ ∈ ℝ^{T×d} = hidden state at layer ℓ
+- P_k^ℓ ∈ ℝ^{T×d} = weak prior k projected to model space, k = 1..K
+  (examples: CSR prior, JEPA prior, Vrtti prior if vectorized)
+- w_k^ℓ ≥ 0, Σ_k w_k^ℓ = 1 = Kosha router weights (soft mixture)
+
+**Option A: Integration (agreement with active priors)**
+
+Per token:
+```
+b_t^ℓ = Σ_{k=1}^{K} w_k^ℓ · cos(H_t^ℓ, P_{k,t}^ℓ)
+```
+
+Layer average:
+```
+B_A^ℓ = (1/T) Σ_{t=1}^{T} b_t^ℓ
+```
+
+**Option B: Cross-layer stability (anti-fragmentation)**
+
+```
+Δ^ℓ = (1/T) Σ_{t=1}^{T} (1 - cos(H_t^ℓ, H_t^{ℓ-1}))
+B_B = Σ_{ℓ=1}^{L} α_ℓ · Δ^ℓ
+```
+
+**Combined Bliss Functional:**
+
+```
+B = (1/L) Σ_{ℓ=1}^{L} B_A^ℓ  −  β · B_B
+```
+
+**Interpretation:**
+- **High B**: Priors integrate cleanly and representation evolves smoothly across layers
+- **Low B**: Subsystem contradiction or cross-layer oscillation
+- **B_A component**: Measures how well hidden states align with the weak priors (weighted by Kosha router)
+- **B_B component**: Penalizes representational fragmentation across layers (sudden direction changes)
+
+#### G.3.3 Hyperparameters
+
+| Parameter | Role | Suggested Range |
+|-----------|------|-----------------|
+| β | Cross-layer stability weight | 0.1 – 0.5 |
+| α_ℓ | Per-layer stability importance | Uniform initially; can be learned |
+| τ | Bliss threshold for gate activation | 0.0 (centered sigmoid) |
+| γ | Gate sharpness | 1.0 – 5.0 |
+| λ_k | Base injection strength per prior | 0.01 – 0.1 (start small) |
+
+---
+
+### G.4 Bliss Governance: Adaptive Injection Gating
+
+#### G.4.1 Principle
+
+Bliss never injects content. It only modulates how strongly priors can perturb the hidden state.
+
+When coherence drops (low Bliss), the system automatically reduces injection strength to prevent runaway or "prior takeover." When coherence is high, priors are allowed their full (still bounded) influence.
+
+#### G.4.2 Gate Formula
+
+For each prior k with base strength λ_k:
+
+```
+λ_{k,eff}^ℓ = λ_k · σ(γ · (B − τ))
+```
+
+Where:
+- σ = sigmoid function
+- γ = gate sharpness (higher = more binary)
+- τ = threshold (Bliss level at which gate is at 50%)
+- B = current Bliss functional value
+
+This matches the general SymbolU principle of entropy feedback modulating confidence/gates (e.g., f(H_D, H_G) = exp(−α·H_D − β·H_G)) used both locally and globally.
+
+#### G.4.3 Governance Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    BLISS GOVERNANCE LOOP                     │
+│                                                              │
+│  For each training step:                                     │
+│                                                              │
+│  1. Forward pass through transformer layers                  │
+│     H^0, H^1, ..., H^L                                      │
+│                                                              │
+│  2. Compute weak priors (detached where appropriate)         │
+│     P_csr, P_jepa, P_vrtti, ...                              │
+│                                                              │
+│  3. Compute Kosha router weights                             │
+│     w_k^ℓ = softmax(kosha_router(H^ℓ))                      │
+│                                                              │
+│  4. Compute Bliss functional B                               │
+│     B_A^ℓ = mean cosine agreement with priors                │
+│     B_B   = cross-layer stability penalty                    │
+│     B     = mean(B_A) − β·B_B                                │
+│                                                              │
+│  5. Compute effective injection strengths                    │
+│     λ_{k,eff}^ℓ = λ_k · σ(γ(B−τ))                           │
+│                                                              │
+│  6. Inject priors (with discipline, see G.5)                 │
+│     H^ℓ += s^ℓ · λ_{k,eff}^ℓ · P_k^ℓ                       │
+│                                                              │
+│  7. Log: B, B_A^ℓ, B_B, λ_{k,eff}^ℓ                        │
+│                                                              │
+│  LOW B  → injection strengths decrease → stabilize           │
+│  HIGH B → injection strengths at full (bounded) → integrate  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### G.5 Injection Discipline
+
+These rules prevent "weak priors" from accidentally turning into ontology authorities. Every prior injection must follow this protocol:
+
+#### G.5.1 Normalization
+
+L2-normalize the prior vector per token before projection:
+```python
+prior_normalized = F.normalize(prior_12d, p=2, dim=-1, eps=1e-8)
+```
+
+#### G.5.2 Small Initialization
+
+Initialize projection weights with small standard deviation:
+```python
+W_12_to_d = nn.Linear(12, d_model)
+nn.init.normal_(W_12_to_d.weight, std=0.01)
+nn.init.zeros_(W_12_to_d.bias)
+```
+
+#### G.5.3 Confidence Gating
+
+Every prior must carry a confidence scalar ∈ [0, 1]:
+```python
+projected_prior = W_12_to_d(prior_normalized) * confidence
+```
+
+For CSR: confidence comes from the confidence_head (sigmoid output).
+For JEPA: confidence from prediction certainty (inverse of residual norm).
+For Vrtti: confidence from distribution sharpness (max probability).
+
+#### G.5.4 Post-LayerNorm Injection
+
+Inject AFTER LayerNorm, never before:
+```python
+H_tilde = LayerNorm(H)
+H = H + s_ℓ * λ_k_eff * P_k  # inject into residual stream post-LN
+```
+
+Never modulate attention logits directly in early training. The prior should influence the residual stream, not the attention pattern.
+
+#### G.5.5 Small Initial λ
+
+Start with λ_k ≤ 0.05 and ramp slowly if coherence (Bliss) stays high:
+```python
+lambda_k = 0.01  # initial
+# Ramp: lambda_k = min(lambda_max, lambda_k * (1 + ramp_rate * step))
+# Only ramp when B > B_threshold for N consecutive steps
+```
+
+#### G.5.6 Canonical Injection Form
+
+```python
+# Full injection for prior k at layer ℓ:
+H_tilde = LayerNorm(H_ℓ)
+H_ℓ = H_ℓ + s_ℓ * λ_k_eff_ℓ * P_k_ℓ
+```
+
+Where:
+- s_ℓ = per-layer scale (from layer_scales, can be fixed or learned)
+- λ_k_eff_ℓ = λ_k · σ(γ(B−τ)) (Bliss-gated effective strength)
+- P_k_ℓ = normalized, confidence-gated, projected prior
+
+---
+
+### G.6 CSR Calibration Fix: Origin vs. Resonance Separation
+
+#### G.6.1 The Problem
+
+The current `VarnaCSRBridge._consonant_layers_to_vector()` uses keyword extraction on ontological layer descriptions. Every consonant's O1 layer description ("dormant activation threshold") contains the keyword "activation" which receives the same weight (0.9) as the actual dominant resonance layer. This causes ALL consonants to peak at O1, eliminating differentiation.
+
+#### G.6.2 The Fix
+
+Separate origin weight from dominant resonance weight in the bridge scoring:
+
+```python
+# Current (broken): all keywords weighted the same
+keyword_weights = {"activation": 0.9, "threshold": 0.7, ...}
+
+# Fixed: separate scoring tiers
+SCORING_TIERS = {
+    "origin":    {"weight_range": (0.05, 0.15)},  # O1 dormancy = baseline
+    "phoneme_bias": {"weight_range": (0.2, 0.4)},  # articulatory class bias
+    "keyword_resonance": {"weight_range": (0.4, 0.7)},  # dominant resonance
+}
+```
+
+O1 (dormant activation threshold) is the **origin** — every phoneme has some baseline potential there. It should receive a small, uniform weight (~0.1), not compete with the dominant resonance layer.
+
+#### G.6.3 Expected Outcome
+
+After calibration fix:
+- Consonants differentiate by their dominant resonance layer (not all O1)
+- Ka (hope) peaks at the layer associated with aspiration/hope
+- Pa (hatred) peaks at the layer associated with aversion
+- Ma (indulgence) peaks at the layer associated with absorption
+- O1 remains present as a small baseline across all phonemes
+
+---
+
+### G.7 Relationship to Existing Architecture
+
+#### G.7.1 What Does NOT Change
+
+- The 32D Sovereign State structure and its partitions (Bhavas, Koshas, Vrittis, Gunas, Sankalpa)
+- The SovereignStateProjector (768D → 32D)
+- The IntentPhaseProjector (phase rotation write-back)
+- The Phase-Quad non-competing roles contract
+- The DisagreementGovernor three-signal detection
+- The RSS training-time engagement sequencer
+- The ControlPlaneGovernor runtime policy (Appendix F)
+- The Kosha Gyroscope homeostatic regulation (the R-T quadrant geometry, Vijnana Gate, diagonal opposition)
+- The existing scoring/relevance stack (rel_i, red(S), dj(S), hotfix toggles)
+
+#### G.7.2 What Changes
+
+| Component | Before | After |
+|-----------|--------|-------|
+| CSR role | "Hard pre-filter, parameter-free, before transformer" | Weak acoustic prior injected into hidden state via small perturbation |
+| Bliss concept | Kosha dimension (Anandamaya sheath = expansion/creativity) | ALSO: coherence functional B measuring hidden-state integration quality |
+| Prior injection | λ_csr fixed, no coherence gating | λ_k_eff = λ_k · σ(γ(B−τ)), Bliss-modulated |
+| Injection discipline | Ad-hoc (varied across subsystems) | Canonical: normalize → small init → confidence gate → post-LN → small λ |
+| Subsystem authority | Implicitly mixed (CSR sometimes described as "authority") | Explicit hierarchy: Ontology Head > Kosha Router > Weak Priors > Bliss (measured) |
+| VarnaCSRBridge scoring | All keywords equal weight (O1 dominates) | Tiered: origin (small) vs. resonance (large) |
+
+#### G.7.3 How Bliss Plugs Into Existing Scoring Stack
+
+The existing v2.6/v2.7 scoring formalization includes:
+- relevance (rel_i)
+- redundancy penalty (red(S))
+- domain jumps (dj(S))
+- hotfix toggles and logging
+
+**Bliss is NOT another term in the relevance equation.** Instead, Bliss modulates the gates that feed the distributions/priors used by that equation (aspect weights, vrtti mix, confidence terms). The scoring stack itself is unchanged.
+
+---
+
+### G.8 Acceptance Tests
+
+These tests validate that the architecture behaves as specified:
+
+1. **Weak prior test — CSR off**: Turning CSR off produces a small performance drop, not collapse. The ontology head continues to function
+2. **Weak prior test — JEPA off**: Drop depends on task, but ontology head still works. No catastrophic degradation
+3. **Bliss governance test**: When B is artificially lowered, prior injection strengths (λ_k_eff) decrease automatically. System becomes more conservative
+4. **No authority inversion test**: No single prior dominates 12D ontology outputs across diverse inputs. The ontology head's learned axes remain the authority
+5. **Injection discipline test**: All priors are L2-normalized, confidence-gated, and inject post-LN. Injection magnitude bounded by λ_max
+6. **CSR differentiation test**: After calibration fix, distinct consonants produce distinct 12D profiles (not all peaking at O1)
+
+---
+
+### G.9 Implementation Checklist
+
+Execute in this order:
+
+1. **Representations**: Implement P_k^ℓ for CSR/JEPA/Vrtti-vector in model-dim space. Implement Kosha router producing w_k^ℓ
+2. **Bliss functional**: Compute B_A^ℓ (cosine agreement), Δ^ℓ (cross-layer stability), combine into B
+3. **Adaptive gate**: Implement λ_{k,eff}^ℓ = λ_k · σ(γ(B−τ))
+4. **Injection discipline**: Normalize priors, post-LN injection, small init, confidence gating
+5. **CSR calibration**: Separate origin(O1) weight from dominant resonance weight in VarnaCSRBridge
+6. **Logging**: Log B, B_A^ℓ, B_B, λ_{k,eff}^ℓ alongside existing v2.6 logs (λ_1, λ_2, Q', β, etc.)
+7. **Acceptance tests**: Validate all 6 tests from G.8
