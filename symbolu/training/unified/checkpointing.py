@@ -40,6 +40,8 @@ def save_checkpoint(
     evoflow_state: Optional[dict] = None,
     # Kosha-Vritti Supervision state
     kv_supervisor_state: Optional[dict] = None,
+    # Appendix G Phase 4: JEPA injection projector state
+    jepa_injection_projector_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
 ):
@@ -100,6 +102,8 @@ def save_checkpoint(
         meta["evoflow_state"] = evoflow_state
     if kv_supervisor_state is not None:
         meta["kv_supervisor_state"] = kv_supervisor_state
+    if jepa_injection_projector_state is not None:
+        meta["jepa_injection_projector_state"] = jepa_injection_projector_state
     if dataloader_position is not None:
         meta["dataloader_position"] = dataloader_position
 

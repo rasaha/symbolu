@@ -632,6 +632,14 @@ class UnifiedTrainingConfig:
     bliss_gate_lambda_min: float = 0.1       # Floor: λ_eff never drops below λ_min × λ_base
     bliss_gate_warmup_steps: int = 1000      # Steps before gating activates (bypass = full λ)
 
+    # Phase 4: JEPA Injection (CSR + Bliss + JEPA multi-prior injection)
+    # Reference: Appendix G.10.2 Stage 4
+    # Requires: enable_jepa=True AND enable_bliss_gating=True
+    enable_jepa_injection: bool = False      # Phase 4: Enable JEPA state delta as weak prior
+    jepa_injection_lambda: float = 0.03      # Base λ_JEPA injection strength (G.3.4 default)
+    jepa_injection_layer: int = 3            # Layer to inject JEPA prior (concept formation)
+    jepa_injection_projector_lr_scale: float = 0.1  # LR scale for 32D→d_model projector
+
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)
 

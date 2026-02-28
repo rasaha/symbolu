@@ -752,6 +752,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
     resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
     resumed_kv_supervisor_state = None  # KV Supervision (Kosha-Vritti Structured Supervision)
+    resumed_jepa_injection_projector_state = None  # Phase 4: JEPA injection projector
 
     # V9.8.6: Initialize CSR Three-Phase Curriculum Controller
     csr_curriculum = None
@@ -779,6 +780,8 @@ def train(config: UnifiedTrainingConfig):
     ontology_health_monitor = None
     gradient_variance_tracker = None
     bliss_lambda_eff_csr = None  # Phase 3: Bliss-gated CSR lambda (None = use config.csr_lambda)
+    bliss_lambda_eff_jepa = None  # Phase 4: Bliss-gated JEPA lambda (None = use config.jepa_injection_lambda)
+    jepa_injection_projector = None  # Phase 4: 32D→d_model projector for JEPA prior
 
     if config.enable_bliss_monitoring:
         bliss_functional = BlissCoherenceFunctional(BlissConfig(
@@ -787,7 +790,13 @@ def train(config: UnifiedTrainingConfig):
             lambda_min=config.bliss_gate_lambda_min,
             warmup_steps=config.bliss_gate_warmup_steps if config.enable_bliss_gating else 0,
         ))
-        if config.enable_bliss_gating:
+        if config.enable_jepa_injection:
+            print(f"  [Appendix G] Bliss Coherence: ENABLED (Phase 4: CSR + JEPA multi-prior gating)")
+            print(f"     β={config.bliss_beta} | γ={config.bliss_gate_gamma} | "
+                  f"λ_min={config.bliss_gate_lambda_min} | warmup={config.bliss_gate_warmup_steps}")
+            print(f"     λ_CSR={config.csr_lambda} | λ_JEPA={config.jepa_injection_lambda} | "
+                  f"JEPA layer={config.jepa_injection_layer}")
+        elif config.enable_bliss_gating:
             print(f"  [Appendix G] Bliss Coherence: ENABLED (Phase 3: gating ACTIVE)")
             print(f"     β={config.bliss_beta} | γ={config.bliss_gate_gamma} | "
                   f"λ_min={config.bliss_gate_lambda_min} | warmup={config.bliss_gate_warmup_steps}")
@@ -1233,6 +1242,28 @@ def train(config: UnifiedTrainingConfig):
             print(f"  ║  Karma Injection (SRK→JEPA): ACTIVE                             ║")
         print(f"  ╚══════════════════════════════════════════════════════════════════╝\n")
 
+        # Phase 4: Initialize JEPA→d_model projector for weak prior injection
+        # Projects 32D Sovereign State predictions to hidden dimension
+        if config.enable_jepa_injection:
+            from symbolu.jepa.state_projector import SOVEREIGN_STATE_DIM
+            jepa_injection_projector = torch.nn.Sequential(
+                torch.nn.Linear(SOVEREIGN_STATE_DIM, model_dim // 2, bias=False),
+                torch.nn.GELU(),
+                torch.nn.Linear(model_dim // 2, model_dim, bias=False),
+            ).to(device)
+            # Small init: std=0.01 per G.5.2 (Injection Discipline)
+            for m in jepa_injection_projector:
+                if isinstance(m, torch.nn.Linear):
+                    torch.nn.init.normal_(m.weight, std=0.01)
+            # Apply gradient scaling for slow learning
+            lr_scale = config.jepa_injection_projector_lr_scale
+            if lr_scale != 1.0:
+                for p in jepa_injection_projector.parameters():
+                    p.register_hook(lambda grad, s=lr_scale: grad * s)
+            print(f"  [Appendix G Phase 4] JEPA Injection Projector: {SOVEREIGN_STATE_DIM}D → {model_dim}D")
+            print(f"     λ_JEPA={config.jepa_injection_lambda} | layer={config.jepa_injection_layer} | "
+                  f"LR_scale={lr_scale}")
+
     elif config.enable_jepa and not JEPA_AVAILABLE:
         print(f"\n  ⚠️  JEPA REQUESTED but module not available!")
         print(f"      Check: symbolu/jepa/__init__.py exists and imports correctly")
@@ -1345,6 +1376,14 @@ def train(config: UnifiedTrainingConfig):
             betas=(config.beta1, config.beta2),
         )
 
+    # Phase 4: Add JEPA injection projector params to optimizer
+    if jepa_injection_projector is not None:
+        optimizer.add_param_group({
+            'params': jepa_injection_projector.parameters(),
+            'lr': config.learning_rate * config.jepa_injection_projector_lr_scale,
+            'weight_decay': 0.01,
+        })
+
     # Scheduler with warmup
     use_adaptive_warmup = config.warmup_until_ppl > 0
     if use_adaptive_warmup:
@@ -1424,6 +1463,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_kosha_gyroscope_state = resume_result.get("kosha_gyroscope_state")
                 resumed_evoflow_state = resume_result.get("evoflow_state")
                 resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
+                resumed_jepa_injection_projector_state = resume_result.get("jepa_injection_projector_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -2414,6 +2454,11 @@ def train(config: UnifiedTrainingConfig):
         kv_supervisor.load_state_dict(resumed_kv_supervisor_state)
         print(f"  ✓ KV Supervision state restored from checkpoint")
 
+    # Phase 4: Restore JEPA injection projector state
+    if jepa_injection_projector is not None and resumed_jepa_injection_projector_state is not None:
+        jepa_injection_projector.load_state_dict(resumed_jepa_injection_projector_state)
+        print(f"  ✓ JEPA injection projector restored from checkpoint")
+
     # V10.7.1: Track first iteration for diagnostic logging (works with resumed training)
     _first_iter_logged = False
 
@@ -3098,6 +3143,115 @@ def train(config: UnifiedTrainingConfig):
                     csr_metrics['csr_loss'] = 0.0
                     csr_metrics['csr_confidence'] = csr_confidence.mean().item() if csr_confidence is not None else 0.0
 
+            # =================================================================
+            # Appendix G Phase 4: JEPA Weak Prior Injection
+            # Projects JEPA s_pred (32D Sovereign State) → d_model space,
+            # then computes alignment loss between JEPA prior and hidden state
+            # at the configured injection layer. Uses Bliss-gated λ_eff.
+            # Multi-prior norm stacking: total injection (CSR + JEPA) is capped
+            # at ε_layer × rms(H) per Trap 3 guardrail (G.4a).
+            # =================================================================
+            jepa_injection_metrics = {}
+            if (config.enable_jepa_injection
+                    and jepa_injection_projector is not None
+                    and jepa_model is not None
+                    and hidden_state_extractor is not None):
+                try:
+                    # Get JEPA state prediction (already computed in JEPA forward pass)
+                    _jepa_out = jepa_output if 'jepa_output' in dir() else None
+                    _s_pred = _jepa_out.get('s_pred', None) if _jepa_out is not None else None
+
+                    if _s_pred is not None:
+                        # Project 32D → d_model (with gradients for projector training)
+                        jepa_prior_vec = jepa_injection_projector(_s_pred.detach())  # [B, d_model]
+
+                        # Get injection layer hidden state
+                        layer_hs_for_jepa = hidden_state_extractor.get_hidden_states(outputs, x)
+                        if layer_hs_for_jepa is not None and len(layer_hs_for_jepa) > 0:
+                            jepa_inj_layer = min(
+                                config.jepa_injection_layer, len(layer_hs_for_jepa) - 1
+                            )
+                            jepa_hidden = layer_hs_for_jepa[jepa_inj_layer]  # [B, T, d_model]
+
+                            # Expand JEPA prior to [B, T, d_model]
+                            T_jepa = jepa_hidden.shape[1]
+                            jepa_prior_expanded = jepa_prior_vec.unsqueeze(1).expand(-1, T_jepa, -1)
+
+                            # DETACH hidden state: JEPA injection is observational
+                            # (projector learns, model does not backprop through this)
+                            jepa_hidden_detached = jepa_hidden.detach()
+
+                            # Compute contrastive alignment loss (same pattern as CSR)
+                            jepa_hidden_norm = torch.nn.functional.normalize(
+                                jepa_hidden_detached, dim=-1
+                            )
+                            jepa_prior_norm = torch.nn.functional.normalize(
+                                jepa_prior_expanded, dim=-1
+                            )
+                            jepa_similarity = (jepa_hidden_norm * jepa_prior_norm).sum(dim=-1)
+
+                            # Use Bliss-gated λ if available (one-step lag from previous iteration)
+                            _jepa_lambda = (
+                                bliss_lambda_eff_jepa
+                                if bliss_lambda_eff_jepa is not None
+                                else config.jepa_injection_lambda
+                            )
+
+                            # Alignment loss: push hidden states toward JEPA prior
+                            jepa_injection_loss = ((1 - jepa_similarity) * _jepa_lambda).mean()
+
+                            # Apply injection discipline: norm cap (Trap 3)
+                            # Total injection from ALL priors must be bounded
+                            jepa_prior_rms = jepa_prior_expanded.norm(dim=-1).mean().item()
+                            h_rms = jepa_hidden_detached.norm(dim=-1).mean().item()
+                            eps_layer = bliss_functional.get_eps_layer(global_step) if bliss_functional else 0.05
+                            max_inj_norm = eps_layer * h_rms
+
+                            # Log cap status
+                            jepa_injection_metrics['jepa_inj_loss'] = jepa_injection_loss.item()
+                            jepa_injection_metrics['jepa_inj_similarity'] = jepa_similarity.mean().item()
+                            jepa_injection_metrics['jepa_inj_lambda'] = _jepa_lambda
+                            jepa_injection_metrics['jepa_inj_prior_rms'] = jepa_prior_rms
+                            jepa_injection_metrics['jepa_inj_eps_cap'] = max_inj_norm
+                            jepa_injection_metrics['jepa_inj_layer'] = jepa_inj_layer
+
+                            # Only add loss if prior norm is within cap
+                            # (prevents runaway injection that violates Trap 3)
+                            if jepa_prior_rms * _jepa_lambda < max_inj_norm:
+                                loss = loss + jepa_injection_loss
+                                jepa_injection_metrics['jepa_inj_active'] = 1.0
+                            else:
+                                # Cap violated — scale down injection to fit within budget
+                                cap_scale = max_inj_norm / (jepa_prior_rms * _jepa_lambda + 1e-8)
+                                loss = loss + jepa_injection_loss * cap_scale
+                                jepa_injection_metrics['jepa_inj_active'] = cap_scale
+                                jepa_injection_metrics['jepa_inj_cap_violated'] = 1.0
+
+                            # One-time diagnostic
+                            if not hasattr(model, '_jepa_inj_logged'):
+                                model._jepa_inj_logged = True
+                                print(f"  ✅ [Phase 4] JEPA injection active at layer {jepa_inj_layer}")
+                                print(f"     s_pred shape: {_s_pred.shape} → prior shape: {jepa_prior_expanded.shape}")
+                                print(f"     λ_JEPA={_jepa_lambda:.4f} | ε_cap={eps_layer:.4f}")
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  ⚠️ [Phase 4 JEPA Injection] Error: {e}", flush=True)
+
+            # Merge JEPA injection metrics into main metrics dict
+            if jepa_injection_metrics:
+                metrics.update(jepa_injection_metrics)
+
+                # Periodic console logging for JEPA injection
+                if global_step % config.bliss_log_interval == 0 and global_step > 0:
+                    _jlam = jepa_injection_metrics.get('jepa_inj_lambda', 0)
+                    _jsim = jepa_injection_metrics.get('jepa_inj_similarity', 0)
+                    _jact = jepa_injection_metrics.get('jepa_inj_active', 0)
+                    _jcap = '⚠️CAP' if 'jepa_inj_cap_violated' in jepa_injection_metrics else ''
+                    print(f"  [JEPA Inj] sim={_jsim:.4f} | λ={_jlam:.4f} | "
+                          f"active={_jact:.2f} {_jcap}", flush=True)
+
+            if csr_provider is not None:
                 # CSR Safety Layers: EntropySink (Layer 0) and SynthesisGate (Layer 11)
                 # These enforce ontological safety at the boundaries of the 12D structure
                 #
@@ -3190,9 +3344,10 @@ def train(config: UnifiedTrainingConfig):
                             metrics['onto_bridge_layer'] = onto_layer
 
             # =================================================================
-            # Appendix G: Bliss Coherence Measurement + Phase 3 Gating
+            # Appendix G: Bliss Coherence Measurement + Gating
             # Computes B = mean(B_A) - β·B_B over detached hidden states.
-            # Phase 3: Also computes λ_eff to gate CSR injection strength.
+            # Phase 3: Computes λ_eff to gate CSR injection strength.
+            # Phase 4: Also gates JEPA injection + multi-prior norm stacking.
             # =================================================================
             if bliss_functional is not None and hidden_state_extractor is not None:
                 try:
@@ -3203,14 +3358,39 @@ def train(config: UnifiedTrainingConfig):
                         if csr_provider is not None and 'csr_emb' in dir() and csr_emb is not None:
                             bliss_priors['csr'] = csr_emb.detach()
 
+                        # Phase 4: Add JEPA predictions as a second prior
+                        # JEPA s_pred is [B, 32D] — project to [B, d_model] then
+                        # expand to [B, T, d_model] for Bliss cosine agreement
+                        jepa_prior_projected = None
+                        if (config.enable_jepa_injection
+                                and jepa_injection_projector is not None
+                                and 'jepa_output' in dir()
+                                and jepa_output is not None):
+                            _jepa_s_pred = jepa_output.get('s_pred', None)
+                            if _jepa_s_pred is not None:
+                                # Project 32D → d_model (detach state for Bliss measurement)
+                                jepa_prior_projected = jepa_injection_projector(
+                                    _jepa_s_pred.detach()
+                                )  # [B, d_model]
+                                # Expand to [B, T, d_model] matching hidden state seq len
+                                _T = layer_hs[0].shape[1]
+                                jepa_prior_expanded = jepa_prior_projected.unsqueeze(1).expand(
+                                    -1, _T, -1
+                                )
+                                bliss_priors['jepa'] = jepa_prior_expanded.detach()
+
                         # Build Kosha router weights if available
                         bliss_router_weights = None
                         try:
                             if 'kosha_means' in dir() and kosha_means:
                                 # Map Kosha sheath activations to prior routing weights
                                 # Physical/Material sheath → acoustic/CSR affinity
+                                # Intellectual/Vijnana sheath → predictive/JEPA affinity
                                 _csr_kosha_w = kosha_means.get('physical', 0.5)
                                 bliss_router_weights = {'csr': _csr_kosha_w}
+                                if 'jepa' in bliss_priors:
+                                    _jepa_kosha_w = kosha_means.get('intellectual', 0.5)
+                                    bliss_router_weights['jepa'] = _jepa_kosha_w
                         except (NameError, AttributeError):
                             pass
 
@@ -3224,26 +3404,46 @@ def train(config: UnifiedTrainingConfig):
                             metrics['bliss_B_A'] = bliss_metrics.B_A_mean
                             metrics['bliss_B_B'] = bliss_metrics.B_B
 
-                            # Phase 3: Compute gated λ_eff for CSR
+                            # Phase 3/4: Compute gated λ_eff for all active priors
                             # Uses sigmoid gate: λ_eff = λ · (λ_min + (1-λ_min) · σ(γ·(B−τ)))
                             # Dead channel alerts are logged automatically by compute_lambda_eff
                             if config.enable_bliss_gating:
+                                base_lambdas = {'csr': config.csr_lambda}
+                                if config.enable_jepa_injection and 'jepa' in bliss_priors:
+                                    base_lambdas['jepa'] = config.jepa_injection_lambda
+
                                 lambda_eff = bliss_functional.compute_lambda_eff(
                                     bliss_metrics.B,
-                                    {'csr': config.csr_lambda},
+                                    base_lambdas,
                                 )
                                 bliss_lambda_eff_csr = lambda_eff.get('csr', config.csr_lambda)
                                 metrics['bliss_lambda_eff_csr'] = bliss_lambda_eff_csr
 
+                                if config.enable_jepa_injection:
+                                    bliss_lambda_eff_jepa = lambda_eff.get(
+                                        'jepa', config.jepa_injection_lambda
+                                    )
+                                    metrics['bliss_lambda_eff_jepa'] = bliss_lambda_eff_jepa
+
                             # Log at interval
                             if global_step % config.bliss_log_interval == 0 and global_step > 0:
-                                cos_str = ', '.join(f'{k}={v:.4f}' for k, v in bliss_metrics.cosine_per_prior.items())
+                                cos_str = ', '.join(
+                                    f'{k}={v:.4f}' for k, v in bliss_metrics.cosine_per_prior.items()
+                                )
                                 if config.enable_bliss_gating and bliss_lambda_eff_csr is not None:
                                     gate_ratio = bliss_lambda_eff_csr / max(config.csr_lambda, 1e-8)
-                                    print(f"  [Bliss] B={bliss_metrics.B:.4f} "
-                                          f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
-                                          f"tau={bliss_functional.tau:.4f} | {cos_str} | "
-                                          f"λ_eff={bliss_lambda_eff_csr:.4f} ({gate_ratio:.1%})", flush=True)
+                                    _bliss_log = (
+                                        f"  [Bliss] B={bliss_metrics.B:.4f} "
+                                        f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
+                                        f"tau={bliss_functional.tau:.4f} | {cos_str} | "
+                                        f"csr={bliss_lambda_eff_csr:.4f} ({gate_ratio:.1%})"
+                                    )
+                                    if bliss_lambda_eff_jepa is not None:
+                                        jepa_gate_ratio = bliss_lambda_eff_jepa / max(
+                                            config.jepa_injection_lambda, 1e-8
+                                        )
+                                        _bliss_log += f" | jepa={bliss_lambda_eff_jepa:.4f} ({jepa_gate_ratio:.1%})"
+                                    print(_bliss_log, flush=True)
                                 else:
                                     print(f"  [Bliss] B={bliss_metrics.B:.4f} "
                                           f"(A={bliss_metrics.B_A_mean:.4f}, B={bliss_metrics.B_B:.4f}) "
@@ -4064,13 +4264,23 @@ def train(config: UnifiedTrainingConfig):
                 if p.grad is not None
             )
 
-            # Appendix G Phase 1: Record gradient variance (after unscale, before clip)
+            # Appendix G: Record gradient variance (after unscale, before clip)
+            # Phase 4: Also tracks JEPA injection projector gradients
             if gradient_variance_tracker is not None:
                 grad_health = gradient_variance_tracker.record(model)
                 metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
                 if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
                     for alert in grad_health['alerts']:
                         print(f"  [GRAD ALERT] {alert}", flush=True)
+
+                # Phase 4: Track JEPA projector gradients separately
+                if jepa_injection_projector is not None:
+                    jepa_proj_grad_health = gradient_variance_tracker.record(
+                        jepa_injection_projector
+                    )
+                    if jepa_proj_grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                        for alert in jepa_proj_grad_health['alerts']:
+                            print(f"  [GRAD ALERT JEPA-Proj] {alert}", flush=True)
 
             # Gradient Norm Throttle: Reduce LR on gradient spikes
             # This physical safety layer prevents destructive weight updates
@@ -5597,13 +5807,24 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("csr/confidence", csr_metrics.get('csr_confidence', 0.0), global_step)
                             tb_writer.add_scalar("csr/similarity", csr_metrics.get('csr_similarity', 0.0), global_step)
 
-                        # Appendix G: Bliss Coherence + Phase 3 Gating
+                        # Appendix G: Bliss Coherence + Phase 3/4 Gating
                         if 'bliss_B' in metrics:
                             tb_writer.add_scalar("bliss/B", metrics['bliss_B'], global_step)
                             tb_writer.add_scalar("bliss/B_A", metrics['bliss_B_A'], global_step)
                             tb_writer.add_scalar("bliss/B_B", metrics['bliss_B_B'], global_step)
                             if 'bliss_lambda_eff_csr' in metrics:
                                 tb_writer.add_scalar("bliss/lambda_eff_csr", metrics['bliss_lambda_eff_csr'], global_step)
+                            if 'bliss_lambda_eff_jepa' in metrics:
+                                tb_writer.add_scalar("bliss/lambda_eff_jepa", metrics['bliss_lambda_eff_jepa'], global_step)
+
+                        # Phase 4: JEPA Injection metrics
+                        if 'jepa_inj_loss' in metrics:
+                            tb_writer.add_scalar("jepa_injection/loss", metrics['jepa_inj_loss'], global_step)
+                            tb_writer.add_scalar("jepa_injection/similarity", metrics['jepa_inj_similarity'], global_step)
+                            tb_writer.add_scalar("jepa_injection/lambda", metrics['jepa_inj_lambda'], global_step)
+                            tb_writer.add_scalar("jepa_injection/prior_rms", metrics['jepa_inj_prior_rms'], global_step)
+                            if 'jepa_inj_cap_violated' in metrics:
+                                tb_writer.add_scalar("jepa_injection/cap_violated", 1.0, global_step)
                 else:
                     print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
 
@@ -5820,6 +6041,7 @@ def train(config: UnifiedTrainingConfig):
                             kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+                            jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                         )
                         print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
@@ -5867,6 +6089,7 @@ def train(config: UnifiedTrainingConfig):
                     kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+                    jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                 )
                 print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -5894,6 +6117,7 @@ def train(config: UnifiedTrainingConfig):
             kosha_gyroscope_state=kosha_curriculum_controller.get_state() if kosha_curriculum_controller else None,
             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
+            jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
         )
         # v2.7 Training State Tracker: Save final state
         if training_state_tracker is not None and training_state_tracker.enabled:
@@ -7055,6 +7279,16 @@ def main():
     parser.add_argument("--bliss_gate_warmup_steps", type=int, default=1000,
                        help="Steps before Bliss gating activates (full λ during warmup)")
 
+    # Appendix G Phase 4: JEPA Injection (CSR + Bliss + JEPA multi-prior)
+    parser.add_argument("--enable_jepa_injection", action="store_true",
+                       help="Phase 4: Enable JEPA state delta as weak prior alongside CSR")
+    parser.add_argument("--jepa_injection_lambda", type=float, default=0.03,
+                       help="Base JEPA injection strength λ_JEPA (Appendix G.3.4 default)")
+    parser.add_argument("--jepa_injection_layer", type=int, default=3,
+                       help="Layer index to inject JEPA prior (2-3 = concept formation)")
+    parser.add_argument("--jepa_injection_projector_lr_scale", type=float, default=0.1,
+                       help="LR scale for JEPA 32D→d_model projector (slow learning)")
+
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
     parser.add_argument("--enable_sgp", action="store_true", default=True,
@@ -7869,6 +8103,11 @@ def main():
         bliss_gate_gamma=args.bliss_gate_gamma,
         bliss_gate_lambda_min=args.bliss_gate_lambda_min,
         bliss_gate_warmup_steps=args.bliss_gate_warmup_steps,
+        # Appendix G Phase 4: JEPA Injection
+        enable_jepa_injection=args.enable_jepa_injection,
+        jepa_injection_lambda=args.jepa_injection_lambda,
+        jepa_injection_layer=args.jepa_injection_layer,
+        jepa_injection_projector_lr_scale=args.jepa_injection_projector_lr_scale,
         # SGP (Stochastic Gradient Persistence)
         enable_sgp=args.enable_sgp and not args.disable_sgp,
         sgp_base_rate=args.sgp_base_rate,
