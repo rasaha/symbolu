@@ -696,6 +696,7 @@ def run_latent_bridge_benchmarks(
     if TRANSFORMERS_AVAILABLE and not getattr(args, 'lstb_synthetic', False):
         print("  Using GPT-2 for real hidden states...")
         tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        tokenizer.pad_token = tokenizer.eos_token
         gpt2 = GPT2Model.from_pretrained('gpt2', output_hidden_states=True).to(device)
         gpt2.eval()
 
