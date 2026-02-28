@@ -614,15 +614,31 @@ class UnifiedTrainingConfig:
     csr_rampdown_steps: int = 500            # Steps to ramp down after disengage trigger
 
     # ==========================================================================
-    # Appendix G: Bliss Coherence Functional & Monitoring (Phase 1)
+    # Appendix G: Bliss Coherence Functional & Monitoring
     # Reference: docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md, §G.10
+    # Phase 1/2: measure + log (no gating)
+    # Phase 3: Bliss gates CSR injection strength via λ_eff
     # ==========================================================================
-    enable_bliss_monitoring: bool = True     # Phase 1: compute & log Bliss (no gating)
+    enable_bliss_monitoring: bool = True     # Compute & log Bliss B/B_A/B_B
     bliss_beta: float = 0.3                 # Cross-layer stability weight in B = mean(B_A) - β·B_B
     bliss_log_interval: int = 100           # Log Bliss metrics every N steps
     enable_12d_health_monitor: bool = True  # Track ontology projection health (SVD, variance, drift)
     health_monitor_interval: int = 100      # Steps between 12D health checks
     enable_gradient_tracker: bool = True    # Track gradient variance & direction stability
+
+    # Phase 3: Bliss Gating (adaptive λ_eff for CSR injection)
+    enable_bliss_gating: bool = False        # Phase 3: Bliss modulates csr_lambda via sigmoid gate
+    bliss_gate_gamma: float = 5.0            # Gate sharpness: σ(γ·(B−τ))
+    bliss_gate_lambda_min: float = 0.1       # Floor: λ_eff never drops below λ_min × λ_base
+    bliss_gate_warmup_steps: int = 1000      # Steps before gating activates (bypass = full λ)
+
+    # Phase 4: JEPA Injection (CSR + Bliss + JEPA multi-prior injection)
+    # Reference: Appendix G.10.2 Stage 4
+    # Requires: enable_jepa=True AND enable_bliss_gating=True
+    enable_jepa_injection: bool = False      # Phase 4: Enable JEPA state delta as weak prior
+    jepa_injection_lambda: float = 0.03      # Base λ_JEPA injection strength (G.3.4 default)
+    jepa_injection_layer: int = 3            # Layer to inject JEPA prior (concept formation)
+    jepa_injection_projector_lr_scale: float = 0.1  # LR scale for 32D→d_model projector
 
     # V9.6.0: Embedding configuration
     untie_embeddings: bool = False           # Untie input/output embeddings (CRITICAL when using CSR)

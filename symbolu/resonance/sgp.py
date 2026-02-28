@@ -315,10 +315,13 @@ class SGPController:
             collapse = status.get('mode_collapse_detected', False)
         else:
             # Infer from provided metrics
+            # V9.9.1 FIX: Aligned fallback threshold with SattvicController (0.0001)
+            # Previous 0.001 was too sensitive — triggered false stagnation during
+            # healthy convergence where entropy variance is naturally low.
             if metrics:
                 variance = metrics.get('variance', 1.0)
                 entropy = metrics.get('entropy', 1.0)
-                stagnation = variance < 0.001
+                stagnation = variance < 0.0001
                 collapse = entropy < 0.4
             else:
                 stagnation = False

@@ -40,29 +40,39 @@ def save_checkpoint(
     evoflow_state: Optional[dict] = None,
     # Kosha-Vritti Supervision state
     kv_supervisor_state: Optional[dict] = None,
+    # Appendix G Phase 4: JEPA injection projector state
+    jepa_injection_projector_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
     Uses split-file format to avoid network filesystem (RunPod MFS/FUSE) write
-    limits (~2GB per file). Saves three files:
+    limits (~2GB per file). Saves four files:
       {stem}_model.pt  - model state_dict
       {stem}_optim.pt  - optimizer state_dict
-      {stem}_meta.pt   - scheduler, step, RNG states, auxiliary controller states
+      {stem}_meta.pt   - scheduler, step, RNG states, lightweight controller states
+      {stem}_aux.pt    - heavy auxiliary module weights (SRK, EvoFlow, KV, JEPA proj)
 
-    For backwards compatibility, load_checkpoint handles both single-file and
-    split-file formats transparently.
+    V9.9.1: Split heavy nn.Module state_dicts out of meta into aux file.
+    Previously meta was ~959MB because SRK (8 modules), EvoFlow (12 gates),
+    KV supervisor, and JEPA projector weights were all stuffed into it.
+    Now meta is <1MB (scalars, scheduler, RNG) and aux holds the module weights.
+
+    For backwards compatibility, load_checkpoint handles both formats and
+    also loads from old meta files that contain the heavy states.
     """
     stem = path.parent / path.stem  # e.g. checkpoints_unified/best
 
     model_path = Path(f"{stem}_model.pt")
     optim_path = Path(f"{stem}_optim.pt")
     meta_path = Path(f"{stem}_meta.pt")
+    aux_path = Path(f"{stem}_aux.pt")
 
-    # Build metadata dict (small — always fits in a single file)
+    # Build metadata dict (LIGHTWEIGHT — scalars, scheduler, RNG only)
     meta = {
         "split_format": True,  # Sentinel for load_checkpoint
+        "has_aux_file": True,  # V9.9.1: Sentinel for aux file
         "scheduler": scheduler.state_dict(),
         "step": step,
         "best_val_loss": best_val_loss,
@@ -73,7 +83,7 @@ def save_checkpoint(
     if torch.cuda.is_available():
         meta["cuda_rng_state"] = torch.cuda.get_rng_state()
 
-    # Add auxiliary controller states
+    # Add LIGHTWEIGHT auxiliary controller states (scalars, small dicts) to meta
     if hgs_state is not None:
         meta["hgs_state"] = hgs_state
     if drc_state is not None:
@@ -82,8 +92,6 @@ def save_checkpoint(
         meta["sgp_state"] = sgp_state
     if sattvic_state is not None:
         meta["sattvic_state"] = sattvic_state
-    if srk_state is not None:
-        meta["srk_state"] = srk_state
     if scaler_state is not None:
         meta["scaler_state"] = scaler_state
     if csr_curriculum_state is not None:
@@ -96,15 +104,23 @@ def save_checkpoint(
         meta["pidv2_curriculum_state"] = pidv2_curriculum_state
     if kosha_gyroscope_state is not None:
         meta["kosha_gyroscope_state"] = kosha_gyroscope_state
-    if evoflow_state is not None:
-        meta["evoflow_state"] = evoflow_state
-    if kv_supervisor_state is not None:
-        meta["kv_supervisor_state"] = kv_supervisor_state
     if dataloader_position is not None:
         meta["dataloader_position"] = dataloader_position
 
+    # V9.9.1: Build HEAVY auxiliary module weights dict (saved separately)
+    # These contain nn.Module state_dicts that were bloating meta to ~959MB
+    aux = {}
+    if srk_state is not None:
+        aux["srk_state"] = srk_state
+    if evoflow_state is not None:
+        aux["evoflow_state"] = evoflow_state
+    if kv_supervisor_state is not None:
+        aux["kv_supervisor_state"] = kv_supervisor_state
+    if jepa_injection_projector_state is not None:
+        aux["jepa_injection_projector_state"] = jepa_injection_projector_state
+
     # Remove old files before saving (both single-file and split formats)
-    for p in [path, model_path, optim_path, meta_path]:
+    for p in [path, model_path, optim_path, meta_path, aux_path]:
         if p.exists():
             p.unlink()
 
@@ -112,6 +128,8 @@ def save_checkpoint(
     torch.save(model.state_dict(), model_path)
     torch.save(optimizer.state_dict(), optim_path)
     torch.save(meta, meta_path)
+    if aux:
+        torch.save(aux, aux_path)
 
 
 def load_checkpoint(
@@ -143,6 +161,7 @@ def load_checkpoint(
     model_path = Path(f"{stem}_model.pt")
     optim_path = Path(f"{stem}_optim.pt")
     meta_path = Path(f"{stem}_meta.pt")
+    aux_path = Path(f"{stem}_aux.pt")
     use_split = model_path.exists()
 
     if not use_split and not path.exists():
@@ -160,6 +179,12 @@ def load_checkpoint(
             model_state_raw = torch.load(model_path, map_location=device, weights_only=False)
             checkpoint = torch.load(meta_path, map_location=device, weights_only=False)
             checkpoint["model"] = model_state_raw
+            # V9.9.1: Load aux file (heavy module weights) if present
+            if aux_path.exists():
+                aux_data = torch.load(aux_path, map_location=device, weights_only=False)
+                checkpoint.update(aux_data)
+                del aux_data
+                print(f"    \u2713 Auxiliary module weights loaded (from {aux_path.name})")
             # Optimizer loaded on-demand below (only if needed)
         else:
             checkpoint = torch.load(path, map_location=device, weights_only=False)

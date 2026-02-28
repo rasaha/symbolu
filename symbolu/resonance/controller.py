@@ -71,16 +71,17 @@ class SattvicConfig:
 
     # Entropy variance detection
     variance_window: int = 50        # Window size for variance calculation
-    # V9.9.0 CRITICAL FIX: Increased variance threshold 10x to reduce thrashing
-    # PREVIOUS (WRONG): 0.001 was too tight → Boosted every time variance dipped slightly
-    # CORRECTED: 0.01 allows natural small fluctuations without triggering emergency boost
-    variance_threshold: float = 0.01   # Variance below this = stagnation (increased from 0.001)
-    variance_release_threshold: float = 0.001  # Variance must exceed this to release (10x trigger, updated from 0.0001)
+    # V9.9.1 FIX: Increased threshold to 0.0001 - previous 0.01 was FAR too sensitive
+    # during early training where entropy naturally has low variance as PPL drops smoothly.
+    # The 0.01 threshold caused boost/release oscillation every 100 steps despite
+    # healthy convergence (PPL dropping 15-17% per eval).
+    variance_threshold: float = 0.0001  # Variance below this = stagnation (reduced from 0.01)
+    variance_release_threshold: float = 0.001  # Variance must exceed this to release
     entropy_floor: float = 0.40      # Entropy below this = mode collapse
 
     # Boost settings
     boost_factor: float = 1.5        # Multiplier when boosting λ
-    boost_cooldown: int = 100        # Steps before boost can trigger again
+    boost_cooldown: int = 200        # Steps before boost can trigger again (increased from 100)
     collapse_release_buffer: float = 0.05  # Entropy must exceed floor + buffer to release collapse boost
 
     # Decay curve
@@ -316,8 +317,10 @@ class SattvicController:
         is_stagnation_broken = current_variance > (self.config.variance_threshold * 5)
 
         # 3. Emergency Release (if Entropy gets too high/hallucination)
-        # If entropy exceeds 0.65, model is becoming too chaotic
-        is_entropy_unsafe = current_entropy > 0.65
+        # V9.9.1 FIX: Raised from 0.65 to 0.95 — during early training entropy is
+        # naturally 0.9+ as PPL is high, which caused immediate release after every
+        # 50-step hysteresis window. Only release for truly dangerous entropy levels.
+        is_entropy_unsafe = current_entropy > 0.95
 
         if is_stagnation_broken or is_entropy_unsafe:
             reason = "stagnation broken" if is_stagnation_broken else "entropy unsafe"

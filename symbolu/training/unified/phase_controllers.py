@@ -376,6 +376,8 @@ class AdaptiveTrainingController:
         self.lr_max = min(lr_max, base_lr * max_lr_relative)
         self.lr_boost_factor = lr_boost_factor
         self.lr_decay_factor = lr_decay_factor
+        # V9.9.1: Reference to scheduler so LR boosts persist through cosine decay
+        self._scheduler = None
 
         self.velocity_slow_threshold = velocity_slow_threshold
         self.velocity_spike_threshold = velocity_spike_threshold
@@ -421,6 +423,11 @@ class AdaptiveTrainingController:
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
         print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
         print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
+        print(f"    V9.9.1: Scheduler-aware LR adjustments ENABLED")
+
+    def set_scheduler(self, scheduler):
+        """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
+        self._scheduler = scheduler
 
     def _compute_velocity(self) -> float:
         """Compute PPL velocity (% change per eval)."""
@@ -565,6 +572,9 @@ class AdaptiveTrainingController:
             if new_lr != current_lr:
                 for pg in self.optimizer.param_groups:
                     pg['lr'] = new_lr
+                # V9.9.1: Also update scheduler base_lr so decay persists through cosine schedule
+                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                    self._scheduler.adjust_base_lr(new_lr)
                 self.decay_count += 1
                 adjustments["actions"].append(f"LR_DECAY: {current_lr:.2e}→{new_lr:.2e} (spike: {velocity:+.1f}%)")
                 print(f"\n  🔻 [AdaptiveTraining] LR DECAY: {current_lr:.2e} → {new_lr:.2e} (PPL spike: {velocity:+.1f}%)")
@@ -580,6 +590,9 @@ class AdaptiveTrainingController:
             if new_lr != current_lr and new_lr > current_lr:
                 for pg in self.optimizer.param_groups:
                     pg['lr'] = new_lr
+                # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                    self._scheduler.adjust_base_lr(new_lr)
                 self.boost_count += 1
                 reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
                 adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
