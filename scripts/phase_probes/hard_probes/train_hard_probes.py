@@ -12875,6 +12875,42 @@ Examples:
                         help="Run ablation: IA3-only vs LoRA-only vs Combined. "
                              "Requires --test-adaptation.")
 
+    # =========================================================================
+    # V11.0: LSTB BENCHMARKS (Latent Semantic Token Bridge)
+    # =========================================================================
+    parser.add_argument("--test-latent-bridge", action="store_true",
+                        help="Run LSTB bridge benchmarks: SovereignStateProjector, "
+                             "PhaseJEPAPredictor, VICReg health, R² validation, "
+                             "Vritti gate, ontology alignment, optional ablation.")
+    parser.add_argument("--lstb-phase", type=int, default=2,
+                        help="LSTB design phase (2=read-only bridge, 3=causal conditioning)")
+    parser.add_argument("--lstb-train-steps", type=int, default=200,
+                        help="Training steps for LSTB bridge validation")
+    parser.add_argument("--lstb-ablation", action="store_true",
+                        help="Run LSTB component ablation study")
+    parser.add_argument("--lstb-synthetic", action="store_true",
+                        help="Force synthetic hidden states (skip GPT-2)")
+
+    parser.add_argument("--test-csr-bridge", action="store_true",
+                        help="Run Phoneme CSR bridge benchmarks: decomposition, "
+                             "10D resonance vectors, FLOP reduction, ontology activation.")
+
+    parser.add_argument("--test-kosha-vritti-bridge", action="store_true",
+                        help="Run Kosha/Vritti bridge benchmarks: KV supervision, "
+                             "collapse detection, Viparyaya curriculum, compatibility matrix, "
+                             "cognitive dissonance detection (§8a).")
+
+    parser.add_argument("--test-anti-collapse", action="store_true",
+                        help="Run anti-collapse objectives benchmarks: VICReg, contrastive "
+                             "alignment, InfoNCE, structured supervision, combined training.")
+    parser.add_argument("--ac-train-steps", type=int, default=100,
+                        help="Training steps for anti-collapse combined test")
+
+    parser.add_argument("--test-control-plane", action="store_true",
+                        help="Run Control Plane Governor benchmarks (Appendix E/F): "
+                             "3-axis (S,D,E), EMA smoothing, Schmitt triggers, "
+                             "Vritti override, truth table, progressive activation.")
+
     # Device
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -12989,6 +13025,34 @@ Examples:
     # ==========================================================================
     if args.test_adaptation:
         run_adaptation_benchmark_integration(args, config)
+        return
+
+    # ==========================================================================
+    # V11.0: LSTB BENCHMARKS (Latent Semantic Token Bridge)
+    # ==========================================================================
+    if args.test_latent_bridge:
+        from hard_probes_lib.benchmarks.latent_bridge import run_latent_bridge_benchmark_integration
+        run_latent_bridge_benchmark_integration(args, config)
+        return
+
+    if args.test_csr_bridge:
+        from hard_probes_lib.benchmarks.csr_bridge import run_csr_bridge_benchmark_integration
+        run_csr_bridge_benchmark_integration(args, config)
+        return
+
+    if args.test_kosha_vritti_bridge:
+        from hard_probes_lib.benchmarks.kosha_vritti_bridge import run_kosha_vritti_bridge_benchmark_integration
+        run_kosha_vritti_bridge_benchmark_integration(args, config)
+        return
+
+    if args.test_anti_collapse:
+        from hard_probes_lib.benchmarks.anti_collapse import run_anti_collapse_benchmark_integration
+        run_anti_collapse_benchmark_integration(args, config)
+        return
+
+    if args.test_control_plane:
+        from hard_probes_lib.benchmarks.control_plane import run_control_plane_benchmark_integration
+        run_control_plane_benchmark_integration(args, config)
         return
 
     print("=" * 70)
