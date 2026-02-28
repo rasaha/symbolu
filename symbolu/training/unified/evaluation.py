@@ -697,36 +697,63 @@ def compute_sample_metrics(text: str) -> Dict[str, float]:
     # Unique token ratio
     unique_ratio = len(set(words)) / len(words) if words else 0.0
 
-    # CRITICAL FIX: Semantic coherence check (basic heuristics)
-    # Checks for common signs of gibberish vs. meaningful text
-    coherence = 1.0
+    # V9.9.1 FIX: Proper semantic coherence check
+    # Previous version started at 1.0 and only applied weak multiplicative penalties,
+    # causing gibberish to score 100%. New version uses additive scoring with
+    # multiple signals that genuinely detect incoherent text.
+    coherence = 0.0
 
-    # Penalty 1: Too many short words (gibberish often has many 1-2 char tokens)
-    short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
-    if short_word_ratio > 0.5:
-        coherence *= 0.5
-
-    # Penalty 2: Too many non-alphabetic tokens
+    # Signal 1: Alphabetic word ratio (0-0.25)
     alpha_ratio = sum(1 for w in words if w.isalpha()) / len(words)
-    if alpha_ratio < 0.6:
-        coherence *= 0.6
+    coherence += 0.25 * min(1.0, alpha_ratio / 0.7)
 
-    # Penalty 3: Excessive punctuation clustering (e.g., "... ,, ,,")
-    punct_cluster = text.count(',,') + text.count('..') * 0.5
-    if punct_cluster > 3:
-        coherence *= 0.4
+    # Signal 2: Function word density (0-0.25)
+    function_words = {'the', 'a', 'an', 'is', 'was', 'are', 'were', 'be', 'been', 'being',
+                      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+                      'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
+                      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+                      'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either',
+                      'that', 'this', 'these', 'those', 'it', 'its', 'he', 'she', 'they',
+                      'we', 'you', 'i', 'me', 'him', 'her', 'us', 'them', 'my', 'his',
+                      'if', 'then', 'when', 'where', 'how', 'what', 'which', 'who'}
+    lower_words = [w.lower() for w in words if w.isalpha()]
+    if lower_words:
+        func_ratio = sum(1 for w in lower_words if w in function_words) / len(lower_words)
+        if 0.25 <= func_ratio <= 0.65:
+            coherence += 0.25
+        elif 0.15 <= func_ratio <= 0.75:
+            coherence += 0.15
+        else:
+            coherence += 0.05
 
-    # Penalty 4: Repeated single characters (e.g., "a a a a")
-    single_char_repeat = sum(1 for i in range(len(words)-2)
-                            if len(words[i]) == 1 and words[i] == words[i+1])
-    if single_char_repeat > 2:
-        coherence *= 0.3
+    # Signal 3: Consecutive function/stop words (0-0.25)
+    max_consecutive_func = 0
+    current_run = 0
+    for w in lower_words:
+        if w in function_words:
+            current_run += 1
+            max_consecutive_func = max(max_consecutive_func, current_run)
+        else:
+            current_run = 0
+    if max_consecutive_func <= 2:
+        coherence += 0.25
+    elif max_consecutive_func <= 3:
+        coherence += 0.15
+    elif max_consecutive_func <= 4:
+        coherence += 0.05
 
-    # Bonus: Reasonable average word length (4-8 chars is typical English)
-    avg_word_len = sum(len(w) for w in words) / len(words)
-    if 4.0 <= avg_word_len <= 8.0:
-        coherence *= 1.1
-    coherence = min(coherence, 1.0)
+    # Signal 4: Short word overload + punctuation noise (0-0.25)
+    short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
+    punct_tokens = sum(1 for w in words if not any(c.isalnum() for c in w)) / len(words)
+    noise_score = short_word_ratio * 0.5 + punct_tokens * 0.5
+    if noise_score < 0.2:
+        coherence += 0.25
+    elif noise_score < 0.35:
+        coherence += 0.15
+    elif noise_score < 0.5:
+        coherence += 0.05
+
+    coherence = max(0.0, min(1.0, coherence))
 
     return {
         "completion": completion,

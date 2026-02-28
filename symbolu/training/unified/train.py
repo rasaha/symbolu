@@ -1622,6 +1622,8 @@ def train(config: UnifiedTrainingConfig):
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
         )
+        # V9.9.1: Link scheduler to controller so LR boosts/decays persist
+        adaptive_controller.set_scheduler(scheduler)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
@@ -4455,6 +4457,7 @@ def train(config: UnifiedTrainingConfig):
                     'entropy': metrics.get('onto_entropy', metrics.get('entropy', 0.5)),
                     'ppl': metrics.get('ppl', math.exp(avg_loss)),
                     'sa_deviation': abs(current_sa_ratio - 0.15) if current_sa_ratio > 0 else 0.0,
+                    'sa_ratio': current_sa_ratio,
                 }
                 training_state_tracker.update(state_metrics, global_step)
 

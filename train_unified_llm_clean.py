@@ -5049,6 +5049,8 @@ class AdaptiveTrainingController:
         self.lr_min = lr_min
         # V9.8.2: Clamp lr_max to max_lr_relative * base_lr
         self.lr_max = min(lr_max, base_lr * max_lr_relative)
+        # V9.9.1: Reference to scheduler so LR boosts persist through cosine decay
+        self._scheduler = None
         self.lr_boost_factor = lr_boost_factor
         self.lr_decay_factor = lr_decay_factor
 
@@ -5095,6 +5097,11 @@ class AdaptiveTrainingController:
         print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
         print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
+        print(f"    V9.9.1: Scheduler-aware LR adjustments ENABLED")
+
+    def set_scheduler(self, scheduler):
+        """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
+        self._scheduler = scheduler
         print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
 
     def _compute_velocity(self) -> float:
@@ -5239,6 +5246,9 @@ class AdaptiveTrainingController:
             if new_lr != current_lr:
                 for pg in self.optimizer.param_groups:
                     pg['lr'] = new_lr
+                # V9.9.1: Also update scheduler base_lr so decay persists through cosine schedule
+                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                    self._scheduler.adjust_base_lr(new_lr)
                 self.decay_count += 1
                 adjustments["actions"].append(f"LR_DECAY: {current_lr:.2e}→{new_lr:.2e} (spike: {velocity:+.1f}%)")
                 print(f"\n  🔻 [AdaptiveTraining] LR DECAY: {current_lr:.2e} → {new_lr:.2e} (PPL spike: {velocity:+.1f}%)")
@@ -5254,6 +5264,9 @@ class AdaptiveTrainingController:
             if new_lr != current_lr and new_lr > current_lr:
                 for pg in self.optimizer.param_groups:
                     pg['lr'] = new_lr
+                # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                    self._scheduler.adjust_base_lr(new_lr)
                 self.boost_count += 1
                 reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
                 adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
@@ -5379,6 +5392,9 @@ class AdaptiveWarmupScheduler:
         self.warmup_end_step = None
         self.warmup_end_ppl = None
 
+        # V9.9.1: Track the original base_lr for cosine decay bounds
+        self._original_base_lr = base_lr
+
         # Set initial LR
         self._set_lr(base_lr * start_factor)
 
@@ -5440,6 +5456,17 @@ class AdaptiveWarmupScheduler:
             lr = self._get_warmup_lr()
 
         self._set_lr(lr)
+
+    def adjust_base_lr(self, new_base_lr: float):
+        """
+        V9.9.1: Allow AdaptiveTrainingController to adjust the base_lr.
+
+        This ensures LR boosts/decays persist through cosine decay steps
+        instead of being overwritten on the next scheduler.step() call.
+        The cosine decay will now oscillate between new_base_lr and eta_min.
+        """
+        self.base_lr = new_base_lr
+        self.eta_min = new_base_lr * (self.eta_min / self._original_base_lr if self._original_base_lr > 0 else 0.1)
 
     def get_last_lr(self) -> list:
         """Return last computed LR (for compatibility with PyTorch schedulers)."""
@@ -8186,36 +8213,69 @@ def compute_sample_metrics(text: str) -> Dict[str, float]:
     # Unique token ratio
     unique_ratio = len(set(words)) / len(words) if words else 0.0
 
-    # CRITICAL FIX: Semantic coherence check (basic heuristics)
-    # Checks for common signs of gibberish vs. meaningful text
-    coherence = 1.0
+    # V9.9.1 FIX: Proper semantic coherence check
+    # Previous version started at 1.0 and only applied weak multiplicative penalties,
+    # causing gibberish to score 100%. New version uses additive scoring with
+    # multiple signals that genuinely detect incoherent text.
+    coherence = 0.0
 
-    # Penalty 1: Too many short words (gibberish often has many 1-2 char tokens)
-    short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
-    if short_word_ratio > 0.5:
-        coherence *= 0.5
-
-    # Penalty 2: Too many non-alphabetic tokens
+    # Signal 1: Alphabetic word ratio (0-0.25)
+    # Gibberish has many punctuation-only or symbol tokens
     alpha_ratio = sum(1 for w in words if w.isalpha()) / len(words)
-    if alpha_ratio < 0.6:
-        coherence *= 0.6
+    coherence += 0.25 * min(1.0, alpha_ratio / 0.7)
 
-    # Penalty 3: Excessive punctuation clustering (e.g., "... ,, ,,")
-    punct_cluster = text.count(',,') + text.count('..') * 0.5
-    if punct_cluster > 3:
-        coherence *= 0.4
+    # Signal 2: Function word density (0-0.25)
+    # Real English text has ~40-60% function words; gibberish either has too many or too few
+    function_words = {'the', 'a', 'an', 'is', 'was', 'are', 'were', 'be', 'been', 'being',
+                      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+                      'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
+                      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+                      'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either',
+                      'that', 'this', 'these', 'those', 'it', 'its', 'he', 'she', 'they',
+                      'we', 'you', 'i', 'me', 'him', 'her', 'us', 'them', 'my', 'his',
+                      'if', 'then', 'when', 'where', 'how', 'what', 'which', 'who'}
+    lower_words = [w.lower() for w in words if w.isalpha()]
+    if lower_words:
+        func_ratio = sum(1 for w in lower_words if w in function_words) / len(lower_words)
+        # Ideal range: 0.3-0.6; penalize outside
+        if 0.25 <= func_ratio <= 0.65:
+            coherence += 0.25
+        elif 0.15 <= func_ratio <= 0.75:
+            coherence += 0.15
+        else:
+            coherence += 0.05
 
-    # Penalty 4: Repeated single characters (e.g., "a a a a")
-    single_char_repeat = sum(1 for i in range(len(words)-2)
-                            if len(words[i]) == 1 and words[i] == words[i+1])
-    if single_char_repeat > 2:
-        coherence *= 0.3
+    # Signal 3: Consecutive function/stop words (0-0.25)
+    # Gibberish produces sequences like "with and for the in by" — real text doesn't
+    max_consecutive_func = 0
+    current_run = 0
+    for w in lower_words:
+        if w in function_words:
+            current_run += 1
+            max_consecutive_func = max(max_consecutive_func, current_run)
+        else:
+            current_run = 0
+    if max_consecutive_func <= 2:
+        coherence += 0.25
+    elif max_consecutive_func <= 3:
+        coherence += 0.15
+    elif max_consecutive_func <= 4:
+        coherence += 0.05
+    # else: 0 — long runs of function words = gibberish
 
-    # Bonus: Reasonable average word length (4-8 chars is typical English)
-    avg_word_len = sum(len(w) for w in words) / len(words)
-    if 4.0 <= avg_word_len <= 8.0:
-        coherence *= 1.1
-    coherence = min(coherence, 1.0)
+    # Signal 4: Short word overload + punctuation noise (0-0.25)
+    # Gibberish often has many 1-2 char tokens mixed with stray punctuation
+    short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
+    punct_tokens = sum(1 for w in words if not any(c.isalnum() for c in w)) / len(words)
+    noise_score = short_word_ratio * 0.5 + punct_tokens * 0.5
+    if noise_score < 0.2:
+        coherence += 0.25
+    elif noise_score < 0.35:
+        coherence += 0.15
+    elif noise_score < 0.5:
+        coherence += 0.05
+
+    coherence = max(0.0, min(1.0, coherence))
 
     return {
         "completion": completion,
@@ -12464,6 +12524,8 @@ def train(config: UnifiedTrainingConfig):
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
         )
+        # V9.9.1: Link scheduler to controller so LR boosts/decays persist
+        adaptive_controller.set_scheduler(scheduler)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
@@ -13886,6 +13948,10 @@ def train(config: UnifiedTrainingConfig):
                     'entropy': metrics.get('onto_entropy', metrics.get('entropy', 0.5)),
                     'ppl': metrics.get('ppl', math.exp(avg_loss)),
                     'sa_deviation': abs(current_sa_ratio - 0.15) if current_sa_ratio > 0 else 0.0,
+                    # V9.9.1 FIX: Pass sa_ratio so confidence metric actually updates
+                    # Previously missing — caused metrics_to_observables() to default to 0.35,
+                    # making contradiction always 0 and confidence stuck at 0.50
+                    'sa_ratio': current_sa_ratio,
                 }
                 training_state_tracker.update(state_metrics, global_step)
 

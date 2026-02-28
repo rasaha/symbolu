@@ -370,6 +370,9 @@ class AdaptiveWarmupScheduler:
         self.warmup_end_step = None
         self.warmup_end_ppl = None
 
+        # V9.9.1: Track the original base_lr for cosine decay bounds
+        self._original_base_lr = base_lr
+
         # Set initial LR
         self._set_lr(base_lr * start_factor)
 
@@ -431,6 +434,16 @@ class AdaptiveWarmupScheduler:
             lr = self._get_warmup_lr()
 
         self._set_lr(lr)
+
+    def adjust_base_lr(self, new_base_lr: float):
+        """
+        V9.9.1: Allow AdaptiveTrainingController to adjust the base_lr.
+
+        This ensures LR boosts/decays persist through cosine decay steps
+        instead of being overwritten on the next scheduler.step() call.
+        """
+        self.base_lr = new_base_lr
+        self.eta_min = new_base_lr * (self.eta_min / self._original_base_lr if self._original_base_lr > 0 else 0.1)
 
     def get_last_lr(self) -> list:
         """Return last computed LR (for compatibility with PyTorch schedulers)."""
