@@ -4622,3 +4622,79 @@ Execute in this order:
 6. **CSR calibration**: Separate origin(O1) weight from dominant resonance weight in VarnaCSRBridge
 7. **Logging**: Log B, B_A^ℓ, B_B, λ_{k,eff}^ℓ, injection norms, cap violations alongside existing v2.6 logs
 8. **Acceptance tests**: Validate all 10 tests from G.8
+
+---
+
+### G.10 Non-Negotiable Deployment Conditions
+
+These conditions MUST be met before enabling Appendix G in production training. Appendix G is a **controlled experiment**, not a feature addition.
+
+#### G.10.1 12D Permanence Monitoring
+
+Because 12D is declared permanent as the ontology basis, silent dimensional collapse would invalidate the entire architecture. Runtime monitoring is mandatory:
+
+- **Singular value tracking**: Compute SVD of the ontology projection matrix W_12→d periodically. Alert if any singular value drops below ε_sv (default: 0.01)
+- **Per-axis variance**: Track variance of each of the 12 ontology dimensions across a batch. Alert if any dimension has variance < ε_var (default: 1e-4) for >100 consecutive steps
+- **Basis drift**: Track cosine similarity between current ontology projection rows and their initial values. Log drift rate. Alert if any row's cosine drops below 0.5 (meaning the learned axis has rotated >60° from initialization)
+
+```python
+# Required monitoring (run every N steps):
+def check_12d_health(projection_weight, initial_weight):
+    # Singular values
+    U, S, V = torch.linalg.svd(projection_weight)
+    if S.min() < eps_sv:
+        log.warning(f"12D collapse risk: min singular value = {S.min():.6f}")
+
+    # Per-axis variance (computed on batch)
+    axis_var = ontology_output.var(dim=0)  # [12]
+    dead_axes = (axis_var < eps_var).sum()
+    if dead_axes > 0:
+        log.warning(f"12D: {dead_axes} axes below variance threshold")
+
+    # Basis drift
+    cos_sim = F.cosine_similarity(
+        projection_weight, initial_weight, dim=-1
+    )  # [12]
+    drifted = (cos_sim < 0.5).sum()
+    if drifted > 0:
+        log.warning(f"12D: {drifted} axes drifted >60° from init")
+```
+
+#### G.10.2 Staged Rollout (Isolation of Instability Sources)
+
+Do NOT enable all components simultaneously. Follow this sequence:
+
+| Stage | Enable | Bliss | Monitor |
+|-------|--------|-------|---------|
+| **Phase 1** | CSR injection only (small λ, no Bliss gate) | — | Loss, gradient norms, 12D health |
+| **Phase 2** | CSR + Bliss measurement (log only, no gating) | Log B, B_A, B_B | Bliss stability, injection norms |
+| **Phase 3** | CSR + Bliss gating (adaptive λ_eff) | Active | λ_eff values, cap violations, dead channels |
+| **Phase 4** | CSR + Bliss + JEPA injection | Active | Multi-prior norm stacking, gradient variance |
+
+**Gate between stages**: Advance only when the current stage shows stable metrics for ≥500 steps (no 12D collapse alerts, no dead channels, gradient variance within 2× of pre-injection baseline).
+
+#### G.10.3 Gradient Variance Tracking
+
+The combination of dual injection paths, coherence feedback loop, and norm caps introduces new gradient dynamics. Track:
+
+- **Gradient norm mean**: Per-layer mean gradient norm (already tracked in most training loops)
+- **Gradient variance**: Per-layer gradient norm variance over a sliding window (e.g., 100 steps). Spike = instability
+- **Layer-wise gradient cosine similarity**: cos(∇L_ℓ^t, ∇L_ℓ^{t-1}) — tracks whether gradient direction is stable across steps. Low cosine = noisy optimization
+
+```python
+# Required tracking:
+def track_gradient_health(model, window_size=100):
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grad_norm = param.grad.norm().item()
+            # Append to sliding window
+            grad_history[name].append(grad_norm)
+            if len(grad_history[name]) > window_size:
+                norms = grad_history[name][-window_size:]
+                variance = np.var(norms)
+                if variance > 2 * baseline_variance[name]:
+                    log.warning(f"Gradient variance spike: {name} "
+                                f"var={variance:.4f} vs baseline={baseline_variance[name]:.4f}")
+```
+
+**If gradient noise spikes**: Reduce β (Bliss stability weight), γ (gate sharpness), or λ_k (injection strength) in that order. If instability persists, fall back to the previous stable stage.

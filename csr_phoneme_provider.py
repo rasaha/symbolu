@@ -876,7 +876,17 @@ class VarnaCSRBridge:
         return vector
 
     def _consonant_layers_to_vector(self, layers: Dict[str, str]) -> List[float]:
-        """Convert consonant layer annotations to 12D vector."""
+        """Convert consonant layer annotations to 12D vector.
+
+        Appendix G.6 calibration fix: separate origin(O1) from dominant resonance.
+
+        Scoring tiers:
+          - Origin (O1, idx=0): "dormant activation threshold" gets a small,
+            uniform weight (~0.1). Every phoneme has baseline potential here.
+          - Phoneme bias: articulatory class gets moderate weight (0.2-0.4).
+          - Keyword resonance: dominant layer gets high weight (0.4-0.7).
+          - Explicit dominant/primary markers get highest weight (0.7-0.95).
+        """
         vector = [0.1] * 12  # Base activation
 
         for layer_name, description in layers.items():
@@ -885,19 +895,31 @@ class VarnaCSRBridge:
             if idx < 0:
                 continue
 
-            # Parse description for keywords
             desc_lower = description.lower()
+
+            # G.6.2: O1 (origin) gets a small fixed weight, NOT boosted
+            # O1 descriptions contain "dormant activation threshold" which
+            # previously matched "activation" keyword and got weight ~0.9.
+            # O1 is the origin — baseline potential, not dominant resonance.
+            if idx == 0:
+                # Origin tier: small uniform weight
+                vector[idx] = 0.15
+                continue
+
+            # Parse description for keywords (non-O1 layers)
             weight = 0.3  # Base weight for having any description
 
             for keyword, kw_weight in LAYER_KEYWORD_WEIGHTS.items():
                 if keyword in desc_lower:
                     weight = max(weight, kw_weight)
 
-            # Boost if description contains activation/dominant patterns
-            if "activation" in desc_lower:
-                weight = min(weight + 0.2, 0.9)
+            # Boost for dominant/primary patterns (these are the actual
+            # resonance layers that differentiate consonants)
             if "dominant" in desc_lower or "primary" in desc_lower:
                 weight = min(weight + 0.3, 0.95)
+            elif "activation" in desc_lower:
+                # "activation" outside O1 gets moderate boost (phoneme bias tier)
+                weight = min(weight + 0.1, 0.7)
 
             vector[idx] = max(vector[idx], weight)
 
