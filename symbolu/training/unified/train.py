@@ -2740,8 +2740,9 @@ def train(config: UnifiedTrainingConfig):
                         current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
 
                     # Scale the loss by the computed weight
-                    # V11.3: Further scale by _aux_loss_scale when val PPL stagnates
-                    phase_div_loss = phase_div_loss_raw * current_weight * _aux_loss_scale
+                    # V11.3.1: Phase diversity is EXEMPT from aux_loss_scale — it's therapeutic
+                    # (fixing key collapse), not parasitic. Scaling it down worsens R_k.
+                    phase_div_loss = phase_div_loss_raw * current_weight
 
                     if phase_div_loss.requires_grad:
                         loss = loss + phase_div_loss
@@ -2864,9 +2865,9 @@ def train(config: UnifiedTrainingConfig):
                             loss = loss + _decorr_w_srk * ortho_loss_tensor
 
                     # V9.9.12c: Re-add phase diversity loss (for gradient flow to W_k_phase)
-                    # V11.3: Scale by _aux_loss_scale when val PPL stagnates
+                    # V11.3.1: Phase diversity EXEMPT from aux_loss_scale (therapeutic)
                     if phase_div_loss_tensor is not None and phase_div_weight_for_srk > 0:
-                        loss = loss + phase_div_weight_for_srk * _aux_loss_scale * phase_div_loss_tensor
+                        loss = loss + phase_div_weight_for_srk * phase_div_loss_tensor
 
                     # Update karma state for O12→O1 carryover (Toroidal Loop)
                     with torch.no_grad():
@@ -5282,11 +5283,43 @@ def train(config: UnifiedTrainingConfig):
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
+                            _rk_above_threshold_count = 0  # V11.3.1: Track for emergency escalation
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
                             print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
                             print(f"     ├─ Mode: TASK-SCALED (urgency α=0.05)")
                             print(f"     ├─ λ_max: 0.5, η: 0.2 (fast adaptation)")
                             print(f"     └─ Layers: {num_phase_layers}")
+
+                        # V11.3.1: R_k Emergency Escalation
+                        # Phase diversity is active but R_k is STILL above 0.5 and worsening.
+                        # The controller's exponential growth (eta=0.2) is too slow — at R_k=0.51,
+                        # adjustment=exp(0.2*0.21)=1.04 per step → reaches λ=0.25 after ~100 evals.
+                        # Emergency: when R_k > 0.5 for 5+ consecutive evals, jump λ to λ_max/2.
+                        elif (phase_diversity_enabled and
+                                phase_diversity_controller is not None and
+                                health_metrics['R_k'] > 0.5):
+                            if not hasattr(phase_diversity_controller, '_rk_emergency_count'):
+                                phase_diversity_controller._rk_emergency_count = 0
+                            phase_diversity_controller._rk_emergency_count += 1
+
+                            if (phase_diversity_controller._rk_emergency_count >= 5 and
+                                    phase_diversity_controller.current_lambda < phase_diversity_controller.lambda_max * 0.5):
+                                old_lambda = phase_diversity_controller.current_lambda
+                                phase_diversity_controller.current_lambda = phase_diversity_controller.lambda_max * 0.5
+                                phase_diversity_controller.eta = min(0.5, phase_diversity_controller.eta * 2)
+                                phase_diversity_controller._rk_emergency_count = 0
+                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] R_k={health_metrics['R_k']:.4f} stuck above 0.5 "
+                                      f"for 5+ evals — force-escalating:")
+                                print(f"     ├─ λ: {old_lambda:.4f} → {phase_diversity_controller.current_lambda:.4f} "
+                                      f"(jumped to λ_max/2)")
+                                print(f"     ├─ η: {phase_diversity_controller.eta:.2f} (doubled for faster response)")
+                                print(f"     └─ R_k needs to drop below 0.5 to stabilize")
+                        else:
+                            # R_k healthy — reset emergency counter
+                            if (phase_diversity_enabled and
+                                    phase_diversity_controller is not None and
+                                    hasattr(phase_diversity_controller, '_rk_emergency_count')):
+                                phase_diversity_controller._rk_emergency_count = 0
 
                     except Exception as e:
                         print(f"\n  ⚠️ [PHASE HEALTH] Diagnostic failed: {e}")
