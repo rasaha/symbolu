@@ -39,7 +39,7 @@ def run_single_benchmark(name: str, module_name: str, device: str, quick: bool) 
                 if "n_videos" in sig.parameters:
                     kwargs["n_videos"] = 4
                 if "distill_steps" in sig.parameters:
-                    kwargs["distill_steps"] = 50
+                    kwargs["distill_steps"] = 200  # Proxy encoder needs enough steps
                 if "height" in sig.parameters and module_name != "bench_scale":
                     kwargs["height"] = 16
                 if "width" in sig.parameters and module_name != "bench_scale":

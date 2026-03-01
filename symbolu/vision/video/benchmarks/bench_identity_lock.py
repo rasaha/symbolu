@@ -111,13 +111,14 @@ def run_benchmark(
             new_frame = prev_frame + noise  # Drift without correction
 
             if use_identity_lock:
-                # Apply identity correction
-                video_so_far = torch.stack(frames + [new_frame], dim=2)  # [B, C, T, H, W]
-                noise_pred = noise.unsqueeze(2)
+                # Apply identity correction on the last 2 frames
+                pair = torch.stack([prev_frame, new_frame], dim=2)  # [B, C, 2, H, W]
+                noise_pred_pair = torch.randn_like(pair) * 0.1
                 corrected = fscsv.correct_noise_prediction(
-                    noise_pred, video_so_far[:, :, -2:], t=100, noise_schedule=noise_schedule,
+                    noise_pred_pair, pair, t=100, noise_schedule=noise_schedule,
                 )
-                new_frame = new_frame - corrected.squeeze(2) * 0.5
+                # Extract correction for the new frame only (index -1 on T dim)
+                new_frame = new_frame - (corrected[:, :, -1] - noise_pred_pair[:, :, -1]) * 0.5
 
             frames.append(new_frame)
 
@@ -165,13 +166,15 @@ def run_benchmark(
     sched = FullSchedule(1000, device)
 
     def tweedie_snr(t):
-        """Measure Tweedie projection SNR at timestep t."""
+        """Measure Tweedie projection SNR at timestep t using noisy eps estimate."""
         sqrt_a = sched.sqrt_alphas_cumprod[t]
         sqrt_1ma = sched.sqrt_one_minus_alphas_cumprod[t]
-        eps = torch.randn_like(z_clean)
-        z_t = sqrt_a * z_clean + sqrt_1ma * eps
+        eps_true = torch.randn_like(z_clean)
+        z_t = sqrt_a * z_clean + sqrt_1ma * eps_true
+        # Use a noisy estimate of eps (simulating imperfect model prediction)
+        eps_pred = eps_true + torch.randn_like(eps_true) * 0.5
         z_hat = TweedieProjection.project(
-            z_t, eps, t, sched.sqrt_alphas_cumprod, sched.sqrt_one_minus_alphas_cumprod,
+            z_t, eps_pred, t, sched.sqrt_alphas_cumprod, sched.sqrt_one_minus_alphas_cumprod,
         )
         signal = z_clean.pow(2).mean().item()
         noise_power = (z_hat - z_clean).pow(2).mean().item()
