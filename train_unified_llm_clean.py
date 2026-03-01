@@ -5319,7 +5319,10 @@ class AdaptiveTrainingController:
         elif current_lr < self.lr_min:
             for pg in self.optimizer.param_groups:
                 pg['lr'] = self.lr_min
-            print(f"\n  ⚠️ [AdaptiveTraining] STEP {global_step} LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e}")
+            # Only log floor clamp once, then every 100 steps to avoid spam
+            if not hasattr(self, '_floor_clamp_logged_step') or global_step - self._floor_clamp_logged_step >= 100:
+                print(f"\n  ⚠️ [AdaptiveTraining] LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e} (cosine schedule below floor, clamping)")
+                self._floor_clamp_logged_step = global_step
             clamped = True
 
         return clamped
@@ -12355,7 +12358,9 @@ def train(config: UnifiedTrainingConfig):
     resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
     if config.resume:
         resume_path = Path(config.resume)
-        if resume_path.exists():
+        # Check both single-file and split-file format existence
+        split_model_path = Path(f"{resume_path.parent / resume_path.stem}_model.pt")
+        if resume_path.exists() or split_model_path.exists():
             try:
                 resume_result = load_checkpoint(
                     path=resume_path,
@@ -12380,6 +12385,7 @@ def train(config: UnifiedTrainingConfig):
                 # Keep default values (resume_step=0, etc.)
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
+            print(f"      (also checked split format: {split_model_path})")
             print(f"      Starting training from scratch...")
 
 

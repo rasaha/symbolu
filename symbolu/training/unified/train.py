@@ -1437,7 +1437,9 @@ def train(config: UnifiedTrainingConfig):
     resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
     if config.resume:
         resume_path = Path(config.resume)
-        if resume_path.exists():
+        # Check both single-file and split-file format existence
+        split_model_path = Path(f"{resume_path.parent / resume_path.stem}_model.pt")
+        if resume_path.exists() or split_model_path.exists():
             try:
                 resume_result = load_checkpoint(
                     path=resume_path,
@@ -1471,6 +1473,7 @@ def train(config: UnifiedTrainingConfig):
                 # Keep default values (resume_step=0, etc.)
         else:
             print(f"\n  ⚠️  Checkpoint not found: {resume_path}")
+            print(f"      (also checked split format: {split_model_path})")
             print(f"      Starting training from scratch...")
 
     # V9.8.6: Restore CSR curriculum state (CSR is already initialized above)
@@ -5198,6 +5201,34 @@ def train(config: UnifiedTrainingConfig):
                         # Add to metrics for tensorboard/wandb logging
                         for k, v in health_metrics.items():
                             metrics[f'health_{k}'] = v
+
+                        # V11.3: Auto-enable phase diversity when R_k collapse detected
+                        # If R_k > 0.5 (collapsed) and phase diversity is not active,
+                        # automatically enable adaptive phase diversity to push keys apart.
+                        # This is a self-healing mechanism — no restart needed.
+                        if (health_metrics['R_k'] > 0.5 and
+                                not phase_diversity_enabled and
+                                config.model_type in ('phase', 'hybrid', 'ontological_hybrid')):
+                            num_phase_layers = enable_phase_diversity_capture(model, enable=True)
+                            phase_diversity_controller = AdaptivePhaseDiversityController(
+                                warmup_steps=config.warmup_steps,
+                                target_R=0.3,
+                                lambda_init=0.001,
+                                lambda_max=0.5,
+                                eta=0.2,
+                                ramp_multiplier=0.0,  # No ramp — collapse is already severe
+                                task_loss_scaling=True,
+                                task_loss_alpha=0.05,
+                            )
+                            # Seed R_ema with actual R_k to avoid warmup lag
+                            phase_diversity_controller.R_ema = health_metrics['R_k']
+                            phase_diversity_enabled = True
+                            print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
+                            print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
+                            print(f"     ├─ Mode: TASK-SCALED (urgency α=0.05)")
+                            print(f"     ├─ λ_max: 0.5, η: 0.2 (fast adaptation)")
+                            print(f"     └─ Layers: {num_phase_layers}")
+
                     except Exception as e:
                         print(f"\n  ⚠️ [PHASE HEALTH] Diagnostic failed: {e}")
                         enable_health_diagnostics_capture(model, False)  # Ensure cleanup

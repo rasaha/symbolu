@@ -112,21 +112,26 @@ class SovereignPhaseController:
         """
         Compute intervention level based on entropy and variance.
 
-        Uses BOTH metrics to avoid false positives from noise.
+        V11.3 FIX: Variance-only should NOT trigger CRITICAL. Low variance
+        just means entropy is stable — that's fine when entropy itself is
+        healthy (e.g. 0.5). Only trigger CRITICAL when entropy is truly
+        collapsed. Low variance + moderate entropy → warning at most.
 
         Returns:
             'critical', 'warning', 'caution', or 'normal'
         """
-        # Critical: Either metric at critical level
-        if entropy < self.entropy_critical or variance < self.variance_critical:
+        # Critical: Entropy truly collapsed (regardless of variance)
+        if entropy < self.entropy_critical:
             return 'critical'
 
-        # Warning: Both metrics moderately concerning
-        elif entropy < 0.45 and variance < 0.001:
+        # Warning: Entropy somewhat low AND stagnant (stuck in bad place)
+        elif entropy < 0.45 and variance < self.variance_critical:
             return 'warning'
 
-        # Caution: Either metric at warning level
-        elif entropy < self.entropy_warning or variance < self.variance_warning:
+        # Caution: Entropy at warning level, OR stagnant below recovery
+        elif entropy < self.entropy_warning:
+            return 'caution'
+        elif variance < self.variance_critical and entropy < self.entropy_recovered:
             return 'caution'
 
         else:
@@ -672,7 +677,10 @@ class AdaptiveTrainingController:
         elif current_lr < self.lr_min:
             for pg in self.optimizer.param_groups:
                 pg['lr'] = self.lr_min
-            print(f"\n  ⚠️ [AdaptiveTraining] STEP {global_step} LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e}")
+            # Only log floor clamp once, then every 100 steps to avoid spam
+            if not hasattr(self, '_floor_clamp_logged_step') or global_step - self._floor_clamp_logged_step >= 100:
+                print(f"\n  ⚠️ [AdaptiveTraining] LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e} (cosine schedule below floor, clamping)")
+                self._floor_clamp_logged_step = global_step
             clamped = True
 
         return clamped
