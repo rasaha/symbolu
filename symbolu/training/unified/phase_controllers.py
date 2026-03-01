@@ -590,19 +590,34 @@ class AdaptiveTrainingController:
             if is_plateau:
                 self.plateau_count += 1
 
-            # Only boost if we're not already at max
-            new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
-            if new_lr != current_lr and new_lr > current_lr:
-                for pg in self.optimizer.param_groups:
-                    pg['lr'] = new_lr
-                # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
-                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
-                    self._scheduler.adjust_base_lr(new_lr)
-                self.boost_count += 1
+            # Skip futile boosts: if cosine schedule has decayed below lr_min floor,
+            # boosting base_lr just gets cosine-decayed back below floor within a few
+            # steps. The floor clamp already maintains lr_min — boosting is pointless.
+            cosine_below_floor = (
+                self._scheduler is not None and
+                hasattr(self._scheduler, '_get_cosine_lr') and
+                self._scheduler._get_cosine_lr() < self.lr_min
+            )
+
+            if cosine_below_floor:
                 reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
-                adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
-                print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
-                self.last_adjustment_step = global_step
+                if not hasattr(self, '_floor_boost_skip_logged') or not self._floor_boost_skip_logged:
+                    print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST SKIPPED ({reason}) - cosine schedule below floor, boost would be futile")
+                    self._floor_boost_skip_logged = True
+            else:
+                # Only boost if we're not already at max
+                new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
+                if new_lr != current_lr and new_lr > current_lr:
+                    for pg in self.optimizer.param_groups:
+                        pg['lr'] = new_lr
+                    # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                    if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                        self._scheduler.adjust_base_lr(new_lr)
+                    self.boost_count += 1
+                    reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                    adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                    print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                    self.last_adjustment_step = global_step
         elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
             # Log that boost was blocked
             reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"

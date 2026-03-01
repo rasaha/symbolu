@@ -5173,7 +5173,10 @@ def train(config: UnifiedTrainingConfig):
                         # Run a single forward pass to capture phase tensors
                         with torch.no_grad():
                             if cached_val_batches and len(cached_val_batches) > 0:
-                                health_batch = cached_val_batches[0]
+                                # Rotate through cached batches so R_k isn't frozen
+                                # on the same input every eval step
+                                health_batch_idx = (global_step // config.log_every) % len(cached_val_batches)
+                                health_batch = cached_val_batches[health_batch_idx]
                             else:
                                 health_batch = next(iter(val_loader))
                             # V11.2: Truncate to avoid OOM — full seq_len forward
@@ -5196,7 +5199,13 @@ def train(config: UnifiedTrainingConfig):
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
-                        print(f"     └─ Phase Drift Std:       {health_metrics['phase_drift_std']:.4f}")
+                        print(f"     ├─ Phase Drift Std:       {health_metrics['phase_drift_std']:.4f}")
+                        # Show phase diversity loss status if active
+                        if phase_diversity_enabled and phase_diversity_controller is not None:
+                            pd_status = phase_diversity_controller.get_status()
+                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}")
+                        else:
+                            print(f"     └─ Phase Diversity:       OFF")
 
                         # Add to metrics for tensorboard/wandb logging
                         for k, v in health_metrics.items():

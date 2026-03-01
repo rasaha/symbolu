@@ -337,6 +337,11 @@ def load_checkpoint(
         result["kv_supervisor_state"] = checkpoint["kv_supervisor_state"]
         print(f"    \u2713 KV Supervision state available for restoration")
 
+    # Appendix G Phase 4: JEPA injection projector state
+    if "jepa_injection_projector_state" in checkpoint:
+        result["jepa_injection_projector_state"] = checkpoint["jepa_injection_projector_state"]
+        print(f"    \u2713 JEPA injection projector state available for restoration")
+
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
         result["dataloader_position"] = checkpoint["dataloader_position"]

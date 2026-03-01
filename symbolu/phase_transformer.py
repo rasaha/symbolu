@@ -1146,10 +1146,11 @@ def enable_health_diagnostics_capture(model: nn.Module, enable: bool = True) -> 
         if module.__class__.__name__ == 'PhaseAttentionLayer':
             module.capture_for_health_diagnostics = enable
             if not enable:
-                # Clear captured data to free memory
-                module._captured_phi_k = None
-                module._captured_phi_q = None
-                module._captured_a_k = None
+                # Clear health-specific captured data to free memory
+                # (do NOT touch _captured_phi_k — diversity loss may need it)
+                module._health_phi_k = None
+                module._health_phi_q = None
+                module._health_a_k = None
             count += 1
     return count
 
@@ -1164,13 +1165,14 @@ def _collect_health_captures(model: nn.Module) -> List[Dict[str, torch.Tensor]]:
     captures = []
     for module in model.modules():
         if module.__class__.__name__ == 'PhaseAttentionLayer':
-            if (hasattr(module, '_captured_phi_k') and module._captured_phi_k is not None and
-                hasattr(module, '_captured_phi_q') and module._captured_phi_q is not None and
-                hasattr(module, '_captured_a_k') and module._captured_a_k is not None):
+            # Read from health-specific attributes (separate from diversity capture)
+            if (hasattr(module, '_health_phi_k') and module._health_phi_k is not None and
+                hasattr(module, '_health_phi_q') and module._health_phi_q is not None and
+                hasattr(module, '_health_a_k') and module._health_a_k is not None):
                 captures.append({
-                    'phi_k': module._captured_phi_k,
-                    'phi_q': module._captured_phi_q,
-                    'a_k': module._captured_a_k,
+                    'phi_k': module._health_phi_k,
+                    'phi_q': module._health_phi_q,
+                    'a_k': module._health_a_k,
                 })
     return captures
 
@@ -1936,10 +1938,11 @@ class PhaseAttentionLayer(nn.Module):
         self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
 
         # V9.9.12c: Health dashboard capture (diagnostic only, no gradients)
-        # Captures additional tensors needed for behavioral auditing
+        # Uses separate _health_* attributes to avoid overwriting diversity capture
         self.capture_for_health_diagnostics = False
-        self._captured_phi_q = None  # [B, N, H, D_h] query phases
-        self._captured_a_k = None    # [B, N, H, D_h] key amplitudes
+        self._health_phi_k = None   # [B, N, H, D_h] key phases (detached)
+        self._health_phi_q = None   # [B, N, H, D_h] query phases (detached)
+        self._health_a_k = None     # [B, N, H, D_h] key amplitudes (detached)
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -2132,10 +2135,12 @@ class PhaseAttentionLayer(nn.Module):
             self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
 
         # V9.9.12c: Capture for health diagnostics (read-only, detached)
+        # Use separate attributes to avoid overwriting diversity capture's
+        # gradient-bearing tensor with a detached version
         if self.capture_for_health_diagnostics:
-            self._captured_phi_k = phi_k.detach()  # [B, N, H, D_h]
-            self._captured_phi_q = phi_q.detach()  # [B, N, H, D_h]
-            self._captured_a_k = a_k.detach()      # [B, N, H, D_h]
+            self._health_phi_k = phi_k.detach()  # [B, N, H, D_h]
+            self._health_phi_q = phi_q.detach()  # [B, N, H, D_h]
+            self._health_a_k = a_k.detach()      # [B, N, H, D_h]
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
