@@ -1537,6 +1537,9 @@ class AdaptivePhaseDiversityController:
         self.current_lambda = 0.0  # Starts at 0, ramps up
         self.R_ema = 0.5  # Initial estimate (neutral)
         self.step_count = 0
+        # V11.3.2: Emergency floor — prevents task-loss scaling from overwriting
+        # force-jumps set by the training loop's emergency escalation.
+        self.lambda_floor = 0.0
 
         # Diagnostics
         self.lambda_history = []
@@ -1610,6 +1613,11 @@ class AdaptivePhaseDiversityController:
                 )
                 if self.current_lambda < self.lambda_init:
                     self.current_lambda = self.lambda_init
+
+        # V11.3.2: Enforce emergency floor (set by train loop when R_k > 0.5 persists)
+        # Without this, task-loss scaling overwrites emergency force-jumps each step.
+        if self.lambda_floor > 0 and self.current_lambda < self.lambda_floor:
+            self.current_lambda = self.lambda_floor
 
         # Apply bounds
         self.current_lambda = max(self.lambda_min, min(self.lambda_max, self.current_lambda))
