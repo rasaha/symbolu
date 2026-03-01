@@ -5191,6 +5191,10 @@ def train(config: UnifiedTrainingConfig):
 
                 # V11.3: Val PPL Stagnation Detector — auto-reduce auxiliary losses
                 # when val PPL plateaus to redirect gradient capacity to CE loss.
+                # V11.3.3: Fix inf initialization — first eval seeds the baseline
+                if _val_ppl_best == float('inf'):
+                    _val_ppl_best = val_ppl
+                    print(f"  📊 [AUX-SCALE] Baseline val PPL set to {val_ppl:.2f}")
                 _improvement = (_val_ppl_best - val_ppl) / max(_val_ppl_best, 1.0) * 100
                 if _improvement > _AUX_STAGNATION_IMPROVE_PCT:
                     # Meaningful improvement — reset counter, restore scale slowly
@@ -5290,17 +5294,20 @@ def train(config: UnifiedTrainingConfig):
                             print(f"     ├─ λ_max: 0.5, η: 0.2 (fast adaptation)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
-                        # V11.3.2: R_k Emergency Escalation (fixed)
-                        # Previous V11.3.1 set current_lambda directly, but task-loss scaling
-                        # mode overwrites it every step. Now uses lambda_floor which persists.
+                        # V11.3.3: R_k Emergency Escalation (robust)
+                        # V11.3.2 required 5 CONSECUTIVE checks above 0.5, but R_k
+                        # oscillates right at the boundary (0.499→0.501→0.499), so the
+                        # counter kept resetting and the emergency never fired.
+                        # Fix: lower threshold to 0.45, reduce patience to 3, and
+                        # only decrement (not reset) when R_k dips below threshold.
                         elif (phase_diversity_enabled and
                                 phase_diversity_controller is not None and
-                                health_metrics['R_k'] > 0.5):
+                                health_metrics['R_k'] > 0.45):
                             if not hasattr(phase_diversity_controller, '_rk_emergency_count'):
                                 phase_diversity_controller._rk_emergency_count = 0
                             phase_diversity_controller._rk_emergency_count += 1
 
-                            if (phase_diversity_controller._rk_emergency_count >= 5 and
+                            if (phase_diversity_controller._rk_emergency_count >= 3 and
                                     phase_diversity_controller.current_lambda < phase_diversity_controller.lambda_max * 0.5):
                                 old_lambda = phase_diversity_controller.current_lambda
                                 floor_val = phase_diversity_controller.lambda_max * 0.5
@@ -5308,22 +5315,26 @@ def train(config: UnifiedTrainingConfig):
                                 phase_diversity_controller.lambda_floor = floor_val
                                 phase_diversity_controller.eta = min(0.5, phase_diversity_controller.eta * 2)
                                 phase_diversity_controller._rk_emergency_count = 0
-                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] R_k={health_metrics['R_k']:.4f} stuck above 0.5 "
-                                      f"for 5+ evals — force-escalating:")
+                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] R_k={health_metrics['R_k']:.4f} stuck above 0.45 "
+                                      f"for 3+ evals — force-escalating:")
                                 print(f"     ├─ λ: {old_lambda:.4f} → {floor_val:.4f} "
                                       f"(jumped to λ_max/2, floor set)")
                                 print(f"     ├─ η: {phase_diversity_controller.eta:.2f} (doubled for faster response)")
                                 print(f"     └─ λ_floor={floor_val:.4f} prevents task-loss formula from overriding")
                         else:
-                            # R_k healthy — reset emergency counter and clear floor
+                            # R_k below 0.45 — decrement counter (don't hard-reset)
+                            # Only fully clear floor once R_k drops well below threshold
                             if (phase_diversity_enabled and
                                     phase_diversity_controller is not None and
                                     hasattr(phase_diversity_controller, '_rk_emergency_count')):
-                                phase_diversity_controller._rk_emergency_count = 0
-                                # Clear emergency floor once R_k is healthy again
-                                if hasattr(phase_diversity_controller, 'lambda_floor'):
+                                # Decrement by 1 instead of resetting to 0
+                                phase_diversity_controller._rk_emergency_count = max(
+                                    0, phase_diversity_controller._rk_emergency_count - 1)
+                                # Only clear floor when R_k is genuinely healthy (< 0.35)
+                                if (health_metrics['R_k'] < 0.35 and
+                                        hasattr(phase_diversity_controller, 'lambda_floor')):
                                     if phase_diversity_controller.lambda_floor > 0:
-                                        print(f"  ✅ [PHASE-DIV] R_k healthy — clearing emergency λ_floor")
+                                        print(f"  ✅ [PHASE-DIV] R_k={health_metrics['R_k']:.4f} healthy — clearing emergency λ_floor")
                                     phase_diversity_controller.lambda_floor = 0.0
 
                     except Exception as e:
