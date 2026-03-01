@@ -119,17 +119,44 @@ def save_checkpoint(
     if jepa_injection_projector_state is not None:
         aux["jepa_injection_projector_state"] = jepa_injection_projector_state
 
-    # Remove old files before saving (both single-file and split formats)
-    for p in [path, model_path, optim_path, meta_path, aux_path]:
-        if p.exists():
-            p.unlink()
+    # Atomic save: write to temp files first, then rename into place.
+    # This prevents checkpoint corruption if training crashes mid-save.
+    # Previously, files were deleted before writing — any crash between
+    # delete and write completion would destroy the best checkpoint.
+    tmp_suffix = ".tmp"
+    tmp_model = Path(f"{model_path}{tmp_suffix}")
+    tmp_optim = Path(f"{optim_path}{tmp_suffix}")
+    tmp_meta = Path(f"{meta_path}{tmp_suffix}")
+    tmp_aux = Path(f"{aux_path}{tmp_suffix}")
 
-    # Save each component as a separate file to stay under NFS write limits
-    torch.save(model.state_dict(), model_path)
-    torch.save(optimizer.state_dict(), optim_path)
-    torch.save(meta, meta_path)
+    # Clean up stale temp files from a previously interrupted save
+    for tmp in [tmp_model, tmp_optim, tmp_meta, tmp_aux]:
+        if tmp.exists():
+            tmp.unlink()
+
+    # Write all data to temp files (old checkpoint untouched during this phase)
+    torch.save(model.state_dict(), tmp_model)
+    torch.save(optimizer.state_dict(), tmp_optim)
+    torch.save(meta, tmp_meta)
     if aux:
-        torch.save(aux, aux_path)
+        torch.save(aux, tmp_aux)
+
+    # Atomically replace old files with new ones (os.replace is atomic on POSIX).
+    # Rename meta LAST — it's the file that carries step/best_val_loss, so if we
+    # crash mid-rename the worst case is stale metadata with fresh weights, which
+    # load_checkpoint can detect and handle.
+    os.replace(tmp_model, model_path)
+    os.replace(tmp_optim, optim_path)
+    if aux:
+        os.replace(tmp_aux, aux_path)
+    elif aux_path.exists():
+        # No aux data this save but old aux file exists — remove it
+        aux_path.unlink()
+    os.replace(tmp_meta, meta_path)
+
+    # Clean up legacy single-file format if it still exists
+    if path.exists() and path != model_path:
+        path.unlink()
 
 
 def load_checkpoint(
@@ -167,6 +194,16 @@ def load_checkpoint(
     if not use_split and not path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {path} (also checked split format at {model_path})")
 
+    # Validate split checkpoint completeness — catch partially-written saves
+    if use_split and not meta_path.exists():
+        # model_path exists but meta_path doesn't: save was interrupted mid-rename.
+        # Stale temp files may be present; refuse to load an incomplete checkpoint.
+        raise RuntimeError(
+            f"Incomplete split checkpoint: {model_path} exists but {meta_path} is missing. "
+            f"This typically means a save was interrupted. "
+            f"Delete the partial files and resume from last.pt or an earlier checkpoint."
+        )
+
     if use_split:
         print(f"\n  \U0001f4c2 Loading split checkpoint from: {stem}_*.pt")
     else:
@@ -188,8 +225,8 @@ def load_checkpoint(
             # Optimizer loaded on-demand below (only if needed)
         else:
             checkpoint = torch.load(path, map_location=device, weights_only=False)
-    except (EOFError, pickle.UnpicklingError, RuntimeError) as e:
-        # Checkpoint file is corrupted or incomplete
+    except (EOFError, pickle.UnpicklingError, RuntimeError, FileNotFoundError) as e:
+        # Checkpoint file is corrupted, incomplete, or partially missing
         ckpt_loc = f"{stem}_*.pt" if use_split else str(path)
         print(f"\n  \u26a0\ufe0f  ERROR: Checkpoint file is corrupted or incomplete: {ckpt_loc}")
         print(f"      Error: {type(e).__name__}: {e}")
