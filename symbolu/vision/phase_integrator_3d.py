@@ -245,6 +245,52 @@ class PhaseIntegrator3D(nn.Module):
             "time_gamma": self.time_integrator._get_decay().detach().cpu(),
         }
 
+    @staticmethod
+    def compute_phase_correlation(
+        x: Tensor, y: Tensor, eps: float = 1e-8,
+    ) -> Tensor:
+        """
+        Compute phase correlation between feature vectors in diffusion
+        embedding space.
+
+        Uses the PhaseIntegrator's complex phasor interpretation:
+        feature dimensions are split into real/imaginary pairs and
+        phase correlation is computed as the average cosine of phase
+        differences.
+
+        Patent formula U1:
+            C[i,j] = (1/W) * sum_k cos(phi_i[k] - phi_j[k])
+
+        This bridges the ontological phase correlation (token-level)
+        with diffusion-level hidden states for FSCS-V.
+
+        Args:
+            x: Features [..., D]. Must have even D.
+            y: Features [..., D].
+            eps: Numerical stability.
+
+        Returns:
+            phase_corr: Phase correlation in [-1, 1], shape [...].
+        """
+        D = x.shape[-1]
+        half_D = D // 2
+
+        x_re, x_im = x[..., :half_D], x[..., half_D : 2 * half_D]
+        y_re, y_im = y[..., :half_D], y[..., half_D : 2 * half_D]
+
+        # Cross-correlation: Re(x * conj(y))
+        cross_re = x_re * y_re + x_im * y_im
+
+        # Magnitudes
+        x_mag = torch.sqrt(x_re ** 2 + x_im ** 2 + eps)
+        y_mag = torch.sqrt(y_re ** 2 + y_im ** 2 + eps)
+
+        # Normalized per-component phase correlation
+        phase_corr = cross_re / (x_mag * y_mag + eps)
+
+        # Average over feature components (formula U1)
+        return phase_corr.mean(dim=-1)
+
     def get_scan_states(
         self,
         x: Tensor,
