@@ -2151,6 +2151,18 @@ def train(config: UnifiedTrainingConfig):
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
+    # V11.3: Val PPL Stagnation Detector — reduce auxiliary loss weights
+    # when val PPL plateaus, redirecting gradient capacity to CE loss.
+    # Tracks last N val PPL values; when no improvement for `patience` evals,
+    # scales down SRK non-task lambdas and phase diversity weight.
+    _aux_loss_scale = 1.0           # Multiplier for SRK non-task lambdas + phase div
+    _val_ppl_best = float('inf')    # Best val PPL seen so far
+    _val_ppl_no_improve_count = 0   # Consecutive evals without improvement
+    _AUX_STAGNATION_PATIENCE = 5    # Evals without improvement before first reduction
+    _AUX_STAGNATION_DECAY = 0.5     # Multiply scale by this each trigger
+    _AUX_STAGNATION_FLOOR = 0.05    # Minimum auxiliary loss scale
+    _AUX_STAGNATION_IMPROVE_PCT = 0.5  # % improvement needed to reset counter
+
     # V9.8.0: RSS (Rational Sovereign Sequence) Controller
     rss_controller = None
     if config.enable_rss:
@@ -2679,9 +2691,11 @@ def train(config: UnifiedTrainingConfig):
 
                 if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
                     decorr_loss_tensor = outputs['decorr_loss']
-                    loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                    # V11.3: Scale decorrelation by _aux_loss_scale when val PPL stagnates
+                    _decorr_w = config.decorr_loss_weight * _aux_loss_scale
+                    loss = loss + _decorr_w * decorr_loss_tensor
                     metrics['decorr_loss'] = decorr_loss_tensor.item()
-                    metrics['decorr_weight'] = config.decorr_loss_weight
+                    metrics['decorr_weight'] = _decorr_w
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -2689,7 +2703,8 @@ def train(config: UnifiedTrainingConfig):
                 if enable_decorr and config.decorr_loss_weight > 0:
                     # Debug on first step only
                     ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
-                    loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                    # V11.3: Scale by _aux_loss_scale when val PPL stagnates
+                    loss = loss + _decorr_w * ortho_loss_tensor
                     metrics['ortho_loss'] = ortho_loss_tensor.item()
 
                 # V9.9.10/V9.9.12: Phase diversity loss (combat phase collapse)
@@ -2725,7 +2740,8 @@ def train(config: UnifiedTrainingConfig):
                         current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
 
                     # Scale the loss by the computed weight
-                    phase_div_loss = phase_div_loss_raw * current_weight
+                    # V11.3: Further scale by _aux_loss_scale when val PPL stagnates
+                    phase_div_loss = phase_div_loss_raw * current_weight * _aux_loss_scale
 
                     if phase_div_loss.requires_grad:
                         loss = loss + phase_div_loss
@@ -2806,14 +2822,16 @@ def train(config: UnifiedTrainingConfig):
                     srk_diagnostics = srk_result.get('diagnostics', {})
 
                     # Update lambda values via annealer
+                    # V11.3: Apply _aux_loss_scale to non-task lambdas when val PPL stagnates
                     if srk_annealer is not None:
                         annealed_lambdas = srk_annealer.get_lambdas(global_step)
                         srk_loss_fn.config.lambda_f = annealed_lambdas['lambda_f']
                         srk_loss_fn.config.lambda_b = annealed_lambdas['lambda_b']
-                        srk_loss_fn.config.lambda_c = annealed_lambdas['lambda_c']
-                        srk_loss_fn.config.lambda_entropy = annealed_lambdas['lambda_entropy']
-                        srk_loss_fn.config.lambda_coherence = annealed_lambdas['lambda_coherence']
+                        srk_loss_fn.config.lambda_c = annealed_lambdas['lambda_c'] * _aux_loss_scale
+                        srk_loss_fn.config.lambda_entropy = annealed_lambdas['lambda_entropy'] * _aux_loss_scale
+                        srk_loss_fn.config.lambda_coherence = annealed_lambdas['lambda_coherence'] * _aux_loss_scale
                         srk_diagnostics['annealer_phase'] = srk_annealer.get_phase_name(global_step)
+                        srk_diagnostics['aux_loss_scale'] = _aux_loss_scale
 
                     # Compute SRK loss (B1/U2/S8 patent formulas)
                     # V10.7: Skip when logits are None (TBPTT frees per-chunk logits)
@@ -2838,14 +2856,17 @@ def train(config: UnifiedTrainingConfig):
                     # by re-adding them after SRK replaces the loss
                     loss = srk_loss
                     if enable_decorr and config.decorr_loss_weight > 0:
+                        # V11.3: Use scaled decorr weight when val PPL stagnates
+                        _decorr_w_srk = config.decorr_loss_weight * _aux_loss_scale
                         if decorr_loss_tensor is not None:
-                            loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                            loss = loss + _decorr_w_srk * decorr_loss_tensor
                         if ortho_loss_tensor is not None:
-                            loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                            loss = loss + _decorr_w_srk * ortho_loss_tensor
 
                     # V9.9.12c: Re-add phase diversity loss (for gradient flow to W_k_phase)
+                    # V11.3: Scale by _aux_loss_scale when val PPL stagnates
                     if phase_div_loss_tensor is not None and phase_div_weight_for_srk > 0:
-                        loss = loss + phase_div_weight_for_srk * phase_div_loss_tensor
+                        loss = loss + phase_div_weight_for_srk * _aux_loss_scale * phase_div_loss_tensor
 
                     # Update karma state for O12→O1 carryover (Toroidal Loop)
                     with torch.no_grad():
@@ -2863,10 +2884,12 @@ def train(config: UnifiedTrainingConfig):
                     if (global_step % config.log_every == 0 and global_step > 0 and
                         (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_name = srk_diagnostics.get('annealer_phase', 'UNKNOWN')
+                        _aux_scale_str = f" | aux_scale={_aux_loss_scale:.3f}" if _aux_loss_scale < 1.0 else ""
                         print(f"  [SRK] Step {global_step} | Phase: {phase_name} | "
                               f"L_total={srk_metrics.get('L_total', 0):.4f} | "
                               f"L_B1={srk_metrics.get('L_lagrangian', 0):.4f} | "
-                              f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}")
+                              f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}"
+                              f"{_aux_scale_str}")
 
             # Phase-JEPA: Joint Embedding Predictive Loss Integration
             jepa_metrics = {}
@@ -5165,6 +5188,33 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V11.3: Val PPL Stagnation Detector — auto-reduce auxiliary losses
+                # when val PPL plateaus to redirect gradient capacity to CE loss.
+                _improvement = (_val_ppl_best - val_ppl) / max(_val_ppl_best, 1.0) * 100
+                if _improvement > _AUX_STAGNATION_IMPROVE_PCT:
+                    # Meaningful improvement — reset counter, restore scale slowly
+                    _val_ppl_best = val_ppl
+                    _val_ppl_no_improve_count = 0
+                    if _aux_loss_scale < 1.0:
+                        _aux_loss_scale = min(1.0, _aux_loss_scale * 1.5)
+                        print(f"  📈 [AUX-SCALE] Val PPL improved to {val_ppl:.2f}! "
+                              f"Restoring aux scale → {_aux_loss_scale:.3f}")
+                else:
+                    _val_ppl_no_improve_count += 1
+                    if _val_ppl_no_improve_count >= _AUX_STAGNATION_PATIENCE:
+                        old_scale = _aux_loss_scale
+                        _aux_loss_scale = max(
+                            _AUX_STAGNATION_FLOOR,
+                            _aux_loss_scale * _AUX_STAGNATION_DECAY,
+                        )
+                        if old_scale != _aux_loss_scale:
+                            print(f"  ⚠️ [AUX-SCALE] Val PPL stagnant for "
+                                  f"{_val_ppl_no_improve_count} evals "
+                                  f"(best={_val_ppl_best:.2f}, current={val_ppl:.2f}). "
+                                  f"Reducing auxiliary loss scale: {old_scale:.3f} → "
+                                  f"{_aux_loss_scale:.3f}")
+                        _val_ppl_no_improve_count = 0  # Reset for next patience window
+
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
                 # Runs during evaluation intervals to monitor behavioral stability
                 if config.model_type in ('phase', 'hybrid', 'ontological_hybrid'):
@@ -5890,7 +5940,8 @@ def train(config: UnifiedTrainingConfig):
                             if 'jepa_inj_cap_violated' in metrics:
                                 tb_writer.add_scalar("jepa_injection/cap_violated", 1.0, global_step)
                 else:
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
+                    _aux_str = f" | aux_scale={_aux_loss_scale:.2f}" if _aux_loss_scale < 1.0 else ""
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}{_aux_str}", flush=True)
 
                 # Sovereign Alert Monitor - Auto-Pivot Logic
                 if alert_monitor is not None:
