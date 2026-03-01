@@ -5259,19 +5259,34 @@ class AdaptiveTrainingController:
             if is_plateau:
                 self.plateau_count += 1
 
-            # Only boost if we're not already at max
-            new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
-            if new_lr != current_lr and new_lr > current_lr:
-                for pg in self.optimizer.param_groups:
-                    pg['lr'] = new_lr
-                # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
-                if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
-                    self._scheduler.adjust_base_lr(new_lr)
-                self.boost_count += 1
+            # Skip futile boosts: if cosine schedule has decayed below lr_min floor,
+            # boosting base_lr just gets cosine-decayed back below floor within a few
+            # steps. The floor clamp already maintains lr_min — boosting is pointless.
+            cosine_below_floor = (
+                self._scheduler is not None and
+                hasattr(self._scheduler, '_get_cosine_lr') and
+                self._scheduler._get_cosine_lr() < self.lr_min
+            )
+
+            if cosine_below_floor:
                 reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
-                adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
-                print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
-                self.last_adjustment_step = global_step
+                if not hasattr(self, '_floor_boost_skip_logged') or not self._floor_boost_skip_logged:
+                    print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST SKIPPED ({reason}) - cosine schedule below floor, boost would be futile")
+                    self._floor_boost_skip_logged = True
+            else:
+                # Only boost if we're not already at max
+                new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
+                if new_lr != current_lr and new_lr > current_lr:
+                    for pg in self.optimizer.param_groups:
+                        pg['lr'] = new_lr
+                    # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                    if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                        self._scheduler.adjust_base_lr(new_lr)
+                    self.boost_count += 1
+                    reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                    adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                    print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                    self.last_adjustment_step = global_step
         elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
             # Log that boost was blocked
             reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
@@ -14337,7 +14352,10 @@ def train(config: UnifiedTrainingConfig):
                         # Run a single forward pass to capture phase tensors
                         with torch.no_grad():
                             if cached_val_batches and len(cached_val_batches) > 0:
-                                health_batch = cached_val_batches[0]
+                                # Rotate through cached batches so R_k isn't frozen
+                                # on the same input every eval step
+                                health_batch_idx = (global_step // config.log_every) % len(cached_val_batches)
+                                health_batch = cached_val_batches[health_batch_idx]
                             else:
                                 health_batch = next(iter(val_loader))
                             # V11.2: Truncate to avoid OOM — full seq_len forward
@@ -14356,7 +14374,13 @@ def train(config: UnifiedTrainingConfig):
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
-                        print(f"     └─ Phase Drift Std:       {health_metrics['phase_drift_std']:.4f}")
+                        print(f"     ├─ Phase Drift Std:       {health_metrics['phase_drift_std']:.4f}")
+                        # Show phase diversity loss status if active
+                        if phase_diversity_enabled and phase_diversity_controller is not None:
+                            pd_status = phase_diversity_controller.get_status()
+                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}")
+                        else:
+                            print(f"     └─ Phase Diversity:       OFF")
 
                         # Add to metrics for tensorboard/wandb logging
                         for k, v in health_metrics.items():
@@ -15521,6 +15545,15 @@ def load_checkpoint(
         print(f"    ✓ EvoFlow state available for restoration")
 
     # KV Supervision state
+    if "kv_supervisor_state" in checkpoint:
+        result["kv_supervisor_state"] = checkpoint["kv_supervisor_state"]
+        print(f"    \u2713 KV Supervision state available for restoration")
+
+    # Appendix G Phase 4: JEPA injection projector state
+    if "jepa_injection_projector_state" in checkpoint:
+        result["jepa_injection_projector_state"] = checkpoint["jepa_injection_projector_state"]
+        print(f"    \u2713 JEPA injection projector state available for restoration")
+
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
         result["dataloader_position"] = checkpoint["dataloader_position"]
