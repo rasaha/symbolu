@@ -1538,11 +1538,12 @@ class AdaptivePhaseDiversityController:
         self.R_ema = 0.5  # Initial estimate (neutral)
         self.step_count = 0
 
-        # V11.4: Stall detection — escalate if R_ema not converging
+        # V11.4b: Stall detection — escalate if R_ema not converging
         self._stall_check_R = None  # R_ema at last stall check
         self._stall_check_step = 0  # Step at last stall check
-        self._stall_window = 300  # Check every N steps
-        self._stall_threshold = 0.01  # Must improve by this much
+        # Shorter window when ramp_multiplier=0 (emergency auto-enable)
+        self._stall_window = 100 if ramp_multiplier == 0.0 else 300
+        self._stall_threshold = 0.005  # Must improve R by this much
         self._escalation_count = 0  # How many times we've escalated
 
         # Diagnostics

@@ -5224,20 +5224,20 @@ def train(config: UnifiedTrainingConfig):
                             phase_diversity_controller = AdaptivePhaseDiversityController(
                                 warmup_steps=config.warmup_steps,
                                 target_R=0.3,
-                                lambda_init=0.001,
-                                lambda_max=1.0,   # V11.4: raised from 0.5
-                                eta=0.3,          # V11.4: raised from 0.2
+                                lambda_init=0.01,     # V11.4b: raised from 0.001
+                                lambda_max=2.0,       # V11.4b: raised from 1.0
+                                eta=0.3,
                                 ramp_multiplier=0.0,  # No ramp — collapse is already severe
                                 task_loss_scaling=True,
-                                task_loss_alpha=0.15,  # V11.4: raised from 0.05 (log-scaled now)
+                                task_loss_alpha=0.40,  # V11.4b: raised from 0.15 (need ~5-10% of task loss)
                             )
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
                             print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
-                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (urgency α=0.15, log-scaled)")
-                            print(f"     ├─ λ_max: 1.0, η: 0.3 (aggressive adaptation)")
+                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (urgency α=0.40, log-scaled)")
+                            print(f"     ├─ λ_max: 2.0, η: 0.3 (aggressive adaptation)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
                     except Exception as e:
