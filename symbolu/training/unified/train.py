@@ -5223,21 +5223,21 @@ def train(config: UnifiedTrainingConfig):
                             num_phase_layers = enable_phase_diversity_capture(model, enable=True)
                             phase_diversity_controller = AdaptivePhaseDiversityController(
                                 warmup_steps=config.warmup_steps,
-                                target_R=0.3,
-                                lambda_init=0.01,     # V11.4b: raised from 0.001
-                                lambda_max=2.0,       # V11.4b: raised from 1.0
+                                target_R=0.45,    # V11.4c: raised from 0.30 — prevent collapse without starving LM
+                                lambda_init=0.01,
+                                lambda_max=0.5,   # V11.4c: lowered from 2.0 — less aggressive ceiling
                                 eta=0.3,
                                 ramp_multiplier=0.0,  # No ramp — collapse is already severe
                                 task_loss_scaling=True,
-                                task_loss_alpha=0.40,  # V11.4b: raised from 0.15 (need ~5-10% of task loss)
+                                task_loss_alpha=0.40,
                             )
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
-                            print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
-                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (urgency α=0.40, log-scaled)")
-                            print(f"     ├─ λ_max: 2.0, η: 0.3 (aggressive adaptation)")
+                            print(f"     ├─ Target R: 0.45 (current R_k: {health_metrics['R_k']:.4f})")
+                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (α=0.40, log-scaled)")
+                            print(f"     ├─ λ_max: 0.5, η: 0.3 (collapse guard, not diversity maximizer)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
                     except Exception as e:
