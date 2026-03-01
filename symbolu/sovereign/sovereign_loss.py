@@ -377,7 +377,13 @@ class SovereignAnnealer:
             return self._get_default_lambdas(current_step)
 
     def _get_default_lambdas(self, current_step: int) -> Dict[str, float]:
-        """Default mode: ramp UP ontological constraints."""
+        """Default mode: ramp UP ontological constraints.
+
+        V11.3: Added STABILIZATION sub-phase (warmup → 2*warmup) with reduced
+        non-task lambdas to prioritize CE loss while the model is still learning
+        basic language patterns. Full-strength lambdas only engage once the model
+        has had time to establish good CE performance.
+        """
         if current_step < self.warmup_steps:
             # Phase 1: Learn to Speak (System 1 dominant)
             progress = current_step / self.warmup_steps
@@ -389,8 +395,20 @@ class SovereignAnnealer:
                 'lambda_entropy': 0.1 + (progress * 0.2),  # SCC constraint (ramping)
                 'lambda_coherence': 0.1 + (progress * 0.1),  # USE constraint (ramping)
             }
+        elif current_step < self.warmup_steps * 3:
+            # Phase 2a: STABILIZATION — CE-priority with gentle auxiliary ramp
+            # Non-task lambdas at 30% of target, ramping to 100% over 2*warmup steps
+            stab_progress = (current_step - self.warmup_steps) / (self.warmup_steps * 2)
+            stab_scale = 0.3 + 0.7 * stab_progress  # 0.3 → 1.0
+            return {
+                'lambda_f': 1.0,
+                'lambda_b': stab_scale,
+                'lambda_c': 0.5 * stab_scale,
+                'lambda_entropy': 0.3 * stab_scale,
+                'lambda_coherence': 0.2 * stab_scale,
+            }
         else:
-            # Phase 2: Learn to Reason (System 2 engaged)
+            # Phase 2b: Full Reasoning (System 2 fully engaged)
             return {
                 'lambda_f': 1.0,
                 'lambda_b': 1.0,
@@ -458,6 +476,8 @@ class SovereignAnnealer:
                 return "LINGUISTIC_FOUNDATION"
             elif current_step < self.warmup_steps * 2:
                 return "ONTOLOGICAL_ALIGNMENT"
+            elif current_step < self.warmup_steps * 3:
+                return "STABILIZATION_CE_PRIORITY"
             elif current_step < self.total_steps * 0.5:
                 return "STABILIZATION"
             else:

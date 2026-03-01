@@ -2151,6 +2151,18 @@ def train(config: UnifiedTrainingConfig):
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
+    # V11.3: Val PPL Stagnation Detector — reduce auxiliary loss weights
+    # when val PPL plateaus, redirecting gradient capacity to CE loss.
+    # Tracks last N val PPL values; when no improvement for `patience` evals,
+    # scales down SRK non-task lambdas and phase diversity weight.
+    _aux_loss_scale = 1.0           # Multiplier for SRK non-task lambdas + phase div
+    _val_ppl_best = float('inf')    # Best val PPL seen so far
+    _val_ppl_no_improve_count = 0   # Consecutive evals without improvement
+    _AUX_STAGNATION_PATIENCE = 5    # Evals without improvement before first reduction
+    _AUX_STAGNATION_DECAY = 0.5     # Multiply scale by this each trigger
+    _AUX_STAGNATION_FLOOR = 0.05    # Minimum auxiliary loss scale
+    _AUX_STAGNATION_IMPROVE_PCT = 0.5  # % improvement needed to reset counter
+
     # V9.8.0: RSS (Rational Sovereign Sequence) Controller
     rss_controller = None
     if config.enable_rss:
@@ -2679,9 +2691,11 @@ def train(config: UnifiedTrainingConfig):
 
                 if enable_decorr and isinstance(outputs, dict) and 'decorr_loss' in outputs:
                     decorr_loss_tensor = outputs['decorr_loss']
-                    loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                    # V11.3: Scale decorrelation by _aux_loss_scale when val PPL stagnates
+                    _decorr_w = config.decorr_loss_weight * _aux_loss_scale
+                    loss = loss + _decorr_w * decorr_loss_tensor
                     metrics['decorr_loss'] = decorr_loss_tensor.item()
-                    metrics['decorr_weight'] = config.decorr_loss_weight
+                    metrics['decorr_weight'] = _decorr_w
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -2689,7 +2703,8 @@ def train(config: UnifiedTrainingConfig):
                 if enable_decorr and config.decorr_loss_weight > 0:
                     # Debug on first step only
                     ortho_loss_tensor = compute_weight_orthogonalization_loss(model, debug=(global_step == 1))
-                    loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                    # V11.3: Scale by _aux_loss_scale when val PPL stagnates
+                    loss = loss + _decorr_w * ortho_loss_tensor
                     metrics['ortho_loss'] = ortho_loss_tensor.item()
 
                 # V9.9.10/V9.9.12: Phase diversity loss (combat phase collapse)
@@ -2725,6 +2740,8 @@ def train(config: UnifiedTrainingConfig):
                         current_weight = config.phase_diversity_weight * (0.1 + 0.9 * ramp_progress)
 
                     # Scale the loss by the computed weight
+                    # V11.3.1: Phase diversity is EXEMPT from aux_loss_scale — it's therapeutic
+                    # (fixing key collapse), not parasitic. Scaling it down worsens R_k.
                     phase_div_loss = phase_div_loss_raw * current_weight
 
                     if phase_div_loss.requires_grad:
@@ -2806,14 +2823,16 @@ def train(config: UnifiedTrainingConfig):
                     srk_diagnostics = srk_result.get('diagnostics', {})
 
                     # Update lambda values via annealer
+                    # V11.3: Apply _aux_loss_scale to non-task lambdas when val PPL stagnates
                     if srk_annealer is not None:
                         annealed_lambdas = srk_annealer.get_lambdas(global_step)
                         srk_loss_fn.config.lambda_f = annealed_lambdas['lambda_f']
                         srk_loss_fn.config.lambda_b = annealed_lambdas['lambda_b']
-                        srk_loss_fn.config.lambda_c = annealed_lambdas['lambda_c']
-                        srk_loss_fn.config.lambda_entropy = annealed_lambdas['lambda_entropy']
-                        srk_loss_fn.config.lambda_coherence = annealed_lambdas['lambda_coherence']
+                        srk_loss_fn.config.lambda_c = annealed_lambdas['lambda_c'] * _aux_loss_scale
+                        srk_loss_fn.config.lambda_entropy = annealed_lambdas['lambda_entropy'] * _aux_loss_scale
+                        srk_loss_fn.config.lambda_coherence = annealed_lambdas['lambda_coherence'] * _aux_loss_scale
                         srk_diagnostics['annealer_phase'] = srk_annealer.get_phase_name(global_step)
+                        srk_diagnostics['aux_loss_scale'] = _aux_loss_scale
 
                     # Compute SRK loss (B1/U2/S8 patent formulas)
                     # V10.7: Skip when logits are None (TBPTT frees per-chunk logits)
@@ -2838,12 +2857,15 @@ def train(config: UnifiedTrainingConfig):
                     # by re-adding them after SRK replaces the loss
                     loss = srk_loss
                     if enable_decorr and config.decorr_loss_weight > 0:
+                        # V11.3: Use scaled decorr weight when val PPL stagnates
+                        _decorr_w_srk = config.decorr_loss_weight * _aux_loss_scale
                         if decorr_loss_tensor is not None:
-                            loss = loss + config.decorr_loss_weight * decorr_loss_tensor
+                            loss = loss + _decorr_w_srk * decorr_loss_tensor
                         if ortho_loss_tensor is not None:
-                            loss = loss + config.decorr_loss_weight * ortho_loss_tensor
+                            loss = loss + _decorr_w_srk * ortho_loss_tensor
 
                     # V9.9.12c: Re-add phase diversity loss (for gradient flow to W_k_phase)
+                    # V11.3.1: Phase diversity EXEMPT from aux_loss_scale (therapeutic)
                     if phase_div_loss_tensor is not None and phase_div_weight_for_srk > 0:
                         loss = loss + phase_div_weight_for_srk * phase_div_loss_tensor
 
@@ -2863,10 +2885,12 @@ def train(config: UnifiedTrainingConfig):
                     if (global_step % config.log_every == 0 and global_step > 0 and
                         (accumulation_step + 1) % config.gradient_accumulation == 0):
                         phase_name = srk_diagnostics.get('annealer_phase', 'UNKNOWN')
+                        _aux_scale_str = f" | aux_scale={_aux_loss_scale:.3f}" if _aux_loss_scale < 1.0 else ""
                         print(f"  [SRK] Step {global_step} | Phase: {phase_name} | "
                               f"L_total={srk_metrics.get('L_total', 0):.4f} | "
                               f"L_B1={srk_metrics.get('L_lagrangian', 0):.4f} | "
-                              f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}")
+                              f"s_f={srk_metrics.get('s_f', 0):.3f} s_b={srk_metrics.get('s_b', 0):.3f}"
+                              f"{_aux_scale_str}")
 
             # Phase-JEPA: Joint Embedding Predictive Loss Integration
             jepa_metrics = {}
@@ -5165,6 +5189,37 @@ def train(config: UnifiedTrainingConfig):
                 val_ppl = val_metrics['ppl']
                 last_val_ppl = val_ppl  # V9.7.0: Update for EvoFlow Fluency Gate
 
+                # V11.3: Val PPL Stagnation Detector — auto-reduce auxiliary losses
+                # when val PPL plateaus to redirect gradient capacity to CE loss.
+                # V11.3.3: Fix inf initialization — first eval seeds the baseline
+                if _val_ppl_best == float('inf'):
+                    _val_ppl_best = val_ppl
+                    print(f"  📊 [AUX-SCALE] Baseline val PPL set to {val_ppl:.2f}")
+                _improvement = (_val_ppl_best - val_ppl) / max(_val_ppl_best, 1.0) * 100
+                if _improvement > _AUX_STAGNATION_IMPROVE_PCT:
+                    # Meaningful improvement — reset counter, restore scale slowly
+                    _val_ppl_best = val_ppl
+                    _val_ppl_no_improve_count = 0
+                    if _aux_loss_scale < 1.0:
+                        _aux_loss_scale = min(1.0, _aux_loss_scale * 1.5)
+                        print(f"  📈 [AUX-SCALE] Val PPL improved to {val_ppl:.2f}! "
+                              f"Restoring aux scale → {_aux_loss_scale:.3f}")
+                else:
+                    _val_ppl_no_improve_count += 1
+                    if _val_ppl_no_improve_count >= _AUX_STAGNATION_PATIENCE:
+                        old_scale = _aux_loss_scale
+                        _aux_loss_scale = max(
+                            _AUX_STAGNATION_FLOOR,
+                            _aux_loss_scale * _AUX_STAGNATION_DECAY,
+                        )
+                        if old_scale != _aux_loss_scale:
+                            print(f"  ⚠️ [AUX-SCALE] Val PPL stagnant for "
+                                  f"{_val_ppl_no_improve_count} evals "
+                                  f"(best={_val_ppl_best:.2f}, current={val_ppl:.2f}). "
+                                  f"Reducing auxiliary loss scale: {old_scale:.3f} → "
+                                  f"{_aux_loss_scale:.3f}")
+                        _val_ppl_no_improve_count = 0  # Reset for next patience window
+
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
                 # Runs during evaluation intervals to monitor behavioral stability
                 if config.model_type in ('phase', 'hybrid', 'ontological_hybrid'):
@@ -5235,11 +5290,55 @@ def train(config: UnifiedTrainingConfig):
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
+                            _rk_above_threshold_count = 0  # V11.3.1: Track for emergency escalation
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
                             print(f"     ├─ Target R: 0.45 (current R_k: {health_metrics['R_k']:.4f})")
                             print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (α=0.40, log-scaled)")
                             print(f"     ├─ λ_max: 0.5, η: 0.3 (collapse guard, not diversity maximizer)")
                             print(f"     └─ Layers: {num_phase_layers}")
+
+                        # V11.3.3: R_k Emergency Escalation (robust)
+                        # V11.3.2 required 5 CONSECUTIVE checks above 0.5, but R_k
+                        # oscillates right at the boundary (0.499→0.501→0.499), so the
+                        # counter kept resetting and the emergency never fired.
+                        # Fix: lower threshold to 0.45, reduce patience to 3, and
+                        # only decrement (not reset) when R_k dips below threshold.
+                        elif (phase_diversity_enabled and
+                                phase_diversity_controller is not None and
+                                health_metrics['R_k'] > 0.45):
+                            if not hasattr(phase_diversity_controller, '_rk_emergency_count'):
+                                phase_diversity_controller._rk_emergency_count = 0
+                            phase_diversity_controller._rk_emergency_count += 1
+
+                            if (phase_diversity_controller._rk_emergency_count >= 3 and
+                                    phase_diversity_controller.current_lambda < phase_diversity_controller.lambda_max * 0.5):
+                                old_lambda = phase_diversity_controller.current_lambda
+                                floor_val = phase_diversity_controller.lambda_max * 0.5
+                                phase_diversity_controller.current_lambda = floor_val
+                                phase_diversity_controller.lambda_floor = floor_val
+                                phase_diversity_controller.eta = min(0.5, phase_diversity_controller.eta * 2)
+                                phase_diversity_controller._rk_emergency_count = 0
+                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] R_k={health_metrics['R_k']:.4f} stuck above 0.45 "
+                                      f"for 3+ evals — force-escalating:")
+                                print(f"     ├─ λ: {old_lambda:.4f} → {floor_val:.4f} "
+                                      f"(jumped to λ_max/2, floor set)")
+                                print(f"     ├─ η: {phase_diversity_controller.eta:.2f} (doubled for faster response)")
+                                print(f"     └─ λ_floor={floor_val:.4f} prevents task-loss formula from overriding")
+                        else:
+                            # R_k below 0.45 — decrement counter (don't hard-reset)
+                            # Only fully clear floor once R_k drops well below threshold
+                            if (phase_diversity_enabled and
+                                    phase_diversity_controller is not None and
+                                    hasattr(phase_diversity_controller, '_rk_emergency_count')):
+                                # Decrement by 1 instead of resetting to 0
+                                phase_diversity_controller._rk_emergency_count = max(
+                                    0, phase_diversity_controller._rk_emergency_count - 1)
+                                # Only clear floor when R_k is genuinely healthy (< 0.35)
+                                if (health_metrics['R_k'] < 0.35 and
+                                        hasattr(phase_diversity_controller, 'lambda_floor')):
+                                    if phase_diversity_controller.lambda_floor > 0:
+                                        print(f"  ✅ [PHASE-DIV] R_k={health_metrics['R_k']:.4f} healthy — clearing emergency λ_floor")
+                                    phase_diversity_controller.lambda_floor = 0.0
 
                     except Exception as e:
                         print(f"\n  ⚠️ [PHASE HEALTH] Diagnostic failed: {e}")
@@ -5893,7 +5992,8 @@ def train(config: UnifiedTrainingConfig):
                             if 'jepa_inj_cap_violated' in metrics:
                                 tb_writer.add_scalar("jepa_injection/cap_violated", 1.0, global_step)
                 else:
-                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}", flush=True)
+                    _aux_str = f" | aux_scale={_aux_loss_scale:.2f}" if _aux_loss_scale < 1.0 else ""
+                    print(f"  --> Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.2f}{_aux_str}", flush=True)
 
                 # Sovereign Alert Monitor - Auto-Pivot Logic
                 if alert_monitor is not None:

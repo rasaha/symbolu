@@ -1537,6 +1537,9 @@ class AdaptivePhaseDiversityController:
         self.current_lambda = 0.0  # Starts at 0, ramps up
         self.R_ema = 0.5  # Initial estimate (neutral)
         self.step_count = 0
+        # V11.3.2: Emergency floor — prevents task-loss scaling from overwriting
+        # force-jumps set by the training loop's emergency escalation.
+        self.lambda_floor = 0.0
 
         # V11.4b: Stall detection — escalate if R_ema not converging
         self._stall_check_R = None  # R_ema at last stall check
@@ -1662,6 +1665,22 @@ class AdaptivePhaseDiversityController:
                 )
                 if self.current_lambda < self.lambda_init:
                     self.current_lambda = self.lambda_init
+
+        # V11.3.3: Proportional minimum λ when collapse is significant
+        # The task-loss scaling formula has a structural ceiling:
+        #   λ = α * task_loss * (R_ema - target) ≈ 0.05 * 5.6 * 0.19 = 0.053
+        # This is too weak to fix R_k ≈ 0.50 collapse. When R_ema exceeds target
+        # by a significant margin, enforce a minimum proportional to the gap.
+        if self.task_loss_scaling and self.R_ema > self.target_R + 0.10:
+            gap_ratio = (self.R_ema - self.target_R) / self.target_R
+            proportional_min = self.lambda_max * min(0.5, gap_ratio)
+            if self.current_lambda < proportional_min:
+                self.current_lambda = proportional_min
+
+        # V11.3.2: Enforce emergency floor (set by train loop when R_k > 0.5 persists)
+        # Without this, task-loss scaling overwrites emergency force-jumps each step.
+        if self.lambda_floor > 0 and self.current_lambda < self.lambda_floor:
+            self.current_lambda = self.lambda_floor
 
         # Apply bounds
         self.current_lambda = max(self.lambda_min, min(self.lambda_max, self.current_lambda))
