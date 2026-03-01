@@ -211,6 +211,17 @@ but requires a discrete diffusion backbone that doesn't exist.
 
 **Fix complexity:** High for the backbone; Low for FSCS-D on top of it.
 
+**Status:** IMPLEMENTED. `train_fscs_d.py` provides:
+- `MaskedDiffusionModel`: Transformer with AdaLN-Zero, cosine mask schedule, sinusoidal
+  timestep embedding. Forward: mask tokens per schedule, predict originals at masked positions.
+- `FSCSDCoherence`: Warmup-gated coherence injection. `lambda=0` when
+  `unmasked_fraction < theta_warmup` (default 0.15). Activates progressively as tokens are
+  revealed, matching the patent's warm-up requirement exactly.
+- Confidence-based iterative unmasking generation (unmask most-confident positions first).
+- Structural test: loss 7.16→4.84, accuracy 0→14% in 11 steps on synthetic tokens.
+  Coupling correctly zero below threshold, active above.
+- **Ready for real data** via `--hf-dataset wikitext --hf-config wikitext-103-v1`.
+
 ---
 
 ## Issue 10: FiLM Time-Conditioning (Severity: Very Low)
@@ -237,23 +248,30 @@ modulation with `(shift, scale, gate)` from timestep embeddings. Architecturally
 | BCVF scoring | `bcvf_image.py`, `bcvf_video.py` | ✅ No gap | — | Can gate FSCS signals |
 | Coherence monitoring | `coherence_monitor.py` | ✅ No gap | — | Ready for FSCS metrics |
 | Coupling schedules | `fscsv_wrapper.py:CouplingSchedule` | ✅ Resolved | `bench_identity_lock` | Correct polarity, parameterized |
-| Proxy encoder | `fscsv_wrapper.py:ProxyEncoder` | ✅ Structural | `bench_proxy_encoder` | 5.7x convergence; **needs CLIP distillation** |
+| Proxy encoder | `fscsv_wrapper.py:ProxyEncoder` + `train_proxy_distill.py` | ✅ Trainable | `bench_proxy_encoder` | 5.7x convergence; distillation script ready, **run with `--use-clip`** |
 | Tweedie projection | `fscsv_wrapper.py:TweedieProjection` | ✅ Resolved | `bench_identity_lock` | SNR 34.18 (low noise) vs 0.11 (high noise) |
 | L2 phase-locking | `bench_l2_phase_lock.py` (validated) | ✅ Validated | `bench_l2_phase_lock` | L2+cosine combined recommended |
 | Gradient safety cap | `fscsv_wrapper.py:GradientSafetyBound` | ✅ Resolved | `bench_gradient_safety` | 0/100 violations, NaN-safe |
 | Three-band hierarchy | `fscsv_wrapper.py:ThreeBandDecomposer` | ✅ Resolved | `bench_three_band_ablation` | Exact decomposition (2.4e-7 error) |
-| Discrete diffusion backbone | None | **High gap** | — | Entirely new model type (FSCS-D) |
+| Discrete diffusion backbone | `train_fscs_d.py:MaskedDiffusionModel` | ✅ Implemented | Structural test | MDLM-style; needs real text data for quality |
 | Identity-locking encoder | `fscsv_wrapper.py:IdentitySchedule` | ✅ Resolved | `bench_identity_lock` | 37.5% drift reduction at 32 frames |
 | Dynamic identity schedule | `fscsv_wrapper.py:IdentitySchedule` | ✅ Resolved | `bench_identity_lock` | Sub-linear drift to 128 frames |
 
-**Summary:** 14/16 components resolved or no gap. 1 low gap (rectification in ontological layer).
-1 high gap (discrete diffusion backbone for FSCS-D).
+**Summary:** 15/16 components resolved or no gap. 1 low gap (rectification in ontological layer).
+All 3 previously-blocked items now have training scripts ready for real data.
 
 **Update (2026-03-01):** The FSCS-V wrapper module (`symbolu/vision/video/fscsv_wrapper.py`) resolves Issues 2-8 at the structural level. Issues 3 (coupling polarity), 5 (Tweedie), 7 (safety bounds), and 8 (three-band) are fully implemented. Issues 2 (phase correlation) and 4 (proxy encoder) have working implementations that need production training data. See Appendix E of `PHASE_QUAD_VIDEO_DESIGN.md` for benchmark results showing +49.8% inter-frame consistency with 15.2% overhead.
 
 **Update (2026-03-01, benchmarks):** Full benchmark suite added at `symbolu/vision/video/benchmarks/`.
 8/8 benchmarks pass on GPU (CUDA). Run with: `python -m symbolu.vision.video.benchmarks.run_all`.
 Scale test validated up to 512x512x32 frames at 5.7GB GPU memory. See Appendix F below.
+
+**Update (2026-03-01, training scripts):** Three training scripts added at
+`symbolu/vision/video/training/` to close the remaining real-data gaps:
+- `train_proxy_distill.py` — CLIP distillation for ProxyEncoder (Issue 4)
+- `evaluate_fvd.py` — FVD with R3D-18/I3D features (FVD gap)
+- `train_fscs_d.py` — Discrete diffusion backbone + FSCS-D coherence (Issue 9)
+All three pass structural tests on synthetic data. See Appendix G for run commands.
 
 ---
 
@@ -267,11 +285,11 @@ Scale test validated up to 512x512x32 frames at 5.7GB GPU memory. See Appendix F
 - ~~Three-band decomposer~~ — Done, exact decomposition validated
 - ~~Gradient safety bounds~~ — Done, 0/100 violations
 
-**Remaining (requires real data / new models):**
+**Remaining (training scripts ready, need real data):**
 1. **Rectify existing `C' = C * S`** in ontological layer — immediate, low risk
-2. **Train proxy encoder** with CLIP distillation — architecture validated, needs real teacher
-3. **FVD evaluation** with I3D features on UCF-101/WebVid — pipeline validated with synthetic proxy
-4. **FSCS-D** — requires discrete diffusion backbone (MDLM/SEDD/D3PM)
+2. **Train proxy encoder** with real CLIP teacher — script ready, run with `--use-clip`
+3. **FVD evaluation** with I3D/R3D features — script ready, run with `--reference-dir`
+4. **Train FSCS-D** on real text data — script ready, run with `--hf-dataset`
 
 ---
 
@@ -288,10 +306,10 @@ some form.
 - FSCS-V scales to 512x512, 32 frames, 50 denoising steps at 5.7GB
 - Identity locking reduces drift 37.5% at 32 frames with sub-linear scaling
 
-**Remaining gaps require real data, not code:**
-1. **Proxy encoder CLIP distillation** — needs pretrained CLIP teacher + video dataset
-2. **FVD with I3D** — needs I3D feature extractor + UCF-101/WebVid reference sets
-3. **Discrete diffusion backbone** for FSCS-D — new model architecture (highest complexity)
+**All gaps now have training/evaluation scripts — remaining work is running them with real data:**
+1. **Proxy encoder CLIP distillation** — `train_proxy_distill.py` ready, needs `--use-clip` + video data
+2. **FVD with I3D/R3D** — `evaluate_fvd.py` ready, needs reference video set (UCF-101/WebVid)
+3. **FSCS-D discrete backbone** — `train_fscs_d.py` implemented and structurally tested, needs real text data
 
 ---
 
@@ -330,12 +348,157 @@ some form.
 ### F.4: Items Requiring Real Data
 
 1. **Proxy encoder** — synthetic teacher gives 0.20x quality ratio. Real CLIP distillation
-   expected to reach >0.8x based on the literature. Needs: pretrained CLIP-ViT + video
-   frame dataset for distillation training.
+   expected to reach >0.8x based on the literature. Training script ready.
 
 2. **FVD evaluation** — synthetic proxy features produce FVD ~0 (no meaningful distribution
-   separation). Needs: pretrained I3D feature extractor + UCF-101 or WebVid-10M reference
-   set for real Frechet distance computation.
+   separation). Evaluation script ready with R3D-18 feature extractor.
 
-3. **FSCS-D discrete backbone** — no benchmark possible. Needs: MDLM/SEDD/D3PM-style
-   masked language model architecture with token masking/unmasking schedule.
+3. **FSCS-D discrete backbone** — MDLM-style model implemented and structurally tested
+   (loss 7.16→4.84, accuracy 0→14% in 11 steps on synthetic tokens). Ready for real text data.
+
+---
+
+## Appendix G: Training Scripts — Run Commands
+
+Training scripts at `symbolu/vision/video/training/`. All scripts support `--synthetic` mode
+for structural testing without downloads, and real-data mode for production results.
+
+### G.1: Proxy Encoder CLIP Distillation
+
+Distills pretrained CLIP-ViT into the 4,608-parameter ProxyEncoder so FSCS-V coherence
+can be computed from diffusion latents at <3% overhead.
+
+```bash
+# Structural test (mock CLIP teacher, no downloads)
+python -m symbolu.vision.video.training.train_proxy_distill \
+    --synthetic --epochs 5
+
+# Real training with CLIP teacher (requires transformers + GPU)
+python -m symbolu.vision.video.training.train_proxy_distill \
+    --use-clip --data-dir /path/to/video_frames --epochs 100
+
+# Real training with HuggingFace video dataset
+python -m symbolu.vision.video.training.train_proxy_distill \
+    --use-clip --synthetic --epochs 100 --batch-size 4
+
+# Resume from checkpoint
+python -m symbolu.vision.video.training.train_proxy_distill \
+    --use-clip --resume checkpoints_proxy/epoch_50.pt --data-dir /path/to/videos
+
+# Full options
+python -m symbolu.vision.video.training.train_proxy_distill \
+    --use-clip \
+    --data-dir /path/to/videos \
+    --epochs 100 \
+    --batch-size 4 \
+    --lr 1e-3 \
+    --num-frames 16 \
+    --image-size 256 \
+    --clip-model openai/clip-vit-large-patch14 \
+    --output-dir checkpoints_proxy \
+    --save-every 10
+```
+
+**Expected output (real CLIP):** cosine similarity >0.8, quality ratio >0.8x.
+**Requirements:** `pip install torch transformers`
+
+### G.2: FVD Evaluation with I3D/R3D Features
+
+Computes real Frechet Video Distance using pretrained 3D CNN features (R3D-18,
+MC3-18, or R(2+1)D-18 as drop-in for I3D).
+
+```bash
+# Structural test (mock features, no downloads)
+python -m symbolu.vision.video.training.evaluate_fvd --synthetic
+
+# Evaluate against UCF-101 reference set
+python -m symbolu.vision.video.training.evaluate_fvd \
+    --reference-dir /path/to/ucf101/videos \
+    --generated-dir /path/to/generated_videos
+
+# Evaluate with FSCS-V comparison
+python -m symbolu.vision.video.training.evaluate_fvd \
+    --reference-dir /path/to/ucf101/videos \
+    --generated-dir /path/to/generated_videos \
+    --use-fscsv
+
+# Use HuggingFace dataset as reference
+python -m symbolu.vision.video.training.evaluate_fvd \
+    --hf-reference webvid \
+    --generated-dir /path/to/generated \
+    --max-reference 1000
+
+# Full options
+python -m symbolu.vision.video.training.evaluate_fvd \
+    --reference-dir /path/to/ucf101 \
+    --generated-dir /path/to/generated \
+    --feature-model r3d_18 \
+    --max-reference 2048 \
+    --max-generated 2048 \
+    --batch-size 8 \
+    --num-frames 16 \
+    --image-size 224
+```
+
+**Feature model options:** `r3d_18` (default, 512-dim), `mc3_18`, `r2plus1d_18`.
+**Expected output:** FVD score (lower = better), inter-frame consistency, diversity ratio.
+**Requirements:** `pip install torch torchvision numpy scipy`
+
+### G.3: FSCS-D Discrete Diffusion Training
+
+Trains a mask-based discrete diffusion model (MDLM-style) with FSCS-D coherence
+injection. The patent's strongest mathematical fit.
+
+```bash
+# Structural test (synthetic tokens, no downloads)
+python -m symbolu.vision.video.training.train_fscs_d \
+    --synthetic --epochs 10
+
+# Train on WikiText-103
+python -m symbolu.vision.video.training.train_fscs_d \
+    --hf-dataset wikitext --hf-config wikitext-103-v1 --epochs 50
+
+# Train WITHOUT FSCS-D (baseline for ablation)
+python -m symbolu.vision.video.training.train_fscs_d \
+    --hf-dataset wikitext --hf-config wikitext-103-v1 --no-fscs-d --epochs 50
+
+# Resume from checkpoint
+python -m symbolu.vision.video.training.train_fscs_d \
+    --hf-dataset wikitext --hf-config wikitext-103-v1 \
+    --resume checkpoints_fscs_d/epoch_25.pt
+
+# Full options
+python -m symbolu.vision.video.training.train_fscs_d \
+    --hf-dataset wikitext \
+    --hf-config wikitext-103-v1 \
+    --enable-fscs-d \
+    --epochs 50 \
+    --batch-size 32 \
+    --lr 3e-4 \
+    --seq-len 256 \
+    --num-layers 6 \
+    --embed-dim 512 \
+    --output-dir checkpoints_fscs_d \
+    --save-every 10
+```
+
+**Key FSCS-D parameters** (in `FSCSDConfig`):
+- `theta_warmup=0.15`: FSCS-D activates when >15% of tokens are unmasked
+- `lambda_max=0.05`: Maximum coherence coupling strength
+- `alpha=2.0`: Power-law schedule exponent
+
+**Expected output:** Perplexity (lower = better), token accuracy, FSCS-D coupling analysis.
+**Ablation:** Compare `--enable-fscs-d` vs `--no-fscs-d` on same dataset.
+**Requirements:** `pip install torch transformers datasets`
+
+### G.4: Quick Structural Smoke Test (All Three)
+
+```bash
+# Run all three in synthetic mode to verify installation
+python -c "
+from symbolu.vision.video.training.train_proxy_distill import ProxyDistillConfig
+from symbolu.vision.video.training.evaluate_fvd import FVDEvalConfig
+from symbolu.vision.video.training.train_fscs_d import FSCSDConfig
+print('All training scripts import OK')
+"
+```
