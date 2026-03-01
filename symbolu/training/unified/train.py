@@ -5205,7 +5205,8 @@ def train(config: UnifiedTrainingConfig):
                             pd_status = phase_diversity_controller.get_status()
                             esc = pd_status.get('phase_div_escalation', 0)
                             esc_str = f" esc={esc}x" if esc > 0 else ""
-                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}{esc_str}")
+                            surr_str = " SURRENDERED" if phase_diversity_controller._surrendered else ""
+                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}{esc_str}{surr_str}")
                         else:
                             print(f"     └─ Phase Diversity:       OFF")
 

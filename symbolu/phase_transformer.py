@@ -1545,6 +1545,8 @@ class AdaptivePhaseDiversityController:
         self._stall_window = 100 if ramp_multiplier == 0.0 else 300
         self._stall_threshold = 0.005  # Must improve R by this much
         self._escalation_count = 0  # How many times we've escalated
+        self._max_escalations = 3  # V11.4c: Give up after this many failed escalations
+        self._surrendered = False   # V11.4c: True when we've accepted the model's natural R
 
         # Diagnostics
         self.lambda_history = []
@@ -1592,29 +1594,45 @@ class AdaptivePhaseDiversityController:
             ramp_progress = 1.0
 
         # V11.4: Stall detection — if R_ema hasn't improved, escalate alpha
-        if self._stall_check_R is not None:
-            steps_since_check = global_step - self._stall_check_step
-            if steps_since_check >= self._stall_window:
-                improvement = self._stall_check_R - self.R_ema  # Positive = good
-                if improvement < self._stall_threshold and self.R_ema > self.target_R:
-                    # Stalled — escalate
-                    self._escalation_count += 1
-                else:
-                    # Making progress — de-escalate
-                    self._escalation_count = max(0, self._escalation_count - 1)
+        # V11.4c: Give up after max_escalations — the model's architecture may
+        # naturally sit at R_k≈0.50 and fighting it just adds gradient noise
+        # that hurts val PPL. Accept the equilibrium and free gradient for LM.
+        escalation_multiplier = 1.0
+        if not self._surrendered:
+            if self._stall_check_R is not None:
+                steps_since_check = global_step - self._stall_check_step
+                if steps_since_check >= self._stall_window:
+                    improvement = self._stall_check_R - self.R_ema  # Positive = good
+                    if improvement < self._stall_threshold and self.R_ema > self.target_R:
+                        # Stalled — escalate
+                        self._escalation_count += 1
+                        if self._escalation_count > self._max_escalations:
+                            # Tried enough — accept the model's natural R
+                            old_target = self.target_R
+                            self.target_R = self.R_ema + 0.01  # Tiny buffer above current
+                            self._surrendered = True
+                            print(
+                                f"  🏳️ [PHASE-DIV] Surrendered after {self._max_escalations} failed escalations. "
+                                f"R_k≈{self.R_ema:.4f} is the model's natural equilibrium. "
+                                f"target_R: {old_target:.2f} → {self.target_R:.4f} "
+                                f"(pressure → 0, all gradient to LM loss)"
+                            )
+                    else:
+                        # Making progress — de-escalate
+                        self._escalation_count = max(0, self._escalation_count - 1)
+                    self._stall_check_R = self.R_ema
+                    self._stall_check_step = global_step
+            else:
                 self._stall_check_R = self.R_ema
                 self._stall_check_step = global_step
-        else:
-            self._stall_check_R = self.R_ema
-            self._stall_check_step = global_step
-        # Each escalation doubles pressure, up to 8x
-        escalation_multiplier = min(8.0, 2.0 ** self._escalation_count)
-        if self._escalation_count > 0 and self._stall_check_step == global_step:
-            print(
-                f"  ⚡ [PHASE-DIV] Stall escalation #{self._escalation_count}: "
-                f"R_ema={self.R_ema:.4f} (target={self.target_R:.2f}), "
-                f"pressure={escalation_multiplier:.0f}x"
-            )
+            # V11.4c: Cap at 4x (was 8x) — higher multipliers just add noise
+            escalation_multiplier = min(4.0, 2.0 ** self._escalation_count)
+            if self._escalation_count > 0 and self._stall_check_step == global_step:
+                print(
+                    f"  ⚡ [PHASE-DIV] Stall escalation #{self._escalation_count}/{self._max_escalations}: "
+                    f"R_ema={self.R_ema:.4f} (target={self.target_R:.2f}), "
+                    f"pressure={escalation_multiplier:.0f}x"
+                )
 
         # Compute λ based on mode
         if self.task_loss_scaling and task_loss is not None:
