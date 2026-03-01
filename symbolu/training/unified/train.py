@@ -5203,7 +5203,9 @@ def train(config: UnifiedTrainingConfig):
                         # Show phase diversity loss status if active
                         if phase_diversity_enabled and phase_diversity_controller is not None:
                             pd_status = phase_diversity_controller.get_status()
-                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}")
+                            esc = pd_status.get('phase_div_escalation', 0)
+                            esc_str = f" esc={esc}x" if esc > 0 else ""
+                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}{esc_str}")
                         else:
                             print(f"     └─ Phase Diversity:       OFF")
 
@@ -5223,19 +5225,19 @@ def train(config: UnifiedTrainingConfig):
                                 warmup_steps=config.warmup_steps,
                                 target_R=0.3,
                                 lambda_init=0.001,
-                                lambda_max=0.5,
-                                eta=0.2,
+                                lambda_max=1.0,   # V11.4: raised from 0.5
+                                eta=0.3,          # V11.4: raised from 0.2
                                 ramp_multiplier=0.0,  # No ramp — collapse is already severe
                                 task_loss_scaling=True,
-                                task_loss_alpha=0.05,
+                                task_loss_alpha=0.15,  # V11.4: raised from 0.05 (log-scaled now)
                             )
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
                             print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
-                            print(f"     ├─ Mode: TASK-SCALED (urgency α=0.05)")
-                            print(f"     ├─ λ_max: 0.5, η: 0.2 (fast adaptation)")
+                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (urgency α=0.15, log-scaled)")
+                            print(f"     ├─ λ_max: 1.0, η: 0.3 (aggressive adaptation)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
                     except Exception as e:
