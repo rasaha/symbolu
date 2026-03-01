@@ -341,6 +341,7 @@ class PhaseQuadVideoPipeline:
         negative_prompt: Optional[Union[str, List[str]]] = None,
         config: Optional[VideoGenerationConfig] = None,
         callback: Optional[Callable[[int, int, Tensor], None]] = None,
+        coherence_callback: Optional[Callable[[Tensor, Tensor, int, object], Tensor]] = None,
     ) -> VideoGenerationResult:
         """
         Generate videos from text prompts.
@@ -350,6 +351,10 @@ class PhaseQuadVideoPipeline:
             negative_prompt: Optional negative prompt(s).
             config: Generation configuration.
             callback: Optional callback(step, total, latents) for progress.
+            coherence_callback: Optional FSCS-V coherence callback.
+                Signature: (noise_pred, latents, timestep, noise_schedule) -> corrected_noise_pred.
+                Called after noise prediction (and CFG) but before the scheduler step.
+                Use ``fscsv_wrapper.make_fscsv_callback()`` to create one.
 
         Returns:
             VideoGenerationResult with generated video frames.
@@ -435,6 +440,10 @@ class PhaseQuadVideoPipeline:
             else:
                 t_tensor = torch.tensor([t] * batch_size, device=self.device)
                 noise_pred = self.model(latents, t_tensor, text_embeddings, control)
+
+            # FSCS-V coherence correction (modifies noise_pred before scheduler step)
+            if coherence_callback is not None:
+                noise_pred = coherence_callback(noise_pred, latents, t, self.noise_schedule)
 
             # Denoise step
             t_prev = timesteps[i + 1] if i + 1 < len(timesteps) else 0
