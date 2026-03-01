@@ -5319,7 +5319,10 @@ class AdaptiveTrainingController:
         elif current_lr < self.lr_min:
             for pg in self.optimizer.param_groups:
                 pg['lr'] = self.lr_min
-            print(f"\n  ⚠️ [AdaptiveTraining] STEP {global_step} LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e}")
+            # Only log floor clamp once, then every 100 steps to avoid spam
+            if not hasattr(self, '_floor_clamp_logged_step') or global_step - self._floor_clamp_logged_step >= 100:
+                print(f"\n  ⚠️ [AdaptiveTraining] LR FLOOR: {current_lr:.2e} → {self.lr_min:.2e} (cosine schedule below floor, clamping)")
+                self._floor_clamp_logged_step = global_step
             clamped = True
 
         return clamped
