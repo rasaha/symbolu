@@ -16,6 +16,12 @@ try:
 except ImportError:
     HF_AVAILABLE = False
 
+try:
+    from symbolu.training.text_utils import clean_wikitext_artifacts
+    WIKITEXT_CLEANUP_AVAILABLE = True
+except ImportError:
+    WIKITEXT_CLEANUP_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -203,7 +209,7 @@ def load_data(
                 text = "\n".join(ds[split]["text"])
                 # V9.8.4: Clean WikiText Moses tokenization artifacts BEFORE tokenizing
                 # This prevents the model from learning @,@ @-@ @.@ and = = = patterns
-                if GRADIENT_THROTTLE_AVAILABLE:
+                if WIKITEXT_CLEANUP_AVAILABLE:
                     text = clean_wikitext_artifacts(text)
                 if hasattr(tokenizer, "encode"):
                     tokens = tokenizer.encode(text)

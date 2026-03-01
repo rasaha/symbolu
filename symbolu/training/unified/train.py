@@ -5203,7 +5203,10 @@ def train(config: UnifiedTrainingConfig):
                         # Show phase diversity loss status if active
                         if phase_diversity_enabled and phase_diversity_controller is not None:
                             pd_status = phase_diversity_controller.get_status()
-                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}")
+                            esc = pd_status.get('phase_div_escalation', 0)
+                            esc_str = f" esc={esc}x" if esc > 0 else ""
+                            surr_str = " SURRENDERED" if phase_diversity_controller._surrendered else ""
+                            print(f"     └─ Phase Diversity:       λ={pd_status['phase_div_lambda']:.4f} R_ema={pd_status['phase_div_R_ema']:.4f} target={pd_status['phase_div_target_R']:.2f}{esc_str}{surr_str}")
                         else:
                             print(f"     └─ Phase Diversity:       OFF")
 
@@ -5221,21 +5224,21 @@ def train(config: UnifiedTrainingConfig):
                             num_phase_layers = enable_phase_diversity_capture(model, enable=True)
                             phase_diversity_controller = AdaptivePhaseDiversityController(
                                 warmup_steps=config.warmup_steps,
-                                target_R=0.3,
-                                lambda_init=0.001,
-                                lambda_max=0.5,
-                                eta=0.2,
+                                target_R=0.45,    # V11.4c: raised from 0.30 — prevent collapse without starving LM
+                                lambda_init=0.01,
+                                lambda_max=0.5,   # V11.4c: lowered from 2.0 — less aggressive ceiling
+                                eta=0.3,
                                 ramp_multiplier=0.0,  # No ramp — collapse is already severe
                                 task_loss_scaling=True,
-                                task_loss_alpha=0.05,
+                                task_loss_alpha=0.40,
                             )
                             # Seed R_ema with actual R_k to avoid warmup lag
                             phase_diversity_controller.R_ema = health_metrics['R_k']
                             phase_diversity_enabled = True
                             print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
-                            print(f"     ├─ Target R: 0.3 (current R_k: {health_metrics['R_k']:.4f})")
-                            print(f"     ├─ Mode: TASK-SCALED (urgency α=0.05)")
-                            print(f"     ├─ λ_max: 0.5, η: 0.2 (fast adaptation)")
+                            print(f"     ├─ Target R: 0.45 (current R_k: {health_metrics['R_k']:.4f})")
+                            print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (α=0.40, log-scaled)")
+                            print(f"     ├─ λ_max: 0.5, η: 0.3 (collapse guard, not diversity maximizer)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
                     except Exception as e:

@@ -1538,6 +1538,16 @@ class AdaptivePhaseDiversityController:
         self.R_ema = 0.5  # Initial estimate (neutral)
         self.step_count = 0
 
+        # V11.4b: Stall detection — escalate if R_ema not converging
+        self._stall_check_R = None  # R_ema at last stall check
+        self._stall_check_step = 0  # Step at last stall check
+        # Shorter window when ramp_multiplier=0 (emergency auto-enable)
+        self._stall_window = 100 if ramp_multiplier == 0.0 else 300
+        self._stall_threshold = 0.005  # Must improve R by this much
+        self._escalation_count = 0  # How many times we've escalated
+        self._max_escalations = 3  # V11.4c: Give up after this many failed escalations
+        self._surrendered = False   # V11.4c: True when we've accepted the model's natural R
+
         # Diagnostics
         self.lambda_history = []
         self.R_history = []
@@ -1583,18 +1593,60 @@ class AdaptivePhaseDiversityController:
         else:
             ramp_progress = 1.0
 
+        # V11.4: Stall detection — if R_ema hasn't improved, escalate alpha
+        # V11.4c: Give up after max_escalations — the model's architecture may
+        # naturally sit at R_k≈0.50 and fighting it just adds gradient noise
+        # that hurts val PPL. Accept the equilibrium and free gradient for LM.
+        escalation_multiplier = 1.0
+        if not self._surrendered:
+            if self._stall_check_R is not None:
+                steps_since_check = global_step - self._stall_check_step
+                if steps_since_check >= self._stall_window:
+                    improvement = self._stall_check_R - self.R_ema  # Positive = good
+                    if improvement < self._stall_threshold and self.R_ema > self.target_R:
+                        # Stalled — escalate
+                        self._escalation_count += 1
+                        if self._escalation_count > self._max_escalations:
+                            # Tried enough — accept the model's natural R
+                            old_target = self.target_R
+                            self.target_R = self.R_ema + 0.01  # Tiny buffer above current
+                            self._surrendered = True
+                            print(
+                                f"  🏳️ [PHASE-DIV] Surrendered after {self._max_escalations} failed escalations. "
+                                f"R_k≈{self.R_ema:.4f} is the model's natural equilibrium. "
+                                f"target_R: {old_target:.2f} → {self.target_R:.4f} "
+                                f"(pressure → 0, all gradient to LM loss)"
+                            )
+                    else:
+                        # Making progress — de-escalate
+                        self._escalation_count = max(0, self._escalation_count - 1)
+                    self._stall_check_R = self.R_ema
+                    self._stall_check_step = global_step
+            else:
+                self._stall_check_R = self.R_ema
+                self._stall_check_step = global_step
+            # V11.4c: Cap at 4x (was 8x) — higher multipliers just add noise
+            escalation_multiplier = min(4.0, 2.0 ** self._escalation_count)
+            if self._escalation_count > 0 and self._stall_check_step == global_step:
+                print(
+                    f"  ⚡ [PHASE-DIV] Stall escalation #{self._escalation_count}/{self._max_escalations}: "
+                    f"R_ema={self.R_ema:.4f} (target={self.target_R:.2f}), "
+                    f"pressure={escalation_multiplier:.0f}x"
+                )
+
         # Compute λ based on mode
         if self.task_loss_scaling and task_loss is not None:
-            # V9.9.12b: Self-normalized scaling (ChatGPT's Lagrange approach)
-            # λ_effective = α * task_loss * collapse_pressure * ramp
-            # - Weakens as training converges (task_loss drops)
-            # - Only activates when collapsed (collapse_pressure > 0)
-            # - Ramps up during warmup
+            # V9.9.12b/V11.4: Normalized scaling with collapse-proportional pressure
+            # Fix: Use log(task_loss) instead of raw task_loss to prevent λ from
+            # weakening as training improves. log(8.2)≈2.1, log(3.0)≈1.1, so
+            # the scaling stays in a tight band rather than halving with loss.
+            log_loss = math.log(max(1.0, self.task_loss_ema))
             self.current_lambda = (
                 self.task_loss_alpha *
-                self.task_loss_ema *
+                log_loss *
                 collapse_pressure *
-                ramp_progress
+                ramp_progress *
+                escalation_multiplier
             )
         else:
             # Original R-adaptive mode (V9.9.12a)
@@ -1628,6 +1680,7 @@ class AdaptivePhaseDiversityController:
             'phase_div_ramp_progress': min(1.0, self.step_count / max(1, self.ramp_steps)),
             'phase_div_collapse_pressure': collapse_pressure,
             'phase_div_task_loss_ema': self.task_loss_ema if self.task_loss_scaling else 0.0,
+            'phase_div_escalation': self._escalation_count,
         }
 
     def __repr__(self) -> str:
