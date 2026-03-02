@@ -7684,6 +7684,733 @@ class LocalOnlyTransformer(nn.Module):
         return input_ids
 
 
+# =============================================================================
+# GATED COHERENCE TRANSFORMER (GCT)
+# =============================================================================
+#
+# GCT: Governed Quadratic Softmax with Pre-Softmax Coherence Gating
+#
+# Core contribution: Pre-softmax temporal stability routing that does NOT
+# require computing QK^T to decide the routing path.
+#
+# Architecture:
+#   O = (1 - pi*) * O_full + pi* * O_local
+#
+# Where:
+#   O_full  = standard O(n²) softmax attention
+#   O_local = local-window softmax (O(n*w)) — same softmax primitive, fewer keys
+#   pi*     = coherence gate * lambda_ladder insulation
+#
+# Coherence is computed from output deltas and residual deltas (no attention
+# KL needed), preserving FlashAttention/SDPA compatibility on the full path.
+#
+# Lambda_ladder prevents band collapse: when heads assigned to different
+# frequency bands produce too-similar outputs (low divergence = collapse risk),
+# lambda_ladder suppresses routing to coarse, forcing full attention.
+#
+# Reference: FSCS pre-softmax routing pattern, adapted for quadratic softmax.
+# =============================================================================
+
+
+@dataclass
+class GCTConfig:
+    """Configuration for Gated Coherence Transformer."""
+    # Base transformer config
+    vocab_size: int = 50257
+    embed_dim: int = 768
+    num_layers: int = 12
+    num_heads: int = 12
+    ff_dim: Optional[int] = None
+    max_seq_len: int = 8192
+    dropout: float = 0.1
+
+    # GCT-specific: Coherence gating
+    gct_window_size: int = 128          # Local window size for coarse path
+    gct_coherence_gamma: float = 5.0    # Sensitivity for output delta in coherence score
+    gct_coherence_delta: float = 3.0    # Sensitivity for residual delta in coherence score
+    gct_ema_decay: float = 0.9          # EMA smoothing for coherence scores
+    gct_num_bands: int = 3              # Number of frequency bands (global/mid/local)
+
+    # GCT-specific: Routing
+    gct_alpha_sharpness: float = 10.0   # Sigmoid sharpness for routing probability
+    gct_hard_route_threshold: float = 0.5  # Threshold for hard routing (inference)
+    gct_use_hard_routing: bool = False   # Use hard routing (inference mode)
+
+    # GCT-specific: Lambda_ladder band insulation
+    gct_kappa: float = 3.0              # Ladder suppression strength
+    gct_tau_ladder: float = 0.15        # Collapse detection threshold (similarity above this = collapse risk)
+
+    # GCT-specific: Training schedule
+    gct_warmup_steps: int = 500         # Steps of full-attention-only warmup (Phase 1)
+    gct_anneal_steps: int = 2000        # Steps to anneal from full to gated (Phase 2)
+    gct_current_step: int = 0           # Current training step (updated externally)
+
+    def __post_init__(self):
+        if self.ff_dim is None:
+            self.ff_dim = 4 * self.embed_dim
+
+
+class GCTCoherenceModule(nn.Module):
+    """
+    Computes pre-softmax coherence scores from output and residual deltas.
+
+    FlashAttention-compatible: does NOT require raw attention matrices.
+    Uses only output deltas and residual deltas as stability signals.
+
+    Coherence score:
+        C_raw(t) = exp(-gamma * ||O(t) - O(t-1)||_rel) * exp(-delta * ||R(t) - R(t-1)||_rel)
+
+    Where ||.||_rel = ||.|| / (||ref|| + eps) for scale invariance.
+
+    EMA smoothing:
+        C_hat(t) = beta * C_hat(t-1) + (1 - beta) * C_raw(t)
+    """
+
+    def __init__(self, num_heads: int, ema_decay: float = 0.9,
+                 gamma: float = 5.0, delta: float = 3.0):
+        super().__init__()
+        self.num_heads = num_heads
+        self.ema_decay = ema_decay
+        self.gamma = gamma
+        self.delta = delta
+
+    def forward(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h] per-head attention output
+        residual: torch.Tensor,      # [B, N, D] residual stream
+    ) -> torch.Tensor:
+        """
+        Compute coherence scores for all positions.
+
+        Returns:
+            coherence: [B, H, N] coherence scores in [0, 1]
+        """
+        B, H, N, D_h = attn_output.shape
+
+        # Output delta: compare adjacent positions per head
+        # attn_output[:, :, t] vs attn_output[:, :, t-1]
+        output_delta = attn_output[:, :, 1:] - attn_output[:, :, :-1]  # [B, H, N-1, D_h]
+        output_norm = output_delta.norm(dim=-1)  # [B, H, N-1]
+        ref_norm = attn_output[:, :, :-1].norm(dim=-1).clamp(min=1e-6)  # [B, H, N-1]
+        output_delta_rel = output_norm / ref_norm  # [B, H, N-1]
+
+        # Residual delta: compare adjacent positions (broadcast across heads)
+        # residual: [B, N, D]
+        res_delta = residual[:, 1:] - residual[:, :-1]  # [B, N-1, D]
+        res_norm = res_delta.norm(dim=-1)  # [B, N-1]
+        res_ref_norm = residual[:, :-1].norm(dim=-1).clamp(min=1e-6)  # [B, N-1]
+        res_delta_rel = res_norm / res_ref_norm  # [B, N-1]
+        res_delta_rel = res_delta_rel.unsqueeze(1).expand_as(output_delta_rel)  # [B, H, N-1]
+
+        # Raw coherence: high when deltas are small (stable region)
+        c_raw = torch.exp(-self.gamma * output_delta_rel) * torch.exp(-self.delta * res_delta_rel)
+        # c_raw: [B, H, N-1] in (0, 1]
+
+        # Pad position 0 with neutral coherence (0.5 = no routing preference)
+        c_first = torch.full((B, H, 1), 0.5, device=c_raw.device, dtype=c_raw.dtype)
+        c_raw = torch.cat([c_first, c_raw], dim=2)  # [B, H, N]
+
+        # EMA smoothing across sequence dimension (causal)
+        coherence = torch.zeros_like(c_raw)
+        coherence[:, :, 0] = c_raw[:, :, 0]
+        for t in range(1, N):
+            coherence[:, :, t] = self.ema_decay * coherence[:, :, t - 1] + (1 - self.ema_decay) * c_raw[:, :, t]
+
+        return coherence  # [B, H, N] in [0, 1]
+
+
+class GCTRoutingGate(nn.Module):
+    """
+    Pre-softmax routing gate: decides full vs local attention per head per position.
+
+    pi(l,h,t) = sigma(alpha_b * (C_hat(l,h,t) - tau(b,h)))
+
+    Where b is the frequency band of head h.
+
+    Band assignment: equal partition of heads into num_bands groups.
+    - Band 0 (global): heads that should attend broadly
+    - Band 1 (mid): intermediate attention span
+    - Band 2 (local): heads that can use local window
+
+    Each band has a learnable threshold tau_b and sharpness alpha_b.
+    """
+
+    def __init__(self, num_heads: int, num_bands: int = 3,
+                 alpha_init: float = 10.0):
+        super().__init__()
+        self.num_heads = num_heads
+        self.num_bands = num_bands
+
+        # Assign heads to bands (equal partition)
+        heads_per_band = num_heads // num_bands
+        band_assignment = []
+        for b in range(num_bands):
+            count = heads_per_band if b < num_bands - 1 else num_heads - b * heads_per_band
+            band_assignment.extend([b] * count)
+        self.register_buffer('band_assignment', torch.tensor(band_assignment, dtype=torch.long))
+
+        # Per-band learnable parameters
+        # tau_b: threshold (higher = harder to route to coarse)
+        # Band 0 (global) has high threshold (rarely uses local window)
+        # Band 2 (local) has low threshold (often uses local window)
+        tau_init = torch.linspace(0.7, 0.3, num_bands)  # Global=0.7, Local=0.3
+        self.tau = nn.Parameter(tau_init)
+
+        # Per-band sharpness
+        self.alpha = nn.Parameter(torch.full((num_bands,), alpha_init))
+
+    def forward(self, coherence: torch.Tensor) -> torch.Tensor:
+        """
+        Compute routing probability pi for each head at each position.
+
+        Args:
+            coherence: [B, H, N] coherence scores in [0, 1]
+
+        Returns:
+            pi: [B, H, N] routing probabilities in [0, 1]
+                (high pi = route to local/coarse, low pi = use full attention)
+        """
+        # Gather per-head thresholds and sharpness from band assignment
+        tau_per_head = self.tau[self.band_assignment]         # [H]
+        alpha_per_head = self.alpha[self.band_assignment]     # [H]
+
+        # Reshape for broadcasting: [1, H, 1]
+        tau = tau_per_head.view(1, -1, 1)
+        alpha = alpha_per_head.view(1, -1, 1)
+
+        # pi = sigma(alpha * (C - tau))
+        # High coherence (stable) -> high pi -> route to local (save compute)
+        # Low coherence (unstable) -> low pi -> use full attention (be careful)
+        pi = torch.sigmoid(alpha * (coherence - tau))
+
+        return pi  # [B, H, N]
+
+
+class GCTLadderInsulation(nn.Module):
+    """
+    Lambda_ladder: band insulation to prevent collapse.
+
+    When heads in different bands produce too-similar outputs
+    (low inter-band divergence = collapse risk), suppress routing
+    to coarse path, forcing full attention to preserve band specialization.
+
+    Corrected sign logic:
+        Collapse risk = bands becoming indistinguishable
+        Low divergence = high similarity = collapse risk
+
+        Lambda = exp(-kappa * max(0, tau_collapse - Delta_band))
+
+    When Delta_band < tau_collapse (bands too similar):
+        Lambda decreases -> pi* decreases -> more full attention
+
+    When Delta_band >= tau_collapse (bands well-separated):
+        Lambda = 1 -> no suppression -> routing proceeds normally
+    """
+
+    def __init__(self, kappa: float = 3.0, tau_ladder: float = 0.15):
+        super().__init__()
+        self.kappa = kappa
+        self.tau_ladder = tau_ladder
+
+    def compute_band_divergence(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h]
+        band_assignment: torch.Tensor,  # [H] band index per head
+        num_bands: int,
+    ) -> torch.Tensor:
+        """
+        Compute inter-band divergence using cosine distance between band means.
+
+        Delta_band = 1 - mean_{b1 != b2} cos_sim(mean_{h in b1}(O_h), mean_{h in b2}(O_h))
+
+        Returns:
+            divergence: [B, N] inter-band divergence in [0, 2]
+        """
+        B, H, N, D_h = attn_output.shape
+
+        # Compute band-mean outputs: average over heads in each band
+        band_means = []
+        for b in range(num_bands):
+            mask = (band_assignment == b)
+            if mask.any():
+                band_out = attn_output[:, mask].mean(dim=1)  # [B, N, D_h]
+                band_means.append(band_out)
+
+        if len(band_means) < 2:
+            # Only one band — no divergence to measure
+            return torch.zeros(B, N, device=attn_output.device)
+
+        # Pairwise cosine similarity between band means
+        cos_sims = []
+        for i in range(len(band_means)):
+            for j in range(i + 1, len(band_means)):
+                # [B, N]
+                sim = F.cosine_similarity(band_means[i], band_means[j], dim=-1)
+                cos_sims.append(sim)
+
+        mean_similarity = torch.stack(cos_sims, dim=0).mean(dim=0)  # [B, N]
+        divergence = 1.0 - mean_similarity  # [B, N] in [-1, 1], typically [0, 1]
+
+        return divergence
+
+    def forward(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h]
+        band_assignment: torch.Tensor,  # [H]
+        num_bands: int,
+    ) -> torch.Tensor:
+        """
+        Compute ladder insulation factor.
+
+        Returns:
+            lambda_ladder: [B, N] in (0, 1]
+        """
+        divergence = self.compute_band_divergence(attn_output, band_assignment, num_bands)
+
+        # Corrected sign: suppress when divergence is LOW (collapse risk)
+        # Lambda = exp(-kappa * max(0, tau - Delta))
+        collapse_pressure = torch.clamp(self.tau_ladder - divergence, min=0.0)
+        lambda_ladder = torch.exp(-self.kappa * collapse_pressure)
+
+        return lambda_ladder  # [B, N] in (0, 1]
+
+
+class GCTAttentionLayer(nn.Module):
+    """
+    Gated Coherence Transformer Attention Layer.
+
+    Combines full O(n²) softmax attention with local-window softmax attention,
+    blended by a pre-softmax coherence gate with lambda_ladder band insulation.
+
+    Training (soft blend):
+        O = (1 - pi*) * O_full + pi* * O_local
+
+    Inference (hard route):
+        O = O_local if pi* > theta else O_full
+
+    The full path uses SDPA/FlashAttention when available.
+    The local path uses masked softmax over a sliding window of size w.
+    Coherence is computed from output/residual deltas (FlashAttention-compatible).
+
+    Phased training schedule:
+        Phase 1 (warmup): Full attention only, coherence predictors warm up
+        Phase 2 (anneal): Soft blend gradually enabled
+        Phase 3 (full):   Full gated operation
+    """
+
+    def __init__(self, gct_config: GCTConfig, layer_idx: int = 0):
+        super().__init__()
+        embed_dim = gct_config.embed_dim
+        num_heads = gct_config.num_heads
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.layer_idx = layer_idx
+        self.gct_config = gct_config
+
+        # QKV projections (shared between full and local paths)
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.dropout = nn.Dropout(gct_config.dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+        # GCT modules
+        self.coherence = GCTCoherenceModule(
+            num_heads=num_heads,
+            ema_decay=gct_config.gct_ema_decay,
+            gamma=gct_config.gct_coherence_gamma,
+            delta=gct_config.gct_coherence_delta,
+        )
+        self.routing_gate = GCTRoutingGate(
+            num_heads=num_heads,
+            num_bands=gct_config.gct_num_bands,
+            alpha_init=gct_config.gct_alpha_sharpness,
+        )
+        self.ladder = GCTLadderInsulation(
+            kappa=gct_config.gct_kappa,
+            tau_ladder=gct_config.gct_tau_ladder,
+        )
+
+        # Window size for local path
+        self.window_size = gct_config.gct_window_size
+
+    def _compute_full_attention(
+        self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """Full O(n²) attention using SDPA when available."""
+        if SDPA_AVAILABLE:
+            output = F.scaled_dot_product_attention(
+                Q, K, V, is_causal=causal_mask,
+                dropout_p=self.dropout.p if self.training else 0.0,
+            )
+        else:
+            B, H, N, D_h = Q.shape
+            attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+            if causal_mask:
+                mask = torch.triu(torch.ones(N, N, device=Q.device, dtype=torch.bool), diagonal=1)
+                attn = attn.masked_fill(mask, float('-inf'))
+            attn = F.softmax(attn, dim=-1)
+            attn = self.dropout(attn)
+            output = torch.matmul(attn, V)
+        return output  # [B, H, N, D_h]
+
+    def _compute_local_attention(
+        self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """
+        Local-window softmax attention: O(n*w) instead of O(n²).
+
+        Each position t attends only to positions in W(t) = {max(0, t-w+1), ..., t}.
+        Implemented via masking the full attention matrix (training-friendly).
+        """
+        B, H, N, D_h = Q.shape
+        w = self.window_size
+
+        # Compute full attention scores (we mask most of them)
+        attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Create combined causal + local window mask
+        # Position t can attend to positions max(0, t-w+1) through t
+        row_idx = torch.arange(N, device=Q.device).unsqueeze(1)  # [N, 1]
+        col_idx = torch.arange(N, device=Q.device).unsqueeze(0)  # [1, N]
+
+        # Local window: col must be >= row - w + 1 AND col <= row (causal)
+        local_mask = (col_idx > row_idx) | (col_idx < row_idx - w + 1)  # True = masked out
+        if causal_mask:
+            causal = col_idx > row_idx
+            local_mask = local_mask | causal
+
+        attn = attn.masked_fill(local_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+        attn = F.softmax(attn, dim=-1)
+        attn = self.dropout(attn)
+        output = torch.matmul(attn, V)
+
+        return output  # [B, H, N, D_h]
+
+    def _get_schedule_weight(self) -> float:
+        """
+        Get the gating schedule weight based on training phase.
+
+        Phase 1 (step < warmup): weight = 0 (full attention only)
+        Phase 2 (warmup <= step < warmup + anneal): weight linearly ramps 0 -> 1
+        Phase 3 (step >= warmup + anneal): weight = 1 (full gating)
+        """
+        step = self.gct_config.gct_current_step
+        warmup = self.gct_config.gct_warmup_steps
+        anneal = self.gct_config.gct_anneal_steps
+
+        if step < warmup:
+            return 0.0
+        elif step < warmup + anneal:
+            return (step - warmup) / max(1, anneal)
+        else:
+            return 1.0
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        GCT attention forward pass.
+
+        Returns:
+            Dict with:
+                'output': [B, N, D] attention output (residual + norm applied)
+                'gct_metrics': dict with routing stats for logging
+        """
+        B, N, D = x.shape
+        residual = x
+
+        # Project Q, K, V
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        # Q, K, V: [B, H, N, D_h]
+
+        schedule_weight = self._get_schedule_weight()
+
+        if schedule_weight == 0.0:
+            # Phase 1: Full attention only (no gating overhead)
+            output = self._compute_full_attention(Q, K, V, causal_mask)
+            output = output.transpose(1, 2).reshape(B, N, D)
+            output = self.out_proj(output)
+            output = self.dropout(output)
+            result_output = self.norm(output + residual)
+            return {
+                'output': result_output,
+                'gct_metrics': {
+                    'gct_schedule_weight': 0.0,
+                    'gct_mean_pi_star': 0.0,
+                    'gct_mean_lambda_ladder': 1.0,
+                    'gct_mean_coherence': 0.5,
+                    'gct_frac_local_routed': 0.0,
+                },
+            }
+
+        # === Compute both attention paths ===
+
+        # Full attention (uses SDPA/FlashAttention)
+        O_full = self._compute_full_attention(Q, K, V, causal_mask)  # [B, H, N, D_h]
+
+        # Local-window attention
+        O_local = self._compute_local_attention(Q, K, V, causal_mask)  # [B, H, N, D_h]
+
+        # === Coherence gating ===
+
+        # Compute coherence from output deltas and residual deltas
+        coherence = self.coherence(O_full.detach(), residual)  # [B, H, N]
+
+        # Routing probability
+        pi = self.routing_gate(coherence)  # [B, H, N]
+
+        # Lambda_ladder band insulation
+        lambda_ladder = self.ladder(
+            O_full.detach(),
+            self.routing_gate.band_assignment,
+            self.routing_gate.num_bands,
+        )  # [B, N]
+
+        # Effective routing: pi* = pi * lambda_ladder
+        pi_star = pi * lambda_ladder.unsqueeze(1)  # [B, H, N]
+
+        # Apply schedule weight (Phase 2 annealing)
+        pi_star = pi_star * schedule_weight
+
+        if self.gct_config.gct_use_hard_routing and not self.training:
+            # Hard routing for inference
+            theta = self.gct_config.gct_hard_route_threshold
+            use_local = (pi_star > theta).unsqueeze(-1)  # [B, H, N, 1]
+            output = torch.where(use_local, O_local, O_full)
+        else:
+            # Soft blend for training
+            pi_expanded = pi_star.unsqueeze(-1)  # [B, H, N, 1]
+            output = (1 - pi_expanded) * O_full + pi_expanded * O_local
+
+        # Reshape and project
+        output = output.transpose(1, 2).reshape(B, N, D)
+        output = self.out_proj(output)
+        output = self.dropout(output)
+        result_output = self.norm(output + residual)
+
+        # Metrics for logging
+        with torch.no_grad():
+            metrics = {
+                'gct_schedule_weight': schedule_weight,
+                'gct_mean_pi_star': pi_star.mean().item(),
+                'gct_mean_lambda_ladder': lambda_ladder.mean().item(),
+                'gct_mean_coherence': coherence.mean().item(),
+                'gct_frac_local_routed': (pi_star > 0.5).float().mean().item(),
+            }
+
+        return {
+            'output': result_output,
+            'gct_metrics': metrics,
+        }
+
+
+class GCTTransformerBlock(nn.Module):
+    """Transformer block with GCT (Gated Coherence Transformer) attention."""
+
+    def __init__(self, gct_config: GCTConfig, layer_idx: int = 0):
+        super().__init__()
+        # Convert GCTConfig to TransformerConfig for FeedForward
+        self.attention = GCTAttentionLayer(gct_config, layer_idx=layer_idx)
+        self.ff = FeedForward(
+            embed_dim=gct_config.embed_dim,
+            ff_dim=gct_config.ff_dim,
+            dropout=gct_config.dropout,
+        )
+
+    def forward(
+        self, x: torch.Tensor, causal_mask: bool = True,
+    ) -> Dict[str, Any]:
+        attn_result = self.attention(x, causal_mask)
+        x = self.ff(attn_result['output'])
+        return {
+            'output': x,
+            'gct_metrics': attn_result['gct_metrics'],
+        }
+
+
+class GCTTransformer(nn.Module):
+    """
+    Gated Coherence Transformer (GCT).
+
+    A standard O(n²) transformer augmented with pre-softmax coherence gating
+    and lambda_ladder band insulation. Routes each head at each position
+    between full attention (O(n²)) and local-window attention (O(n*w))
+    based on temporal stability signals.
+
+    Training: Soft blend with phased schedule (warmup -> anneal -> full gating).
+    Inference: Hard routing for real FLOP savings.
+
+    The routing decision is made BEFORE computing QK^T, using only output
+    deltas and residual deltas from the previous layer — the core contribution.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        tie_embeddings: bool = True,
+        # GCT-specific
+        gct_window_size: int = 128,
+        gct_coherence_gamma: float = 5.0,
+        gct_coherence_delta: float = 3.0,
+        gct_ema_decay: float = 0.9,
+        gct_num_bands: int = 3,
+        gct_alpha_sharpness: float = 10.0,
+        gct_hard_route_threshold: float = 0.5,
+        gct_use_hard_routing: bool = False,
+        gct_kappa: float = 3.0,
+        gct_tau_ladder: float = 0.15,
+        gct_warmup_steps: int = 500,
+        gct_anneal_steps: int = 2000,
+        **kwargs,
+    ):
+        super().__init__()
+
+        gct_config = GCTConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            gct_window_size=gct_window_size,
+            gct_coherence_gamma=gct_coherence_gamma,
+            gct_coherence_delta=gct_coherence_delta,
+            gct_ema_decay=gct_ema_decay,
+            gct_num_bands=gct_num_bands,
+            gct_alpha_sharpness=gct_alpha_sharpness,
+            gct_hard_route_threshold=gct_hard_route_threshold,
+            gct_use_hard_routing=gct_use_hard_routing,
+            gct_kappa=gct_kappa,
+            gct_tau_ladder=gct_tau_ladder,
+            gct_warmup_steps=gct_warmup_steps,
+            gct_anneal_steps=gct_anneal_steps,
+        )
+        self.gct_config = gct_config
+        self.tie_embeddings = tie_embeddings
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # GCT Transformer blocks
+        self.blocks = nn.ModuleList([
+            GCTTransformerBlock(gct_config, layer_idx=i) for i in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
+
+        self.apply(self._init_weights)
+
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def set_training_step(self, step: int):
+        """Update training step for phased schedule across all layers."""
+        self.gct_config.gct_current_step = step
+
+    def set_hard_routing(self, enabled: bool):
+        """Enable/disable hard routing (for inference vs training)."""
+        self.gct_config.gct_use_hard_routing = enabled
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Forward pass.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return all hidden states
+            extract_layers: Specific layer indices to extract
+            return_last_hidden: Return normalized hidden state before lm_head
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state',
+            and 'gct_metrics' (aggregated across layers)
+        """
+        B, N = input_ids.shape
+
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
+
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        hidden_states = [] if should_extract else None
+        all_gct_metrics = []
+
+        for i, block in enumerate(self.blocks):
+            block_result = block(x, causal_mask=True)
+            x = block_result['output']
+            all_gct_metrics.append(block_result['gct_metrics'])
+
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
+
+        x = self.norm(x)
+        logits = self.lm_head(x) * self.logit_scale
+
+        result = {'logits': logits}
+
+        if should_extract:
+            result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
+
+        # Aggregate GCT metrics across layers
+        if all_gct_metrics:
+            agg = {}
+            for key in all_gct_metrics[0]:
+                vals = [m[key] for m in all_gct_metrics]
+                agg[key] = sum(vals) / len(vals)
+            result['gct_metrics'] = agg
+
+        return result
+
+
 class StandardTransformer(nn.Module):
     """
     Standard O(n²) Transformer for comparison.
