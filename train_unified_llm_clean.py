@@ -184,6 +184,7 @@ from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
+    GCTTransformer,  # Gated Coherence Transformer (pre-softmax coherence routing)
     OntologicalHybridTransformer,  # V9.6.14: Two-Tier AGI Architecture
     BindingCacheTransformer,  # V10.0: Protected Phase + Top-K Query (validated by probes)
     OntologicalBindingCacheTransformer,  # V10.0: AGI Architecture (Binding Cache + 32D Sovereign State)
@@ -8532,6 +8533,22 @@ class UnifiedTrainingConfig:
     interference_auto_classify: bool = True  # Auto-detect compositional tasks
     interference_modes: str = "compose,reason,write"  # Enabled modes (comma-separated)
 
+    # ==========================================================================
+    # GCT (Gated Coherence Transformer) parameters
+    # ==========================================================================
+    # Pre-softmax coherence gating with lambda_ladder band insulation.
+    # Routes heads between full O(n²) and local-window O(n*w) attention.
+    gct_window_size: int = 128           # Local window size for coarse path
+    gct_coherence_gamma: float = 5.0     # Output delta sensitivity in coherence score
+    gct_coherence_delta: float = 3.0     # Residual delta sensitivity in coherence score
+    gct_ema_decay: float = 0.9           # EMA smoothing for coherence scores
+    gct_num_bands: int = 3               # Frequency bands (global/mid/local head partition)
+    gct_alpha_sharpness: float = 10.0    # Sigmoid sharpness for routing probability
+    gct_hard_route_threshold: float = 0.5  # Hard routing threshold (inference)
+    gct_kappa: float = 3.0              # Lambda_ladder suppression strength
+    gct_tau_ladder: float = 0.15        # Collapse detection threshold
+    gct_warmup_steps: int = 500         # Full-attention-only warmup (Phase 1)
+    gct_anneal_steps: int = 2000        # Anneal from full to gated (Phase 2)
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -9636,6 +9653,41 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
         )
         print(f"\n  [Standard] O(n²) baseline transformer for comparison")
+
+    elif config.model_type == "gct":
+        # Gated Coherence Transformer: pre-softmax coherence routing
+        # Routes heads between full O(n²) and local-window O(n*w) attention
+        # based on temporal stability signals (output + residual deltas).
+        # FlashAttention-compatible on the full path.
+        model = GCTTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            tie_embeddings=tie_emb,
+            gct_window_size=config.gct_window_size,
+            gct_coherence_gamma=config.gct_coherence_gamma,
+            gct_coherence_delta=config.gct_coherence_delta,
+            gct_ema_decay=config.gct_ema_decay,
+            gct_num_bands=config.gct_num_bands,
+            gct_alpha_sharpness=config.gct_alpha_sharpness,
+            gct_hard_route_threshold=config.gct_hard_route_threshold,
+            gct_use_hard_routing=False,  # Training uses soft blend
+            gct_kappa=config.gct_kappa,
+            gct_tau_ladder=config.gct_tau_ladder,
+            gct_warmup_steps=config.gct_warmup_steps,
+            gct_anneal_steps=config.gct_anneal_steps,
+        )
+        print(f"\n  [GCT] Gated Coherence Transformer")
+        print(f"    Attention: Full O(n²) + Local-Window O(n*{config.gct_window_size})")
+        print(f"    Coherence: output_delta(γ={config.gct_coherence_gamma}) * residual_delta(δ={config.gct_coherence_delta})")
+        print(f"    Bands: {config.gct_num_bands} (equal head partition)")
+        print(f"    Lambda_ladder: κ={config.gct_kappa}, τ={config.gct_tau_ladder}")
+        print(f"    Schedule: warmup={config.gct_warmup_steps}, anneal={config.gct_anneal_steps}")
+        print(f"    Routing: soft blend (training), hard θ={config.gct_hard_route_threshold} (inference)")
 
     elif config.model_type == "ontological_hybrid":
         # V9.6.14: Two-Tier AGI Architecture (Ontological State Delta + Hybrid)
@@ -13011,6 +13063,10 @@ def train(config: UnifiedTrainingConfig):
         if 'hidden_state_extractor' in dir() and hidden_state_extractor is not None:
             hidden_state_extractor.clear()
 
+        # GCT: Update training step for phased schedule
+        if config.model_type == "gct" and hasattr(model, 'set_training_step'):
+            model.set_training_step(global_step)
+
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
             # V9.9.6: Initialize decorr variables before model-type branching
             enable_decorr = False
@@ -13049,6 +13105,14 @@ def train(config: UnifiedTrainingConfig):
                     'level_2_coh': outputs['level_coherences'][:, 1].mean().item(),
                     'level_3_coh': outputs['level_coherences'][:, 2].mean().item(),
                 }
+            elif config.model_type == "gct":
+                # Gated Coherence Transformer: pre-softmax coherence routing
+                outputs = model(x)
+                logits = outputs['logits']
+                loss, metrics = compute_phase_loss(logits, y, config)
+                # Add GCT-specific metrics
+                if 'gct_metrics' in outputs:
+                    metrics.update(outputs['gct_metrics'])
             else:
                 # Phase or Hybrid - handle both tensor and dict returns
                 # Enable decorrelation loss for hybrid/ontological_hybrid models
@@ -14256,6 +14320,17 @@ def train(config: UnifiedTrainingConfig):
                         if "level_3_coh" in metrics:
                             log_msg += f" | L3: {metrics['level_3_coh']:.2f}"
 
+                    # Add GCT routing metrics
+                    if config.model_type == "gct":
+                        if "gct_mean_pi_star" in metrics:
+                            pi_star = metrics['gct_mean_pi_star']
+                            frac_local = metrics.get('gct_frac_local_routed', 0.0)
+                            lambda_l = metrics.get('gct_mean_lambda_ladder', 1.0)
+                            coh = metrics.get('gct_mean_coherence', 0.5)
+                            sched = metrics.get('gct_schedule_weight', 0.0)
+                            log_msg += (f" | GCT: pi*={pi_star:.2f} local={frac_local:.0%}"
+                                       f" Λ={lambda_l:.2f} C={coh:.2f} sched={sched:.1f}")
+
                     # Add alpha for phase/hybrid models (including ontological_hybrid)
                     # V9.8.10: Check if model type contains "phase" or "hybrid"
                     if "phase" in config.model_type or "hybrid" in config.model_type:
@@ -14863,6 +14938,14 @@ def train(config: UnifiedTrainingConfig):
                 if tb_writer is not None:
                     tb_writer.add_scalar("val/loss", val_loss, global_step)
                     tb_writer.add_scalar("val/ppl", val_ppl, global_step)
+
+                    # GCT routing metrics
+                    if config.model_type == "gct" and 'gct_mean_pi_star' in metrics:
+                        tb_writer.add_scalar("gct/pi_star", metrics['gct_mean_pi_star'], global_step)
+                        tb_writer.add_scalar("gct/frac_local_routed", metrics.get('gct_frac_local_routed', 0.0), global_step)
+                        tb_writer.add_scalar("gct/lambda_ladder", metrics.get('gct_mean_lambda_ladder', 1.0), global_step)
+                        tb_writer.add_scalar("gct/coherence", metrics.get('gct_mean_coherence', 0.5), global_step)
+                        tb_writer.add_scalar("gct/schedule_weight", metrics.get('gct_schedule_weight', 0.0), global_step)
 
                     # Sattvic Brake metrics
                     # v2.7 Training State Tracker metrics
@@ -15576,8 +15659,9 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache"],
-                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache"],
+                       help="Model architecture type (standard = O(n²) baseline, gct = Gated Coherence Transformer, "
+                            "ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
                             "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State])")
     parser.add_argument("--model_size", type=str, default="small",
@@ -15599,6 +15683,30 @@ def main():
                        help="Dropout rate")
     parser.add_argument("--attention_dropout", type=float, default=0.1,
                        help="Attention dropout rate")
+
+    # GCT (Gated Coherence Transformer) arguments
+    parser.add_argument("--gct_window_size", type=int, default=128,
+                       help="GCT local window size for coarse attention path")
+    parser.add_argument("--gct_coherence_gamma", type=float, default=5.0,
+                       help="GCT output delta sensitivity in coherence score")
+    parser.add_argument("--gct_coherence_delta", type=float, default=3.0,
+                       help="GCT residual delta sensitivity in coherence score")
+    parser.add_argument("--gct_ema_decay", type=float, default=0.9,
+                       help="GCT EMA smoothing decay for coherence scores")
+    parser.add_argument("--gct_num_bands", type=int, default=3,
+                       help="GCT number of frequency bands for head partitioning")
+    parser.add_argument("--gct_alpha_sharpness", type=float, default=10.0,
+                       help="GCT sigmoid sharpness for routing probability")
+    parser.add_argument("--gct_hard_route_threshold", type=float, default=0.5,
+                       help="GCT hard routing threshold for inference")
+    parser.add_argument("--gct_kappa", type=float, default=3.0,
+                       help="GCT lambda_ladder suppression strength")
+    parser.add_argument("--gct_tau_ladder", type=float, default=0.15,
+                       help="GCT collapse detection threshold for lambda_ladder")
+    parser.add_argument("--gct_warmup_steps", type=int, default=500,
+                       help="GCT Phase 1: full-attention-only warmup steps")
+    parser.add_argument("--gct_anneal_steps", type=int, default=2000,
+                       help="GCT Phase 2: anneal from full to gated attention over N steps")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
