@@ -5103,7 +5103,7 @@ class AdaptiveTrainingController:
     def set_scheduler(self, scheduler):
         """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
         self._scheduler = scheduler
-        print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
+        print(f"    Plateau detection: {self.plateau_window} evals, {self.plateau_threshold}% threshold")
 
     def _compute_velocity(self) -> float:
         """Compute PPL velocity (% change per eval)."""
