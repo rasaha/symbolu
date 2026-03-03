@@ -6506,9 +6506,7 @@ class HybridPhaseTransformer(nn.Module):
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
         decay_gamma: float = 0.99,  # V10.11: EMA decay (was 1.0 = unbounded cumsum → norm explosion)
-        learned_decay: bool = True,  # V10.11: Per-head learned decay (was False). Each head
-        # learns its own γ ∈ [0.5, 1.0] via sigmoid. Heads needing long memory learn γ→1,
-        # heads needing short focus learn γ→0.5. Prevents state norm growing O(√N).
+        learned_decay: bool = True,  # V10.11: Per-head learned decay γ∈[0.5,1.0] (was False)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
