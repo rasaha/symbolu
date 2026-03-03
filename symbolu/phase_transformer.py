@@ -5016,6 +5016,13 @@ class LocalAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 
+        # V10.11: Learned Re+Im projection for complex phase memory.
+        # When phase_memory is complex [B, M, H, D_h], we concatenate Re and Im
+        # to get [B, M, 2*H*D_h], then project to embed_dim for K/V.
+        # This preserves both components instead of discarding Im (.real) or
+        # destroying sign information (.abs()).
+        self.complex_proj = nn.Linear(2 * self.kv_dim, embed_dim)
+
         # Select backend
         if backend == 'auto':
             if FLASH_ATTN_AVAILABLE:
@@ -5265,32 +5272,28 @@ class LocalAttention(nn.Module):
             # V10.2.1: Cross-attention mode - K/V from Phase memory
             # phase_memory is [B, M, H, D_h] complex where M may differ from N
             # V10.2.2: M can be N+1 when prev_phase_state is concatenated
-            # V10.11: Use abs() (magnitude) instead of .real to preserve amplitude.
-            # The imaginary component encodes cumulative relevance/energy; discarding
-            # it via .real lost half the Phase signal → weak cross-attention.
+            # V10.11: Learned Re+Im projection instead of .real (loses Im) or
+            # .abs() (destroys sign). Concatenate [Re(S); Im(S)] and project
+            # through a learned linear layer to preserve full complex signal.
+            M = phase_memory.shape[1]
+            H = phase_memory.shape[2]
+            D_h = phase_memory.shape[3]
+
             if phase_memory.is_complex():
-                memory_real = phase_memory.abs()  # [B, M, H, D_h] magnitude preserves amplitude
+                re_part = phase_memory.real.reshape(B, M, H * D_h)
+                im_part = phase_memory.imag.reshape(B, M, H * D_h)
+                memory_flat = self.complex_proj(
+                    torch.cat([re_part, im_part], dim=-1)
+                )  # [B, M, embed_dim]
             else:
-                memory_real = phase_memory
-
-            # V10.2.2: Use memory's sequence length, not input's
-            M = memory_real.shape[1]  # Memory sequence length (may differ from N)
-            H = memory_real.shape[2]
-            D_h = memory_real.shape[3]
-            memory_flat = memory_real.view(B, M, H * D_h)
-
-            # Project to K/V (may need to handle dimension mismatch)
-            # If embed_dim != H * D_h, we need a separate projection
-            if memory_flat.shape[-1] != D:
-                # Create projection on-the-fly (or should be added to __init__)
-                # For now, use linear interpolation or truncation
-                if memory_flat.shape[-1] < D:
-                    # Pad with zeros
-                    padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
-                    memory_flat = torch.cat([memory_flat, padding], dim=-1)
-                else:
-                    # Truncate
-                    memory_flat = memory_flat[:, :, :D]
+                memory_flat = phase_memory.reshape(B, M, H * D_h)
+                # Handle dimension mismatch for real-only memory
+                if memory_flat.shape[-1] != D:
+                    if memory_flat.shape[-1] < D:
+                        padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
+                        memory_flat = torch.cat([memory_flat, padding], dim=-1)
+                    else:
+                        memory_flat = memory_flat[:, :, :D]
 
             # K, V from Phase memory (length M, may differ from Q length N)
             K = self.k_proj(memory_flat).view(B, M, self.n_kv_heads, self.head_dim).transpose(1, 2)
@@ -5892,16 +5895,14 @@ class HybridAttentionLayer(nn.Module):
 
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
-            # V10.11: Phase contributes directly to the residual via alpha_phase.
-            # Previous: output = residual + x_local  (Phase completely discarded!)
-            # This starved the output of Phase's temporal signal — Local's cross-
-            # attention was the *only* channel, too narrow a bottleneck for text.
-            # Now: Phase gets a small direct path (alpha_phase ≈ 0.2) so its
-            # accumulated state influences token prediction. Gradient routing is
-            # preserved: Local still dominates (alpha_local ≈ 0.8), and Phase
-            # still learns primarily through Local's K/V queries.
-            w_phase = torch.abs(self.alpha_phase)
-            output = residual + x_local + w_phase * x_phase
+            # V10.2.1 GRADIENT ROUTING (Requirement 7):
+            # Phase output is NOT added to the residual directly. Phase influences
+            # logits only through Local's cross-attention to phase_memory.
+            # This is intentional: Phase state can have large norms (cumsum),
+            # and adding it directly would destabilize the residual stream.
+            # The fix for Phase signal strength is at the source (bounded state
+            # accumulation + learned Re+Im projection), not here.
+            output = residual + x_local
         else:
             # Standard Parallel: Local processes original input independently
             # (Not recommended for chunking - causes gradient competition)
@@ -6504,8 +6505,10 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
-        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
-        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        decay_gamma: float = 0.99,  # V10.11: EMA decay (was 1.0 = unbounded cumsum → norm explosion)
+        learned_decay: bool = True,  # V10.11: Per-head learned decay (was False). Each head
+        # learns its own γ ∈ [0.5, 1.0] via sigmoid. Heads needing long memory learn γ→1,
+        # heads needing short focus learn γ→0.5. Prevents state norm growing O(√N).
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
