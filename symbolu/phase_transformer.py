@@ -2327,9 +2327,11 @@ class PhaseAttentionLayer(nn.Module):
 
             # V9.9.7: Per-head learned decay or fixed decay
             if self.learned_decay:
-                # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
-                # Higher values = longer memory, lower = focus on recent
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                # V10.11: Learned decay: γ ∈ [0.97, 0.9995] per head via sigmoid
+                # Range rationale: γ<0.97 (~33 tokens) is too short — Local handles
+                # short-range already. γ>0.9995 (~2000 tokens) risks accumulation.
+                # At init (logit=0): γ≈0.985 (~67 token effective horizon).
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma = self.decay_gamma  # Scalar
 
@@ -2384,7 +2386,7 @@ class PhaseAttentionLayer(nn.Module):
             # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
             # Reuse gamma from above (already computed for learned_decay case)
             if self.learned_decay:
-                gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                gamma_norm = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma_norm = self.decay_gamma
 
@@ -2625,6 +2627,8 @@ class PhaseStateCache:
         # Maps layer_idx -> {'final_state': Tensor, 'final_norm_state': Tensor}
         self._states: Dict[int, Dict[str, torch.Tensor]] = {}
         self._step_count: int = 0
+        # V10.7.1: Token buffer for full-prefix replay when local layers are active
+        self._token_buffer: Optional[torch.Tensor] = None
 
     def get_layer_state(self, layer_idx: int) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
         """Get (prev_state, prev_norm_state) for a layer. Returns (None, None) if no state yet."""
@@ -2674,10 +2678,31 @@ class PhaseStateCache:
         """Record that n_tokens were processed."""
         self._step_count += n_tokens
 
+    def append_tokens(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """
+        V10.7.1: Append new tokens to the token buffer and return full sequence.
+
+        Used by the safety fallback to reconstruct the full prefix for replay.
+        The token buffer grows linearly with sequence length — this is the
+        correctness-over-performance tradeoff when local layers are active.
+
+        Args:
+            input_ids: [B, N] new token IDs to append
+
+        Returns:
+            full_input_ids: [B, total_len] all tokens seen so far (including new)
+        """
+        if self._token_buffer is None:
+            self._token_buffer = input_ids
+        else:
+            self._token_buffer = torch.cat([self._token_buffer, input_ids], dim=1)
+        return self._token_buffer
+
     def reset(self) -> None:
         """Clear all state (start of new sequence)."""
         self._states.clear()
         self._step_count = 0
+        self._token_buffer = None
 
     def memory_bytes(self) -> int:
         """Total memory used by cached states (should be constant regardless of seq_len)."""
@@ -3198,7 +3223,7 @@ class BindingCachePhaseState(nn.Module):
         else:
             # EMA with decay
             if self.learned_decay:
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)
             else:
                 gamma = self.decay_gamma
             memory_state = parallel_ema_scan(kv, gamma)
@@ -3723,6 +3748,12 @@ class BindingCacheBlock(nn.Module):
         # Applied AFTER proposals, BEFORE phase integration (compositional creativity)
         self.interference_scorer = interference_scorer
 
+        # V10.7.2: RMSNorm on memory_state before Quad queries.
+        # With decay_gamma=1.0, cumsum causes memory_state norm to grow O(sqrt(N)).
+        # Without normalization, growing norms flatten quad attention scores
+        # (softmax saturates) and cause overconfident/repetitive generation.
+        self.norm_memory = nn.RMSNorm(embed_dim)
+
         # Feed-forward
         self.norm_ff = nn.LayerNorm(embed_dim)
         self.ff = nn.Sequential(
@@ -3835,6 +3866,11 @@ class BindingCacheBlock(nn.Module):
         # enable_slots_read only gates the READ path (quad retrieval)
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
+        # V10.7.2: Normalize memory_state before Quad queries it.
+        # With decay_gamma=1.0 (cumsum), memory_state norm grows O(sqrt(N)).
+        # RMSNorm stabilizes the scale so Quad attention scores don't saturate.
+        memory_state_normed = self.norm_memory(memory_state)
+
         # V10.6.2: Check if slot reading is enabled (D.2 recommendation)
         # This separates read path gating from write path
         if not enable_slots_read:
@@ -3852,7 +3888,7 @@ class BindingCacheBlock(nn.Module):
 
             # Get proposals from quad (no softmax mixing)
             proposals, proposal_scores = self.quad_query.get_proposals(
-                x, memory_state, binding_salience=binding_salience
+                x, memory_state_normed, binding_salience=binding_salience
             )
 
             # V10.5: Optional interference-aware rescoring (compositional creativity)
@@ -3865,15 +3901,15 @@ class BindingCacheBlock(nn.Module):
                 if hasattr(self, '_last_interference_stats'):
                     self._last_interference_stats = interference_stats
 
-            # Phase integrates proposals
+            # Phase integrates proposals (uses raw memory_state for gating context)
             mem_out = self.phase_state.integrate_proposals(
                 x, memory_state, proposals, proposal_scores
             )
             # Combine: local (syntax) + memory (semantics) - no competition
             attn_out = local_out + mem_out
         else:
-            # Original mode: Quad queries memory state with softmax attention
-            mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+            # Original mode: Quad queries normalized memory state with softmax attention
+            mem_out = self.quad_query(x, memory_state_normed, binding_salience=binding_salience)
             # Combine: local (syntax) + memory (semantics) - no competition
             attn_out = local_out + mem_out
 
@@ -4982,6 +5018,13 @@ class LocalAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 
+        # V10.11: Learned Re+Im projection for complex phase memory.
+        # When phase_memory is complex [B, M, H, D_h], we concatenate Re and Im
+        # to get [B, M, 2*H*D_h], then project to embed_dim for K/V.
+        # Preserves both Re and Im instead of discarding Im (.real) or
+        # destroying sign (.abs()). Init std=0.02 prevents early amplification.
+        self.complex_proj = nn.Linear(2 * self.kv_dim, embed_dim)
+
         # Select backend
         if backend == 'auto':
             if FLASH_ATTN_AVAILABLE:
@@ -5231,30 +5274,28 @@ class LocalAttention(nn.Module):
             # V10.2.1: Cross-attention mode - K/V from Phase memory
             # phase_memory is [B, M, H, D_h] complex where M may differ from N
             # V10.2.2: M can be N+1 when prev_phase_state is concatenated
-            # Take real part for K/V (imaginary encodes phase relationships)
+            # V10.11: Learned Re+Im projection instead of .real (loses Im) or
+            # .abs() (destroys sign). Concatenate [Re(S); Im(S)] and project
+            # through a learned linear layer to preserve full complex signal.
+            M = phase_memory.shape[1]
+            H = phase_memory.shape[2]
+            D_h = phase_memory.shape[3]
+
             if phase_memory.is_complex():
-                memory_real = phase_memory.real  # [B, M, H, D_h]
+                re_part = phase_memory.real.reshape(B, M, H * D_h)
+                im_part = phase_memory.imag.reshape(B, M, H * D_h)
+                memory_flat = self.complex_proj(
+                    torch.cat([re_part, im_part], dim=-1)
+                )  # [B, M, embed_dim]
             else:
-                memory_real = phase_memory
-
-            # V10.2.2: Use memory's sequence length, not input's
-            M = memory_real.shape[1]  # Memory sequence length (may differ from N)
-            H = memory_real.shape[2]
-            D_h = memory_real.shape[3]
-            memory_flat = memory_real.view(B, M, H * D_h)
-
-            # Project to K/V (may need to handle dimension mismatch)
-            # If embed_dim != H * D_h, we need a separate projection
-            if memory_flat.shape[-1] != D:
-                # Create projection on-the-fly (or should be added to __init__)
-                # For now, use linear interpolation or truncation
-                if memory_flat.shape[-1] < D:
-                    # Pad with zeros
-                    padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
-                    memory_flat = torch.cat([memory_flat, padding], dim=-1)
-                else:
-                    # Truncate
-                    memory_flat = memory_flat[:, :, :D]
+                memory_flat = phase_memory.reshape(B, M, H * D_h)
+                # Handle dimension mismatch for real-only memory
+                if memory_flat.shape[-1] != D:
+                    if memory_flat.shape[-1] < D:
+                        padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
+                        memory_flat = torch.cat([memory_flat, padding], dim=-1)
+                    else:
+                        memory_flat = memory_flat[:, :, :D]
 
             # K, V from Phase memory (length M, may differ from Q length N)
             K = self.k_proj(memory_flat).view(B, M, self.n_kv_heads, self.head_dim).transpose(1, 2)
@@ -5592,8 +5633,9 @@ class GroupedHybridTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -5856,15 +5898,12 @@ class HybridAttentionLayer(nn.Module):
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
             # V10.2.1 GRADIENT ROUTING (Requirement 7):
-            # - Token loss → Local (via output): ✅
-            # - Token loss → Phase (via Local's K/V from memory_state): ✅
-            # - Token loss → Phase directly: ❌ (NO x_phase in output!)
-            #
-            # Phase gets gradients ONLY through:
-            #   loss → output → x_local → Local K/V → memory_state → Phase
-            #
-            # This is critical for "protected learning" - Phase must learn
-            # representations useful for Local's queries, not compete for loss.
+            # Phase output is NOT added to the residual directly. Phase influences
+            # logits only through Local's cross-attention to phase_memory.
+            # This is intentional: Phase state can have large norms (cumsum),
+            # and adding it directly would destabilize the residual stream.
+            # The fix for Phase signal strength is at the source (bounded state
+            # accumulation + learned Re+Im projection), not here.
             output = residual + x_local
         else:
             # Standard Parallel: Local processes original input independently
@@ -6226,8 +6265,9 @@ class PhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -6467,8 +6507,8 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
-        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
-        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        decay_gamma: float = 0.99,  # V10.11: EMA decay (was 1.0 = unbounded cumsum → norm explosion)
+        learned_decay: bool = True,  # V10.11: Per-head learned decay γ∈[0.5,1.0] (was False)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
@@ -6546,8 +6586,9 @@ class HybridPhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -7073,9 +7114,15 @@ class HybridPhaseTransformer(nn.Module):
     ) -> Tuple[Dict[str, torch.Tensor], 'PhaseStateCache']:
         """
         V10.7: Inference forward pass using PhaseStateCache.
+        V10.7.1: Safety fallback for correctness when local layers are active.
 
-        Guarantees O(1) memory per layer regardless of total sequence length.
-        Only processes the NEW tokens (not the full sequence).
+        When local_layers > 0, incremental decoding cannot be exactly reproduced
+        from Phase state alone — LocalAttention layers need token-level context
+        that is lost in the O(1) phase state. In this case, we fall back to
+        full-prefix replay to guarantee generation quality matches full forward.
+
+        When local_layers == 0 (pure phase model), O(1) incremental decoding
+        is exact and the fast path is used.
 
         For prefill (first call), pass the full prompt as input_ids.
         For decode (subsequent calls), pass one token at a time.
@@ -7095,7 +7142,19 @@ class HybridPhaseTransformer(nn.Module):
                 hybrid_layer_start=self.local_layers,
             )
 
-        # Use forward_chunk with cache state
+        # V10.7.1 SAFETY FALLBACK:
+        # If LocalAttention layers are active, exact incremental decoding cannot be
+        # reproduced from Phase state alone (local path needs token-level context).
+        # Use full-prefix replay for correctness to prevent generation quality drift.
+        if self.local_layers > 0:
+            full_input_ids = cache.append_tokens(input_ids)
+            result = self.forward(full_input_ids, intent_phase=intent_phase)
+            # Return logits only for newly appended tokens to preserve API shape.
+            result = {'logits': result['logits'][:, -input_ids.shape[1]:, :]}
+            cache.advance(input_ids.shape[1])
+            return result, cache
+
+        # Fast path: pure phase model (no local layers) — O(1) incremental decode
         prev_layer_states = cache.as_prev_layer_states() if cache.seq_len > 0 else None
 
         result, new_layer_states = self.forward_chunk(
@@ -7575,8 +7634,9 @@ class LocalOnlyTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -8320,8 +8380,9 @@ class GCTTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -8458,8 +8519,9 @@ class StandardTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:

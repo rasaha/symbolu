@@ -163,14 +163,22 @@ def test_forward_with_cache():
     logits = result['logits']
     assert logits.shape == (1, 32, 256), f"Wrong shape: {logits.shape}"
     assert cache.seq_len == 32, f"Wrong seq_len: {cache.seq_len}"
-    assert len(cache._states) > 0, "No states captured"
 
-    # Verify all states are [B, 1, H, D_h]
-    for layer_idx, state_dict in cache._states.items():
-        for name, tensor in state_dict.items():
-            assert tensor.shape[1] == 1, (
-                f"Layer {layer_idx} {name} has seq dim {tensor.shape[1]}"
-            )
+    # V10.7.1: When local_layers > 0, the safety fallback uses token buffer
+    # instead of layer states. Verify the token buffer is populated.
+    if model.local_layers > 0:
+        assert cache._token_buffer is not None, "Token buffer not populated"
+        assert cache._token_buffer.shape[1] == 32, (
+            f"Token buffer wrong length: {cache._token_buffer.shape[1]}"
+        )
+    else:
+        # Pure phase model: verify O(1) layer states
+        assert len(cache._states) > 0, "No states captured"
+        for layer_idx, state_dict in cache._states.items():
+            for name, tensor in state_dict.items():
+                assert tensor.shape[1] == 1, (
+                    f"Layer {layer_idx} {name} has seq dim {tensor.shape[1]}"
+                )
 
     print(f"  PASS: forward_with_cache output shape {logits.shape}, cache {cache}")
     return True
@@ -182,10 +190,10 @@ def test_forward_with_cache():
 
 def test_incremental_decode_consistency():
     """
-    Prefill + single-token decode should produce logits close to full forward.
+    Prefill + single-token decode should match full forward.
 
-    Note: Due to Local attention windowing, exact match is not expected.
-    But the Phase state contribution should be consistent.
+    V10.7.1: forward_with_cache now falls back to exact full-prefix replay when
+    LocalAttention layers are active, preventing autoregressive cache drift.
     """
     torch.manual_seed(42)
     model = make_small_hybrid_model(window_size=64)
@@ -209,17 +217,11 @@ def test_incremental_decode_consistency():
         incremental_last_logit = result2['logits'][:, -1, :]
         full_last_logit = full_logits[:, -1, :]
 
-    # Check that the outputs are in the same ballpark
-    # (exact match not expected due to Local attention differences)
-    cosine_sim = F.cosine_similarity(
-        incremental_last_logit.flatten().unsqueeze(0),
-        full_last_logit.flatten().unsqueeze(0),
-    ).item()
+    max_abs_diff = (incremental_last_logit - full_last_logit).abs().max().item()
 
-    print(f"  Cosine similarity (incremental vs full): {cosine_sim:.4f}")
-    # Phase state should contribute meaningfully
-    assert cosine_sim > 0.5, f"Cosine sim too low: {cosine_sim}"
-    print(f"  PASS: Incremental decode consistent with full forward (cos={cosine_sim:.4f})")
+    print(f"  Max abs diff (incremental vs full): {max_abs_diff:.6e}")
+    assert max_abs_diff < 1e-6, f"Incremental decode drift too high: {max_abs_diff}"
+    print("  PASS: Incremental decode matches full forward")
     return True
 
 
