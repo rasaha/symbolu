@@ -4401,12 +4401,10 @@ def run_interference_benchmarks(
         print("  Comparing: Base vs +Interference vs +BCVF vs +BCVF+Interference")
 
         # Create BCVF scorer
+        # BCVFTextScorer accepts (interference_enabled, interference_lambda), not d_model/config.
         bcvf_scorer = BCVFTextScorer(
-            d_model=D,
-            interference_config=TextInterferenceConfig(
-                enabled=True,
-                lambda_text=args.interference_lambda,
-            ),
+            interference_enabled=True,
+            interference_lambda=args.interference_lambda,
         ).to(device)
 
         # Synthetic compositional task proposals
@@ -4423,9 +4421,9 @@ def run_interference_benchmarks(
         )
 
         # +BCVF+Interference
-        policy = TextInterferencePolicy(enable=True, lam=0.02, min_step=1)
+        # BCVFTextScorer.forward() accepts (proposals, scores, memory_state, sf, sb).
         results_bcvf_interf, bcvf_stats = bcvf_scorer(
-            proposals_comp, scores_base, policy=policy, step=10
+            proposals_comp, scores_base
         )
 
         print(f"\n  Score statistics after each variant:")

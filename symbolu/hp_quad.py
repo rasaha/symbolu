@@ -229,7 +229,7 @@ class HierarchicalPhaseIntegrator(nn.Module):
                     if level < self.num_levels - 1:
                         top_down = self.top_down_projections[level](phase_states[level + 1])
                     else:
-                        top_down = torch.zeros_like(phase_states[level - 1])
+                        top_down = torch.zeros_like(phase_states[level])
 
                     # Mask for samples where boundary fired
                     mask = z_hard.unsqueeze(-1)  # [B, 1]
