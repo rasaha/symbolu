@@ -2327,9 +2327,11 @@ class PhaseAttentionLayer(nn.Module):
 
             # V9.9.7: Per-head learned decay or fixed decay
             if self.learned_decay:
-                # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
-                # Higher values = longer memory, lower = focus on recent
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                # V10.11: Learned decay: γ ∈ [0.97, 0.9995] per head via sigmoid
+                # Range rationale: γ<0.97 (~33 tokens) is too short — Local handles
+                # short-range already. γ>0.9995 (~2000 tokens) risks accumulation.
+                # At init (logit=0): γ≈0.985 (~67 token effective horizon).
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma = self.decay_gamma  # Scalar
 
@@ -2384,7 +2386,7 @@ class PhaseAttentionLayer(nn.Module):
             # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
             # Reuse gamma from above (already computed for learned_decay case)
             if self.learned_decay:
-                gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                gamma_norm = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma_norm = self.decay_gamma
 
@@ -3221,7 +3223,7 @@ class BindingCachePhaseState(nn.Module):
         else:
             # EMA with decay
             if self.learned_decay:
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)
             else:
                 gamma = self.decay_gamma
             memory_state = parallel_ema_scan(kv, gamma)
@@ -5019,8 +5021,8 @@ class LocalAttention(nn.Module):
         # V10.11: Learned Re+Im projection for complex phase memory.
         # When phase_memory is complex [B, M, H, D_h], we concatenate Re and Im
         # to get [B, M, 2*H*D_h], then project to embed_dim for K/V.
-        # This preserves both components instead of discarding Im (.real) or
-        # destroying sign information (.abs()).
+        # Preserves both Re and Im instead of discarding Im (.real) or
+        # destroying sign (.abs()). Init std=0.02 prevents early amplification.
         self.complex_proj = nn.Linear(2 * self.kv_dim, embed_dim)
 
         # Select backend
