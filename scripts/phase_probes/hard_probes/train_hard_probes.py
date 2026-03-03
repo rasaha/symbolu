@@ -4281,7 +4281,9 @@ def run_interference_benchmarks(
     # Create synthetic proposals [B, N, K, D]
     B, N, K, D = 2, 4, 8, 64
     proposals = torch.randn(B, N, K, D, device=device, requires_grad=True)
-    scores = torch.randn(B, N, K, device=device, requires_grad=True).abs()
+    # Use torch.rand (uniform [0,1]) to keep scores positive AND preserve leaf status.
+    # Previously: torch.randn(...).abs() — .abs() creates a non-leaf, breaking .grad access.
+    scores = torch.rand(B, N, K, device=device, requires_grad=True)
 
     # Test rescore function
     rescored, stats = text_interference_rescore(
@@ -4310,8 +4312,10 @@ def run_interference_benchmarks(
         stats.get("interference/multiplier_mean", 0) <= 1.1
     )
     print(f"\n  Multiplier stats:")
-    print(f"    Mean: {stats.get('interference/multiplier_mean', 'N/A'):.4f}")
-    print(f"    Std:  {stats.get('interference/multiplier_std', 'N/A'):.4f}")
+    mult_mean = stats.get('interference/multiplier_mean', 'N/A')
+    mult_std = stats.get('interference/multiplier_std', 'N/A')
+    print(f"    Mean: {mult_mean:.4f}" if isinstance(mult_mean, (int, float)) else f"    Mean: {mult_mean}")
+    print(f"    Std:  {mult_std:.4f}" if isinstance(mult_std, (int, float)) else f"    Std:  {mult_std}")
     print(f"  Multiplier in bounds [0.9, 1.1]: {'OK' if mult_in_bounds else 'WARN'}")
 
     # Check score change percentage
@@ -4349,18 +4353,26 @@ def run_interference_benchmarks(
     proposals_low_ent = proposals_low_ent + torch.randn_like(proposals_low_ent) * 0.01
 
     scores_low = torch.ones(B, N, K, device=device)
-    policy_low = TextInterferencePolicy(enable=True, lam=0.02, min_step=1, entropy_gate=1.2)
+    # TextInterferenceScorer.forward() accepts (proposals, scores, step, proposal_entropy).
+    # The entropy_gate is set via the scorer's config, not per-call policy.
     rescored_low, stats_low = scorer(
-        proposals_low_ent, scores_low, policy=policy_low, step=10
+        proposals_low_ent, scores_low, step=10
     )
     applied_low = stats_low.get("interference/applied", 0) > 0
 
-    # Test with high entropy (should apply)
+    # Test with high entropy (should apply) — use a scorer with low entropy gate
+    scorer_low_gate = TextInterferenceScorer(
+        config=TextInterferenceConfig(
+            enabled=True,
+            lambda_text=args.interference_lambda,
+            min_step=1,
+            entropy_gate=0.1,  # Very low gate so diverse proposals trigger interference
+        )
+    )
     proposals_high_ent = torch.randn(B, N, K, D, device=device)
-    scores_high = torch.randn(B, N, K, device=device).abs()
-    policy_high = TextInterferencePolicy(enable=True, lam=0.02, min_step=1, entropy_gate=0.1)  # Low gate
-    rescored_high, stats_high = scorer(
-        proposals_high_ent, scores_high, policy=policy_high, step=10
+    scores_high = torch.rand(B, N, K, device=device)
+    rescored_high, stats_high = scorer_low_gate(
+        proposals_high_ent, scores_high, step=10
     )
     applied_high = stats_high.get("interference/applied", 0) > 0
 
