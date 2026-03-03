@@ -320,6 +320,20 @@ def compute_phase_loss(
         ignore_index=-100,
     )
 
+    total_loss = lm_loss
+
+    # V10.7.2: z-loss regularization — penalizes log(sum(exp(logits)))^2
+    # Prevents unbounded logit norm growth during generation.
+    # From PaLM/ST-MoE: z_loss = λ * mean(log(Σ_j exp(z_j))^2)
+    # This is differentiable and gently pushes logits toward zero.
+    z_loss_weight = getattr(config, 'z_loss_weight', 1e-4)
+    if z_loss_weight > 0:
+        log_z = torch.logsumexp(logits, dim=-1)  # [B, N]
+        z_loss = z_loss_weight * (log_z ** 2).mean()
+        total_loss = total_loss + z_loss
+    else:
+        z_loss = torch.tensor(0.0, device=logits.device)
+
     # Compute entropy for Sattvic controller (prevents variance=0.0 stagnation bug)
     # V10.7.2: Chunk over sequence dim to avoid OOM at long sequences
     # (full softmax [B,N,V] = B*N*V*4 bytes, e.g. 24GB at seq=32k, V=50k)
@@ -340,10 +354,11 @@ def compute_phase_loss(
 
     metrics = {
         "lm_loss": lm_loss.item(),
+        "z_loss": z_loss.item(),
         "ppl": math.exp(min(lm_loss.item(), 20)),
-        "total_loss": lm_loss.item(),
+        "total_loss": total_loss.item(),
         "onto_entropy": normalized_entropy,  # Required for Sattvic stagnation detection
     }
 
-    return lm_loss, metrics
+    return total_loss, metrics
 

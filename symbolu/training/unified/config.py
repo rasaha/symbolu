@@ -50,6 +50,11 @@ class UnifiedTrainingConfig:
     bounded_phase: bool = True  # V9.9.11: Constrain φ to [-π, π] via π*sin() (mandatory fix - enabled by default)
     zero_mean_cosine: bool = False  # V9.9.11: Center cosine per head (forces selectivity)
 
+    # V10.7.2: z-loss regularization — prevents unbounded logit norm growth
+    # Penalizes log(sum(exp(logits)))^2. From PaLM/ST-MoE.
+    # Set to 0 to disable. 1e-4 is a safe default.
+    z_loss_weight: float = 1e-4
+
     # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
     # Separates content similarity from intent alignment to prevent intent from dominating:
     #   s_content = cos(φ_q - φ_k)           # What matches (preserved)
