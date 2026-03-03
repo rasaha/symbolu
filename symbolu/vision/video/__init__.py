@@ -42,6 +42,21 @@ from symbolu.vision.video.bcvf_video import (
     AdaptiveBCVFVideoWeighter,
     compute_video_bcvf_metrics,
 )
+from symbolu.vision.video.fscsv_wrapper import (
+    FSCSVConfig,
+    FSCSVModule,
+    FSCSVPipeline,
+    make_fscsv_callback,
+    CouplingSchedule,
+    IdentitySchedule,
+    GradientSafetyBound,
+    ThreeBandDecomposer,
+    ProxyEncoder,
+    FrameCoherence,
+    TweedieProjection,
+    compute_phase_correlation,
+    compute_semantic_similarity,
+)
 
 __all__ = [
     # Core components
@@ -59,6 +74,20 @@ __all__ = [
     "BCVFVideoQuadWeighter",
     "AdaptiveBCVFVideoWeighter",
     "compute_video_bcvf_metrics",
+    # FSCS-V (Frequency-Stratified Coherence for Video)
+    "FSCSVConfig",
+    "FSCSVModule",
+    "FSCSVPipeline",
+    "make_fscsv_callback",
+    "CouplingSchedule",
+    "IdentitySchedule",
+    "GradientSafetyBound",
+    "ThreeBandDecomposer",
+    "ProxyEncoder",
+    "FrameCoherence",
+    "TweedieProjection",
+    "compute_phase_correlation",
+    "compute_semantic_similarity",
     # Pipeline
     "PhaseQuadVideoPipeline",
     "VideoGenerationConfig",

@@ -53,6 +53,14 @@ class DataCollectionConfig:
     device: str = "cpu"
     """Device for inference ('cpu' or 'cuda')."""
 
+    activation_source: str = "block"
+    """Which activation to extract:
+    'block'     — full transformer block output (MLP residual stream).
+    'attention' — attention sublayer output only (before residual connection,
+                  no MLP contribution).  Use this to test whether structural
+                  roles live in attention patterns rather than MLP directions.
+    """
+
     seed: int = 42
 
 
@@ -72,6 +80,9 @@ class HiddenStateStore:
         tokens: list[str] – decoded token strings
         d_model: int – hidden dimension
         n_layers: int – number of transformer layers
+        attention_entropy: dict mapping layer index → np.ndarray [N, n_heads]
+            Per-token, per-head attention entropy (in nats).
+        n_heads: int – number of attention heads (0 if not collected)
     """
 
     states: Dict[int, np.ndarray] = field(default_factory=dict)
@@ -81,6 +92,8 @@ class HiddenStateStore:
     sequence_ids: Optional[np.ndarray] = None
     d_model: int = 0
     n_layers: int = 0
+    attention_entropy: Dict[int, np.ndarray] = field(default_factory=dict)
+    n_heads: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -88,20 +101,46 @@ class HiddenStateStore:
 # ---------------------------------------------------------------------------
 
 class _LayerHookCollector:
-    """Attaches forward hooks to every transformer layer to capture outputs."""
+    """Attaches forward hooks to every transformer layer to capture outputs.
 
-    def __init__(self):
+    When ``collect_attention=True`` and the model is invoked with
+    ``output_attentions=True``, each block returns attention weights as part
+    of its output tuple.  Rather than storing the full [B, H, T, T] matrices
+    (which would be enormous), we compute per-token, per-head entropy on the
+    fly and store only the [B, T, H] scalar results.
+
+    When ``activation_source='attention'``, hooks the attention sublayer
+    instead of the full block, capturing attention output before the residual
+    connection (no MLP contribution).
+    """
+
+    def __init__(
+        self,
+        collect_attention: bool = False,
+        activation_source: str = "block",
+    ):
         self.layer_outputs: Dict[int, List[torch.Tensor]] = {}
+        self.layer_attn_entropy: Dict[int, List[torch.Tensor]] = {}
         self._handles: list = []
+        self._collect_attention = collect_attention
+        self._activation_source = activation_source
 
     def attach(self, model: nn.Module) -> None:
-        """Find transformer blocks and register hooks."""
-        blocks = _find_transformer_blocks(model)
-        for idx, block in enumerate(blocks):
+        """Find transformer blocks (or attention modules) and register hooks."""
+        if self._activation_source == "attention":
+            modules = _find_attention_modules(model)
+            module_desc = "attention modules"
+        else:
+            modules = _find_transformer_blocks(model)
+            module_desc = "transformer blocks"
+
+        for idx, module in enumerate(modules):
             self.layer_outputs[idx] = []
-            handle = block.register_forward_hook(self._make_hook(idx))
+            if self._collect_attention:
+                self.layer_attn_entropy[idx] = []
+            handle = module.register_forward_hook(self._make_hook(idx))
             self._handles.append(handle)
-        logger.info("Attached hooks to %d transformer blocks", len(blocks))
+        logger.info("Attached hooks to %d %s", len(modules), module_desc)
 
     def _make_hook(self, layer_idx: int):
         def hook_fn(module, inp, out):
@@ -111,6 +150,17 @@ class _LayerHookCollector:
             else:
                 h = out
             self.layer_outputs[layer_idx].append(h.detach().cpu())
+
+            # Collect attention entropy if available.
+            # GPT-2 block output: (hidden_states, attn_weights) when
+            # output_attentions=True.  Other architectures may place
+            # attn_weights at index 2 (after KV cache).  We search for
+            # the first 4-D tensor with matching [B, H, T, T] shape.
+            if self._collect_attention and isinstance(out, tuple) and len(out) >= 2:
+                attn_weights = _find_attn_weights(out)
+                if attn_weights is not None:
+                    entropy = _attention_entropy(attn_weights)  # [B, T, n_heads]
+                    self.layer_attn_entropy[layer_idx].append(entropy.cpu())
         return hook_fn
 
     def detach(self) -> None:
@@ -121,6 +171,41 @@ class _LayerHookCollector:
     def reset(self) -> None:
         for k in self.layer_outputs:
             self.layer_outputs[k] = []
+        for k in self.layer_attn_entropy:
+            self.layer_attn_entropy[k] = []
+
+
+def _find_attn_weights(out: tuple) -> Optional[torch.Tensor]:
+    """Extract attention weight tensor from a block's output tuple.
+
+    Different architectures place attention weights at different indices.
+    We look for the first 4-D tensor whose last two dims are equal (T, T),
+    which is the hallmark of an attention matrix.
+    """
+    for item in out[1:]:  # skip index 0 (hidden states)
+        if isinstance(item, torch.Tensor) and item.ndim == 4:
+            # [B, n_heads, T_q, T_k] — T_q == T_k for self-attention
+            if item.shape[-1] == item.shape[-2]:
+                return item
+    return None
+
+
+def _attention_entropy(attn_weights: torch.Tensor) -> torch.Tensor:
+    """Compute per-token, per-head Shannon entropy from attention weights.
+
+    Args:
+        attn_weights: [B, n_heads, T_q, T_k] attention probability matrix
+            (already softmaxed, rows sum to 1).
+
+    Returns:
+        Tensor of shape [B, T_q, n_heads] containing entropy in nats for
+        each query position and each head.
+    """
+    # Clamp to avoid log(0)
+    p = attn_weights.clamp(min=1e-12)
+    # H = -sum(p * log(p)) along the key dimension
+    ent = -(p * p.log()).sum(dim=-1)  # [B, n_heads, T_q]
+    return ent.permute(0, 2, 1)  # [B, T_q, n_heads]
 
 
 def _find_transformer_blocks(model: nn.Module) -> list:
@@ -141,6 +226,29 @@ def _find_transformer_blocks(model: nn.Module) -> list:
         "Could not locate transformer blocks. "
         "Ensure the model follows GPT-2 / LLaMA / OPT conventions."
     )
+
+
+def _find_attention_modules(model: nn.Module) -> list:
+    """Locate the attention submodule inside each transformer block.
+
+    For GPT-2 this is ``block.attn``, for LLaMA ``block.self_attn``, etc.
+    The returned modules' forward output has the attention hidden state at
+    index 0 of the output tuple, same as the block output convention.
+    """
+    blocks = _find_transformer_blocks(model)
+    attn_modules: list = []
+    for block in blocks:
+        for attr in ("attn", "self_attn", "attention"):
+            mod = getattr(block, attr, None)
+            if mod is not None and isinstance(mod, nn.Module):
+                attn_modules.append(mod)
+                break
+        else:
+            raise RuntimeError(
+                f"Could not find attention module in {block.__class__.__name__}. "
+                "Expected .attn, .self_attn, or .attention attribute."
+            )
+    return attn_modules
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +276,12 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
 
     logger.info("Loading model: %s", cfg.model_name)
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
-    model = AutoModelForCausalLM.from_pretrained(cfg.model_name)
+    # Use "eager" attention so that output_attentions=True returns actual
+    # weight matrices.  The default SDPA backend uses fused kernels that
+    # never materialise the attention matrix, returning None instead.
+    model = AutoModelForCausalLM.from_pretrained(
+        cfg.model_name, attn_implementation="eager",
+    )
 
     n_params = count_parameters(model)
     logger.info("Model has %s parameters (%.1fM)", f"{n_params:,}", n_params / 1e6)
@@ -194,8 +307,11 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
     sequences = _load_corpus(cfg, tokenizer)
     logger.info("Collected %d tokenized sequences", len(sequences))
 
-    # Hook collector
-    collector = _LayerHookCollector()
+    # Hook collector — also collect attention entropy for Part 7 gating analysis
+    collector = _LayerHookCollector(
+        collect_attention=True,
+        activation_source=cfg.activation_source,
+    )
     collector.attach(model)
 
     all_positions: List[np.ndarray] = []
@@ -203,6 +319,7 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
     all_seq_ids: List[np.ndarray] = []
     n_layers = len(collector.layer_outputs)
     layer_accum: Dict[int, List[np.ndarray]] = {i: [] for i in range(n_layers)}
+    attn_ent_accum: Dict[int, List[np.ndarray]] = {i: [] for i in range(n_layers)}
 
     seq_offset = 0
 
@@ -225,7 +342,10 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
         collector.reset()
 
         with torch.no_grad():
-            model(input_ids=input_ids, attention_mask=attention_mask)
+            # output_attentions=True makes each block return attn weights
+            # in its output tuple, which our hook captures for entropy
+            model(input_ids=input_ids, attention_mask=attention_mask,
+                  output_attentions=True)
 
         # Gather per-token hidden states (skip padding)
         for b_idx in range(input_ids.shape[0]):
@@ -247,10 +367,21 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
                 layer_accum[layer_idx].append(
                     h[b_idx, :real_len, :].numpy()
                 )
+                # Attention entropy: [B, T, n_heads]
+                if layer_idx in collector.layer_attn_entropy and collector.layer_attn_entropy[layer_idx]:
+                    ae = collector.layer_attn_entropy[layer_idx][-1]
+                    attn_ent_accum[layer_idx].append(
+                        ae[b_idx, :real_len, :].numpy()
+                    )
 
         seq_offset += len(batch_ids)
-        if seq_offset % 200 == 0:
-            logger.info("Processed %d / %d sequences", seq_offset, len(sequences))
+        # Report progress every batch so the user sees forward-pass activity
+        elapsed_batches = seq_offset // cfg.batch_size
+        total_batches = (len(sequences) + cfg.batch_size - 1) // cfg.batch_size
+        logger.info(
+            "Forward pass: batch %d/%d (%d/%d sequences)",
+            elapsed_batches, total_batches, seq_offset, len(sequences),
+        )
 
     collector.detach()
 
@@ -266,6 +397,26 @@ def collect_hidden_states(cfg: DataCollectionConfig) -> HiddenStateStore:
         store.states[layer_idx] = arr
         if store.d_model == 0:
             store.d_model = arr.shape[1]
+
+    # Concatenate attention entropy if collected
+    for layer_idx in range(n_layers):
+        if attn_ent_accum[layer_idx]:
+            ae_arr = np.concatenate(attn_ent_accum[layer_idx], axis=0)
+            store.attention_entropy[layer_idx] = ae_arr  # [N, n_heads]
+            if store.n_heads == 0:
+                store.n_heads = ae_arr.shape[1]
+
+    if store.attention_entropy:
+        logger.info(
+            "Attention entropy collected: %d layers, %d heads/layer",
+            len(store.attention_entropy),
+            store.n_heads,
+        )
+    else:
+        logger.warning(
+            "Attention entropy not collected (model may not expose "
+            "attention weights via output_attentions=True)"
+        )
 
     logger.info(
         "Collection complete: %d tokens, %d layers, d=%d",

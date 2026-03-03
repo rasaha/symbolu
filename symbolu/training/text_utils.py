@@ -68,6 +68,10 @@ def clean_wikitext_artifacts(text: str) -> str:
     # Clean up stray @ symbols that might remain
     text = re.sub(r'\s*@\s*', ' ', text)
 
+    # Remove <unk> tokens (WikiText replaces rare words with <unk>)
+    # These pollute the vocabulary when tokenized by BPE (becomes <, unk, >)
+    text = re.sub(r'\s*<unk>\s*', ' ', text)
+
     return text
 
 

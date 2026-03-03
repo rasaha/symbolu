@@ -1,6 +1,6 @@
 # Spanda-Softmax Hybrid: Design Evaluation
 
-**Version:** 0.4.0 (Evaluation Only -- No Implementation)
+**Version:** 0.4.1 (Evaluation Only -- No Implementation)
 **Date:** 2026-02-19
 **Status:** Design evaluation. Not approved for implementation.
 
@@ -811,6 +811,23 @@ emission-layer memory adds value. If only gamma=0.99 is tested, and Spanda
 shows no benefit, the experiment is inconclusive -- the memory may simply
 have been too short-lived to matter.
 
+**Critical control: trivial logit smoothing baseline.**
+
+14. Logit-smoothed baseline (no Spanda geometry):
+    ```python
+    z_t = W @ h_t                        # standard linear head
+    z_t_smooth = gamma * z_{t-1} + z_t   # temporal smoothing on logits
+    p(y) = softmax(z_t_smooth / tau)
+    ```
+
+This isolates whether temporal smoothing alone (applied directly to logits,
+no geometric emission, no Psi state, no anchor space) captures the same
+benefit. If experiment 14 performs comparably to the full Spanda hybrid,
+then the geometric emission parameterization adds no structural value --
+the benefit was entirely from temporal inertia, which can be achieved
+trivially. This control is scientifically necessary: without it, positive
+Spanda results cannot be attributed to geometry vs. smoothing.
+
 ### 9.3 Spanda-Specific Diagnostics
 
 These diagnostics are unique to the hybrid and must be logged during
@@ -847,6 +864,34 @@ Compute periodically (every N training steps):
   the emission space is underutilized.
 
 These catch anchor collapse (Section 6.2) early enough to intervene.
+
+**Norm clamp saturation monitoring:**
+
+When gamma is high (0.995+) and sequences are long, Psi may frequently
+saturate against the norm clamp ceiling `c`. If that happens, the magnitude
+channel is effectively destroyed -- Psi becomes direction-only, reducing
+the emission advantage over dot-product heads.
+
+Log at every training step:
+- **Clamp saturation rate:** % of timesteps (across batch) where
+  `||Psi_raw|| > c` (i.e., clamping was active). Compute as:
+  ```python
+  saturation_rate = (psi_raw.norm(dim=-1) > self.norm_clamp_c).float().mean()
+  ```
+- **Psi norm histogram:** Distribution of `||Psi||` across timesteps and
+  batch elements. Should show spread across `[0, c]`, not a spike at `c`.
+- **Effective magnitude entropy:** If Psi norms cluster tightly (low
+  variance), the magnitude channel carries little information.
+
+**Alert thresholds:**
+- Clamp saturation > 30%: magnitude channel is being significantly
+  compressed. Consider increasing `c` or decreasing `gamma`.
+- Clamp saturation > 60%: Psi has effectively become direction-only.
+  The geometric emission advantage over dot-product is largely nullified.
+  Increase `c`, decrease `gamma`, or reconsider the norm management strategy.
+
+This diagnostic is especially critical for the high-gamma ablations
+(experiments 10-11 in Section 9.2), where saturation is most likely.
 
 ### 9.4 Regularizer Staging Protocol
 
@@ -925,13 +970,60 @@ is future work -- v0.1 should use a flat Psi vector.
 
 ---
 
-## 12. Summary Position
+## 12. What This Design Actually Is
+
+Stripped of naming and philosophy, this is:
+
+**A first-order linear state-space model attached to the emission head.**
+
+The core recurrence:
+
+```
+Psi_{t+1} = gamma * Psi_t + f(h_t)
+```
+
+is structurally identical to the state update in S4, Mamba, and linear
+RNN augmentation -- but applied to emission rather than attention or
+context mixing. The anchor-distance emission adds a geometric
+parameterization on top of this state-space structure.
+
+This framing matters because:
+- It connects Spanda to a well-understood family of models (state-space
+  models), not to speculative geometry.
+- It identifies the genuinely novel component: applying SSM-style
+  accumulation to the emission layer specifically, where standard LMs
+  use a stateless linear projection.
+- It clarifies what must be demonstrated: that emission-layer state
+  persistence provides value that backbone-level state does not already
+  capture.
+
+**The two degrees of freedom Spanda adds over a standard linear head:**
+
+1. **Temporal accumulation** -- Psi carries filtered history of h_t
+   across timesteps. This is the primary hypothesis: does emission-layer
+   memory add value?
+2. **Radial confidence channel** -- With norm clamping, `||Psi||` encodes
+   a scalar confidence energy that modulates all logits simultaneously
+   (via the `-||Psi||^2` term in the emission). A standard dot-product
+   head has no analogue of this. When `||Psi||` is small, all distances
+   to anchors shrink and the distribution flattens (higher entropy). When
+   `||Psi||` is large (near clamp ceiling), the distribution sharpens
+   around the nearest anchors. This is a genuinely different degree of
+   freedom from what standard softmax emission provides.
+
+Whether either degree of freedom produces measurable improvement is
+the empirical question this design exists to answer.
+
+---
+
+## 13. Summary Position
 
 The Spanda-Softmax hybrid is a well-motivated inductive bias change. It
 does not expand the function class but provides:
 
 - Explicit state trajectory at the emission layer.
 - Geometric interpretability of token prediction.
+- A radial confidence channel with no dot-product analogue.
 - Trajectory smoothness as a regularizable quantity.
 - Attention-agnostic design: works on all 8 existing backbone variants.
 
@@ -944,10 +1036,20 @@ The implementation is minimal (~100 new lines) and non-destructive
 (existing architectures unchanged). Spanda is orthogonal to attention
 complexity -- it consumes `h_t` regardless of how it was computed.
 
-The key research question is not compatibility but consequence:
-**Does Spanda reduce reliance on quadratic attention for long-range
-coherence?** The backbone ablation plan (Section 9.2, experiments 5-8)
-is designed to answer this directly.
+There are two key research questions:
+
+1. **Does emission-layer state persistence add value?** Compared to
+   a stateless linear head, does Psi accumulation improve coherence or
+   stability? (Experiments 1-8 in Section 9.2.)
+2. **Does geometric emission add value beyond temporal smoothing?** If
+   trivial logit smoothing (experiment 14) captures the same benefit,
+   then the geometry is unnecessary and temporal inertia alone explains
+   any improvement. This is the most important control.
+
+The honest prior: the probability of dramatic improvement is low. The
+probability of measurable stability gains in long-form generation is
+moderate. The probability that high-gamma tuning reveals a useful
+secondary memory channel is non-trivial. That makes it worth testing.
 
 **This is an evaluation document. Implementation should proceed only
 after review and approval.**
@@ -955,6 +1057,30 @@ after review and approval.**
 ---
 
 ## Appendix A: Changelog
+
+### v0.4.1 (2026-02-19) -- Experimental Controls & Honest Framing
+
+Addressed second-round review. Changes:
+
+1. **Added norm clamp saturation diagnostic.** Log % timesteps where
+   `||Psi||` hits clamp ceiling. Alert thresholds at 30% (magnitude
+   compressed) and 60% (effectively direction-only). Critical for
+   high-gamma ablations. (Section 9.3)
+
+2. **Added trivial logit-smoothing baseline (experiment 14).** A simple
+   `z_t_smooth = gamma * z_{t-1} + z_t` applied to standard linear head
+   logits. If this matches Spanda, geometry adds no value -- the benefit
+   is entirely from temporal inertia. This is the most important control
+   experiment. (Section 9.2)
+
+3. **Added Section 12: "What This Design Actually Is."** Honest framing:
+   Spanda is a first-order linear state-space model on the emission head.
+   Identifies the two genuine degrees of freedom (temporal accumulation
+   and radial confidence channel). Connects to S4/Mamba family. (Section 12)
+
+4. **Updated summary** with honest probability priors on outcomes and
+   explicit framing of the two research questions (state persistence value
+   vs. geometry value). (Section 13)
 
 ### v0.4.0 (2026-02-19) -- Post-Review Refinements
 

@@ -1146,10 +1146,11 @@ def enable_health_diagnostics_capture(model: nn.Module, enable: bool = True) -> 
         if module.__class__.__name__ == 'PhaseAttentionLayer':
             module.capture_for_health_diagnostics = enable
             if not enable:
-                # Clear captured data to free memory
-                module._captured_phi_k = None
-                module._captured_phi_q = None
-                module._captured_a_k = None
+                # Clear health-specific captured data to free memory
+                # (do NOT touch _captured_phi_k — diversity loss may need it)
+                module._health_phi_k = None
+                module._health_phi_q = None
+                module._health_a_k = None
             count += 1
     return count
 
@@ -1164,13 +1165,14 @@ def _collect_health_captures(model: nn.Module) -> List[Dict[str, torch.Tensor]]:
     captures = []
     for module in model.modules():
         if module.__class__.__name__ == 'PhaseAttentionLayer':
-            if (hasattr(module, '_captured_phi_k') and module._captured_phi_k is not None and
-                hasattr(module, '_captured_phi_q') and module._captured_phi_q is not None and
-                hasattr(module, '_captured_a_k') and module._captured_a_k is not None):
+            # Read from health-specific attributes (separate from diversity capture)
+            if (hasattr(module, '_health_phi_k') and module._health_phi_k is not None and
+                hasattr(module, '_health_phi_q') and module._health_phi_q is not None and
+                hasattr(module, '_health_a_k') and module._health_a_k is not None):
                 captures.append({
-                    'phi_k': module._captured_phi_k,
-                    'phi_q': module._captured_phi_q,
-                    'a_k': module._captured_a_k,
+                    'phi_k': module._health_phi_k,
+                    'phi_q': module._health_phi_q,
+                    'a_k': module._health_a_k,
                 })
     return captures
 
@@ -1535,6 +1537,19 @@ class AdaptivePhaseDiversityController:
         self.current_lambda = 0.0  # Starts at 0, ramps up
         self.R_ema = 0.5  # Initial estimate (neutral)
         self.step_count = 0
+        # V11.3.2: Emergency floor — prevents task-loss scaling from overwriting
+        # force-jumps set by the training loop's emergency escalation.
+        self.lambda_floor = 0.0
+
+        # V11.4b: Stall detection — escalate if R_ema not converging
+        self._stall_check_R = None  # R_ema at last stall check
+        self._stall_check_step = 0  # Step at last stall check
+        # Shorter window when ramp_multiplier=0 (emergency auto-enable)
+        self._stall_window = 100 if ramp_multiplier == 0.0 else 300
+        self._stall_threshold = 0.005  # Must improve R by this much
+        self._escalation_count = 0  # How many times we've escalated
+        self._max_escalations = 3  # V11.4c: Give up after this many failed escalations
+        self._surrendered = False   # V11.4c: True when we've accepted the model's natural R
 
         # Diagnostics
         self.lambda_history = []
@@ -1581,18 +1596,60 @@ class AdaptivePhaseDiversityController:
         else:
             ramp_progress = 1.0
 
+        # V11.4: Stall detection — if R_ema hasn't improved, escalate alpha
+        # V11.4c: Give up after max_escalations — the model's architecture may
+        # naturally sit at R_k≈0.50 and fighting it just adds gradient noise
+        # that hurts val PPL. Accept the equilibrium and free gradient for LM.
+        escalation_multiplier = 1.0
+        if not self._surrendered:
+            if self._stall_check_R is not None:
+                steps_since_check = global_step - self._stall_check_step
+                if steps_since_check >= self._stall_window:
+                    improvement = self._stall_check_R - self.R_ema  # Positive = good
+                    if improvement < self._stall_threshold and self.R_ema > self.target_R:
+                        # Stalled — escalate
+                        self._escalation_count += 1
+                        if self._escalation_count > self._max_escalations:
+                            # Tried enough — accept the model's natural R
+                            old_target = self.target_R
+                            self.target_R = self.R_ema + 0.01  # Tiny buffer above current
+                            self._surrendered = True
+                            print(
+                                f"  🏳️ [PHASE-DIV] Surrendered after {self._max_escalations} failed escalations. "
+                                f"R_k≈{self.R_ema:.4f} is the model's natural equilibrium. "
+                                f"target_R: {old_target:.2f} → {self.target_R:.4f} "
+                                f"(pressure → 0, all gradient to LM loss)"
+                            )
+                    else:
+                        # Making progress — de-escalate
+                        self._escalation_count = max(0, self._escalation_count - 1)
+                    self._stall_check_R = self.R_ema
+                    self._stall_check_step = global_step
+            else:
+                self._stall_check_R = self.R_ema
+                self._stall_check_step = global_step
+            # V11.4c: Cap at 4x (was 8x) — higher multipliers just add noise
+            escalation_multiplier = min(4.0, 2.0 ** self._escalation_count)
+            if self._escalation_count > 0 and self._stall_check_step == global_step:
+                print(
+                    f"  ⚡ [PHASE-DIV] Stall escalation #{self._escalation_count}/{self._max_escalations}: "
+                    f"R_ema={self.R_ema:.4f} (target={self.target_R:.2f}), "
+                    f"pressure={escalation_multiplier:.0f}x"
+                )
+
         # Compute λ based on mode
         if self.task_loss_scaling and task_loss is not None:
-            # V9.9.12b: Self-normalized scaling (ChatGPT's Lagrange approach)
-            # λ_effective = α * task_loss * collapse_pressure * ramp
-            # - Weakens as training converges (task_loss drops)
-            # - Only activates when collapsed (collapse_pressure > 0)
-            # - Ramps up during warmup
+            # V9.9.12b/V11.4: Normalized scaling with collapse-proportional pressure
+            # Fix: Use log(task_loss) instead of raw task_loss to prevent λ from
+            # weakening as training improves. log(8.2)≈2.1, log(3.0)≈1.1, so
+            # the scaling stays in a tight band rather than halving with loss.
+            log_loss = math.log(max(1.0, self.task_loss_ema))
             self.current_lambda = (
                 self.task_loss_alpha *
-                self.task_loss_ema *
+                log_loss *
                 collapse_pressure *
-                ramp_progress
+                ramp_progress *
+                escalation_multiplier
             )
         else:
             # Original R-adaptive mode (V9.9.12a)
@@ -1608,6 +1665,22 @@ class AdaptivePhaseDiversityController:
                 )
                 if self.current_lambda < self.lambda_init:
                     self.current_lambda = self.lambda_init
+
+        # V11.3.3: Proportional minimum λ when collapse is significant
+        # The task-loss scaling formula has a structural ceiling:
+        #   λ = α * task_loss * (R_ema - target) ≈ 0.05 * 5.6 * 0.19 = 0.053
+        # This is too weak to fix R_k ≈ 0.50 collapse. When R_ema exceeds target
+        # by a significant margin, enforce a minimum proportional to the gap.
+        if self.task_loss_scaling and self.R_ema > self.target_R + 0.10:
+            gap_ratio = (self.R_ema - self.target_R) / self.target_R
+            proportional_min = self.lambda_max * min(0.5, gap_ratio)
+            if self.current_lambda < proportional_min:
+                self.current_lambda = proportional_min
+
+        # V11.3.2: Enforce emergency floor (set by train loop when R_k > 0.5 persists)
+        # Without this, task-loss scaling overwrites emergency force-jumps each step.
+        if self.lambda_floor > 0 and self.current_lambda < self.lambda_floor:
+            self.current_lambda = self.lambda_floor
 
         # Apply bounds
         self.current_lambda = max(self.lambda_min, min(self.lambda_max, self.current_lambda))
@@ -1626,6 +1699,7 @@ class AdaptivePhaseDiversityController:
             'phase_div_ramp_progress': min(1.0, self.step_count / max(1, self.ramp_steps)),
             'phase_div_collapse_pressure': collapse_pressure,
             'phase_div_task_loss_ema': self.task_loss_ema if self.task_loss_scaling else 0.0,
+            'phase_div_escalation': self._escalation_count,
         }
 
     def __repr__(self) -> str:
@@ -1936,10 +2010,11 @@ class PhaseAttentionLayer(nn.Module):
         self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
 
         # V9.9.12c: Health dashboard capture (diagnostic only, no gradients)
-        # Captures additional tensors needed for behavioral auditing
+        # Uses separate _health_* attributes to avoid overwriting diversity capture
         self.capture_for_health_diagnostics = False
-        self._captured_phi_q = None  # [B, N, H, D_h] query phases
-        self._captured_a_k = None    # [B, N, H, D_h] key amplitudes
+        self._health_phi_k = None   # [B, N, H, D_h] key phases (detached)
+        self._health_phi_q = None   # [B, N, H, D_h] query phases (detached)
+        self._health_a_k = None     # [B, N, H, D_h] key amplitudes (detached)
 
         # Legacy parameters kept for checkpoint compatibility
         self.sync_steps = sync_steps
@@ -1955,14 +2030,16 @@ class PhaseAttentionLayer(nn.Module):
         # 3. Vanishing gradients: uniform [-π,π] init instead of small normal
         #
         # This matches standard attention capacity while keeping O(n) complexity
+        #
+        # V10.8: FUSED PROJECTIONS — 2 GEMMs instead of 4
+        # Phase and amplitude are projected together then split, eliminating
+        # 2 kernel launches per layer. Checkpoint-compatible via properties.
 
-        # Separate Query projections (what am I looking for?)
-        self.W_q_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_q_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Fused Query projection: phase + amplitude in one GEMM
+        self.W_q_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
 
-        # Separate Key projections (what do I represent?)
-        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Fused Key projection: phase + amplitude in one GEMM
+        self.W_k_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
 
         # Value projection (content)
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -1976,8 +2053,9 @@ class PhaseAttentionLayer(nn.Module):
 
         # V9.6.11: Initialize phase projections with uniform [-π, π]
         # This ensures diverse phases at initialization for gradient flow
-        nn.init.uniform_(self.W_q_phase.weight, -3.14159, 3.14159)
-        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+        # V10.8: Apply to fused weight's phase half (first embed_dim rows)
+        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -3.14159, 3.14159)
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
 
         # V9.6.12: Complex-to-real projection for "complex" cosine mode
         # Projects [real, imag] → real, allowing the model to learn how to
@@ -2001,6 +2079,35 @@ class PhaseAttentionLayer(nn.Module):
         self.value_gate = nn.Linear(self.head_dim, self.head_dim)
         self.phase_embed = nn.Linear(embed_dim, num_heads)
         self.amp_gate = nn.Linear(embed_dim, num_heads)
+
+    # V10.8: Backward-compatible properties for diagnostics that access
+    # the old separate W_q_phase, W_k_phase weights (e.g., ortho loss).
+    # These return view-like objects with a .weight attribute.
+    class _FusedWeightView:
+        """Lightweight view into a slice of the fused weight matrix."""
+        def __init__(self, fused_linear, start, end):
+            self._fused = fused_linear
+            self._start = start
+            self._end = end
+        @property
+        def weight(self):
+            return self._fused.weight[self._start:self._end]
+
+    @property
+    def W_q_phase(self):
+        return self._FusedWeightView(self.W_q_fused, 0, self.embed_dim)
+
+    @property
+    def W_q_amp(self):
+        return self._FusedWeightView(self.W_q_fused, self.embed_dim, self.embed_dim * 2)
+
+    @property
+    def W_k_phase(self):
+        return self._FusedWeightView(self.W_k_fused, 0, self.embed_dim)
+
+    @property
+    def W_k_amp(self):
+        return self._FusedWeightView(self.W_k_fused, self.embed_dim, self.embed_dim * 2)
 
     def forward(
         self,
@@ -2067,13 +2174,15 @@ class PhaseAttentionLayer(nn.Module):
         # - Key: "what do I represent?"
         # This allows asymmetric attention patterns (e.g., "The" → "Empire")
 
-        # Query phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_q_raw = self.W_q_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_q = torch.sigmoid(self.W_q_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused query projection — one GEMM, then split
+        q_fused = self.W_q_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_q_raw = q_fused[:, :, 0]  # [B, N, H, D_h]
+        a_q = torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
 
-        # Key phase and amplitude: [B, N, D] → [B, N, H, D_h]
-        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused key projection — one GEMM, then split
+        k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
+        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
         # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
@@ -2098,10 +2207,12 @@ class PhaseAttentionLayer(nn.Module):
             self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
 
         # V9.9.12c: Capture for health diagnostics (read-only, detached)
+        # Use separate attributes to avoid overwriting diversity capture's
+        # gradient-bearing tensor with a detached version
         if self.capture_for_health_diagnostics:
-            self._captured_phi_k = phi_k.detach()  # [B, N, H, D_h]
-            self._captured_phi_q = phi_q.detach()  # [B, N, H, D_h]
-            self._captured_a_k = a_k.detach()      # [B, N, H, D_h]
+            self._health_phi_k = phi_k.detach()  # [B, N, H, D_h]
+            self._health_phi_q = phi_q.detach()  # [B, N, H, D_h]
+            self._health_a_k = a_k.detach()      # [B, N, H, D_h]
 
         # =====================================================================
         # 1.5. Apply Intent Phase Rotation (Ontological → Phase bridge)
@@ -2162,9 +2273,11 @@ class PhaseAttentionLayer(nn.Module):
         # Q = a_q * e^(iφ_q)   - Query phasor (what I'm looking for)
         # K = a_k * e^(-iφ_k)  - Key phasor (what I represent, conjugate)
 
-        # torch.polar doesn't support BFloat16 - cast to float32 for complex ops
+        # V10.7: Always accumulate in float32 for numerical stability.
+        # torch.polar doesn't support BFloat16, and cumsum/EMA scan in fp16
+        # drifts on long sequences (>1K tokens). Force float32 for all complex ops.
         orig_dtype = phi_q.dtype
-        if orig_dtype == torch.bfloat16:
+        if orig_dtype != torch.float32:
             phi_q = phi_q.float()
             phi_k = phi_k.float()
             a_q = a_q.float()
@@ -2477,6 +2590,273 @@ class PhaseAttentionLayer(nn.Module):
 
 
 # =============================================================================
+# V10.7: PHASE STATE CACHE — Hardened O(1) Inference API
+# =============================================================================
+# At inference time, Phase Attention only needs to carry forward:
+#   - final_state:      [B, 1, H, D_h] complex — accumulated KV state
+#   - final_norm_state: [B, 1, H, D_h] real    — amplitude normalizer
+#
+# This class enforces that no O(N) allocation occurs during inference.
+# It wraps the per-layer state and provides a clean API for generate loops.
+# =============================================================================
+
+
+class PhaseStateCache:
+    """
+    O(1) inference cache for Phase Attention layers.
+
+    Stores only the final accumulated state per layer, NOT per-token K/V.
+    This is the core KV-cache reduction: memory is O(d × layers), not O(T × d × layers).
+
+    Usage:
+        cache = PhaseStateCache(num_layers=12, hybrid_layer_start=4)
+
+        for token in tokens:
+            result, cache = model.forward_with_cache(token, cache)
+
+    Internal storage per hybrid layer:
+        - final_state:      [B, 1, H, D_h] complex
+        - final_norm_state: [B, 1, H, D_h] real
+    """
+
+    def __init__(self, num_layers: int, hybrid_layer_start: int = 0):
+        self.num_layers = num_layers
+        self.hybrid_layer_start = hybrid_layer_start
+        # Maps layer_idx -> {'final_state': Tensor, 'final_norm_state': Tensor}
+        self._states: Dict[int, Dict[str, torch.Tensor]] = {}
+        self._step_count: int = 0
+
+    def get_layer_state(self, layer_idx: int) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """Get (prev_state, prev_norm_state) for a layer. Returns (None, None) if no state yet."""
+        state = self._states.get(layer_idx)
+        if state is None:
+            return None, None
+        return state['final_state'], state['final_norm_state']
+
+    def update_layer_state(self, layer_idx: int, state_dict: Dict[str, torch.Tensor]) -> None:
+        """
+        Update state for a layer from PhaseAttentionLayer's return_state output.
+
+        Enforces O(1) shape: state must be [B, 1, H, D_h].
+        Raises ValueError if state has sequence dimension > 1.
+        """
+        final_state = state_dict['final_state']
+        final_norm_state = state_dict['final_norm_state']
+
+        # Shape enforcement: must be [B, 1, H, D_h]
+        if final_state.shape[1] != 1:
+            raise ValueError(
+                f"PhaseStateCache: final_state has seq dim {final_state.shape[1]}, "
+                f"expected 1. This indicates O(N) allocation leaked into inference. "
+                f"Full shape: {final_state.shape}"
+            )
+        if final_norm_state.shape[1] != 1:
+            raise ValueError(
+                f"PhaseStateCache: final_norm_state has seq dim {final_norm_state.shape[1]}, "
+                f"expected 1. Full shape: {final_norm_state.shape}"
+            )
+
+        self._states[layer_idx] = {
+            'final_state': final_state.detach(),
+            'final_norm_state': final_norm_state.detach(),
+        }
+
+    def as_prev_layer_states(self) -> Dict[int, Dict[str, torch.Tensor]]:
+        """Convert to the dict format expected by forward_chunk(prev_layer_states=...)."""
+        return dict(self._states)
+
+    @property
+    def seq_len(self) -> int:
+        """Number of tokens processed so far."""
+        return self._step_count
+
+    def advance(self, n_tokens: int = 1) -> None:
+        """Record that n_tokens were processed."""
+        self._step_count += n_tokens
+
+    def reset(self) -> None:
+        """Clear all state (start of new sequence)."""
+        self._states.clear()
+        self._step_count = 0
+
+    def memory_bytes(self) -> int:
+        """Total memory used by cached states (should be constant regardless of seq_len)."""
+        total = 0
+        for state_dict in self._states.values():
+            for t in state_dict.values():
+                total += t.nelement() * t.element_size()
+        return total
+
+    def __repr__(self) -> str:
+        n_layers = len(self._states)
+        mem_mb = self.memory_bytes() / (1024 * 1024)
+        return (
+            f"PhaseStateCache(layers={n_layers}/{self.num_layers}, "
+            f"seq_len={self._step_count}, mem={mem_mb:.2f}MB)"
+        )
+
+
+# =============================================================================
+# V10.7: CHUNKED STATEFUL TRAINING — Truncated BPTT with Phase State Carry
+# =============================================================================
+# Unlike standard LLM chunking (which resets context between segments),
+# this carries Phase state across chunks via detached state tensors.
+#
+# Memory: O(C × d × layers) instead of O(N × d × layers)
+#   where C = chunk_size, N = full sequence length
+#
+# Key difference from forward_chunked (line 12984):
+#   forward_chunked: gradients flow through ALL chunks (memory = O(N))
+#   forward_chunked_tbptt: detaches state between chunks (memory = O(C))
+#
+# This is Truncated BPTT — the same technique used by Mamba, RWKV, RetNet
+# for training state-space models on long sequences.
+# =============================================================================
+
+
+def forward_chunked_tbptt(
+    model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    targets: torch.Tensor,
+    chunk_size: int,
+    loss_fn: callable,
+    accumulate_grad: bool = True,
+    grad_scaler: Optional[Any] = None,
+    autocast_dtype: Optional[torch.dtype] = None,
+    gradient_accumulation: int = 1,
+) -> Dict[str, Any]:
+    """
+    Chunked forward + backward with Truncated BPTT for Phase state machines.
+
+    Unlike forward_chunked (which concatenates all logits and does one backward),
+    this processes each chunk independently:
+      1. Forward chunk with prev_state (detached from previous chunk)
+      2. Compute loss on this chunk's logits
+      3. Backward on this chunk (frees chunk activations)
+      4. Carry final_state to next chunk (detached)
+
+    This keeps peak memory at O(C) instead of O(N).
+
+    Args:
+        model: HybridPhaseTransformer with forward_chunk() method
+        input_ids: [B, N] full sequence token indices
+        targets: [B, N] full sequence targets
+        chunk_size: Tokens per chunk (controls memory/compute tradeoff)
+        loss_fn: Callable(logits, targets) -> (loss, metrics_dict)
+        accumulate_grad: If True, accumulates gradients across chunks.
+                        If False, steps optimizer per chunk (not recommended).
+        grad_scaler: Optional GradScaler for mixed precision
+        autocast_dtype: Optional dtype for torch.autocast (e.g. torch.bfloat16)
+        gradient_accumulation: Number of gradient accumulation steps. Loss is scaled
+                              by 1/(num_chunks * gradient_accumulation) so that
+                              TBPTT gradient magnitude matches the standard path.
+
+    Returns:
+        Dict with:
+            'total_loss': scalar — mean loss across all chunks
+            'metrics': dict — averaged metrics from loss_fn
+            'num_chunks': int — number of chunks processed
+            'chunk_losses': list — per-chunk loss values
+    """
+    B, N = input_ids.shape
+    device = input_ids.device
+    num_chunks = (N + chunk_size - 1) // chunk_size
+
+    # V10.8: Combined loss divisor accounts for BOTH chunk averaging AND
+    # gradient accumulation. Without this, TBPTT gradients are grad_accum×
+    # too large because the standard path's `loss /= grad_accum` (in the
+    # training loop) runs AFTER backward — which TBPTT already did here.
+    loss_divisor = num_chunks * gradient_accumulation
+
+    # State carry across chunks (detached — this is the TBPTT boundary)
+    layer_states = None
+
+    # Accumulate loss on GPU to avoid per-chunk .item() sync stalls
+    total_loss_gpu = torch.zeros(1, device=device)
+    chunk_losses_gpu = []
+    all_metrics = {}
+
+    for chunk_idx in range(num_chunks):
+        chunk_start = chunk_idx * chunk_size
+        chunk_end = min(chunk_start + chunk_size, N)
+        chunk_ids = input_ids[:, chunk_start:chunk_end]
+        chunk_targets = targets[:, chunk_start:chunk_end]
+
+        # Forward with optional autocast
+        if autocast_dtype is not None:
+            with torch.autocast(device_type=device.type, dtype=autocast_dtype):
+                result, layer_states_new = model.forward_chunk(
+                    chunk_ids,
+                    chunk_offset=chunk_start,
+                    prev_layer_states=layer_states,
+                )
+                chunk_logits = result['logits']
+                chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+        else:
+            result, layer_states_new = model.forward_chunk(
+                chunk_ids,
+                chunk_offset=chunk_start,
+                prev_layer_states=layer_states,
+            )
+            chunk_logits = result['logits']
+            chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+
+        # V10.8: Scale loss for BOTH chunk mean AND gradient accumulation
+        scaled_loss = chunk_loss / loss_divisor
+
+        # Backward on this chunk — frees chunk activations
+        if accumulate_grad:
+            if grad_scaler is not None:
+                grad_scaler.scale(scaled_loss).backward()
+            else:
+                scaled_loss.backward()
+
+        # TBPTT boundary: detach state before carrying to next chunk
+        # This is what makes memory O(C) instead of O(N)
+        layer_states = _detach_layer_states(layer_states_new)
+
+        # Track loss on GPU (single .item() call after loop avoids sync stalls)
+        total_loss_gpu += chunk_loss.detach()
+        chunk_losses_gpu.append(chunk_loss.detach())
+        for k, v in chunk_metrics.items():
+            if k not in all_metrics:
+                all_metrics[k] = 0.0
+            all_metrics[k] += v
+
+    # Single GPU→CPU sync for all loss values (was N syncs before)
+    avg_loss = (total_loss_gpu / num_chunks).item()
+    chunk_losses = [cl.item() for cl in chunk_losses_gpu]
+
+    # Average metrics across chunks
+    avg_metrics = {k: v / num_chunks for k, v in all_metrics.items()}
+
+    return {
+        'total_loss': avg_loss,
+        'metrics': avg_metrics,
+        'num_chunks': num_chunks,
+        'chunk_losses': chunk_losses,
+    }
+
+
+def _detach_layer_states(
+    layer_states: Dict[int, Dict[str, torch.Tensor]]
+) -> Dict[int, Dict[str, torch.Tensor]]:
+    """
+    Detach all tensors in layer_states to break the autograd graph.
+
+    This is the TBPTT boundary: gradients do not flow across chunks,
+    but the state values carry forward as initial conditions.
+    """
+    detached = {}
+    for layer_idx, state_dict in layer_states.items():
+        detached[layer_idx] = {
+            k: v.detach() if isinstance(v, torch.Tensor) else v
+            for k, v in state_dict.items()
+        }
+    return detached
+
+
+# =============================================================================
 # BINDING CACHE ARCHITECTURE (V10.0) - Protected Phase + Top-K Query
 # =============================================================================
 # Validated by diagnostic probe experiments:
@@ -2642,9 +3022,8 @@ class BindingCachePhaseState(nn.Module):
         self.decay_gamma = decay_gamma
         self.learned_decay = learned_decay
 
-        # Phase projections for keys (NOT queries - Quad handles queries)
-        self.W_k_phase = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k_amp = nn.Linear(embed_dim, embed_dim, bias=False)
+        # V10.8: Fused key phase+amplitude projection (1 GEMM instead of 2)
+        self.W_k_fused = nn.Linear(embed_dim, embed_dim * 2, bias=False)
         self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
 
         # Layer norm for input
@@ -2679,8 +3058,27 @@ class BindingCachePhaseState(nn.Module):
         # This tests whether phase encodes relational structure
         self._rotation_angle = 0.0  # in radians
 
-        # Initialize phase with uniform [-π, π]
-        nn.init.uniform_(self.W_k_phase.weight, -3.14159, 3.14159)
+        # Initialize phase half with uniform [-π, π]
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+
+    # V10.8: Backward-compatible properties for code accessing old separate weights
+    class _FusedWeightView:
+        """Lightweight view into a slice of the fused weight matrix."""
+        def __init__(self, fused_linear, start, end):
+            self._fused = fused_linear
+            self._start = start
+            self._end = end
+        @property
+        def weight(self):
+            return self._fused.weight[self._start:self._end]
+
+    @property
+    def W_k_phase(self):
+        return self._FusedWeightView(self.W_k_fused, 0, self.embed_dim)
+
+    @property
+    def W_k_amp(self):
+        return self._FusedWeightView(self.W_k_fused, self.embed_dim, self.embed_dim * 2)
 
     def set_ablation(self, mode: str, seed: int = 42):
         """Set ablation mode: none, scramble, freeze, off."""
@@ -2736,9 +3134,10 @@ class BindingCachePhaseState(nn.Module):
         # Pre-norm
         x_norm = self.norm(x)
 
-        # Compute phase and amplitude for keys
-        phi_k_raw = self.W_k_phase(x_norm).view(B, N, self.num_heads, self.head_dim)
-        a_k = torch.sigmoid(self.W_k_amp(x_norm)).view(B, N, self.num_heads, self.head_dim)
+        # V10.8: Fused key projection — one GEMM, then split
+        k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
+        phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
+        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
         v = self.W_v(x_norm).view(B, N, self.num_heads, self.head_dim)
 
         # Bounded phase (mandatory fix from probes)
@@ -2779,9 +3178,10 @@ class BindingCachePhaseState(nn.Module):
         if self._rotation_angle != 0.0:
             phi_k = phi_k + self._rotation_angle
 
-        # Convert to float32 for complex ops if needed
+        # V10.7: Always accumulate in float32 for numerical stability.
+        # cumsum/EMA scan in fp16 drifts on long sequences (>1K tokens).
         orig_dtype = phi_k.dtype
-        if orig_dtype == torch.bfloat16:
+        if orig_dtype != torch.float32:
             phi_k = phi_k.float()
             a_k = a_k.float()
             v = v.float()
@@ -6665,6 +7065,89 @@ class HybridPhaseTransformer(nn.Module):
 
         return result
 
+    def forward_with_cache(
+        self,
+        input_ids: torch.Tensor,
+        cache: Optional['PhaseStateCache'] = None,
+        intent_phase: Optional[torch.Tensor] = None,
+    ) -> Tuple[Dict[str, torch.Tensor], 'PhaseStateCache']:
+        """
+        V10.7: Inference forward pass using PhaseStateCache.
+
+        Guarantees O(1) memory per layer regardless of total sequence length.
+        Only processes the NEW tokens (not the full sequence).
+
+        For prefill (first call), pass the full prompt as input_ids.
+        For decode (subsequent calls), pass one token at a time.
+
+        Args:
+            input_ids: [B, N] tokens to process (N=prompt_len for prefill, N=1 for decode)
+            cache: PhaseStateCache from previous call (None for first call)
+            intent_phase: Optional phase rotation
+
+        Returns:
+            (result_dict, updated_cache)
+            result_dict has 'logits': [B, N, V]
+        """
+        if cache is None:
+            cache = PhaseStateCache(
+                num_layers=len(self.blocks),
+                hybrid_layer_start=self.local_layers,
+            )
+
+        # Use forward_chunk with cache state
+        prev_layer_states = cache.as_prev_layer_states() if cache.seq_len > 0 else None
+
+        result, new_layer_states = self.forward_chunk(
+            input_ids,
+            chunk_offset=cache.seq_len,
+            prev_layer_states=prev_layer_states,
+            intent_phase=intent_phase,
+        )
+
+        # Update cache with new states (enforces O(1) shape)
+        for layer_idx, state_dict in new_layer_states.items():
+            cache.update_layer_state(layer_idx, state_dict)
+        cache.advance(input_ids.shape[1])
+
+        return result, cache
+
+    def generate_with_cache(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+    ) -> torch.Tensor:
+        """
+        V10.7: Stateful generation using PhaseStateCache.
+
+        Unlike generate() which re-processes the full sequence each step,
+        this processes only the new token at each step using O(1) cached state.
+
+        Memory: O(d × layers) constant, regardless of generated length.
+        Speed: O(1) per token after prefill (no re-computation).
+        """
+        # Prefill: process the prompt
+        cache = None
+        result, cache = self.forward_with_cache(input_ids, cache)
+        generated = input_ids
+
+        for _ in range(max_new_tokens):
+            logits = result['logits'][:, -1, :]
+            logits = logits / temperature
+            if top_k > 0:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float('-inf')
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            generated = torch.cat([generated, next_token], dim=1)
+
+            # Decode: process only the new token with cached state
+            result, cache = self.forward_with_cache(next_token, cache)
+
+        return generated
+
     def generate(
         self,
         input_ids: torch.Tensor,
@@ -6672,7 +7155,7 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,
         top_k: int = 50,
     ) -> torch.Tensor:
-        """Simple generation loop."""
+        """Simple generation loop (legacy — re-processes full sequence each step)."""
         for _ in range(max_new_tokens):
             logits = self(input_ids)['logits'][:, -1, :]
             logits = logits / temperature
@@ -6831,6 +7314,16 @@ class OntologicalHybridTransformer(nn.Module):
         # V11.0.0: Track Bhava-only previous state for phase delta
         self.register_buffer('prev_bhava', None, persistent=False)
 
+    def gradient_checkpointing_enable(self, **kwargs):
+        """Enable gradient checkpointing on the inner hybrid model."""
+        self.hybrid.gradient_checkpointing_enable()
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self):
+        """Disable gradient checkpointing on the inner hybrid model."""
+        self.hybrid.gradient_checkpointing_disable()
+        self.gradient_checkpointing = False
+
     def _init_absolute_potential_bias(self):
         """
         Initialize state projector to bias toward "Absolute Potential" state.
@@ -6974,13 +7467,19 @@ class OntologicalHybridTransformer(nn.Module):
         # Only ontological identity (12D) modulates attention
         intent_phase = self.intent_projector(delta_bhava)  # [B, H] or [B, H, D_h]
 
+        # Detach intent_phase for the second pass to prevent gradient checkpointing
+        # recomputation issues. compute_state_delta() mutates self.prev_state/prev_bhava,
+        # so recomputing through it produces different deltas. Detaching makes
+        # intent_phase a fixed input to the checkpointed region.
+        intent_phase_for_hybrid = intent_phase.detach()
+
         # Second pass: Full forward WITH intent phase
         result = self.hybrid(
             input_ids,
             return_hidden=return_hidden,
             extract_layers=extract_layers,
             return_last_hidden=return_last_hidden,
-            intent_phase=intent_phase,
+            intent_phase=intent_phase_for_hybrid,
             return_decorr_loss=return_decorr_loss,
         )
 
@@ -7183,6 +7682,733 @@ class LocalOnlyTransformer(nn.Module):
             next_token = torch.multinomial(probs, num_samples=1)
             input_ids = torch.cat([input_ids, next_token], dim=1)
         return input_ids
+
+
+# =============================================================================
+# GATED COHERENCE TRANSFORMER (GCT)
+# =============================================================================
+#
+# GCT: Governed Quadratic Softmax with Pre-Softmax Coherence Gating
+#
+# Core contribution: Pre-softmax temporal stability routing that does NOT
+# require computing QK^T to decide the routing path.
+#
+# Architecture:
+#   O = (1 - pi*) * O_full + pi* * O_local
+#
+# Where:
+#   O_full  = standard O(n²) softmax attention
+#   O_local = local-window softmax (O(n*w)) — same softmax primitive, fewer keys
+#   pi*     = coherence gate * lambda_ladder insulation
+#
+# Coherence is computed from output deltas and residual deltas (no attention
+# KL needed), preserving FlashAttention/SDPA compatibility on the full path.
+#
+# Lambda_ladder prevents band collapse: when heads assigned to different
+# frequency bands produce too-similar outputs (low divergence = collapse risk),
+# lambda_ladder suppresses routing to coarse, forcing full attention.
+#
+# Reference: FSCS pre-softmax routing pattern, adapted for quadratic softmax.
+# =============================================================================
+
+
+@dataclass
+class GCTConfig:
+    """Configuration for Gated Coherence Transformer."""
+    # Base transformer config
+    vocab_size: int = 50257
+    embed_dim: int = 768
+    num_layers: int = 12
+    num_heads: int = 12
+    ff_dim: Optional[int] = None
+    max_seq_len: int = 8192
+    dropout: float = 0.1
+
+    # GCT-specific: Coherence gating
+    gct_window_size: int = 128          # Local window size for coarse path
+    gct_coherence_gamma: float = 5.0    # Sensitivity for output delta in coherence score
+    gct_coherence_delta: float = 3.0    # Sensitivity for residual delta in coherence score
+    gct_ema_decay: float = 0.9          # EMA smoothing for coherence scores
+    gct_num_bands: int = 3              # Number of frequency bands (global/mid/local)
+
+    # GCT-specific: Routing
+    gct_alpha_sharpness: float = 10.0   # Sigmoid sharpness for routing probability
+    gct_hard_route_threshold: float = 0.5  # Threshold for hard routing (inference)
+    gct_use_hard_routing: bool = False   # Use hard routing (inference mode)
+
+    # GCT-specific: Lambda_ladder band insulation
+    gct_kappa: float = 3.0              # Ladder suppression strength
+    gct_tau_ladder: float = 0.15        # Collapse detection threshold (similarity above this = collapse risk)
+
+    # GCT-specific: Training schedule
+    gct_warmup_steps: int = 500         # Steps of full-attention-only warmup (Phase 1)
+    gct_anneal_steps: int = 2000        # Steps to anneal from full to gated (Phase 2)
+    gct_current_step: int = 0           # Current training step (updated externally)
+
+    def __post_init__(self):
+        if self.ff_dim is None:
+            self.ff_dim = 4 * self.embed_dim
+
+
+class GCTCoherenceModule(nn.Module):
+    """
+    Computes pre-softmax coherence scores from output and residual deltas.
+
+    FlashAttention-compatible: does NOT require raw attention matrices.
+    Uses only output deltas and residual deltas as stability signals.
+
+    Coherence score:
+        C_raw(t) = exp(-gamma * ||O(t) - O(t-1)||_rel) * exp(-delta * ||R(t) - R(t-1)||_rel)
+
+    Where ||.||_rel = ||.|| / (||ref|| + eps) for scale invariance.
+
+    EMA smoothing:
+        C_hat(t) = beta * C_hat(t-1) + (1 - beta) * C_raw(t)
+    """
+
+    def __init__(self, num_heads: int, ema_decay: float = 0.9,
+                 gamma: float = 5.0, delta: float = 3.0):
+        super().__init__()
+        self.num_heads = num_heads
+        self.ema_decay = ema_decay
+        self.gamma = gamma
+        self.delta = delta
+
+    def forward(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h] per-head attention output
+        residual: torch.Tensor,      # [B, N, D] residual stream
+    ) -> torch.Tensor:
+        """
+        Compute coherence scores for all positions.
+
+        Returns:
+            coherence: [B, H, N] coherence scores in [0, 1]
+        """
+        B, H, N, D_h = attn_output.shape
+
+        # Output delta: compare adjacent positions per head
+        # attn_output[:, :, t] vs attn_output[:, :, t-1]
+        output_delta = attn_output[:, :, 1:] - attn_output[:, :, :-1]  # [B, H, N-1, D_h]
+        output_norm = output_delta.norm(dim=-1)  # [B, H, N-1]
+        ref_norm = attn_output[:, :, :-1].norm(dim=-1).clamp(min=1e-6)  # [B, H, N-1]
+        output_delta_rel = output_norm / ref_norm  # [B, H, N-1]
+
+        # Residual delta: compare adjacent positions (broadcast across heads)
+        # residual: [B, N, D]
+        res_delta = residual[:, 1:] - residual[:, :-1]  # [B, N-1, D]
+        res_norm = res_delta.norm(dim=-1)  # [B, N-1]
+        res_ref_norm = residual[:, :-1].norm(dim=-1).clamp(min=1e-6)  # [B, N-1]
+        res_delta_rel = res_norm / res_ref_norm  # [B, N-1]
+        res_delta_rel = res_delta_rel.unsqueeze(1).expand_as(output_delta_rel)  # [B, H, N-1]
+
+        # Raw coherence: high when deltas are small (stable region)
+        c_raw = torch.exp(-self.gamma * output_delta_rel) * torch.exp(-self.delta * res_delta_rel)
+        # c_raw: [B, H, N-1] in (0, 1]
+
+        # Pad position 0 with neutral coherence (0.5 = no routing preference)
+        c_first = torch.full((B, H, 1), 0.5, device=c_raw.device, dtype=c_raw.dtype)
+        c_raw = torch.cat([c_first, c_raw], dim=2)  # [B, H, N]
+
+        # EMA smoothing across sequence dimension (causal)
+        coherence = torch.zeros_like(c_raw)
+        coherence[:, :, 0] = c_raw[:, :, 0]
+        for t in range(1, N):
+            coherence[:, :, t] = self.ema_decay * coherence[:, :, t - 1] + (1 - self.ema_decay) * c_raw[:, :, t]
+
+        return coherence  # [B, H, N] in [0, 1]
+
+
+class GCTRoutingGate(nn.Module):
+    """
+    Pre-softmax routing gate: decides full vs local attention per head per position.
+
+    pi(l,h,t) = sigma(alpha_b * (C_hat(l,h,t) - tau(b,h)))
+
+    Where b is the frequency band of head h.
+
+    Band assignment: equal partition of heads into num_bands groups.
+    - Band 0 (global): heads that should attend broadly
+    - Band 1 (mid): intermediate attention span
+    - Band 2 (local): heads that can use local window
+
+    Each band has a learnable threshold tau_b and sharpness alpha_b.
+    """
+
+    def __init__(self, num_heads: int, num_bands: int = 3,
+                 alpha_init: float = 10.0):
+        super().__init__()
+        self.num_heads = num_heads
+        self.num_bands = num_bands
+
+        # Assign heads to bands (equal partition)
+        heads_per_band = num_heads // num_bands
+        band_assignment = []
+        for b in range(num_bands):
+            count = heads_per_band if b < num_bands - 1 else num_heads - b * heads_per_band
+            band_assignment.extend([b] * count)
+        self.register_buffer('band_assignment', torch.tensor(band_assignment, dtype=torch.long))
+
+        # Per-band learnable parameters
+        # tau_b: threshold (higher = harder to route to coarse)
+        # Band 0 (global) has high threshold (rarely uses local window)
+        # Band 2 (local) has low threshold (often uses local window)
+        tau_init = torch.linspace(0.7, 0.3, num_bands)  # Global=0.7, Local=0.3
+        self.tau = nn.Parameter(tau_init)
+
+        # Per-band sharpness
+        self.alpha = nn.Parameter(torch.full((num_bands,), alpha_init))
+
+    def forward(self, coherence: torch.Tensor) -> torch.Tensor:
+        """
+        Compute routing probability pi for each head at each position.
+
+        Args:
+            coherence: [B, H, N] coherence scores in [0, 1]
+
+        Returns:
+            pi: [B, H, N] routing probabilities in [0, 1]
+                (high pi = route to local/coarse, low pi = use full attention)
+        """
+        # Gather per-head thresholds and sharpness from band assignment
+        tau_per_head = self.tau[self.band_assignment]         # [H]
+        alpha_per_head = self.alpha[self.band_assignment]     # [H]
+
+        # Reshape for broadcasting: [1, H, 1]
+        tau = tau_per_head.view(1, -1, 1)
+        alpha = alpha_per_head.view(1, -1, 1)
+
+        # pi = sigma(alpha * (C - tau))
+        # High coherence (stable) -> high pi -> route to local (save compute)
+        # Low coherence (unstable) -> low pi -> use full attention (be careful)
+        pi = torch.sigmoid(alpha * (coherence - tau))
+
+        return pi  # [B, H, N]
+
+
+class GCTLadderInsulation(nn.Module):
+    """
+    Lambda_ladder: band insulation to prevent collapse.
+
+    When heads in different bands produce too-similar outputs
+    (low inter-band divergence = collapse risk), suppress routing
+    to coarse path, forcing full attention to preserve band specialization.
+
+    Corrected sign logic:
+        Collapse risk = bands becoming indistinguishable
+        Low divergence = high similarity = collapse risk
+
+        Lambda = exp(-kappa * max(0, tau_collapse - Delta_band))
+
+    When Delta_band < tau_collapse (bands too similar):
+        Lambda decreases -> pi* decreases -> more full attention
+
+    When Delta_band >= tau_collapse (bands well-separated):
+        Lambda = 1 -> no suppression -> routing proceeds normally
+    """
+
+    def __init__(self, kappa: float = 3.0, tau_ladder: float = 0.15):
+        super().__init__()
+        self.kappa = kappa
+        self.tau_ladder = tau_ladder
+
+    def compute_band_divergence(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h]
+        band_assignment: torch.Tensor,  # [H] band index per head
+        num_bands: int,
+    ) -> torch.Tensor:
+        """
+        Compute inter-band divergence using cosine distance between band means.
+
+        Delta_band = 1 - mean_{b1 != b2} cos_sim(mean_{h in b1}(O_h), mean_{h in b2}(O_h))
+
+        Returns:
+            divergence: [B, N] inter-band divergence in [0, 2]
+        """
+        B, H, N, D_h = attn_output.shape
+
+        # Compute band-mean outputs: average over heads in each band
+        band_means = []
+        for b in range(num_bands):
+            mask = (band_assignment == b)
+            if mask.any():
+                band_out = attn_output[:, mask].mean(dim=1)  # [B, N, D_h]
+                band_means.append(band_out)
+
+        if len(band_means) < 2:
+            # Only one band — no divergence to measure
+            return torch.zeros(B, N, device=attn_output.device)
+
+        # Pairwise cosine similarity between band means
+        cos_sims = []
+        for i in range(len(band_means)):
+            for j in range(i + 1, len(band_means)):
+                # [B, N]
+                sim = F.cosine_similarity(band_means[i], band_means[j], dim=-1)
+                cos_sims.append(sim)
+
+        mean_similarity = torch.stack(cos_sims, dim=0).mean(dim=0)  # [B, N]
+        divergence = 1.0 - mean_similarity  # [B, N] in [-1, 1], typically [0, 1]
+
+        return divergence
+
+    def forward(
+        self,
+        attn_output: torch.Tensor,  # [B, H, N, D_h]
+        band_assignment: torch.Tensor,  # [H]
+        num_bands: int,
+    ) -> torch.Tensor:
+        """
+        Compute ladder insulation factor.
+
+        Returns:
+            lambda_ladder: [B, N] in (0, 1]
+        """
+        divergence = self.compute_band_divergence(attn_output, band_assignment, num_bands)
+
+        # Corrected sign: suppress when divergence is LOW (collapse risk)
+        # Lambda = exp(-kappa * max(0, tau - Delta))
+        collapse_pressure = torch.clamp(self.tau_ladder - divergence, min=0.0)
+        lambda_ladder = torch.exp(-self.kappa * collapse_pressure)
+
+        return lambda_ladder  # [B, N] in (0, 1]
+
+
+class GCTAttentionLayer(nn.Module):
+    """
+    Gated Coherence Transformer Attention Layer.
+
+    Combines full O(n²) softmax attention with local-window softmax attention,
+    blended by a pre-softmax coherence gate with lambda_ladder band insulation.
+
+    Training (soft blend):
+        O = (1 - pi*) * O_full + pi* * O_local
+
+    Inference (hard route):
+        O = O_local if pi* > theta else O_full
+
+    The full path uses SDPA/FlashAttention when available.
+    The local path uses masked softmax over a sliding window of size w.
+    Coherence is computed from output/residual deltas (FlashAttention-compatible).
+
+    Phased training schedule:
+        Phase 1 (warmup): Full attention only, coherence predictors warm up
+        Phase 2 (anneal): Soft blend gradually enabled
+        Phase 3 (full):   Full gated operation
+    """
+
+    def __init__(self, gct_config: GCTConfig, layer_idx: int = 0):
+        super().__init__()
+        embed_dim = gct_config.embed_dim
+        num_heads = gct_config.num_heads
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.layer_idx = layer_idx
+        self.gct_config = gct_config
+
+        # QKV projections (shared between full and local paths)
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+
+        self.dropout = nn.Dropout(gct_config.dropout)
+        self.norm = nn.LayerNorm(embed_dim)
+
+        # GCT modules
+        self.coherence = GCTCoherenceModule(
+            num_heads=num_heads,
+            ema_decay=gct_config.gct_ema_decay,
+            gamma=gct_config.gct_coherence_gamma,
+            delta=gct_config.gct_coherence_delta,
+        )
+        self.routing_gate = GCTRoutingGate(
+            num_heads=num_heads,
+            num_bands=gct_config.gct_num_bands,
+            alpha_init=gct_config.gct_alpha_sharpness,
+        )
+        self.ladder = GCTLadderInsulation(
+            kappa=gct_config.gct_kappa,
+            tau_ladder=gct_config.gct_tau_ladder,
+        )
+
+        # Window size for local path
+        self.window_size = gct_config.gct_window_size
+
+    def _compute_full_attention(
+        self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """Full O(n²) attention using SDPA when available."""
+        if SDPA_AVAILABLE:
+            output = F.scaled_dot_product_attention(
+                Q, K, V, is_causal=causal_mask,
+                dropout_p=self.dropout.p if self.training else 0.0,
+            )
+        else:
+            B, H, N, D_h = Q.shape
+            attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
+            if causal_mask:
+                mask = torch.triu(torch.ones(N, N, device=Q.device, dtype=torch.bool), diagonal=1)
+                attn = attn.masked_fill(mask, float('-inf'))
+            attn = F.softmax(attn, dim=-1)
+            attn = self.dropout(attn)
+            output = torch.matmul(attn, V)
+        return output  # [B, H, N, D_h]
+
+    def _compute_local_attention(
+        self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> torch.Tensor:
+        """
+        Local-window softmax attention: O(n*w) instead of O(n²).
+
+        Each position t attends only to positions in W(t) = {max(0, t-w+1), ..., t}.
+        Implemented via masking the full attention matrix (training-friendly).
+        """
+        B, H, N, D_h = Q.shape
+        w = self.window_size
+
+        # Compute full attention scores (we mask most of them)
+        attn = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B, H, N, N]
+
+        # Create combined causal + local window mask
+        # Position t can attend to positions max(0, t-w+1) through t
+        row_idx = torch.arange(N, device=Q.device).unsqueeze(1)  # [N, 1]
+        col_idx = torch.arange(N, device=Q.device).unsqueeze(0)  # [1, N]
+
+        # Local window: col must be >= row - w + 1 AND col <= row (causal)
+        local_mask = (col_idx > row_idx) | (col_idx < row_idx - w + 1)  # True = masked out
+        if causal_mask:
+            causal = col_idx > row_idx
+            local_mask = local_mask | causal
+
+        attn = attn.masked_fill(local_mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+        attn = F.softmax(attn, dim=-1)
+        attn = self.dropout(attn)
+        output = torch.matmul(attn, V)
+
+        return output  # [B, H, N, D_h]
+
+    def _get_schedule_weight(self) -> float:
+        """
+        Get the gating schedule weight based on training phase.
+
+        Phase 1 (step < warmup): weight = 0 (full attention only)
+        Phase 2 (warmup <= step < warmup + anneal): weight linearly ramps 0 -> 1
+        Phase 3 (step >= warmup + anneal): weight = 1 (full gating)
+        """
+        step = self.gct_config.gct_current_step
+        warmup = self.gct_config.gct_warmup_steps
+        anneal = self.gct_config.gct_anneal_steps
+
+        if step < warmup:
+            return 0.0
+        elif step < warmup + anneal:
+            return (step - warmup) / max(1, anneal)
+        else:
+            return 1.0
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        GCT attention forward pass.
+
+        Returns:
+            Dict with:
+                'output': [B, N, D] attention output (residual + norm applied)
+                'gct_metrics': dict with routing stats for logging
+        """
+        B, N, D = x.shape
+        residual = x
+
+        # Project Q, K, V
+        Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+        # Q, K, V: [B, H, N, D_h]
+
+        schedule_weight = self._get_schedule_weight()
+
+        if schedule_weight == 0.0:
+            # Phase 1: Full attention only (no gating overhead)
+            output = self._compute_full_attention(Q, K, V, causal_mask)
+            output = output.transpose(1, 2).reshape(B, N, D)
+            output = self.out_proj(output)
+            output = self.dropout(output)
+            result_output = self.norm(output + residual)
+            return {
+                'output': result_output,
+                'gct_metrics': {
+                    'gct_schedule_weight': 0.0,
+                    'gct_mean_pi_star': 0.0,
+                    'gct_mean_lambda_ladder': 1.0,
+                    'gct_mean_coherence': 0.5,
+                    'gct_frac_local_routed': 0.0,
+                },
+            }
+
+        # === Compute both attention paths ===
+
+        # Full attention (uses SDPA/FlashAttention)
+        O_full = self._compute_full_attention(Q, K, V, causal_mask)  # [B, H, N, D_h]
+
+        # Local-window attention
+        O_local = self._compute_local_attention(Q, K, V, causal_mask)  # [B, H, N, D_h]
+
+        # === Coherence gating ===
+
+        # Compute coherence from output deltas and residual deltas
+        coherence = self.coherence(O_full.detach(), residual)  # [B, H, N]
+
+        # Routing probability
+        pi = self.routing_gate(coherence)  # [B, H, N]
+
+        # Lambda_ladder band insulation
+        lambda_ladder = self.ladder(
+            O_full.detach(),
+            self.routing_gate.band_assignment,
+            self.routing_gate.num_bands,
+        )  # [B, N]
+
+        # Effective routing: pi* = pi * lambda_ladder
+        pi_star = pi * lambda_ladder.unsqueeze(1)  # [B, H, N]
+
+        # Apply schedule weight (Phase 2 annealing)
+        pi_star = pi_star * schedule_weight
+
+        if self.gct_config.gct_use_hard_routing and not self.training:
+            # Hard routing for inference
+            theta = self.gct_config.gct_hard_route_threshold
+            use_local = (pi_star > theta).unsqueeze(-1)  # [B, H, N, 1]
+            output = torch.where(use_local, O_local, O_full)
+        else:
+            # Soft blend for training
+            pi_expanded = pi_star.unsqueeze(-1)  # [B, H, N, 1]
+            output = (1 - pi_expanded) * O_full + pi_expanded * O_local
+
+        # Reshape and project
+        output = output.transpose(1, 2).reshape(B, N, D)
+        output = self.out_proj(output)
+        output = self.dropout(output)
+        result_output = self.norm(output + residual)
+
+        # Metrics for logging
+        with torch.no_grad():
+            metrics = {
+                'gct_schedule_weight': schedule_weight,
+                'gct_mean_pi_star': pi_star.mean().item(),
+                'gct_mean_lambda_ladder': lambda_ladder.mean().item(),
+                'gct_mean_coherence': coherence.mean().item(),
+                'gct_frac_local_routed': (pi_star > 0.5).float().mean().item(),
+            }
+
+        return {
+            'output': result_output,
+            'gct_metrics': metrics,
+        }
+
+
+class GCTTransformerBlock(nn.Module):
+    """Transformer block with GCT (Gated Coherence Transformer) attention."""
+
+    def __init__(self, gct_config: GCTConfig, layer_idx: int = 0):
+        super().__init__()
+        # Convert GCTConfig to TransformerConfig for FeedForward
+        self.attention = GCTAttentionLayer(gct_config, layer_idx=layer_idx)
+        self.ff = FeedForward(
+            embed_dim=gct_config.embed_dim,
+            ff_dim=gct_config.ff_dim,
+            dropout=gct_config.dropout,
+        )
+
+    def forward(
+        self, x: torch.Tensor, causal_mask: bool = True,
+    ) -> Dict[str, Any]:
+        attn_result = self.attention(x, causal_mask)
+        x = self.ff(attn_result['output'])
+        return {
+            'output': x,
+            'gct_metrics': attn_result['gct_metrics'],
+        }
+
+
+class GCTTransformer(nn.Module):
+    """
+    Gated Coherence Transformer (GCT).
+
+    A standard O(n²) transformer augmented with pre-softmax coherence gating
+    and lambda_ladder band insulation. Routes each head at each position
+    between full attention (O(n²)) and local-window attention (O(n*w))
+    based on temporal stability signals.
+
+    Training: Soft blend with phased schedule (warmup -> anneal -> full gating).
+    Inference: Hard routing for real FLOP savings.
+
+    The routing decision is made BEFORE computing QK^T, using only output
+    deltas and residual deltas from the previous layer — the core contribution.
+    """
+
+    def __init__(
+        self,
+        vocab_size: int = 50257,
+        embed_dim: int = 768,
+        num_layers: int = 12,
+        num_heads: int = 12,
+        ff_dim: Optional[int] = None,
+        max_seq_len: int = 8192,
+        dropout: float = 0.1,
+        tie_embeddings: bool = True,
+        # GCT-specific
+        gct_window_size: int = 128,
+        gct_coherence_gamma: float = 5.0,
+        gct_coherence_delta: float = 3.0,
+        gct_ema_decay: float = 0.9,
+        gct_num_bands: int = 3,
+        gct_alpha_sharpness: float = 10.0,
+        gct_hard_route_threshold: float = 0.5,
+        gct_use_hard_routing: bool = False,
+        gct_kappa: float = 3.0,
+        gct_tau_ladder: float = 0.15,
+        gct_warmup_steps: int = 500,
+        gct_anneal_steps: int = 2000,
+        **kwargs,
+    ):
+        super().__init__()
+
+        gct_config = GCTConfig(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=max_seq_len,
+            dropout=dropout,
+            gct_window_size=gct_window_size,
+            gct_coherence_gamma=gct_coherence_gamma,
+            gct_coherence_delta=gct_coherence_delta,
+            gct_ema_decay=gct_ema_decay,
+            gct_num_bands=gct_num_bands,
+            gct_alpha_sharpness=gct_alpha_sharpness,
+            gct_hard_route_threshold=gct_hard_route_threshold,
+            gct_use_hard_routing=gct_use_hard_routing,
+            gct_kappa=gct_kappa,
+            gct_tau_ladder=gct_tau_ladder,
+            gct_warmup_steps=gct_warmup_steps,
+            gct_anneal_steps=gct_anneal_steps,
+        )
+        self.gct_config = gct_config
+        self.tie_embeddings = tie_embeddings
+
+        # Embeddings
+        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embed = nn.Embedding(max_seq_len, embed_dim)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        # GCT Transformer blocks
+        self.blocks = nn.ModuleList([
+            GCTTransformerBlock(gct_config, layer_idx=i) for i in range(num_layers)
+        ])
+
+        # Output
+        self.norm = nn.LayerNorm(embed_dim)
+        self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
+
+        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
+        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+
+        if tie_embeddings:
+            self.lm_head.weight = self.token_embed.weight
+
+        self.apply(self._init_weights)
+
+        if not self.tie_embeddings:
+            with torch.no_grad():
+                self.lm_head.weight.copy_(self.token_embed.weight)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def set_training_step(self, step: int):
+        """Update training step for phased schedule across all layers."""
+        self.gct_config.gct_current_step = step
+
+    def set_hard_routing(self, enabled: bool):
+        """Enable/disable hard routing (for inference vs training)."""
+        self.gct_config.gct_use_hard_routing = enabled
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        return_hidden: bool = False,
+        extract_layers: Optional[List[int]] = None,
+        return_last_hidden: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Forward pass.
+
+        Args:
+            input_ids: [B, N] token indices
+            return_hidden: Return all hidden states
+            extract_layers: Specific layer indices to extract
+            return_last_hidden: Return normalized hidden state before lm_head
+
+        Returns:
+            Dict with 'logits' and optionally 'hidden_states', 'last_hidden_state',
+            and 'gct_metrics' (aggregated across layers)
+        """
+        B, N = input_ids.shape
+
+        should_extract = return_hidden or extract_layers is not None
+        extract_set = set(extract_layers) if extract_layers is not None else None
+
+        positions = torch.arange(N, device=input_ids.device).unsqueeze(0)
+        x = self.token_embed(input_ids) + self.pos_embed(positions)
+        x = self.embed_dropout(x)
+
+        hidden_states = [] if should_extract else None
+        all_gct_metrics = []
+
+        for i, block in enumerate(self.blocks):
+            block_result = block(x, causal_mask=True)
+            x = block_result['output']
+            all_gct_metrics.append(block_result['gct_metrics'])
+
+            if should_extract:
+                if extract_set is None or i in extract_set:
+                    hidden_states.append(x)
+
+        x = self.norm(x)
+        logits = self.lm_head(x) * self.logit_scale
+
+        result = {'logits': logits}
+
+        if should_extract:
+            result['hidden_states'] = hidden_states
+
+        if return_last_hidden:
+            result['last_hidden_state'] = x
+
+        # Aggregate GCT metrics across layers
+        if all_gct_metrics:
+            agg = {}
+            for key in all_gct_metrics[0]:
+                vals = [m[key] for m in all_gct_metrics]
+                agg[key] = sum(vals) / len(vals)
+            result['gct_metrics'] = agg
+
+        return result
 
 
 class StandardTransformer(nn.Module):

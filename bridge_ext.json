@@ -1,0 +1,474 @@
+{
+  "bridge_metrics": {
+    "r2_mean": 0.29331108927726746,
+    "r2_per_axis": {
+      "O2_IDENTITY": 0.12179934978485107,
+      "O3_EXECUTION": 0.35261791944503784,
+      "O6_AGENCY": 0.35991770029067993,
+      "O9_WITNESSES": 0.338909387588501
+    },
+    "train_loss": 0.07239518221467733,
+    "n_train": 8000,
+    "n_val": 2000
+  },
+  "sanity_tests": [
+    {
+      "name": "Shuffle Test (leakage detection)",
+      "passed": true,
+      "r2_per_axis": {
+        "O2_IDENTITY": -0.003391861915588379,
+        "O3_EXECUTION": -0.0005539655685424805,
+        "O6_AGENCY": -0.002378106117248535,
+        "O9_WITNESSES": 0.0007641911506652832
+      },
+      "r2_mean": -0.0013899356126785278,
+      "threshold": 0.05,
+      "detail": "Shuffled R\u00b2=-0.0014 < 0.05 OK"
+    },
+    {
+      "name": "Permute Dims (encoding specificity)",
+      "passed": true,
+      "r2_per_axis": {
+        "O2_IDENTITY": 0.10733705759048462,
+        "O3_EXECUTION": 0.3569663166999817,
+        "O6_AGENCY": 0.34730058908462524,
+        "O9_WITNESSES": 0.3098956346511841
+      },
+      "r2_mean": 0.2803748995065689,
+      "baseline_r2_mean": 0.29331108927726746,
+      "delta": 0.012936189770698547,
+      "permutation": [
+        9,
+        27,
+        26,
+        18,
+        21,
+        19,
+        10,
+        23,
+        12,
+        7,
+        30,
+        13,
+        20,
+        3,
+        0,
+        14,
+        29,
+        8,
+        5,
+        2,
+        31,
+        22,
+        6,
+        16,
+        11,
+        15,
+        25,
+        24,
+        28,
+        17,
+        4,
+        1
+      ],
+      "detail": "Permuted R\u00b2=0.2804 vs baseline 0.2933 (delta=0.0129)"
+    },
+    {
+      "name": "Ablate Top-5 Variance Dims (distribution test)",
+      "passed": true,
+      "r2_per_axis": {
+        "O2_IDENTITY": 0.11416906118392944,
+        "O3_EXECUTION": 0.23185664415359497,
+        "O6_AGENCY": 0.23457026481628418,
+        "O9_WITNESSES": 0.2573087811470032
+      },
+      "r2_mean": 0.20947618782520294,
+      "baseline_r2_mean": 0.29331108927726746,
+      "r2_drop": 0.08383490145206451,
+      "r2_drop_fraction": 0.28582247489734436,
+      "removed_dims": [
+        25,
+        28,
+        30,
+        31,
+        29
+      ],
+      "removed_dim_names": [
+        "Guna.VELOCITY",
+        "Reserved.0",
+        "Reserved.2",
+        "Reserved.3",
+        "Reserved.1"
+      ],
+      "detail": "Ablated R\u00b2=0.2095 (drop=0.0838, 29% of signal)"
+    },
+    {
+      "name": "Cross-Model Test (random weights baseline)",
+      "passed": true,
+      "r2_per_axis": {
+        "O2_IDENTITY": 0.23691558837890625,
+        "O3_EXECUTION": 0.4097476601600647,
+        "O6_AGENCY": 0.3994753956794739,
+        "O9_WITNESSES": 0.3170483112335205
+      },
+      "r2_mean": 0.34079673886299133,
+      "baseline_r2_mean": 0.29331108927726746,
+      "delta_trained_minus_random": -0.04748564958572388,
+      "note": "Synthetic data has signal in H directly, so random projections capture partial signal. On real model data, random R\u00b2 should be ~0.",
+      "detail": "Random R\u00b2=0.3408 vs trained 0.2933 (delta=-0.0475) [synthetic data: signal in H]"
+    },
+    {
+      "name": "Ridge vs OLS (multicollinearity check)",
+      "passed": true,
+      "ols_r2_per_axis": {
+        "O2_IDENTITY": 0.2105605411316256,
+        "O3_EXECUTION": 0.49295980615855084,
+        "O6_AGENCY": 0.47314356495717813,
+        "O9_WITNESSES": 0.4073235801152141
+      },
+      "ols_r2_mean": 0.39599687309064213,
+      "ridge_r2_per_axis": {
+        "O2_IDENTITY": 0.2028436289636939,
+        "O3_EXECUTION": 0.4910799102524658,
+        "O6_AGENCY": 0.4705718879791594,
+        "O9_WITNESSES": 0.4005308323738115
+      },
+      "ridge_r2_mean": 0.39125656489228267,
+      "alpha": 1.0,
+      "delta": 0.004740308198359466,
+      "detail": "OLS R\u00b2=0.3960, Ridge R\u00b2=0.3913 (delta=0.0047)"
+    },
+    {
+      "name": "Sign Symmetry (centering diagnostic)",
+      "passed": true,
+      "n_positive": 71,
+      "n_negative": 57,
+      "pos_fraction": 0.5546875,
+      "skew_from_50": 0.0546875,
+      "best_axis_signs": [
+        0.22901113709811138,
+        0.4026607438146075,
+        0.36987358757073585,
+        0.3284034464840344
+      ],
+      "all_best_negative": false,
+      "detail": "pos=71/128 (55.5%), neg=57/128 (44.5%), skew=0.055"
+    },
+    {
+      "name": "Centering / Normalization Check",
+      "passed": true,
+      "sovereign_mean_abs": 0.2473653256893158,
+      "sovereign_std_mean": 0.05745301768183708,
+      "ontology_mean_abs": 0.30583471059799194,
+      "ontology_std_mean": 0.31947797536849976,
+      "variance_ratio": 0.17983404838962147,
+      "sovereign_per_dim_mean": [
+        0.08038726449012756,
+        0.09183882921934128,
+        0.0935043916106224,
+        0.08044108003377914,
+        0.08628230541944504,
+        0.07850346714258194,
+        0.0735524520277977,
+        0.08066579699516296,
+        0.08773595839738846,
+        0.08492986857891083,
+        0.07795857638120651,
+        0.08420086652040482,
+        0.4876917898654938,
+        0.4542686939239502,
+        0.4912782311439514,
+        0.5071609616279602,
+        0.49167925119400024,
+        0.19656126201152802,
+        0.1751192808151245,
+        0.2279323935508728,
+        0.18974709510803223,
+        0.21063871681690216,
+        0.536583423614502,
+        0.5083680748939514,
+        0.5110442638397217,
+        0.46311119198799133,
+        0.5074737071990967,
+        0.5322167277336121,
+        -0.23131360113620758,
+        0.021783512085676193,
+        0.1253397911787033,
+        0.04637804999947548
+      ],
+      "sovereign_per_dim_std": [
+        0.01694796048104763,
+        0.019419511780142784,
+        0.019619252532720566,
+        0.016726475208997726,
+        0.016880907118320465,
+        0.016315937042236328,
+        0.01519402302801609,
+        0.01911788061261177,
+        0.020534170791506767,
+        0.01865226775407791,
+        0.016734322533011436,
+        0.018189938738942146,
+        0.04936188831925392,
+        0.05607527494430542,
+        0.05537126958370209,
+        0.05631231889128685,
+        0.049051735550165176,
+        0.040489744395017624,
+        0.0371607169508934,
+        0.045580796897411346,
+        0.03657529130578041,
+        0.039493460208177567,
+        0.05660006403923035,
+        0.06317007541656494,
+        0.05562547594308853,
+        0.0639977976679802,
+        0.05138592794537544,
+        0.05571262910962105,
+        0.1983163207769394,
+        0.20914027094841003,
+        0.20232082903385162,
+        0.2024221122264862
+      ],
+      "ontology_per_axis_mean": [
+        0.32868796586990356,
+        0.309477835893631,
+        0.3122458755970001,
+        0.27292710542678833
+      ],
+      "ontology_per_axis_std": [
+        0.3380623459815979,
+        0.34744447469711304,
+        0.3088487684726715,
+        0.2835562825202942
+      ],
+      "detail": "S: mean|=0.2474, std=0.0575; z: mean|=0.3058, std=0.3195; var_ratio=0.18"
+    },
+    {
+      "name": "Condition Number (multicollinearity risk)",
+      "passed": true,
+      "effective_condition_number": 280.2984541324283,
+      "raw_condition_number": 48725601941233.484,
+      "max_eigenvalue": 0.04872560194123349,
+      "min_eigenvalue": 2.9550610750851137e-16,
+      "n_trivial_eigenvalues": 2,
+      "n_significant_eigenvalues": 30,
+      "effective_rank_95": 15,
+      "top_5_eigenvalues": [
+        0.04872560194123349,
+        0.04149083144851481,
+        0.039493498285960986,
+        0.03623646554293094,
+        0.005695085530455255
+      ],
+      "detail": "eff_cond=280.3 (raw=4.9e+13), eff_rank(95%)=15/32, trivial_eigs=2 (softmax constraints)"
+    }
+  ],
+  "summary": {
+    "n_samples": 10000,
+    "bridge_type": "linear",
+    "bridge_r2_mean": 0.29331108927726746,
+    "sanity_passed": 8,
+    "sanity_total": 8,
+    "elapsed_seconds": 96.08938574790955
+  },
+  "config": {
+    "n_samples": 10000,
+    "d_model": 768,
+    "state_dim": 32,
+    "bridge_type": "linear",
+    "bridge_epochs": 200,
+    "seed": 42
+  },
+  "extensions": {
+    "enriched_witnesses": {
+      "name": "Enriched Witnesses Bridge",
+      "passed": false,
+      "enriched_r2_per_axis": {
+        "O2_IDENTITY": 0.21972942352294922,
+        "O3_EXECUTION": 0.536370038986206,
+        "O6_AGENCY": 0.513285756111145,
+        "O9_WITNESSES": 0.44869697093963623
+      },
+      "enriched_r2_mean": 0.42952054738998413,
+      "mlp_baseline_r2_per_axis": {
+        "O2_IDENTITY": 0.22249102592468262,
+        "O3_EXECUTION": 0.535607635974884,
+        "O6_AGENCY": 0.5138058662414551,
+        "O9_WITNESSES": 0.4491427540779114
+      },
+      "mlp_baseline_r2_mean": 0.4302618205547333,
+      "per_axis_delta_vs_mlp": {
+        "O2_IDENTITY": -0.0027616024017333984,
+        "O3_EXECUTION": 0.0007624030113220215,
+        "O6_AGENCY": -0.0005201101303100586,
+        "O9_WITNESSES": -0.0004457831382751465
+      },
+      "witnesses_linear": 0.338909387588501,
+      "witnesses_mlp": 0.4491427540779114,
+      "witnesses_enriched": 0.44869697093963623,
+      "witnesses_lift": -0.0004457831382751465,
+      "meta_feature_importance": {
+        "residual_mean": 0.008157432079315186,
+        "residual_max": 0.001830756664276123,
+        "residual_std": -0.0008636713027954102,
+        "cosine_sim": -0.00027173757553100586,
+        "vritti_entropy": 0.013889729976654053,
+        "state_variance": 0.0004317164421081543
+      },
+      "meta_feature_stats": {
+        "residual_mean": {
+          "mean": 0.788719654083252,
+          "std": 0.023196587339043617
+        },
+        "residual_max": {
+          "mean": 2.0150768756866455,
+          "std": 0.17764943838119507
+        },
+        "residual_std": {
+          "mean": 0.5378838777542114,
+          "std": 0.034912846982479095
+        },
+        "cosine_sim": {
+          "mean": 0.16904737055301666,
+          "std": 0.04946407675743103
+        },
+        "vritti_entropy": {
+          "mean": 1.5856503248214722,
+          "std": 0.016572237014770508
+        },
+        "state_variance": {
+          "mean": 0.1568557471036911,
+          "std": 0.003421562956646085
+        }
+      },
+      "detail": "Witnesses: linear=0.3389 \u2192 MLP=0.4491 \u2192 enriched=0.4487 (lift=-0.0004)"
+    },
+    "generalization_linear": {
+      "name": "Generalization (linear)",
+      "passed": false,
+      "iid_r2_per_axis": {
+        "O2_IDENTITY": 0.10702472925186157,
+        "O3_EXECUTION": 0.35250961780548096,
+        "O6_AGENCY": 0.346859335899353,
+        "O9_WITNESSES": 0.31777334213256836
+      },
+      "iid_r2_mean": 0.281041756272316,
+      "cross_r2_per_axis": {
+        "O2_IDENTITY": -0.1229468584060669,
+        "O3_EXECUTION": 0.08501911163330078,
+        "O6_AGENCY": 0.10403174161911011,
+        "O9_WITNESSES": 0.21443241834640503
+      },
+      "cross_r2_mean": 0.07013410329818726,
+      "generalization_gap": 0.21090765297412872,
+      "bridge_type": "linear",
+      "train_seed": 42,
+      "test_seed": 123,
+      "n_train": 10000,
+      "n_test": 10000,
+      "detail": "IID R\u00b2=0.2810, Cross R\u00b2=0.0701, gap=0.2109 (OVERFIT)"
+    },
+    "generalization_mlp": {
+      "name": "Generalization (mlp)",
+      "passed": false,
+      "iid_r2_per_axis": {
+        "O2_IDENTITY": 0.2208465337753296,
+        "O3_EXECUTION": 0.5352278351783752,
+        "O6_AGENCY": 0.5140098333358765,
+        "O9_WITNESSES": 0.45018166303634644
+      },
+      "iid_r2_mean": 0.43006646633148193,
+      "cross_r2_per_axis": {
+        "O2_IDENTITY": -0.4829212427139282,
+        "O3_EXECUTION": -0.018703103065490723,
+        "O6_AGENCY": 0.06617939472198486,
+        "O9_WITNESSES": 0.20093607902526855
+      },
+      "cross_r2_mean": -0.05862721800804138,
+      "generalization_gap": 0.4886936843395233,
+      "bridge_type": "mlp",
+      "train_seed": 42,
+      "test_seed": 123,
+      "n_train": 10000,
+      "n_test": 10000,
+      "detail": "IID R\u00b2=0.4301, Cross R\u00b2=-0.0586, gap=0.4887 (OVERFIT)"
+    },
+    "learned_combiner": {
+      "name": "Learned Combiner",
+      "passed": true,
+      "per_anomaly_type": {
+        "trajectory_break": {
+          "jepa_auc": 0.5149216249999995,
+          "ontology_auc": 0.7173829374999969,
+          "residual_auc": 0.7930955624999926,
+          "naive_2way_auc": 0.7183811874999931,
+          "naive_3way_auc": 0.7695636874999956,
+          "learned_auc": 0.7695636249999958,
+          "improvement_over_naive": 0.05118243750000262,
+          "learned_weights": {
+            "w_jepa": 0.8078232407569885,
+            "w_ontology": 0.8077279329299927,
+            "w_residual": 0.8077086806297302,
+            "bias": -1.1921764612197876
+          }
+        },
+        "domain_shift": {
+          "jepa_auc": 0.5373863749999985,
+          "ontology_auc": 0.5342152499999998,
+          "residual_auc": 0.6727531875000129,
+          "naive_2way_auc": 0.5392159374999981,
+          "naive_3way_auc": 0.611540312500002,
+          "learned_auc": 0.6115403125000018,
+          "improvement_over_naive": 0.07232437500000377,
+          "learned_weights": {
+            "w_jepa": 0.8075549602508545,
+            "w_ontology": 0.8074288964271545,
+            "w_residual": 0.8074049949645996,
+            "bias": -1.192444920539856
+          }
+        },
+        "subtle_drift": {
+          "jepa_auc": 0.4946018749999999,
+          "ontology_auc": 0.5106991250000004,
+          "residual_auc": 0.5069035624999996,
+          "naive_2way_auc": 0.5092877500000015,
+          "naive_3way_auc": 0.5101963124999991,
+          "learned_auc": 0.5101963124999993,
+          "improvement_over_naive": 0.0009085624999978226,
+          "learned_weights": {
+            "w_jepa": 0.80752032995224,
+            "w_ontology": 0.8073916435241699,
+            "w_residual": 0.8073645830154419,
+            "bias": -1.1924787759780884
+          }
+        },
+        "adversarial": {
+          "jepa_auc": 0.5081529375000028,
+          "ontology_auc": 0.6684033125000004,
+          "residual_auc": 0.5684620000000001,
+          "naive_2way_auc": 0.6696729999999936,
+          "naive_3way_auc": 0.6357008750000027,
+          "learned_auc": 0.6357021875000027,
+          "improvement_over_naive": -0.0339708124999909,
+          "learned_weights": {
+            "w_jepa": 0.8077444434165955,
+            "w_ontology": 0.8076406121253967,
+            "w_residual": 0.8076154589653015,
+            "bias": -1.1922554969787598
+          }
+        }
+      },
+      "avg_naive_2way_auc": 0.6091394687499966,
+      "avg_learned_auc": 0.6317506093749999,
+      "avg_improvement": 0.022611140625003356,
+      "representative_weights": {
+        "w_jepa": 0.8078232407569885,
+        "w_ontology": 0.8077279329299927,
+        "w_residual": 0.8077086806297302,
+        "bias": -1.1921764612197876
+      },
+      "detail": "Avg naive AUC=0.6091, learned AUC=0.6318, delta=+0.0226"
+    }
+  }
+}

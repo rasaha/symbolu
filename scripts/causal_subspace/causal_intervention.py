@@ -61,7 +61,24 @@ class InterventionConfig:
 
     fluency_threshold: float = 2.0
     """Max ratio of patched_perplexity / original_perplexity before
-    declaring fluency destroyed."""
+    declaring fluency destroyed.  2.0 = patched PPL can be at most 2x
+    the original."""
+
+    # --- Fixed effect-size thresholds (principled, not adaptive) ---
+    fixed_kl_threshold: float = 0.05
+    """Minimum KL divergence (nats) for a structural flip to count.
+    This is an absolute floor that does NOT adapt to control noise.
+    0.05 nats ≈ a ~5% redistribution of probability mass."""
+
+    min_specificity_ratio: float = 2.0
+    """Structural patch must produce at least this many times more KL
+    divergence than the random-subspace control for a pair to count as
+    a causal success.  Enforced per-pair, not just as a summary stat."""
+
+    activation_source: str = "block"
+    """Which module to intervene on: 'block' (transformer block) or
+    'attention' (attention sublayer only).  Must match the activation_source
+    used during data collection so that U_k lives in the correct space."""
 
     device: str = "cpu"
     seed: int = 42
@@ -80,7 +97,7 @@ class InterventionResult:
     n_pairs_tested: int = 0
     n_structural_flips: int = 0
     n_fluency_preserved: int = 0
-    n_causal_successes: int = 0  # flip AND fluent
+    n_causal_successes: int = 0  # flip AND fluent AND specific
 
     flip_rate: float = 0.0
     fluency_rate: float = 0.0
@@ -95,6 +112,16 @@ class InterventionResult:
     random_kl_mean: float = 0.0
     random_kl_std: float = 0.0
     specificity_ratio: float = 0.0  # real_kl / random_kl (>1 = specific)
+
+    # Unrelated-sentence control statistics (cross-sentence baseline)
+    unrelated_kl_mean: float = 0.0
+    unrelated_kl_std: float = 0.0
+    cross_specificity_ratio: float = 0.0  # real_kl / unrelated_kl
+
+    # Ablation (zero-out) comparison statistics
+    ablation_kl_mean: float = 0.0
+    ablation_kl_std: float = 0.0
+    swap_vs_ablation_ratio: float = 0.0  # real_kl / ablation_kl
 
     # Per-pair diagnostics
     pair_details: List[Dict] = field(default_factory=list)
@@ -147,6 +174,37 @@ def build_subspace_basis(
         "Built subspace basis: d=%d, k=%d, singular values=%s",
         H.shape[1], actual_k,
         ", ".join(f"{s:.3f}" for s in S[:actual_k]),
+    )
+    return U_k
+
+
+def build_pca_basis(H: np.ndarray, k: int) -> np.ndarray:
+    """Construct an orthonormal basis U_k ∈ R^{d × k} using global PCA.
+
+    This uses the same top-k PCA directions that ``select_top_k_components``
+    validates via MDL probing, ensuring the intervention operates on the
+    exact subspace where compression was found.
+
+    Parameters
+    ----------
+    H : np.ndarray [N, d]
+    k : int  (subspace dimensionality)
+
+    Returns
+    -------
+    U_k : np.ndarray [d, k]  orthonormal columns
+    """
+    from sklearn.decomposition import PCA
+
+    actual_k = min(k, H.shape[1], H.shape[0])
+    pca = PCA(n_components=actual_k, random_state=42)
+    pca.fit(H)
+    U_k = pca.components_[:actual_k].T  # [d, actual_k]
+
+    logger.info(
+        "Built PCA subspace basis: d=%d, k=%d, explained_var=%.3f",
+        H.shape[1], actual_k,
+        pca.explained_variance_ratio_[:actual_k].sum(),
     )
     return U_k
 
@@ -303,6 +361,39 @@ class _PatchHook:
         return h_patched
 
 
+class _AblationHook:
+    """Forward hook that zeros-out the subspace projection at a position.
+
+    h_ablated = h_original - U_k @ U_k^T @ h_original
+
+    If zeroing-out produces the same KL as swapping, the subspace is
+    load-bearing but the *direction* within it does not encode role-specific
+    information — the model just needs *something* there.
+    """
+
+    def __init__(self, U_k: torch.Tensor, target_pos: int):
+        self.U_k = U_k
+        self.target_pos = target_pos
+
+    def __call__(self, module, inp, out):
+        if isinstance(out, tuple):
+            h = out[0]
+            rest = out[1:]
+        else:
+            h = out
+            rest = None
+
+        h_at_pos = h[0, self.target_pos, :]
+        proj = self.U_k @ (self.U_k.T @ h_at_pos)
+
+        h_ablated = h.clone()
+        h_ablated[0, self.target_pos, :] = h_at_pos - proj
+
+        if rest is not None:
+            return (h_ablated,) + rest
+        return h_ablated
+
+
 def _random_orthonormal_basis(d: int, k: int, seed: int = 0) -> np.ndarray:
     """Generate a random orthonormal basis of shape [d, k].
 
@@ -381,29 +472,47 @@ def run_single_intervention(
     U_k: np.ndarray,
     target_layer_idx: int,
     device: torch.device,
+    cfg: Optional[InterventionConfig] = None,
     kl_threshold: Optional[float] = None,
     pair_idx: int = 0,
+    unrelated_donor_ids: Optional[List[int]] = None,
+    unrelated_target_pos: Optional[int] = None,
 ) -> Dict:
-    """Run a single interchange intervention with two control baselines.
+    """Run a single interchange intervention with four control baselines.
 
-    Runs FOUR forward passes:
-        1. Original (no patch)           — baseline
+    Runs SIX forward passes:
+        1. Original (no patch)           — baseline logits
         2. Identity control              — swap A's own subspace back in
         3. Random subspace control       — swap B's projection through a
            random orthonormal basis of the same dimensionality k
-        4. Structural patch (real)       — swap B's structural subspace into A
+        4. Unrelated-sentence control    — swap hidden state from a
+           completely unrelated sentence through the *structural* basis
+        5. Ablation control              — zero-out the subspace projection
+           (h - U_k U_k^T h) to test whether direction matters or just
+           occupancy
+        6. Structural patch (real)       — swap B's structural subspace into A
 
     **Causal specificity** requires that the real patch KL significantly
-    exceeds BOTH the identity control AND the random subspace control.
-    This rules out both numerical noise (identity) and general perturbation
-    sensitivity (random).
+    exceeds ALL controls.  Additionally, the real-patch KL must exceed a
+    fixed, principled threshold (not just an adaptive one).
 
     Returns dict with structural_flip, fluency_preserved, and detailed metrics.
     """
-    from scripts.causal_subspace.data_collection import _find_transformer_blocks
+    from scripts.causal_subspace.data_collection import (
+        _find_attention_modules,
+        _find_transformer_blocks,
+    )
 
-    blocks = _find_transformer_blocks(model)
-    target_block = blocks[target_layer_idx]
+    fixed_kl = cfg.fixed_kl_threshold if cfg else 0.05
+    min_spec = cfg.min_specificity_ratio if cfg else 2.0
+    fluency_thresh = cfg.fluency_threshold if cfg else 2.0
+    act_source = cfg.activation_source if cfg else "block"
+
+    if act_source == "attention":
+        modules = _find_attention_modules(model)
+    else:
+        modules = _find_transformer_blocks(model)
+    target_block = modules[target_layer_idx]
 
     U_k_t = torch.tensor(U_k, dtype=torch.float32, device=device)
     d, k = U_k.shape
@@ -427,6 +536,22 @@ def run_single_intervention(
     handle.remove()
 
     donor_h = donor_captured["h"][0, pair.target_pos_b, :].to(device)  # [d]
+
+    # --- Run unrelated sentence (if provided) to get cross-sentence donor ---
+    unrelated_h = None
+    if unrelated_donor_ids is not None and unrelated_target_pos is not None:
+        ids_u = torch.tensor([unrelated_donor_ids], dtype=torch.long, device=device)
+        unrel_captured = {}
+
+        def unrel_capture_hook(module, inp, out):
+            h = out[0] if isinstance(out, tuple) else out
+            unrel_captured["h"] = h.detach()
+
+        handle = target_block.register_forward_hook(unrel_capture_hook)
+        with torch.no_grad():
+            model(input_ids=ids_u)
+        handle.remove()
+        unrelated_h = unrel_captured["h"][0, unrelated_target_pos, :].to(device)
 
     # --- Run sequence A to get its own hidden state (for controls) ---
     ids_a = torch.tensor([pair.seq_a_ids], dtype=torch.long, device=device)
@@ -462,6 +587,31 @@ def run_single_intervention(
     handle.remove()
     random_logits = random_output.logits if hasattr(random_output, "logits") else random_output["logits"]
 
+    # --- Control C: Unrelated-sentence swap (cross-sentence baseline) ---
+    #     Swap the *structural* subspace projection from a completely
+    #     unrelated sentence.  If this produces comparable KL to the real
+    #     patch, the effect is driven by general perturbation, not by
+    #     swapping role-specific information.
+    unrelated_logits = None
+    if unrelated_h is not None:
+        unrelated_hook = _PatchHook(U_k_t, unrelated_h, pair.target_pos_a)
+        handle = target_block.register_forward_hook(unrelated_hook)
+        with torch.no_grad():
+            unrelated_output = model(input_ids=ids_a)
+        handle.remove()
+        unrelated_logits = unrelated_output.logits if hasattr(unrelated_output, "logits") else unrelated_output["logits"]
+
+    # --- Control D: Ablation (zero-out the subspace) ---
+    #     If zeroing-out produces the same KL as swapping, the subspace is
+    #     load-bearing but the direction within it does NOT encode role-
+    #     specific information.
+    ablation_hook = _AblationHook(U_k_t, pair.target_pos_a)
+    handle = target_block.register_forward_hook(ablation_hook)
+    with torch.no_grad():
+        ablation_output = model(input_ids=ids_a)
+    handle.remove()
+    ablation_logits = ablation_output.logits if hasattr(ablation_output, "logits") else ablation_output["logits"]
+
     # --- Real patch: swap B's structural subspace into A ---
     patch_hook = _PatchHook(U_k_t, donor_h, pair.target_pos_a)
     handle = target_block.register_forward_hook(patch_hook)
@@ -470,37 +620,78 @@ def run_single_intervention(
     handle.remove()
     patched_logits = patched_output.logits if hasattr(patched_output, "logits") else patched_output["logits"]
 
-    # --- Compute metrics for all three interventions ---
+    # --- Compute metrics for all interventions ---
     control_metrics = _compute_logit_metrics(
         original_logits, control_logits, pair.seq_a_ids, pair.target_pos_a,
     )
     random_metrics = _compute_logit_metrics(
         original_logits, random_logits, pair.seq_a_ids, pair.target_pos_a,
     )
+    ablation_metrics = _compute_logit_metrics(
+        original_logits, ablation_logits, pair.seq_a_ids, pair.target_pos_a,
+    )
     real_metrics = _compute_logit_metrics(
         original_logits, patched_logits, pair.seq_a_ids, pair.target_pos_a,
     )
 
-    # --- Structural flip detection (requires specificity over BOTH controls) ---
+    unrelated_metrics = None
+    if unrelated_logits is not None:
+        unrelated_metrics = _compute_logit_metrics(
+            original_logits, unrelated_logits, pair.seq_a_ids, pair.target_pos_a,
+        )
+
+    # --- Structural flip detection ---
+    # Two-tier threshold: BOTH adaptive and fixed must be met.
     if kl_threshold is not None:
-        effective_threshold = kl_threshold
+        adaptive_threshold = kl_threshold
     else:
-        # Threshold: must exceed both identity and random controls
         identity_floor = max(control_metrics["kl_divergence"] * 3.0, 0.01)
         random_floor = max(random_metrics["kl_divergence"] * 1.5, 0.01)
-        effective_threshold = max(identity_floor, random_floor)
+        adaptive_threshold = max(identity_floor, random_floor)
+
+    # The effective threshold is the *maximum* of the adaptive and fixed
+    # thresholds — so the test can never be easier than the fixed floor.
+    effective_threshold = max(adaptive_threshold, fixed_kl)
+
+    real_kl = real_metrics["kl_divergence"]
+    random_kl = random_metrics["kl_divergence"]
+
+    kl_exceeds_threshold = real_kl > effective_threshold
+    prob_exceeds_threshold = real_metrics["max_prob_change"] > max(
+        control_metrics["max_prob_change"] * 3.0,
+        random_metrics["max_prob_change"] * 1.5,
+        0.03,
+    )
+
+    # Per-pair specificity: real KL must be ≥ min_specificity_ratio × random KL
+    pair_specificity = (real_kl / random_kl) if random_kl > 1e-10 else float("inf")
+    specific_over_random = pair_specificity >= min_spec
+
+    # Unrelated-sentence specificity (if available)
+    specific_over_unrelated = True
+    if unrelated_metrics is not None:
+        unrel_kl = unrelated_metrics["kl_divergence"]
+        unrel_ratio = (real_kl / unrel_kl) if unrel_kl > 1e-10 else float("inf")
+        # Real patch must produce more effect than swapping from an
+        # unrelated sentence — otherwise the effect is generic.
+        specific_over_unrelated = unrel_ratio >= 1.5
+    else:
+        unrel_kl = 0.0
+        unrel_ratio = 0.0
+
+    # Swap-vs-ablation: if ablation KL ≈ swap KL, the direction doesn't
+    # carry role information — the model just needs *something* there.
+    ablation_kl = ablation_metrics["kl_divergence"]
+    swap_ablation_ratio = (real_kl / ablation_kl) if ablation_kl > 1e-10 else float("inf")
 
     structural_flip = (
-        real_metrics["kl_divergence"] > effective_threshold
-        or real_metrics["max_prob_change"] > max(
-            control_metrics["max_prob_change"] * 3.0,
-            random_metrics["max_prob_change"] * 1.5,
-            0.03,
-        )
+        (kl_exceeds_threshold or prob_exceeds_threshold)
+        and specific_over_random
+        and specific_over_unrelated
     )
 
     # Fluency: perplexity ratio still bounded
-    fluency_preserved = real_metrics["perplexity_ratio"] < 2.0
+    fluency_preserved = real_metrics["perplexity_ratio"] < fluency_thresh
 
     return {
         "structural_flip": structural_flip,
@@ -519,13 +710,73 @@ def run_single_intervention(
         "random_kl": random_metrics["kl_divergence"],
         "random_max_prob_change": random_metrics["max_prob_change"],
         "random_ppl_ratio": random_metrics["perplexity_ratio"],
+        # Unrelated-sentence control (cross-sentence baseline)
+        "unrelated_kl": unrelated_metrics["kl_divergence"] if unrelated_metrics else 0.0,
+        "unrelated_ppl_ratio": unrelated_metrics["perplexity_ratio"] if unrelated_metrics else 0.0,
+        "cross_specificity": float(unrel_ratio) if unrelated_metrics else 0.0,
+        # Ablation control (zero-out baseline)
+        "ablation_kl": ablation_metrics["kl_divergence"],
+        "ablation_ppl_ratio": ablation_metrics["perplexity_ratio"],
+        "swap_vs_ablation_ratio": float(swap_ablation_ratio),
+        # Thresholds used
         "effective_threshold": effective_threshold,
+        "pair_specificity": float(pair_specificity),
     }
 
 
 # ---------------------------------------------------------------------------
 # Main intervention pipeline
 # ---------------------------------------------------------------------------
+
+def _generate_unrelated_sentences(
+    tokenizer,
+    n: int,
+    seed: int = 99,
+) -> List[Tuple[List[int], int]]:
+    """Generate short unrelated sentences with a known target position.
+
+    These are topically and structurally unrelated to the intervention
+    templates so that any effect of swapping their hidden states through
+    the structural subspace is purely generic perturbation, not structural.
+
+    We deliberately include *shuffled* word-salad variants alongside
+    grammatically incoherent templates.  This destroys syntactic structure
+    so that the hidden-state projection into U_k is not a clean
+    grammatical-role signal—any residual KL change is generic
+    perturbation, giving a tighter control baseline.
+
+    Returns list of (token_ids, target_position) tuples.
+    """
+    import random
+    random.seed(seed)
+
+    # Mix of topically unrelated AND structurally incoherent templates.
+    # The shuffled variants have no grammatical role encoding.
+    templates = [
+        # --- Shuffled / word-salad (no grammatical structure) ---
+        "morning heavy rain the tomorrow predicts weather forecast.",
+        "bits instead computers qubits of information process using quantum.",
+        "civilizations celestial pyramids aligned with ancient built bodies.",
+        "volatility market quarter the stock last significant experienced.",
+        "pressure species trenches deep extreme to unique adapted ocean contain.",
+        # --- Unusual/non-SVO structure ---
+        "Tomorrow comes rain.",
+        "Silently the fog drifts.",
+        "Yes no maybe perhaps certainly.",
+        "Red blue green yellow orange purple.",
+        "One two three four five six seven eight.",
+    ]
+
+    results = []
+    for _ in range(n):
+        text = random.choice(templates)
+        ids = tokenizer.encode(text, add_special_tokens=False)
+        # Vary target position across the sentence instead of always
+        # targeting the middle — avoids systematic positional confound.
+        target = random.randint(1, max(1, len(ids) - 2))
+        results.append((ids, target))
+    return results
+
 
 def run_causal_intervention(
     model: nn.Module,
@@ -554,19 +805,32 @@ def run_causal_intervention(
 
     pairs = generate_intervention_pairs(tokenizer, cfg.n_pairs, cfg.seed)
 
+    # Generate unrelated sentences for the cross-sentence control
+    unrelated_pool = _generate_unrelated_sentences(
+        tokenizer, max(len(pairs), 10), seed=cfg.seed + 1000,
+    )
+
     result = InterventionResult(layer_idx=target_layer)
     result.n_pairs_tested = len(pairs)
 
-    # Phase 1: Run all pairs to collect control & random KL statistics
+    # Phase 1: Run all pairs with all controls
     control_kls: List[float] = []
     random_kls: List[float] = []
+    unrelated_kls: List[float] = []
+    ablation_kls: List[float] = []
     real_kls: List[float] = []
 
     for i, pair in enumerate(pairs):
+        # Pick an unrelated sentence for this pair
+        unrel_ids, unrel_pos = unrelated_pool[i % len(unrelated_pool)]
+
         try:
             detail = run_single_intervention(
                 model, tokenizer, pair, U_k, target_layer, device,
+                cfg=cfg,
                 pair_idx=i,
+                unrelated_donor_ids=unrel_ids,
+                unrelated_target_pos=unrel_pos,
             )
         except Exception as e:
             logger.warning("Pair %d failed: %s", i, e)
@@ -575,11 +839,11 @@ def run_causal_intervention(
         result.pair_details.append(detail)
         control_kls.append(detail.get("control_kl", 0.0))
         random_kls.append(detail.get("random_kl", 0.0))
+        unrelated_kls.append(detail.get("unrelated_kl", 0.0))
+        ablation_kls.append(detail.get("ablation_kl", 0.0))
         real_kls.append(detail.get("kl_divergence", 0.0))
 
-    # Phase 2: Compute adaptive threshold from BOTH control distributions
-    # Real flips must exceed mean + 3*std of identity control KL
-    # AND demonstrate specificity over random subspace control
+    # Phase 2: Compute aggregate statistics for all control distributions
     if control_kls:
         result.control_kl_mean = float(np.mean(control_kls))
         result.control_kl_std = float(np.std(control_kls))
@@ -594,50 +858,63 @@ def run_causal_intervention(
     else:
         random_threshold = 0.01
 
+    if unrelated_kls:
+        result.unrelated_kl_mean = float(np.mean(unrelated_kls))
+        result.unrelated_kl_std = float(np.std(unrelated_kls))
+
+    if ablation_kls:
+        result.ablation_kl_mean = float(np.mean(ablation_kls))
+        result.ablation_kl_std = float(np.std(ablation_kls))
+
     # Adaptive threshold: must exceed both identity noise floor and random
-    # perturbation sensitivity baseline
+    # perturbation baseline.  Also must exceed the fixed floor from config.
     result.adaptive_kl_threshold = max(
         identity_threshold,
         random_threshold,
-        0.01,  # absolute floor
+        cfg.fixed_kl_threshold,
     )
 
-    # Specificity ratio: how much more does the structural patch shift
-    # outputs compared to a random subspace patch?  >1 means specific.
+    # Specificity ratios (aggregate)
     if result.random_kl_mean > 1e-10 and real_kls:
         result.specificity_ratio = float(np.mean(real_kls)) / result.random_kl_mean
     else:
         result.specificity_ratio = 0.0
 
+    if result.unrelated_kl_mean > 1e-10 and real_kls:
+        result.cross_specificity_ratio = float(np.mean(real_kls)) / result.unrelated_kl_mean
+    else:
+        result.cross_specificity_ratio = 0.0
+
+    if result.ablation_kl_mean > 1e-10 and real_kls:
+        result.swap_vs_ablation_ratio = float(np.mean(real_kls)) / result.ablation_kl_mean
+    else:
+        result.swap_vs_ablation_ratio = 0.0
+
     logger.info(
         "Control baselines: identity KL=%.4f±%.4f, random KL=%.4f±%.4f, "
-        "specificity_ratio=%.2f, adaptive_threshold=%.4f",
+        "unrelated KL=%.4f±%.4f, ablation KL=%.4f±%.4f",
         result.control_kl_mean, result.control_kl_std,
         result.random_kl_mean, result.random_kl_std,
+        result.unrelated_kl_mean, result.unrelated_kl_std,
+        result.ablation_kl_mean, result.ablation_kl_std,
+    )
+    logger.info(
+        "Specificity ratios: vs_random=%.2fx, vs_unrelated=%.2fx, "
+        "swap_vs_ablation=%.2fx, adaptive_threshold=%.4f",
         result.specificity_ratio,
+        result.cross_specificity_ratio,
+        result.swap_vs_ablation_ratio,
         result.adaptive_kl_threshold,
     )
 
-    # Phase 3: Re-evaluate flips using the adaptive threshold
-    # A flip is only real if the structural patch KL exceeds the threshold
-    # derived from BOTH control distributions
+    # Phase 3: Count successes from per-pair results
+    # (run_single_intervention already applied per-pair specificity gates)
     for detail in result.pair_details:
-        real_kl = detail.get("kl_divergence", 0.0)
-        real_prob = detail.get("max_prob_change", 0.0)
-        control_prob = detail.get("control_max_prob_change", 0.0)
-        random_prob = detail.get("random_max_prob_change", 0.0)
-
-        structural_flip = (
-            real_kl > result.adaptive_kl_threshold
-            or real_prob > max(control_prob * 3.0, random_prob * 1.5, 0.03)
-        )
-        detail["structural_flip"] = structural_flip
-
-        if structural_flip:
+        if detail.get("structural_flip", False):
             result.n_structural_flips += 1
         if detail.get("fluency_preserved", False):
             result.n_fluency_preserved += 1
-        if structural_flip and detail.get("fluency_preserved", False):
+        if detail.get("structural_flip", False) and detail.get("fluency_preserved", False):
             result.n_causal_successes += 1
 
     n = max(result.n_pairs_tested, 1)
@@ -648,13 +925,16 @@ def run_causal_intervention(
     logger.info(
         "Causal intervention [layer=%d]: %d pairs, "
         "flip_rate=%.1f%%, fluency_rate=%.1f%%, causal_success=%.1f%% "
-        "(adaptive_threshold=%.4f, specificity=%.2fx)",
+        "(adaptive_threshold=%.4f, specificity=%.2fx, "
+        "cross_specificity=%.2fx, swap/ablation=%.2fx)",
         target_layer, result.n_pairs_tested,
         result.flip_rate * 100,
         result.fluency_rate * 100,
         result.causal_success_rate * 100,
         result.adaptive_kl_threshold,
         result.specificity_ratio,
+        result.cross_specificity_ratio,
+        result.swap_vs_ablation_ratio,
     )
 
     return result

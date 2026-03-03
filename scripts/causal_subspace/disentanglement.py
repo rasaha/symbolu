@@ -47,7 +47,7 @@ class DisentanglementConfig:
 
     sae_lr: float = 1e-3
     sae_epochs: int = 50
-    sae_batch_size: int = 512
+    sae_batch_size: int = 2048
 
     # Clustering
     n_clusters: int = 32
@@ -243,7 +243,7 @@ def train_sae(
             total_l1 += l1_loss.item()
             n_batches += 1
 
-        if (epoch + 1) % 10 == 0 or epoch == 0:
+        if (epoch + 1) % 5 == 0 or epoch == 0:
             logger.info(
                 "  SAE epoch %d/%d: recon=%.4f, L1=%.4f",
                 epoch + 1, cfg.sae_epochs,
@@ -288,9 +288,10 @@ def cluster_sae_features(
     labels : np.ndarray [N]
     centers : np.ndarray [K, sae_dim]
     """
-    from sklearn.cluster import KMeans
+    from sklearn.cluster import MiniBatchKMeans
 
-    km = KMeans(n_clusters=n_clusters, random_state=seed, n_init=10, max_iter=300)
+    km = MiniBatchKMeans(n_clusters=n_clusters, random_state=seed, n_init=3,
+                         max_iter=100, batch_size=min(1024, features.shape[0]))
     labels = km.fit_predict(features)
     centers = km.cluster_centers_
 

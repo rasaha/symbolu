@@ -3,7 +3,7 @@
 Causal Subspace Extraction & Validation — Main Orchestrator
 =============================================================
 
-Runs the complete 6-part pipeline:
+Runs the complete 7-part pipeline:
 
     Part 1: Precision Data Collection
     Part 2: Structural Label Alignment
@@ -11,6 +11,7 @@ Runs the complete 6-part pipeline:
     Part 4: MDL Probing (Information-Theoretic Validation)
     Part 5: Causal Interchange Intervention (Activation Patching)
     Part 6: Layer Trajectory Mapping
+    Part 7: Ontology Alignment Discovery (optional, --run-ontology)
 
 Usage::
 
@@ -29,6 +30,9 @@ Usage::
     # Output results to JSON
     python scripts/causal_subspace/run_pipeline.py --output results.json
 
+    # Run Part 7 ontology alignment discovery
+    python scripts/causal_subspace/run_pipeline.py --run-ontology --output results.json
+
     # Specific layers only
     python scripts/causal_subspace/run_pipeline.py --layers 0 3 6 9 11
 
@@ -41,11 +45,20 @@ Deliverables:
 
 from __future__ import annotations
 
+import os
+
+# Prevent OpenBLAS/MKL thread deadlocks when using Python ThreadPoolExecutor.
+# MUST be set before numpy (or any library that loads BLAS) is imported.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import argparse
 import json
 import logging
 import sys
 import time
+import concurrent.futures
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -80,6 +93,7 @@ from scripts.causal_subspace.mdl_probing import (
 from scripts.causal_subspace.causal_intervention import (
     InterventionConfig,
     InterventionResult,
+    build_pca_basis,
     build_subspace_basis,
     run_causal_intervention,
 )
@@ -87,6 +101,22 @@ from scripts.causal_subspace.trajectory import (
     LayerTrajectory,
     compute_layer_trajectory,
     plot_trajectory_ascii,
+)
+from scripts.causal_subspace.ontology_alignment import (
+    OntologyConfig,
+    DiscoveryResult,
+    MultiLayerDiscoveryResult,
+    Phase2Result,
+    run_multi_layer_discovery,
+    run_ontology_discovery,
+    run_phase2,
+    build_ontology_vectors,
+    OntologyMonitor,
+    OntologyInjector,
+    AXIS_NAMES,
+    N_AXES,
+    ROBUST_AXES,
+    N_ROBUST,
 )
 
 logger = logging.getLogger("causal_subspace")
@@ -110,8 +140,14 @@ def run_full_pipeline(
     subspace_k: int = 16,
     layers: Optional[List[int]] = None,
     skip_interventions: bool = False,
+    run_ontology: bool = False,
+    run_phase2_flag: bool = False,
+    phase2_epochs: int = 100,
+    ontology_mi_threshold: float = 0.1,
     device: str = "cpu",
     seed: int = 42,
+    activation_source: str = "block",
+    n_workers: int = 0,
 ) -> Dict[str, Any]:
     """Run the complete causal subspace extraction and validation pipeline.
 
@@ -119,14 +155,20 @@ def run_full_pipeline(
     """
     results: Dict[str, Any] = {
         "model_name": model_name,
+        "activation_source": activation_source,
         "config": {
             "max_sequences": max_sequences,
             "max_seq_len": max_seq_len,
             "subspace_k": subspace_k,
             "sae_expansion": sae_expansion,
             "n_clusters": n_clusters,
+            "activation_source": activation_source,
         },
     }
+
+    # Auto-detect parallel workers
+    if n_workers <= 0:
+        n_workers = min(os.cpu_count() or 4, 8)
 
     t0 = time.time()
 
@@ -137,6 +179,11 @@ def run_full_pipeline(
     print("PART 1: PRECISION DATA COLLECTION")
     print("=" * 70)
 
+    source_desc = "attention sublayer" if activation_source == "attention" else "block (MLP residual)"
+    print(f"  Activation source: {source_desc}")
+    print(f"  Loading model and running forward passes ({max_sequences} sequences)...",
+          flush=True)
+
     data_cfg = DataCollectionConfig(
         model_name=model_name,
         max_sequences=max_sequences,
@@ -144,11 +191,15 @@ def run_full_pipeline(
         batch_size=batch_size,
         device=device,
         seed=seed,
+        activation_source=activation_source,
     )
     store = collect_hidden_states(data_cfg)
 
     print(f"  Collected {len(store.tokens)} tokens across {store.n_layers} layers")
     print(f"  Hidden dimension: {store.d_model}")
+    if store.attention_entropy:
+        print(f"  Attention entropy: {store.n_heads} heads/layer "
+              f"(collected for Part 7 gating analysis)")
 
     # Keep model + tokenizer for later parts
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -205,13 +256,33 @@ def run_full_pipeline(
     disentanglement_results: Dict[int, DisentanglementResult] = {}
     sae_sparsity_distributions: Dict[int, Dict] = {}
 
-    for layer_idx in active_layers:
-        print(f"\n--- Layer {layer_idx} ---")
+    def _disentangle_layer(layer_idx):
         H = annotations.hidden_states[layer_idx]
-        dr = run_disentanglement(H, layer_idx, dis_cfg)
-        disentanglement_results[layer_idx] = dr
+        return layer_idx, run_disentanglement(H, layer_idx, dis_cfg)
 
-        # Sparsity distribution
+    if n_workers > 1 and len(active_layers) > 1:
+        print(f"  Running {len(active_layers)} layers in parallel "
+              f"(workers={min(n_workers, len(active_layers))})...", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(n_workers, len(active_layers))
+        ) as executor:
+            futures = {
+                executor.submit(_disentangle_layer, l): l
+                for l in active_layers
+            }
+            for future in concurrent.futures.as_completed(futures):
+                layer_idx, dr = future.result()
+                disentanglement_results[layer_idx] = dr
+    else:
+        for layer_idx in active_layers:
+            print(f"\n--- Layer {layer_idx} (PCA + SAE {sae_epochs}ep + K-means) ---",
+                  flush=True)
+            _, dr = _disentangle_layer(layer_idx)
+            disentanglement_results[layer_idx] = dr
+
+    # Compute sparsity distributions after all layers complete
+    for layer_idx in sorted(disentanglement_results.keys()):
+        dr = disentanglement_results[layer_idx]
         if dr.sae_features is not None:
             l0_per_sample = (dr.sae_features > 0).sum(axis=1)
             sae_sparsity_distributions[layer_idx] = {
@@ -224,7 +295,8 @@ def run_full_pipeline(
                 "pct_active": float(l0_per_sample.mean() / dr.sae_features.shape[1] * 100),
                 "reconstruction_loss": dr.sae_reconstruction_loss,
             }
-            print(f"  SAE: {sae_sparsity_distributions[layer_idx]['pct_active']:.1f}% features active, "
+            print(f"  Layer {layer_idx} SAE: "
+                  f"{sae_sparsity_distributions[layer_idx]['pct_active']:.1f}% features active, "
                   f"recon={dr.sae_reconstruction_loss:.4f}")
 
     results["sae_sparsity_distributions"] = sae_sparsity_distributions
@@ -252,27 +324,59 @@ def run_full_pipeline(
         "dep_depth": np.clip(annotations.labels_depth, 0, 5),  # bin depths
     }
 
-    for label_name, label_arr in label_sets.items():
-        print(f"\n--- MDL Probe: {label_name} ---")
+    # Initialize result dicts
+    for label_name in label_sets:
         mdl_results[label_name] = {}
         mdl_result_objects[label_name] = {}
 
+    def _mdl_task(label_name, label_arr, layer_idx):
+        H = annotations.hidden_states[layer_idx]
+        r = run_mdl_probe(H, label_arr, layer_idx, label_name, mdl_cfg)
+        return label_name, layer_idx, r
+
+    def _store_mdl_result(label_name, layer_idx, r):
+        mdl_result_objects[label_name][layer_idx] = r
+        mdl_results[label_name][layer_idx] = {
+            "compression_ratio": r.compression_ratio,
+            "compression_vs_uniform": r.compression_vs_uniform,
+            "online_code_length": r.online_code_length,
+            "prior_code_length": r.prior_code_length,
+            "uniform_code_length": r.uniform_code_length,
+            "bits_per_label": r.online_code_length / max(r.n_samples, 1),
+            "n_classes": r.n_classes,
+        }
+
+    # Build flat task list: all (label, layer) pairs are independent
+    mdl_tasks = []
+    for label_name, label_arr in label_sets.items():
         for layer_idx in active_layers:
-            H = annotations.hidden_states[layer_idx]
-            r = run_mdl_probe(H, label_arr, layer_idx, label_name, mdl_cfg)
-            mdl_result_objects[label_name][layer_idx] = r
-            mdl_results[label_name][layer_idx] = {
-                "compression_ratio": r.compression_ratio,
-                "compression_vs_uniform": r.compression_vs_uniform,
-                "online_code_length": r.online_code_length,
-                "prior_code_length": r.prior_code_length,
-                "uniform_code_length": r.uniform_code_length,
-                "bits_per_label": r.online_code_length / max(r.n_samples, 1),
-                "n_classes": r.n_classes,
-            }
-            print(f"  Layer {layer_idx}: compression={r.compression_ratio:.2f}x (vs prior), "
-                  f"{r.compression_vs_uniform:.2f}x (vs uniform), "
-                  f"bits/label={r.online_code_length / max(r.n_samples, 1):.3f}")
+            mdl_tasks.append((label_name, label_arr, layer_idx))
+
+    n_mdl = len(mdl_tasks)
+    if n_workers > 1 and n_mdl > 1:
+        print(f"\n  Running {n_mdl} MDL probes in parallel "
+              f"(workers={min(n_workers, n_mdl)})...", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(n_workers, n_mdl)
+        ) as executor:
+            futures = [executor.submit(_mdl_task, *t) for t in mdl_tasks]
+            for future in concurrent.futures.as_completed(futures):
+                ln, li, r = future.result()
+                _store_mdl_result(ln, li, r)
+    else:
+        for label_name, label_arr, layer_idx in mdl_tasks:
+            ln, li, r = _mdl_task(label_name, label_arr, layer_idx)
+            _store_mdl_result(ln, li, r)
+
+    # Print results summary
+    for label_name in label_sets:
+        print(f"\n--- MDL Probe: {label_name} ---")
+        for layer_idx in active_layers:
+            if layer_idx in mdl_results[label_name]:
+                m = mdl_results[label_name][layer_idx]
+                print(f"  Layer {layer_idx}: compression={m['compression_ratio']:.2f}x (vs prior), "
+                      f"{m['compression_vs_uniform']:.2f}x (vs uniform), "
+                      f"bits/label={m['bits_per_label']:.3f}")
 
     results["mdl_compression_ratios"] = mdl_results
 
@@ -288,9 +392,10 @@ def run_full_pipeline(
     print(f"\n--- Finding optimal subspace dimensionality at layer {best_layer} ---")
     H_best = annotations.hidden_states[best_layer]
     candidate_ks = [4, 8, 16, 32, 64]
-    optimal_k, k_results = select_top_k_components(
+    optimal_k, k_results, best_pca_basis = select_top_k_components(
         H_best, annotations.labels_role, best_layer,
         "grammatical_role", candidate_ks, mdl_cfg,
+        n_workers=n_workers,
     )
     print(f"  Optimal k = {optimal_k}")
     results["optimal_k"] = optimal_k
@@ -309,6 +414,7 @@ def run_full_pipeline(
             n_pairs=n_intervention_pairs,
             device=device,
             seed=seed,
+            activation_source=activation_source,
         )
 
         # Run at best layer and a few surrounding layers
@@ -321,7 +427,12 @@ def run_full_pipeline(
         for layer_idx in intervention_layers:
             print(f"\n--- Causal intervention at Layer {layer_idx} ---")
             H = annotations.hidden_states[layer_idx]
-            U_k = build_subspace_basis(H, annotations.labels_role, optimal_k)
+            # Use global PCA basis (matching what MDL validated) instead of
+            # class-conditional PCA which produces a misaligned subspace.
+            if layer_idx == best_layer and best_pca_basis is not None:
+                U_k = best_pca_basis  # exact basis MDL validated
+            else:
+                U_k = build_pca_basis(H, optimal_k)
 
             ir = run_causal_intervention(model, tokenizer, U_k, layer_idx, int_cfg)
 
@@ -331,11 +442,23 @@ def run_full_pipeline(
                 "fluency_rate": ir.fluency_rate,
                 "causal_success_rate": ir.causal_success_rate,
                 "n_causal_successes": ir.n_causal_successes,
+                # New causal rigor metrics
+                "specificity_ratio": ir.specificity_ratio,
+                "cross_specificity_ratio": ir.cross_specificity_ratio,
+                "swap_vs_ablation_ratio": ir.swap_vs_ablation_ratio,
+                "control_kl_mean": ir.control_kl_mean,
+                "random_kl_mean": ir.random_kl_mean,
+                "unrelated_kl_mean": ir.unrelated_kl_mean,
+                "ablation_kl_mean": ir.ablation_kl_mean,
+                "adaptive_kl_threshold": ir.adaptive_kl_threshold,
             }
             print(f"  Pairs: {ir.n_pairs_tested}, "
                   f"Flip: {ir.flip_rate * 100:.1f}%, "
                   f"Fluency: {ir.fluency_rate * 100:.1f}%, "
                   f"Causal success: {ir.causal_success_rate * 100:.1f}%")
+            print(f"  Specificity: vs_random={ir.specificity_ratio:.2f}x, "
+                  f"vs_unrelated={ir.cross_specificity_ratio:.2f}x, "
+                  f"swap/ablation={ir.swap_vs_ablation_ratio:.2f}x")
     else:
         print("  (Skipped — use --skip-interventions=false to enable)")
 
@@ -360,9 +483,11 @@ def run_full_pipeline(
             n_pairs=max(10, n_intervention_pairs // 5),
             device=device,
             seed=seed,
+            activation_source=activation_source,
         ) if not skip_interventions else None,
         run_interventions=not skip_interventions,
         precomputed_mdl=mdl_result_objects.get("grammatical_role"),
+        activation_source=activation_source,
     )
 
     # Print trajectory
@@ -379,6 +504,228 @@ def run_full_pipeline(
         "peak_compression": trajectory.peak_compression,
         "peak_causal_success": trajectory.peak_causal_success,
     }
+
+    # ===================================================================
+    # Attention Entropy Summary (for Part 7 go/no-go)
+    # ===================================================================
+    if store.attention_entropy:
+        attn_entropy_summary: Dict[int, Dict] = {}
+        for layer_idx in active_layers:
+            if layer_idx in store.attention_entropy:
+                ae = store.attention_entropy[layer_idx]  # [N_tokens, n_heads]
+                attn_entropy_summary[layer_idx] = {
+                    "mean_entropy": float(ae.mean()),
+                    "std_entropy": float(ae.std()),
+                    "per_head_mean": [float(x) for x in ae.mean(axis=0)],
+                    "per_head_std": [float(x) for x in ae.std(axis=0)],
+                    "min_head_entropy": float(ae.mean(axis=0).min()),
+                    "max_head_entropy": float(ae.mean(axis=0).max()),
+                    "n_heads": int(ae.shape[1]),
+                }
+        results["attention_entropy"] = attn_entropy_summary
+
+    # ===================================================================
+    # PART 7: Ontology Alignment Discovery (optional)
+    # ===================================================================
+    ontology_result: Optional[MultiLayerDiscoveryResult] = None
+
+    if run_ontology:
+        print("\n" + "=" * 70)
+        print("PART 7: ONTOLOGY ALIGNMENT DISCOVERY")
+        print("=" * 70)
+
+        ont_cfg = OntologyConfig(
+            naming_mi_threshold=ontology_mi_threshold,
+            device=device,
+            seed=seed,
+        )
+
+        # Determine which layers to run discovery on:
+        # - crystallization_layer (best MDL compression — structure peaks here)
+        # - consumption_layer (best causal success — causal effect peaks here)
+        discovery_layers = set()
+        crystal_layer = trajectory.crystallization_layer
+        consume_layer = trajectory.consumption_layer
+
+        if crystal_layer is not None and crystal_layer in annotations.hidden_states:
+            discovery_layers.add(crystal_layer)
+        if consume_layer is not None and consume_layer in annotations.hidden_states:
+            discovery_layers.add(consume_layer)
+
+        # Fallback: use best_layer from Part 4 if trajectory didn't find anything
+        if not discovery_layers:
+            discovery_layers.add(best_layer)
+
+        discovery_layers_sorted = sorted(discovery_layers)
+        print(f"  Running discovery at layers: {discovery_layers_sorted}")
+        if crystal_layer is not None:
+            print(f"    Crystallization layer (best MDL): L{crystal_layer}")
+        if consume_layer is not None:
+            print(f"    Consumption layer (best causal): L{consume_layer}")
+
+        # Build causal_success_by_layer from Part 5 intervention results
+        causal_success_by_layer: Optional[Dict[int, float]] = None
+        if intervention_results:
+            causal_success_by_layer = {
+                l: ir_data["causal_success_rate"]
+                for l, ir_data in intervention_results.items()
+            }
+
+        # Use the trajectory's causal success rates too (covers more layers)
+        if trajectory.causal_success_rate:
+            if causal_success_by_layer is None:
+                causal_success_by_layer = {}
+            for l, rate in zip(trajectory.layers, trajectory.causal_success_rate):
+                if rate is not None:
+                    causal_success_by_layer.setdefault(l, rate)
+
+        ontology_result = run_multi_layer_discovery(
+            annotations=annotations,
+            hidden_states={l: annotations.hidden_states[l] for l in discovery_layers_sorted},
+            labels=annotations.labels_role,
+            U_k=best_pca_basis if best_pca_basis is not None else build_pca_basis(
+                annotations.hidden_states[best_layer], optimal_k
+            ),
+            layers=discovery_layers_sorted,
+            causal_success_by_layer=causal_success_by_layer,
+            cfg=ont_cfg,
+        )
+
+        # Print summary
+        print(f"\n  --- Ontology Discovery Results ---")
+        print(f"  Overall scenario: {ontology_result.scenario}")
+        print(f"  Recommended Phase 2: {ontology_result.recommended_phase2}")
+        print(f"  Validated axes ({ontology_result.n_validated_axes}/12): "
+              f"{', '.join(ontology_result.all_validated_axes) or '(none)'}")
+        print(f"  Best alignment layer: L{ontology_result.best_alignment_layer}")
+        print(f"  Best causal layer: L{ontology_result.best_causal_layer}")
+        print(f"  Dissociation: {ontology_result.dissociation}")
+
+        if ontology_result.dissociation:
+            print(f"\n  ** L{ontology_result.best_alignment_layer}/L{ontology_result.best_causal_layer} DISSOCIATION DETECTED **")
+            print(f"     Meta-controller: READ from L{ontology_result.meta_controller_read_layer}, "
+                  f"ACT at L{ontology_result.meta_controller_act_layer}")
+            print(f"     Q/K gating: operate at L{ontology_result.qk_gating_layer}")
+
+        # Per-layer detail
+        for layer_idx in sorted(ontology_result.per_layer.keys()):
+            r = ontology_result.per_layer[layer_idx]
+            print(f"\n  Layer {layer_idx}:")
+            print(f"    Scenario: {r.scenario} (confidence={r.scenario_confidence:.2f})")
+            print(f"    Alignment MI: {r.alignment_mi:.4f} (normalized: {r.alignment_mi_normalized:.4f})")
+            print(f"    CKA: {r.cka_similarity:.4f}")
+            print(f"    Subspace overlap: {r.subspace_overlap:.4f}")
+            print(f"    Validated axes ({r.n_validated_axes}/12): {', '.join(r.validated_axes) or '(none)'}")
+            print(f"    Discriminability: ont={r.ontology_role_accuracy:.3f}, "
+                  f"emb={r.embedding_role_accuracy:.3f}, "
+                  f"concat={r.concat_role_accuracy:.3f} (gap={r.discriminability_gap:.3f})")
+
+        # Store in results dict
+        results["ontology_alignment"] = {
+            "scenario": ontology_result.scenario,
+            "recommended_phase2": ontology_result.recommended_phase2,
+            "n_validated_axes": ontology_result.n_validated_axes,
+            "validated_axes": ontology_result.all_validated_axes,
+            "best_alignment_layer": ontology_result.best_alignment_layer,
+            "best_causal_layer": ontology_result.best_causal_layer,
+            "dissociation": ontology_result.dissociation,
+            "meta_controller_read_layer": ontology_result.meta_controller_read_layer,
+            "meta_controller_act_layer": ontology_result.meta_controller_act_layer,
+            "qk_gating_layer": ontology_result.qk_gating_layer,
+            "per_layer": {},
+        }
+        for layer_idx, r in ontology_result.per_layer.items():
+            results["ontology_alignment"]["per_layer"][layer_idx] = {
+                "scenario": r.scenario,
+                "scenario_confidence": r.scenario_confidence,
+                "scenario_evidence": r.scenario_evidence,
+                "alignment_mi": r.alignment_mi,
+                "alignment_mi_normalized": r.alignment_mi_normalized,
+                "cka_similarity": r.cka_similarity,
+                "subspace_overlap": r.subspace_overlap,
+                "n_validated_axes": r.n_validated_axes,
+                "validated_axes": r.validated_axes,
+                "per_axis_mi": r.per_axis_mi,
+                "per_axis_best_pca": r.per_axis_best_pca,
+                "ontology_role_accuracy": r.ontology_role_accuracy,
+                "embedding_role_accuracy": r.embedding_role_accuracy,
+                "concat_role_accuracy": r.concat_role_accuracy,
+                "discriminability_gap": r.discriminability_gap,
+                "accuracy_ci_low": r.accuracy_ci_low,
+                "accuracy_ci_high": r.accuracy_ci_high,
+                "n_words_with_ontology": r.n_words_with_ontology,
+                "coverage_ratio": r.coverage_ratio,
+            }
+    else:
+        print("\n  (Part 7 ontology alignment skipped — use --run-ontology to enable)")
+
+    # ===================================================================
+    # PHASE 2: Observatory + Injection Prototype (optional)
+    # ===================================================================
+    phase2_result: Optional[Phase2Result] = None
+
+    if run_phase2_flag:
+        if not run_ontology or ontology_result is None:
+            print("\n  Phase 2 requires --run-ontology. Running ontology discovery first...")
+            run_ontology = True
+            # Re-run ontology if needed (this branch handles --run-phase2 without --run-ontology)
+            if ontology_result is None:
+                print("  ERROR: Cannot run Phase 2 without Phase 1 results. Add --run-ontology.")
+        else:
+            print("\n" + "=" * 70)
+            print("PHASE 2: OBSERVATORY + INJECTION PROTOTYPE")
+            print("=" * 70)
+
+            # Determine read layer (best alignment layer from Phase 1)
+            read_layer = ontology_result.best_alignment_layer
+            print(f"  Monitor read layer: L{read_layer} (best alignment)")
+            print(f"  Training epochs: {phase2_epochs}")
+            print(f"  Robust axes: {', '.join(ROBUST_AXES)}")
+
+            # Build ontology vectors for the read layer
+            H_read = annotations.hidden_states[read_layer]
+            ont_features_read, valid_mask_read = build_ontology_vectors(
+                annotations.words, H_read, annotations.labels_role,
+            )
+
+            phase2_result = run_phase2(
+                annotations=annotations,
+                hidden_states={read_layer: H_read},
+                labels=annotations.labels_role,
+                ont_features=ont_features_read,
+                valid_mask=valid_mask_read,
+                read_layer=read_layer,
+                n_epochs=phase2_epochs,
+                seed=seed,
+            )
+
+            # Print Phase 2 summary
+            print(f"\n  --- Phase 2 Results ---")
+            print(f"  Monitor trained: {phase2_result.monitor_trained}")
+            print(f"  Monitor R² (mean): {phase2_result.monitor_r2_mean:.3f}")
+            for axis, r2 in phase2_result.monitor_r2_per_axis.items():
+                print(f"    {axis}: R²={r2:.3f}")
+            print(f"  Monitor train loss: {phase2_result.monitor_train_loss:.4f}")
+            print(f"  Monitor val loss: {phase2_result.monitor_val_loss:.4f}")
+
+            print(f"\n  Injector test results:")
+            for test in phase2_result.injector_test_results:
+                print(f"    '{test['input'][:40]}...'")
+                print(f"      → {test['domain']}/{test['structure']}/{test['intent']} "
+                      f"(confidence={test['confidence']})")
+
+            # Store in results
+            results["phase2"] = {
+                "monitor_trained": phase2_result.monitor_trained,
+                "monitor_r2_mean": phase2_result.monitor_r2_mean,
+                "monitor_r2_per_axis": phase2_result.monitor_r2_per_axis,
+                "monitor_train_loss": phase2_result.monitor_train_loss,
+                "monitor_val_loss": phase2_result.monitor_val_loss,
+                "monitor_sample_predictions": phase2_result.monitor_sample_predictions,
+                "injector_test_results": phase2_result.injector_test_results,
+            }
+    else:
+        print("\n  (Phase 2 skipped — use --run-phase2 to enable)")
 
     # ===================================================================
     # FINAL REPORT
@@ -415,6 +762,9 @@ def run_full_pipeline(
         for layer_idx, ir in intervention_results.items():
             print(f"   Layer {layer_idx}: {ir['causal_success_rate'] * 100:.1f}% "
                   f"(flip={ir['flip_rate'] * 100:.1f}%, fluency={ir['fluency_rate'] * 100:.1f}%)")
+            print(f"     Specificity: vs_random={ir.get('specificity_ratio', 0):.2f}x, "
+                  f"vs_unrelated={ir.get('cross_specificity_ratio', 0):.2f}x, "
+                  f"swap/ablation={ir.get('swap_vs_ablation_ratio', 0):.2f}x")
     else:
         print("   (Not run)")
 
@@ -423,6 +773,39 @@ def run_full_pipeline(
           f"(compression={trajectory.peak_compression:.2f}x)")
     print(f"   Consumption: Layer {trajectory.consumption_layer}")
     print(f"   Peak causal success: {trajectory.peak_causal_success * 100:.1f}%")
+
+    if store.attention_entropy:
+        print(f"\n5. Attention Entropy (per-head, per-layer):")
+        for layer_idx in active_layers:
+            if layer_idx in results.get("attention_entropy", {}):
+                ae = results["attention_entropy"][layer_idx]
+                print(f"   Layer {layer_idx}: mean={ae['mean_entropy']:.3f} nats "
+                      f"(heads: {ae['min_head_entropy']:.3f}–{ae['max_head_entropy']:.3f})")
+
+    if ontology_result is not None:
+        scenario_names = {"A": "Isomorphic", "B": "Partial Overlap",
+                          "C": "Orthogonal", "D": "Complementary"}
+        sname = scenario_names.get(ontology_result.scenario, ontology_result.scenario)
+        print(f"\n6. Ontology Alignment Discovery:")
+        print(f"   Scenario: {ontology_result.scenario} ({sname})")
+        print(f"   Recommended Phase 2: {ontology_result.recommended_phase2}")
+        print(f"   Validated axes: {ontology_result.n_validated_axes}/12 "
+              f"({', '.join(ontology_result.all_validated_axes) or 'none'})")
+        if ontology_result.dissociation:
+            print(f"   DISSOCIATION: alignment peaks at L{ontology_result.best_alignment_layer}, "
+                  f"causal peaks at L{ontology_result.best_causal_layer}")
+            print(f"   -> Meta-controller: READ L{ontology_result.meta_controller_read_layer}, "
+                  f"ACT L{ontology_result.meta_controller_act_layer}")
+            print(f"   -> Q/K gating: L{ontology_result.qk_gating_layer}")
+        for ev in ontology_result.scenario_evidence:
+            print(f"   {ev}")
+
+    if phase2_result is not None:
+        print(f"\n7. Phase 2 Prototype:")
+        print(f"   Monitor R² (mean): {phase2_result.monitor_r2_mean:.3f}")
+        for axis, r2 in phase2_result.monitor_r2_per_axis.items():
+            print(f"     {axis}: R²={r2:.3f}")
+        print(f"   Injector classifications: {len(phase2_result.injector_test_results)} texts tested")
 
     print(f"\nTotal pipeline elapsed: {elapsed:.1f}s")
     print("=" * 70)
@@ -468,8 +851,8 @@ def main():
         help="Max token length per sequence",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=8,
-        help="Batch size for forward passes",
+        "--batch-size", type=int, default=32,
+        help="Batch size for forward passes (increase for large GPUs)",
     )
     parser.add_argument(
         "--sae-epochs", type=int, default=50,
@@ -508,6 +891,23 @@ def main():
         help="Skip causal interventions (faster)",
     )
     parser.add_argument(
+        "--run-ontology", action="store_true",
+        help="Run Part 7: ontology alignment discovery",
+    )
+    parser.add_argument(
+        "--run-phase2", action="store_true",
+        help="Run Phase 2: Observatory monitor + content injection prototype "
+             "(requires --run-ontology)",
+    )
+    parser.add_argument(
+        "--phase2-epochs", type=int, default=100,
+        help="Training epochs for the ontology monitor (default: 100)",
+    )
+    parser.add_argument(
+        "--ontology-mi-threshold", type=float, default=0.1,
+        help="MI threshold for naming ceremony axis validation (default: 0.1)",
+    )
+    parser.add_argument(
         "--device", type=str, default="cpu",
         help="Device: cpu or cuda",
     )
@@ -518,6 +918,16 @@ def main():
     parser.add_argument(
         "--output", type=str, default=None,
         help="Save results to JSON file",
+    )
+    parser.add_argument(
+        "--activation-source", type=str, default="block",
+        choices=["block", "attention"],
+        help="Activation source: 'block' (MLP residual stream) or "
+             "'attention' (attention sublayer output, no MLP)",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=0,
+        help="Parallel workers for Parts 3/4 (0 = auto-detect from CPU count)",
     )
     parser.add_argument(
         "--quick", action="store_true",
@@ -544,6 +954,11 @@ def main():
         args.sae_epochs = min(args.sae_epochs, 10)
         args.n_pairs = min(args.n_pairs, 10)
         args.layers = args.layers or [0, 5, 11]
+        args.phase2_epochs = min(args.phase2_epochs, 20)
+
+    # --run-phase2 implies --run-ontology
+    if args.run_phase2:
+        args.run_ontology = True
 
     results = run_full_pipeline(
         model_name=args.model,
@@ -559,8 +974,14 @@ def main():
         subspace_k=args.subspace_k,
         layers=args.layers,
         skip_interventions=args.skip_interventions,
+        run_ontology=args.run_ontology,
+        run_phase2_flag=args.run_phase2,
+        phase2_epochs=args.phase2_epochs,
+        ontology_mi_threshold=args.ontology_mi_threshold,
         device=args.device,
         seed=args.seed,
+        activation_source=args.activation_source,
+        n_workers=args.workers,
     )
 
     if args.output:
