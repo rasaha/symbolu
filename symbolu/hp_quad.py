@@ -391,12 +391,14 @@ class HierarchicalQuadProposal(nn.Module):
                 combined = torch.cat([proposals, retrieved], dim=-1)  # [B, N_chunks, num_proposals, 2D]
                 proposal_scores = scorer(combined).squeeze(-1)  # [B, N_chunks, num_proposals]
 
-                # Select best proposal per position
-                best_idx = proposal_scores.argmax(dim=-1)  # [B, N_chunks]
-
-                # Gather best retrieved [B, N_chunks, D]
-                best_idx_expanded = best_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, D)
-                best_retrieved = torch.gather(retrieved, dim=2, index=best_idx_expanded).squeeze(2)
+                # V10.11: Differentiable proposal selection via softmax weighting.
+                # Previous: argmax (non-differentiable) → no gradient through selection
+                # → proposals never learned which retrieval pattern to prefer.
+                # Now: soft-select = weighted sum of all proposals by their scores.
+                # At inference, this still peaks on the best proposal (softmax is
+                # sharp for confident scores), but gradients flow to all proposals.
+                selection_weights = F.softmax(proposal_scores, dim=-1)  # [B, N_chunks, num_proposals]
+                best_retrieved = torch.einsum('bnp,bnpd->bnd', selection_weights, retrieved)
 
                 # Upsample back to original resolution if needed
                 if chunk_size > 1 and N_chunks < N:

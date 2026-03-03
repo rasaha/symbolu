@@ -5265,9 +5265,11 @@ class LocalAttention(nn.Module):
             # V10.2.1: Cross-attention mode - K/V from Phase memory
             # phase_memory is [B, M, H, D_h] complex where M may differ from N
             # V10.2.2: M can be N+1 when prev_phase_state is concatenated
-            # Take real part for K/V (imaginary encodes phase relationships)
+            # V10.11: Use abs() (magnitude) instead of .real to preserve amplitude.
+            # The imaginary component encodes cumulative relevance/energy; discarding
+            # it via .real lost half the Phase signal → weak cross-attention.
             if phase_memory.is_complex():
-                memory_real = phase_memory.real  # [B, M, H, D_h]
+                memory_real = phase_memory.abs()  # [B, M, H, D_h] magnitude preserves amplitude
             else:
                 memory_real = phase_memory
 
@@ -5626,8 +5628,9 @@ class GroupedHybridTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -5889,17 +5892,16 @@ class HybridAttentionLayer(nn.Module):
 
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
-            # V10.2.1 GRADIENT ROUTING (Requirement 7):
-            # - Token loss → Local (via output): ✅
-            # - Token loss → Phase (via Local's K/V from memory_state): ✅
-            # - Token loss → Phase directly: ❌ (NO x_phase in output!)
-            #
-            # Phase gets gradients ONLY through:
-            #   loss → output → x_local → Local K/V → memory_state → Phase
-            #
-            # This is critical for "protected learning" - Phase must learn
-            # representations useful for Local's queries, not compete for loss.
-            output = residual + x_local
+            # V10.11: Phase contributes directly to the residual via alpha_phase.
+            # Previous: output = residual + x_local  (Phase completely discarded!)
+            # This starved the output of Phase's temporal signal — Local's cross-
+            # attention was the *only* channel, too narrow a bottleneck for text.
+            # Now: Phase gets a small direct path (alpha_phase ≈ 0.2) so its
+            # accumulated state influences token prediction. Gradient routing is
+            # preserved: Local still dominates (alpha_local ≈ 0.8), and Phase
+            # still learns primarily through Local's K/V queries.
+            w_phase = torch.abs(self.alpha_phase)
+            output = residual + x_local + w_phase * x_phase
         else:
             # Standard Parallel: Local processes original input independently
             # (Not recommended for chunking - causes gradient competition)
@@ -6260,8 +6262,9 @@ class PhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -6580,8 +6583,9 @@ class HybridPhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -7627,8 +7631,9 @@ class LocalOnlyTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -8372,8 +8377,9 @@ class GCTTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -8510,8 +8516,9 @@ class StandardTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
