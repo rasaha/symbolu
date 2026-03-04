@@ -2041,6 +2041,17 @@ class PhaseAttentionLayer(nn.Module):
         self._diag_phase_state_norm_per_channel = None
         self._diag_phase_attn_mass = None
 
+        # V10.13: Phase Warm-Start Gate (defaults, overridden by HybridPhaseTransformer)
+        self.phase_warmstart_enabled = False
+        self._warmstart_steps = 10000
+        self._warmstart_tau = 2000.0
+        self._warmstart_apply_inference = False
+        self._current_step = 0
+        self._diag_warmstart_alpha = None
+
+        # V10.13: Phase→Global state capture (detached, for external consumers)
+        self._last_final_state_agg = None
+
         # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
         # Distribute starting phases around the unit circle to shatter phase collapse.
         # Each head gets a unique rotational offset to encourage semantic diversity.
@@ -2207,6 +2218,16 @@ class PhaseAttentionLayer(nn.Module):
         """
         B, N, D = x.shape
         residual = x
+
+        # V10.13: Phase Warm-Start Gate — compute dampening coefficient
+        if self.phase_warmstart_enabled:
+            _ws_s = self._current_step
+            _warmstart_alpha = 1.0 / (1.0 + math.exp(-(_ws_s - self._warmstart_steps) / max(self._warmstart_tau, 1.0)))
+            if (not self.training) and (not self._warmstart_apply_inference):
+                _warmstart_alpha = 1.0
+            self._diag_warmstart_alpha = _warmstart_alpha
+        else:
+            _warmstart_alpha = 1.0
 
         # Pre-norm (standard for modern transformers)
         x_norm = self.norm(x)
@@ -2385,6 +2406,10 @@ class PhaseAttentionLayer(nn.Module):
                 kv_scan = kv_complex
             # kv_scan: [B, N, H, D_h] — unchanged shape for backward compat
 
+        # V10.13: Phase Warm-Start — dampen writes during early training
+        if _warmstart_alpha < 1.0:
+            kv_scan = kv_scan * _warmstart_alpha
+
         # --- State Accumulation (O(n) causal aggregation) ---
         use_decay = self.learned_decay or self.decay_gamma < 1.0
 
@@ -2437,6 +2462,9 @@ class PhaseAttentionLayer(nn.Module):
             final_state_agg = (final_state_ch * ch_w).sum(dim=2)  # [B, 1, H, D_h]
         else:
             final_state_agg = final_state
+
+        # V10.13: Store for Phase→Global integration (detached, no extra grad)
+        self._last_final_state_agg = final_state_agg.detach()
 
         # --- Multi-channel readout: aggregate across channels ---
         if C > 1:
@@ -2594,6 +2622,9 @@ class PhaseAttentionLayer(nn.Module):
             output = self.out_proj(sync_output)
             output = self.dropout(output)
             output = output * self.aux_scale
+            # V10.13: Phase Warm-Start — dampen reads during early training
+            if _warmstart_alpha < 1.0:
+                output = output * _warmstart_alpha
             result = output + residual
 
             # V10.2: Return state for chunk continuation
@@ -2655,6 +2686,10 @@ class PhaseAttentionLayer(nn.Module):
         # This prevents Phase from competing 50/50 with Quadratic attention
         output = output * self.aux_scale
 
+        # V10.13: Phase Warm-Start — dampen reads during early training
+        if _warmstart_alpha < 1.0:
+            output = output * _warmstart_alpha
+
         # Residual connection
         result = output + residual
 
@@ -2666,7 +2701,8 @@ class PhaseAttentionLayer(nn.Module):
                 'final_norm_state': final_norm_state,  # [B, 1, H, D_h] real
                 # V10.2.1: Return memory_state for Local cross-attention
                 # Uses aggregated state [B, N, H, D_h] (channels already combined)
-                'memory_state': global_state_agg,  # [B, N, H, D_h] complex
+                # V10.13: Dampen memory for cross-attention during warm-start
+                'memory_state': global_state_agg * _warmstart_alpha if _warmstart_alpha < 1.0 else global_state_agg,
             }
             return result, state_dict
 
@@ -6616,6 +6652,19 @@ class HybridPhaseTransformer(nn.Module):
         # V10.12: Multi-channel Phase memory with selective write gating
         phase_channels: int = 1,  # Independent memory channels (1=legacy, 4=recommended)
         phase_write_gate: bool = False,  # Selective write gating for memory updates
+        # V10.13: Phase Warm-Start Gate (training stability)
+        phase_warmstart: bool = False,  # Enable warm-start dampening
+        phase_warmstart_steps: int = 10000,  # Step at which alpha=0.5
+        phase_warmstart_tau: float = 2000.0,  # Sigmoid steepness
+        phase_warmstart_apply_inference: bool = False,  # Apply during inference
+        # V10.13: Global Compressed Tokens (GCT)
+        global_tokens_enabled: bool = False,  # Enable GCT memory slots
+        num_global_tokens: int = 16,  # Number of global tokens
+        global_update_enabled: bool = True,  # Enable controlled write
+        global_update_mode: str = "pool",  # "pool" or "attn-lite"
+        global_update_interval: int = 1,  # Update every N layers
+        global_token_write_detach: bool = True,  # Detach tokens in write path
+        phase_to_global: bool = False,  # Phase→Global integration
     ):
         super().__init__()
 
@@ -6707,6 +6756,51 @@ class HybridPhaseTransformer(nn.Module):
             num_layers=2,
         )
 
+        # V10.13: Phase Warm-Start Gate config
+        self.phase_warmstart_enabled = phase_warmstart
+        self._phase_warmstart_steps = phase_warmstart_steps
+        self._phase_warmstart_tau = phase_warmstart_tau
+        self._phase_warmstart_apply_inference = phase_warmstart_apply_inference
+        self._global_step = 0
+
+        # V10.13: Global Compressed Tokens (GCT) — stable long-range memory slots
+        self.global_tokens_enabled = global_tokens_enabled
+        self.num_global_tokens = num_global_tokens
+        self.global_update_enabled = global_update_enabled
+        self.global_update_mode = global_update_mode
+        self.global_update_interval = global_update_interval
+        self.global_token_write_detach = global_token_write_detach
+
+        if global_tokens_enabled:
+            # Learnable global token embeddings [G, D]
+            self.global_tokens = nn.Parameter(
+                torch.randn(num_global_tokens, embed_dim) * 0.02
+            )
+            # READ path: tokens attend to globals via cross-attention
+            self.gct_read_attn = nn.MultiheadAttention(
+                embed_dim, num_heads, dropout=dropout, batch_first=True
+            )
+            # WRITE path: controlled compression update (pool mode)
+            self.global_write_gate = nn.Linear(embed_dim, 1)
+            self.global_update_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+            # WRITE path: attn-lite mode (optional)
+            if global_update_mode == "attn-lite":
+                self.gct_write_attn = nn.MultiheadAttention(
+                    embed_dim, num_heads, dropout=dropout, batch_first=True
+                )
+                self._gct_write_scale = 0.05
+            # Phase → Global integration (optional)
+            if phase_to_global:
+                # Input: Re + Im of phase state = 2 * embed_dim
+                self.phase_to_global_proj = nn.Linear(2 * embed_dim, embed_dim)
+            else:
+                self.phase_to_global_proj = None
+            # Diagnostics
+            self._diag_global_token_norm = None
+            self._diag_global_token_delta_norm = None
+            self._diag_global_write_gate_mean = None
+            self._diag_global_attn_mass = None
+
         # Gradient checkpointing (disabled by default)
         self.gradient_checkpointing = False
 
@@ -6722,6 +6816,16 @@ class HybridPhaseTransformer(nn.Module):
                     if hasattr(_pa, 'write_gate_proj') and _pa.write_gate_proj.bias is not None:
                         nn.init.constant_(_pa.write_gate_proj.bias, 2.0)
 
+        # V10.13: Propagate warm-start config to PhaseAttentionLayers
+        if phase_warmstart:
+            for blk in self.blocks:
+                if hasattr(blk, 'attention') and hasattr(blk.attention, 'phase_attn'):
+                    _pa = blk.attention.phase_attn
+                    _pa.phase_warmstart_enabled = True
+                    _pa._warmstart_steps = phase_warmstart_steps
+                    _pa._warmstart_tau = phase_warmstart_tau
+                    _pa._warmstart_apply_inference = phase_warmstart_apply_inference
+
         # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
         # This provides semantic alignment at start while keeping them separate
         if not self.tie_embeddings:
@@ -6735,6 +6839,17 @@ class HybridPhaseTransformer(nn.Module):
     def gradient_checkpointing_disable(self):
         """Disable gradient checkpointing."""
         self.gradient_checkpointing = False
+
+    def set_global_step(self, step: int):
+        """V10.13: Set global training step for warm-start gating.
+
+        Call this once per training step before forward().
+        Propagates step to all PhaseAttentionLayers for warm-start alpha computation.
+        """
+        self._global_step = step
+        for module in self.modules():
+            if isinstance(module, PhaseAttentionLayer):
+                module._current_step = step
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -6878,6 +6993,11 @@ class HybridPhaseTransformer(nn.Module):
         hidden_states = [] if should_extract else None
         decorr_losses = [] if return_decorr_loss else None
 
+        # V10.13: Initialize GCT global state
+        if self.global_tokens_enabled:
+            _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+            _gct_state = _gct_state.to(dtype=x.dtype)
+
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
             is_hybrid_block = i >= self.local_layers
@@ -6916,10 +7036,72 @@ class HybridPhaseTransformer(nn.Module):
                 else:
                     x = block(x, causal_mask=True)
 
+            # =================================================================
+            # V10.13: GCT — Token READ from global tokens (cross-attention)
+            # =================================================================
+            if self.global_tokens_enabled:
+                _gct_out = self.gct_read_attn(
+                    x, _gct_state, _gct_state, need_weights=False
+                )[0]
+                x = x + _gct_out
+
+            # =================================================================
+            # V10.13: GCT — Global WRITE via controlled compression
+            # =================================================================
+            if self.global_tokens_enabled and self.global_update_enabled:
+                if (i % self.global_update_interval) == 0:
+                    if self.global_update_mode == "pool":
+                        # Gated pooled summary of tokens
+                        _w = torch.sigmoid(self.global_write_gate(x))  # [B, T, 1]
+                        _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)  # [B, D]
+                        _delta = self.global_update_proj(_pooled).unsqueeze(1)  # [B, 1, D]
+                    else:
+                        # attn-lite: globals attend to tokens with small scale
+                        _delta = self.gct_write_attn(
+                            _gct_state, x, x, need_weights=False
+                        )[0]
+                        _delta = _delta * self._gct_write_scale
+
+                    if self.global_token_write_detach and self.training:
+                        _delta = _delta.detach()
+
+                    _gct_state = _gct_state + _delta
+
+                    # Write diagnostics
+                    with torch.no_grad():
+                        self._diag_global_token_delta_norm = _delta.norm().item()
+                        if self.global_update_mode == "pool":
+                            self._diag_global_write_gate_mean = _w.mean().item()
+
+            # =================================================================
+            # V10.13: Phase → Global integration (after hybrid blocks only)
+            # =================================================================
+            _p2g = getattr(self, 'phase_to_global_proj', None)
+            if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
+                _pa = block.attention.phase_attn
+                _phase_agg = getattr(_pa, '_last_final_state_agg', None)
+                if _phase_agg is not None:
+                    _pf = _phase_agg.squeeze(1)  # [B, H, D_h] complex
+                    _p_in = torch.cat([
+                        _pf.real.reshape(B, -1),
+                        _pf.imag.reshape(B, -1),
+                    ], dim=-1).to(dtype=x.dtype)  # [B, 2D]
+                    _phase_upd = _p2g(_p_in).unsqueeze(1)  # [B, 1, D]
+                    # Scale by warm-start alpha if enabled
+                    if self.phase_warmstart_enabled:
+                        _ws_a = getattr(_pa, '_diag_warmstart_alpha', 1.0) or 1.0
+                        _phase_upd = _phase_upd * _ws_a
+                    _gct_state = _gct_state + _phase_upd
+
             # Extract if: return_hidden=True (all), or layer in extract_layers
             if should_extract:
                 if extract_set is None or i in extract_set:
                     hidden_states.append(x)
+
+        # V10.13: GCT diagnostics (after all layers)
+        if self.global_tokens_enabled:
+            with torch.no_grad():
+                self._diag_global_token_norm = _gct_state.norm(dim=-1).mean().item()
 
         # Output
         x = self.norm(x)
@@ -6993,6 +7175,15 @@ class HybridPhaseTransformer(nn.Module):
 
         next_layer_states = {}
 
+        # V10.13: GCT state — restore from previous chunk or initialize
+        if self.global_tokens_enabled:
+            _gct_prev = prev_layer_states.get('_gct_global_state', None)
+            if _gct_prev is not None:
+                _gct_state = _gct_prev.to(dtype=x.dtype)
+            else:
+                _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+                _gct_state = _gct_state.to(dtype=x.dtype)
+
         # Process through blocks with state management
         for i, block in enumerate(self.blocks):
             is_hybrid_block = i >= self.local_layers
@@ -7014,6 +7205,50 @@ class HybridPhaseTransformer(nn.Module):
             else:
                 # Local-only blocks: no state to manage
                 x = block(x, causal_mask=True)
+
+            # V10.13: GCT read/write (same logic as forward())
+            if self.global_tokens_enabled:
+                _gct_out = self.gct_read_attn(
+                    x, _gct_state, _gct_state, need_weights=False
+                )[0]
+                x = x + _gct_out
+
+            if self.global_tokens_enabled and self.global_update_enabled:
+                if (i % self.global_update_interval) == 0:
+                    if self.global_update_mode == "pool":
+                        _w = torch.sigmoid(self.global_write_gate(x))
+                        _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)
+                        _delta = self.global_update_proj(_pooled).unsqueeze(1)
+                    else:
+                        _delta = self.gct_write_attn(
+                            _gct_state, x, x, need_weights=False
+                        )[0]
+                        _delta = _delta * self._gct_write_scale
+
+                    if self.global_token_write_detach and self.training:
+                        _delta = _delta.detach()
+                    _gct_state = _gct_state + _delta
+
+            # V10.13: Phase → Global (after hybrid blocks)
+            _p2g = getattr(self, 'phase_to_global_proj', None)
+            if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
+                _pa = block.attention.phase_attn
+                _phase_agg = getattr(_pa, '_last_final_state_agg', None)
+                if _phase_agg is not None:
+                    _pf = _phase_agg.squeeze(1)
+                    _p_in = torch.cat([
+                        _pf.real.reshape(B, -1),
+                        _pf.imag.reshape(B, -1),
+                    ], dim=-1).to(dtype=x.dtype)
+                    _phase_upd = _p2g(_p_in).unsqueeze(1)
+                    if self.phase_warmstart_enabled:
+                        _ws_a = getattr(_pa, '_diag_warmstart_alpha', 1.0) or 1.0
+                        _phase_upd = _phase_upd * _ws_a
+                    _gct_state = _gct_state + _phase_upd
+
+        # V10.13: Save GCT state for next chunk
+        if self.global_tokens_enabled:
+            next_layer_states['_gct_global_state'] = _gct_state.detach()
 
         # Output
         x = self.norm(x)

@@ -9562,17 +9562,28 @@ def train_real_language(
             max_seq_len=args.seq_len,
             bounded_phase=config.bounded_phase,
         ).to(config.device)
-    elif getattr(args, 'phase_channels', 1) > 1 or getattr(args, 'phase_write_gate', False):
-        # V10.12: Use real HybridPhaseTransformer with multi-channel + write gate
+    elif (getattr(args, 'phase_channels', 1) > 1 or getattr(args, 'phase_write_gate', False)
+          or getattr(args, 'phase_warmstart', False) or getattr(args, 'global_tokens', False)):
+        # V10.12/V10.13: Use HybridPhaseTransformer with advanced features
         from symbolu.phase_transformer import HybridPhaseTransformer
 
         phase_channels = getattr(args, 'phase_channels', 1)
         phase_write_gate = getattr(args, 'phase_write_gate', False)
+        phase_warmstart = getattr(args, 'phase_warmstart', False)
+        phase_warmstart_steps = getattr(args, 'phase_warmstart_steps', 10000)
+        phase_warmstart_tau = getattr(args, 'phase_warmstart_tau', 2000.0)
+        global_tokens = getattr(args, 'global_tokens', False)
+        num_global_tokens = getattr(args, 'num_global_tokens', 16)
+        global_update_mode = getattr(args, 'global_update_mode', 'pool')
+        phase_to_global = getattr(args, 'phase_to_global', False)
 
-        print(f"\nCreating HybridPhaseTransformer (V10.12)...")
+        print(f"\nCreating HybridPhaseTransformer (V10.13)...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
         print(f"  Phase Channels: {phase_channels}")
         print(f"  Phase Write Gate: {'ENABLED' if phase_write_gate else 'disabled'}")
+        print(f"  Phase Warm-Start: {'ENABLED (steps={}, tau={})'.format(phase_warmstart_steps, phase_warmstart_tau) if phase_warmstart else 'disabled'}")
+        print(f"  Global Tokens: {'ENABLED (G={}, mode={})'.format(num_global_tokens, global_update_mode) if global_tokens else 'disabled'}")
+        print(f"  Phase→Global: {'ENABLED' if phase_to_global else 'disabled'}")
 
         _inner_model = HybridPhaseTransformer(
             vocab_size=args.lm_vocab_size,
@@ -9587,6 +9598,15 @@ def train_real_language(
             protected_phase=True,
             phase_channels=phase_channels,
             phase_write_gate=phase_write_gate,
+            # V10.13: Phase Warm-Start Gate
+            phase_warmstart=phase_warmstart,
+            phase_warmstart_steps=phase_warmstart_steps,
+            phase_warmstart_tau=phase_warmstart_tau,
+            # V10.13: Global Compressed Tokens (GCT)
+            global_tokens_enabled=global_tokens,
+            num_global_tokens=num_global_tokens,
+            global_update_mode=global_update_mode,
+            phase_to_global=phase_to_global,
         ).to(config.device)
 
         # Wrap to match training loop interface (expects logits tensor, not dict)
@@ -9620,6 +9640,10 @@ def train_real_language(
 
             def load_state_dict(self, *args, **kwargs):
                 return self.inner.load_state_dict(*args, **kwargs)
+
+            def set_global_step(self, step):
+                if hasattr(self.inner, 'set_global_step'):
+                    self.inner.set_global_step(step)
 
             def update_curriculum(self, new_curriculum):
                 pass  # No curriculum in HybridPhaseTransformer
@@ -9972,6 +9996,10 @@ def train_real_language(
 
         # V10.5.6: Use ignore_index for associative recall (ignore PAD tokens in loss)
         ignore_idx = ar_pad_token if use_associative_recall else -100  # -100 is PyTorch default (no ignore)
+
+        # V10.13: Update global step for warm-start gate
+        if hasattr(model, 'set_global_step'):
+            model.set_global_step(step)
 
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
             logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y, ignore_index=ignore_idx)
@@ -12362,6 +12390,23 @@ Examples:
                         help="Number of independent Phase memory channels (1=legacy, 4=recommended)")
     parser.add_argument("--phase-write-gate", action="store_true",
                         help="Enable selective write gating for Phase memory updates")
+    # V10.13: Phase Warm-Start Gate
+    parser.add_argument("--phase-warmstart", action="store_true",
+                        help="Enable Phase warm-start gate (dampens Phase for first N steps)")
+    parser.add_argument("--phase-warmstart-steps", type=int, default=10000,
+                        help="Step at which warm-start alpha=0.5")
+    parser.add_argument("--phase-warmstart-tau", type=float, default=2000.0,
+                        help="Warm-start sigmoid steepness")
+    # V10.13: Global Compressed Tokens (GCT)
+    parser.add_argument("--global-tokens", action="store_true",
+                        help="Enable Global Compressed Tokens (GCT) memory slots")
+    parser.add_argument("--num-global-tokens", type=int, default=16,
+                        help="Number of global token memory slots")
+    parser.add_argument("--global-update-mode", type=str, default="pool",
+                        choices=["pool", "attn-lite"],
+                        help="GCT write mode: 'pool' (recommended) or 'attn-lite'")
+    parser.add_argument("--phase-to-global", action="store_true",
+                        help="Enable Phase→Global integration (Phase memory injects into GCT)")
 
     # Phase Rotation Test
     parser.add_argument("--rotation-test", action="store_true",
