@@ -9562,6 +9562,69 @@ def train_real_language(
             max_seq_len=args.seq_len,
             bounded_phase=config.bounded_phase,
         ).to(config.device)
+    elif getattr(args, 'phase_channels', 1) > 1 or getattr(args, 'phase_write_gate', False):
+        # V10.12: Use real HybridPhaseTransformer with multi-channel + write gate
+        from symbolu.phase_transformer import HybridPhaseTransformer
+
+        phase_channels = getattr(args, 'phase_channels', 1)
+        phase_write_gate = getattr(args, 'phase_write_gate', False)
+
+        print(f"\nCreating HybridPhaseTransformer (V10.12)...")
+        print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"  Phase Channels: {phase_channels}")
+        print(f"  Phase Write Gate: {'ENABLED' if phase_write_gate else 'disabled'}")
+
+        _inner_model = HybridPhaseTransformer(
+            vocab_size=args.lm_vocab_size,
+            embed_dim=config.d_model,
+            num_layers=config.num_layers,
+            num_heads=config.num_heads,
+            ff_dim=config.d_ff,
+            max_seq_len=args.seq_len,
+            dropout=config.dropout,
+            local_layers=config.num_layers // 2,  # Half local, half hybrid
+            window_size=getattr(args, 'local_window_size', 64),
+            protected_phase=True,
+            phase_channels=phase_channels,
+            phase_write_gate=phase_write_gate,
+        ).to(config.device)
+
+        # Wrap to match training loop interface (expects logits tensor, not dict)
+        class _HybridPhaseAdapter(nn.Module):
+            def __init__(self, inner):
+                super().__init__()
+                self.inner = inner
+                self.layer_outputs = []
+                self.vocab_size = inner.config.vocab_size
+
+            def forward(self, input_ids, probe_layers=False):
+                result = self.inner(input_ids)
+                return result['logits']
+
+            def parameters(self, recurse=True):
+                return self.inner.parameters(recurse=recurse)
+
+            def named_parameters(self, prefix='', recurse=True):
+                return self.inner.named_parameters(prefix=prefix, recurse=recurse)
+
+            def train(self, mode=True):
+                self.inner.train(mode)
+                return self
+
+            def eval(self):
+                self.inner.eval()
+                return self
+
+            def state_dict(self, *args, **kwargs):
+                return self.inner.state_dict(*args, **kwargs)
+
+            def load_state_dict(self, *args, **kwargs):
+                return self.inner.load_state_dict(*args, **kwargs)
+
+            def update_curriculum(self, new_curriculum):
+                pass  # No curriculum in HybridPhaseTransformer
+
+        model = _HybridPhaseAdapter(_inner_model)
     else:
         print(f"\nCreating HybridLMTransformer...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
@@ -10818,10 +10881,16 @@ def run_chunking_tests_v10(args, config):
             local_layers=2,
             window_size=32,
             protected_phase=True,
+            phase_channels=getattr(args, 'phase_channels', 1),
+            phase_write_gate=getattr(args, 'phase_write_gate', False),
         ).to(device)
 
         print(f"  Model: {sum(p.numel() for p in model.parameters()):,} parameters")
         print(f"  Protected Phase: ENABLED")
+        if getattr(args, 'phase_channels', 1) > 1:
+            print(f"  Phase Channels: {args.phase_channels}")
+        if getattr(args, 'phase_write_gate', False):
+            print(f"  Phase Write Gate: ENABLED")
         print(f"  Vocab: {vocab_size} (anchors 0-9, query 10, fillers 11-49)")
 
         # =================================================================
@@ -12287,6 +12356,12 @@ Examples:
     # Protected Phase (v5)
     parser.add_argument("--protected-phase", action="store_true",
                         help="Run Protected Phase model (Phase accumulates, Quad queries)")
+
+    # V10.12: Multi-channel Phase memory with selective write gating
+    parser.add_argument("--phase-channels", type=int, default=1,
+                        help="Number of independent Phase memory channels (1=legacy, 4=recommended)")
+    parser.add_argument("--phase-write-gate", action="store_true",
+                        help="Enable selective write gating for Phase memory updates")
 
     # Phase Rotation Test
     parser.add_argument("--rotation-test", action="store_true",
