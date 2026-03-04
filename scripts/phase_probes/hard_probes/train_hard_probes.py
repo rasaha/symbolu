@@ -9562,6 +9562,69 @@ def train_real_language(
             max_seq_len=args.seq_len,
             bounded_phase=config.bounded_phase,
         ).to(config.device)
+    elif getattr(args, 'phase_channels', 1) > 1 or getattr(args, 'phase_write_gate', False):
+        # V10.12: Use real HybridPhaseTransformer with multi-channel + write gate
+        from symbolu.phase_transformer import HybridPhaseTransformer
+
+        phase_channels = getattr(args, 'phase_channels', 1)
+        phase_write_gate = getattr(args, 'phase_write_gate', False)
+
+        print(f"\nCreating HybridPhaseTransformer (V10.12)...")
+        print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"  Phase Channels: {phase_channels}")
+        print(f"  Phase Write Gate: {'ENABLED' if phase_write_gate else 'disabled'}")
+
+        _inner_model = HybridPhaseTransformer(
+            vocab_size=args.lm_vocab_size,
+            embed_dim=config.d_model,
+            num_layers=config.num_layers,
+            num_heads=config.num_heads,
+            ff_dim=config.d_ff,
+            max_seq_len=args.seq_len,
+            dropout=config.dropout,
+            local_layers=config.num_layers // 2,  # Half local, half hybrid
+            window_size=getattr(args, 'local_window_size', 64),
+            protected_phase=True,
+            phase_channels=phase_channels,
+            phase_write_gate=phase_write_gate,
+        ).to(config.device)
+
+        # Wrap to match training loop interface (expects logits tensor, not dict)
+        class _HybridPhaseAdapter(nn.Module):
+            def __init__(self, inner):
+                super().__init__()
+                self.inner = inner
+                self.layer_outputs = []
+                self.vocab_size = inner.config.vocab_size
+
+            def forward(self, input_ids, probe_layers=False):
+                result = self.inner(input_ids)
+                return result['logits']
+
+            def parameters(self, recurse=True):
+                return self.inner.parameters(recurse=recurse)
+
+            def named_parameters(self, prefix='', recurse=True):
+                return self.inner.named_parameters(prefix=prefix, recurse=recurse)
+
+            def train(self, mode=True):
+                self.inner.train(mode)
+                return self
+
+            def eval(self):
+                self.inner.eval()
+                return self
+
+            def state_dict(self, *args, **kwargs):
+                return self.inner.state_dict(*args, **kwargs)
+
+            def load_state_dict(self, *args, **kwargs):
+                return self.inner.load_state_dict(*args, **kwargs)
+
+            def update_curriculum(self, new_curriculum):
+                pass  # No curriculum in HybridPhaseTransformer
+
+        model = _HybridPhaseAdapter(_inner_model)
     else:
         print(f"\nCreating HybridLMTransformer...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
