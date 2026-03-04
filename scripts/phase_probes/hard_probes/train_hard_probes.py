@@ -10818,10 +10818,16 @@ def run_chunking_tests_v10(args, config):
             local_layers=2,
             window_size=32,
             protected_phase=True,
+            phase_channels=getattr(args, 'phase_channels', 1),
+            phase_write_gate=getattr(args, 'phase_write_gate', False),
         ).to(device)
 
         print(f"  Model: {sum(p.numel() for p in model.parameters()):,} parameters")
         print(f"  Protected Phase: ENABLED")
+        if getattr(args, 'phase_channels', 1) > 1:
+            print(f"  Phase Channels: {args.phase_channels}")
+        if getattr(args, 'phase_write_gate', False):
+            print(f"  Phase Write Gate: ENABLED")
         print(f"  Vocab: {vocab_size} (anchors 0-9, query 10, fillers 11-49)")
 
         # =================================================================
@@ -12287,6 +12293,12 @@ Examples:
     # Protected Phase (v5)
     parser.add_argument("--protected-phase", action="store_true",
                         help="Run Protected Phase model (Phase accumulates, Quad queries)")
+
+    # V10.12: Multi-channel Phase memory with selective write gating
+    parser.add_argument("--phase-channels", type=int, default=1,
+                        help="Number of independent Phase memory channels (1=legacy, 4=recommended)")
+    parser.add_argument("--phase-write-gate", action="store_true",
+                        help="Enable selective write gating for Phase memory updates")
 
     # Phase Rotation Test
     parser.add_argument("--rotation-test", action="store_true",
