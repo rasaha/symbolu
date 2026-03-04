@@ -1916,12 +1916,19 @@ class PhaseAttentionLayer(nn.Module):
         # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
         dual_channel_mode: bool = False,  # Separate content and alignment scores
         alignment_authority: float = 0.1,  # α: weight for alignment term
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,  # Number of independent memory channels (1=legacy)
+        phase_write_gate: bool = False,  # Selective write gating for memory updates
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V10.12: Multi-channel Phase memory with selective write gating
+        self.phase_channels = phase_channels
+        self.phase_write_gate_enabled = phase_write_gate
 
         # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
         self.bounded_phase = bounded_phase  # π*sin() bounds φ to S¹ manifold
@@ -1995,6 +2002,44 @@ class PhaseAttentionLayer(nn.Module):
             # (ChatGPT analysis: wasted parameters and optimizer state)
             # Instead, just use self.decay_gamma directly in forward()
             self.decay_logit = None
+
+        # V10.12: Multi-channel Phase memory modules
+        if phase_channels > 1:
+            # Per-channel-per-head decay: allows each channel to specialize
+            # in different memory horizons (e.g., channel 0=short, channel 3=long)
+            if learned_decay:
+                # Shape [C*H]: folded so parallel_ema_scan treats each channel-head
+                # pair as an independent "virtual head"
+                min_ts, max_ts = 2.0, 2048.0
+                log_ts = torch.linspace(math.log(min_ts), math.log(max_ts), phase_channels * num_heads)
+                ts = torch.exp(log_ts)
+                ch_gamma = torch.clamp(1.0 - 1.0 / ts, 0.001, 0.9995)
+                ch_sig = 2.0 * ch_gamma - 1.0
+                ch_sig = torch.clamp(ch_sig, 0.01, 0.99)
+                ch_logits = torch.log(ch_sig / (1.0 - ch_sig))
+                self.channel_decay_logit = nn.Parameter(ch_logits)  # [C*H]
+            else:
+                self.channel_decay_logit = None
+
+            # Channel aggregation: learned weights to combine C channels at readout
+            # Initialized uniform so all channels contribute equally at start
+            self.channel_agg = nn.Parameter(torch.ones(phase_channels) / phase_channels)
+
+        if phase_write_gate:
+            # Selective write gate: g_t = sigmoid(W_g @ x_t)
+            # Per-channel per-head gate controls what gets written to memory
+            # Shape: embed_dim → phase_channels * num_heads
+            self.write_gate_proj = nn.Linear(embed_dim, phase_channels * num_heads, bias=True)
+            # Initialize bias to +2 so gates start near-open (sigmoid(2)≈0.88)
+            # This ensures training starts close to the unmodified behavior
+            nn.init.zeros_(self.write_gate_proj.weight)
+            nn.init.constant_(self.write_gate_proj.bias, 2.0)
+
+        # V10.12: Diagnostic capture flags
+        self._diag_phase_gate_mean = None
+        self._diag_phase_gate_std = None
+        self._diag_phase_state_norm_per_channel = None
+        self._diag_phase_attn_mass = None
 
         # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
         # Distribute starting phases around the unit circle to shatter phase collapse.
@@ -2306,68 +2351,108 @@ class PhaseAttentionLayer(nn.Module):
         # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
-        # O(n) Causal aggregation with optional decay
-        # V9.6.13: State decay for memory horizon control
-        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        # V10.12: Multi-channel write gating and state accumulation
+        C = self.phase_channels
+        H_size = kv_complex.shape[2]
+        D_h = kv_complex.shape[3]
+
+        # --- Write Gate ---
+        # g_t = sigmoid(W_g @ x_t), applied: kv_gated = g_t * kv_t
+        if self.phase_write_gate_enabled:
+            # x is the pre-norm input [B, N, D] — use it for gating
+            gate_logits = self.write_gate_proj(x)  # [B, N, C*H]
+            gate = torch.sigmoid(gate_logits).view(B, N, C, H_size, 1)  # [B, N, C, H, 1]
+            # Diagnostic capture
+            with torch.no_grad():
+                self._diag_phase_gate_mean = gate.mean().item()
+                self._diag_phase_gate_std = gate.std().item()
+        else:
+            gate = None  # No gating — all 1s implicitly
+
+        # --- Expand kv to channels and apply gate ---
+        if C > 1:
+            # kv_complex: [B, N, H, D_h] → [B, N, C, H, D_h] (broadcast across channels)
+            kv_multi = kv_complex.unsqueeze(2).expand(B, N, C, H_size, D_h)
+            if gate is not None:
+                kv_multi = kv_multi * gate  # Per-channel per-head gating
+            # Fold channels into heads for parallel_ema_scan: [B, N, C*H, D_h]
+            kv_scan = kv_multi.reshape(B, N, C * H_size, D_h)
+        else:
+            # Single channel: apply gate directly (no expand needed)
+            if gate is not None:
+                kv_scan = kv_complex * gate.view(B, N, H_size, 1)
+            else:
+                kv_scan = kv_complex
+            # kv_scan: [B, N, H, D_h] — unchanged shape for backward compat
+
+        # --- State Accumulation (O(n) causal aggregation) ---
         use_decay = self.learned_decay or self.decay_gamma < 1.0
 
         if not use_decay:
-            # Original: infinite memory via cumsum
-            # V10.2: Add prev_state if provided (chunk continuation)
             if prev_state is not None:
-                # prev_state is [B, 1, H, D_h] - the final state from previous chunk
-                # Add it to cumsum: S_t = prev_state + Σ_{j≤t} KV_j
-                global_state = torch.cumsum(kv_complex, dim=1) + prev_state
+                global_state = torch.cumsum(kv_scan, dim=1) + prev_state
             else:
-                global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+                global_state = torch.cumsum(kv_scan, dim=1)
         else:
-            # V9.9.8: Use parallel EMA scan for ~32x speedup over sequential loop
-            # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
-            H_size = kv_complex.shape[2]
-
-            # V9.9.7: Per-head learned decay or fixed decay
-            if self.learned_decay:
-                # V10.11: Learned decay: γ ∈ [0.97, 0.9995] per head via sigmoid
-                # Range rationale: γ<0.97 (~33 tokens) is too short — Local handles
-                # short-range already. γ>0.9995 (~2000 tokens) risks accumulation.
-                # At init (logit=0): γ≈0.985 (~67 token effective horizon).
+            # Compute decay: per-channel-per-head if C>1, else per-head
+            if C > 1 and self.learned_decay and self.channel_decay_logit is not None:
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.channel_decay_logit)  # [C*H]
+            elif self.learned_decay:
                 gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
+                if C > 1:
+                    # Broadcast per-head decay to all channels: [H] → [C*H]
+                    gamma = gamma.repeat(C)
             else:
                 gamma = self.decay_gamma  # Scalar
 
-            # V10.2: Handle prev_state for chunked EMA scan
+            # Handle prev_state for chunked EMA scan
+            VH = kv_scan.shape[2]  # H or C*H
             if prev_state is not None:
-                # For EMA: S_t = γ * S_{t-1} + kv_t
-                # With prev_state: S_0 = γ * prev_state + kv_0
-                # We prepend a decayed prev_state contribution to each position
-                # S_t = γ^(t+1) * prev_state + Σ_{j≤t} γ^(t-j) * kv_j
                 if isinstance(gamma, float):
-                    gamma_tensor = torch.tensor(gamma, device=kv_complex.device, dtype=torch.float32)
+                    gamma_tensor = torch.tensor(gamma, device=kv_scan.device, dtype=torch.float32)
                 else:
                     gamma_tensor = gamma
-                # Compute decay factors for prev_state: γ^1, γ^2, ..., γ^N
-                t_indices = torch.arange(1, N + 1, device=kv_complex.device, dtype=torch.float32)
+                t_indices = torch.arange(1, N + 1, device=kv_scan.device, dtype=torch.float32)
                 if gamma_tensor.dim() == 0:
-                    # Scalar gamma
-                    decay_factors = gamma_tensor ** t_indices  # [N]
+                    decay_factors = gamma_tensor ** t_indices
                     decay_factors = decay_factors.view(1, N, 1, 1)
                 else:
-                    # Per-head gamma [H]
-                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)  # [N, H]
-                    decay_factors = decay_factors.view(1, N, H_size, 1)
-                # Add decayed prev_state to EMA scan result
-                global_state = parallel_ema_scan(kv_complex, gamma) + prev_state * decay_factors.to(kv_complex.dtype)
+                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)  # [N, VH]
+                    decay_factors = decay_factors.view(1, N, VH, 1)
+                global_state = parallel_ema_scan(kv_scan, gamma) + prev_state * decay_factors.to(kv_scan.dtype)
             else:
-                # Use optimized parallel scan instead of sequential loop
-                global_state = parallel_ema_scan(kv_complex, gamma)
+                global_state = parallel_ema_scan(kv_scan, gamma)
 
-            # V9.9.9: Capture state norm for cumsum health monitoring (Gemini's suggestion)
-            # If this grows linearly with sequence length, the leaky scan isn't working
+            # State norm diagnostic
             with torch.no_grad():
                 self._diag_state_norm = global_state.abs().mean(dim=-1).mean(dim=-1)  # [B, N]
 
-        # V10.2: Capture final state for chunk continuation
-        final_state = global_state[:, -1:, :, :]  # [B, 1, H, D_h] - last position's state
+        # Capture final state for chunk continuation
+        # Raw state: [B, 1, H, D_h] (C=1) or [B, 1, C*H, D_h] (C>1) — for Phase EMA continuation
+        final_state = global_state[:, -1:, :, :]
+        # Aggregated final state: always [B, 1, H, D_h] — for cross-attention concatenation
+        if C > 1:
+            final_state_ch = final_state.view(B, 1, C, H_size, D_h)
+            ch_w = torch.softmax(self.channel_agg, dim=0).view(1, 1, C, 1, 1)
+            final_state_agg = (final_state_ch * ch_w).sum(dim=2)  # [B, 1, H, D_h]
+        else:
+            final_state_agg = final_state
+
+        # --- Multi-channel readout: aggregate across channels ---
+        if C > 1:
+            # global_state: [B, N, C*H, D_h] → [B, N, C, H, D_h]
+            global_state_ch = global_state.view(B, N, C, H_size, D_h)
+            # Learned channel weights (softmax for stable mixing)
+            ch_weights = torch.softmax(self.channel_agg, dim=0)  # [C]
+            ch_weights = ch_weights.view(1, 1, C, 1, 1)
+            # Weighted sum across channels: [B, N, C, H, D_h] → [B, N, H, D_h]
+            global_state_agg = (global_state_ch * ch_weights).sum(dim=2)
+
+            # Per-channel norm diagnostic
+            with torch.no_grad():
+                self._diag_phase_state_norm_per_channel = global_state_ch.abs().mean(dim=(0, 1, 4))  # [C, H]
+        else:
+            global_state_agg = global_state
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -2377,21 +2462,20 @@ class PhaseAttentionLayer(nn.Module):
         # V9.6.13: Apply same decay to normalizer for consistency
         # V9.9.7: Use same per-head learned decay as state accumulation
         # V10.2: Handle prev_norm_state for chunk continuation
+        # NOTE: Normalizer uses per-head decay (not per-channel), since it tracks
+        # amplitude accumulation which is channel-independent.
         if not use_decay:
             if prev_norm_state is not None:
                 a_k_cumsum = torch.cumsum(a_k, dim=1) + prev_norm_state
             else:
                 a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
-            # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
-            # Reuse gamma from above (already computed for learned_decay case)
             if self.learned_decay:
                 gamma_norm = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma_norm = self.decay_gamma
 
             if prev_norm_state is not None:
-                # Same decay logic as for main state
                 if isinstance(gamma_norm, float):
                     gamma_tensor = torch.tensor(gamma_norm, device=a_k.device, dtype=torch.float32)
                 else:
@@ -2401,20 +2485,20 @@ class PhaseAttentionLayer(nn.Module):
                     decay_factors = gamma_tensor ** t_indices
                     decay_factors = decay_factors.view(1, N, 1, 1)
                 else:
-                    H_size = a_k.shape[2]
                     decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)
                     decay_factors = decay_factors.view(1, N, H_size, 1)
                 a_k_cumsum = parallel_ema_scan(a_k, gamma_norm) + prev_norm_state * decay_factors.to(a_k.dtype)
             else:
                 a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
 
-        # V10.2: Capture final normalizer state for chunk continuation
+        # Capture final normalizer state for chunk continuation
         final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
 
         normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
-        qk_product = q_phasor * global_state  # [B, N, H, D_h] complex
+        # Use aggregated state (channels already combined) for readout
+        qk_product = q_phasor * global_state_agg  # [B, N, H, D_h] complex
 
         if self.cosine_mode == "standard":
             # Original: cos(φ_q - φ_k), range [-1, +1]
@@ -2577,11 +2661,12 @@ class PhaseAttentionLayer(nn.Module):
         # V10.2: Return state for chunk continuation
         if return_state:
             state_dict = {
-                'final_state': final_state,  # [B, 1, H, D_h] complex
+                'final_state': final_state,  # [B, 1, H, D_h] or [B, 1, C*H, D_h] for Phase EMA
+                'final_state_agg': final_state_agg,  # [B, 1, H, D_h] always — for cross-attn
                 'final_norm_state': final_norm_state,  # [B, 1, H, D_h] real
                 # V10.2.1: Return memory_state for Local cross-attention
-                # This is the full cumsum state [B, N, H, D_h] that Local can query
-                'memory_state': global_state,  # [B, N, H, D_h] complex - FULL sequence state
+                # Uses aggregated state [B, N, H, D_h] (channels already combined)
+                'memory_state': global_state_agg,  # [B, N, H, D_h] complex
             }
             return result, state_dict
 
@@ -5746,6 +5831,9 @@ class HybridAttentionLayer(nn.Module):
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2: Protected Phase pattern (default=True)
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,
+        phase_write_gate: bool = False,
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -5790,6 +5878,8 @@ class HybridAttentionLayer(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            phase_channels=phase_channels,  # V10.12: Multi-channel memory
+            phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -5886,14 +5976,18 @@ class HybridAttentionLayer(nn.Module):
             # This enforces: "Quadratic queries ONLY Phase memory for long-range info"
 
             # V10.2.2 FIX: Include previous chunk's final state in cross-attention
-            # Without this, Local can only see current chunk's Phase memory.
-            # The prev_phase_state contains aggregated info from all previous chunks.
+            # V10.12: prev_phase_state may be [B,1,C*H,D_h] with multi-channel.
+            # Aggregate it to [B,1,H,D_h] to match phase_memory for concatenation.
             if prev_phase_state is not None and phase_memory is not None:
-                # Concatenate: [prev_final_state, current_chunk_memory]
-                # prev_phase_state: [B, 1, H, D_h] (aggregated from previous chunks)
-                # phase_memory: [B, N, H, D_h] (current chunk positions)
-                # Result: [B, N+1, H, D_h] - Local can attend to both
-                phase_memory = torch.cat([prev_phase_state, phase_memory], dim=1)
+                prev_for_xattn = prev_phase_state
+                H_mem = phase_memory.shape[2]  # num_heads
+                if prev_for_xattn.shape[2] != H_mem:
+                    # Multi-channel: [B,1,C*H,D_h] → mean over channels → [B,1,H,D_h]
+                    C = prev_for_xattn.shape[2] // H_mem
+                    prev_for_xattn = prev_for_xattn.view(
+                        prev_for_xattn.shape[0], 1, C, H_mem, prev_for_xattn.shape[3]
+                    ).mean(dim=2)
+                phase_memory = torch.cat([prev_for_xattn, phase_memory], dim=1)
 
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
@@ -6039,6 +6133,9 @@ class HybridTransformerBlock(nn.Module):
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,
+        phase_write_gate: bool = False,
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -6063,6 +6160,8 @@ class HybridTransformerBlock(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            phase_channels=phase_channels,  # V10.12: Multi-channel memory
+            phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -6514,6 +6613,9 @@ class HybridPhaseTransformer(nn.Module):
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,  # Independent memory channels (1=legacy, 4=recommended)
+        phase_write_gate: bool = False,  # Selective write gating for memory updates
     ):
         super().__init__()
 
@@ -6580,6 +6682,8 @@ class HybridPhaseTransformer(nn.Module):
                     dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
                     alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
                     protected_phase=protected_phase,  # V10.2.1: Protected Phase for chunking
+                    phase_channels=phase_channels,  # V10.12: Multi-channel memory
+                    phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
                 ))
 
         # Output
@@ -6608,6 +6712,15 @@ class HybridPhaseTransformer(nn.Module):
 
         # Initialize
         self.apply(self._init_weights)
+
+        # V10.12: Re-init write gate biases after _init_weights zeros them.
+        # sigmoid(2)≈0.88 means gates start near-open → initial training ≈ no gating.
+        if phase_write_gate:
+            for blk in self.blocks:
+                if hasattr(blk, 'attention') and hasattr(blk.attention, 'phase_attn'):
+                    _pa = blk.attention.phase_attn
+                    if hasattr(_pa, 'write_gate_proj') and _pa.write_gate_proj.bias is not None:
+                        nn.init.constant_(_pa.write_gate_proj.bias, 2.0)
 
         # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
         # This provides semantic alignment at start while keeping them separate
