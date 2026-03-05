@@ -8570,12 +8570,15 @@ class SlotMemoryGCT(nn.Module):
         lm_head: nn.Linear,            # Shared LM head for prediction
     ) -> torch.Tensor:
         """
-        Auxiliary retrieval loss: at query positions, read from slots and
-        predict the target value token using the shared LM head.
+        V10.14.6: Direct retrieval loss — bypasses read_output_proj.
 
-        This loss directly supervises the slot memory to store retrievable
-        key-value bindings. Without it, slot writes may not learn to store
-        what's needed for retrieval.
+        Previous version called self.read() which goes through read_output_proj.
+        Problem: the main LM loss suppresses read_output_proj to avoid noisy reads,
+        so compute_retrieval_loss got lm_head(≈0) → random logits → no gradient.
+
+        Fix: compute attention-weighted slot values directly (no output projection),
+        then pass to lm_head. This gives the retrieval loss a clean gradient path
+        to slot values and write parameters, independent of the main read path.
 
         Args:
             x: Token representations [B, N, D]
@@ -8592,22 +8595,31 @@ class SlotMemoryGCT(nn.Module):
         if query_mask is None or not query_mask.any():
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Read from slots at all positions (needed for gradient flow)
-        retrieved = self.read(x, slot_keys, slot_vals)  # [B, N, D]
+        # Direct retrieval: same attention as read() but skip read_output_proj.
+        # This prevents the LM-loss-suppressed output projection from killing
+        # the retrieval gradient signal.
+        queries = self.write_key_proj(x)  # [B, N, D_key]
+        _scale = torch.exp(self._write_log_scale)
+        _q_norm = F.normalize(queries, dim=-1)
+        _sk_norm = F.normalize(slot_keys, dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # [B, N, K]
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+
+        # Raw retrieval: attention-weighted slot values (NO read_output_proj)
+        raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
 
         # Select only query positions
-        # Flatten: [num_queries, D]
-        query_retrieved = retrieved[query_mask]
+        query_retrieved = raw_retrieved[query_mask]  # [num_queries, D]
         query_targets = target_ids[query_mask]
 
         if query_retrieved.shape[0] == 0:
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Predict target token from retrieved vector using shared LM head
-        # This forces the slot memory to store information decodable by LM head
+        # Predict target token directly from raw slot values via shared LM head
         query_logits = lm_head(query_retrieved)  # [num_queries, V]
 
-        # Cross-entropy loss on query positions
         retrieval_loss = F.cross_entropy(
             query_logits, query_targets, ignore_index=-100
         )

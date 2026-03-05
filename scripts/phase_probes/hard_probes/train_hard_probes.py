@@ -9681,6 +9681,28 @@ def train_real_language(
             def update_curriculum(self, new_curriculum):
                 pass  # No curriculum in HybridPhaseTransformer
 
+            def ablate_attention(self, input_ids, targets,
+                                ablate_phase=False, ablate_local=False):
+                """Return normal PPL — HybridPhaseTransformer doesn't have
+                separate phase/local paths to ablate independently."""
+                with torch.no_grad():
+                    logits = self.forward(input_ids)
+                    loss = F.cross_entropy(
+                        logits.view(-1, self.vocab_size), targets.view(-1),
+                        ignore_index=self.vocab_size - 1,  # PAD token
+                    )
+                    return math.exp(min(loss.item(), 20.0))
+
+            def get_layer_contributions(self, input_ids, targets):
+                """Stub — layer contribution analysis not applicable."""
+                num_layers = self.inner.config.num_layers
+                return {
+                    'layer_ppl': [0.0] * num_layers,
+                    'contribution_pct': [1.0 / num_layers] * num_layers,
+                    'ppl_embed': 0.0,
+                    'total_reduction': 0.0,
+                }
+
         model = _HybridPhaseAdapter(_inner_model)
     else:
         print(f"\nCreating HybridLMTransformer...")
@@ -12481,8 +12503,11 @@ Examples:
                         choices=["pool", "attn-lite", "slots"],
                         help="GCT write mode: 'pool', 'attn-lite', or 'slots' (V10.14 addressable KV memory)")
     # V10.14: Slot memory parameters (when --global-update-mode=slots)
-    parser.add_argument("--slots-write-lr", type=float, default=0.1,
-                        help="EMA learning rate for competitive slot writes (default: 0.1)")
+    parser.add_argument("--slots-write-lr", type=float, default=0.5,
+                        help="EMA learning rate for competitive slot writes (default: 0.5). "
+                             "V10.14.6: increased from 0.1 — with 4 layers of writes per "
+                             "forward pass, 0.1 retains 65%% init noise (0.9^4). At 0.5, "
+                             "only 6%% init noise remains (0.5^4).")
     parser.add_argument("--retrieval-loss-weight", type=float, default=1.0,
                         help="Weight for auxiliary retrieval CE loss at query positions (default: 1.0)")
     parser.add_argument("--phase-to-global", action="store_true",
