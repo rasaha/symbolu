@@ -4292,6 +4292,7 @@ def train(config: UnifiedTrainingConfig):
                             x=_sh,
                             slot_keys=_sk,
                             slot_vals=_sv,
+                            query_mask=getattr(model, '_retrieval_query_mask', None),
                             target_ids=y,
                             lm_head=_lm_head,
                         )
