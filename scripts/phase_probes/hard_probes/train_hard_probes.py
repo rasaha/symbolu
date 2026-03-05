@@ -10072,8 +10072,9 @@ def train_real_language(
             )
             # Balanced sharpness loss: sharp per-token + diverse across-tokens
             _sharp_loss = model.slot_memory.compute_sharpness_loss()
-            # Weight at 0.1 — balances specialization pressure vs main loss
-            _sharp_weight = 0.1
+            # V10.14.4: Weight 0.5 — previous 0.1 was too weak to prevent
+            # assignment collapse (gate died to 0.017, H stayed near-uniform)
+            _sharp_weight = 0.5
             loss = loss + _sharp_weight * _sharp_loss
             if _retr_loss.item() > 0:
                 loss = loss + model.retrieval_loss_weight * _retr_loss

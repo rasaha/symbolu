@@ -8299,16 +8299,21 @@ class SlotMemoryGCT(nn.Module):
         # Novelty gate: only write when the token carries new binding info
         # sigmoid(gate) → 0 means "don't write", 1 means "write"
         self.write_novelty_gate = nn.Linear(embed_dim, 1)
-        # Initialize gate bias to -1 so writes are selective by default
-        # sigmoid(-1) ≈ 0.27 — starts conservative, learns to open
-        nn.init.constant_(self.write_novelty_gate.bias, -1.0)
+        # V10.14.4: Initialize gate bias to 0 (sigmoid(0) = 0.5).
+        # Previous bias=-1 (sigmoid=0.27) was too conservative: combined with
+        # weak gradient signal to the gate, it collapsed to 0.017 and killed writes.
+        nn.init.constant_(self.write_novelty_gate.bias, 0.0)
+        # Floor: prevent gate from collapsing below 0.1 even under LM loss pressure
+        self._novelty_gate_floor = 0.1
 
         # Write key scale: learnable inverse temperature for sharpening assignment.
-        # Initialize to 1/sqrt(d) but allow gradient to increase it for sharper
-        # competitive assignment. Without this, random projections produce
-        # near-uniform softmax (H ≈ ln(K)) and slots never specialize.
+        # V10.14.4: Initialize to log(1.0) = 0 so scale starts at 1.0.
+        # Previous init log(1/sqrt(d)) gave scale ≈ 0.036 which made softmax
+        # over K slots near-uniform → dead assignment → write gate collapse.
+        # With scale=1.0, cosine-like similarities produce meaningful softmax
+        # differentiation from the start.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log((_key_dim) ** -0.5))
+            torch.tensor(0.0)  # exp(0) = 1.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8380,7 +8385,9 @@ class SlotMemoryGCT(nn.Module):
         x_write = x.detach()  # Always detach input to write path
 
         # Novelty gate: which tokens should write? [B, N, 1]
+        # V10.14.4: Floor clamp prevents gate death — ensures minimum write pressure
         novelty = torch.sigmoid(self.write_novelty_gate(x_write))
+        novelty = torch.clamp(novelty, min=self._novelty_gate_floor)
 
         # Project tokens into write key/value space
         write_keys = self.write_key_proj(x_write)   # [B, N, D_key]
@@ -8435,6 +8442,7 @@ class SlotMemoryGCT(nn.Module):
         # Store assignment for sharpness loss (WITH grad — this is the learning signal)
         self._last_assignment = assignment  # [B, N, K]
         self._last_novelty = novelty  # [B, N, 1]
+        self._last_gated_assignment = gated_assignment  # [B, N, K] — for gate gradient
 
         # Diagnostics (no grad)
         with torch.no_grad():
@@ -8551,14 +8559,17 @@ class SlotMemoryGCT(nn.Module):
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """
-        Balanced slot assignment loss: sharp per-token + diverse across-tokens.
+        Balanced slot assignment loss: sharp per-token + diverse across-tokens,
+        plus gate utilization penalty.
 
-        Two competing objectives:
+        Three objectives:
         1. Per-token sharpness: each token should assign to ~1 slot (low entropy)
         2. Slot diversity: across all tokens, slots should be used evenly (high marginal entropy)
+        3. Gate utilization: novelty gate should stay open enough for writes (V10.14.4)
 
-        Loss = per_token_entropy - marginal_entropy (both normalized by ln(K)).
-        Minimized when each token picks one slot AND different tokens pick different slots.
+        Loss = per_token_entropy - marginal_entropy - gate_utilization
+        Minimized when each token picks one slot, different tokens pick different slots,
+        AND the novelty gate is meaningfully open.
 
         Score interpretation:
             Uniform:  1.0 - 1.0 = 0.0  (bad: no specialization)
@@ -8566,7 +8577,7 @@ class SlotMemoryGCT(nn.Module):
             Ideal:    ~0.0 - ~1.0 = -1.0 (good: sharp + diverse)
 
         Returns:
-            sharpness_loss: scalar in [-1, 1]. Lower is better.
+            sharpness_loss: scalar. Lower is better.
         """
         if self._last_assignment is None:
             return torch.tensor(0.0)
@@ -8580,8 +8591,16 @@ class SlotMemoryGCT(nn.Module):
         mean_per_token = per_token_entropy.mean() / max_entropy  # normalized
 
         # Marginal entropy: want HIGH (diverse slot usage across tokens)
-        # Average assignment distribution across all tokens
-        marginal = assignment.mean(dim=1)  # [B, K] — avg slot usage
+        # V10.14.4: Use gated_assignment for marginal so gradient reaches novelty gate.
+        # The marginal of gated_assignment reflects which slots actually receive writes,
+        # so maximizing its entropy pushes the gate open for informative tokens.
+        gated = self._last_gated_assignment  # [B, N, K]
+        if gated is not None:
+            # Normalize gated to a distribution over slots
+            gated_sum = gated.sum(dim=1).clamp(min=1e-8)  # [B, K]
+            marginal = gated_sum / gated_sum.sum(dim=-1, keepdim=True)  # [B, K]
+        else:
+            marginal = assignment.mean(dim=1)  # fallback
         log_m = torch.log(marginal.clamp(min=1e-8))
         marginal_entropy = -(marginal * log_m).sum(dim=-1)  # [B]
         mean_marginal = marginal_entropy.mean() / max_entropy  # normalized
