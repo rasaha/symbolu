@@ -6038,6 +6038,20 @@ class HybridAttentionLayer(nn.Module):
                     ).mean(dim=2)
                 phase_memory = torch.cat([prev_for_xattn, phase_memory], dim=1)
 
+            # V10.21: RMS-normalize phase_memory before local cross-attention.
+            # phase_memory is a cumsum output — magnitudes grow linearly with
+            # sequence position. When local_attn's complex_proj → k_proj/v_proj
+            # processes unbounded magnitudes, the softmax attention gradients
+            # create 300-500× spikes in W_k_fused and v_proj (step 700: 430×,
+            # 487×) that cascade through blocks 3-7 into full PPL collapse.
+            # RMS normalization bounds the magnitudes to O(1) while preserving
+            # relative structure and gradient flow. Using detached denominator
+            # (same pattern as phase normalizer V10.19) to prevent the
+            # normalization Jacobian from creating new amplification paths.
+            if phase_memory is not None:
+                _pm_rms = (phase_memory.abs() ** 2).mean(dim=-1, keepdim=True).sqrt().clamp(min=1e-6)
+                phase_memory = phase_memory / _pm_rms.detach()
+
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
             # V10.2.1 GRADIENT ROUTING (Requirement 7):
