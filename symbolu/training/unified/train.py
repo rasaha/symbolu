@@ -4303,11 +4303,16 @@ def train(config: UnifiedTrainingConfig):
                     _sh = _out_dict.get('_slot_hidden')
                     _retr_loss_val = 0.0
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
+                        # V10.16: Compute retrieval query mask per-batch.
+                        # Previously used getattr(model, '_retrieval_query_mask', None)
+                        # which was never set, so retrieval loss was always 0.
+                        # Use all non-padding positions (y != -100) as query targets.
+                        _retr_query_mask = (y != -100)  # [B, N] True at valid targets
                         _retr_loss = _sm.compute_retrieval_loss(
                             x=_sh,
                             slot_keys=_sk,
                             slot_vals=_sv,
-                            query_mask=getattr(model, '_retrieval_query_mask', None),
+                            query_mask=_retr_query_mask,
                             target_ids=y,
                             lm_head=_lm_head,
                         )
