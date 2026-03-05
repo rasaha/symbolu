@@ -4303,11 +4303,14 @@ def train(config: UnifiedTrainingConfig):
                     _sh = _out_dict.get('_slot_hidden')
                     _retr_loss_val = 0.0
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
-                        # V10.16: Compute retrieval query mask per-batch.
-                        # Previously used getattr(model, '_retrieval_query_mask', None)
-                        # which was never set, so retrieval loss was always 0.
-                        # Use all non-padding positions (y != -100) as query targets.
-                        _retr_query_mask = (y != -100)  # [B, N] True at valid targets
+                        # V10.16.1: Use explicit query_mask from batch if available
+                        # (e.g. AssociativeRecallDataset provides True only at answer positions).
+                        # Fall back to (y != -100) for general LM training.
+                        _retr_query_mask = None
+                        if isinstance(batch, dict) and 'query_mask' in batch:
+                            _retr_query_mask = batch['query_mask'].to(device)
+                        if _retr_query_mask is None:
+                            _retr_query_mask = (y != -100)  # [B, N] general LM fallback
                         _retr_loss = _sm.compute_retrieval_loss(
                             x=_sh,
                             slot_keys=_sk,
@@ -4323,7 +4326,9 @@ def train(config: UnifiedTrainingConfig):
                     # Log slot diagnostics periodically
                     if global_step % config.log_every == 0:
                         _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(15.0))))
+                        _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
                         print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
+                              f"qmask={_mask_frac:.4f} "
                               f"L_sharp={getattr(_sm, '_diag_L_sharp', 0):.4f} "
                               f"L_bal={getattr(_sm, '_diag_L_bal', 0):.4f} "
                               f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "

@@ -739,12 +739,18 @@ def train_real_language(
                 train_dataset.set_delay_range(new_delay_min, new_delay_max)
 
         try:
-            x, y = next(train_iter)
+            batch = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
-            x, y = next(train_iter)
+            batch = next(train_iter)
 
-        x, y = x.to(config.device), y.to(config.device)
+        # V10.16.1: Handle dict batches (with query_mask) and tuple batches
+        if isinstance(batch, dict):
+            x = batch["input_ids"].to(config.device)
+            y = batch["labels"].to(config.device)
+        else:
+            x, y = batch
+            x, y = x.to(config.device), y.to(config.device)
 
         # V10.3.7: Check if witness entropy regularization is enabled
         use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
@@ -753,8 +759,8 @@ def train_real_language(
         deep_loss_value = 0.0
         main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
 
-        # V10.5.6: Use ignore_index for associative recall (ignore PAD tokens in loss)
-        ignore_idx = ar_pad_token if use_associative_recall else -100  # -100 is PyTorch default (no ignore)
+        # V10.16.1: Targets now use -100 for ignored positions (standard PyTorch convention)
+        ignore_idx = -100
 
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
             logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y, ignore_index=ignore_idx)

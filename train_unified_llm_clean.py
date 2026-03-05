@@ -13273,14 +13273,18 @@ def train(config: UnifiedTrainingConfig):
                 if (isinstance(outputs, dict) and '_slot_keys' in outputs
                         and hasattr(model, 'slot_memory') and model.slot_memory is not None
                         and hasattr(model, 'retrieval_loss_weight') and model.retrieval_loss_weight > 0):
-                    # Build query mask: positions where the model should retrieve
-                    # For retrieval-enriched training data, "Answer:" positions are queries
-                    # For standard LM data, no query positions → loss = 0 (no-op)
+                    # V10.16.1: Use explicit query_mask from batch if available,
+                    # fall back to (y != -100) for general LM training.
+                    _retr_query_mask = None
+                    if isinstance(batch, dict) and 'query_mask' in batch:
+                        _retr_query_mask = batch['query_mask'].to(device)
+                    if _retr_query_mask is None:
+                        _retr_query_mask = (y != -100)
                     _retr_loss = model.slot_memory.compute_retrieval_loss(
                         x=outputs['_slot_hidden'],
                         slot_keys=outputs['_slot_keys'],
                         slot_vals=outputs['_slot_vals'],
-                        query_mask=getattr(model, '_retrieval_query_mask', None),
+                        query_mask=_retr_query_mask,
                         target_ids=y,
                         lm_head=model.lm_head,
                     )
