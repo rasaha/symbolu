@@ -6661,10 +6661,13 @@ class HybridPhaseTransformer(nn.Module):
         global_tokens_enabled: bool = False,  # Enable GCT memory slots
         num_global_tokens: int = 16,  # Number of global tokens
         global_update_enabled: bool = True,  # Enable controlled write
-        global_update_mode: str = "pool",  # "pool" or "attn-lite"
+        global_update_mode: str = "pool",  # "pool", "attn-lite", or "slots"
         global_update_interval: int = 1,  # Update every N layers
         global_token_write_detach: bool = True,  # Detach tokens in write path
         phase_to_global: bool = False,  # Phase→Global integration
+        # V10.14: Slot memory parameters (when global_update_mode="slots")
+        slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
+        retrieval_loss_weight: float = 0.1,  # Weight for auxiliary retrieval loss
     ):
         super().__init__()
 
@@ -6771,26 +6774,47 @@ class HybridPhaseTransformer(nn.Module):
         self.global_update_interval = global_update_interval
         self.global_token_write_detach = global_token_write_detach
 
+        # V10.14: Store retrieval loss weight
+        self.retrieval_loss_weight = retrieval_loss_weight
+
         if global_tokens_enabled:
-            # Learnable global token embeddings [G, D]
-            self.global_tokens = nn.Parameter(
-                torch.randn(num_global_tokens, embed_dim) * 0.02
-            )
-            # READ path: tokens attend to globals via cross-attention
-            self.gct_read_attn = nn.MultiheadAttention(
-                embed_dim, num_heads, dropout=dropout, batch_first=True
-            )
-            # WRITE path: controlled compression update (pool mode)
-            self.global_write_gate = nn.Linear(embed_dim, 1)
-            self.global_update_proj = nn.Linear(embed_dim, embed_dim, bias=False)
-            # WRITE path: attn-lite mode (optional)
-            if global_update_mode == "attn-lite":
-                self.gct_write_attn = nn.MultiheadAttention(
+            if global_update_mode == "slots":
+                # V10.14: Addressable slot memory — replaces pool/attn-lite
+                # SlotMemoryGCT handles its own read/write paths.
+                # CRITICAL: Slots update ONLY through competitive write rule.
+                # No nn.MultiheadAttention read — SlotMemoryGCT.read() is used instead.
+                self.slot_memory = SlotMemoryGCT(
+                    num_slots=num_global_tokens,
+                    embed_dim=embed_dim,
+                    num_heads=num_heads,
+                    write_lr=slots_write_lr,
+                    dropout=dropout,
+                )
+                # No legacy GCT modules needed — slot_memory handles everything
+                self.global_tokens = None  # Slots init is inside SlotMemoryGCT
+                self.gct_read_attn = None  # Read is via SlotMemoryGCT.read()
+            else:
+                # Legacy: pool or attn-lite modes
+                self.slot_memory = None
+                # Learnable global token embeddings [G, D]
+                self.global_tokens = nn.Parameter(
+                    torch.randn(num_global_tokens, embed_dim) * 0.02
+                )
+                # READ path: tokens attend to globals via cross-attention
+                self.gct_read_attn = nn.MultiheadAttention(
                     embed_dim, num_heads, dropout=dropout, batch_first=True
                 )
-                self._gct_write_scale = 0.05
-            # Phase → Global integration (optional)
-            if phase_to_global:
+                # WRITE path: controlled compression update (pool mode)
+                self.global_write_gate = nn.Linear(embed_dim, 1)
+                self.global_update_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+                # WRITE path: attn-lite mode (optional)
+                if global_update_mode == "attn-lite":
+                    self.gct_write_attn = nn.MultiheadAttention(
+                        embed_dim, num_heads, dropout=dropout, batch_first=True
+                    )
+                    self._gct_write_scale = 0.05
+            # Phase → Global integration (optional, only for non-slot modes)
+            if phase_to_global and global_update_mode != "slots":
                 # Input: Re + Im of phase state = 2 * embed_dim
                 self.phase_to_global_proj = nn.Linear(2 * embed_dim, embed_dim)
             else:
@@ -6993,10 +7017,17 @@ class HybridPhaseTransformer(nn.Module):
         hidden_states = [] if should_extract else None
         decorr_losses = [] if return_decorr_loss else None
 
-        # V10.13: Initialize GCT global state
+        # V10.13/V10.14: Initialize GCT global state
+        _slot_keys = None  # V10.14: Only used in slots mode
+        _slot_vals = None
         if self.global_tokens_enabled:
-            _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
-            _gct_state = _gct_state.to(dtype=x.dtype)
+            if self.global_update_mode == "slots":
+                # V10.14: Initialize addressable slot memory
+                _slot_keys, _slot_vals = self.slot_memory.init_state(B, x.dtype, x.device)
+            else:
+                # Legacy: pooled/attn-lite global tokens
+                _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+                _gct_state = _gct_state.to(dtype=x.dtype)
 
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
@@ -7037,24 +7068,44 @@ class HybridPhaseTransformer(nn.Module):
                     x = block(x, causal_mask=True)
 
             # =================================================================
-            # V10.13: GCT — Token READ from global tokens (cross-attention)
+            # V10.13/V10.14: GCT — Token READ from memory
             # =================================================================
             if self.global_tokens_enabled:
-                _gct_out = self.gct_read_attn(
-                    x, _gct_state, _gct_state, need_weights=False
-                )[0]
-                x = x + _gct_out
+                if self.global_update_mode == "slots":
+                    # V10.14: Read via SlotMemoryGCT (never modifies slot state)
+                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                    x = x + _slot_out
+                else:
+                    # Legacy: cross-attention to global tokens
+                    _gct_out = self.gct_read_attn(
+                        x, _gct_state, _gct_state, need_weights=False
+                    )[0]
+                    x = x + _gct_out
 
             # =================================================================
-            # V10.13: GCT — Global WRITE via controlled compression
+            # V10.13/V10.14: GCT — Memory WRITE
             # =================================================================
             if self.global_tokens_enabled and self.global_update_enabled:
                 if (i % self.global_update_interval) == 0:
-                    if self.global_update_mode == "pool":
+                    if self.global_update_mode == "slots":
+                        # V10.14: Competitive slot write — the ONLY way slots update
+                        _slot_keys, _slot_vals = self.slot_memory.write(
+                            x, _slot_keys, _slot_vals,
+                            detach=(self.global_token_write_detach and self.training),
+                        )
+                    elif self.global_update_mode == "pool":
                         # Gated pooled summary of tokens
                         _w = torch.sigmoid(self.global_write_gate(x))  # [B, T, 1]
                         _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)  # [B, D]
                         _delta = self.global_update_proj(_pooled).unsqueeze(1)  # [B, 1, D]
+
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
+
+                        with torch.no_grad():
+                            self._diag_global_token_delta_norm = _delta.norm().item()
+                            self._diag_global_write_gate_mean = _w.mean().item()
                     else:
                         # attn-lite: globals attend to tokens with small scale
                         _delta = self.gct_write_attn(
@@ -7062,19 +7113,16 @@ class HybridPhaseTransformer(nn.Module):
                         )[0]
                         _delta = _delta * self._gct_write_scale
 
-                    if self.global_token_write_detach and self.training:
-                        _delta = _delta.detach()
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
 
-                    _gct_state = _gct_state + _delta
-
-                    # Write diagnostics
-                    with torch.no_grad():
-                        self._diag_global_token_delta_norm = _delta.norm().item()
-                        if self.global_update_mode == "pool":
-                            self._diag_global_write_gate_mean = _w.mean().item()
+                        with torch.no_grad():
+                            self._diag_global_token_delta_norm = _delta.norm().item()
 
             # =================================================================
             # V10.13: Phase → Global integration (after hybrid blocks only)
+            # Skipped in slots mode — Phase stays separate as context summarizer
             # =================================================================
             _p2g = getattr(self, 'phase_to_global_proj', None)
             if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
@@ -7098,10 +7146,15 @@ class HybridPhaseTransformer(nn.Module):
                 if extract_set is None or i in extract_set:
                     hidden_states.append(x)
 
-        # V10.13: GCT diagnostics (after all layers)
+        # V10.13/V10.14: GCT diagnostics (after all layers)
         if self.global_tokens_enabled:
             with torch.no_grad():
-                self._diag_global_token_norm = _gct_state.norm(dim=-1).mean().item()
+                if self.global_update_mode == "slots":
+                    self._diag_global_token_norm = _slot_vals.norm(dim=-1).mean().item()
+                    # Expose slot diagnostics from SlotMemoryGCT
+                    self._diag_global_write_gate_mean = self.slot_memory._diag_write_gate_mean
+                else:
+                    self._diag_global_token_norm = _gct_state.norm(dim=-1).mean().item()
 
         # Output
         x = self.norm(x)
@@ -7118,6 +7171,13 @@ class HybridPhaseTransformer(nn.Module):
         if return_decorr_loss and decorr_losses:
             # Average decorrelation loss across all hybrid layers
             result['decorr_loss'] = torch.stack(decorr_losses).mean()
+
+        # V10.14: Expose slot state + hidden for retrieval loss computation
+        # The training loop uses these to call slot_memory.compute_retrieval_loss()
+        if self.global_tokens_enabled and self.global_update_mode == "slots":
+            result['_slot_keys'] = _slot_keys
+            result['_slot_vals'] = _slot_vals
+            result['_slot_hidden'] = x  # Post-norm hidden for query matching
 
         return result
 
@@ -7175,14 +7235,25 @@ class HybridPhaseTransformer(nn.Module):
 
         next_layer_states = {}
 
-        # V10.13: GCT state — restore from previous chunk or initialize
+        # V10.13/V10.14: GCT state — restore from previous chunk or initialize
+        _slot_keys = None
+        _slot_vals = None
         if self.global_tokens_enabled:
-            _gct_prev = prev_layer_states.get('_gct_global_state', None)
-            if _gct_prev is not None:
-                _gct_state = _gct_prev.to(dtype=x.dtype)
+            if self.global_update_mode == "slots":
+                _prev_sk = prev_layer_states.get('_slot_keys', None)
+                _prev_sv = prev_layer_states.get('_slot_vals', None)
+                if _prev_sk is not None and _prev_sv is not None:
+                    _slot_keys = _prev_sk.to(dtype=x.dtype)
+                    _slot_vals = _prev_sv.to(dtype=x.dtype)
+                else:
+                    _slot_keys, _slot_vals = self.slot_memory.init_state(B, x.dtype, x.device)
             else:
-                _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
-                _gct_state = _gct_state.to(dtype=x.dtype)
+                _gct_prev = prev_layer_states.get('_gct_global_state', None)
+                if _gct_prev is not None:
+                    _gct_state = _gct_prev.to(dtype=x.dtype)
+                else:
+                    _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+                    _gct_state = _gct_state.to(dtype=x.dtype)
 
         # Process through blocks with state management
         for i, block in enumerate(self.blocks):
@@ -7206,30 +7277,41 @@ class HybridPhaseTransformer(nn.Module):
                 # Local-only blocks: no state to manage
                 x = block(x, causal_mask=True)
 
-            # V10.13: GCT read/write (same logic as forward())
+            # V10.13/V10.14: GCT read/write (same logic as forward())
             if self.global_tokens_enabled:
-                _gct_out = self.gct_read_attn(
-                    x, _gct_state, _gct_state, need_weights=False
-                )[0]
-                x = x + _gct_out
+                if self.global_update_mode == "slots":
+                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                    x = x + _slot_out
+                else:
+                    _gct_out = self.gct_read_attn(
+                        x, _gct_state, _gct_state, need_weights=False
+                    )[0]
+                    x = x + _gct_out
 
             if self.global_tokens_enabled and self.global_update_enabled:
                 if (i % self.global_update_interval) == 0:
-                    if self.global_update_mode == "pool":
+                    if self.global_update_mode == "slots":
+                        _slot_keys, _slot_vals = self.slot_memory.write(
+                            x, _slot_keys, _slot_vals,
+                            detach=(self.global_token_write_detach and self.training),
+                        )
+                    elif self.global_update_mode == "pool":
                         _w = torch.sigmoid(self.global_write_gate(x))
                         _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)
                         _delta = self.global_update_proj(_pooled).unsqueeze(1)
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
                     else:
                         _delta = self.gct_write_attn(
                             _gct_state, x, x, need_weights=False
                         )[0]
                         _delta = _delta * self._gct_write_scale
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
 
-                    if self.global_token_write_detach and self.training:
-                        _delta = _delta.detach()
-                    _gct_state = _gct_state + _delta
-
-            # V10.13: Phase → Global (after hybrid blocks)
+            # V10.13: Phase → Global (after hybrid blocks, non-slot modes only)
             _p2g = getattr(self, 'phase_to_global_proj', None)
             if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
                 _pa = block.attention.phase_attn
@@ -7246,9 +7328,13 @@ class HybridPhaseTransformer(nn.Module):
                         _phase_upd = _phase_upd * _ws_a
                     _gct_state = _gct_state + _phase_upd
 
-        # V10.13: Save GCT state for next chunk
+        # V10.13/V10.14: Save GCT/slot state for next chunk
         if self.global_tokens_enabled:
-            next_layer_states['_gct_global_state'] = _gct_state.detach()
+            if self.global_update_mode == "slots":
+                next_layer_states['_slot_keys'] = _slot_keys.detach()
+                next_layer_states['_slot_vals'] = _slot_vals.detach()
+            else:
+                next_layer_states['_gct_global_state'] = _gct_state.detach()
 
         # Output
         x = self.norm(x)
@@ -8118,6 +8204,310 @@ class LocalOnlyTransformer(nn.Module):
 #
 # Reference: FSCS pre-softmax routing pattern, adapted for quadratic softmax.
 # =============================================================================
+
+
+# =============================================================================
+# V10.14: SLOT MEMORY GCT — Addressable Key-Value Slots for Associative Recall
+# =============================================================================
+#
+# Problem: EMA/pooled GCT state is compressive — it cannot answer "what value
+# was paired with key X?" because distinct bindings get blurred together.
+#
+# Solution: Replace pooled writes with competitive slot assignment.
+# Each global token becomes an addressable memory slot with a key embedding
+# and value state. Tokens write to slots via competitive assignment (softmax
+# over slot keys), and read via cross-attention to slot values.
+#
+# CRITICAL INVARIANT: Slots update ONLY through the competitive write rule.
+# Normal attention must NOT modify slot state — otherwise slots become noisy.
+# The read path (cross-attention from tokens to slots) produces output that
+# feeds into the residual stream, but never writes back to slot state.
+#
+# Architecture:
+#   WRITE: assignment = softmax(token_key @ slot_keys.T / sqrt(d))
+#          slot_val = (1 - η*a) * slot_val + η*a * proj(token)
+#          slot_key = (1 - η*a) * slot_key + η*a * key_proj(token)
+#   READ:  attn_weights = softmax(query @ slot_keys.T / sqrt(d))
+#          output = attn_weights @ slot_vals
+#
+# This is Option 3 from the ChatGPT analysis: upgrade GCT into addressable
+# retrieval slots, using the existing global tokens scaffold.
+# =============================================================================
+
+
+class SlotMemoryGCT(nn.Module):
+    """
+    V10.14: Addressable Key-Value Slot Memory for GCT.
+
+    Replaces pooled/attn-lite GCT write with competitive slot assignment.
+    Enables true associative recall: given a query key, retrieve the value
+    that was stored with a matching key.
+
+    Slots are write-protected: only the competitive write rule can update
+    slot state. The read path (cross-attention) produces output for the
+    residual stream but NEVER writes back to slots.
+
+    Args:
+        num_slots: Number of memory slots (= num_global_tokens)
+        embed_dim: Embedding dimension
+        num_heads: Number of attention heads for read path
+        write_lr: Learning rate for slot updates (η in the write rule)
+        dropout: Dropout rate
+        write_key_dim: Dimension for write key matching (default: embed_dim)
+    """
+
+    def __init__(
+        self,
+        num_slots: int = 64,
+        embed_dim: int = 768,
+        num_heads: int = 12,
+        write_lr: float = 0.1,
+        dropout: float = 0.1,
+        write_key_dim: Optional[int] = None,
+    ):
+        super().__init__()
+        self.num_slots = num_slots
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.write_lr = write_lr
+        _key_dim = write_key_dim or embed_dim
+
+        # --- Slot state (learnable initialization) ---
+        # Keys: used for both write assignment and read queries
+        self.slot_keys_init = nn.Parameter(
+            torch.randn(num_slots, _key_dim) * 0.02
+        )
+        # Values: content stored in each slot
+        self.slot_vals_init = nn.Parameter(
+            torch.randn(num_slots, embed_dim) * 0.02
+        )
+
+        # --- WRITE path: token → slot assignment ---
+        # Projects input token into write-key space for slot matching
+        self.write_key_proj = nn.Linear(embed_dim, _key_dim, bias=False)
+        # Projects input token into value to be written
+        self.write_val_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Novelty gate: only write when the token carries new binding info
+        # sigmoid(gate) → 0 means "don't write", 1 means "write"
+        self.write_novelty_gate = nn.Linear(embed_dim, 1)
+        # Initialize gate bias to -1 so writes are selective by default
+        # sigmoid(-1) ≈ 0.27 — starts conservative, learns to open
+        nn.init.constant_(self.write_novelty_gate.bias, -1.0)
+
+        # Write key scale (1/sqrt(d_key))
+        self._write_scale = (_key_dim) ** -0.5
+
+        # --- READ path: query → slot attention ---
+        self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
+        self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.read_dropout = nn.Dropout(dropout)
+        self._read_scale = (_key_dim) ** -0.5
+
+        # --- Diagnostics ---
+        self._diag_write_gate_mean = None
+        self._diag_assignment_entropy = None
+        self._diag_slot_key_norm = None
+        self._diag_slot_val_norm = None
+        self._diag_read_attn_entropy = None
+
+    def init_state(self, batch_size: int, dtype: torch.dtype, device: torch.device):
+        """Initialize slot state for a new batch.
+
+        Returns:
+            slot_keys: [B, K, D_key] — slot key embeddings
+            slot_vals: [B, K, D] — slot value embeddings
+        """
+        slot_keys = self.slot_keys_init.unsqueeze(0).expand(batch_size, -1, -1).clone()
+        slot_vals = self.slot_vals_init.unsqueeze(0).expand(batch_size, -1, -1).clone()
+        return slot_keys.to(dtype=dtype, device=device), slot_vals.to(dtype=dtype, device=device)
+
+    def write(
+        self,
+        x: torch.Tensor,            # [B, N, D] — token representations
+        slot_keys: torch.Tensor,     # [B, K, D_key] — current slot keys
+        slot_vals: torch.Tensor,     # [B, K, D] — current slot values
+        detach: bool = False,        # Detach write deltas (stop grad to main path)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Competitive slot write: each token writes to the most similar slot.
+
+        The write uses a soft competitive assignment (softmax over slots),
+        followed by a gated EMA update. This ensures each slot specializes
+        in storing specific key-value bindings.
+
+        IMPORTANT: This is the ONLY way slot state gets modified.
+
+        Args:
+            x: Token representations [B, N, D]
+            slot_keys: Current slot keys [B, K, D_key]
+            slot_vals: Current slot values [B, K, D]
+            detach: If True, detach deltas from computation graph
+
+        Returns:
+            updated_slot_keys: [B, K, D_key]
+            updated_slot_vals: [B, K, D]
+        """
+        B, N, D = x.shape
+
+        # Novelty gate: which tokens should write? [B, N, 1]
+        novelty = torch.sigmoid(self.write_novelty_gate(x))
+
+        # Project tokens into write key/value space
+        write_keys = self.write_key_proj(x)   # [B, N, D_key]
+        write_vals = self.write_val_proj(x)    # [B, N, D]
+
+        # Competitive assignment: softmax(token_key @ slot_keys.T / sqrt(d))
+        # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
+        assignment_logits = torch.bmm(
+            write_keys, slot_keys.transpose(1, 2)
+        ) * self._write_scale
+        assignment = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
+
+        # Gate assignment by novelty: only tokens with binding info write
+        # [B, N, K] * [B, N, 1] → [B, N, K]
+        gated_assignment = assignment * novelty
+
+        # Aggregate writes per slot: sum over tokens
+        # effective_write[b, k] = sum_t(gated_assignment[b, t, k])
+        # This is the total write pressure on each slot
+        write_pressure = gated_assignment.sum(dim=1)  # [B, K]
+
+        # Weighted average of incoming keys/values per slot
+        # [B, K, N] @ [B, N, D_key] → [B, K, D_key]
+        incoming_keys = torch.bmm(
+            gated_assignment.transpose(1, 2), write_keys
+        )
+        # [B, K, N] @ [B, N, D] → [B, K, D]
+        incoming_vals = torch.bmm(
+            gated_assignment.transpose(1, 2), write_vals
+        )
+
+        # Normalize by write pressure (avoid division by zero)
+        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=1e-6)
+        incoming_keys = incoming_keys / pressure_norm
+        incoming_vals = incoming_vals / pressure_norm
+
+        # EMA update rate per slot: η * min(write_pressure, 1.0)
+        # Slots with no write pressure don't update; heavy pressure caps at η
+        eta = self.write_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
+
+        if detach:
+            incoming_keys = incoming_keys.detach()
+            incoming_vals = incoming_vals.detach()
+            eta = eta.detach()
+
+        # Slot update: EMA rule
+        new_slot_keys = (1 - eta) * slot_keys + eta * incoming_keys
+        new_slot_vals = (1 - eta) * slot_vals + eta * incoming_vals
+
+        # Diagnostics (no grad)
+        with torch.no_grad():
+            self._diag_write_gate_mean = novelty.mean().item()
+            # Assignment entropy: high = spread across slots, low = sharp assignment
+            _a_log = torch.log(assignment.clamp(min=1e-8))
+            self._diag_assignment_entropy = -(assignment * _a_log).sum(dim=-1).mean().item()
+            self._diag_slot_key_norm = new_slot_keys.norm(dim=-1).mean().item()
+            self._diag_slot_val_norm = new_slot_vals.norm(dim=-1).mean().item()
+
+        return new_slot_keys, new_slot_vals
+
+    def read(
+        self,
+        x: torch.Tensor,            # [B, N, D] — query tokens
+        slot_keys: torch.Tensor,     # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,     # [B, K, D] — slot values
+    ) -> torch.Tensor:
+        """
+        Read from slots via attention: query tokens attend to slot keys,
+        retrieve weighted sum of slot values.
+
+        This produces output for the residual stream but NEVER modifies slots.
+
+        Args:
+            x: Query token representations [B, N, D]
+            slot_keys: Slot keys [B, K, D_key]
+            slot_vals: Slot values [B, K, D]
+
+        Returns:
+            read_output: [B, N, D] — retrieved information
+        """
+        # Project queries
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+
+        # Attention: softmax(query @ slot_keys.T / sqrt(d))
+        # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
+        attn_logits = torch.bmm(
+            queries, slot_keys.transpose(1, 2)
+        ) * self._read_scale
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+        attn_weights = self.read_dropout(attn_weights)
+
+        # Retrieve: [B, N, K] @ [B, K, D] → [B, N, D]
+        retrieved = torch.bmm(attn_weights, slot_vals)
+
+        # Project to output space
+        output = self.read_output_proj(retrieved)
+
+        # Diagnostics
+        with torch.no_grad():
+            _w_log = torch.log(attn_weights.clamp(min=1e-8))
+            self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
+
+        return output
+
+    def compute_retrieval_loss(
+        self,
+        x: torch.Tensor,              # [B, N, D] — token representations
+        slot_keys: torch.Tensor,       # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,       # [B, K, D] — slot values
+        query_mask: torch.Tensor,      # [B, N] — True at query positions
+        target_ids: torch.Tensor,      # [B, N] — target token IDs
+        lm_head: nn.Linear,            # Shared LM head for prediction
+    ) -> torch.Tensor:
+        """
+        Auxiliary retrieval loss: at query positions, read from slots and
+        predict the target value token using the shared LM head.
+
+        This loss directly supervises the slot memory to store retrievable
+        key-value bindings. Without it, slot writes may not learn to store
+        what's needed for retrieval.
+
+        Args:
+            x: Token representations [B, N, D]
+            slot_keys: Slot keys [B, K, D_key]
+            slot_vals: Slot values [B, K, D]
+            query_mask: Boolean mask, True at positions where retrieval is tested [B, N]
+            target_ids: Token IDs to predict at query positions [B, N]
+            lm_head: The model's LM head (shared, not separate)
+
+        Returns:
+            retrieval_loss: Scalar CE loss averaged over query positions.
+                           Returns 0 if no query positions exist.
+        """
+        if query_mask is None or not query_mask.any():
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Read from slots at all positions (needed for gradient flow)
+        retrieved = self.read(x, slot_keys, slot_vals)  # [B, N, D]
+
+        # Select only query positions
+        # Flatten: [num_queries, D]
+        query_retrieved = retrieved[query_mask]
+        query_targets = target_ids[query_mask]
+
+        if query_retrieved.shape[0] == 0:
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Predict target token from retrieved vector using shared LM head
+        # This forces the slot memory to store information decodable by LM head
+        query_logits = lm_head(query_retrieved)  # [num_queries, V]
+
+        # Cross-entropy loss on query positions
+        retrieval_loss = F.cross_entropy(
+            query_logits, query_targets, ignore_index=-100
+        )
+
+        return retrieval_loss
 
 
 @dataclass

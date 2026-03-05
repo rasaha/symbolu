@@ -13252,6 +13252,35 @@ def train(config: UnifiedTrainingConfig):
                     metrics['decorr_loss'] = decorr_loss_tensor.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
 
+                # V10.14: Slot memory retrieval auxiliary loss
+                # When using slots mode, add CE loss at query positions to supervise
+                # addressable key-value retrieval through slot memory
+                if (isinstance(outputs, dict) and '_slot_keys' in outputs
+                        and hasattr(model, 'slot_memory') and model.slot_memory is not None
+                        and hasattr(model, 'retrieval_loss_weight') and model.retrieval_loss_weight > 0):
+                    # Build query mask: positions where the model should retrieve
+                    # For retrieval-enriched training data, "Answer:" positions are queries
+                    # For standard LM data, no query positions → loss = 0 (no-op)
+                    _retr_loss = model.slot_memory.compute_retrieval_loss(
+                        x=outputs['_slot_hidden'],
+                        slot_keys=outputs['_slot_keys'],
+                        slot_vals=outputs['_slot_vals'],
+                        query_mask=getattr(model, '_retrieval_query_mask', None),
+                        target_ids=y,
+                        lm_head=model.lm_head,
+                    )
+                    if _retr_loss.item() > 0:
+                        loss = loss + model.retrieval_loss_weight * _retr_loss
+                        metrics['retrieval_loss'] = _retr_loss.item()
+                        metrics['retrieval_weight'] = model.retrieval_loss_weight
+                    # Expose slot diagnostics
+                    if model.slot_memory._diag_write_gate_mean is not None:
+                        metrics['slot_write_gate'] = model.slot_memory._diag_write_gate_mean
+                    if model.slot_memory._diag_assignment_entropy is not None:
+                        metrics['slot_assignment_entropy'] = model.slot_memory._diag_assignment_entropy
+                    if model.slot_memory._diag_read_attn_entropy is not None:
+                        metrics['slot_read_entropy'] = model.slot_memory._diag_read_attn_entropy
+
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
                 # Unlike output decorrelation, this cannot be blocked by detach()
@@ -14946,6 +14975,16 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("gct/lambda_ladder", metrics.get('gct_mean_lambda_ladder', 1.0), global_step)
                         tb_writer.add_scalar("gct/coherence", metrics.get('gct_mean_coherence', 0.5), global_step)
                         tb_writer.add_scalar("gct/schedule_weight", metrics.get('gct_schedule_weight', 0.0), global_step)
+
+                    # V10.14: Slot memory metrics
+                    if 'retrieval_loss' in metrics:
+                        tb_writer.add_scalar("slots/retrieval_loss", metrics['retrieval_loss'], global_step)
+                    if 'slot_write_gate' in metrics:
+                        tb_writer.add_scalar("slots/write_gate", metrics['slot_write_gate'], global_step)
+                    if 'slot_assignment_entropy' in metrics:
+                        tb_writer.add_scalar("slots/assignment_entropy", metrics['slot_assignment_entropy'], global_step)
+                    if 'slot_read_entropy' in metrics:
+                        tb_writer.add_scalar("slots/read_entropy", metrics['slot_read_entropy'], global_step)
 
                     # Sattvic Brake metrics
                     # v2.7 Training State Tracker metrics
