@@ -1349,32 +1349,47 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
+    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
+    # gradient variance explosions from cosine-similarity key matching
+    _slot_memory_lr_scale = 0.1
+    _slot_param_ids = set()
+    _slot_params = []
+    _main_params = []
+    if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+        for p in model.slot_memory.parameters():
+            _slot_param_ids.add(id(p))
+            _slot_params.append(p)
+        for p in model.parameters():
+            if id(p) not in _slot_param_ids:
+                _main_params.append(p)
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
+              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+    else:
+        _main_params = list(model.parameters())
+
+    _param_groups = [
+        {'params': _main_params, 'lr': config.learning_rate,
+         'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2)},
+    ]
+    if _slot_params:
+        _param_groups.append({
+            'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+
     if config.use_8bit_optimizer:
         try:
             import bitsandbytes as bnb
             optimizer = bnb.optim.AdamW8bit(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
+                _param_groups,
             )
             print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
         except ImportError:
             print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
             print("           Install with: pip install bitsandbytes")
-            optimizer = AdamW(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
-            )
+            optimizer = AdamW(_param_groups)
     else:
-        optimizer = AdamW(
-            model.parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-            betas=(config.beta1, config.beta2),
-        )
+        optimizer = AdamW(_param_groups)
 
     # Phase 4: Add JEPA injection projector params to optimizer
     if jepa_injection_projector is not None:
@@ -4266,6 +4281,61 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 500 == 0:
                         print(f"  [CONFIDENCE] Error at step {global_step}: {e}")
 
+            # V10.14: Slot memory auxiliary losses (retrieval + router balancing)
+            if config.global_tokens_enabled and config.global_update_mode == "slots":
+                _out_dict = outputs if isinstance(outputs, dict) else {}
+                # Get slot_memory from model (handles OntologicalHybrid wrapper)
+                _sm = getattr(model, 'slot_memory', None)
+                if _sm is None:
+                    _inner = getattr(model, 'hybrid', model)
+                    _sm = getattr(_inner, 'slot_memory', None)
+                if _sm is not None:
+                    # Router loss (L_sharp + L_bal + L_ortho)
+                    _router_loss = _sm.compute_sharpness_loss()
+                    loss = loss + _router_loss
+                    # Retrieval loss (auxiliary slot readout → lm_head)
+                    _lm_head = getattr(model, 'lm_head', None)
+                    if _lm_head is None:
+                        _inner = getattr(model, 'hybrid', model)
+                        _lm_head = getattr(_inner, 'lm_head', None)
+                    _sk = _out_dict.get('_slot_keys')
+                    _sv = _out_dict.get('_slot_vals')
+                    _sh = _out_dict.get('_slot_hidden')
+                    _retr_loss_val = 0.0
+                    if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
+                        # V10.16.1: Use explicit query_mask from batch if available
+                        # (e.g. AssociativeRecallDataset provides True only at answer positions).
+                        # Fall back to (y != -100) for general LM training.
+                        _retr_query_mask = None
+                        if isinstance(batch, dict) and 'query_mask' in batch:
+                            _retr_query_mask = batch['query_mask'].to(device)
+                        if _retr_query_mask is None:
+                            _retr_query_mask = (y != -100)  # [B, N] general LM fallback
+                        _retr_loss = _sm.compute_retrieval_loss(
+                            x=_sh,
+                            slot_keys=_sk,
+                            slot_vals=_sv,
+                            query_mask=_retr_query_mask,
+                            target_ids=y,
+                            lm_head=_lm_head,
+                        )
+                        loss = loss + config.retrieval_loss_weight * _retr_loss
+                        _retr_loss_val = _retr_loss.item()
+                    # Step the router noise counter
+                    _sm._router_step += 1
+                    # Log slot diagnostics periodically
+                    if global_step % config.log_every == 0:
+                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(15.0))))
+                        _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
+                        print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
+                              f"qmask={_mask_frac:.4f} "
+                              f"L_sharp={getattr(_sm, '_diag_L_sharp', 0):.4f} "
+                              f"L_bal={getattr(_sm, '_diag_L_bal', 0):.4f} "
+                              f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "
+                              f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
+                              f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
+                              f"wr_scale={_wr_scale:.1f}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -4342,6 +4412,34 @@ def train(config: UnifiedTrainingConfig):
                 )
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+            # V10.15: Clip slot memory gradients separately (tighter bound)
+            # Slot keys live on the unit hypersphere — large gradients push them
+            # off-manifold and cause the exponential variance growth seen in logs.
+            if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+                _slot_params_with_grad = [
+                    p for p in model.slot_memory.parameters()
+                    if p.grad is not None
+                ]
+                if _slot_params_with_grad:
+                    torch.nn.utils.clip_grad_norm_(
+                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                    )
+
+            # V10.16: Clip phase attention OV circuit params separately.
+            # The v_proj (741x spike) and W_k_fused (311x spike) are the primary
+            # gradient explosion sources — sin/cos backprop and division by small
+            # normalizer create amplification cascades. Clip these at 0.5x base
+            # before global clipping to prevent cross-layer contamination.
+            _phase_attn_ov_params = [
+                p for n, p in model.named_parameters()
+                if p.grad is not None and 'phase_attn' in n
+                and any(k in n for k in ('v_proj', 'W_k_fused', 'W_q_fused'))
+            ]
+            if _phase_attn_ov_params:
+                torch.nn.utils.clip_grad_norm_(
+                    _phase_attn_ov_params, config.max_grad_norm * 0.5
+                )
 
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
@@ -6571,6 +6669,21 @@ def main():
                        help="Weight for phase attention in hybrid layers")
 
     # ==========================================================================
+    # V10.14: GLOBAL TOKENS / SLOT MEMORY (GCT)
+    # ==========================================================================
+    parser.add_argument("--global_tokens", action="store_true",
+                       help="Enable SlotMemoryGCT for long-range associative retrieval")
+    parser.add_argument("--num_global_tokens", type=int, default=64,
+                       help="Number of memory slots (default: 64)")
+    parser.add_argument("--global_update_mode", type=str, default="slots",
+                       choices=["pool", "attn-lite", "slots"],
+                       help="Global token update mode (default: slots)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.1,
+                       help="EMA learning rate for slot writes (default: 0.1)")
+    parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
+                       help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+
+    # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
     # ==========================================================================
     # Enables processing sequences longer than max_seq_len by chunking
@@ -7895,6 +8008,12 @@ def main():
         window_size=args.window_size,
         alpha_local=args.alpha_local,
         local_layers=args.local_layers,
+        # V10.14: Global Tokens / Slot Memory
+        global_tokens_enabled=getattr(args, 'global_tokens', False),
+        num_global_tokens=getattr(args, 'num_global_tokens', 64),
+        global_update_mode=getattr(args, 'global_update_mode', 'slots'),
+        slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
+        retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay

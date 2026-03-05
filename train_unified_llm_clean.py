@@ -12356,32 +12356,47 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
+    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
+    # gradient variance explosions from cosine-similarity key matching
+    _slot_memory_lr_scale = 0.1
+    _slot_param_ids = set()
+    _slot_params = []
+    _main_params = []
+    if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+        for p in model.slot_memory.parameters():
+            _slot_param_ids.add(id(p))
+            _slot_params.append(p)
+        for p in model.parameters():
+            if id(p) not in _slot_param_ids:
+                _main_params.append(p)
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
+              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+    else:
+        _main_params = list(model.parameters())
+
+    _param_groups = [
+        {'params': _main_params, 'lr': config.learning_rate,
+         'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2)},
+    ]
+    if _slot_params:
+        _param_groups.append({
+            'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+
     if config.use_8bit_optimizer:
         try:
             import bitsandbytes as bnb
             optimizer = bnb.optim.AdamW8bit(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
+                _param_groups,
             )
             print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
         except ImportError:
             print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
             print("           Install with: pip install bitsandbytes")
-            optimizer = AdamW(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
-            )
+            optimizer = AdamW(_param_groups)
     else:
-        optimizer = AdamW(
-            model.parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-            betas=(config.beta1, config.beta2),
-        )
+        optimizer = AdamW(_param_groups)
 
     # Scheduler with warmup
     use_adaptive_warmup = config.warmup_until_ppl > 0
@@ -13252,6 +13267,45 @@ def train(config: UnifiedTrainingConfig):
                     metrics['decorr_loss'] = decorr_loss_tensor.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
 
+                # V10.14: Slot memory retrieval auxiliary loss
+                # When using slots mode, add CE loss at query positions to supervise
+                # addressable key-value retrieval through slot memory
+                if (isinstance(outputs, dict) and '_slot_keys' in outputs
+                        and hasattr(model, 'slot_memory') and model.slot_memory is not None
+                        and hasattr(model, 'retrieval_loss_weight') and model.retrieval_loss_weight > 0):
+                    # V10.16.1: Use explicit query_mask from batch if available,
+                    # fall back to (y != -100) for general LM training.
+                    _retr_query_mask = None
+                    if isinstance(batch, dict) and 'query_mask' in batch:
+                        _retr_query_mask = batch['query_mask'].to(device)
+                    if _retr_query_mask is None:
+                        _retr_query_mask = (y != -100)
+                    _retr_loss = model.slot_memory.compute_retrieval_loss(
+                        x=outputs['_slot_hidden'],
+                        slot_keys=outputs['_slot_keys'],
+                        slot_vals=outputs['_slot_vals'],
+                        query_mask=_retr_query_mask,
+                        target_ids=y,
+                        lm_head=model.lm_head,
+                    )
+                    # Sharpness loss: penalize uniform assignment to bootstrap slot specialization
+                    _sharp_loss = model.slot_memory.compute_sharpness_loss()
+                    loss = loss + 0.1 * _sharp_loss
+                    metrics['slot_sharpness_loss'] = _sharp_loss.item()
+                    if _retr_loss.item() > 0:
+                        loss = loss + model.retrieval_loss_weight * _retr_loss
+                        metrics['retrieval_loss'] = _retr_loss.item()
+                        metrics['retrieval_weight'] = model.retrieval_loss_weight
+                    # Expose slot diagnostics
+                    if model.slot_memory._diag_write_gate_mean is not None:
+                        metrics['slot_write_gate'] = model.slot_memory._diag_write_gate_mean
+                    if model.slot_memory._diag_assignment_entropy is not None:
+                        metrics['slot_assignment_entropy'] = model.slot_memory._diag_assignment_entropy
+                    if model.slot_memory._diag_read_attn_entropy is not None:
+                        metrics['slot_read_entropy'] = model.slot_memory._diag_read_attn_entropy
+                    if hasattr(model.slot_memory, '_diag_marginal_entropy'):
+                        metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
+
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
                 # Unlike output decorrelation, this cannot be blocked by detach()
@@ -13915,6 +13969,17 @@ def train(config: UnifiedTrainingConfig):
                 )
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+            # V10.15: Clip slot memory gradients separately (tighter bound)
+            if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+                _slot_params_with_grad = [
+                    p for p in model.slot_memory.parameters()
+                    if p.grad is not None
+                ]
+                if _slot_params_with_grad:
+                    torch.nn.utils.clip_grad_norm_(
+                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                    )
 
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
@@ -14946,6 +15011,16 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("gct/lambda_ladder", metrics.get('gct_mean_lambda_ladder', 1.0), global_step)
                         tb_writer.add_scalar("gct/coherence", metrics.get('gct_mean_coherence', 0.5), global_step)
                         tb_writer.add_scalar("gct/schedule_weight", metrics.get('gct_schedule_weight', 0.0), global_step)
+
+                    # V10.14: Slot memory metrics
+                    if 'retrieval_loss' in metrics:
+                        tb_writer.add_scalar("slots/retrieval_loss", metrics['retrieval_loss'], global_step)
+                    if 'slot_write_gate' in metrics:
+                        tb_writer.add_scalar("slots/write_gate", metrics['slot_write_gate'], global_step)
+                    if 'slot_assignment_entropy' in metrics:
+                        tb_writer.add_scalar("slots/assignment_entropy", metrics['slot_assignment_entropy'], global_step)
+                    if 'slot_read_entropy' in metrics:
+                        tb_writer.add_scalar("slots/read_entropy", metrics['slot_read_entropy'], global_step)
 
                     # Sattvic Brake metrics
                     # v2.7 Training State Tracker metrics
