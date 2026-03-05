@@ -8375,8 +8375,13 @@ class SlotMemoryGCT(nn.Module):
         # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
         # route to the same slot. Scale=5 gives enough sharpness to differentiate
         # while allowing more balanced slot utilization.
+        # V10.20: Lowered from 5→3. Logs showed wr_scale learning to 5.9 during
+        # calibration, which made assignment ultra-peaky and concentrated write
+        # pressure on few slots — amplifying the 1.2M× gradient variance spikes.
+        # Starting at 3 with tighter max clamp (8 instead of 15) keeps assignments
+        # sharp enough for differentiation without explosive write concentration.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(5.0))  # exp(log(5)) = 5.0
+            torch.tensor(math.log(3.0))  # exp(log(3)) = 3.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8500,9 +8505,18 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.8: Clamp temperature to [3, 15]. At scale=10+ all tokens
         # pick the same top slot → winner-take-all collapse. Capping at 15
         # prevents runaway; floor of 3 prevents assignments from going uniform.
-        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=15.0)
+        # V10.20: Tightened max from 15→8. Logs showed scale learning to 5.9,
+        # concentrating writes on few slots and causing 1.2M× gradient spikes.
+        # Max of 8 still allows sharp differentiation without explosive peakiness.
+        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=8.0)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
-        _sk_norm = F.normalize(slot_keys, dim=-1)       # [B, K, D_key]
+        # V10.20: Detach slot_keys before F.normalize in assignment computation.
+        # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
+        # gradient variance when many tokens write to the same slot. Since slot_keys
+        # are updated via EMA (line 8577), they don't need assignment-path gradients —
+        # the learning signal comes through the EMA update itself. Detaching here
+        # severs the 1.2M× amplification path through slot_keys_init.
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)       # [B, K, D_key]
         assignment_logits = torch.bmm(
             _wk_norm, _sk_norm.transpose(1, 2)
         ) * _scale  # cosine_sim * temperature
@@ -8552,9 +8566,24 @@ class SlotMemoryGCT(nn.Module):
         )
 
         # Normalize by write pressure (avoid division by zero)
-        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=1e-6)
+        # V10.20: Raised clamp floor from 1e-6 to 0.1. The old floor allowed
+        # 1/1e-6 = 1M× gradient amplification through the pressure division,
+        # which was the root cause of the 1.2M× slot_keys_init variance spikes.
+        # Floor of 0.1 caps amplification at 10× — consistent with the phase
+        # attention normalizer clamp.
+        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=0.1)
         incoming_keys = incoming_keys / pressure_norm
         incoming_vals = incoming_vals / pressure_norm
+
+        # V10.20: L2-normalize incoming write vectors before EMA update.
+        # Without this, unbounded incoming_keys magnitude drifts slot_keys
+        # off the unit hypersphere, causing F.normalize Jacobian explosion
+        # in subsequent forward passes. Normalizing here ensures the EMA
+        # interpolates between unit vectors, keeping slot keys well-conditioned.
+        _ik_norm = incoming_keys.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        incoming_keys = incoming_keys / _ik_norm
+        _iv_norm = incoming_vals.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        incoming_vals = incoming_vals / _iv_norm
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
@@ -8627,7 +8656,12 @@ class SlotMemoryGCT(nn.Module):
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
         _read_scale = torch.exp(self._write_log_scale)
         _q_norm = F.normalize(queries, dim=-1)
-        _sk_norm = F.normalize(slot_keys, dim=-1)
+        # V10.20: Detach slot_keys in read path (same rationale as write path).
+        # Slot keys learn through EMA updates, not through read attention gradients.
+        # The LM learning signal flows through slot_vals (retrieved content),
+        # not through slot_keys (routing). Detaching prevents F.normalize Jacobian
+        # explosion while preserving the value-path gradient.
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _read_scale
@@ -8685,7 +8719,8 @@ class SlotMemoryGCT(nn.Module):
         queries = self.write_key_proj(x)  # [B, N, D_key]
         _scale = torch.exp(self._write_log_scale)
         _q_norm = F.normalize(queries, dim=-1)
-        _sk_norm = F.normalize(slot_keys, dim=-1)
+        # V10.20: Detach slot_keys (consistent with read/write paths).
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _scale  # [B, N, K]
