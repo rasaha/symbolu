@@ -7078,7 +7078,12 @@ class HybridPhaseTransformer(nn.Module):
                 if self.global_update_mode == "slots":
                     # V10.14: Read via SlotMemoryGCT (never modifies slot state)
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    x = x + _slot_out
+                    # V10.14.6d: Detach read output so LM loss cannot suppress
+                    # read_output_proj. Retrieval loss trains read_output_proj
+                    # independently. Warmstart alpha ramps mixing from 0→1 so
+                    # early noisy reads don't disrupt LM training.
+                    _alpha = self.slot_memory.read_warmstart_alpha
+                    x = x + _alpha * _slot_out.detach()
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7289,7 +7294,9 @@ class HybridPhaseTransformer(nn.Module):
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    x = x + _slot_out
+                    # V10.14.6d: Detach + warmstart (mirrors forward())
+                    _alpha = self.slot_memory.read_warmstart_alpha
+                    x = x + _alpha * _slot_out.detach()
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
@@ -8363,12 +8370,29 @@ class SlotMemoryGCT(nn.Module):
         self._router_noise_warmup = 2000  # steps to decay noise to 0
         self._router_step = 0  # updated externally by training loop
 
+        # --- Read warmstart ---
+        # V10.14.6d: Read output is detached before adding to residual (LM
+        # can't suppress read_output_proj). But we still ramp the mixing
+        # coefficient from 0→1 so early noisy reads don't disrupt LM training.
+        # Uses same _router_step counter. Sigmoid centered at 500 steps,
+        # tau=100 → effectively 0 for first ~300 steps, ~1 after ~700.
+        self._read_warmstart_center = 500
+        self._read_warmstart_tau = 100
+
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
         self._diag_assignment_entropy = None
         self._diag_slot_key_norm = None
         self._diag_slot_val_norm = None
         self._diag_read_attn_entropy = None
+
+    @property
+    def read_warmstart_alpha(self) -> float:
+        """Sigmoid ramp for read mixing: 0 early, 1 later."""
+        return 1.0 / (1.0 + math.exp(
+            -(self._router_step - self._read_warmstart_center)
+            / max(self._read_warmstart_tau, 1.0)
+        ))
 
     def init_state(self, batch_size: int, dtype: torch.dtype, device: torch.device):
         """Initialize slot state for a new batch.
@@ -8578,15 +8602,14 @@ class SlotMemoryGCT(nn.Module):
         lm_head: nn.Linear,            # Shared LM head for prediction
     ) -> torch.Tensor:
         """
-        V10.14.6: Direct retrieval loss — bypasses read_output_proj.
+        V10.14.6d: Retrieval loss routes through read_output_proj.
 
-        Previous version called self.read() which goes through read_output_proj.
-        Problem: the main LM loss suppresses read_output_proj to avoid noisy reads,
-        so compute_retrieval_loss got lm_head(≈0) → random logits → no gradient.
+        The read output is detached in the main forward pass (LM can't suppress
+        read_output_proj). This means read_output_proj is trained ONLY by this
+        retrieval loss — it learns to produce useful projections for token
+        prediction, not to suppress noisy reads.
 
-        Fix: compute attention-weighted slot values directly (no output projection),
-        then pass to lm_head. This gives the retrieval loss a clean gradient path
-        to slot values and write parameters, independent of the main read path.
+        Path: slot_vals → attn·vals → read_output_proj → retr_read_norm → lm_head
 
         Args:
             x: Token representations [B, N, D]
@@ -8603,9 +8626,7 @@ class SlotMemoryGCT(nn.Module):
         if query_mask is None or not query_mask.any():
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Direct retrieval: same attention as read() but skip read_output_proj.
-        # This prevents the LM-loss-suppressed output projection from killing
-        # the retrieval gradient signal.
+        # Same attention as read(): cosine similarity with shared key space.
         queries = self.write_key_proj(x)  # [B, N, D_key]
         _scale = torch.exp(self._write_log_scale)
         _q_norm = F.normalize(queries, dim=-1)
@@ -8615,17 +8636,23 @@ class SlotMemoryGCT(nn.Module):
         ) * _scale  # [B, N, K]
         attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
 
-        # Raw retrieval: attention-weighted slot values (NO read_output_proj)
+        # Retrieve weighted slot values
         raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
 
+        # V10.14.6d: Route through read_output_proj. Since the main forward
+        # detaches read output, this retrieval loss is the ONLY gradient source
+        # for read_output_proj — it learns useful projections without LM
+        # interference.
+        projected = self.read_output_proj(raw_retrieved)  # [B, N, D]
+
         # Select only query positions
-        query_retrieved = raw_retrieved[query_mask]  # [num_queries, D]
+        query_retrieved = projected[query_mask]  # [num_queries, D]
         query_targets = target_ids[query_mask]
 
         if query_retrieved.shape[0] == 0:
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Normalize before lm_head: raw slot values have arbitrary scale,
+        # Normalize before lm_head: projected values may have arbitrary scale,
         # but lm_head expects layer-normed input (same as main path).
         query_retrieved = self.retr_read_norm(query_retrieved)  # [num_queries, D]
         query_logits = lm_head(query_retrieved)  # [num_queries, V]
