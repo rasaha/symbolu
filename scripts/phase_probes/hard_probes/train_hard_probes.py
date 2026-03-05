@@ -10439,7 +10439,7 @@ def train_real_language(
     if use_protected_phase:
         print(f"  Architecture: Protected Phase (sequential collaboration)")
         print(f"  Phase contributes 100% as memory accumulator")
-    else:
+    elif hasattr(model, 'curriculum'):
         print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
 
     # Convergence speed summary
