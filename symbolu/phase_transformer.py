@@ -8282,10 +8282,18 @@ class SlotMemoryGCT(nn.Module):
         _key_dim = write_key_dim or embed_dim
 
         # --- Slot state (learnable initialization) ---
-        # Keys: used for both write assignment and read queries
-        self.slot_keys_init = nn.Parameter(
-            torch.randn(num_slots, _key_dim) * 0.02
-        )
+        # V10.14.5: Initialize slot keys on the unit hypersphere using orthogonal
+        # init. Previous randn*0.02 made all keys near-identical → EMA pushed
+        # them toward the same mean → winner-take-all collapse to one slot.
+        # Orthogonal + L2-normalized keys are maximally separated, giving each
+        # slot a distinct "identity" from the start.
+        _init_keys = torch.randn(num_slots, _key_dim)
+        if num_slots <= _key_dim:
+            # More dims than slots: use orthogonal rows
+            nn.init.orthogonal_(_init_keys)
+        # Normalize to unit sphere regardless
+        _init_keys = F.normalize(_init_keys, dim=-1)
+        self.slot_keys_init = nn.Parameter(_init_keys)
         # Values: content stored in each slot
         self.slot_vals_init = nn.Parameter(
             torch.randn(num_slots, embed_dim) * 0.02
@@ -8303,17 +8311,16 @@ class SlotMemoryGCT(nn.Module):
         # Previous bias=-1 (sigmoid=0.27) was too conservative: combined with
         # weak gradient signal to the gate, it collapsed to 0.017 and killed writes.
         nn.init.constant_(self.write_novelty_gate.bias, 0.0)
-        # Floor: prevent gate from collapsing below 0.1 even under LM loss pressure
-        self._novelty_gate_floor = 0.1
+        # Floor: minimal safety net (collapse is in assignment, not gate)
+        self._novelty_gate_floor = 0.01
 
-        # Write key scale: learnable inverse temperature for sharpening assignment.
-        # V10.14.4: Initialize to log(1.0) = 0 so scale starts at 1.0.
-        # Previous init log(1/sqrt(d)) gave scale ≈ 0.036 which made softmax
-        # over K slots near-uniform → dead assignment → write gate collapse.
-        # With scale=1.0, cosine-like similarities produce meaningful softmax
-        # differentiation from the start.
+        # Write key scale: learnable inverse temperature for cosine similarity.
+        # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
+        # are in [-1, 1]. Scale=10 gives softmax logits in [-10, 10] — sharp
+        # enough to differentiate but not saturate. This is the standard approach
+        # used in CLIP, prototypical networks, etc.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(0.0)  # exp(0) = 1.0
+            torch.tensor(math.log(10.0))  # exp(log(10)) = 10.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8330,6 +8337,14 @@ class SlotMemoryGCT(nn.Module):
         self._read_log_scale = nn.Parameter(
             torch.tensor(math.log((_key_dim) ** -0.5))
         )
+
+        # --- Router noise (MoE-style symmetry breaking) ---
+        # V10.14.5: Add Gaussian noise to assignment logits during early training
+        # to prevent "slot 0 wins by tiny initial advantage" collapse.
+        # Noise decays linearly: noise_std * max(0, 1 - step/warmup_steps)
+        self._router_noise_std = 0.5
+        self._router_noise_warmup = 2000  # steps to decay noise to 0
+        self._router_step = 0  # updated externally by training loop
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
@@ -8393,13 +8408,26 @@ class SlotMemoryGCT(nn.Module):
         write_keys = self.write_key_proj(x_write)   # [B, N, D_key]
         write_vals = self.write_val_proj(x_write)    # [B, N, D]
 
-        # Competitive assignment: softmax(token_key @ slot_keys.T * exp(log_scale))
-        # Learnable scale lets the model sharpen assignment as it learns to specialize.
+        # V10.14.5: Cosine similarity assignment.
+        # L2-normalize both write keys and slot keys so assignment is based on
+        # direction only, not magnitude. This prevents winner-take-all collapse
+        # where one slot's key norm grows larger and attracts all tokens.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        _scale = torch.exp(self._write_log_scale)  # Always positive
+        _scale = torch.exp(self._write_log_scale)  # Learnable temperature
+        _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
+        _sk_norm = F.normalize(slot_keys, dim=-1)       # [B, K, D_key]
         assignment_logits = torch.bmm(
-            write_keys, slot_keys.transpose(1, 2)
-        ) * _scale
+            _wk_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # cosine_sim * temperature
+
+        # V10.14.5: Router noise — break symmetry during early training.
+        # Without this, the slot with the tiny initial advantage snowballs.
+        if self.training and self._router_noise_std > 0:
+            _noise_decay = max(0.0, 1.0 - self._router_step / self._router_noise_warmup)
+            if _noise_decay > 0:
+                _noise = torch.randn_like(assignment_logits) * (self._router_noise_std * _noise_decay)
+                assignment_logits = assignment_logits + _noise
+
         assignment = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
 
         # Gate assignment by novelty: only tokens with binding info write
@@ -8438,6 +8466,10 @@ class SlotMemoryGCT(nn.Module):
         # Slot update: EMA rule
         new_slot_keys = (1 - eta) * slot_keys + eta * incoming_keys
         new_slot_vals = (1 - eta) * slot_vals + eta * incoming_vals
+
+        # V10.14.5: Re-normalize slot keys to unit sphere after EMA update.
+        # Prevents key norms from drifting, which would bias cosine similarity.
+        new_slot_keys = F.normalize(new_slot_keys, dim=-1)
 
         # Store assignment for sharpness loss (WITH grad — this is the learning signal)
         self._last_assignment = assignment  # [B, N, K]
@@ -8480,12 +8512,14 @@ class SlotMemoryGCT(nn.Module):
         # the write path used, enabling content-based key-value lookup.
         queries = self.write_key_proj(x)  # [B, N, D_key]
 
-        # V10.14.3: Share _write_log_scale for read attention temperature.
-        # Sharpness loss pushes this scale UP → reads sharpen with writes.
+        # V10.14.5: Cosine similarity for reads (matching write path).
+        # Both queries and slot keys are L2-normalized.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
         _read_scale = torch.exp(self._write_log_scale)
+        _q_norm = F.normalize(queries, dim=-1)
+        _sk_norm = F.normalize(slot_keys, dim=-1)
         attn_logits = torch.bmm(
-            queries, slot_keys.transpose(1, 2)
+            _q_norm, _sk_norm.transpose(1, 2)
         ) * _read_scale
         attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
         attn_weights = self.read_dropout(attn_weights)
@@ -8559,57 +8593,59 @@ class SlotMemoryGCT(nn.Module):
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """
-        Balanced slot assignment loss: sharp per-token + diverse across-tokens,
-        plus gate utilization penalty.
+        V10.14.5: MoE-style router loss — sharp but balanced.
 
-        Three objectives:
-        1. Per-token sharpness: each token should assign to ~1 slot (low entropy)
-        2. Slot diversity: across all tokens, slots should be used evenly (high marginal entropy)
-        3. Gate utilization: novelty gate should stay open enough for writes (V10.14.4)
+        Two-term loss replacing the old per_token_H - marginal_H which had a
+        trivial optimum at single-slot collapse (both terms → 0).
 
-        Loss = per_token_entropy - marginal_entropy - gate_utilization
-        Minimized when each token picks one slot, different tokens pick different slots,
-        AND the novelty gate is meaningfully open.
+        Term 1 — Target sharpness (L_sharp):
+            ReLU(H(assign_t) - H_target) averaged over tokens.
+            "Be sharp enough, then stop pushing." This prevents the loss from
+            rewarding degenerate one-hot collapse.
+            H_target ≈ 1.0 nats: allows 2-3 active slots per token.
 
-        Score interpretation:
-            Uniform:  1.0 - 1.0 = 0.0  (bad: no specialization)
-            Collapsed: 0.0 - 0.0 = 0.0  (bad: all in one slot)
-            Ideal:    ~0.0 - ~1.0 = -1.0 (good: sharp + diverse)
+        Term 2 — Load balancing (L_bal):
+            KL(marginal || uniform) where marginal = mean(assign) over tokens.
+            Directly penalizes slot-0 collapse. This is the critical missing
+            piece from the original loss.
 
         Returns:
-            sharpness_loss: scalar. Lower is better.
+            router_loss: λ_sharp * L_sharp + λ_bal * L_bal
         """
         if self._last_assignment is None:
             return torch.tensor(0.0)
 
         assignment = self._last_assignment  # [B, N, K]
-        log_a = torch.log(assignment.clamp(min=1e-8))
-        max_entropy = math.log(self.num_slots)
+        K = self.num_slots
+        eps = 1e-8
 
-        # Per-token entropy: want LOW (sharp assignment per token)
-        per_token_entropy = -(assignment * log_a).sum(dim=-1)  # [B, N]
-        mean_per_token = per_token_entropy.mean() / max_entropy  # normalized
+        # --- Term 1: Target sharpness ---
+        # Per-token entropy: H(a_t) = -sum(a * log(a))
+        log_a = torch.log(assignment + eps)
+        per_token_H = -(assignment * log_a).sum(dim=-1)  # [B, N], ≥ 0
+        # Only penalize if entropy exceeds target (don't reward going below)
+        H_target = 1.0  # nats — allows ~2-3 active slots per token
+        L_sharp = torch.relu(per_token_H - H_target).mean()
 
-        # Marginal entropy: want HIGH (diverse slot usage across tokens)
-        # V10.14.4: Use gated_assignment for marginal so gradient reaches novelty gate.
-        # The marginal of gated_assignment reflects which slots actually receive writes,
-        # so maximizing its entropy pushes the gate open for informative tokens.
-        gated = self._last_gated_assignment  # [B, N, K]
-        if gated is not None:
-            # Normalize gated to a distribution over slots
-            gated_sum = gated.sum(dim=1).clamp(min=1e-8)  # [B, K]
-            marginal = gated_sum / gated_sum.sum(dim=-1, keepdim=True)  # [B, K]
-        else:
-            marginal = assignment.mean(dim=1)  # fallback
-        log_m = torch.log(marginal.clamp(min=1e-8))
-        marginal_entropy = -(marginal * log_m).sum(dim=-1)  # [B]
-        mean_marginal = marginal_entropy.mean() / max_entropy  # normalized
+        # --- Term 2: Load balancing (KL to uniform) ---
+        # Marginal: average assignment over all tokens in the batch
+        # [B, N, K] → [K] average
+        marginal = assignment.mean(dim=(0, 1))  # [K]
+        # KL(marginal || uniform) = sum(p * log(p * K))
+        L_bal = (marginal * torch.log(marginal * K + eps)).sum()
 
-        # Store diagnostics
+        # Store diagnostics (normalized by max entropy for readability)
+        max_entropy = math.log(K)
         with torch.no_grad():
-            self._diag_marginal_entropy = mean_marginal.item()
+            self._diag_marginal_entropy = (
+                -(marginal * torch.log(marginal + eps)).sum() / max_entropy
+            ).item()
+            self._diag_per_token_entropy = per_token_H.mean().item()
+            self._diag_L_sharp = L_sharp.item()
+            self._diag_L_bal = L_bal.item()
 
-        return mean_per_token - mean_marginal
+        # Weights: balancing is more important than sharpness initially
+        return 0.01 * L_sharp + 0.05 * L_bal
 
 
 @dataclass

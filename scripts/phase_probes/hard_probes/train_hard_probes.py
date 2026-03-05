@@ -10070,23 +10070,26 @@ def train_real_language(
                 target_ids=y,
                 lm_head=model.lm_head,
             )
-            # Balanced sharpness loss: sharp per-token + diverse across-tokens
-            _sharp_loss = model.slot_memory.compute_sharpness_loss()
-            # V10.14.4: Weight 0.5 — previous 0.1 was too weak to prevent
-            # assignment collapse (gate died to 0.017, H stayed near-uniform)
-            _sharp_weight = 0.5
-            loss = loss + _sharp_weight * _sharp_loss
+            # V10.14.5: MoE-style router loss (target entropy + load balancing)
+            # Weights are internal to compute_sharpness_loss() now:
+            #   0.01 * L_sharp + 0.05 * L_bal
+            _router_loss = model.slot_memory.compute_sharpness_loss()
+            loss = loss + _router_loss
             if _retr_loss.item() > 0:
                 loss = loss + model.retrieval_loss_weight * _retr_loss
+            # V10.14.5: Update router step counter for noise decay
+            model.slot_memory._router_step = step
             if step % log_interval == 0:
                 _sm = model.slot_memory
                 _marginal_H = getattr(_sm, '_diag_marginal_entropy', 0.0)
+                _L_sharp = getattr(_sm, '_diag_L_sharp', 0.0)
+                _L_bal = getattr(_sm, '_diag_L_bal', 0.0)
                 print(f"  [SLOTS] retr_loss={_retr_loss.item():.4f} "
-                      f"sharp={_sharp_loss.item():+.3f} "
+                      f"L_sharp={_L_sharp:.4f} L_bal={_L_bal:.4f} "
                       f"write_gate={_sm._diag_write_gate_mean:.3f} "
                       f"assign_H={_sm._diag_assignment_entropy:.3f} "
                       f"marginal_H={_marginal_H:.3f} "
-                      f"read_H={_sm._diag_read_attn_entropy:.3f} "
+                      f"read_H={max(0.0, _sm._diag_read_attn_entropy):.3f} "
                       f"wr_scale={torch.exp(_sm._write_log_scale).item():.4f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
