@@ -2524,7 +2524,11 @@ class PhaseAttentionLayer(nn.Module):
         # Capture final normalizer state for chunk continuation
         final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
 
-        normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
+        # V10.16: Clamp normalizer minimum to 0.1 to prevent gradient explosion.
+        # When sigmoid amplitudes collapse toward 0 (e.g., after LR warmup ends),
+        # the old epsilon of 1e-6 allowed numerator/normalizer to produce extreme
+        # outputs, causing cascading gradient spikes through v_proj and W_k_fused.
+        normalizer = (a_q * a_k_cumsum).clamp(min=0.1)  # [B, N, H, D_h], always positive
 
         # V9.6.12: Cosine mode selection for interaction kernel
         # Use aggregated state (channels already combined) for readout
@@ -8552,9 +8556,15 @@ class SlotMemoryGCT(nn.Module):
         new_slot_keys = (1 - eta) * slot_keys + eta * incoming_keys
         new_slot_vals = (1 - eta) * slot_vals + eta * incoming_vals
 
-        # V10.14.5: Re-normalize slot keys to unit sphere after EMA update.
+        # V10.14.5 / V10.16: Re-normalize slot keys to unit sphere after EMA update.
         # Prevents key norms from drifting, which would bias cosine similarity.
-        new_slot_keys = F.normalize(new_slot_keys, dim=-1)
+        # V10.16: Use detached norms to avoid the F.normalize Jacobian explosion.
+        # When many tokens write to the same slot, the normalize Jacobian
+        # (I - x̂x̂ᵀ)/||x|| can produce 3000x+ gradient variance spikes.
+        # Detaching the denominator preserves forward normalization while keeping
+        # gradients flowing only through the EMA numerator (the actual learning signal).
+        _key_norms = new_slot_keys.detach().norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        new_slot_keys = new_slot_keys / _key_norms
 
         # Store assignment for sharpness loss (WITH grad — this is the learning signal)
         self._last_assignment = assignment  # [B, N, K]

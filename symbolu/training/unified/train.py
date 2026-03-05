@@ -4416,6 +4416,21 @@ def train(config: UnifiedTrainingConfig):
                         _slot_params_with_grad, config.max_grad_norm * 0.1
                     )
 
+            # V10.16: Clip phase attention OV circuit params separately.
+            # The v_proj (741x spike) and W_k_fused (311x spike) are the primary
+            # gradient explosion sources — sin/cos backprop and division by small
+            # normalizer create amplification cascades. Clip these at 0.5x base
+            # before global clipping to prevent cross-layer contamination.
+            _phase_attn_ov_params = [
+                p for n, p in model.named_parameters()
+                if p.grad is not None and 'phase_attn' in n
+                and any(k in n for k in ('v_proj', 'W_k_fused', 'W_q_fused'))
+            ]
+            if _phase_attn_ov_params:
+                torch.nn.utils.clip_grad_norm_(
+                    _phase_attn_ov_params, config.max_grad_norm * 0.5
+                )
+
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
                 # Clip authority and sensory layers separately to respect 9:3 design
