@@ -156,6 +156,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             dual_channel_mode=config.dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             protected_phase=use_protected_phase,  # V10.2.1: Protected Phase for chunking
+            # V10.14: Global Tokens / Slot Memory
+            global_tokens_enabled=config.global_tokens_enabled,
+            num_global_tokens=config.num_global_tokens,
+            global_update_mode=config.global_update_mode,
+            slots_write_lr=config.slots_write_lr,
+            retrieval_loss_weight=config.retrieval_loss_weight,
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
@@ -167,6 +173,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"  Zero-Mean Cosine: ENABLED (forces selectivity)")  # V9.9.11
         if config.dual_channel_mode:
             print(f"  Dual-Channel Mode: ENABLED (α={config.alignment_authority})")  # V10.3.8
+        if config.global_tokens_enabled:
+            print(f"  Global Tokens: ENABLED ({config.num_global_tokens} slots, mode={config.global_update_mode})")
+            print(f"  Slot Write LR: {config.slots_write_lr}, Retrieval Loss Weight: {config.retrieval_loss_weight}")
         # V10.2.1: Log chunking settings
         if config.enable_chunking:
             print(f"  Chunking: ENABLED (chunk_size={config.chunk_size})")
@@ -246,6 +255,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             alignment_authority=config.alignment_authority,  # V10.3.8: Alignment authority
             state_dim=config.state_dim,
             project_per_head_dim=config.project_per_head_dim,
+            # V10.14: Global Tokens / Slot Memory
+            global_tokens_enabled=config.global_tokens_enabled,
+            num_global_tokens=config.num_global_tokens,
+            global_update_mode=config.global_update_mode,
+            slots_write_lr=config.slots_write_lr,
+            retrieval_loss_weight=config.retrieval_loss_weight,
         )
         print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled (V11.0.0: Separated Planes)")
         print(f"    Full Sovereign State: {config.state_dim}D (diagnostics/control/learning)")

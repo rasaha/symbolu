@@ -143,6 +143,18 @@ class UnifiedTrainingConfig:
     enable_tbptt: bool = False  # V10.7: Truncated BPTT (detach state between chunks, memory O(C))
 
     # ==========================================================================
+    # V10.14: GLOBAL TOKENS / SLOT MEMORY (GCT)
+    # ==========================================================================
+    # SlotMemoryGCT provides addressable memory slots for long-range retrieval.
+    # Tokens write to slots via competitive assignment; queries read via attention.
+    # Required for associative recall beyond the local attention window.
+    global_tokens_enabled: bool = False  # Enable GCT memory slots
+    num_global_tokens: int = 64  # Number of memory slots
+    global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
+    slots_write_lr: float = 0.1  # EMA learning rate for slot writes
+    retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
+
+    # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
     # ==========================================================================
     # Master toggle that enables optimal phase-first learning configuration:

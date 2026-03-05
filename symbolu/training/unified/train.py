@@ -4266,6 +4266,50 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 500 == 0:
                         print(f"  [CONFIDENCE] Error at step {global_step}: {e}")
 
+            # V10.14: Slot memory auxiliary losses (retrieval + router balancing)
+            if config.global_tokens_enabled and config.global_update_mode == "slots":
+                _out_dict = outputs if isinstance(outputs, dict) else {}
+                # Get slot_memory from model (handles OntologicalHybrid wrapper)
+                _sm = getattr(model, 'slot_memory', None)
+                if _sm is None:
+                    _inner = getattr(model, 'hybrid', model)
+                    _sm = getattr(_inner, 'slot_memory', None)
+                if _sm is not None:
+                    # Router loss (L_sharp + L_bal + L_ortho)
+                    _router_loss = _sm.compute_sharpness_loss()
+                    loss = loss + _router_loss
+                    # Retrieval loss (auxiliary slot readout → lm_head)
+                    _lm_head = getattr(model, 'lm_head', None)
+                    if _lm_head is None:
+                        _inner = getattr(model, 'hybrid', model)
+                        _lm_head = getattr(_inner, 'lm_head', None)
+                    _sk = _out_dict.get('_slot_keys')
+                    _sv = _out_dict.get('_slot_vals')
+                    _sh = _out_dict.get('_slot_hidden')
+                    _retr_loss_val = 0.0
+                    if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
+                        _retr_loss = _sm.compute_retrieval_loss(
+                            x=_sh,
+                            slot_keys=_sk,
+                            slot_vals=_sv,
+                            target_ids=y,
+                            lm_head=_lm_head,
+                        )
+                        loss = loss + config.retrieval_loss_weight * _retr_loss
+                        _retr_loss_val = _retr_loss.item()
+                    # Step the router noise counter
+                    _sm._router_step += 1
+                    # Log slot diagnostics periodically
+                    if global_step % config.log_every == 0:
+                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(15.0))))
+                        print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
+                              f"L_sharp={getattr(_sm, '_diag_L_sharp', 0):.4f} "
+                              f"L_bal={getattr(_sm, '_diag_L_bal', 0):.4f} "
+                              f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "
+                              f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
+                              f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
+                              f"wr_scale={_wr_scale:.1f}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -6571,6 +6615,21 @@ def main():
                        help="Weight for phase attention in hybrid layers")
 
     # ==========================================================================
+    # V10.14: GLOBAL TOKENS / SLOT MEMORY (GCT)
+    # ==========================================================================
+    parser.add_argument("--global_tokens", action="store_true",
+                       help="Enable SlotMemoryGCT for long-range associative retrieval")
+    parser.add_argument("--num_global_tokens", type=int, default=64,
+                       help="Number of memory slots (default: 64)")
+    parser.add_argument("--global_update_mode", type=str, default="slots",
+                       choices=["pool", "attn-lite", "slots"],
+                       help="Global token update mode (default: slots)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.1,
+                       help="EMA learning rate for slot writes (default: 0.1)")
+    parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
+                       help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+
+    # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
     # ==========================================================================
     # Enables processing sequences longer than max_seq_len by chunking
@@ -7895,6 +7954,12 @@ def main():
         window_size=args.window_size,
         alpha_local=args.alpha_local,
         local_layers=args.local_layers,
+        # V10.14: Global Tokens / Slot Memory
+        global_tokens_enabled=getattr(args, 'global_tokens', False),
+        num_global_tokens=getattr(args, 'num_global_tokens', 64),
+        global_update_mode=getattr(args, 'global_update_mode', 'slots'),
+        slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
+        retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay

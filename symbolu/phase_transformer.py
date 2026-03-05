@@ -7752,6 +7752,12 @@ class OntologicalHybridTransformer(nn.Module):
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
+        # V10.14: Global Tokens / Slot Memory (passed through to HybridPhaseTransformer)
+        global_tokens_enabled: bool = False,
+        num_global_tokens: int = 16,
+        global_update_mode: str = "pool",
+        slots_write_lr: float = 0.1,
+        retrieval_loss_weight: float = 0.1,
     ):
         super().__init__()
 
@@ -7778,6 +7784,12 @@ class OntologicalHybridTransformer(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            # V10.14: Global Tokens / Slot Memory
+            global_tokens_enabled=global_tokens_enabled,
+            num_global_tokens=num_global_tokens,
+            global_update_mode=global_update_mode,
+            slots_write_lr=slots_write_lr,
+            retrieval_loss_weight=retrieval_loss_weight,
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
