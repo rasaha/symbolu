@@ -2245,12 +2245,16 @@ class PhaseAttentionLayer(nn.Module):
         # V10.8: Fused query projection — one GEMM, then split
         q_fused = self.W_q_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_q_raw = q_fused[:, :, 0]  # [B, N, H, D_h]
-        a_q = torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
+        # V10.17: Amplitude floor prevents sigmoid collapse toward 0.
+        # When a_q ≈ 0, the normalizer (a_q * a_k_cumsum) hits the clamp floor
+        # and gradients through the sigmoid/cumsum path explode (2183x variance
+        # spikes observed on W_k_fused). Floor at 0.05 guarantees minimum amplitude.
+        a_q = 0.05 + 0.95 * torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V10.8: Fused key projection — one GEMM, then split
         k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
-        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
+        a_k = 0.05 + 0.95 * torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
         # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
