@@ -2107,11 +2107,13 @@ class PhaseAttentionLayer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
 
-        # V9.6.11: Initialize phase projections with uniform [-π, π]
-        # This ensures diverse phases at initialization for gradient flow
+        # V9.6.11: Initialize phase projections with diverse phases
         # V10.8: Apply to fused weight's phase half (first embed_dim rows)
-        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -3.14159, 3.14159)
-        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+        # V10.15: Reduced from [-π, π] to [-1, 1] to prevent gradient spikes
+        # in fused projection during LR warmup. Phase diversity is preserved
+        # since sin/cos cover full range within [-1, 1] input.
+        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -1.0, 1.0)
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -1.0, 1.0)
 
         # V9.6.12: Complex-to-real projection for "complex" cosine mode
         # Projects [real, imag] → real, allowing the model to learn how to
@@ -3204,8 +3206,8 @@ class BindingCachePhaseState(nn.Module):
         # This tests whether phase encodes relational structure
         self._rotation_angle = 0.0  # in radians
 
-        # Initialize phase half with uniform [-π, π]
-        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+        # V10.15: Reduced from [-π, π] to [-1, 1] to prevent gradient spikes
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -1.0, 1.0)
 
     # V10.8: Backward-compatible properties for code accessing old separate weights
     class _FusedWeightView:

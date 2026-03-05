@@ -426,7 +426,9 @@ class GradientVarianceTracker:
         # V9.9.1: Rate-limit alerts per layer (only alert once per window_size steps)
         self._last_alert_step: Dict[str, int] = {}
         # V9.9.1: EMA factor for baseline updates (adapts to LR changes)
-        self._baseline_ema_alpha = 0.01
+        # V10.15: Increased from 0.01 to 0.05 so baseline tracks LR warmup
+        # faster, preventing false positive spike alerts during warmup phase
+        self._baseline_ema_alpha = 0.05
 
     @torch.no_grad()
     def record(self, model: torch.nn.Module) -> Dict[str, any]:

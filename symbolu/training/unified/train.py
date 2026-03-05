@@ -1349,32 +1349,47 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
+    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
+    # gradient variance explosions from cosine-similarity key matching
+    _slot_memory_lr_scale = 0.1
+    _slot_param_ids = set()
+    _slot_params = []
+    _main_params = []
+    if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+        for p in model.slot_memory.parameters():
+            _slot_param_ids.add(id(p))
+            _slot_params.append(p)
+        for p in model.parameters():
+            if id(p) not in _slot_param_ids:
+                _main_params.append(p)
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
+              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+    else:
+        _main_params = list(model.parameters())
+
+    _param_groups = [
+        {'params': _main_params, 'lr': config.learning_rate,
+         'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2)},
+    ]
+    if _slot_params:
+        _param_groups.append({
+            'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+
     if config.use_8bit_optimizer:
         try:
             import bitsandbytes as bnb
             optimizer = bnb.optim.AdamW8bit(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
+                _param_groups,
             )
             print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
         except ImportError:
             print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
             print("           Install with: pip install bitsandbytes")
-            optimizer = AdamW(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
-            )
+            optimizer = AdamW(_param_groups)
     else:
-        optimizer = AdamW(
-            model.parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-            betas=(config.beta1, config.beta2),
-        )
+        optimizer = AdamW(_param_groups)
 
     # Phase 4: Add JEPA injection projector params to optimizer
     if jepa_injection_projector is not None:
@@ -4387,6 +4402,19 @@ def train(config: UnifiedTrainingConfig):
                 )
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+            # V10.15: Clip slot memory gradients separately (tighter bound)
+            # Slot keys live on the unit hypersphere — large gradients push them
+            # off-manifold and cause the exponential variance growth seen in logs.
+            if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+                _slot_params_with_grad = [
+                    p for p in model.slot_memory.parameters()
+                    if p.grad is not None
+                ]
+                if _slot_params_with_grad:
+                    torch.nn.utils.clip_grad_norm_(
+                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                    )
 
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
