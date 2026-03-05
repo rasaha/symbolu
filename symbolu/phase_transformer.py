@@ -2528,11 +2528,14 @@ class PhaseAttentionLayer(nn.Module):
         # Capture final normalizer state for chunk continuation
         final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
 
-        # V10.16: Clamp normalizer minimum to 0.1 to prevent gradient explosion.
-        # When sigmoid amplitudes collapse toward 0 (e.g., after LR warmup ends),
-        # the old epsilon of 1e-6 allowed numerator/normalizer to produce extreme
-        # outputs, causing cascading gradient spikes through v_proj and W_k_fused.
-        normalizer = (a_q * a_k_cumsum).clamp(min=0.1)  # [B, N, H, D_h], always positive
+        # V10.19: Detached normalizer — same pattern as slot key normalization (line 8576).
+        # The division numerator/normalizer creates ∂L/∂normalizer = -numerator/normalizer²,
+        # which is -100x when normalizer hits the 0.1 clamp floor. This gradient propagates
+        # back through a_q → W_q_fused and cumsum(a_k) → W_k_fused, causing the variance
+        # spikes (906x on v_proj, 34x on W_k_fused) that cascade to full backbone divergence
+        # around step 720. Detaching preserves correct forward normalization while keeping
+        # amplitude gradients flowing only through the numerator (bounded, healthy signal).
+        normalizer = (a_q * a_k_cumsum).clamp(min=0.1).detach()  # [B, N, H, D_h]
 
         # V9.6.12: Cosine mode selection for interaction kernel
         # Use aggregated state (channels already combined) for readout
