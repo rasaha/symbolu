@@ -6663,7 +6663,7 @@ class HybridPhaseTransformer(nn.Module):
         global_update_enabled: bool = True,  # Enable controlled write
         global_update_mode: str = "pool",  # "pool", "attn-lite", or "slots"
         global_update_interval: int = 1,  # Update every N layers
-        global_token_write_detach: bool = True,  # Detach tokens in write path
+        global_token_write_detach: bool = True,  # Detach tokens in write path (auto-disabled for slots mode)
         phase_to_global: bool = False,  # Phase→Global integration
         # V10.14: Slot memory parameters (when global_update_mode="slots")
         slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
@@ -6772,6 +6772,12 @@ class HybridPhaseTransformer(nn.Module):
         self.global_update_enabled = global_update_enabled
         self.global_update_mode = global_update_mode
         self.global_update_interval = global_update_interval
+        # V10.14: Slots mode REQUIRES gradient flow through writes.
+        # Detach was designed for pool/attn-lite to prevent global tokens from
+        # dominating early training. But slots need gradients to learn competitive
+        # assignment — without them, assignment stays uniform (H = ln(K)).
+        if global_update_mode == "slots" and global_token_write_detach:
+            global_token_write_detach = False
         self.global_token_write_detach = global_token_write_detach
 
         # V10.14: Store retrieval loss weight
@@ -8294,8 +8300,13 @@ class SlotMemoryGCT(nn.Module):
         # sigmoid(-1) ≈ 0.27 — starts conservative, learns to open
         nn.init.constant_(self.write_novelty_gate.bias, -1.0)
 
-        # Write key scale (1/sqrt(d_key))
-        self._write_scale = (_key_dim) ** -0.5
+        # Write key scale: learnable inverse temperature for sharpening assignment.
+        # Initialize to 1/sqrt(d) but allow gradient to increase it for sharper
+        # competitive assignment. Without this, random projections produce
+        # near-uniform softmax (H ≈ ln(K)) and slots never specialize.
+        self._write_log_scale = nn.Parameter(
+            torch.tensor(math.log((_key_dim) ** -0.5))
+        )
 
         # --- READ path: query → slot attention ---
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
@@ -8356,11 +8367,13 @@ class SlotMemoryGCT(nn.Module):
         write_keys = self.write_key_proj(x)   # [B, N, D_key]
         write_vals = self.write_val_proj(x)    # [B, N, D]
 
-        # Competitive assignment: softmax(token_key @ slot_keys.T / sqrt(d))
+        # Competitive assignment: softmax(token_key @ slot_keys.T * exp(log_scale))
+        # Learnable scale lets the model sharpen assignment as it learns to specialize.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
+        _scale = torch.exp(self._write_log_scale)  # Always positive
         assignment_logits = torch.bmm(
             write_keys, slot_keys.transpose(1, 2)
-        ) * self._write_scale
+        ) * _scale
         assignment = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
 
         # Gate assignment by novelty: only tokens with binding info write
@@ -8399,6 +8412,10 @@ class SlotMemoryGCT(nn.Module):
         # Slot update: EMA rule
         new_slot_keys = (1 - eta) * slot_keys + eta * incoming_keys
         new_slot_vals = (1 - eta) * slot_vals + eta * incoming_vals
+
+        # Store assignment for sharpness loss (WITH grad — this is the learning signal)
+        self._last_assignment = assignment  # [B, N, K]
+        self._last_novelty = novelty  # [B, N, 1]
 
         # Diagnostics (no grad)
         with torch.no_grad():
@@ -8508,6 +8525,35 @@ class SlotMemoryGCT(nn.Module):
         )
 
         return retrieval_loss
+
+    def compute_sharpness_loss(self) -> torch.Tensor:
+        """
+        Assignment sharpness loss: penalize uniform assignment across slots.
+
+        When assignment is uniform (H = ln(K)), all slots get identical writes
+        and never specialize. This loss encourages sharp, competitive assignment
+        by minimizing the entropy of the assignment distribution.
+
+        Uses the assignment from the last write() call. Must be called after write().
+
+        Returns:
+            sharpness_loss: scalar, mean entropy of assignment normalized by ln(K).
+                           1.0 = perfectly uniform (bad), 0.0 = perfectly sharp (good).
+                           Returns 0 if no assignment available.
+        """
+        if self._last_assignment is None:
+            return torch.tensor(0.0)
+
+        assignment = self._last_assignment  # [B, N, K]
+        # Entropy: -sum(p * log(p))
+        log_a = torch.log(assignment.clamp(min=1e-8))
+        entropy = -(assignment * log_a).sum(dim=-1)  # [B, N]
+
+        # Normalize by max entropy so loss is in [0, 1] regardless of num_slots
+        max_entropy = math.log(self.num_slots)
+        normalized_entropy = entropy.mean() / max_entropy
+
+        return normalized_entropy
 
 
 @dataclass

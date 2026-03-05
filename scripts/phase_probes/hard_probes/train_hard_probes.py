@@ -10062,14 +10062,21 @@ def train_real_language(
                 target_ids=y,
                 lm_head=model.lm_head,
             )
+            # Sharpness loss: penalize uniform assignment to bootstrap slot specialization
+            _sharp_loss = model.slot_memory.compute_sharpness_loss()
+            # Weight sharpness loss at 0.1 — enough to break symmetry without dominating
+            _sharp_weight = 0.1
+            loss = loss + _sharp_weight * _sharp_loss
             if _retr_loss.item() > 0:
                 loss = loss + model.retrieval_loss_weight * _retr_loss
-                if step % log_interval == 0:
-                    _sm = model.slot_memory
-                    print(f"  [SLOTS] retr_loss={_retr_loss.item():.4f} "
-                          f"write_gate={_sm._diag_write_gate_mean:.3f} "
-                          f"assign_H={_sm._diag_assignment_entropy:.3f} "
-                          f"read_H={_sm._diag_read_attn_entropy:.3f}")
+            if step % log_interval == 0:
+                _sm = model.slot_memory
+                print(f"  [SLOTS] retr_loss={_retr_loss.item():.4f} "
+                      f"sharp_loss={_sharp_loss.item():.3f} "
+                      f"write_gate={_sm._diag_write_gate_mean:.3f} "
+                      f"assign_H={_sm._diag_assignment_entropy:.3f} "
+                      f"read_H={_sm._diag_read_attn_entropy:.3f} "
+                      f"write_scale={torch.exp(_sm._write_log_scale).item():.4f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:

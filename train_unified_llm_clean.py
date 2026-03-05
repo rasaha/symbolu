@@ -13269,6 +13269,10 @@ def train(config: UnifiedTrainingConfig):
                         target_ids=y,
                         lm_head=model.lm_head,
                     )
+                    # Sharpness loss: penalize uniform assignment to bootstrap slot specialization
+                    _sharp_loss = model.slot_memory.compute_sharpness_loss()
+                    loss = loss + 0.1 * _sharp_loss
+                    metrics['slot_sharpness_loss'] = _sharp_loss.item()
                     if _retr_loss.item() > 0:
                         loss = loss + model.retrieval_loss_weight * _retr_loss
                         metrics['retrieval_loss'] = _retr_loss.item()
