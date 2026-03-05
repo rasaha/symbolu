@@ -7200,7 +7200,13 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            result['_slot_hidden'] = x  # Post-norm hidden for query matching
+            # V10.14.9: Detach hidden states for retrieval loss. Without this,
+            # retrieval loss gradients flow through _slot_hidden back into ALL
+            # transformer blocks (phase_attn.W_k_fused, v_proj, complex_proj),
+            # creating a secondary training signal that destabilizes the backbone
+            # around step 650 and cascades into slot memory gradient explosions.
+            # Retrieval loss should only train slot memory parameters.
+            result['_slot_hidden'] = x.detach()  # Post-norm hidden for query matching
 
         return result
 
