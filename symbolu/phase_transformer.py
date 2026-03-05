@@ -8312,10 +8312,20 @@ class SlotMemoryGCT(nn.Module):
         )
 
         # --- READ path: query → slot attention ---
+        # V10.14.2: Read queries share write_key_proj (same key space).
+        # Separate read_query_proj couldn't learn write's key space alignment
+        # → read_H ≈ 3.8 (uniform over 64 slots) → retrieval impossible.
+        # Shared projection: write_key_proj(K3) matches the slot that
+        # write_key_proj(K3_original) wrote to — natural key-value lookup.
+        # read_query_proj kept for backward compat but unused.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.read_dropout = nn.Dropout(dropout)
-        self._read_scale = (_key_dim) ** -0.5
+        # Learnable read temperature (like write has _write_log_scale).
+        # Fixed _read_scale = 0.25 was too cold for 64 slots → near-uniform softmax.
+        self._read_log_scale = nn.Parameter(
+            torch.tensor(math.log((_key_dim) ** -0.5))
+        )
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
@@ -8458,14 +8468,17 @@ class SlotMemoryGCT(nn.Module):
         Returns:
             read_output: [B, N, D] — retrieved information
         """
-        # Project queries
-        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # V10.14.2: Read queries use write_key_proj (shared key space).
+        # This ensures read queries naturally match the same slot keys that
+        # the write path used, enabling content-based key-value lookup.
+        queries = self.write_key_proj(x)  # [B, N, D_key]
 
-        # Attention: softmax(query @ slot_keys.T / sqrt(d))
+        # Attention: softmax(query @ slot_keys.T * exp(log_scale))
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
+        _read_scale = torch.exp(self._read_log_scale)
         attn_logits = torch.bmm(
             queries, slot_keys.transpose(1, 2)
-        ) * self._read_scale
+        ) * _read_scale
         attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
         attn_weights = self.read_dropout(attn_weights)
 

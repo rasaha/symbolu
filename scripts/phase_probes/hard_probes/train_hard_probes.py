@@ -10078,7 +10078,8 @@ def train_real_language(
                       f"assign_H={_sm._diag_assignment_entropy:.3f} "
                       f"marginal_H={_marginal_H:.3f} "
                       f"read_H={_sm._diag_read_attn_entropy:.3f} "
-                      f"w_scale={torch.exp(_sm._write_log_scale).item():.4f}")
+                      f"w_scale={torch.exp(_sm._write_log_scale).item():.4f} "
+                      f"r_scale={torch.exp(_sm._read_log_scale).item():.4f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
