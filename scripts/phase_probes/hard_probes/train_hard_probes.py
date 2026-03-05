@@ -9607,6 +9607,9 @@ def train_real_language(
             num_global_tokens=num_global_tokens,
             global_update_mode=global_update_mode,
             phase_to_global=phase_to_global,
+            # V10.14: Slot memory params (only effective when global_update_mode="slots")
+            slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
+            retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 0.1),
         ).to(config.device)
 
         # Wrap to match training loop interface (expects logits tensor, not dict)
@@ -9616,10 +9619,31 @@ def train_real_language(
                 self.inner = inner
                 self.layer_outputs = []
                 self.vocab_size = inner.config.vocab_size
+                # V10.14: Expose slot state from last forward pass for retrieval loss
+                self._last_result = None
 
             def forward(self, input_ids, probe_layers=False):
                 result = self.inner(input_ids)
+                # V10.14: Stash full result dict so training loop can access slot state
+                self._last_result = result
                 return result['logits']
+
+            # V10.14: Expose inner model attributes for slot memory access
+            @property
+            def slot_memory(self):
+                return getattr(self.inner, 'slot_memory', None)
+
+            @property
+            def lm_head(self):
+                return self.inner.lm_head
+
+            @property
+            def retrieval_loss_weight(self):
+                return getattr(self.inner, 'retrieval_loss_weight', 0.0)
+
+            @property
+            def global_update_mode(self):
+                return getattr(self.inner, 'global_update_mode', 'pool')
 
             def parameters(self, recurse=True):
                 return self.inner.parameters(recurse=recurse)
@@ -10019,6 +10043,32 @@ def train_real_language(
             layer_hidden_states = None
             loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
+
+        # V10.14: Slot memory retrieval auxiliary loss
+        # At query positions (where y != PAD), read from slots and predict value
+        if (hasattr(model, 'slot_memory') and model.slot_memory is not None
+                and hasattr(model, '_last_result') and model._last_result is not None
+                and '_slot_keys' in model._last_result
+                and model.retrieval_loss_weight > 0):
+            _result = model._last_result
+            # Query mask: True at positions where model must retrieve (non-PAD targets)
+            _query_mask = (y != ignore_idx) if ignore_idx != -100 else None
+            _retr_loss = model.slot_memory.compute_retrieval_loss(
+                x=_result['_slot_hidden'],
+                slot_keys=_result['_slot_keys'],
+                slot_vals=_result['_slot_vals'],
+                query_mask=_query_mask,
+                target_ids=y,
+                lm_head=model.lm_head,
+            )
+            if _retr_loss.item() > 0:
+                loss = loss + model.retrieval_loss_weight * _retr_loss
+                if step % log_interval == 0:
+                    _sm = model.slot_memory
+                    print(f"  [SLOTS] retr_loss={_retr_loss.item():.4f} "
+                          f"write_gate={_sm._diag_write_gate_mean:.3f} "
+                          f"assign_H={_sm._diag_assignment_entropy:.3f} "
+                          f"read_H={_sm._diag_read_attn_entropy:.3f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -12403,8 +12453,13 @@ Examples:
     parser.add_argument("--num-global-tokens", type=int, default=16,
                         help="Number of global token memory slots")
     parser.add_argument("--global-update-mode", type=str, default="pool",
-                        choices=["pool", "attn-lite"],
-                        help="GCT write mode: 'pool' (recommended) or 'attn-lite'")
+                        choices=["pool", "attn-lite", "slots"],
+                        help="GCT write mode: 'pool', 'attn-lite', or 'slots' (V10.14 addressable KV memory)")
+    # V10.14: Slot memory parameters (when --global-update-mode=slots)
+    parser.add_argument("--slots-write-lr", type=float, default=0.1,
+                        help="EMA learning rate for competitive slot writes (default: 0.1)")
+    parser.add_argument("--retrieval-loss-weight", type=float, default=0.1,
+                        help="Weight for auxiliary retrieval CE loss at query positions (default: 0.1)")
     parser.add_argument("--phase-to-global", action="store_true",
                         help="Enable Phase→Global integration (Phase memory injects into GCT)")
 
