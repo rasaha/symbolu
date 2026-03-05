@@ -10545,10 +10545,18 @@ def train_real_language(
         print(f"    • Phase and Quad have SEPARATE roles, not parallel mixing")
         print(f"    • No curriculum needed - roles are architecturally defined")
     elif pfc is not None:
-        print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
-        print(f"    • Final curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+        _cur = getattr(model, 'curriculum', None)
+        if _cur is not None:
+            print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
+            print(f"    • Final curriculum: {[f'{c:.2f}' for c in _cur]}")
+        else:
+            print(f"    • Curriculum was DYNAMIC (PPL-based)")
     else:
-        print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in model.curriculum]}")
+        _cur = getattr(model, 'curriculum', None)
+        if _cur is not None:
+            print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in _cur]}")
+        else:
+            print(f"    • No curriculum (HybridPhaseTransformer mode)")
 
     # =========================================================================
     # STABILITY / CONFIDENCE FLAGS (Trust indicators)
