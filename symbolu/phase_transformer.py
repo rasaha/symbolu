@@ -8330,8 +8330,10 @@ class SlotMemoryGCT(nn.Module):
         # Previous bias=-1 (sigmoid=0.27) was too conservative: combined with
         # weak gradient signal to the gate, it collapsed to 0.017 and killed writes.
         nn.init.constant_(self.write_novelty_gate.bias, 0.0)
-        # Floor: minimal safety net (collapse is in assignment, not gate)
-        self._novelty_gate_floor = 0.01
+        # V10.14.7: Raised floor from 0.01→0.05 to ensure minimum write
+        # pressure while retrieval loss bootstraps. At 0.01, EMA updates
+        # were too tiny to move slot_vals from zero init → no retrieval signal.
+        self._novelty_gate_floor = 0.05
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -8727,10 +8729,15 @@ class SlotMemoryGCT(nn.Module):
             self._diag_L_sharp = L_sharp.item()
             self._diag_L_bal = L_bal.item()
 
-        # V10.14.6: Rebalanced weights.
-        # Old: 0.01 * L_sharp + 0.05 * L_bal → uniform was trivial optimum.
-        # New: sharpness dominates (0.1), gate sparsity creates selectivity.
-        return 0.1 * L_sharp + 0.02 * L_bal + 0.02 * L_gate
+        # V10.14.7: Removed L_gate term.
+        # L_gate (0.02 * mean(novelty)) was a direct gradient pushing gate→0,
+        # overwhelming the very indirect retrieval loss gradient through the
+        # EMA write chain. This caused a chicken-and-egg collapse:
+        #   gate→0 → slots stay empty → no retrieval signal → gate stays at 0.
+        # Without L_gate, gate stays near sigmoid(0)=0.5 from init, writes
+        # happen, slots fill with content, and retrieval loss naturally shapes
+        # the gate toward selective writing once it has signal to work with.
+        return 0.1 * L_sharp + 0.02 * L_bal
 
 
 @dataclass
