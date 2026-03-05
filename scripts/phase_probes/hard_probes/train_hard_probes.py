@@ -9585,7 +9585,7 @@ def train_real_language(
         global_update_mode = getattr(args, 'global_update_mode', 'pool')
         phase_to_global = getattr(args, 'phase_to_global', False)
 
-        print(f"\nCreating HybridPhaseTransformer (V10.13)...")
+        print(f"\nCreating HybridPhaseTransformer (V10.14.6)...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
         print(f"  Phase Channels: {phase_channels}")
         print(f"  Phase Write Gate: {'ENABLED' if phase_write_gate else 'disabled'}")

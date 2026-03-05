@@ -8256,6 +8256,12 @@ class SlotMemoryGCT(nn.Module):
     slot state. The read path (cross-attention) produces output for the
     residual stream but NEVER writes back to slots.
 
+    V10.14.6: Top-k hard routing with straight-through gradient estimator.
+    Soft softmax over all K slots collapses to uniform when write keys are
+    similar (all from x.detach()). Top-k forces sparse assignment: each
+    token writes to at most k slots, then softmax only within those k.
+    Straight-through passes gradients through the full softmax for learning.
+
     Args:
         num_slots: Number of memory slots (= num_global_tokens)
         embed_dim: Embedding dimension
@@ -8263,6 +8269,7 @@ class SlotMemoryGCT(nn.Module):
         write_lr: Learning rate for slot updates (η in the write rule)
         dropout: Dropout rate
         write_key_dim: Dimension for write key matching (default: embed_dim)
+        write_top_k: Number of slots each token can write to (default: 4)
     """
 
     def __init__(
@@ -8273,12 +8280,14 @@ class SlotMemoryGCT(nn.Module):
         write_lr: float = 0.1,
         dropout: float = 0.1,
         write_key_dim: Optional[int] = None,
+        write_top_k: int = 4,
     ):
         super().__init__()
         self.num_slots = num_slots
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.write_lr = write_lr
+        self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
 
         # --- Slot state (learnable initialization) ---
@@ -8428,7 +8437,21 @@ class SlotMemoryGCT(nn.Module):
                 _noise = torch.randn_like(assignment_logits) * (self._router_noise_std * _noise_decay)
                 assignment_logits = assignment_logits + _noise
 
-        assignment = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
+        # V10.14.6: Top-k hard routing with straight-through gradient.
+        # Soft softmax over all K slots converges to uniform when write keys
+        # are similar. Top-k selects the k best-matching slots per token,
+        # then softmax only within those k. Straight-through estimator passes
+        # gradients through the full softmax so the router can still learn.
+        assignment_soft = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
+        if self.write_top_k < self.num_slots:
+            topk_vals, topk_idx = assignment_logits.topk(self.write_top_k, dim=-1)  # [B, N, k]
+            topk_weights = F.softmax(topk_vals, dim=-1)  # [B, N, k] — normalized within top-k
+            assignment_hard = torch.zeros_like(assignment_logits)  # [B, N, K]
+            assignment_hard.scatter_(-1, topk_idx, topk_weights)
+            # Straight-through: hard forward, soft backward
+            assignment = assignment_hard - assignment_soft.detach() + assignment_soft
+        else:
+            assignment = assignment_soft
 
         # Gate assignment by novelty: only tokens with binding info write
         # [B, N, K] * [B, N, 1] → [B, N, K]
@@ -8593,24 +8616,27 @@ class SlotMemoryGCT(nn.Module):
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """
-        V10.14.5: MoE-style router loss — sharp but balanced.
+        V10.14.6: MoE-style router loss — sharp, balanced, and gate-selective.
 
-        Two-term loss replacing the old per_token_H - marginal_H which had a
-        trivial optimum at single-slot collapse (both terms → 0).
+        Three-term loss:
 
         Term 1 — Target sharpness (L_sharp):
             ReLU(H(assign_t) - H_target) averaged over tokens.
-            "Be sharp enough, then stop pushing." This prevents the loss from
-            rewarding degenerate one-hot collapse.
             H_target ≈ 1.0 nats: allows 2-3 active slots per token.
 
         Term 2 — Load balancing (L_bal):
             KL(marginal || uniform) where marginal = mean(assign) over tokens.
-            Directly penalizes slot-0 collapse. This is the critical missing
-            piece from the original loss.
+            Prevents single-slot collapse.
+
+        Term 3 — Gate sparsity (L_gate):  [NEW in V10.14.6]
+            Mean(novelty) — L1 penalty pushing gate toward closed.
+            Without this, gate drifts to 1.0 (everything writes, including
+            filler). Retrieval loss counteracts by pushing gate open for
+            tokens that actually carry binding info. The tension creates
+            selectivity.
 
         Returns:
-            router_loss: λ_sharp * L_sharp + λ_bal * L_bal
+            router_loss: λ_sharp * L_sharp + λ_bal * L_bal + λ_gate * L_gate
         """
         if self._last_assignment is None:
             return torch.tensor(0.0)
@@ -8634,6 +8660,14 @@ class SlotMemoryGCT(nn.Module):
         # KL(marginal || uniform) = sum(p * log(p * K))
         L_bal = (marginal * torch.log(marginal * K + eps)).sum()
 
+        # --- Term 3: Gate sparsity (V10.14.6) ---
+        # L1 penalty on novelty gate mean: pushes gate toward 0 (closed).
+        # Retrieval loss pushes back open for tokens with useful bindings.
+        # The tension creates content-vs-filler selectivity.
+        L_gate = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        if self._last_novelty is not None:
+            L_gate = self._last_novelty.mean()
+
         # Store diagnostics (normalized by max entropy for readability)
         max_entropy = math.log(K)
         with torch.no_grad():
@@ -8644,8 +8678,10 @@ class SlotMemoryGCT(nn.Module):
             self._diag_L_sharp = L_sharp.item()
             self._diag_L_bal = L_bal.item()
 
-        # Weights: balancing is more important than sharpness initially
-        return 0.01 * L_sharp + 0.05 * L_bal
+        # V10.14.6: Rebalanced weights.
+        # Old: 0.01 * L_sharp + 0.05 * L_bal → uniform was trivial optimum.
+        # New: sharpness dominates (0.1), gate sparsity creates selectivity.
+        return 0.1 * L_sharp + 0.02 * L_bal + 0.02 * L_gate
 
 
 @dataclass
