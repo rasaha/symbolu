@@ -9595,6 +9595,7 @@ def train_real_language(
             dropout=config.dropout,
             local_layers=config.num_layers // 2,  # Half local, half hybrid
             window_size=getattr(args, 'local_window_size', 64),
+            local_backend=getattr(args, 'local_backend', 'sdpa'),
             protected_phase=True,
             phase_channels=phase_channels,
             phase_write_gate=phase_write_gate,
@@ -12671,6 +12672,9 @@ Examples:
                         help="Top-K cache size for Quad query (default: 64)")
     parser.add_argument("--local-window-size", type=int, default=64,
                         help="Window size for local attention (default: 64)")
+    parser.add_argument("--local-backend", type=str, default="sdpa",
+                        choices=["auto", "flash", "sdpa", "unfold"],
+                        help="Local attention backend (default: sdpa; flash requires fp16/bf16)")
     parser.add_argument("--decay-gamma", type=float, default=0.9,
                         help="Decay factor for phase memory accumulation (default: 0.9)")
     parser.add_argument("--binding-cache-phase-ratio", type=str, default="0.3,0.3,0.3,0.3",
