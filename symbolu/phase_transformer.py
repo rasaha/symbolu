@@ -8340,8 +8340,12 @@ class SlotMemoryGCT(nn.Module):
         # are in [-1, 1]. Scale=10 gives softmax logits in [-10, 10] — sharp
         # enough to differentiate but not saturate. This is the standard approach
         # used in CLIP, prototypical networks, etc.
+        # V10.14.8: Lowered init temperature from 10→5. At scale=10, cosine
+        # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
+        # route to the same slot. Scale=5 gives enough sharpness to differentiate
+        # while allowing more balanced slot utilization.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(10.0))  # exp(log(10)) = 10.0
+            torch.tensor(math.log(5.0))  # exp(log(5)) = 5.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8368,8 +8372,13 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.5: Add Gaussian noise to assignment logits during early training
         # to prevent "slot 0 wins by tiny initial advantage" collapse.
         # Noise decays linearly: noise_std * max(0, 1 - step/warmup_steps)
+        # V10.14.8: Extended noise warmup 2000→10000 and added noise floor.
+        # Noise decaying to 0 at step 2000 meant collapse was permanent after
+        # that point. Longer warmup + floor=0.1 maintains diversity pressure
+        # throughout training while still allowing sharp convergence.
         self._router_noise_std = 0.5
-        self._router_noise_warmup = 2000  # steps to decay noise to 0
+        self._router_noise_warmup = 10000  # steps to decay noise toward floor
+        self._router_noise_floor = 0.1  # minimum noise std (never fully zero)
         self._router_step = 0  # updated externally by training loop
 
         # --- Read warmstart ---
@@ -8387,6 +8396,7 @@ class SlotMemoryGCT(nn.Module):
         self._diag_slot_key_norm = None
         self._diag_slot_val_norm = None
         self._diag_read_attn_entropy = None
+        self._last_slot_keys = None  # V10.14.8: for orthogonality loss
 
     @property
     def read_warmstart_alpha(self) -> float:
@@ -8456,7 +8466,10 @@ class SlotMemoryGCT(nn.Module):
         # direction only, not magnitude. This prevents winner-take-all collapse
         # where one slot's key norm grows larger and attracts all tokens.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        _scale = torch.exp(self._write_log_scale)  # Learnable temperature
+        # V10.14.8: Clamp temperature to [3, 15]. At scale=10+ all tokens
+        # pick the same top slot → winner-take-all collapse. Capping at 15
+        # prevents runaway; floor of 3 prevents assignments from going uniform.
+        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=15.0)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
         _sk_norm = F.normalize(slot_keys, dim=-1)       # [B, K, D_key]
         assignment_logits = torch.bmm(
@@ -8466,10 +8479,11 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.5: Router noise — break symmetry during early training.
         # Without this, the slot with the tiny initial advantage snowballs.
         if self.training and self._router_noise_std > 0:
+            # V10.14.8: Decay toward floor instead of 0
             _noise_decay = max(0.0, 1.0 - self._router_step / self._router_noise_warmup)
-            if _noise_decay > 0:
-                _noise = torch.randn_like(assignment_logits) * (self._router_noise_std * _noise_decay)
-                assignment_logits = assignment_logits + _noise
+            _noise_std = self._router_noise_floor + (self._router_noise_std - self._router_noise_floor) * _noise_decay
+            _noise = torch.randn_like(assignment_logits) * _noise_std
+            assignment_logits = assignment_logits + _noise
 
         # V10.14.6: Top-k hard routing with straight-through gradient.
         # Soft softmax over all K slots converges to uniform when write keys
@@ -8532,6 +8546,8 @@ class SlotMemoryGCT(nn.Module):
         self._last_assignment = assignment  # [B, N, K]
         self._last_novelty = novelty  # [B, N, 1]
         self._last_gated_assignment = gated_assignment  # [B, N, K] — for gate gradient
+        # V10.14.8: Store updated slot keys for orthogonality loss
+        self._last_slot_keys = new_slot_keys  # [B, K, D_key]
 
         # Diagnostics (no grad)
         with torch.no_grad():
@@ -8737,7 +8753,25 @@ class SlotMemoryGCT(nn.Module):
         # Without L_gate, gate stays near sigmoid(0)=0.5 from init, writes
         # happen, slots fill with content, and retrieval loss naturally shapes
         # the gate toward selective writing once it has signal to work with.
-        return 0.1 * L_sharp + 0.02 * L_bal
+        # --- Term 4: Slot key orthogonality (V10.14.8) ---
+        # Penalize slot keys for being too similar. Without this, EMA updates
+        # drift keys toward the mean token embedding → all slots become identical.
+        # L_ortho = ||K·K^T - I||_F^2 / K^2 (normalized Frobenius norm)
+        L_ortho = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        if hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
+            _sk = F.normalize(self._last_slot_keys, dim=-1)  # [B, K, D]
+            # Cosine similarity matrix: [B, K, K]
+            _sim = torch.bmm(_sk, _sk.transpose(1, 2))  # diagonal = 1.0
+            # Zero out diagonal (self-similarity is always 1, not informative)
+            _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
+            _off_diag = _sim - _eye.unsqueeze(0)
+            L_ortho = (_off_diag ** 2).mean()
+
+        # V10.14.8: L_bal weight 0.02→1.0. At 0.02 the balance loss contributed
+        # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
+        # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
+        # when fully collapsed, providing meaningful gradient to redistribute.
+        return 0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho
 
 
 @dataclass
