@@ -4393,10 +4393,14 @@ def train(config: UnifiedTrainingConfig):
 
             # V9.7.0: Capture RAW gradient norm BEFORE clipping for Kosha Time axis
             # This gives meaningful t values instead of always 0 (post-clip is always ~1.0)
-            raw_grad_norm = sum(
-                p.grad.norm().item() for p in model.parameters()
+            # Fix: compute true global L2 norm = sqrt(sum(||p.grad||²))
+            # Previous code used sum(||p.grad||) which is L1-of-L2-norms and
+            # overestimates the true norm, causing the throttle to trigger
+            # too aggressively and crush LR unnecessarily.
+            raw_grad_norm = (sum(
+                p.grad.norm().item() ** 2 for p in model.parameters()
                 if p.grad is not None
-            )
+            )) ** 0.5
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
