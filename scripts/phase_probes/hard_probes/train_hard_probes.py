@@ -10078,8 +10078,7 @@ def train_real_language(
                       f"assign_H={_sm._diag_assignment_entropy:.3f} "
                       f"marginal_H={_marginal_H:.3f} "
                       f"read_H={_sm._diag_read_attn_entropy:.3f} "
-                      f"w_scale={torch.exp(_sm._write_log_scale).item():.4f} "
-                      f"r_scale={torch.exp(_sm._read_log_scale).item():.4f}")
+                      f"wr_scale={torch.exp(_sm._write_log_scale).item():.4f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -12469,8 +12468,8 @@ Examples:
     # V10.14: Slot memory parameters (when --global-update-mode=slots)
     parser.add_argument("--slots-write-lr", type=float, default=0.1,
                         help="EMA learning rate for competitive slot writes (default: 0.1)")
-    parser.add_argument("--retrieval-loss-weight", type=float, default=0.1,
-                        help="Weight for auxiliary retrieval CE loss at query positions (default: 0.1)")
+    parser.add_argument("--retrieval-loss-weight", type=float, default=1.0,
+                        help="Weight for auxiliary retrieval CE loss at query positions (default: 1.0)")
     parser.add_argument("--phase-to-global", action="store_true",
                         help="Enable Phase→Global integration (Phase memory injects into GCT)")
 

@@ -8313,16 +8313,15 @@ class SlotMemoryGCT(nn.Module):
 
         # --- READ path: query → slot attention ---
         # V10.14.2: Read queries share write_key_proj (same key space).
-        # Separate read_query_proj couldn't learn write's key space alignment
-        # → read_H ≈ 3.8 (uniform over 64 slots) → retrieval impossible.
-        # Shared projection: write_key_proj(K3) matches the slot that
-        # write_key_proj(K3_original) wrote to — natural key-value lookup.
+        # V10.14.3: Read also shares _write_log_scale (same temperature).
+        #   The separate _read_log_scale collapsed to 0.057 because the main
+        #   LM loss actively suppresses noisy reads. But _write_log_scale is
+        #   pushed UP by sharpness loss → shared scale prevents read collapse.
         # read_query_proj kept for backward compat but unused.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.read_dropout = nn.Dropout(dropout)
-        # Learnable read temperature (like write has _write_log_scale).
-        # Fixed _read_scale = 0.25 was too cold for 64 slots → near-uniform softmax.
+        # Kept for checkpoint compat; read now uses _write_log_scale
         self._read_log_scale = nn.Parameter(
             torch.tensor(math.log((_key_dim) ** -0.5))
         )
@@ -8473,9 +8472,10 @@ class SlotMemoryGCT(nn.Module):
         # the write path used, enabling content-based key-value lookup.
         queries = self.write_key_proj(x)  # [B, N, D_key]
 
-        # Attention: softmax(query @ slot_keys.T * exp(log_scale))
+        # V10.14.3: Share _write_log_scale for read attention temperature.
+        # Sharpness loss pushes this scale UP → reads sharpen with writes.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        _read_scale = torch.exp(self._read_log_scale)
+        _read_scale = torch.exp(self._write_log_scale)
         attn_logits = torch.bmm(
             queries, slot_keys.transpose(1, 2)
         ) * _read_scale
