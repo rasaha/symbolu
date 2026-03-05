@@ -7092,10 +7092,14 @@ class HybridPhaseTransformer(nn.Module):
             if self.global_tokens_enabled and self.global_update_enabled:
                 if (i % self.global_update_interval) == 0:
                     if self.global_update_mode == "slots":
-                        # V10.14: Competitive slot write — the ONLY way slots update
+                        # V10.14.1: Competitive slot write — the ONLY way slots update
+                        # Always pass detach=False for slots: write() uses x.detach()
+                        # internally to protect backbone, but slot_vals/keys must
+                        # carry grad so retrieval loss can teach write_val_proj
+                        # what to store (not just where).
                         _slot_keys, _slot_vals = self.slot_memory.write(
                             x, _slot_keys, _slot_vals,
-                            detach=(self.global_token_write_detach and self.training),
+                            detach=False,
                         )
                     elif self.global_update_mode == "pool":
                         # Gated pooled summary of tokens
@@ -7295,9 +7299,10 @@ class HybridPhaseTransformer(nn.Module):
             if self.global_tokens_enabled and self.global_update_enabled:
                 if (i % self.global_update_interval) == 0:
                     if self.global_update_mode == "slots":
+                        # V10.14.1: Always detach=False for slots (see comment above)
                         _slot_keys, _slot_vals = self.slot_memory.write(
                             x, _slot_keys, _slot_vals,
-                            detach=(self.global_token_write_detach and self.training),
+                            detach=False,
                         )
                     elif self.global_update_mode == "pool":
                         _w = torch.sigmoid(self.global_write_gate(x))
