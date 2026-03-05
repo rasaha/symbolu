@@ -8303,9 +8303,12 @@ class SlotMemoryGCT(nn.Module):
         # Normalize to unit sphere regardless
         _init_keys = F.normalize(_init_keys, dim=-1)
         self.slot_keys_init = nn.Parameter(_init_keys)
-        # Values: content stored in each slot
+        # V10.14.6: Zero-init slot values. Previous randn*0.02 contaminated
+        # reads before any writes — 65% of slot content was still init noise
+        # after 4 writes at eta=0.1. Zero init means reads return zero until
+        # the model writes actual content, eliminating init noise entirely.
         self.slot_vals_init = nn.Parameter(
-            torch.randn(num_slots, embed_dim) * 0.02
+            torch.zeros(num_slots, embed_dim)
         )
 
         # --- WRITE path: token → slot assignment ---
@@ -8342,6 +8345,11 @@ class SlotMemoryGCT(nn.Module):
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.read_dropout = nn.Dropout(dropout)
+        # V10.14.6: Retrieval readout norm — raw slot values go through this
+        # LayerNorm before lm_head in compute_retrieval_loss. The lm_head
+        # expects layer-normed input; without this, raw slot values have
+        # arbitrary scale → lm_head predictions are garbage.
+        self.retr_read_norm = nn.LayerNorm(embed_dim)
         # Kept for checkpoint compat; read now uses _write_log_scale
         self._read_log_scale = nn.Parameter(
             torch.tensor(math.log((_key_dim) ** -0.5))
@@ -8617,7 +8625,9 @@ class SlotMemoryGCT(nn.Module):
         if query_retrieved.shape[0] == 0:
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Predict target token directly from raw slot values via shared LM head
+        # Normalize before lm_head: raw slot values have arbitrary scale,
+        # but lm_head expects layer-normed input (same as main path).
+        query_retrieved = self.retr_read_norm(query_retrieved)  # [num_queries, D]
         query_logits = lm_head(query_retrieved)  # [num_queries, V]
 
         retrieval_loss = F.cross_entropy(
