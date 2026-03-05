@@ -13284,6 +13284,8 @@ def train(config: UnifiedTrainingConfig):
                         metrics['slot_assignment_entropy'] = model.slot_memory._diag_assignment_entropy
                     if model.slot_memory._diag_read_attn_entropy is not None:
                         metrics['slot_read_entropy'] = model.slot_memory._diag_read_attn_entropy
+                    if hasattr(model.slot_memory, '_diag_marginal_entropy'):
+                        metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow

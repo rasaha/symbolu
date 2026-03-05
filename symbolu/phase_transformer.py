@@ -6772,12 +6772,10 @@ class HybridPhaseTransformer(nn.Module):
         self.global_update_enabled = global_update_enabled
         self.global_update_mode = global_update_mode
         self.global_update_interval = global_update_interval
-        # V10.14: Slots mode REQUIRES gradient flow through writes.
-        # Detach was designed for pool/attn-lite to prevent global tokens from
-        # dominating early training. But slots need gradients to learn competitive
-        # assignment — without them, assignment stays uniform (H = ln(K)).
-        if global_update_mode == "slots" and global_token_write_detach:
-            global_token_write_detach = False
+        # V10.14.1: Slot memory uses selective detach internally (detaches x
+        # at write entry to protect backbone, keeps grad to slot params via
+        # aux losses). The global_token_write_detach flag controls whether
+        # slot UPDATE outputs are also detached — keep True for stability.
         self.global_token_write_detach = global_token_write_detach
 
         # V10.14: Store retrieval loss weight
@@ -8360,12 +8358,19 @@ class SlotMemoryGCT(nn.Module):
         """
         B, N, D = x.shape
 
+        # V10.14.1: Selective detach — stop gradients from slot write flowing
+        # back to the transformer backbone, but KEEP gradients to slot memory
+        # parameters (write_key_proj, write_val_proj, novelty_gate, _write_log_scale).
+        # Without this, main LM loss gradients through the slot write path
+        # destabilize backbone training (write_gate collapses to ~0.04).
+        x_write = x.detach()  # Always detach input to write path
+
         # Novelty gate: which tokens should write? [B, N, 1]
-        novelty = torch.sigmoid(self.write_novelty_gate(x))
+        novelty = torch.sigmoid(self.write_novelty_gate(x_write))
 
         # Project tokens into write key/value space
-        write_keys = self.write_key_proj(x)   # [B, N, D_key]
-        write_vals = self.write_val_proj(x)    # [B, N, D]
+        write_keys = self.write_key_proj(x_write)   # [B, N, D_key]
+        write_vals = self.write_val_proj(x_write)    # [B, N, D]
 
         # Competitive assignment: softmax(token_key @ slot_keys.T * exp(log_scale))
         # Learnable scale lets the model sharpen assignment as it learns to specialize.
@@ -8528,32 +8533,46 @@ class SlotMemoryGCT(nn.Module):
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """
-        Assignment sharpness loss: penalize uniform assignment across slots.
+        Balanced slot assignment loss: sharp per-token + diverse across-tokens.
 
-        When assignment is uniform (H = ln(K)), all slots get identical writes
-        and never specialize. This loss encourages sharp, competitive assignment
-        by minimizing the entropy of the assignment distribution.
+        Two competing objectives:
+        1. Per-token sharpness: each token should assign to ~1 slot (low entropy)
+        2. Slot diversity: across all tokens, slots should be used evenly (high marginal entropy)
 
-        Uses the assignment from the last write() call. Must be called after write().
+        Loss = per_token_entropy - marginal_entropy (both normalized by ln(K)).
+        Minimized when each token picks one slot AND different tokens pick different slots.
+
+        Score interpretation:
+            Uniform:  1.0 - 1.0 = 0.0  (bad: no specialization)
+            Collapsed: 0.0 - 0.0 = 0.0  (bad: all in one slot)
+            Ideal:    ~0.0 - ~1.0 = -1.0 (good: sharp + diverse)
 
         Returns:
-            sharpness_loss: scalar, mean entropy of assignment normalized by ln(K).
-                           1.0 = perfectly uniform (bad), 0.0 = perfectly sharp (good).
-                           Returns 0 if no assignment available.
+            sharpness_loss: scalar in [-1, 1]. Lower is better.
         """
         if self._last_assignment is None:
             return torch.tensor(0.0)
 
         assignment = self._last_assignment  # [B, N, K]
-        # Entropy: -sum(p * log(p))
         log_a = torch.log(assignment.clamp(min=1e-8))
-        entropy = -(assignment * log_a).sum(dim=-1)  # [B, N]
-
-        # Normalize by max entropy so loss is in [0, 1] regardless of num_slots
         max_entropy = math.log(self.num_slots)
-        normalized_entropy = entropy.mean() / max_entropy
 
-        return normalized_entropy
+        # Per-token entropy: want LOW (sharp assignment per token)
+        per_token_entropy = -(assignment * log_a).sum(dim=-1)  # [B, N]
+        mean_per_token = per_token_entropy.mean() / max_entropy  # normalized
+
+        # Marginal entropy: want HIGH (diverse slot usage across tokens)
+        # Average assignment distribution across all tokens
+        marginal = assignment.mean(dim=1)  # [B, K] — avg slot usage
+        log_m = torch.log(marginal.clamp(min=1e-8))
+        marginal_entropy = -(marginal * log_m).sum(dim=-1)  # [B]
+        mean_marginal = marginal_entropy.mean() / max_entropy  # normalized
+
+        # Store diagnostics
+        with torch.no_grad():
+            self._diag_marginal_entropy = mean_marginal.item()
+
+        return mean_per_token - mean_marginal
 
 
 @dataclass
