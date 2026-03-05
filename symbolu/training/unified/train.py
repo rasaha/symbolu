@@ -4437,7 +4437,7 @@ def train(config: UnifiedTrainingConfig):
                 ]
                 if _slot_params_with_grad:
                     torch.nn.utils.clip_grad_norm_(
-                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                        _slot_params_with_grad, config.max_grad_norm * 0.01
                     )
 
             # V10.16: Clip phase attention OV circuit params separately.
