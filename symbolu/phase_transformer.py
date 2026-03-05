@@ -8507,7 +8507,7 @@ class SlotMemoryGCT(nn.Module):
             topk_vals, topk_idx = assignment_logits.topk(self.write_top_k, dim=-1)  # [B, N, k]
             topk_weights = F.softmax(topk_vals, dim=-1)  # [B, N, k] — normalized within top-k
             assignment_hard = torch.zeros_like(assignment_logits)  # [B, N, K]
-            assignment_hard.scatter_(-1, topk_idx, topk_weights)
+            assignment_hard.scatter_(-1, topk_idx, topk_weights.to(assignment_hard.dtype))
             # Straight-through: hard forward, soft backward
             assignment = assignment_hard - assignment_soft.detach() + assignment_soft
         else:
