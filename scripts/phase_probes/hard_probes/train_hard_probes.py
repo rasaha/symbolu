@@ -9354,24 +9354,28 @@ def train_real_language(
 
         ar_vocab_size = getattr(args, 'ar_vocab_size', 1000)
         ar_num_pairs = getattr(args, 'ar_num_pairs', 8)
-        ar_delay_min = getattr(args, 'ar_delay_min', 80)
-        ar_delay_max = getattr(args, 'ar_delay_max', 150)
+        ar_delay_min = getattr(args, 'ar_delay_min', 5)
+        ar_delay_max = getattr(args, 'ar_delay_max', 30)
         ar_train_samples = getattr(args, 'ar_train_samples', 50000)
         ar_val_samples = getattr(args, 'ar_val_samples', 2000)
 
         print(f"  Vocabulary size: {ar_vocab_size}")
         print(f"  Key-value pairs: {ar_num_pairs}")
+        _local_win = getattr(args, 'local_window_size', 64)
         print(f"  Initial delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
-        print(f"  Local window: {getattr(args, 'local_window_size', 64)}")
-        print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        print(f"  Local window: {_local_win}")
+        if ar_delay_min > _local_win:
+            print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        else:
+            print(f"  → Initial delay ≤ window (curriculum warmup — slots learn before they're needed)")
         print(f"  Train samples: {ar_train_samples}")
         print(f"  Val samples: {ar_val_samples}")
 
         # V10.5.8: Dynamic delay curriculum
-        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', False)
-        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 120)
-        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 200)
-        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.3)
+        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', True)
+        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 80)
+        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 150)
+        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.2)
 
         if ar_dynamic_delay:
             print(f"\n  ★ DYNAMIC DELAY CURRICULUM ENABLED (V10.5.8)")
@@ -9390,11 +9394,15 @@ def train_real_language(
             seed=42,
             dynamic_delay=ar_dynamic_delay,  # V10.5.8
         )
+        # V10.14.3: Validation ALWAYS uses target (hard) delay range so we measure
+        # actual long-range retrieval, not easy within-window cases.
+        _val_delay_min = ar_target_delay_min if ar_dynamic_delay else ar_delay_min
+        _val_delay_max = ar_target_delay_max if ar_dynamic_delay else ar_delay_max
         val_dataset = AssociativeRecallDataset(
             num_samples=ar_val_samples,
             num_pairs=ar_num_pairs,
-            delay_min=ar_delay_min,
-            delay_max=ar_delay_max,
+            delay_min=_val_delay_min,
+            delay_max=_val_delay_max,
             seq_len=args.seq_len,
             vocab_size=ar_vocab_size,
             seed=123,  # Different seed for validation
@@ -10188,7 +10196,10 @@ def train_real_language(
             # V10.5.6: Associative Recall accuracy evaluation
             if use_associative_recall and ar_dataset is not None:
                 retrieval_acc = ar_dataset.get_accuracy(model, config.device, num_samples=500)
-                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}%")
+                _curr_delay = f"[{train_dataset.delay_min},{train_dataset.delay_max}]" if ar_dynamic_delay else f"[{ar_delay_min},{ar_delay_max}]"
+                _beyond_window = train_dataset.delay_min > getattr(args, 'local_window_size', 64) if ar_dynamic_delay else ar_delay_min > getattr(args, 'local_window_size', 64)
+                _phase_str = " [HARD: delay>window]" if _beyond_window else " [EASY: delay≤window]"
+                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}% (delay={_curr_delay}{_phase_str})")
                 # Random baseline for num_pairs=8 keys would be 12.5%
                 random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
                 if retrieval_acc * 100 > random_baseline * 2:
@@ -12582,10 +12593,10 @@ Examples:
                              "quad to retrieve from phase memory.")
     parser.add_argument("--ar-num-pairs", type=int, default=8,
                         help="Number of key-value pairs per sample (default: 8)")
-    parser.add_argument("--ar-delay-min", type=int, default=80,
-                        help="Minimum filler tokens between pairs and query (default: 80, > local window)")
-    parser.add_argument("--ar-delay-max", type=int, default=150,
-                        help="Maximum filler tokens between pairs and query (default: 150)")
+    parser.add_argument("--ar-delay-min", type=int, default=5,
+                        help="Initial minimum filler tokens (default: 5, within local window for curriculum)")
+    parser.add_argument("--ar-delay-max", type=int, default=30,
+                        help="Initial maximum filler tokens (default: 30, within local window for curriculum)")
     parser.add_argument("--ar-vocab-size", type=int, default=1000,
                         help="Vocabulary size for associative recall task (default: 1000)")
     parser.add_argument("--ar-train-samples", type=int, default=50000,
@@ -12594,15 +12605,17 @@ Examples:
                         help="Number of validation samples for associative recall (default: 2000)")
 
     # V10.5.8: Dynamic delay curriculum
-    parser.add_argument("--ar-dynamic-delay", action="store_true",
-                        help="Enable dynamic delay curriculum. Starts with --ar-delay-min/max and "
-                             "progressively increases to --ar-target-delay-min/max over training.")
-    parser.add_argument("--ar-target-delay-min", type=int, default=120,
-                        help="Target minimum delay at end of training (default: 120)")
-    parser.add_argument("--ar-target-delay-max", type=int, default=200,
-                        help="Target maximum delay at end of training (default: 200)")
-    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.3,
-                        help="Fraction of training to stay at initial delay before ramping (default: 0.3)")
+    parser.add_argument("--ar-dynamic-delay", action="store_true", default=True,
+                        help="Enable dynamic delay curriculum (default: True). Starts with --ar-delay-min/max "
+                             "and progressively increases to --ar-target-delay-min/max over training.")
+    parser.add_argument("--ar-no-dynamic-delay", action="store_false", dest="ar_dynamic_delay",
+                        help="Disable dynamic delay curriculum (use fixed delay range)")
+    parser.add_argument("--ar-target-delay-min", type=int, default=80,
+                        help="Target minimum delay at end of training (default: 80, > local window)")
+    parser.add_argument("--ar-target-delay-max", type=int, default=150,
+                        help="Target maximum delay at end of training (default: 150)")
+    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.2,
+                        help="Fraction of training to stay at initial delay before ramping (default: 0.2)")
 
     # V10.5.7: Binding Slot Cache (explicit key-value memory)
     parser.add_argument("--binding-slots", type=int, default=0,
