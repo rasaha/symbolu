@@ -985,10 +985,10 @@ def train(config: UnifiedTrainingConfig):
         gradient_throttle = GradientNormThrottle(
             ema_decay=0.99,           # Slow adaptation to gradient baseline
             spike_threshold=2.0,       # Trigger if gradient > 2x average
-            min_factor=0.3,           # Never reduce LR below 30%
+            min_factor=0.05,          # Allow deeper damping on severe spikes
             warmup_steps=config.warmup_steps,  # Skip throttling during warmup
         )
-        print(f"  Gradient Throttle: ENABLED (spike>2x → LR×0.3 min)")
+        print(f"  Gradient Throttle: ENABLED (spike>2x → LR×0.05 min)")
 
     # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
     evolutionary_bridge = None
@@ -4450,20 +4450,26 @@ def train(config: UnifiedTrainingConfig):
                         _slot_params_with_grad, config.max_grad_norm * 0.01
                     )
 
-            # V10.17: Clip phase attention OV circuit params separately.
+            # V10.17/V10.18: Clip phase attention OV circuit params separately.
             # The v_proj (741x spike) and W_k_fused (2183x spike at step 1270) are
             # the primary gradient explosion sources — sin/cos backprop and division
-            # by small normalizer create amplification cascades. Clip these at 0.1x
-            # base before global clipping to prevent cross-layer contamination.
-            # (Tightened from 0.5x: 2183x variance spikes show 0.5x was insufficient)
+            # by small normalizer create amplification cascades.
+            # V10.18: Group norm clip alone was insufficient — with ~10 blocks × 3
+            # params, the per-parameter budget was too large and cross-layer cascading
+            # caused norms to escalate 5.9→117.1 over 150 steps despite throttle.
+            # Per-element value clipping (same approach that stabilized slot memory)
+            # caps EACH gradient element independently before norm clipping.
             _phase_attn_ov_params = [
                 p for n, p in model.named_parameters()
                 if p.grad is not None and 'phase_attn' in n
                 and any(k in n for k in ('v_proj', 'W_k_fused', 'W_q_fused'))
             ]
             if _phase_attn_ov_params:
+                # First: per-element cap (prevents cross-layer cascade buildup)
+                torch.nn.utils.clip_grad_value_(_phase_attn_ov_params, 0.005)
+                # Second: group norm clip as safety net (tightened from 0.1x)
                 torch.nn.utils.clip_grad_norm_(
-                    _phase_attn_ov_params, config.max_grad_norm * 0.1
+                    _phase_attn_ov_params, config.max_grad_norm * 0.05
                 )
 
             # Gradient clipping: per-layer or global

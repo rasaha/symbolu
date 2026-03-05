@@ -7,7 +7,7 @@ Acts as a physical safety layer that prevents destructive weight updates during
 training instabilities.
 
 Usage:
-    throttle = GradientNormThrottle(ema_decay=0.99, spike_threshold=2.0, min_factor=0.3)
+    throttle = GradientNormThrottle(ema_decay=0.99, spike_threshold=2.0, min_factor=0.05)
 
     # In training loop, after loss.backward() and before optimizer.step():
     factor, grad_norm = throttle.step(model, optimizer, base_lr)
@@ -39,7 +39,7 @@ class GradientNormThrottle:
         self,
         ema_decay: float = 0.99,
         spike_threshold: float = 2.0,
-        min_factor: float = 0.3,
+        min_factor: float = 0.05,
         warmup_steps: int = 100,
     ):
         self.ema_decay = ema_decay
