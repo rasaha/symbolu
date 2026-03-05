@@ -6355,6 +6355,41 @@ def train(config: UnifiedTrainingConfig):
 
                 model.train()
 
+                # V10.21: Slot ablation eval — measure slot memory contribution
+                # Runs every 500 steps: temporarily disables slot read output,
+                # re-evaluates, and prints the PPL delta. If slots help, PPL
+                # should be HIGHER without them.
+                if (
+                    global_step % 500 == 0
+                    and hasattr(model, 'slot_memory')
+                    and model.slot_memory is not None
+                ):
+                    _sm = model.slot_memory
+                    # Save original warmstart state and force alpha=0
+                    _orig_step = _sm._router_step
+                    _orig_center = _sm._read_warmstart_center
+                    _sm._read_warmstart_center = float('inf')  # Forces alpha → 0
+                    model.eval()
+                    with torch.no_grad():
+                        _no_slot_loss, _no_slot_metrics = evaluate(
+                            model, val_loader, device, config, autocast_dtype,
+                            sovereign_loss=sovereign_loss,
+                            sovereign_engine=sovereign_engine,
+                            cached_val_batches=cached_val_batches,
+                        )
+                    _no_slot_ppl = _no_slot_metrics['ppl']
+                    _slot_delta = _no_slot_ppl - val_ppl
+                    _slot_pct = (_slot_delta / max(val_ppl, 1.0)) * 100
+                    _sign = "+" if _slot_delta > 0 else ""
+                    print(f"  🧩 [SLOT ABLATION] With slots: {val_ppl:.2f} | "
+                          f"Without: {_no_slot_ppl:.2f} | "
+                          f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
+                          f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                    # Restore
+                    _sm._read_warmstart_center = _orig_center
+                    _sm._router_step = _orig_step
+                    model.train()
+
             # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
             if config.sample_every > 0 and global_step % config.sample_every == 0:
                 if tokenizer is not None:
