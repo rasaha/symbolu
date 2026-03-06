@@ -3986,3 +3986,433 @@ Design target:
 ```
 
 The fundamental shift is from **hidden-state modification** (current: primitives inject into `h_t`) to **candidate-token evaluation** (design: primitives score each candidate `w` before final selection). The existing hidden-state injection mechanisms (CSR at Layer 7, JEPA weak prior, Kosha steering) can coexist as complementary enrichment during the transition, but the design's token-level multi-field consensus mechanism must become the primary generation pathway.
+
+---
+
+## Appendix B — Auxiliary Signal Weight Governance and Scenario-Specific Configurations
+
+This appendix documents the three-tier weight governance system that controls how auxiliary losses interact with the primary language modeling objective, and provides concrete configurations for realistic deployment scenarios.
+
+### B.1 The Three-Tier Weight Governance Architecture
+
+The system governs auxiliary signal weights at three distinct levels, each operating at a different timescale:
+
+```
+Tier 1: Static Defaults (config.py)
+  ↓ set at launch, define base ratios
+Tier 2: PPL-Gated Curriculum (curriculum.py)
+  ↓ overrides Tier 1 based on validation perplexity
+Tier 3: Runtime Adaptive Controllers (phase_controllers.py, losses.py)
+  ↓ modulates Tier 2 weights step-by-step based on entropy/variance
+Final effective weight applied to each auxiliary loss
+```
+
+**Design invariant:** The LM loss weight (`lambda_lm`) always remains at 1.0. All auxiliary weights are calibrated relative to this anchor, ensuring language modeling gradients contribute at least 50% of the total gradient signal at every training step.
+
+### B.2 Tier 1 — Static Base Weights
+
+Defined in `UnifiedTrainingConfig` (`symbolu/training/unified/config.py`), these establish the maximum possible contribution of each auxiliary signal:
+
+| Signal | Parameter | Default | Role |
+|--------|-----------|---------|------|
+| Language Modeling | `lambda_lm` | 1.0 | Primary objective (anchor) |
+| Bhava Consistency | `bhava_lambda` | 0.1 | Inter-layer relationship regularization |
+| Global Coherence | `coherence_lambda` | 0.05 | Semantic field alignment |
+| Entropy Regularization | `lambda_entropy` | 0.01 | Prevents distribution collapse |
+| Sovereign R-Signal | `sovereign_weight_r` | 5.0 | Ontological intent consistency |
+| Sovereign S-Signal | `sovereign_weight_s` | 2.0 | Referent accuracy |
+| Sovereign C-Signal | `sovereign_weight_c` | 0.5 | Phonetic structure |
+| B1 Consistency | `b1_lambda` | 0.5 | Forward/backward feasibility alignment |
+| S3 Global Coherence | `mu_s3` | 0.2 | Lagrangian coherence penalty |
+| CSR Injection | `csr_lambda` | 0.1 | Phoneme-ontological grounding |
+| Ontological Bridge | `onto_bridge_lambda` | 0.1 | 12D projection consistency |
+| JEPA Prediction | `jepa_prediction_weight` | 0.5 | Representation learning |
+| JEPA VICReg | `jepa_vicreg_weight` | 1.0 | Collapse prevention |
+| Evolutionary Flow | `evo_lambda` | 0.1 | Cross-layer coherence |
+| Toroidal Bridge | `toroidal_lambda` | 0.1 | O12→O1 recursive consistency |
+| Kosha KL | `kv_weight_kosha_kl` | 0.1 | Sheath classification auxiliary |
+| Vritti KL | `kv_weight_vritti_kl` | 0.1 | Cognitive mode auxiliary |
+| Entropy Floor | `entropy_floor_weight` | 0.1 | Anti-repetition penalty |
+| Z-Loss | `z_loss_weight` | 1e-4 | Logit norm regularization |
+
+**Signal hierarchy by magnitude:** R-Signal (5.0) > S-Signal (2.0) > LM (1.0) > JEPA/VICReg (0.5–1.0) > B1/C-Signal (0.5) > Bhava/CSR/Bridge/Evo/Toroidal/Kosha (0.1) > Coherence/Entropy (0.01–0.05).
+
+The R-Signal dominance reflects a design decision: ontological intent is the most critical auxiliary signal — the model must know *why* it generates a token before optimizing *what* token or *how* it sounds.
+
+### B.3 Tier 2 — PPL-Gated Curriculum Controller
+
+The `CurriculumController` (`symbolu/training/unified/curriculum.py`) overrides Tier 1 weights based on model maturity measured by validation perplexity. This prevents auxiliary losses from interfering with basic language acquisition.
+
+**Phase Progression and Weight Schedule:**
+
+```
+Phase           │ PPL Gate  │ Stability │ Active Auxiliary Signals
+────────────────┼───────────┼───────────┼─────────────────────────────────────
+FOUNDATION      │ > 30      │ —         │ None (pure cross-entropy)
+REGULARIZATION  │ 15 – 30   │ 5 evals   │ bhava=0.01, coherence=0.01
+GROUNDING       │ 10 – 15   │ 5 evals   │ + csr=0.05, onto_bridge=0.05, jepa=0.1
+SOVEREIGN       │ < 10      │ 5 evals   │ Full stack (see below)
+```
+
+**SOVEREIGN phase full weight table:**
+
+```python
+{
+    'lm': 1.0,              # LM stays at 1.0
+    'bhava': 0.05,
+    'coherence': 0.03,
+    'b1_lambda': 0.1,       # Reduced from static default of 0.5
+    'mu_s3': 0.05,          # Reduced from static default of 0.2
+    'csr': 0.1,
+    'onto_bridge': 0.1,
+    'evo': 0.05,
+    'toroidal': 0.05,
+    'jepa': 0.2,
+    'kosha': 0.1,
+    'sovereign_r': 0.5,     # Reduced from static default of 5.0
+    'sovereign_s': 0.2,     # Reduced from static default of 2.0
+    'sovereign_c': 0.1,     # Reduced from static default of 0.5
+}
+```
+
+Note: The curriculum intentionally reduces Sovereign signal weights from their static defaults. The static defaults (R=5.0, S=2.0) assume Sovereign-1 hardened loss is the *only* active auxiliary. When the full stack is engaged, these weights must be reduced to prevent over-regularization — a lesson from the v9.9.0 diagnosis where 17 controllers fighting simultaneously caused training instability.
+
+**Stability and hysteresis:** Phase transitions require `stability_window=5` consecutive evaluations below the threshold. Backward transitions require PPL to exceed the threshold by `hysteresis=1.5×` (e.g., exiting SOVEREIGN requires PPL > 15.0, not 10.0). Once SOVEREIGN is reached, `phase_locked=True` prevents any regression.
+
+### B.4 Tier 3 — Runtime Adaptive Modulation
+
+Two runtime controllers dynamically scale weights step-by-step:
+
+**B.4.1 Sovereign Phase Controller** (`symbolu/training/unified/phase_controllers.py`)
+
+Monitors entropy and variance to detect mode collapse or stagnation, and applies graduated intervention:
+
+| Level | Entropy Condition | Variance Condition | Steering Multiplier |
+|-------|-------------------|--------------------|---------------------|
+| normal | > 0.55 | > 0.002 | 0.15× |
+| caution | 0.50 – 0.55 | < 0.001 | 0.30× |
+| warning | 0.45 – 0.50 | < 0.0005 | 0.60× |
+| critical | < 0.40 | — | 1.00× |
+
+Hysteresis prevents oscillation: boost mode requires `min_boost_duration=100` steps before exit, and exit requires *both* entropy > 0.55 and variance > 0.002.
+
+**B.4.2 Entropy-Scaled B1 Consistency** (`symbolu/training/unified/losses.py:99–107`)
+
+When semantic entropy exceeds 0.60 (indicating Rajasic/chaotic state), the B1 consistency weight scales dynamically:
+
+```
+b1_scale = 1.0 + ((onto_entropy - 0.60) / 0.40) × 0.5
+```
+
+This ramps `lambda_b1` from 1.0× to 1.5× as entropy approaches maximum, providing stronger consistency enforcement when the model is most disorganized.
+
+### B.5 Scenario-Specific Configurations
+
+The governance architecture supports fundamentally different weight profiles for distinct deployment scenarios. Each scenario below specifies which Tier 1 defaults to override and which curriculum/controller behaviors to adjust.
+
+#### B.5.1 Domain-Specific Fine-Tuning (Medical, Legal, Technical)
+
+**Goal:** Adapt a pretrained model to domain vocabulary and conventions without disrupting general language capability.
+
+**Configuration:**
+
+```python
+UnifiedTrainingConfig(
+    # Core: LM-dominant, minimal auxiliary interference
+    lambda_lm=1.0,
+    bhava_lambda=0.02,           # Reduced — domain text has different relationship norms
+    coherence_lambda=0.03,       # Light coherence to maintain fluency
+
+    # Sovereign signals: disabled or minimal
+    use_sovereign_loss=False,    # Domain text doesn't need ontological decomposition
+    enable_sovereign_loss=False,
+
+    # Curriculum: relaxed thresholds for domain PPL
+    enable_curriculum=True,
+    curriculum_ppl_regularization=50.0,  # Domain text has higher baseline PPL
+    curriculum_ppl_grounding=25.0,
+    curriculum_ppl_sovereign=15.0,       # May never reach — acceptable
+
+    # Disable heavyweight subsystems
+    enable_evolutionary_flow=False,
+    enable_toroidal_bridge=False,
+    enable_jepa=False,
+
+    # Keep: light regularization for stability
+    enable_csr=True,
+    csr_lambda=0.05,             # Half strength — domain phonemes differ
+    enable_entropy_floor=True,   # Prevent repetitive domain jargon loops
+    entropy_floor=0.40,          # Lower floor for specialized vocabulary
+)
+```
+
+**Rationale:** Domain text has narrower vocabulary distributions. Heavy ontological constraints would fight the model's specialization. CSR at half strength captures domain-specific phonemic patterns without imposing general-language phoneme expectations. The entropy floor prevents the common failure mode of fine-tuned models repeating technical terms.
+
+#### B.5.2 Creative and Literary Generation (Poetry, Fiction, Narrative)
+
+**Goal:** Maximize expressive range, phonemic awareness, and narrative coherence while preserving structural freedom.
+
+**Configuration:**
+
+```python
+UnifiedTrainingConfig(
+    lambda_lm=1.0,
+    bhava_lambda=0.15,           # Increased — narrative needs strong inter-layer relationships
+    coherence_lambda=0.10,       # Doubled — narrative consistency is paramount
+
+    # Sovereign: boost C-Signal (phoneme/rhythm), moderate R-Signal
+    use_sovereign_loss=True,
+    sovereign_weight_r=2.0,      # Reduced from 5.0 — creative intent is less rigid
+    sovereign_weight_s=1.5,      # Moderate referent accuracy
+    sovereign_weight_c=2.0,      # Quadrupled — rhythm, meter, sound matter
+
+    # CSR: full strength with phonemic emphasis
+    enable_csr=True,
+    csr_lambda=0.15,             # 1.5× default — phonemic resonance for poetry
+    csr_sparse_supervision=True, # Word-boundary alignment for prosody
+    csr_content_word_only=True,  # Focus on content words, not articles
+
+    # Entropy: wider band for creative expression
+    enable_entropy_control_train=True,
+    entropy_h_min=0.25,          # Allow more distributional spread
+    entropy_h_max=0.50,          # Higher ceiling for creative diversity
+    entropy_floor=0.55,          # Higher floor — repetition is the enemy of creativity
+
+    # Bliss coherence: engage gating for aesthetic integration
+    enable_bliss_gating=True,
+    bliss_gate_gamma=3.0,        # Softer gate — don't kill creative divergence
+
+    # Kosha: enabled for layered narrative depth
+    enable_kosha_steering=True,
+    kv_weight_kosha_kl=0.15,     # Stronger sheath classification
+    kv_weight_vritti_kl=0.15,    # Stronger cognitive mode awareness
+
+    # Evolutionary flow: narrative evolution across layers
+    enable_evolutionary_flow=True,
+    evo_lambda=0.15,             # Stronger flow for narrative progression
+)
+```
+
+**Rationale:** Creative generation requires the model to balance multiple aesthetic dimensions simultaneously. The C-Signal increase captures phonemic patterns (alliteration, rhythm, rhyme). Higher entropy bounds prevent repetitive prose while the Bliss gate ensures aesthetic coherence isn't sacrificed for diversity. Kosha steering at increased weight provides awareness of whether the model is operating at physical description (Annamaya), emotional expression (Pranamaya), conceptual abstraction (Manomaya), or wisdom/insight (Vijnanamaya) — all of which literary text must navigate fluidly.
+
+#### B.5.3 Analytical and Reasoning-Heavy Tasks (Mathematics, Logic, Code)
+
+**Goal:** Maximize logical consistency, referent precision, and step-by-step coherence. Minimize creative divergence.
+
+**Configuration:**
+
+```python
+UnifiedTrainingConfig(
+    lambda_lm=1.0,
+    coherence_lambda=0.10,       # Strong coherence — logical chains must hold
+
+    # Sovereign: maximize R-Signal (ontological intent), reduce C-Signal
+    use_sovereign_loss=True,
+    sovereign_weight_r=7.0,      # Maximum — logical intent must be precise
+    sovereign_weight_s=3.0,      # Strong referent — variables/symbols must be accurate
+    sovereign_weight_c=0.1,      # Minimal — phoneme structure irrelevant for math
+
+    # Ontological bridge: strong grounding in formal semantics
+    enable_onto_bridge=True,
+    onto_bridge_lambda=0.2,      # Doubled — 12D projection must be sharp
+
+    # Entropy: tight band for deterministic reasoning
+    enable_entropy_control_train=True,
+    entropy_h_min=0.10,          # Low floor — reasoning should be decisive
+    entropy_h_max=0.25,          # Low ceiling — limit distributional spread
+    entropy_floor=0.35,          # Moderate floor — some token diversity needed
+
+    # SRK: strong consistency enforcement
+    enable_srk=True,
+    srk_lambda_c=1.0,            # Doubled consistency penalty
+    srk_lambda_coherence=0.4,    # Doubled coherence weight
+
+    # Disable: systems that add noise to logical reasoning
+    enable_csr=False,            # Phoneme resonance irrelevant for math
+    enable_bliss_gating=False,   # Aesthetic coherence not needed
+    enable_evolutionary_flow=False,  # Inter-layer evolution adds noise
+
+    # B1/S3: strong consistency for proof-like chains
+    enable_sovereign_loss=True,  # Sovereign-Lagrangian for consistency
+    b1_lambda=0.8,               # Strong forward/backward alignment
+    mu_s3=0.3,                   # Strong global coherence
+)
+```
+
+**Rationale:** Mathematical and logical reasoning demands the narrowest possible output distributions at decision points. The R-Signal at 7.0 (highest of any scenario) ensures every generated token serves the logical intent. CSR is disabled because phonemic resonance provides no signal for formal reasoning. The tight entropy band (0.10–0.25) produces the focused distributions needed for deterministic step-by-step derivations. Strong B1 consistency enforces that forward passes (prediction) align with backward passes (verification) — analogous to checking a proof in both directions.
+
+#### B.5.4 Edge Deployment (Resource-Constrained Devices)
+
+**Goal:** Minimize computational overhead while preserving core generation quality. Target devices with limited memory and no GPU.
+
+**Configuration:**
+
+```python
+UnifiedTrainingConfig(
+    # Use smallest engine profile
+    model_size="tiny",           # 4 layers
+
+    lambda_lm=1.0,
+    bhava_lambda=0.05,           # Light
+    coherence_lambda=0.02,       # Light
+
+    # Disable all heavyweight auxiliary systems
+    use_sovereign_loss=False,
+    enable_sovereign_loss=False,
+    enable_csr=False,
+    enable_jepa=False,
+    enable_onto_bridge=False,
+    enable_kosha_steering=False,
+    enable_evolutionary_flow=False,
+    enable_toroidal_bridge=False,
+    enable_bliss_gating=False,
+    enable_bliss_monitoring=False,
+    enable_srk=False,
+    enable_entropy_control_train=False,
+
+    # Curriculum: simplified two-phase
+    enable_curriculum=True,
+    curriculum_ppl_regularization=40.0,
+    curriculum_ppl_sovereign=999.0,      # Never enter SOVEREIGN
+
+    # Entropy floor only — cheapest anti-collapse mechanism
+    enable_entropy_floor=True,
+    entropy_floor=0.45,
+    entropy_floor_weight=0.05,
+
+    # No z-loss overhead
+    z_loss_weight=0.0,
+
+    # Mixed precision for speed
+    mixed_precision="fp16",      # fp16 instead of bf16 for wider device support
+)
+```
+
+**Engine selection:** Use `EngineSwitch.SYMBOLU12_TINY_BHAVA` (128D) or `SYMBOLU12_OPTIMIZED_BHAVA` (256D, CPU-friendly) from the ontological engine configuration (`symbolu/ontological/config.py`). These profiles eliminate the VICReg, evolutionary flow, and toroidal bridge computations entirely at the architecture level.
+
+**Rationale:** Edge deployment trades auxiliary signal richness for latency and memory. The only retained auxiliary is the entropy floor — the cheapest mechanism that prevents the most damaging failure mode (repetitive generation). All subsystems with O(N²) or cross-layer computation (JEPA, EvoFlow, CSR phoneme alignment) are eliminated.
+
+#### B.5.5 Safety-Critical Output (Compliance, Regulated Content)
+
+**Goal:** Maximize output controllability, enforce strict semantic boundaries, and detect/prevent hallucination or out-of-distribution generation.
+
+**Configuration:**
+
+```python
+UnifiedTrainingConfig(
+    lambda_lm=1.0,
+    bhava_lambda=0.10,
+    coherence_lambda=0.10,       # Strong coherence for factual consistency
+
+    # Sovereign-Lagrangian: strict consistency enforcement
+    enable_sovereign_loss=True,
+    b1_lambda=1.0,               # Maximum consistency — forward/backward must agree
+    mu_s3=0.5,                   # Strong global coherence penalty
+
+    # Sovereign signals: strong across all channels
+    sovereign_weight_r=5.0,      # Full intent consistency
+    sovereign_weight_s=3.0,      # Strong referent accuracy — no hallucinated entities
+    sovereign_weight_c=0.3,      # Moderate phoneme structure
+
+    # SRK: maximum consistency and stability
+    enable_srk=True,
+    srk_lambda_c=1.5,            # Triple default consistency divergence penalty
+    srk_lambda_coherence=0.5,    # Strong phase coherence
+    srk_lambda_entropy=0.3,      # Strong stability constraint
+    srk_nidra_penalty_weight=0.15,  # Stronger VOID penalty — don't drift
+
+    # Entropy: controlled band
+    enable_entropy_control_train=True,
+    entropy_h_min=0.15,
+    entropy_h_max=0.30,
+
+    # Kosha: for output-layer awareness
+    enable_kosha_steering=True,
+    kv_weight_kosha_kl=0.15,
+    kv_weight_vritti_kl=0.15,
+    kv_weight_compatibility=0.10,  # Enforce Kosha-Vritti compatibility
+
+    # Ontological bridge: strong grounding
+    enable_onto_bridge=True,
+    onto_bridge_lambda=0.2,
+
+    # Phase controller: aggressive intervention on collapse
+    # (SovereignPhaseController settings)
+    # entropy_critical=0.45 (higher threshold — intervene sooner)
+    # min_boost_duration=200 (longer intervention — ensure recovery)
+
+    # Adaptive training: conservative
+    adaptive_lr_boost=1.2,       # Smaller boosts
+    adaptive_lr_decay=0.5,       # Stronger decay on spikes
+)
+```
+
+**Rationale:** Safety-critical applications require the tightest auxiliary signal governance. The B1 Lagrangian at 1.0 (double default) enforces that every generated token is consistent with the model's forward prediction and backward verification — hallucinated facts will fail this bidirectional check. The SRK consistency penalty at 1.5× detects and penalizes semantic drift. The Nidra (VOID) penalty at 3× default prevents the model from entering an "unconscious" generation mode where compliance constraints are bypassed. Kosha-Vritti compatibility enforcement ensures the model maintains awareness of which cognitive layer it is operating in — critical for compliance systems that must distinguish factual claims from speculation.
+
+### B.6 Weight Interaction Constraints
+
+When configuring weights for any scenario, the following constraints must be respected:
+
+1. **LM dominance invariant:** The sum of all auxiliary weights (after curriculum scaling) must not exceed `lambda_lm`. If violated, auxiliary gradients can overwhelm language modeling, causing PPL regression. The curriculum controller enforces this by design.
+
+2. **Signal washing detection:** If `sovereign_weight_r / sovereign_weight_c < 2.0`, the system logs a "signal washing" warning — the R-Signal (intent) must dominate the C-Signal (phoneme) to prevent surface-level phonemic patterns from overriding semantic intent.
+
+3. **Cascade dependencies:** Some signals depend on others:
+   - `enable_kosha_steering` requires `enable_csr` (CSR at Layer 7 feeds Kosha at Layer 9)
+   - `enable_bliss_gating` requires `enable_bliss_monitoring`
+   - `enable_jepa_injection` requires both `enable_jepa` and `enable_bliss_gating`
+   - `enable_toroidal_bridge` is subsumed by `enable_evolutionary_flow` (EvoFlow includes toroidal as its macro-scale component)
+
+4. **Over-regularization ceiling:** The v9.9.0 training diagnosis identified that having more than ~8 active auxiliary signals simultaneously causes gradient interference. Scenarios should target 4–6 active auxiliaries for optimal training stability.
+
+### B.7 Custom Curriculum Weight Overrides
+
+All curriculum phase weights can be overridden at construction time by passing custom dictionaries:
+
+```python
+controller = CurriculumController(
+    ppl_regularization=30.0,
+    ppl_grounding=15.0,
+    ppl_sovereign=10.0,
+    foundation_weights={
+        'lm': 1.0,
+        # All other signals at 0.0
+        ...
+    },
+    sovereign_weights={
+        'lm': 1.0,
+        # Custom final-phase weights for your scenario
+        'sovereign_r': 0.5,
+        'jepa': 0.3,
+        ...
+    },
+)
+```
+
+This allows any scenario in Section B.5 to define its own ramp-up schedule, controlling not just the final weights but also the intermediate phases. For example, the creative generation scenario (B.5.2) might introduce CSR phoneme grounding earlier (in REGULARIZATION rather than GROUNDING) to let phonemic patterns co-evolve with basic language competence, while the reasoning scenario (B.5.3) might skip GROUNDING entirely and jump from REGULARIZATION directly to SOVEREIGN with its tight entropy constraints.
+
+### B.8 Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Weight Governance Summary                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Tier 1 (Static)     50+ lambda/weight params in config.py          │
+│       ↓               Set once at launch                            │
+│  Tier 2 (Curriculum)  4-phase PPL-gated controller                  │
+│       ↓               Overrides Tier 1 based on model maturity      │
+│  Tier 3 (Adaptive)    Phase controller + entropy-scaled B1          │
+│       ↓               Step-by-step modulation                       │
+│  Effective Weight     Applied to loss computation                   │
+│                                                                     │
+├──────────────┬──────┬──────┬──────┬──────┬──────────────────────────┤
+│ Scenario     │ R    │ S    │ C    │ Aux  │ Key Feature              │
+├──────────────┼──────┼──────┼──────┼──────┼──────────────────────────┤
+│ Domain FT    │ off  │ off  │ off  │ 2-3  │ Minimal auxiliary        │
+│ Creative     │ 2.0  │ 1.5  │ 2.0  │ 6-8  │ C-Signal boost           │
+│ Reasoning    │ 7.0  │ 3.0  │ 0.1  │ 4-5  │ R-Signal maximum         │
+│ Edge         │ off  │ off  │ off  │ 1    │ Entropy floor only       │
+│ Safety       │ 5.0  │ 3.0  │ 0.3  │ 7-8  │ B1=1.0, SRK 1.5×        │
+└──────────────┴──────┴──────┴──────┴──────┴──────────────────────────┘
+```
