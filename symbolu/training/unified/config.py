@@ -939,6 +939,16 @@ class UnifiedTrainingConfig:
     primitive_rank: int = 8                        # Rank for low-rank factorization
     use_shared_token_basis: bool = False           # Share intermediate projection across primitives
 
+    # Phase 3: Governance Integration
+    lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
+    lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
+    lambda_jepa_token: float = 0.0                 # JEPA token-level plausibility loss
+    lambda_csr_token: float = 0.0                  # CSR token-level resonance loss
+    lambda_vritti_token: float = 0.0               # Vritti token-level cognitive mode loss
+    lambda_guna_token: float = 0.0                 # Guna token-level energetic loss
+    bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
+    kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
+
 
 # Model size presets
 MODEL_PRESETS = {

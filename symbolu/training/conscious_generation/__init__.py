@@ -15,6 +15,14 @@ Phase 2: Primitive scoring heads
   - GunaTokenScorer: S_guna(w) energetic compatibility
   - TokenEvaluationTensor: Orchestrates T_t ∈ ℝ^{K×6}
 
+Phase 3: Governance integration
+  - KoshaPrimitiveRouter: Dynamic α_t weights over 6 primitives
+  - BlissTokenGate: Per-token coherence gating B(w)
+  - IntegratedTokenScorer: Z*(w) = B(w) · Σ_f α_f S_f(w)
+  - KoshaRoutingLoss: Agreement-based + entropy routing supervision
+  - PrimitiveAuxiliaryLosses: Per-primitive contrastive token losses
+  - BlissCoherenceLoss: Correct tokens → high Bliss, negatives → low Bliss
+
 Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
 """
 
@@ -34,6 +42,24 @@ from symbolu.training.conscious_generation.primitives import (
     GunaTokenScorer,
     TokenEvaluationTensor,
 )
+from symbolu.training.conscious_generation.governance.kosha_router import (
+    KoshaPrimitiveRouter,
+)
+from symbolu.training.conscious_generation.governance.bliss_gate import (
+    BlissTokenGate,
+)
+from symbolu.training.conscious_generation.integration.token_scorer import (
+    IntegratedTokenScorer,
+)
+from symbolu.training.conscious_generation.losses.kosha_routing import (
+    KoshaRoutingLoss,
+)
+from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+    PrimitiveAuxiliaryLosses,
+)
+from symbolu.training.conscious_generation.losses.bliss_coherence import (
+    BlissCoherenceLoss,
+)
 
 __all__ = [
     "TokenOntologyProjector",
@@ -46,4 +72,10 @@ __all__ = [
     "VrittiTokenScorer",
     "GunaTokenScorer",
     "TokenEvaluationTensor",
+    "KoshaPrimitiveRouter",
+    "BlissTokenGate",
+    "IntegratedTokenScorer",
+    "KoshaRoutingLoss",
+    "PrimitiveAuxiliaryLosses",
+    "BlissCoherenceLoss",
 ]

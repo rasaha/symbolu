@@ -4392,6 +4392,111 @@ def train(config: UnifiedTrainingConfig):
                                 metrics['cg_ont_pos_sim'] = _cg_result['avg_pos_sim'].item()
                                 metrics['cg_ont_neg_sim'] = _cg_result['avg_neg_sim'].item()
 
+                        # =========================================================
+                        # Phase 3: Governance — Kosha routing, Bliss gating, losses
+                        # Requires: logits, hidden states, sovereign state
+                        # =========================================================
+                        _cg_has_p3 = 'integrated_scorer' in model.conscious_gen
+                        _cg_any_p3_loss = (config.lambda_kosha_routing > 0
+                                          or config.lambda_bliss_token > 0
+                                          or config.lambda_jepa_token > 0
+                                          or config.lambda_csr_token > 0
+                                          or config.lambda_vritti_token > 0
+                                          or config.lambda_guna_token > 0)
+
+                        if _cg_has_p3 and _cg_any_p3_loss and logits is not None:
+                            # Extract hidden states and sovereign state from outputs
+                            _cg_hidden = None
+                            _cg_sov_state = None
+                            if isinstance(outputs, dict):
+                                _cg_hidden = outputs.get('last_hidden_state', None)
+                                _cg_sov_state = outputs.get('state', None)
+
+                            if _cg_hidden is not None and _cg_sov_state is not None:
+                                # Build T_t via TokenEvaluationTensor
+                                _cg_tet = model.conscious_gen['token_eval_tensor']
+                                _cg_tet_result = _cg_tet(
+                                    logits=logits.detach() if logits is not None else None,
+                                    hidden=_cg_hidden.detach(),
+                                    o_ctx=_cg_sov_state.detach(),
+                                    cache=_cg_cache,
+                                )
+                                _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
+                                _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
+
+                                # Run IntegratedTokenScorer (Kosha + Bliss)
+                                _cg_integ = model.conscious_gen['integrated_scorer']
+                                _cg_integ_result = _cg_integ(
+                                    T=_cg_T,
+                                    hidden=_cg_hidden,
+                                    o_ctx=_cg_sov_state,
+                                    candidate_ids=_cg_cand_ids,
+                                )
+                                _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
+                                _cg_B = _cg_integ_result['B']            # (B, T, K)
+                                _cg_D = _cg_integ_result['D']            # (B, T, K)
+
+                                # Kosha routing loss
+                                if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:
+                                    _cg_kr_fn = model.conscious_gen['kosha_routing_loss']
+                                    _cg_kr_result = _cg_kr_fn(
+                                        alpha=_cg_alpha,
+                                        T=_cg_T,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    _cg_kr_loss = _cg_kr_result['loss']
+                                    if torch.isfinite(_cg_kr_loss):
+                                        loss = loss + config.lambda_kosha_routing * _cg_kr_loss
+                                        metrics['cg_kosha_routing_loss'] = _cg_kr_loss.item()
+
+                                # Bliss coherence loss
+                                if config.lambda_bliss_token > 0 and 'bliss_coherence_loss' in model.conscious_gen:
+                                    _cg_bl_fn = model.conscious_gen['bliss_coherence_loss']
+                                    _cg_bl_result = _cg_bl_fn(
+                                        B=_cg_B,
+                                        D=_cg_D,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    _cg_bl_loss = _cg_bl_result['loss']
+                                    if torch.isfinite(_cg_bl_loss):
+                                        loss = loss + config.lambda_bliss_token * _cg_bl_loss
+                                        metrics['cg_bliss_loss'] = _cg_bl_loss.item()
+                                        metrics['cg_bliss_pos'] = _cg_bl_result['pos_bliss'].item()
+                                        metrics['cg_bliss_neg'] = _cg_bl_result['neg_bliss'].item()
+
+                                # Primitive auxiliary losses
+                                _cg_prim_lambdas = {
+                                    'jepa': config.lambda_jepa_token,
+                                    'csr': config.lambda_csr_token,
+                                    'vritti': config.lambda_vritti_token,
+                                    'guna': config.lambda_guna_token,
+                                }
+                                if any(v > 0 for v in _cg_prim_lambdas.values()) and 'primitive_aux_losses' in model.conscious_gen:
+                                    _cg_pa_fn = model.conscious_gen['primitive_aux_losses']
+                                    _cg_pa_result = _cg_pa_fn(
+                                        T=_cg_T,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    for _prim_name, _prim_lam in _cg_prim_lambdas.items():
+                                        if _prim_lam > 0:
+                                            _prim_loss_key = f"L_{_prim_name}"
+                                            _prim_loss = _cg_pa_result.get(_prim_loss_key, None)
+                                            if _prim_loss is not None and torch.isfinite(_prim_loss):
+                                                loss = loss + _prim_lam * _prim_loss
+                                                metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
+
+                                # Log Kosha routing diagnostics
+                                if global_step % config.log_every == 0 and global_step > 0:
+                                    _cg_alpha_mean = _cg_alpha.mean(dim=(0, 1))
+                                    metrics['cg_alpha_entropy'] = -(
+                                        _cg_alpha * (_cg_alpha + 1e-8).log()
+                                    ).sum(dim=-1).mean().item()
+                                    metrics['cg_bliss_mean'] = _cg_B.mean().item()
+                                    metrics['cg_disagree_mean'] = _cg_D.mean().item()
+
                         # Log diagnostics periodically
                         if (global_step % config.log_every == 0 and global_step > 0 and
                             (accumulation_step + 1) % config.gradient_accumulation == 0):
@@ -4411,6 +4516,11 @@ def train(config: UnifiedTrainingConfig):
                                         _p2_norms.append(f"{_buf_name}={_cg_diag[_norm_key]:.3f}")
                                 if _p2_norms:
                                     _cg_msg += f" | norms: {', '.join(_p2_norms)}"
+                                # Phase 3 governance metrics
+                                if 'cg_alpha_entropy' in metrics:
+                                    _cg_msg += f" | α_H={metrics['cg_alpha_entropy']:.3f}"
+                                if 'cg_bliss_mean' in metrics:
+                                    _cg_msg += f" | B={metrics['cg_bliss_mean']:.3f}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -4426,6 +4536,21 @@ def train(config: UnifiedTrainingConfig):
                                     _norm_key = f"{_buf_name}_mean_norm"
                                     if _norm_key in _cg_diag:
                                         writer.add_scalar(f'conscious_gen/{_norm_key}', _cg_diag[_norm_key], global_step)
+                                # Phase 3 governance metrics
+                                if 'cg_alpha_entropy' in metrics:
+                                    writer.add_scalar('conscious_gen/alpha_entropy', metrics['cg_alpha_entropy'], global_step)
+                                if 'cg_bliss_mean' in metrics:
+                                    writer.add_scalar('conscious_gen/bliss_mean', metrics['cg_bliss_mean'], global_step)
+                                if 'cg_disagree_mean' in metrics:
+                                    writer.add_scalar('conscious_gen/disagree_mean', metrics['cg_disagree_mean'], global_step)
+                                if 'cg_kosha_routing_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_kosha_routing', metrics['cg_kosha_routing_loss'], global_step)
+                                if 'cg_bliss_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_bliss', metrics['cg_bliss_loss'], global_step)
+                                for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                    _pk = f'cg_L_{_pn}'
+                                    if _pk in metrics:
+                                        writer.add_scalar(f'conscious_gen/L_{_pn}_token', metrics[_pk], global_step)
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -8117,6 +8242,25 @@ def main():
     parser.add_argument("--use_shared_token_basis", action="store_true", default=False,
                        help="Share intermediate projection across primitives")
 
+    # Conscious Generation Phase 3: Governance Integration
+    parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
+                       help="Kosha routing loss weight")
+    parser.add_argument("--lambda_bliss_token", type=float, default=0.0,
+                       help="Bliss token-level coherence loss weight")
+    parser.add_argument("--lambda_jepa_token", type=float, default=0.0,
+                       help="JEPA token-level plausibility loss")
+    parser.add_argument("--lambda_csr_token", type=float, default=0.0,
+                       help="CSR token-level resonance loss")
+    parser.add_argument("--lambda_vritti_token", type=float, default=0.0,
+                       help="Vritti token-level cognitive mode loss")
+    parser.add_argument("--lambda_guna_token", type=float, default=0.0,
+                       help="Guna token-level energetic loss")
+    parser.add_argument("--bliss_lambda_B", type=float, default=1.0,
+                       help="Lambda_B temperature for Bliss gate")
+    parser.add_argument("--kosha_routing_init", type=str, default="uniform",
+                       choices=["uniform", "base_dominant"],
+                       help="Kosha router initialization mode")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -8774,6 +8918,15 @@ def main():
         use_low_rank_primitives=args.use_low_rank_primitives,
         primitive_rank=args.primitive_rank,
         use_shared_token_basis=args.use_shared_token_basis,
+        # Conscious Generation (Phase 3)
+        lambda_kosha_routing=args.lambda_kosha_routing,
+        lambda_bliss_token=args.lambda_bliss_token,
+        lambda_jepa_token=args.lambda_jepa_token,
+        lambda_csr_token=args.lambda_csr_token,
+        lambda_vritti_token=args.lambda_vritti_token,
+        lambda_guna_token=args.lambda_guna_token,
+        bliss_lambda_B=args.bliss_lambda_B,
+        kosha_routing_init=args.kosha_routing_init,
     )
 
     # ==========================================================================

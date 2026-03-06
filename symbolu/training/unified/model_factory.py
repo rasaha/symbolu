@@ -63,6 +63,24 @@ try:
         GunaTokenScorer,
         TokenEvaluationTensor,
     )
+    from symbolu.training.conscious_generation.governance.kosha_router import (
+        KoshaPrimitiveRouter,
+    )
+    from symbolu.training.conscious_generation.governance.bliss_gate import (
+        BlissTokenGate,
+    )
+    from symbolu.training.conscious_generation.integration.token_scorer import (
+        IntegratedTokenScorer,
+    )
+    from symbolu.training.conscious_generation.losses.kosha_routing import (
+        KoshaRoutingLoss,
+    )
+    from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+        PrimitiveAuxiliaryLosses,
+    )
+    from symbolu.training.conscious_generation.losses.bliss_coherence import (
+        BlissCoherenceLoss,
+    )
     CONSCIOUS_GENERATION_AVAILABLE = True
 except ImportError:
     CONSCIOUS_GENERATION_AVAILABLE = False
@@ -556,6 +574,62 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    VrittiTokenScorer: 5 classes (dot-product)")
         print(f"    GunaTokenScorer: 3 classes (bilinear G)")
         print(f"    TokenEvaluationTensor: K={config.primitive_shortlist_k}, 6 primitives")
+
+        # Phase 3: Governance Integration
+        kosha_router = KoshaPrimitiveRouter(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            init_mode=config.kosha_routing_init,
+        )
+
+        bliss_gate = BlissTokenGate(
+            lambda_B=config.bliss_lambda_B,
+        )
+
+        integrated_scorer = IntegratedTokenScorer(
+            kosha_router=kosha_router,
+            bliss_gate=bliss_gate,
+        )
+
+        model.conscious_gen["kosha_router"] = kosha_router
+        model.conscious_gen["bliss_gate"] = bliss_gate
+        model.conscious_gen["integrated_scorer"] = integrated_scorer
+
+        # Phase 3 losses (only instantiate when their lambda > 0)
+        _any_prim_loss = (config.lambda_jepa_token > 0 or config.lambda_csr_token > 0
+                         or config.lambda_vritti_token > 0 or config.lambda_guna_token > 0)
+        if _any_prim_loss:
+            prim_aux_losses = PrimitiveAuxiliaryLosses()
+            model.conscious_gen["primitive_aux_losses"] = prim_aux_losses
+
+        if config.lambda_kosha_routing > 0:
+            kosha_routing_loss = KoshaRoutingLoss()
+            model.conscious_gen["kosha_routing_loss"] = kosha_routing_loss
+
+        if config.lambda_bliss_token > 0:
+            bliss_coherence_loss = BlissCoherenceLoss()
+            model.conscious_gen["bliss_coherence_loss"] = bliss_coherence_loss
+
+        print(f"  [Conscious Gen Phase 3] Governance Integration")
+        print(f"    KoshaPrimitiveRouter: init={config.kosha_routing_init}")
+        print(f"    BlissTokenGate: lambda_B={config.bliss_lambda_B}")
+        _p3_losses = []
+        if config.lambda_kosha_routing > 0:
+            _p3_losses.append(f"L_kosha={config.lambda_kosha_routing}")
+        if config.lambda_bliss_token > 0:
+            _p3_losses.append(f"L_bliss={config.lambda_bliss_token}")
+        if config.lambda_jepa_token > 0:
+            _p3_losses.append(f"L_jepa={config.lambda_jepa_token}")
+        if config.lambda_csr_token > 0:
+            _p3_losses.append(f"L_csr={config.lambda_csr_token}")
+        if config.lambda_vritti_token > 0:
+            _p3_losses.append(f"L_vritti={config.lambda_vritti_token}")
+        if config.lambda_guna_token > 0:
+            _p3_losses.append(f"L_guna={config.lambda_guna_token}")
+        if _p3_losses:
+            print(f"    Losses: {', '.join(_p3_losses)}")
+        else:
+            print(f"    Losses: ALL DISABLED (all lambda=0)")
 
     return model.to(device)
 
