@@ -8440,6 +8440,32 @@ def main():
                        choices=["uniform", "base_dominant"],
                        help="Kosha router initialization mode")
 
+    # Conscious Generation Phase 4: Field-Integrated Generation
+    parser.add_argument("--use_field_integrated_softmax", action="store_true",
+                       help="Replace standard logits with Z*(w) for L_LM")
+    parser.add_argument("--field_softmax_temperature", type=float, default=1.0,
+                       help="Temperature scaling for integrated softmax")
+    parser.add_argument("--use_agreement_energy", action="store_true",
+                       help="Enable pairwise agreement term A_t(w)")
+    parser.add_argument("--agreement_energy_weight", type=float, default=0.1,
+                       help="Beta weight for agreement-energy synergy term")
+
+    # Conscious Generation Phase 5: Curriculum, Validation, and Ablation
+    parser.add_argument("--enable_cg_curriculum", action="store_true",
+                       help="Enable staged curriculum (A->D) for conscious generation")
+    parser.add_argument("--cg_curriculum_ramp_mode", type=str, default="cosine",
+                       choices=["linear", "cosine", "step"],
+                       help="Lambda ramp mode for curriculum stages")
+    parser.add_argument("--cg_curriculum_ppl_var_threshold", type=float, default=0.5,
+                       help="Max PPL variance for stage transition")
+    parser.add_argument("--cg_curriculum_stability_window", type=int, default=5,
+                       help="Eval steps for PPL stability check")
+    parser.add_argument("--cg_curriculum_stage_proportions", type=str,
+                       default="0.30,0.20,0.25,0.25",
+                       help="Stage A,B,C,D proportions (comma-separated, must sum to 1.0)")
+    parser.add_argument("--enable_cg_diagnostics", action="store_true",
+                       help="Enable governance diagnostics tracking")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -9106,6 +9132,18 @@ def main():
         lambda_guna_token=args.lambda_guna_token,
         bliss_lambda_B=args.bliss_lambda_B,
         kosha_routing_init=args.kosha_routing_init,
+        # Conscious Generation (Phase 4)
+        use_field_integrated_softmax=args.use_field_integrated_softmax,
+        field_softmax_temperature=args.field_softmax_temperature,
+        use_agreement_energy=args.use_agreement_energy,
+        agreement_energy_weight=args.agreement_energy_weight,
+        # Conscious Generation (Phase 5)
+        enable_cg_curriculum=args.enable_cg_curriculum,
+        cg_curriculum_ramp_mode=args.cg_curriculum_ramp_mode,
+        cg_curriculum_ppl_var_threshold=args.cg_curriculum_ppl_var_threshold,
+        cg_curriculum_stability_window=args.cg_curriculum_stability_window,
+        cg_curriculum_stage_proportions=args.cg_curriculum_stage_proportions,
+        enable_cg_diagnostics=args.enable_cg_diagnostics,
     )
 
     # ==========================================================================
