@@ -3657,3 +3657,332 @@ The framework also opens new directions for language model design. Instead of re
 While several research questions remain — including optimal ontology dimensionality, primitive interaction dynamics, and efficient training signals — the architecture establishes a conceptual foundation for integrating structured semantic reasoning directly into the token generation process.
 
 Ultimately, this approach reframes language modeling from sequence prediction toward multi-layer semantic inference, where language emerges from the coordinated interaction of statistical context and structured representations of meaning.
+
+---
+
+## Appendix A — Implementation Audit: `ontological_hybrid` Model vs Design Document
+
+This appendix audits the current `OntologicalHybridTransformer` implementation (`symbolu/phase_transformer.py`) against the Conscious Generation design, identifying what is implemented, what is partially implemented, what is missing, and what existing modules need to be updated or disabled for coherent alignment with this design.
+
+### A.1 Component Implementation Status
+
+#### A.1.1 Transformer Backbone / Base Score — IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| Transformer context encoding | Implemented | `HybridPhaseTransformer` (local + phase attention layers) |
+| Hidden state `h_t` | Implemented | Forward pass produces `h_t ∈ ℝ^{embed_dim}` |
+| Base logits / `S_base(w)` | Implemented | Standard vocabulary projection `e_w⊤ W_b h_t + b_w` → softmax |
+| Top-K candidate shortlisting | Implemented | `generate()` uses `top_k` parameter for candidate pruning |
+
+The transformer backbone is fully operational and produces contextual hidden states used by downstream components.
+
+#### A.1.2 32D Ontological Manifold — IMPLEMENTED (Partial Alignment)
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| 32D state projection `O_t = W_o h_t` | Implemented | `SovereignStateProjector` (`symbolu/jepa/state_projector.py`) projects `h_t → ℝ³²` |
+| Structured subspace layout | Implemented | Bhava[0:12], Kosha[12:17], Vritti[17:22], Guna[22:28], Reserved[28:32] |
+| Softmax normalization per subgroup | Implemented | Bhava/Kosha/Vritti use softmax; Guna uses sigmoid; Reserved uses tanh |
+| Token ontology codes `o_w = U_o e_w` | **Not implemented** | No per-token ontological projection exists; ontology is context-only |
+| Ontological structure loss `L_ont` | **Not implemented** | No contrastive or prototype loss for ontology clustering |
+
+**Gap**: The design specifies both context-side (`o_t`) and token-side (`o_w`) ontological projections. The current implementation only projects the context hidden state to 32D. Token-side ontological codes and the cached token ontology table `O_tok ∈ ℝ^{V×32}` are absent.
+
+**Gap**: The 32D state currently serves as a phase rotation driver (Bhava delta → `IntentPhaseProjector` → attention modulation), not as an ontological scoring manifold for candidate token evaluation. The design requires `S_ont(w) = o_t⊤ M_ont o_w` — a compatibility score between context and token ontological codes.
+
+#### A.1.3 JEPA Primitive — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| JEPA predictor | Implemented | `PhaseJEPAPredictor` (`symbolu/jepa/predictor.py`) — predicts state deltas |
+| Target encoder (EMA) | Implemented | `TargetEncoder` (`symbolu/jepa/target_encoder.py`) — momentum-updated copy |
+| VICReg loss | Implemented | `VICRegLoss` (`symbolu/jepa/losses.py`) — variance/invariance/covariance |
+| JEPA injection as weak prior | Implemented | `enable_jepa_injection` config → injects JEPA delta at configurable layer |
+| `S_jepa(w)` per-token plausibility score | **Not implemented** | JEPA operates at sequence level (state prediction), not token-level scoring |
+| Token JEPA signatures `p_w` | **Not implemented** | No per-token physical plausibility representation |
+| Cached `P_tok ∈ ℝ^{V×d_j}` table | **Not implemented** | No token-side JEPA cache |
+
+**Gap**: JEPA is implemented as a self-supervised state predictor (predicting future hidden states), not as a token-level plausibility scorer. The design requires JEPA to produce `S_jepa(w) = p_t⊤ M_jepa p_w` for each candidate token. Currently JEPA contributes via weak prior injection into hidden states, not via candidate token re-ranking.
+
+#### A.1.4 CSR Primitive — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| CSR phoneme pipeline | Implemented | Phoneme-to-embedding system with Sanskrit-derived resonance codes |
+| CSR injection at Layer 7 | Implemented | `enable_csr` config → sparse CSR loss at alignment layer |
+| CSR inference guard | Implemented | `CSRInferenceGuard` (`symbolu/inference/csr_inference.py`) |
+| Bliss-gated CSR lambda | Implemented | `enable_bliss_gating` → `λ_csr_eff = λ_csr · gate(B)` |
+| `S_csr(w) = f_csr(r_t, r_w)` token score | **Not implemented** | CSR operates as hidden-state injection, not token-level compatibility scoring |
+| Token CSR signatures `r_w` | **Not implemented** | No per-token CSR resonance cache |
+| Cached `R_tok ∈ ℝ^{V×d_c}` table | **Not implemented** | No token-side CSR cache |
+
+**Gap**: CSR modifies hidden states via injection (adding phonemic information into the representation), rather than scoring candidate tokens against a context resonance state. The design's abstract form `S_csr(w) = f_csr(r_t, r_w)` with bilinear or cosine compatibility is not implemented.
+
+#### A.1.5 Vritti Primitive — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| Vritti state dimensions | Implemented | `VRITTI_SLICE = [17:22]` — 5 cognitive modes in sovereign state |
+| Vritti names | Implemented | FACT, ERROR, IMAGINATION, VOID, MEMORY |
+| `VrittiResonanceLoss` | Implemented | `symbolu/losses/kosha_gyroscope.py` — Kosha-Vritti coupling loss |
+| Vritti-validated predictor | Implemented | `VrittiValidatedPredictor` gates JEPA by Vritti confidence |
+| `S_vritti(w)` per-token cognitive-mode score | **Not implemented** | No per-token Vritti profile `q_w^(v)` |
+| Token Vritti profiles `V_tok ∈ ℝ^{V×K_v}` | **Not implemented** | No token-side Vritti cache |
+
+**Gap**: Vritti is a context-level classification (what cognitive mode is the sentence in), but does not produce per-token compatibility scores. The design requires `S_vritti(w) = -KL(q_t^(v) ‖ q_w^(v))` or dot-product form.
+
+#### A.1.6 Guna Primitive — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| Guna state dimensions | Implemented | `GUNA_SLICE = [22:28]` — 6 dynamics dimensions |
+| Guna names | Implemented | LUCIDITY, ACTIVITY, STABILITY, VELOCITY, ACCEL, STABLE |
+| Guna inference module | Implemented | `InferenceGunas` (`symbolu/inference/guna_inference.py`) |
+| `S_guna(w)` per-token energetic score | **Not implemented** | No per-token Guna compatibility scoring |
+| Token Guna profiles `G_tok ∈ ℝ^{V×3}` | **Not implemented** | No token-side Guna cache |
+| Structured `G ∈ ℝ^{3×3}` compatibility matrix | **Not implemented** | No learned Guna compatibility matrix |
+
+**Gap**: Guna dimensions exist in the sovereign state but serve as diagnostic signals, not as token-level compatibility scorers. The design's 3-class (Sattva/Rajas/Tamas) framework also differs from the current 6-dimensional dynamics representation.
+
+#### A.1.7 Kosha Governance — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| Kosha state dimensions | Implemented | `KOSHA_SLICE = [12:17]` — 5 sheaths |
+| Kosha names | Implemented | MATERIAL, VITAL, MENTAL, INTELLECTUAL, BLISSFUL |
+| `KoshaGyroscopicLoss` | Implemented | Homeostatic balance loss preventing mode collapse |
+| Kosha steering | Implemented | `enable_kosha_steering` → phase coupling control |
+| `α_t = softmax(W_k h_t)` primitive weighting | **Not implemented** | Kosha does not produce dynamic weights over {base, ont, JEPA, CSR, Vritti, Guna} |
+| Context-dependent field routing | **Not implemented** | No mechanism routes primitive influence based on Kosha activation |
+
+**Gap**: Kosha currently acts as a homeostatic regularizer (preventing pathological states) and phase coupling controller. The design requires Kosha to produce dynamic weights `α_t` that determine how much each primitive contributes to the integrated token score. This routing function is absent.
+
+#### A.1.8 Bliss Coherence — PARTIALLY IMPLEMENTED
+
+| Aspect | Status | Implementation |
+|---|---|---|
+| Bliss functional | Implemented | `BlissCoherenceFunctional` (`symbolu/training/unified/bliss_coherence.py`) |
+| Per-layer integration measurement | Implemented | `B_A^ℓ` measures cosine agreement with Kosha-weighted priors |
+| Cross-layer stability penalty | Implemented | `B_B` anti-fragmentation term |
+| Bliss-gated injection | Implemented | `λ_eff = λ · sigmoid(γ · (B - τ))` gates CSR and JEPA injection |
+| `B_t(w) = exp(-λ_B D_t(w))` per-token coherence gate | **Not implemented** | Bliss is a global scalar, not a per-token cross-field agreement measure |
+| Weighted variance `D_t(w)` across primitive scores | **Not implemented** | No per-token disagreement computation (requires primitive scores first) |
+
+**Gap**: Bliss is implemented as a global representational coherence measure over hidden states and weak priors. The design requires a per-token Bliss gate: for each candidate token `w`, measure disagreement across primitive scores `D_t(w)` and gate the integrated score accordingly. This requires all primitive scores to exist first.
+
+#### A.1.9 Token Evaluation Tensor — NOT IMPLEMENTED
+
+| Aspect | Status |
+|---|---|
+| `T_t ∈ ℝ^{\|V\| × 6}` evaluation tensor | Not implemented |
+| Per-token multi-field score vector `S_t(w)` | Not implemented |
+| Vocabulary-wide matrix-vector scoring | Not implemented |
+
+**Gap**: The core data structure of the design — a tensor where each row is a token and each column is a primitive score — does not exist. All scoring currently happens at the hidden-state level, not at the candidate-token level.
+
+#### A.1.10 Integrated Token Score `Z*(w)` — NOT IMPLEMENTED
+
+| Aspect | Status |
+|---|---|
+| `Z(w) = Σ_f α_f · S_f(w)` | Not implemented |
+| `Z*(w) = B(w) · Z(w)` | Not implemented |
+| Kosha-weighted primitive integration | Not implemented |
+| Bliss-gated final score | Not implemented |
+
+**Gap**: The central equation of the design is not implemented. Token probability is still computed via standard logits `z_t(w) = e_w⊤ W_h h_t + b_w` followed by softmax. The multi-field integrated score does not replace or augment this.
+
+#### A.1.11 Field-Integrated Softmax — NOT IMPLEMENTED
+
+| Aspect | Status |
+|---|---|
+| `P(w_t = w \| x_{<t}) = exp(Z*(w)) / Σ exp(Z*(u))` | Not implemented |
+| Semantic re-ranking over shortlist | Not implemented |
+| Two-stage candidate evaluation | Not implemented |
+
+**Gap**: Generation uses standard softmax over transformer logits. The field-integrated softmax from Section 5.7 is not yet implemented.
+
+#### A.1.12 Cached Token Primitive Tables — NOT IMPLEMENTED
+
+| Aspect | Status |
+|---|---|
+| `O_tok ∈ ℝ^{V×32}` | Not implemented |
+| `P_tok ∈ ℝ^{V×d_j}` | Not implemented |
+| `R_tok ∈ ℝ^{V×d_c}` | Not implemented |
+| `V_tok ∈ ℝ^{V×K_v}` | Not implemented |
+| `G_tok ∈ ℝ^{V×3}` | Not implemented |
+
+**Gap**: No precomputed token-side primitive representations exist. All computation is context-side only.
+
+---
+
+### A.2 Implementation Summary Matrix
+
+| Design Component | Implementation Status | Current Role in Model |
+|---|---|---|
+| Transformer backbone | **Implemented** | Primary generation engine (HybridPhaseTransformer) |
+| 32D Ontological manifold | **Implemented** (context-side only) | Phase rotation driver via Bhava delta |
+| JEPA | **Partial** | Self-supervised state predictor; weak prior injection |
+| CSR | **Partial** | Hidden-state injection via phoneme pipeline |
+| Vritti | **Partial** | Context-level cognitive mode classification |
+| Guna | **Partial** | Diagnostic dynamics dimensions in sovereign state |
+| Kosha | **Partial** | Homeostatic regularizer; not primitive weighting |
+| Bliss | **Partial** | Global coherence measurement; not per-token gate |
+| Token Evaluation Tensor | **Not implemented** | — |
+| Integrated Token Score | **Not implemented** | — |
+| Field-Integrated Softmax | **Not implemented** | — |
+| Cached Token Tables | **Not implemented** | — |
+| Training losses (per-primitive) | **Partial** | L_LM, L_JEPA (VICReg), L_CSR (sparse), L_Kosha (gyroscope) exist; L_ont, per-token primitive losses absent |
+
+---
+
+### A.3 Modules Requiring Update or Disablement for Design Coherence
+
+For the `ontological_hybrid` model to evolve coherently toward the Conscious Generation design, the following existing modules need to be updated, restructured, or disabled.
+
+#### A.3.1 Modules to Update
+
+| Module | Current Behavior | Required Change |
+|---|---|---|
+| `SovereignStateProjector` | Projects context `h_t → ℝ³²` for phase rotation | Add parallel token-side projection `e_w → o_w ∈ ℝ³²` for ontological compatibility scoring. Retain context-side projection as-is. |
+| `IntentPhaseProjector` | Converts 12D Bhava delta to phase rotation `θ` | Retain for attention modulation. Add separate pathway where full 32D state feeds primitive scoring heads (not just phase rotation). |
+| `BlissCoherenceFunctional` | Global scalar `B` over hidden states and priors | Extend to compute per-token `B_t(w)` using weighted variance over primitive score vectors. The global B can coexist as a training diagnostic. |
+| `KoshaGyroscopicLoss` | Homeostatic balance regularizer across 5 Koshas | Retain as training regularizer. Add new `KoshaPrimitiveRouter` module that uses Kosha activations to produce dynamic weights `α_t` over the 6 primitive scores. |
+| `VrittiResonanceLoss` | Kosha-Vritti coupling loss at context level | Retain. Add token-level Vritti profile head: `q_w^(v) = softmax(U_v e_w)` for per-token cognitive-mode scoring. |
+| CSR injection pipeline | Adds phoneme information into hidden states at Layer 7 | Retain as hidden-state enrichment (Phase 1). Add parallel CSR token scoring head: `r_w = f_csr-tok(w)` and context state `r_t` for `S_csr(w) = f_csr(r_t, r_w)`. |
+| JEPA predictor | Predicts future state deltas; injected as weak prior | Retain state prediction. Add token-level JEPA scoring: `p_w = f_jepa-tok(e_w, o_w)` and `S_jepa(w) = p_t⊤ M_jepa p_w`. |
+| Guna dimensions [22:28] | 6 diagnostic dynamics (LUCIDITY through STABLE) | Restructure to expose 3-class Sattva/Rajas/Tamas token scoring. The 6-dim dynamics can remain for diagnostics but the token-level Guna scorer should use the classical 3-class framework with `G ∈ ℝ^{3×3}` compatibility matrix. |
+| `generate()` method | Standard top-k sampling from transformer logits | Replace with two-stage generation: (1) top-K from base logits, (2) full primitive re-ranking via `Z*(w)` over shortlist, (3) field-integrated softmax. |
+
+#### A.3.2 Modules to Disable or Deprecate
+
+| Module | Reason |
+|---|---|
+| `OntologicalBindingAnnotator` | Designed for binding cache architecture (Top-K query biasing), not for token-level primitive scoring. Its CSR/Kosha/SRK salience computation is incompatible with the design's multi-field consensus mechanism. Disable for `ontological_hybrid` model; retain only for `ontological_binding_cache`. |
+| Phase rotation as sole ontological output | Currently the only consumer of the 32D state is `IntentPhaseProjector → θ → attention modulation`. This must no longer be the sole use. The 32D state must also feed primitive scoring heads. Phase rotation can remain as one output channel. |
+| `LegacyLossAdapter` | Provides backward compatibility with pre-Sovereign loss computation. Should be removed once the new per-primitive loss framework (L_ont + L_jepa + L_csr + L_vritti + L_guna + L_bliss) is implemented. |
+| 124D cognitive state references | Any remaining references to the deprecated 124D CognitiveState (44 phonemes + 64 topics + 12 Bhava + 4 dynamics) should be fully removed to prevent confusion. |
+
+#### A.3.3 New Modules Required
+
+| Module | Purpose | Design Reference |
+|---|---|---|
+| `TokenPrimitiveCache` | Precompute and cache `O_tok`, `P_tok`, `R_tok`, `V_tok`, `G_tok` from token embeddings | Section 8.3 |
+| `PrimitiveScoringHeads` | Compute `S_f(w)` for each primitive using context state + cached token representations | Section 5.4 |
+| `KoshaPrimitiveRouter` | Produce dynamic `α_t` weights over primitives from Kosha activations and context | Section 5.5.1 |
+| `BlissTokenGate` | Compute per-token `B_t(w) = exp(-λ_B D_t(w))` from primitive score disagreement | Section 5.5.2 |
+| `IntegratedTokenScorer` | Combine: `Z(w) = Σ_f α_f S_f(w)`, then `Z*(w) = B(w) · Z(w)` | Section 5.6 |
+| `FieldIntegratedSoftmax` | Replace standard logit softmax with `P(w) = softmax(Z*(w))` over shortlist | Section 5.7 |
+| `OntologicalStructureLoss` | Contrastive/prototype loss for 32D manifold semantic clustering | Section 6.4 |
+| `PrimitiveAuxiliaryLosses` | Per-primitive supervision: L_ont, L_jepa (token-level), L_csr (token-level), L_vritti, L_guna | Section 6.5 |
+
+---
+
+### A.4 Phased Implementation Plan
+
+#### Phase 1 — Token-Side Ontological Projections (Foundation)
+
+**Goal**: Establish per-token ontological representations alongside existing context-side projections.
+
+**Tasks**:
+
+1. Add token ontology projection `o_w = U_o e_w ∈ ℝ³²` using a learnable linear layer from token embeddings
+2. Implement `TokenPrimitiveCache` to precompute `O_tok ∈ ℝ^{V×32}` from vocabulary embeddings
+3. Implement ontological compatibility score `S_ont(w) = o_t⊤ M_ont o_w` as the first primitive scorer
+4. Add ontological structure loss `L_ont` (contrastive: similar tokens cluster; dissimilar tokens separate)
+5. Verify that existing phase rotation and Bhava delta pathways remain functional
+
+**Modules to update**: `SovereignStateProjector` (add token-side projection), `OntologicalHybridTransformer` (add `TokenPrimitiveCache`)
+
+**Existing modules unaffected**: `IntentPhaseProjector`, `HybridPhaseTransformer`, all attention layers
+
+#### Phase 2 — Primitive Scoring Heads (Core Evaluation)
+
+**Goal**: Convert each primitive from hidden-state-level operation to token-level scoring.
+
+**Tasks**:
+
+1. Implement `S_base(w)` extraction from existing transformer logits
+2. Implement JEPA token scoring head: `p_w = f_jepa-tok(e_w, o_w)` and `S_jepa(w) = p_t⊤ M_jepa p_w`
+3. Implement CSR token scoring head: `r_w = f_csr-tok(w)` and `S_csr(w) = r_t⊤ M_csr r_w`
+4. Implement Vritti token scoring head: `q_w^(v) = softmax(U_v e_w)` and `S_vritti(w) = (q_t^(v))⊤ q_w^(v)`
+5. Implement Guna token scoring head: `q_w^(g) = softmax(U_g e_w)` and `S_guna(w) = (q_t^(g))⊤ G q_w^(g)`
+6. Extend `TokenPrimitiveCache` to store `P_tok`, `R_tok`, `V_tok`, `G_tok`
+7. Construct Token Evaluation Tensor `T_t ∈ ℝ^{|V|×6}` (or over shortlist)
+
+**Modules to update**: JEPA predictor (add token-level head), CSR pipeline (add token-level head)
+
+**Modules to retain unchanged**: `KoshaGyroscopicLoss`, `VrittiResonanceLoss` (these continue as regularizers alongside new token-level scoring)
+
+#### Phase 3 — Governance Integration (Kosha Routing + Bliss Gating)
+
+**Goal**: Implement the governance layer that weights and gates primitive scores.
+
+**Tasks**:
+
+1. Implement `KoshaPrimitiveRouter`: `α_t = softmax(W_k [h_t ; o_t])` producing 6 weights over primitives
+2. Implement `BlissTokenGate`: per-token `D_t(w)` (weighted variance) and `B_t(w) = exp(-λ_B D_t(w))`
+3. Implement `IntegratedTokenScorer`: `Z(w) = Σ_f α_f S_f(w)` → `Z*(w) = B(w) · Z(w)`
+4. Add per-primitive auxiliary losses alongside existing training objectives
+5. Retain `KoshaGyroscopicLoss` as an additional regularizer; do not disable
+
+**Modules to update**: `BlissCoherenceFunctional` (extend with per-token computation), Kosha (add routing head)
+
+**Module to disable**: `OntologicalBindingAnnotator` (for `ontological_hybrid` only; retain for `ontological_binding_cache`)
+
+#### Phase 4 — Field-Integrated Softmax (Generation)
+
+**Goal**: Replace standard logit-based generation with multi-field semantic consensus.
+
+**Tasks**:
+
+1. Implement `FieldIntegratedSoftmax`: `P(w) = exp(Z*(w)) / Σ exp(Z*(u))` over candidate shortlist
+2. Implement two-stage generation: base top-K shortlist → full primitive re-ranking → semantic softmax
+3. Update `generate()` method in `OntologicalHybridTransformer`
+4. Add ablation toggle: `--use_field_integrated_softmax` (default off initially for comparison)
+5. Add diagnostic logging: per-token primitive scores, Kosha weights, Bliss values, rank shifts
+
+**Modules to update**: `OntologicalHybridTransformer.generate()`, training loop (switch L_LM to integrated softmax)
+
+**Module to deprecate**: `LegacyLossAdapter` (once integrated softmax is validated)
+
+#### Phase 5 — Training Curriculum and Validation
+
+**Goal**: Implement staged curriculum training and full validation framework.
+
+**Tasks**:
+
+1. Implement curriculum schedule: Stage A (backbone) → Stage B (ontology) → Stage C (primitives) → Stage D (integrated generation)
+2. Integrate with existing `TrainingCurriculumOrchestrator` from JEPA
+3. Implement full joint loss: `L = L_LM + Σ λ_f L_f`
+4. Implement ablation experiments (Section 9.3): remove one primitive at a time
+5. Implement ontology diagnostics: semantic clustering, sense separation (Section 9.4)
+6. Implement primitive behavior diagnostics (Section 9.5)
+7. Implement governance diagnostics: Kosha routing entropy, Bliss coherence vs accuracy (Section 9.6)
+8. Benchmark against standard transformer baseline
+
+**Modules to retain**: All existing JEPA curriculum infrastructure, `KoshaGyroscopicLoss`, `VrittiResonanceLoss`, `BlissCoherenceFunctional` (as complementary diagnostics)
+
+---
+
+### A.5 Architecture Alignment Summary
+
+```
+Current ontological_hybrid architecture:
+  tokens → transformer → h_t → 32D state → Bhava delta → phase rotation → logits → softmax
+
+Design target:
+  tokens → transformer → h_t → 32D state → primitive scoring heads
+                                                ↓
+                                    S_base, S_ont, S_jepa, S_csr, S_vritti, S_guna
+                                                ↓
+                                         Kosha weighting (α_t)
+                                                ↓
+                                         Bliss coherence gate B(w)
+                                                ↓
+                                         Z*(w) = B(w) · Σ α_f S_f(w)
+                                                ↓
+                                         Field-Integrated Softmax
+```
+
+The fundamental shift is from **hidden-state modification** (current: primitives inject into `h_t`) to **candidate-token evaluation** (design: primitives score each candidate `w` before final selection). The existing hidden-state injection mechanisms (CSR at Layer 7, JEPA weak prior, Kosha steering) can coexist as complementary enrichment during the transition, but the design's token-level multi-field consensus mechanism must become the primary generation pathway.
