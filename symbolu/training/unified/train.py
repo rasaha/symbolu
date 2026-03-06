@@ -4351,6 +4351,73 @@ def train(config: UnifiedTrainingConfig):
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
                               f"wr_scale={_wr_scale:.1f}")
 
+            # =====================================================================
+            # CONSCIOUS GENERATION Phase 1: Token Ontology Cache + L_ont Loss
+            # Refreshes O_tok cache periodically, computes ontological structure
+            # loss to encourage semantic clustering in the 32D manifold.
+            # =====================================================================
+            if config.enable_conscious_generation and hasattr(model, 'conscious_gen'):
+                try:
+                    # Get embedding weight (need non-detached for gradient flow through projector)
+                    _cg_emb_weight = None
+                    _cg_inner = getattr(model, 'hybrid', model)
+                    _cg_tok_emb = getattr(_cg_inner, 'token_embed', None)
+                    if _cg_tok_emb is None:
+                        _cg_tok_emb = getattr(_cg_inner, 'embed_tokens', None)
+                    if _cg_tok_emb is None:
+                        _cg_tok_emb = getattr(_cg_inner, 'wte', None)
+                    if _cg_tok_emb is not None and hasattr(_cg_tok_emb, 'weight'):
+                        _cg_emb_weight = _cg_tok_emb.weight
+
+                    if _cg_emb_weight is not None:
+                        # Refresh token primitive cache periodically
+                        _cg_cache = model.conscious_gen['token_cache']
+                        _cg_cache.maybe_refresh(_cg_emb_weight.detach(), global_step)
+
+                        # Compute L_ont: ontological structure loss
+                        if config.lambda_ont > 0 and 'ontology_loss' in model.conscious_gen:
+                            _cg_projector = model.conscious_gen['token_projector']
+                            _cg_loss_fn = model.conscious_gen['ontology_loss']
+
+                            # Project target tokens through the projector (with gradients)
+                            _cg_target_emb = _cg_tok_emb(y)
+                            _cg_target_codes = _cg_projector(_cg_target_emb)
+
+                            _cg_result = _cg_loss_fn(_cg_target_codes, y)
+                            _cg_ont_loss = _cg_result['loss']
+
+                            if torch.isfinite(_cg_ont_loss):
+                                loss = loss + config.lambda_ont * _cg_ont_loss
+                                metrics['cg_ont_loss'] = _cg_ont_loss.item()
+                                metrics['cg_ont_pos_sim'] = _cg_result['avg_pos_sim'].item()
+                                metrics['cg_ont_neg_sim'] = _cg_result['avg_neg_sim'].item()
+
+                        # Log diagnostics periodically
+                        if (global_step % config.log_every == 0 and global_step > 0 and
+                            (accumulation_step + 1) % config.gradient_accumulation == 0):
+                            _cg_diag = _cg_cache.get_diagnostics()
+                            if _cg_diag.get('initialized', False):
+                                _cg_msg = (f"  [Conscious Gen] Step {global_step} | "
+                                          f"O_tok refresh={_cg_diag['step']}")
+                                if 'cg_ont_loss' in metrics:
+                                    _cg_msg += (f" | L_ont={metrics['cg_ont_loss']:.4f}"
+                                               f" | pos_sim={metrics.get('cg_ont_pos_sim', 0):.3f}"
+                                               f" | neg_sim={metrics.get('cg_ont_neg_sim', 0):.3f}")
+                                print(_cg_msg)
+
+                            # TensorBoard logging
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                if 'cg_ont_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_ont', metrics['cg_ont_loss'], global_step)
+                                    writer.add_scalar('conscious_gen/ont_pos_sim', metrics.get('cg_ont_pos_sim', 0), global_step)
+                                    writer.add_scalar('conscious_gen/ont_neg_sim', metrics.get('cg_ont_neg_sim', 0), global_step)
+                                writer.add_scalar('conscious_gen/O_tok_std', _cg_diag.get('O_tok_std', 0), global_step)
+                                writer.add_scalar('conscious_gen/bhava_entropy', _cg_diag.get('bhava_entropy', 0), global_step)
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -8001,6 +8068,28 @@ def main():
     parser.add_argument("--confidence_vritti_kl_weight", type=float, default=0.1,
                        help="Weight for Vritti KL auxiliary loss in risk gating")
 
+    # ==========================================================================
+    # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # ==========================================================================
+    parser.add_argument("--enable_conscious_generation", action="store_true",
+                       help="Enable conscious generation modules (token-side ontological projection)")
+    parser.add_argument("--token_ontology_dim", type=int, default=32,
+                       help="Ontological code dimension (must match SOVEREIGN_STATE_DIM)")
+    parser.add_argument("--ontology_cache_refresh_interval", type=int, default=100,
+                       help="Steps between O_tok cache refresh")
+    parser.add_argument("--lambda_ont", type=float, default=0.0,
+                       help="Ontological structure loss weight (0 = disabled)")
+    parser.add_argument("--ontology_loss_type", type=str, default="contrastive",
+                       choices=["contrastive", "prototype"],
+                       help="Ontological structure loss formulation")
+    parser.add_argument("--ontology_loss_temperature", type=float, default=0.1,
+                       help="Temperature for contrastive ontological structure loss")
+    parser.add_argument("--ontology_scorer_use_low_rank", action="store_true", default=True,
+                       help="Use low-rank M_ont = A B^T factorization")
+    parser.add_argument("--ontology_scorer_rank", type=int, default=8,
+                       help="Rank for low-rank bilinear factorization")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -8642,6 +8731,15 @@ def main():
         kv_teacher_mode=args.kv_teacher_mode,
         kv_collapse_check_interval=args.kv_collapse_check_interval,
         kv_kl_clamp_max=args.kv_kl_clamp_max,
+        # Conscious Generation (Phase 1+)
+        enable_conscious_generation=args.enable_conscious_generation,
+        token_ontology_dim=args.token_ontology_dim,
+        ontology_cache_refresh_interval=args.ontology_cache_refresh_interval,
+        lambda_ont=args.lambda_ont,
+        ontology_loss_type=args.ontology_loss_type,
+        ontology_loss_temperature=args.ontology_loss_temperature,
+        ontology_scorer_use_low_rank=args.ontology_scorer_use_low_rank,
+        ontology_scorer_rank=args.ontology_scorer_rank,
     )
 
     # ==========================================================================
