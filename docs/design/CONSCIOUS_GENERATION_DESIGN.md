@@ -4814,3 +4814,464 @@ This design enables:
 - Clear separation between token-level neural generation and response-level symbolic reasoning
 
 The earlier appendices provide the operational detail: Appendix A covers the implementation migration path from the current architecture to the design target, and Appendix B specifies the weight governance system and scenario-specific configurations. This appendix provides the conceptual frame that connects them.
+
+---
+
+## Appendix D — Phase Plan for Building Ontological Hybrid Modules in `symbolu/training`
+
+This appendix provides the detailed build strategy for implementing the Conscious Generation architecture as concrete modules within the `symbolu/training` folder structure, targeting the `ontological_hybrid` model type. Each phase defines what modules are created, where they live, what they depend on, what training losses they introduce, and what validation gates must pass before the next phase begins.
+
+### D.1 Current `symbolu/training` Folder Structure
+
+```
+symbolu/training/
+├── __init__.py                       # Module exports
+├── confidence_scaler.py              # Confidence scaling utilities
+├── entropy_control.py                # Entropy-based training controls
+├── kosha_vritti_supervision.py       # Kosha-Vritti coupling supervision
+├── schemas.py                        # Data schemas (QueryIntentPair, etc.)
+├── text_utils.py                     # Text cleaning utilities
+├── data/
+│   ├── raw/                          # Raw training data
+│   └── processed/                    # Validated processed data
+├── generators/
+│   ├── intent_generator.py           # Intent data generation
+│   └── paraphrase_generator.py       # Paraphrase data generation
+├── scripts/
+│   ├── generate_data.py              # Data generation script
+│   ├── train.py                      # Training script (consumer providers)
+│   └── validate.py                   # Validation script
+├── trainers/
+│   ├── embedding_trainer.py          # Embedding training
+│   ├── gradient_throttle.py          # Gradient norm throttling
+│   └── router_trainer.py             # Router training
+└── unified/
+    ├── __init__.py                    # Unified training exports
+    ├── __main__.py                    # CLI entry point
+    ├── bliss_coherence.py             # Bliss coherence functional (global B)
+    ├── checkpointing.py               # Checkpoint management
+    ├── config.py                      # UnifiedTrainingConfig + MODEL_PRESETS
+    ├── control_plane.py               # Control plane interface
+    ├── curriculum.py                  # Curriculum orchestration
+    ├── data.py                        # Data loading
+    ├── diagnostics.py                 # Training diagnostics
+    ├── evaluation.py                  # Evaluation framework
+    ├── gradient_control.py            # Gradient control
+    ├── intelligence_engine.py         # Intelligence engine
+    ├── losses.py                      # Loss computation
+    ├── model_factory.py               # Model creation (supports ontological_hybrid)
+    ├── ontological_flow.py            # Ontological flow management
+    ├── phase_controllers.py           # Phase controller logic
+    ├── relaxation.py                  # Relaxation schedule
+    ├── scheduling.py                  # Training schedule
+    ├── train.py                       # Main training loop (~7000 lines)
+    ├── training_state.py              # Training state tracking
+    ├── utilities.py                   # Utility functions
+    └── vram_manager.py                # VRAM management
+```
+
+### D.2 Target Folder Structure After All Phases
+
+```
+symbolu/training/
+├── ... (existing files unchanged)
+├── conscious_generation/             # NEW — All Conscious Generation modules
+│   ├── __init__.py
+│   ├── primitives/                   # Phase 2: Token-level primitive scoring
+│   │   ├── __init__.py
+│   │   ├── base_scorer.py            # S_base(w) — transformer logit extraction
+│   │   ├── ontology_scorer.py        # S_ont(w) — ontological compatibility
+│   │   ├── jepa_scorer.py            # S_jepa(w) — physical plausibility
+│   │   ├── csr_scorer.py             # S_csr(w) — mental/phonemic resonance
+│   │   ├── vritti_scorer.py          # S_vritti(w) — cognitive mode compatibility
+│   │   └── guna_scorer.py            # S_guna(w) — energetic compatibility
+│   ├── token_cache.py                # Phase 1: TokenPrimitiveCache
+│   ├── token_ontology.py             # Phase 1: Token-side ontological projection
+│   ├── governance/                   # Phase 3: Governance layer
+│   │   ├── __init__.py
+│   │   ├── kosha_router.py           # KoshaPrimitiveRouter — α_t weights
+│   │   └── bliss_gate.py             # BlissTokenGate — per-token B(w)
+│   ├── integration/                  # Phase 4: Score integration + generation
+│   │   ├── __init__.py
+│   │   ├── token_scorer.py           # IntegratedTokenScorer — Z*(w)
+│   │   ├── field_softmax.py          # FieldIntegratedSoftmax
+│   │   └── two_stage_generator.py    # Two-stage generation pipeline
+│   ├── losses/                       # Phase 3-5: Per-primitive losses
+│   │   ├── __init__.py
+│   │   ├── ontological_structure.py  # L_ont — contrastive/prototype
+│   │   ├── primitive_auxiliary.py    # L_jepa, L_csr, L_vritti, L_guna (token-level)
+│   │   ├── kosha_routing.py          # L_kosha — routing supervision
+│   │   └── bliss_coherence.py        # L_bliss — cross-field agreement
+│   ├── curriculum/                   # Phase 5: Staged curriculum
+│   │   ├── __init__.py
+│   │   ├── stages.py                 # Stage A→B→C→D definitions
+│   │   └── weight_scheduler.py       # λ_f curriculum weight schedule
+│   └── diagnostics/                  # Phase 5: Validation & ablation
+│       ├── __init__.py
+│       ├── primitive_ablation.py     # Single-primitive-removal experiments
+│       ├── ontology_visualization.py # 32D manifold clustering diagnostics
+│       └── governance_diagnostics.py # Kosha entropy, Bliss vs accuracy
+└── unified/
+    ├── ... (existing files)
+    ├── config.py                     # UPDATED — new conscious_generation config fields
+    ├── model_factory.py              # UPDATED — wire conscious generation modules
+    ├── losses.py                     # UPDATED — integrate per-primitive losses
+    └── train.py                      # UPDATED — curriculum stages, integrated softmax toggle
+```
+
+---
+
+### D.3 Phase 1 — Token-Side Ontological Foundation
+
+**Objective**: Establish per-token ontological representations that create the semantic coordinate system required by all downstream primitive scorers.
+
+**Rationale**: The current `ontological_hybrid` model has context-side 32D projection (`SovereignStateProjector: h_t → o_t ∈ ℝ³²`) but no token-side ontological projection (`e_w → o_w ∈ ℝ³²`). All subsequent phases depend on tokens having their own ontological codes.
+
+#### D.3.1 Modules to Build
+
+| Module | File | Purpose |
+|---|---|---|
+| `TokenOntologyProjector` | `conscious_generation/token_ontology.py` | Learnable `nn.Linear(embed_dim, 32)` mapping token embeddings `e_w` to ontological codes `o_w ∈ ℝ³²`. Applies subgroup normalization matching the existing sovereign state layout (Bhava[0:12] softmax, Kosha[12:17] softmax, Vritti[17:22] softmax, Guna[22:28] sigmoid, Reserved[28:32] tanh). |
+| `TokenPrimitiveCache` | `conscious_generation/token_cache.py` | Precomputes and caches `O_tok ∈ ℝ^{V×32}` from the full vocabulary embedding matrix. Supports periodic refresh during training (every N steps) and one-shot computation at inference. Stores as a contiguous buffer for efficient matrix-vector products. |
+| `OntologyCompatibilityScorer` | `conscious_generation/primitives/ontology_scorer.py` | Computes `S_ont(w) = o_t⊤ M_ont o_w` using a learnable bilinear form `M_ont ∈ ℝ^{32×32}` (or low-rank factored `A_ont B_ont⊤`). Operates over the full vocabulary via `S_ont = O_tok (M_ont o_t)` returning `ℝ^V`. |
+| `OntologicalStructureLoss` | `conscious_generation/losses/ontological_structure.py` | Contrastive loss encouraging semantic clustering in the 32D manifold. Positive pairs: tokens with same semantic type (object-object, action-action). Negative pairs: semantic mismatches (physical-abstract, entity-attribute). Uses InfoNCE or prototype-based formulation. |
+
+#### D.3.2 Config Additions
+
+```python
+# In UnifiedTrainingConfig
+enable_conscious_generation: bool = False      # Master toggle
+token_ontology_dim: int = 32                   # Must match sovereign state dim
+ontology_cache_refresh_interval: int = 100     # Steps between O_tok refresh
+lambda_ont: float = 0.0                        # Ontological structure loss weight (0 = disabled)
+ontology_loss_type: str = "contrastive"        # "contrastive" or "prototype"
+```
+
+#### D.3.3 Integration Points
+
+- `model_factory.py`: When `config.enable_conscious_generation` is True and model_type is `ontological_hybrid`, instantiate `TokenOntologyProjector` and `TokenPrimitiveCache` alongside the existing model.
+- `train.py`: Add `L_ont` computation after forward pass when `lambda_ont > 0`. Refresh `TokenPrimitiveCache` every `ontology_cache_refresh_interval` steps.
+- Existing `SovereignStateProjector` and `IntentPhaseProjector`: **No changes**. Phase rotation pathway remains untouched.
+
+#### D.3.4 Validation Gate (Must Pass Before Phase 2)
+
+1. `O_tok` cache produces correct shapes (`V × 32`) and refreshes without memory leaks
+2. `S_ont` scores produce finite, non-degenerate values across vocabulary
+3. `L_ont` loss decreases during training — semantically similar tokens cluster in 32D space
+4. Existing phase rotation, Bhava delta, and attention modulation remain numerically identical (regression test)
+5. Perplexity on WikiText-103 does not degrade by more than 2% relative to baseline `ontological_hybrid`
+
+---
+
+### D.4 Phase 2 — Primitive Scoring Heads
+
+**Objective**: Convert each architectural primitive (JEPA, CSR, Vritti, Guna) from hidden-state-level operation to token-level scoring, producing the Token Evaluation Tensor `T_t ∈ ℝ^{K×6}` over a candidate shortlist.
+
+**Rationale**: The design's core innovation is that each candidate token receives a multi-dimensional evaluation, not a single logit. This phase creates the scoring heads that read from the cached token tables and context states.
+
+#### D.4.1 Modules to Build
+
+| Module | File | Purpose |
+|---|---|---|
+| `BaseScorer` | `conscious_generation/primitives/base_scorer.py` | Extracts `S_base(w)` from existing transformer vocabulary projection logits. Thin wrapper — no new parameters. |
+| `JEPATokenScorer` | `conscious_generation/primitives/jepa_scorer.py` | Token-side: `p_w = f_jepa-tok(e_w, o_w) ∈ ℝ^{d_j}` via MLP on concatenated `[e_w; o_w]`. Context-side: `p_t = f_jepa-ctx(h_t, o_t) ∈ ℝ^{d_j}` via MLP on concatenated `[h_t; o_t]`. Score: `S_jepa(w) = p_t⊤ M_jepa p_w` (bilinear or cosine). Token representations cached in `P_tok ∈ ℝ^{V×d_j}`. Default `d_j = 16`. |
+| `CSRTokenScorer` | `conscious_generation/primitives/csr_scorer.py` | Token-side: `r_w = f_csr-tok(w) ∈ ℝ^{d_c}` derived from existing CSR phoneme pipeline (`csr_phoneme_provider.py`). Context-side: `r_t = f_csr-ctx(h_t, o_t) ∈ ℝ^{d_c}` via learned projection. Score: `S_csr(w) = r_t⊤ M_csr r_w`. Cached in `R_tok ∈ ℝ^{V×d_c}`. Default `d_c = 16`. |
+| `VrittiTokenScorer` | `conscious_generation/primitives/vritti_scorer.py` | Token-side: `q_w^(v) = softmax(U_v e_w) ∈ Δ⁴` over 5 Vritti classes (FACT, ERROR, IMAGINATION, VOID, MEMORY). Context-side: `q_t^(v) = softmax(W_v [h_t; o_t])`. Score: `S_vritti(w) = (q_t^(v))⊤ q_w^(v)` (dot-product compatibility). Cached in `V_tok ∈ ℝ^{V×5}`. |
+| `GunaTokenScorer` | `conscious_generation/primitives/guna_scorer.py` | Token-side: `q_w^(g) = softmax(U_g e_w) ∈ Δ²` over 3 classical Gunas (Sattva, Rajas, Tamas). Context-side: `q_t^(g) = softmax(W_g [h_t; o_t])`. Score: `S_guna(w) = (q_t^(g))⊤ G q_w^(g)` with learnable `G ∈ ℝ^{3×3}`. Cached in `G_tok ∈ ℝ^{V×3}`. |
+| `TokenEvaluationTensor` | `conscious_generation/primitives/__init__.py` | Orchestrator: takes a candidate set `C_t` (top-K from base logits), retrieves cached representations, computes all 6 primitive scores, returns `T_t ∈ ℝ^{K×6}`. |
+
+#### D.4.2 Config Additions
+
+```python
+# Primitive head dimensions
+jepa_token_dim: int = 16               # d_j for JEPA token representations
+csr_token_dim: int = 16                # d_c for CSR token representations
+primitive_shortlist_k: int = 128       # Top-K base logits for primitive evaluation
+use_low_rank_primitives: bool = True   # Low-rank M_f = A_f B_f⊤ (reduces params)
+primitive_rank: int = 8                # Rank for low-rank factorization
+use_shared_token_basis: bool = False   # Share intermediate projection across primitives
+```
+
+#### D.4.3 Dependency on Existing Modules
+
+- **JEPA predictor** (`symbolu/jepa/predictor.py`): Retain for self-supervised state prediction. `JEPATokenScorer` is a **new parallel head**, not a replacement. It reads from the same `h_t` and `o_t` but produces token-level scores instead of state deltas.
+- **CSR phoneme pipeline** (`csr_phoneme_provider.py`): `CSRTokenScorer` uses the existing phoneme-to-embedding pipeline to derive `r_w`. The CSR hidden-state injection at Layer 7 remains as complementary enrichment.
+- **Vritti dimensions** (`VRITTI_SLICE = [17:22]`): `VrittiTokenScorer` reads the same 5-class structure from the sovereign state for `q_t^(v)` and adds a token-side profile `q_w^(v)`.
+- **Guna dimensions** (`GUNA_SLICE = [22:28]`): `GunaTokenScorer` maps the existing 6-dim dynamics to the classical 3-class (Sattva/Rajas/Tamas) framework for token-level scoring. The 6-dim representation remains for diagnostics.
+
+#### D.4.4 Extending `TokenPrimitiveCache`
+
+The cache built in Phase 1 is extended to store all token-side representations:
+
+```python
+class TokenPrimitiveCache:
+    O_tok: Tensor  # (V, 32)   — Phase 1
+    P_tok: Tensor  # (V, d_j)  — Phase 2
+    R_tok: Tensor  # (V, d_c)  — Phase 2
+    V_tok: Tensor  # (V, 5)    — Phase 2
+    G_tok: Tensor  # (V, 3)    — Phase 2
+```
+
+Total memory at `V=50,257`: `50,257 × (32 + 16 + 16 + 5 + 3) × 2 bytes (fp16) ≈ 7.2 MB`. Negligible.
+
+#### D.4.5 Validation Gate (Must Pass Before Phase 3)
+
+1. All 6 primitive scores produce finite, numerically stable values for every token in the shortlist
+2. `TokenEvaluationTensor` shape is `(K, 6)` for shortlist size K
+3. Each primitive head adds < 1% parameter overhead to the model
+4. Existing training losses (L_LM, L_JEPA VICReg, L_CSR sparse) are numerically unaffected
+5. Primitive scores show expected directional behavior on diagnostic sentences (e.g., "He placed the cup on the ___" → table > database for JEPA, ontology)
+6. Cache refresh is stable under multi-GPU / DDP settings
+
+---
+
+### D.5 Phase 3 — Governance Integration
+
+**Objective**: Implement the governance layer that determines how primitive scores are weighted (Kosha) and gated by cross-field agreement (Bliss), producing the integrated token score `Z*(w)`.
+
+**Rationale**: Without governance, primitive scores would contribute equally regardless of context. Kosha routing ensures the right primitives dominate in the right contexts. Bliss gating ensures tokens are selected by consensus, not by single-field spikes.
+
+#### D.5.1 Modules to Build
+
+| Module | File | Purpose |
+|---|---|---|
+| `KoshaPrimitiveRouter` | `conscious_generation/governance/kosha_router.py` | Produces dynamic weights `α_t = softmax(W_k [h_t ; o_t]) ∈ Δ⁵` over the 6 primitives {base, ont, JEPA, CSR, Vritti, Guna}. Uses concatenation of transformer hidden state and ontological context as input. Output weights sum to 1 and are context-dependent. |
+| `BlissTokenGate` | `conscious_generation/governance/bliss_gate.py` | For each candidate token `w` in the shortlist, computes weighted mean `μ(w) = Σ_f α_f S_f(w)`, disagreement `D(w) = Σ_f α_f (S_f(w) - μ(w))²`, and coherence factor `B(w) = exp(-λ_B D(w))`. Returns per-token Bliss values. |
+| `IntegratedTokenScorer` | `conscious_generation/integration/token_scorer.py` | Combines Kosha weights and primitive scores: `Z(w) = Σ_f α_f S_f(w)`, then applies Bliss gate: `Z*(w) = B(w) · Z(w)`. Returns integrated scores for the candidate shortlist. |
+| `KoshaRoutingLoss` | `conscious_generation/losses/kosha_routing.py` | Supervision for Kosha routing — encourages context-appropriate weighting. Signals: corpus-type labels (factual → JEPA, narrative → CSR), agreement-based routing targets, meta-learning over primitive success rates. |
+| `PrimitiveAuxiliaryLosses` | `conscious_generation/losses/primitive_auxiliary.py` | Per-primitive token-level losses: `L_jepa` (contrastive plausibility), `L_csr` (resonance alignment), `L_vritti` (cognitive mode classification), `L_guna` (energetic compatibility). Each loss teaches its primitive to distinguish correct from incorrect token-context pairs. |
+| `BlissCoherenceLoss` | `conscious_generation/losses/bliss_coherence.py` | Encourages agreement on correct tokens and disagreement on incorrect tokens. Formulated as: correct tokens should have low `D(w)` (high Bliss), hard negatives should have high `D(w)` (low Bliss). |
+
+#### D.5.2 Config Additions
+
+```python
+# Governance parameters
+lambda_kosha_routing: float = 0.0      # Kosha routing loss weight
+lambda_bliss_token: float = 0.0        # Bliss token-level coherence loss weight
+lambda_jepa_token: float = 0.0         # JEPA token-level plausibility loss
+lambda_csr_token: float = 0.0          # CSR token-level resonance loss
+lambda_vritti_token: float = 0.0       # Vritti token-level cognitive mode loss
+lambda_guna_token: float = 0.0         # Guna token-level energetic loss
+bliss_lambda_B: float = 1.0            # λ_B temperature for Bliss gate
+kosha_routing_init: str = "uniform"    # "uniform" or "base_dominant" (α_base starts high)
+```
+
+#### D.5.3 Relationship to Existing Governance Modules
+
+| Existing Module | Action | Rationale |
+|---|---|---|
+| `KoshaGyroscopicLoss` | **Retain** as regularizer | Prevents pathological Kosha state collapse. Complements the new `KoshaPrimitiveRouter` which uses Kosha for active routing. |
+| `VrittiResonanceLoss` | **Retain** as regularizer | Maintains Kosha-Vritti coupling at the state level. New token-level Vritti loss is additive. |
+| `BlissCoherenceFunctional` (global B) | **Retain** as diagnostic | Global Bliss remains a useful training diagnostic. New per-token `BlissTokenGate` is the operational component. |
+| `OntologicalBindingAnnotator` | **Disable** for `ontological_hybrid` | Incompatible with multi-field consensus. Retained for `ontological_binding_cache` model type. |
+
+#### D.5.4 Validation Gate (Must Pass Before Phase 4)
+
+1. Kosha weights `α_t` are non-degenerate (no single primitive dominates > 0.9 weight consistently; entropy > 0.5 bits)
+2. Kosha routing responds to context: factual passages increase JEPA weight, narrative increases CSR weight
+3. Bliss gate produces values in `[0, 1]` range and correctly penalizes high-disagreement tokens
+4. `Z*(w)` integrated scores are numerically stable and produce sensible rankings
+5. Joint loss `L_LM + Σ λ_f L_f` converges without divergence
+6. Perplexity with governance active is within 5% of baseline (governance should not hurt, even if not yet helping)
+
+---
+
+### D.6 Phase 4 — Field-Integrated Generation
+
+**Objective**: Replace standard logit-based token generation with the two-stage semantic consensus mechanism, making the multi-field evaluation the primary generation pathway.
+
+**Rationale**: Phases 1–3 built the scoring infrastructure but kept generation on standard logits. This phase activates the integrated softmax, making token selection a function of multi-field agreement.
+
+#### D.6.1 Modules to Build
+
+| Module | File | Purpose |
+|---|---|---|
+| `FieldIntegratedSoftmax` | `conscious_generation/integration/field_softmax.py` | Replaces standard softmax: `P(w) = exp(Z*(w)) / Σ_{u ∈ C_t} exp(Z*(u))` computed over the candidate shortlist `C_t`. Supports temperature scaling, optional agreement-energy terms (Section 5.9). |
+| `TwoStageGenerator` | `conscious_generation/integration/two_stage_generator.py` | End-to-end generation pipeline: (1) run transformer forward, (2) extract top-K from base logits, (3) retrieve cached token primitive representations, (4) compute all primitive scores, (5) apply Kosha + Bliss governance, (6) compute `Z*(w)`, (7) apply `FieldIntegratedSoftmax`, (8) sample/greedy from integrated distribution. Replaces the existing `generate()` method. |
+
+#### D.6.2 Config Additions
+
+```python
+# Generation mode
+use_field_integrated_softmax: bool = False  # Toggle for A/B comparison
+field_softmax_temperature: float = 1.0      # Temperature for integrated softmax
+use_agreement_energy: bool = False          # Enable pairwise agreement term A_t(w)
+agreement_energy_weight: float = 0.1        # β weight for agreement-energy term
+generation_mode: str = "shortlist"          # "shortlist" or "full_vocabulary"
+```
+
+#### D.6.3 Integration with `OntologicalHybridTransformer`
+
+The existing `generate()` method in `OntologicalHybridTransformer` (`symbolu/phase_transformer.py`) is updated to support two modes:
+
+1. **Standard mode** (default, `use_field_integrated_softmax=False`): Existing behavior unchanged.
+2. **Integrated mode** (`use_field_integrated_softmax=True`): Delegates to `TwoStageGenerator` which performs the full multi-field evaluation pipeline.
+
+This toggle allows direct A/B comparison between standard and conscious generation.
+
+#### D.6.4 Training Loop Changes
+
+The training loop in `symbolu/training/unified/train.py` is updated:
+
+1. When `use_field_integrated_softmax=True`, the `L_LM` loss is computed using integrated scores `Z*(w)` instead of raw transformer logits.
+2. The loss becomes `L_LM(Z*(w))` — the cross-entropy between the integrated token distribution and the ground truth.
+3. Gradients flow through: `Z*(w) → B(w) → α_t → S_f(w) → primitive heads → h_t → transformer → embeddings`.
+4. This end-to-end gradient flow is what creates co-evolution between embeddings, hidden states, ontological manifold, and primitive evaluators.
+
+#### D.6.5 Diagnostic Logging
+
+New diagnostic outputs per training step (when enabled):
+
+| Diagnostic | Purpose |
+|---|---|
+| Per-token primitive scores `S_f(w)` for top-10 candidates | Verify primitive discrimination |
+| Kosha weights `α_t` | Monitor routing behavior across contexts |
+| Bliss values `B(w)` for top-10 candidates | Monitor coherence gating |
+| Rank shift: position of correct token in base logits vs integrated scores | Measure re-ranking effectiveness |
+| Primitive agreement rate: how often all primitives agree on the top token | Track consensus convergence |
+
+#### D.6.6 Validation Gate (Must Pass Before Phase 5)
+
+1. `FieldIntegratedSoftmax` produces valid probability distributions (sum to 1, non-negative)
+2. `TwoStageGenerator` produces coherent text on WikiText-103 prompts
+3. Re-ranking improves at least one of: hallucination rate, sense disambiguation accuracy, or Bliss coherence score
+4. Training with `L_LM(Z*(w))` converges without divergence or mode collapse
+5. End-to-end gradient flow is verified (each primitive's parameters receive non-zero gradients)
+6. Inference latency with top-128 shortlist is < 2x standard generation time
+
+---
+
+### D.7 Phase 5 — Training Curriculum, Validation, and Ablation
+
+**Objective**: Implement the staged curriculum that introduces primitive losses gradually, run full ablation experiments, and establish the validation framework that proves the architecture works.
+
+**Rationale**: Naive joint training with all losses from step 0 risks destabilizing the language backbone. The curriculum ensures each component is learned in the right order (Section 6.7).
+
+#### D.7.1 Curriculum Stages
+
+| Stage | Name | Loss Configuration | λ Schedule | Duration |
+|---|---|---|---|---|
+| **A** | Backbone Stabilization | `L_LM` dominant; `L_ont` at 1% weight; all other λ = 0 | `λ_ont` = 0.01, all others = 0 | 30% of total training |
+| **B** | Ontology Formation | Increase `λ_ont` to target; begin weak primitive losses | `λ_ont` ramps to 0.1; `λ_jepa`, `λ_csr` = 0.01 | 20% of total training |
+| **C** | Primitive Specialization | All primitive losses active; Kosha routing begins | All `λ_f` ramp to target values; `λ_kosha` = 0.05 | 25% of total training |
+| **D** | Integrated Generation | Switch `L_LM` to integrated softmax; full governance | `use_field_integrated_softmax` = True; all λ at target | 25% of total training |
+
+Stage transitions are gated by perplexity stability (PPL variance < threshold over last N steps).
+
+#### D.7.2 Modules to Build
+
+| Module | File | Purpose |
+|---|---|---|
+| `CurriculumStageManager` | `conscious_generation/curriculum/stages.py` | Defines Stage A→D transitions with PPL-gated progression. Integrates with existing `TrainingCurriculumOrchestrator` (JEPA curriculum). |
+| `PrimitiveLambdaScheduler` | `conscious_generation/curriculum/weight_scheduler.py` | Controls `λ_f` ramp schedules per stage. Supports linear ramp, cosine ramp, and step transitions. Uses Appendix B's three-tier governance (safety bounds, scenario defaults, curriculum progression). |
+| `PrimitiveAblationRunner` | `conscious_generation/diagnostics/primitive_ablation.py` | Runs experiments removing one primitive at a time (Section 9.3). Measures: perplexity, hallucination rate, sense disambiguation accuracy, Bliss coherence, generation quality. |
+| `OntologyVisualizer` | `conscious_generation/diagnostics/ontology_visualization.py` | Projects 32D manifold to 2D (t-SNE/UMAP). Visualizes semantic clusters, sense separation (table-furniture vs table-database), and category structure. |
+| `GovernanceDiagnostics` | `conscious_generation/diagnostics/governance_diagnostics.py` | Tracks: Kosha routing entropy over training, Bliss coherence vs accuracy correlation, primitive contribution analysis (which primitive most influences correct predictions). |
+
+#### D.7.3 Ablation Experiments (Section 9.3 Implementation)
+
+Each experiment trains the full model with one primitive disabled:
+
+| Experiment | Configuration | Expected Impact |
+|---|---|---|
+| No JEPA | `λ_jepa = 0`, `S_jepa = 0` | Increased hallucination, reduced world grounding |
+| No CSR | `λ_csr = 0`, `S_csr = 0` | Reduced tonal consistency, weaker resonance |
+| No Vritti | `λ_vritti = 0`, `S_vritti = 0` | Cognitive mode confusion (mixing fact/imagination) |
+| No Guna | `λ_guna = 0`, `S_guna = 0` | Reduced relational harmony in word combinations |
+| No Kosha | Uniform `α_t = 1/6` | Equal weighting regardless of context — loss of adaptivity |
+| No Bliss | `B(w) = 1` for all w | No coherence gating — tokens can win on single-field spikes |
+| Standard baseline | All primitives off, standard softmax | Pure transformer — the control |
+
+#### D.7.4 Benchmark Targets
+
+| Metric | Standard Transformer | Target with Conscious Generation |
+|---|---|---|
+| WikiText-103 Perplexity | Baseline | ≤ Baseline (must not degrade) |
+| TruthfulQA accuracy | Baseline | ≥ Baseline + 5% (JEPA/ontology grounding) |
+| Sense disambiguation (WSD) | Baseline | ≥ Baseline + 10% (ontological scoring) |
+| Coherence score (Bliss metric) | N/A | B > 0.7 mean across generated text |
+| Generation latency (top-128) | 1.0x | ≤ 1.5x |
+
+#### D.7.5 Final Validation Gate
+
+1. All ablation experiments show measurable degradation when primitives are removed (proving each contributes)
+2. Full model matches or exceeds standard transformer perplexity
+3. At least one semantic quality metric (TruthfulQA, WSD, or hallucination rate) shows statistically significant improvement
+4. Curriculum staging produces stable training curves without sudden loss spikes
+5. Kosha routing shows context-appropriate behavior across diverse text domains
+6. Bliss coherence positively correlates with generation quality
+
+---
+
+### D.8 Phase Dependencies and Critical Path
+
+```
+Phase 1: Token Ontology Foundation
+    │
+    ├── TokenOntologyProjector
+    ├── TokenPrimitiveCache (O_tok)
+    ├── OntologyCompatibilityScorer
+    └── OntologicalStructureLoss
+         │
+         ▼
+Phase 2: Primitive Scoring Heads
+    │
+    ├── BaseScorer (no new params)
+    ├── JEPATokenScorer ← depends on existing JEPA predictor
+    ├── CSRTokenScorer ← depends on existing CSR pipeline
+    ├── VrittiTokenScorer ← depends on Vritti state dims
+    ├── GunaTokenScorer ← depends on Guna state dims
+    └── TokenEvaluationTensor ← depends on TokenPrimitiveCache
+         │
+         ▼
+Phase 3: Governance Integration
+    │
+    ├── KoshaPrimitiveRouter ← depends on all primitive scores
+    ├── BlissTokenGate ← depends on all primitive scores + Kosha weights
+    ├── IntegratedTokenScorer ← depends on BlissTokenGate + KoshaPrimitiveRouter
+    └── Per-primitive auxiliary losses
+         │
+         ▼
+Phase 4: Field-Integrated Generation
+    │
+    ├── FieldIntegratedSoftmax ← depends on IntegratedTokenScorer
+    └── TwoStageGenerator ← depends on everything above
+         │
+         ▼
+Phase 5: Curriculum + Validation
+    │
+    ├── CurriculumStageManager ← orchestrates Phases 1-4 during training
+    ├── PrimitiveLambdaScheduler
+    ├── Ablation experiments
+    └── Benchmark evaluation
+```
+
+### D.9 Existing Module Preservation Contract
+
+Throughout all phases, the following modules must remain functionally identical:
+
+| Module | Guarantee |
+|---|---|
+| `HybridPhaseTransformer` | All attention layers, phase rotation, local/global mixing unchanged |
+| `IntentPhaseProjector` | Bhava → θ pathway unchanged |
+| `SovereignStateProjector` | Context-side `h_t → o_t` unchanged; token-side added as new parallel pathway |
+| `KoshaGyroscopicLoss` | Retained as regularizer alongside new routing |
+| `VrittiResonanceLoss` | Retained as context-level coupling loss |
+| `BlissCoherenceFunctional` (global) | Retained as training diagnostic |
+| CSR injection at Layer 7 | Retained as hidden-state enrichment |
+| JEPA weak prior injection | Retained as hidden-state enrichment |
+| Standard `generate()` | Available via `use_field_integrated_softmax=False` toggle |
+
+All conscious generation modules are strictly additive — no existing behavior is removed or altered.
+
+### D.10 Summary
+
+The build strategy follows five sequential phases:
+
+1. **Phase 1 — Token Ontology Foundation**: Create token-side 32D projections and the primitive cache. This is the foundational data structure everything else depends on.
+2. **Phase 2 — Primitive Scoring Heads**: Build the 6 token-level scorers (base, ontology, JEPA, CSR, Vritti, Guna) that produce the Token Evaluation Tensor.
+3. **Phase 3 — Governance Integration**: Build Kosha routing and Bliss gating to produce weighted, coherence-checked integrated scores.
+4. **Phase 4 — Field-Integrated Generation**: Replace standard softmax with the two-stage semantic consensus generation pipeline.
+5. **Phase 5 — Curriculum + Validation**: Implement staged training, ablation experiments, and benchmarks to prove the architecture works.
+
+Each phase has explicit validation gates that must pass before the next phase begins. All modules live under `symbolu/training/conscious_generation/` and are activated via the `enable_conscious_generation` flag in `UnifiedTrainingConfig`. Existing modules are preserved without modification — the conscious generation system is purely additive to the current `ontological_hybrid` architecture.
