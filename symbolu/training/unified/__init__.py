@@ -178,6 +178,12 @@ from symbolu.training.unified.model_factory import (
     PerLayerPhaseController,
 )
 
+# Mistral CG wrapper (optional — requires transformers)
+try:
+    from symbolu.training.unified.mistral_wrapper import MistralCGWrapper
+except ImportError:
+    pass
+
 __all__ = [
     # utilities
     "_SimpleByteTokenizer",
