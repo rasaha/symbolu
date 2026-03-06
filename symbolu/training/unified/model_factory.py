@@ -55,6 +55,14 @@ try:
     from symbolu.training.conscious_generation.losses.ontological_structure import (
         OntologicalStructureLoss,
     )
+    from symbolu.training.conscious_generation.primitives import (
+        BaseScorer,
+        JEPATokenScorer,
+        CSRTokenScorer,
+        VrittiTokenScorer,
+        GunaTokenScorer,
+        TokenEvaluationTensor,
+    )
     CONSCIOUS_GENERATION_AVAILABLE = True
 except ImportError:
     CONSCIOUS_GENERATION_AVAILABLE = False
@@ -456,11 +464,74 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             temperature=config.ontology_loss_temperature,
         ) if config.lambda_ont > 0 else None
 
+        # Phase 2: Primitive Scoring Heads
+        base_scorer = BaseScorer()
+
+        jepa_scorer = JEPATokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            jepa_dim=config.jepa_token_dim,
+            use_low_rank=config.use_low_rank_primitives,
+            rank=config.primitive_rank,
+        )
+
+        csr_scorer = CSRTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            csr_dim=config.csr_token_dim,
+            use_low_rank=config.use_low_rank_primitives,
+            rank=config.primitive_rank,
+        )
+
+        vritti_scorer = VrittiTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        guna_scorer = GunaTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        token_eval_tensor = TokenEvaluationTensor(
+            base_scorer=base_scorer,
+            ontology_scorer=ontology_scorer,
+            jepa_scorer=jepa_scorer,
+            csr_scorer=csr_scorer,
+            vritti_scorer=vritti_scorer,
+            guna_scorer=guna_scorer,
+            shortlist_k=config.primitive_shortlist_k,
+        )
+
+        # Register Phase 2 scorers with cache for refresh
+        token_cache_with_phase2 = TokenPrimitiveCache(
+            projector=token_projector,
+            vocab_size=config.vocab_size,
+            state_dim=config.token_ontology_dim,
+            refresh_interval=config.ontology_cache_refresh_interval,
+            jepa_dim=config.jepa_token_dim,
+            csr_dim=config.csr_token_dim,
+        )
+        token_cache_with_phase2.set_scorers(
+            jepa_scorer=jepa_scorer,
+            csr_scorer=csr_scorer,
+            vritti_scorer=vritti_scorer,
+            guna_scorer=guna_scorer,
+        )
+        # Replace Phase 1 cache with extended version
+        token_cache = token_cache_with_phase2
+
         conscious_gen_modules = {
             "token_projector": token_projector,
             "token_cache": token_cache,
             "ontology_scorer": ontology_scorer,
             "ontology_loss": ontology_loss,
+            "base_scorer": base_scorer,
+            "jepa_scorer": jepa_scorer,
+            "csr_scorer": csr_scorer,
+            "vritti_scorer": vritti_scorer,
+            "guna_scorer": guna_scorer,
+            "token_eval_tensor": token_eval_tensor,
         }
 
         # Attach to model as a ModuleDict so parameters are tracked
@@ -468,6 +539,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             "token_projector": token_projector,
             "token_cache": token_cache,
             "ontology_scorer": ontology_scorer,
+            "base_scorer": base_scorer,
+            "jepa_scorer": jepa_scorer,
+            "csr_scorer": csr_scorer,
+            "vritti_scorer": vritti_scorer,
+            "guna_scorer": guna_scorer,
+            "token_eval_tensor": token_eval_tensor,
         })
         if ontology_loss is not None:
             model.conscious_gen["ontology_loss"] = ontology_loss
@@ -480,6 +557,13 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    OntologicalStructureLoss: type={config.ontology_loss_type}, lambda={config.lambda_ont}, tau={config.ontology_loss_temperature}")
         else:
             print(f"    OntologicalStructureLoss: DISABLED (lambda_ont=0)")
+
+        print(f"  [Conscious Gen Phase 2] Primitive Scoring Heads")
+        print(f"    JEPATokenScorer: d_j={config.jepa_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        print(f"    CSRTokenScorer: d_c={config.csr_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        print(f"    VrittiTokenScorer: 5 classes (dot-product)")
+        print(f"    GunaTokenScorer: 3 classes (bilinear G)")
+        print(f"    TokenEvaluationTensor: K={config.primitive_shortlist_k}, 6 primitives")
 
     return model.to(device)
 

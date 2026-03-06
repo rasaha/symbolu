@@ -8090,6 +8090,20 @@ def main():
     parser.add_argument("--ontology_scorer_rank", type=int, default=8,
                        help="Rank for low-rank bilinear factorization")
 
+    # Conscious Generation Phase 2: Primitive Scoring Heads
+    parser.add_argument("--jepa_token_dim", type=int, default=16,
+                       help="JEPA token representation dimension (d_j)")
+    parser.add_argument("--csr_token_dim", type=int, default=16,
+                       help="CSR token representation dimension (d_c)")
+    parser.add_argument("--primitive_shortlist_k", type=int, default=128,
+                       help="Top-K base logits for primitive evaluation")
+    parser.add_argument("--use_low_rank_primitives", action="store_true", default=True,
+                       help="Use low-rank factorization for primitive bilinear forms")
+    parser.add_argument("--primitive_rank", type=int, default=8,
+                       help="Rank for primitive low-rank factorization")
+    parser.add_argument("--use_shared_token_basis", action="store_true", default=False,
+                       help="Share intermediate projection across primitives")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -8740,6 +8754,13 @@ def main():
         ontology_loss_temperature=args.ontology_loss_temperature,
         ontology_scorer_use_low_rank=args.ontology_scorer_use_low_rank,
         ontology_scorer_rank=args.ontology_scorer_rank,
+        # Conscious Generation (Phase 2)
+        jepa_token_dim=args.jepa_token_dim,
+        csr_token_dim=args.csr_token_dim,
+        primitive_shortlist_k=args.primitive_shortlist_k,
+        use_low_rank_primitives=args.use_low_rank_primitives,
+        primitive_rank=args.primitive_rank,
+        use_shared_token_basis=args.use_shared_token_basis,
     )
 
     # ==========================================================================

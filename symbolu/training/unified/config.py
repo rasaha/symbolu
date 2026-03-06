@@ -931,6 +931,14 @@ class UnifiedTrainingConfig:
     ontology_scorer_use_low_rank: bool = True      # Low-rank M_ont = A B^T (saves params)
     ontology_scorer_rank: int = 8                  # Rank for low-rank factorization
 
+    # Phase 2: Primitive Scoring Heads
+    jepa_token_dim: int = 16                       # d_j for JEPA token representations
+    csr_token_dim: int = 16                        # d_c for CSR token representations
+    primitive_shortlist_k: int = 128               # Top-K base logits for primitive evaluation
+    use_low_rank_primitives: bool = True           # Low-rank M_f = A_f B_f^T (reduces params)
+    primitive_rank: int = 8                        # Rank for low-rank factorization
+    use_shared_token_basis: bool = False           # Share intermediate projection across primitives
+
 
 # Model size presets
 MODEL_PRESETS = {
