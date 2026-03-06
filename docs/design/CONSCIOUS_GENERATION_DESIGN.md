@@ -3312,3 +3312,227 @@ Current language model architectures improve generation primarily through:
 The proposed architecture instead modifies how token probability itself is computed.
 
 By integrating ontology, physical grounding, mental resonance, cognitive modes, energetic compatibility, and coherence governance, the system transforms token selection into a multi-layer semantic decision.
+
+---
+
+## Step 11 — Limitations and Open Research Questions
+
+A strong architecture document must clearly acknowledge current limitations and identify open research directions. The proposed system introduces multiple semantic primitives and governance layers that enrich token generation, but these additions also raise theoretical, empirical, and engineering challenges. This section outlines the key limitations and the areas that require further investigation.
+
+### 11.1 Ontological Manifold Design
+
+#### Limitation
+
+The architecture assumes that semantic meaning can be organized within a structured ontological manifold. However, the optimal structure and dimensionality of this manifold are not yet fully established.
+
+Questions include:
+
+* How many conceptual ontology axes are required for language understanding?
+* What embedding dimensionality best represents those axes?
+* How stable is the ontology representation across domains?
+
+While the current design encodes 12 conceptual ontology axes within a 32-dimensional latent manifold, alternative dimensionalities (e.g., 48–64 dimensions) may provide improved capacity for representing complex semantic relationships.
+
+#### Research Questions
+
+* What ontology dimensionality minimizes semantic interference between primitives?
+* Can ontology axes be learned automatically rather than predefined?
+* How stable are ontology clusters across languages and domains?
+
+### 11.2 Primitive Interaction and Interference
+
+#### Limitation
+
+Multiple primitives influence token scoring simultaneously:
+
+* JEPA (physical plausibility)
+* CSR (mental resonance)
+* Vritti (cognitive mode)
+* Guna (relational energy)
+
+Although Bliss and Kosha attempt to coordinate these signals, conflicts between primitives may still occur.
+
+For example:
+
+| Primitive | Preference |
+|---|---|
+| JEPA | physically plausible token |
+| CSR | emotionally resonant token |
+| Vritti | cognition-mode consistent token |
+
+These preferences may not always align.
+
+#### Research Questions
+
+* What mechanisms best resolve primitive disagreement?
+* Should primitives interact multiplicatively, additively, or through learned attention?
+* Can the architecture learn dynamic primitive hierarchies?
+
+Understanding primitive interaction dynamics is critical to maintaining stable token generation.
+
+### 11.3 Training Signal Availability
+
+#### Limitation
+
+Some primitives require structured supervision signals.
+
+Examples:
+
+| Primitive | Training Signal |
+|---|---|
+| JEPA | physical world plausibility |
+| CSR | phonemic or emotional resonance |
+| Vritti | cognition-mode classification |
+| Guna | relational compatibility |
+
+Large-scale labeled datasets for these signals may be limited.
+
+#### Research Questions
+
+* Can primitives be trained using weak supervision or self-supervised objectives?
+* Can primitives emerge from unsupervised representation learning?
+* What forms of synthetic data or curriculum learning best train these signals?
+
+Developing scalable training signals remains a major challenge.
+
+### 11.4 Computational Complexity
+
+#### Limitation
+
+Evaluating multiple primitives for each candidate token increases computational complexity relative to standard transformers.
+
+Although optimizations such as candidate shortlisting and cached token primitive representations reduce this cost, additional overhead remains.
+
+Potential concerns include:
+
+* increased inference latency
+* larger memory footprint
+* additional model parameters
+
+#### Research Questions
+
+* What is the optimal number of primitives before diminishing returns occur?
+* Can primitive computations be fused with existing transformer operations?
+* Are some primitives redundant or compressible?
+
+Efficiency improvements will be important for production-scale systems.
+
+### 11.5 Interpretability of Semantic Primitives
+
+#### Limitation
+
+Although the primitives are conceptually interpretable, their learned representations may drift during training.
+
+For example:
+
+* CSR representations may not strictly correspond to phonemic resonance.
+* Guna distributions may not align perfectly with conceptual harmony or conflict.
+* Vritti classifications may blur between cognitive modes.
+
+#### Research Questions
+
+* How interpretable are primitive activations during inference?
+* Can diagnostic tools reliably visualize primitive behavior?
+* Can primitives maintain conceptual alignment during large-scale training?
+
+Maintaining interpretability is important for validating the architecture's theoretical foundations.
+
+### 11.6 Evaluation Metrics
+
+#### Limitation
+
+Many current language-model benchmarks focus on:
+
+* perplexity
+* knowledge recall
+* reasoning accuracy
+
+However, the architecture aims to improve additional qualities:
+
+* semantic coherence
+* grounding in physical reality
+* emotional resonance
+* cognitive mode alignment
+
+Existing benchmarks may not fully capture these properties.
+
+#### Research Questions
+
+* What evaluation metrics best measure semantic-field agreement?
+* Can new benchmarks quantify grounding, resonance, or cognitive mode?
+* How can hallucination reduction be reliably measured?
+
+Developing appropriate evaluation frameworks will be necessary to validate the architecture.
+
+### 11.7 Integration with Existing Architectures
+
+#### Limitation
+
+The design assumes that semantic primitives can be layered on top of transformer hidden states.
+
+However, deeper integration may ultimately produce better results.
+
+Examples include:
+
+* primitives influencing attention patterns
+* ontology shaping token embeddings
+* governance layers guiding internal reasoning paths
+
+#### Research Questions
+
+* Should primitives remain external evaluation heads or be integrated into attention layers?
+* Can ontology representations guide attention routing?
+* Would primitive-aware attention improve reasoning capability?
+
+Future work may explore tighter integration between primitives and the transformer backbone.
+
+### 11.8 Generalization Across Domains
+
+#### Limitation
+
+Language models operate across many domains:
+
+* scientific reasoning
+* emotional narratives
+* technical documentation
+* casual conversation
+
+The relative importance of primitives may vary dramatically across these domains.
+
+#### Research Questions
+
+* How should Kosha routing adapt to domain shifts?
+* Can domain-specific primitives be dynamically activated?
+* How robust is the ontology manifold across specialized vocabularies?
+
+Domain generalization remains an open challenge.
+
+### 11.9 Philosophical and Theoretical Questions
+
+The architecture introduces concepts inspired by philosophical frameworks such as:
+
+* layered cognition
+* energetic relations
+* semantic ontology
+
+While these ideas guide the design, their formal grounding in machine learning theory is still developing.
+
+#### Research Questions
+
+* Can semantic primitives be derived from information-theoretic principles?
+* Are there equivalent formulations in probabilistic graphical models?
+* Can multi-field agreement be framed as energy-based inference?
+
+Further theoretical work could strengthen the conceptual foundation of the architecture.
+
+### 11.10 Summary
+
+The architecture introduces a structured approach to language generation that integrates multiple semantic evaluation fields. However, several key challenges remain:
+
+* determining optimal ontology representation
+* managing interactions between primitives
+* developing scalable training signals
+* maintaining computational efficiency
+* designing appropriate evaluation metrics
+
+Addressing these open questions will be essential for validating and refining the architecture.
