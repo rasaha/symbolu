@@ -588,3 +588,303 @@ The proposed architecture transforms language generation into a structured evalu
 * token selection emerges from semantic agreement
 
 This modular structure allows the model to incorporate multiple dimensions of meaning while maintaining compatibility with transformer-based language modeling.
+
+---
+
+## Step 4 — Ontological Semantic Manifold (32D) and Primitive Capture During Training
+
+### 4.1 Purpose of the Ontological Manifold
+
+The architecture introduces a structured semantic manifold that represents meaning independently of raw token embeddings.
+
+While the transformer hidden state captures contextual statistical information, the ontological manifold captures structured semantic identity and cognitive attributes associated with tokens and concepts.
+
+This manifold serves as the semantic coordinate system through which the architectural primitives (JEPA, CSR, Vritti, Guna, Kosha, Bliss) interpret and evaluate token candidates.
+
+Formally, the ontology is represented as a vector:
+
+```
+O_t ∈ ℝ³²
+```
+
+where:
+
+* `O_t` represents the ontological state at generation step `t`.
+
+The ontological state is derived from the transformer hidden representation:
+
+```
+O_t = W_o · h_t
+```
+
+where `W_o` is a learned projection.
+
+### 4.2 Why 32 Dimensions
+
+The ontology must encode multiple aspects of meaning simultaneously:
+
+* semantic identity
+* relational structure
+* physical plausibility
+* cognitive mode
+* phonemic resonance
+* energetic compatibility
+* coherence signals
+
+A higher dimensional manifold allows these aspects to be represented without interference.
+
+32 dimensions provide sufficient capacity to encode:
+
+| Primitive                        | Dimensional Allocation (conceptual) |
+|----------------------------------|-------------------------------------|
+| Core semantic identity           | 8 dims                              |
+| Physical world relations (JEPA)  | 6 dims                              |
+| Mental resonance (CSR)           | 6 dims                              |
+| Cognitive modes (Vritti)         | 4 dims                              |
+| Energetic relations (Guna)       | 4 dims                              |
+| Layer routing (Kosha)            | 2 dims                              |
+| Coherence state (Bliss)          | 2 dims                              |
+
+These allocations are conceptual guides; during training the system learns how to distribute meaning across the space.
+
+### 4.3 Mapping Tokens into the Ontological Space
+
+Each candidate token `w` has an embedding:
+
+```
+e_w ∈ ℝ^d
+```
+
+The ontology projection maps tokens to semantic coordinates:
+
+```
+O(w) = W_o · e_w
+```
+
+This creates an ontological representation for each token.
+
+Example:
+
+| Token    | Ontological Character          |
+|----------|--------------------------------|
+| table    | physical object / support surface |
+| database | abstract structure             |
+| memory   | cognitive construct            |
+| dream    | imaginative state              |
+
+The ontology therefore captures semantic identity beyond token statistics.
+
+### 4.4 Capturing Architectural Primitives in the Ontology
+
+Each primitive reads specific semantic patterns from the ontological manifold.
+
+The ontology does not explicitly contain separate modules; rather, it encodes semantic signals that the primitives interpret.
+
+#### 4.4.1 JEPA (Physical Grounding)
+
+JEPA reads the dimensions associated with physical object relationships and causal interactions.
+
+From the ontological vector:
+
+```
+S_jepa(w) = f_j(O(w), context)
+```
+
+Example relationships learned during training:
+
+```
+table → supports objects
+chair → sits near table
+cup   → placed on surfaces
+```
+
+JEPA uses these learned relations to evaluate world plausibility.
+
+#### 4.4.2 CSR (Phonemic Mental Resonance)
+
+CSR uses the ontological representation together with phoneme-derived features to evaluate mental resonance.
+
+CSR score:
+
+```
+S_csr(w) = f_c(O(w), phoneme(w))
+```
+
+This captures:
+
+* tone
+* emotional resonance
+* phoneme semantic tendencies
+
+Example:
+
+```
+gentle sentence → calm phoneme tokens preferred
+```
+
+#### 4.4.3 Vritti (Cognitive Mode)
+
+Vritti interprets dimensions associated with types of cognition.
+
+```
+S_vritti(w) = f_v(O(w), context)
+```
+
+Example modes:
+
+| Mode             | Example                    |
+|------------------|----------------------------|
+| valid cognition  | factual description        |
+| imagination      | narrative / speculative    |
+| memory           | recollection               |
+| misperception    | incorrect assumption       |
+| dormancy         | latent knowledge           |
+
+The ontological space therefore captures cognitive semantic signals.
+
+#### 4.4.4 Guna (Energetic Compatibility)
+
+Guna reads the ontological representation to determine relational energy compatibility between tokens.
+
+```
+S_guna(w) = f_g(O(w), context)
+```
+
+Energy states:
+
+| Guna   | Interpretation              |
+|--------|-----------------------------|
+| Sattva | harmony / clarity           |
+| Rajas  | activity / change           |
+| Tamas  | conflict / obstruction      |
+
+Guna evaluates how a token influences the semantic energy of the sentence.
+
+#### 4.4.5 Kosha (Layer Routing)
+
+Kosha determines which primitives should dominate evaluation.
+
+Kosha reads global semantic signals:
+
+```
+α = f_k(O_t)
+```
+
+These weights determine the relative influence of each primitive during token scoring.
+
+Example:
+
+| Context                    | Dominant Layer   |
+|----------------------------|------------------|
+| physical narrative         | JEPA weighted    |
+| philosophical discussion   | Vritti weighted  |
+| emotional narrative        | CSR weighted     |
+
+#### 4.4.6 Bliss (Coherence)
+
+Bliss measures agreement among primitive scores.
+
+```
+B = f_b(S_ont, S_jepa, S_csr, S_vritti, S_guna)
+```
+
+When multiple primitives agree on a token candidate, Bliss increases.
+
+When primitives conflict, Bliss decreases.
+
+Bliss therefore acts as the global integration signal.
+
+### 4.5 Training the Ontological Space
+
+During training, the ontology is optimized jointly with the transformer.
+
+The training objective combines:
+
+**1. Language Modeling Loss**
+
+```
+L_LM
+```
+
+ensuring token prediction capability.
+
+**2. Primitive Alignment Loss**
+
+Each primitive learns to interpret ontological coordinates.
+
+```
+L_primitive
+```
+
+Examples:
+
+* JEPA grounding consistency
+* CSR resonance alignment
+* Vritti cognitive classification
+
+**3. Ontological Structure Loss**
+
+Encourages consistent semantic clustering in the manifold.
+
+```
+L_ont
+```
+
+Tokens representing similar semantic entities should occupy nearby coordinates.
+
+**4. Coherence Regularization**
+
+Encourages agreement across primitives.
+
+```
+L_coh
+```
+
+This stabilizes token evaluation.
+
+**Total training objective:**
+
+```
+L = L_LM + λ₁ L_primitive + λ₂ L_ont + λ₃ L_coh
+```
+
+### 4.6 Co-Evolution with Token Embeddings
+
+The ontological manifold and token embeddings are trained together.
+
+During training:
+
+* transformer representations evolve
+* ontology projection evolves
+* primitives learn to interpret ontology
+* token embeddings align with semantic structure
+
+This produces a shared representation space in which token meaning, cognitive modes, and physical grounding become internally consistent.
+
+### 4.7 Role During Inference
+
+At generation time:
+
+1. transformer produces hidden state
+2. hidden state maps to ontological coordinates
+3. primitives evaluate candidate tokens
+4. governance layers integrate scores
+5. final probability distribution selects the token
+
+Thus the ontology acts as the semantic backbone connecting transformer reasoning and primitive evaluation.
+
+### 4.8 Summary
+
+The 32-dimensional ontological manifold functions as the central semantic structure of the architecture.
+
+During training it learns to encode signals that represent:
+
+* semantic identity
+* physical plausibility
+* mental resonance
+* cognitive mode
+* energetic compatibility
+* layer routing
+* coherence
+
+These signals are interpreted by the architectural primitives and integrated to determine final token probability.
