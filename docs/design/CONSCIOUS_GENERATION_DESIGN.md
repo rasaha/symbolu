@@ -1051,6 +1051,22 @@ Interpretation: this score answers, "If this token is chosen, does it fit the ph
 
 CSR evaluates whether the token's phonemic-emotional signature matches the mental tone of the context.
 
+**Abstract form**
+
+```
+S_csr(w) = f_csr(r_t, r_w)
+```
+
+where:
+
+* `r_t` = CSR resonance state of the current context
+* `r_w` = CSR resonance signature of candidate token `w`
+* `f_csr` = compatibility or similarity function
+
+This abstraction admits multiple concrete implementations — cosine similarity, learned bilinear compatibility, or distance metrics — while preserving the conceptual role: CSR scores measure how well a candidate token's phonemic-mental resonance aligns with the resonance state already established by the context. This score becomes one of the primitive token evaluation signals that participates in the integrated scoring function.
+
+**Concrete implementations**
+
 Let the token's CSR representation be
 
 ```
@@ -1374,6 +1390,62 @@ P(w_t = w | x_{<t}) = exp(Z_t*(w)) / Σ_{u ∈ V} exp(Z_t*(u))
 So the end generation is no longer "the most statistically likely next word."
 
 It is "the token with the strongest integrated semantic agreement."
+
+### 5.13 Key Equations of the Architecture
+
+The entire generation mechanism rests on two core equations. These define how token generation works and without them the architecture would not be mathematically specified.
+
+**Equation 1 — CSR Scoring Abstraction**
+
+The CSR primitive evaluates mental and phonemic resonance of a candidate token relative to the current context:
+
+```
+S_csr(w) = f_csr(r_t, r_w)
+```
+
+where `r_t` is the context resonance state, `r_w` is the candidate token's resonance signature, and `f_csr` is a compatibility function (e.g., bilinear form, cosine similarity, or distance metric). This score represents one of the primitive evaluation signals. Each other primitive — ontology, JEPA, Vritti, Guna — follows the same abstract pattern: a context state, a token signature, and a compatibility function producing a scalar score `S_f(w)`.
+
+**Equation 2 — Integrated Candidate Token Scoring Function**
+
+This is the central generation equation of the architecture. It integrates all primitive scores into a single token evaluation.
+
+Step 1 — Kosha-weighted integration of primitive scores:
+
+```
+Z(w) = Σ_f α_f · S_f(w)
+```
+
+where `S_f(w)` is the primitive score for token `w`, `f ∈ {base, ontology, JEPA, CSR, Vritti, Guna}`, and `α_f` is the Kosha governance weight (context-dependent, summing to 1).
+
+Step 2 — Bliss coherence modulation:
+
+```
+Z*(w) = B(w) · Z(w)
+```
+
+where `B(w) = exp(-λ_B · D(w))` gates the score by cross-field agreement, penalizing tokens on which the primitives disagree.
+
+Step 3 — Token probability via softmax:
+
+```
+P(w_t = w | x_{<t}) = exp(Z*(w)) / Σ_{u ∈ V} exp(Z*(u))
+```
+
+This replaces the standard transformer logit equation. The generation pipeline flows as:
+
+```
+Primitive Scores (base, ontology, JEPA, CSR, Vritti, Guna)
+    ↓
+Kosha weighted integration
+    ↓
+Bliss coherence gate
+    ↓
+Final token score Z*(w)
+    ↓
+Softmax → P(w_t = w | x_{<t})
+```
+
+**Scope boundary note**: These equations define the LLM token generation layer. Patent-specific equations — including resonance modulation coefficients, entropy and domain gating, recursion update rules, symbolic candidate recursion formulas, and harm/time governance thresholds — belong to the Symbol-U reasoning engine and are not included in this design document.
 
 ---
 
