@@ -2217,6 +2217,46 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
         print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
 
+    # Conscious Generation Curriculum (Phase 5: Stage A→D with PPL-gated progression)
+    cg_stage_manager = None
+    cg_governance_diag = None
+    if config.enable_conscious_generation and config.enable_cg_curriculum:
+        try:
+            from symbolu.training.conscious_generation.curriculum.stages import CurriculumStageManager
+            from symbolu.training.conscious_generation.diagnostics.governance_diagnostics import GovernanceDiagnostics
+
+            _cg_stage_proportions = tuple(
+                float(x) for x in config.cg_curriculum_stage_proportions.split(",")
+            )
+            _cg_target_lambdas = {
+                "lambda_ont": config.lambda_ont,
+                "lambda_kosha_routing": config.lambda_kosha_routing,
+                "lambda_bliss_token": config.lambda_bliss_token,
+                "lambda_jepa_token": config.lambda_jepa_token,
+                "lambda_csr_token": config.lambda_csr_token,
+                "lambda_vritti_token": config.lambda_vritti_token,
+                "lambda_guna_token": config.lambda_guna_token,
+            }
+            cg_stage_manager = CurriculumStageManager(
+                target_lambdas=_cg_target_lambdas,
+                total_steps=config.max_steps,
+                stage_proportions=_cg_stage_proportions,
+                ppl_var_threshold=config.cg_curriculum_ppl_var_threshold,
+                stability_window=config.cg_curriculum_stability_window,
+                ramp_mode=config.cg_curriculum_ramp_mode,
+            )
+            print(f"\n  [Conscious Gen Phase 5] Staged Curriculum ENABLED")
+            print(f"    Stages: A(backbone) -> B(ontology) -> C(primitives) -> D(integrated)")
+            print(f"    Proportions: {_cg_stage_proportions}")
+            print(f"    Ramp mode: {config.cg_curriculum_ramp_mode}")
+            print(f"    PPL var threshold: {config.cg_curriculum_ppl_var_threshold}")
+
+            if config.enable_cg_diagnostics:
+                cg_governance_diag = GovernanceDiagnostics(window_size=100)
+                print(f"    Governance diagnostics: ENABLED")
+        except ImportError as e:
+            print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -4366,6 +4406,15 @@ def train(config: UnifiedTrainingConfig):
             # =====================================================================
             if config.enable_conscious_generation and hasattr(model, 'conscious_gen'):
                 try:
+                    # Phase 5: Apply curriculum lambda overrides for this step
+                    if cg_stage_manager is not None:
+                        _cg_lambdas = cg_stage_manager.step(global_step)
+                        for _lk, _lv in _cg_lambdas.items():
+                            if hasattr(config, _lk):
+                                setattr(config, _lk, _lv)
+                        # Dynamic Phase 4 toggle based on curriculum stage
+                        config.use_field_integrated_softmax = cg_stage_manager.use_field_integrated_softmax
+
                     # Get embedding weight (need non-detached for gradient flow through projector)
                     _cg_emb_weight = None
                     _cg_inner = getattr(model, 'hybrid', model)
@@ -4582,6 +4631,19 @@ def train(config: UnifiedTrainingConfig):
                                     metrics['cg_bliss_mean'] = _cg_B.mean().item()
                                     metrics['cg_disagree_mean'] = _cg_D.mean().item()
 
+                                # Phase 5: Update governance diagnostics tracker
+                                if cg_governance_diag is not None:
+                                    cg_governance_diag.update(
+                                        alpha=_cg_alpha,
+                                        B=_cg_B,
+                                        D=_cg_D,
+                                        T=_cg_T,
+                                        Z_star=_cg_integ_result.get('Z_star'),
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                        base_logits=logits.detach(),
+                                    )
+
                         # Log diagnostics periodically
                         if (global_step % config.log_every == 0 and global_step > 0 and
                             (accumulation_step + 1) % config.gradient_accumulation == 0):
@@ -4639,6 +4701,22 @@ def train(config: UnifiedTrainingConfig):
                                     _pk = f'cg_L_{_pn}'
                                     if _pk in metrics:
                                         writer.add_scalar(f'conscious_gen/L_{_pn}_token', metrics[_pk], global_step)
+
+                            # Phase 5: Log governance diagnostics summary
+                            if cg_governance_diag is not None:
+                                _cg_gov_summary = cg_governance_diag.get_summary()
+                                for _gk, _gv in _cg_gov_summary.items():
+                                    metrics[_gk] = _gv
+                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                    for _gk, _gv in _cg_gov_summary.items():
+                                        writer.add_scalar(f'conscious_gen/{_gk}', _gv, global_step)
+
+                            # Phase 5: Log curriculum stage info
+                            if cg_stage_manager is not None:
+                                _cg_stage_diag = cg_stage_manager.get_diagnostics()
+                                for _sk, _sv in _cg_stage_diag.items():
+                                    if isinstance(_sv, (int, float)):
+                                        metrics[_sk] = _sv
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -6106,6 +6184,14 @@ def train(config: UnifiedTrainingConfig):
                     if tb_writer is not None and not kosha_graduated:
                         tb_writer.add_scalar("gyro/mean_ppl", kosha_graduation_monitor.mean_ppl, global_step)
                         tb_writer.add_scalar("gyro/ppl_variance", kosha_graduation_monitor.variance, global_step)
+
+                # Conscious Generation Curriculum: PPL-gated stage transitions
+                if cg_stage_manager is not None:
+                    _cg_transition = cg_stage_manager.update(val_ppl, global_step)
+                    if _cg_transition:
+                        print(_cg_transition)
+                        print(f"  [CG Curriculum] Current lambdas: {cg_stage_manager.step(global_step)}")
+                        print(f"  [CG Curriculum] Field-integrated softmax: {cg_stage_manager.use_field_integrated_softmax}")
 
                 # Curriculum Controller Update - check for phase transitions
                 if curriculum_controller is not None:

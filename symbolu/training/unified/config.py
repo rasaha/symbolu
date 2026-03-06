@@ -955,6 +955,14 @@ class UnifiedTrainingConfig:
     use_agreement_energy: bool = False              # Enable pairwise agreement term A_t(w)
     agreement_energy_weight: float = 0.1            # β weight for agreement-energy synergy term
 
+    # Phase 5: Curriculum, Validation, and Ablation
+    enable_cg_curriculum: bool = False              # Enable staged curriculum (A→D) for conscious gen
+    cg_curriculum_ramp_mode: str = "cosine"         # Lambda ramp mode: linear, cosine, step
+    cg_curriculum_ppl_var_threshold: float = 0.5    # Max PPL variance for stage transition
+    cg_curriculum_stability_window: int = 5         # Eval steps for PPL stability check
+    cg_curriculum_stage_proportions: str = "0.30,0.20,0.25,0.25"  # Stage A,B,C,D proportions
+    enable_cg_diagnostics: bool = False             # Enable governance diagnostics tracking
+
 
 # Model size presets
 MODEL_PRESETS = {
