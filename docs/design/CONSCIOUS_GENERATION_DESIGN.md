@@ -2697,3 +2697,349 @@ Key principles:
 * use shared and low-rank projections where possible
 
 So although the conceptual model is richer than a standard transformer, the runtime cost can be kept within practical bounds.
+
+---
+
+## Step 9 — Diagnostics, Ablations, and Validation Plan
+
+### 9.1 Purpose of the Validation Framework
+
+The architecture introduces multiple semantic evaluation fields that influence token generation. To justify the design, the model must demonstrate that:
+
+1. Each primitive contributes measurable improvements to generation.
+2. The integrated system produces more coherent and grounded outputs than a standard transformer.
+3. The ontology manifold organizes semantic structure in a meaningful way.
+4. The governance layers (Kosha and Bliss) improve cross-field consistency.
+
+Therefore, this section defines diagnostic tools, ablation experiments, and evaluation benchmarks that validate the architecture.
+
+### 9.2 Baseline Models for Comparison
+
+The architecture should always be evaluated relative to clear baselines.
+
+#### Baseline A — Standard Transformer
+
+```
+context → hidden state → logits → softmax
+```
+
+This represents the conventional language model.
+
+#### Baseline B — Transformer + Ontology Only
+
+This variant adds the ontological manifold but removes semantic primitives.
+
+**Purpose:**
+Determine whether ontology alone improves semantic consistency.
+
+#### Baseline C — Transformer + Primitive Heads (No Governance)
+
+Here the primitives influence scoring but Kosha weighting and Bliss coherence are removed.
+
+**Purpose:**
+Measure whether governance layers add value beyond primitive scoring.
+
+#### Baseline D — Full Architecture
+
+The full system includes:
+
+* ontology
+* primitives
+* Kosha
+* Bliss
+* integrated token scoring
+
+This is the final system.
+
+### 9.3 Primitive Ablation Experiments
+
+Ablation tests remove one primitive at a time.
+
+For primitive *p*:
+
+$$S_p(w) \rightarrow 0$$
+
+or its weight α_p is forced to zero.
+
+**Test variants:**
+
+| Model Variant | Removed Component |
+|---|---|
+| –JEPA | remove physical grounding |
+| –CSR | remove mental resonance |
+| –Vritti | remove cognition classification |
+| –Guna | remove energetic compatibility |
+| –Kosha | equal weighting of primitives |
+| –Bliss | no coherence gating |
+
+Each ablation is evaluated on the same test tasks.
+
+This reveals:
+
+* whether each primitive contributes meaningful signal
+* whether primitives interact synergistically
+
+### 9.4 Ontology Diagnostics
+
+The ontology manifold should demonstrate meaningful semantic organization.
+
+Tests include:
+
+#### Semantic Clustering
+
+Tokens representing similar concepts should cluster in ontology space.
+
+Example clusters:
+
+* furniture
+* physical containers
+* emotions
+* abstract concepts
+
+**Metric:**
+
+* silhouette score
+* cluster purity
+
+#### Sense Separation
+
+Polysemous tokens should separate into distinct ontology regions depending on context.
+
+Example:
+
+| Word | Context | Ontology Cluster |
+|---|---|---|
+| table | furniture | physical-object cluster |
+| table | database | abstract-structure cluster |
+
+**Metric:**
+Contextual embedding separability.
+
+### 9.5 Primitive Behavior Diagnostics
+
+Each primitive should demonstrate interpretable behavior.
+
+#### JEPA Diagnostics
+
+Test whether the model prefers physically plausible continuations.
+
+**Example:**
+
+> He placed the cup on the ___
+
+**Candidates:**
+
+| Token | Plausibility |
+|---|---|
+| table | plausible |
+| shelf | plausible |
+| database | implausible |
+
+**Metric:**
+
+* accuracy on physical plausibility benchmarks
+* ranking accuracy
+
+#### CSR Diagnostics
+
+Test tone and resonance alignment.
+
+**Example:**
+
+> The calm evening breeze gently ___
+
+**Candidates:**
+
+| Token | Tone |
+|---|---|
+| whispered | aligned |
+| shattered | misaligned |
+
+**Metric:**
+
+* emotional tone consistency
+* resonance alignment score
+
+#### Vritti Diagnostics
+
+Test cognitive-mode classification.
+
+**Example tasks:**
+
+| Sentence | Mode |
+|---|---|
+| "The earth orbits the sun." | valid cognition |
+| "Perhaps dragons live beneath the sea." | imagination |
+| "I remember the first snowfall." | memory |
+
+**Metric:**
+
+* vritti classification accuracy
+* token-mode compatibility score
+
+#### Guna Diagnostics
+
+Test relational harmony.
+
+**Example:**
+
+> She spoke with calm and ___
+
+**Candidates:**
+
+| Token | Energetic Relation |
+|---|---|
+| clarity | sattva |
+| urgency | rajas |
+| confusion | tamas |
+
+**Metric:**
+
+* relational harmony ranking
+* compatibility accuracy
+
+### 9.6 Governance Diagnostics
+
+Governance layers should produce stable integration across primitives.
+
+#### Kosha Routing Diagnostics
+
+Test whether Kosha weights shift appropriately with context.
+
+**Example contexts:**
+
+| Context | Expected Dominant Primitive |
+|---|---|
+| physical scene | JEPA |
+| emotional narrative | CSR |
+| analytical reasoning | ontology + vritti |
+
+**Metric:**
+
+* routing entropy
+* context-alignment accuracy
+
+#### Bliss Coherence Diagnostics
+
+Bliss should penalize primitive disagreement.
+
+**Metric:**
+
+$$D(w) = \sum_f \alpha_f \left( S_f(w) - \mu(w) \right)^2$$
+
+Test cases where primitives conflict. The correct token should maximize coherence.
+
+**Measure:**
+
+* coherence score vs prediction accuracy
+* hallucination reduction
+
+### 9.7 Hallucination Reduction Tests
+
+One of the key goals of the architecture is reducing hallucination.
+
+**Evaluation tasks:**
+
+* factual QA benchmarks
+* grounded reasoning tasks
+* adversarial prompts
+
+**Metrics:**
+
+* hallucination rate
+* factual consistency score
+* contradiction detection
+
+### 9.8 Multi-Field Agreement Analysis
+
+To validate the architecture's central hypothesis, measure whether correct tokens produce higher agreement across primitives.
+
+**Define agreement metric:**
+
+$$A(w) = \sum_{f < g} S_f(w) \cdot S_g(w)$$
+
+**Compare:**
+
+* agreement of chosen tokens
+* agreement of rejected tokens
+
+**Hypothesis:**
+Correct tokens should show higher multi-field agreement.
+
+### 9.9 Token Ranking Analysis
+
+For each generation step:
+
+1. compute primitive scores
+2. compute integrated score
+3. observe token ranking shifts
+
+**Example:**
+
+| Token | Base Rank | Integrated Rank |
+|---|---|---|
+| table | 3 | 1 |
+| shelf | 2 | 2 |
+| database | 4 | 20 |
+
+Measure how semantic primitives reorder candidate tokens.
+
+### 9.10 Evaluation Benchmarks
+
+The model should be evaluated on diverse benchmarks.
+
+**Language benchmarks:**
+
+* perplexity
+* MMLU
+* BIG-bench
+
+**Grounding benchmarks:**
+
+* physical reasoning datasets
+* commonsense reasoning tasks
+
+**Semantic coherence benchmarks:**
+
+* narrative consistency tasks
+* contradiction detection
+
+**Emotion / tone benchmarks:**
+
+* sentiment alignment tasks
+* narrative tone consistency
+
+### 9.11 Human Evaluation
+
+Human evaluators should assess:
+
+| Criterion | Description |
+|---|---|
+| coherence | logical sentence flow |
+| grounding | realism of generated content |
+| tone consistency | emotional alignment |
+| semantic clarity | absence of conceptual confusion |
+
+Outputs from the architecture are compared to baseline models.
+
+### 9.12 Expected Outcomes
+
+If the architecture works as intended, experiments should show:
+
+1. lower hallucination rates
+2. improved semantic consistency
+3. better sense disambiguation
+4. improved contextual tone alignment
+5. improved physical plausibility
+6. stronger multi-field agreement on correct tokens
+
+### 9.13 Summary
+
+This validation framework ensures the architecture can be empirically tested.
+
+The experiments verify:
+
+* the ontology manifold organizes semantic meaning
+* each primitive contributes measurable improvements
+* governance layers improve coherence
+* integrated token scoring produces more grounded language generation
