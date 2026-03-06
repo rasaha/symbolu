@@ -94,40 +94,39 @@ class KoshaRoutingLoss(nn.Module):
 
         For each primitive f, check if its top-scoring candidate matches
         the ground truth. Primitives that are "correct" should get higher weight.
+        Only computes over positions where the target is in the shortlist.
         """
-        # Find which candidate index (if any) matches the target
+        # Find which positions have the target in the candidate list
         # target_ids: (...,) -> (..., 1) for comparison with candidate_ids (..., K)
         target_expanded = target_ids.unsqueeze(-1)
         target_in_candidates = (candidate_ids == target_expanded)  # (..., K)
+        has_target = target_in_candidates.any(dim=-1)  # (...)
 
-        if not target_in_candidates.any():
-            # Target not in shortlist — no agreement signal
+        if not has_target.any():
+            # No position has target in shortlist — no agreement signal
             return torch.tensor(0.0, device=alpha.device, dtype=alpha.dtype)
 
-        # For each primitive, get the score of the correct token
-        # T: (..., K, 6), target_in_candidates: (..., K)
-        # Get index of target in candidate list
-        target_mask = target_in_candidates.float()  # (..., K)
+        # Filter to only positions where target is in shortlist
+        alpha_valid = alpha[has_target]                    # (N, 6)
+        T_valid = T[has_target]                            # (N, K, 6)
+        mask_valid = target_in_candidates[has_target].float()  # (N, K)
 
-        # Score of correct token per primitive: (..., 6)
-        # Use mask to extract (handles case where target isn't in shortlist)
-        target_scores = (T * target_mask.unsqueeze(-1)).sum(dim=-2)  # (..., 6)
+        # Score of correct token per primitive: (N, 6)
+        target_scores = (T_valid * mask_valid.unsqueeze(-1)).sum(dim=-2)
 
-        # Per-primitive "accuracy": did this primitive rank the correct token highest?
-        # Get max score per primitive
-        max_scores = T.max(dim=-2).values  # (..., 6)
+        # Per-primitive max score: (N, 6)
+        max_scores = T_valid.max(dim=-2).values
 
         # Soft agreement: how close is the correct token's score to the max?
-        # score_ratio in [0, 1] where 1 = primitive's top token is correct
-        score_gap = max_scores - target_scores  # (..., 6)
-        soft_accuracy = torch.exp(-score_gap / self.agreement_temperature)  # (..., 6)
+        score_gap = max_scores - target_scores  # (N, 6)
+        soft_accuracy = torch.exp(-score_gap / self.agreement_temperature)
 
         # Target routing: primitives with higher accuracy should get more weight
         target_alpha = torch.softmax(soft_accuracy / self.agreement_temperature, dim=-1)
 
         # KL divergence: encourage alpha to match the agreement-derived target
         loss = F.kl_div(
-            (alpha + 1e-8).log(),
+            (alpha_valid + 1e-8).log(),
             target_alpha.detach(),
             reduction="batchmean",
             log_target=False,

@@ -88,16 +88,13 @@ class BlissCoherenceLoss(nn.Module):
 
         # Negative: Bliss of incorrect tokens (sample up to max_neg_samples)
         neg_mask = ~mask_flat  # (N, K)
-        B_neg = B_flat.masked_fill(~neg_mask, 0.0)
+        # Fill correct-token positions with -1 so they sort to the end
+        B_neg = B_flat.masked_fill(mask_flat, -1.0)
 
-        # Subsample negatives if needed
-        K = B_flat.shape[-1]
-        if K - 1 > self.max_neg_samples:
-            # Use top-scoring negatives (hardest negatives)
-            B_neg_sorted = B_neg.sort(dim=-1, descending=True).values
-            B_neg_sampled = B_neg_sorted[..., :self.max_neg_samples]
-        else:
-            B_neg_sampled = B_neg[neg_mask].reshape(B_flat.shape[0], -1)
+        # Sort descending and take top negatives (hardest negatives first)
+        B_neg_sorted = B_neg.sort(dim=-1, descending=True).values
+        n_neg = min(B_neg_sorted.shape[-1] - 1, self.max_neg_samples)
+        B_neg_sampled = B_neg_sorted[..., :n_neg]
 
         # Positive loss: -log(B(w_correct)) — encourage high Bliss for correct
         pos_loss = -torch.log(B_pos + 1e-8).mean()

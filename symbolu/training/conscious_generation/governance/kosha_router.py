@@ -70,9 +70,9 @@ class KoshaPrimitiveRouter(nn.Module):
 
         if init_mode == "base_dominant":
             # Bias the final layer to produce high α_base initially
-            # softmax([2, 0, 0, 0, 0, 0]) ≈ [0.72, 0.056, ...]
+            # softmax([3, 0, 0, 0, 0, 0]) ≈ [0.80, 0.04, ...]
             final_layer = self.router[-1]
-            final_layer.bias.data[0] = 2.0
+            final_layer.bias.data[0] = 3.0
 
     def forward(
         self,

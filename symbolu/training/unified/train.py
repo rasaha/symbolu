@@ -4414,22 +4414,28 @@ def train(config: UnifiedTrainingConfig):
 
                             if _cg_hidden is not None and _cg_sov_state is not None:
                                 # Build T_t via TokenEvaluationTensor
+                                # Detach logits (base LM logits shouldn't be perturbed
+                                # by aux losses), but keep hidden/o_ctx live so primitive
+                                # scorers receive gradients from PrimitiveAuxiliaryLosses.
                                 _cg_tet = model.conscious_gen['token_eval_tensor']
                                 _cg_tet_result = _cg_tet(
                                     logits=logits.detach() if logits is not None else None,
-                                    hidden=_cg_hidden.detach(),
-                                    o_ctx=_cg_sov_state.detach(),
+                                    hidden=_cg_hidden,
+                                    o_ctx=_cg_sov_state,
                                     cache=_cg_cache,
                                 )
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
+                                # Detach hidden/o_ctx here: Kosha router trains its own
+                                # MLP weights but shouldn't backprop into the transformer
+                                # backbone during Phase 3 (Phase 4 enables end-to-end).
                                 _cg_integ = model.conscious_gen['integrated_scorer']
                                 _cg_integ_result = _cg_integ(
                                     T=_cg_T,
-                                    hidden=_cg_hidden,
-                                    o_ctx=_cg_sov_state,
+                                    hidden=_cg_hidden.detach(),
+                                    o_ctx=_cg_sov_state.detach(),
                                     candidate_ids=_cg_cand_ids,
                                 )
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
