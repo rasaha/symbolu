@@ -8466,6 +8466,17 @@ def main():
     parser.add_argument("--enable_cg_diagnostics", action="store_true",
                        help="Enable governance diagnostics tracking")
 
+    # Conscious Generation Phase Test
+    parser.add_argument("--test_cg_phases", action="store_true",
+                       help="Run conscious generation phase tests instead of training. "
+                            "Smoke-tests Phases 1-5 with synthetic data.")
+    parser.add_argument("--test_cg_phases_list", type=int, nargs="*", default=None,
+                       help="Which CG phases to test (e.g., --test_cg_phases_list 1 2 3)")
+    parser.add_argument("--test_cg_phase5_only", action="store_true",
+                       help="Only test Phase 5 (curriculum) — no model needed")
+    parser.add_argument("--test_cg_no_loop", action="store_true",
+                       help="Skip integration training loop (unit tests only)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -8484,6 +8495,30 @@ def main():
     # Handle --use_amp convenience flag
     if args.use_amp:
         args.mixed_precision = "bf16"
+
+    # Handle CG phase test redirect
+    if args.test_cg_phases or args.test_cg_phase5_only:
+        print("=" * 70)
+        print("  CONSCIOUS GENERATION PHASE TEST MODE")
+        print("=" * 70)
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts", "test_cg_phases.py")
+        script_path = os.path.normpath(script_path)
+        cg_cmd = [sys.executable, script_path]
+        if args.test_cg_phase5_only:
+            cg_cmd.append("--phase5-only")
+        elif args.test_cg_phases_list:
+            cg_cmd.extend(["--phases"] + [str(p) for p in args.test_cg_phases_list])
+        cg_cmd.extend(["--steps", str(args.max_steps)])
+        cg_cmd.extend(["--eval-every", str(args.eval_every)])
+        cg_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.model_size == "tiny":
+            cg_cmd.append("--tiny")
+        if args.test_cg_no_loop:
+            cg_cmd.append("--no-loop")
+        print(f"\nRunning: {' '.join(cg_cmd)}\n")
+        result = subprocess.run(cg_cmd)
+        sys.exit(result.returncode)
 
     # Handle stress test redirect
     if args.stress_test:
