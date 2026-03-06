@@ -45,6 +45,20 @@ try:
 except ImportError:
     GEN2_AVAILABLE = False
 
+# Import Conscious Generation modules (optional)
+try:
+    from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
+    from symbolu.training.conscious_generation.token_cache import TokenPrimitiveCache
+    from symbolu.training.conscious_generation.primitives.ontology_scorer import (
+        OntologyCompatibilityScorer,
+    )
+    from symbolu.training.conscious_generation.losses.ontological_structure import (
+        OntologicalStructureLoss,
+    )
+    CONSCIOUS_GENERATION_AVAILABLE = True
+except ImportError:
+    CONSCIOUS_GENERATION_AVAILABLE = False
+
 
 def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Module:
     """Create model based on configuration."""
@@ -398,6 +412,74 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
 
         if config.checkpoint_offload_cpu:
             print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
+
+    # =========================================================================
+    # Conscious Generation: Phase 1 — Token-Side Ontological Foundation
+    # Instantiate TokenOntologyProjector, TokenPrimitiveCache, OntologyScorer,
+    # and OntologicalStructureLoss when enabled for ontological_hybrid.
+    # =========================================================================
+    conscious_gen_modules = None
+    if config.enable_conscious_generation:
+        if not CONSCIOUS_GENERATION_AVAILABLE:
+            raise ImportError(
+                "Conscious Generation modules not available. "
+                "Check symbolu/training/conscious_generation/ imports."
+            )
+        if config.model_type not in ("ontological_hybrid", "ontological_binding_cache"):
+            print(
+                f"  [Conscious Gen] WARNING: enable_conscious_generation=True but "
+                f"model_type={config.model_type}. Conscious generation is designed "
+                f"for ontological_hybrid. Proceeding anyway."
+            )
+
+        token_projector = TokenOntologyProjector(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        token_cache = TokenPrimitiveCache(
+            projector=token_projector,
+            vocab_size=config.vocab_size,
+            state_dim=config.token_ontology_dim,
+            refresh_interval=config.ontology_cache_refresh_interval,
+        )
+
+        ontology_scorer = OntologyCompatibilityScorer(
+            state_dim=config.token_ontology_dim,
+            use_low_rank=config.ontology_scorer_use_low_rank,
+            rank=config.ontology_scorer_rank,
+        )
+
+        ontology_loss = OntologicalStructureLoss(
+            state_dim=config.token_ontology_dim,
+            loss_type=config.ontology_loss_type,
+            temperature=config.ontology_loss_temperature,
+        ) if config.lambda_ont > 0 else None
+
+        conscious_gen_modules = {
+            "token_projector": token_projector,
+            "token_cache": token_cache,
+            "ontology_scorer": ontology_scorer,
+            "ontology_loss": ontology_loss,
+        }
+
+        # Attach to model as a ModuleDict so parameters are tracked
+        model.conscious_gen = nn.ModuleDict({
+            "token_projector": token_projector,
+            "token_cache": token_cache,
+            "ontology_scorer": ontology_scorer,
+        })
+        if ontology_loss is not None:
+            model.conscious_gen["ontology_loss"] = ontology_loss
+
+        print(f"\n  [Conscious Gen Phase 1] Token-Side Ontological Foundation")
+        print(f"    TokenOntologyProjector: {embed_dim}D -> {config.token_ontology_dim}D")
+        print(f"    TokenPrimitiveCache: V={config.vocab_size}, refresh every {config.ontology_cache_refresh_interval} steps")
+        print(f"    OntologyScorer: {'low-rank r=' + str(config.ontology_scorer_rank) if config.ontology_scorer_use_low_rank else 'full bilinear'}")
+        if config.lambda_ont > 0:
+            print(f"    OntologicalStructureLoss: type={config.ontology_loss_type}, lambda={config.lambda_ont}, tau={config.ontology_loss_temperature}")
+        else:
+            print(f"    OntologicalStructureLoss: DISABLED (lambda_ont=0)")
 
     return model.to(device)
 

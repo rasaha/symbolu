@@ -918,6 +918,19 @@ class UnifiedTrainingConfig:
     confidence_alpha_risk: float = 0.5            # Risk scaling coefficient
     confidence_vritti_kl_weight: float = 0.1      # Weight for Vritti KL aux loss
 
+    # ==========================================================================
+    # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # ==========================================================================
+    enable_conscious_generation: bool = False      # Master toggle for conscious generation modules
+    token_ontology_dim: int = 32                   # Must match SOVEREIGN_STATE_DIM
+    ontology_cache_refresh_interval: int = 100     # Steps between O_tok cache refresh
+    lambda_ont: float = 0.0                        # Ontological structure loss weight (0 = disabled)
+    ontology_loss_type: str = "contrastive"        # "contrastive" (InfoNCE) or "prototype"
+    ontology_loss_temperature: float = 0.1         # Temperature for contrastive loss
+    ontology_scorer_use_low_rank: bool = True      # Low-rank M_ont = A B^T (saves params)
+    ontology_scorer_rank: int = 8                  # Rank for low-rank factorization
+
 
 # Model size presets
 MODEL_PRESETS = {
