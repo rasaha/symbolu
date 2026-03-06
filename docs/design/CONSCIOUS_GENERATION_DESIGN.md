@@ -1892,3 +1892,332 @@ During training:
 * Bliss learns cross-field coherence
 
 These are not independent modules attached after training. They are co-trained components of one integrated generation architecture.
+
+---
+
+## Step 7 — Inference Flow and End-to-End Generation Walkthrough
+
+This section explains how a token is generated during inference using the full architecture. The goal is to show how the transformer, ontology, and primitives interact to produce the final token probability.
+
+Unlike a standard transformer where the next token is determined directly from logits, here token generation emerges from multi-field semantic agreement.
+
+### 7.1 Overview of the Inference Process
+
+At generation step `t`, the model performs the following operations:
+
+```
+Input tokens
+      ↓
+Transformer context state
+      ↓
+32D Ontological projection
+      ↓
+Primitive evaluation of candidate tokens (JEPA, CSR, Vritti, Guna)
+      ↓
+Kosha weighting
+      ↓
+Bliss coherence calculation
+      ↓
+Integrated token score
+      ↓
+Field-Integrated Softmax
+      ↓
+Next token selection
+```
+
+Each candidate token is therefore evaluated across multiple semantic dimensions before being selected.
+
+### 7.2 Step 1 — Context Encoding
+
+Given a token sequence:
+
+```
+x_1, x_2, ..., x_{t-1}
+```
+
+the transformer produces a contextual hidden state:
+
+```
+h_t = Transformer(x_{<t})
+```
+
+This state represents:
+
+* semantic context
+* syntactic structure
+* discourse progression
+
+At this stage the system behaves like a normal language model.
+
+### 7.3 Step 2 — Ontological Projection
+
+The hidden state is mapped into the 32-dimensional ontological manifold:
+
+```
+o_t = W_o h_t
+```
+
+This vector encodes the semantic state of the sentence in structured coordinates.
+
+Example signals encoded in ontology:
+
+* object vs concept
+* physical vs abstract entity
+* relational structure
+* action vs attribute
+* conceptual hierarchy
+
+This manifold allows primitives to interpret the meaning of the context.
+
+### 7.4 Step 3 — Candidate Token Set
+
+For vocabulary `V`, the model considers candidate tokens:
+
+```
+w ∈ V
+```
+
+For each candidate token we retrieve:
+
+* token embedding `e_w`
+* token ontology vector `o_w`
+
+```
+o_w = U_o e_w
+```
+
+Each token becomes a semantic hypothesis about how the sentence might continue.
+
+### 7.5 Step 4 — Primitive Evaluation
+
+Each primitive evaluates candidate tokens relative to the context.
+
+For token `w`, compute:
+
+**Base transformer continuation**
+
+```
+S_base(w)
+```
+
+**Ontological compatibility**
+
+```
+S_ont(w)
+```
+
+**Physical plausibility (JEPA)**
+
+```
+S_jepa(w)
+```
+
+**Mental resonance (CSR)**
+
+```
+S_csr(w)
+```
+
+**Cognitive mode compatibility (Vritti)**
+
+```
+S_vritti(w)
+```
+
+**Energetic compatibility (Guna)**
+
+```
+S_guna(w)
+```
+
+These scores together form the token evaluation vector:
+
+```
+S(w)
+```
+
+### 7.6 Step 5 — Kosha Layer Weighting
+
+Different contexts require different semantic priorities.
+
+Kosha determines which primitives should dominate.
+
+```
+α = softmax(W_k [h_t ; o_t])
+```
+
+Weights:
+
+```
+α = (α_base, α_ont, α_jepa, α_csr, α_vritti, α_guna)
+```
+
+Example contexts:
+
+| Context                | Dominant primitives   |
+|------------------------|-----------------------|
+| physical description   | JEPA + ontology       |
+| emotional narrative    | CSR                   |
+| analytical reasoning   | ontology + vritti     |
+
+This prevents all primitives from contributing equally in every situation.
+
+### 7.7 Step 6 — Bliss Coherence
+
+Bliss measures agreement among primitives.
+
+First compute weighted mean score:
+
+```
+μ(w) = Σ_f α_f S_f(w)
+```
+
+Then compute disagreement:
+
+```
+D(w) = Σ_f α_f (S_f(w) - μ(w))²
+```
+
+Bliss coherence factor:
+
+```
+B(w) = exp(-λ_B D(w))
+```
+
+Interpretation:
+
+| Condition              | Bliss |
+|------------------------|-------|
+| all primitives agree   | high  |
+| primitive conflict     | low   |
+
+Bliss penalizes tokens that are strong in only one dimension but inconsistent in others.
+
+### 7.8 Step 7 — Integrated Token Score
+
+The integrated token score combines primitive scores:
+
+```
+Z(w) = Σ_f α_f S_f(w)
+```
+
+Then Bliss modulates the score:
+
+```
+Z*(w) = B(w) · Z(w)
+```
+
+Thus a token must both:
+
+* score well individually
+* maintain semantic coherence across fields.
+
+### 7.9 Step 8 — Field-Integrated Softmax
+
+The final probability distribution becomes:
+
+```
+P(w_t = w | x_{<t}) = exp(Z*(w)) / Σ_{u ∈ V} exp(Z*(u))
+```
+
+This replaces the standard transformer softmax.
+
+The probability now depends on:
+
+* statistical continuation
+* ontological fit
+* physical plausibility
+* mental resonance
+* cognitive mode
+* energetic compatibility
+* multi-field agreement
+
+### 7.10 Example Walkthrough
+
+Sentence context:
+
+```
+He placed the cup on the ___
+```
+
+Candidate tokens:
+
+| Token    | Base   | Ont  | JEPA     | CSR     | Vritti   | Guna        |
+|----------|--------|------|----------|---------|----------|-------------|
+| table    | high   | high | high     | neutral | high     | harmonious  |
+| shelf    | medium | high | high     | neutral | high     | harmonious  |
+| database | medium | low  | very low | neutral | mismatch | conflict    |
+
+After Kosha weighting and Bliss integration:
+
+| Token    | Integrated score |
+|----------|------------------|
+| table    | highest          |
+| shelf    | second           |
+| database | near zero        |
+
+Softmax selects **table**.
+
+This decision arises because all semantic primitives converge on the same answer.
+
+### 7.11 Key Difference from Standard Transformers
+
+Standard transformer generation:
+
+```
+context → hidden state → logits → softmax → token
+```
+
+New architecture:
+
+```
+context
+  ↓
+hidden state
+  ↓
+ontology projection
+  ↓
+multi-primitive evaluation
+  ↓
+Kosha weighting
+  ↓
+Bliss coherence
+  ↓
+integrated token score
+  ↓
+softmax
+  ↓
+token
+```
+
+Token generation becomes a consensus process across semantic fields, rather than a purely statistical continuation.
+
+### 7.12 Conceptual Interpretation
+
+This architecture models language generation as the interaction of multiple semantic layers:
+
+| Layer    | Role                    |
+|----------|-------------------------|
+| ontology | semantic identity       |
+| JEPA     | physical reality        |
+| CSR      | mental resonance        |
+| Vritti   | cognition mode          |
+| Guna     | relational energy       |
+| Kosha    | contextual governance   |
+| Bliss    | coherence integration   |
+
+A token is selected when these layers agree that it is the correct continuation.
+
+### 7.13 Summary
+
+During inference:
+
+1. Transformer generates contextual representation.
+2. Context is projected into ontological space.
+3. Candidate tokens are evaluated by semantic primitives.
+4. Kosha determines primitive importance.
+5. Bliss measures cross-field agreement.
+6. Integrated scores define token probabilities.
+7. Softmax selects the next token.
+
+This transforms token generation into multi-layer semantic evaluation, producing more grounded and coherent language.
