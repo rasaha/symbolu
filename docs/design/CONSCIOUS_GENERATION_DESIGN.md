@@ -298,3 +298,293 @@ This shift enables:
 * coherent tone
 * cognitive-mode awareness
 * structured semantic reasoning
+
+---
+
+## Step 3 — Architecture and Architectural Primitives
+
+### 3.1 Architectural Overview
+
+The proposed system augments a transformer language model with a structured semantic evaluation framework composed of multiple governing fields. Rather than relying solely on contextual token associations, the architecture evaluates each candidate token against several semantic primitives that represent different aspects of meaning and cognition.
+
+The system contains three major layers:
+
+1. **Token Generation Layer** — the transformer that produces contextual semantic proposals.
+2. **Semantic Evaluation Layer** — multiple evaluators that interpret candidate tokens through different semantic dimensions.
+3. **Governance Layer** — mechanisms that weight, modulate, and integrate the evaluations to produce the final token probability.
+
+Conceptually:
+
+```
+Transformer Context State
+        │
+Candidate Tokens
+        │
+┌────────────── Semantic Evaluation Layer ──────────────┐
+│  Ontology  │  JEPA  │  CSR  │  Vritti  │
+└────────────────────────────────────────────────────────┘
+        │
+   Governance Layer   (Kosha → Guna → Bliss)
+        │
+Integrated Token Score
+        │
+Final Inference
+```
+
+This structure transforms token generation from a single logit prediction into a multi-field evaluation process.
+
+### 3.2 Transformer Context Generator
+
+The transformer remains the primary contextual reasoning engine.
+
+Its functions include:
+
+* processing input token sequences
+* producing contextual hidden states
+* generating candidate token likelihood proposals
+
+The transformer produces:
+
+```
+h_t
+```
+
+where:
+
+* `h_t` = contextual semantic state derived from previous tokens.
+
+From this state the system generates a candidate token set and semantic proposals.
+
+The transformer therefore provides the base semantic context, but does not alone determine final token probability.
+
+### 3.3 Token Candidate Space
+
+At generation step `t`, the system considers a set of candidate tokens:
+
+```
+W = {w_1, w_2, ..., w_V}
+```
+
+Each token candidate represents a possible continuation of the sentence.
+
+Unlike standard transformers, where the hidden state directly produces final logits, the proposed architecture sends each candidate token to the semantic evaluation layer.
+
+Each token is therefore treated as a hypothesis that must be evaluated across multiple semantic dimensions.
+
+### 3.4 12-Dimensional Ontological Space
+
+The 12-Dimensional Ontological Space represents the central semantic manifold of the architecture.
+
+It defines the fundamental structure of meaning independent of specific token sequences.
+
+Each token candidate is mapped to coordinates in this space:
+
+```
+O(w) ∈ ℝ¹²
+```
+
+The ontological space captures relationships such as:
+
+* object vs concept
+* action vs description
+* entity vs attribute
+* relational roles
+* semantic categories
+
+The ontology provides the core semantic identity of tokens.
+
+Example:
+
+| Token    | Ontological Type      |
+|----------|-----------------------|
+| table    | physical object       |
+| database | abstract system       |
+| memory   | cognitive construct   |
+
+The ontology ensures that tokens are evaluated according to what they fundamentally represent.
+
+### 3.5 JEPA — Physical and Causal Grounding
+
+The JEPA module evaluates the physical or causal plausibility of candidate tokens.
+
+JEPA asks:
+
+> If this token represents an entity or event, does it correspond to a plausible state of the world?
+
+Example:
+
+Sentence context:
+
+```
+He placed the cup on the ______
+```
+
+JEPA evaluates tokens:
+
+| Token    | Physical Plausibility |
+|----------|-----------------------|
+| table    | high                  |
+| shelf    | high                  |
+| database | low                   |
+| query    | very low              |
+
+JEPA therefore grounds token generation in world-consistent states.
+
+### 3.6 CSR — Phonemic and Mental Resonance
+
+CSR evaluates the mental and acoustic resonance of a token using phoneme structure.
+
+This system derives from the Sanskrit phoneme semantic model in which sounds carry intrinsic cognitive tendencies.
+
+CSR determines whether the token aligns with the mental tone and resonance of the sentence.
+
+Example:
+
+Sentence:
+
+```
+He gently placed the cup on the ______
+```
+
+CSR favors calm and neutral tokens.
+
+Tokens with disruptive or emotionally mismatched phonemes are down-weighted.
+
+CSR therefore provides mental coherence and tonal stability.
+
+### 3.7 Vritti — Cognitive Mode Classification
+
+Vritti represents the mode of cognition in which language is operating.
+
+Based on classical categories of mental modification, the system classifies tokens according to cognitive roles such as:
+
+| Vritti           | Meaning                             |
+|------------------|-------------------------------------|
+| Valid cognition  | factual description                 |
+| Imagination      | hypothetical or creative content    |
+| Misperception    | incorrect interpretation            |
+| Memory           | recall of past events               |
+| Dormancy         | suppressed or implicit knowledge    |
+
+Vritti ensures that token generation remains consistent with the cognitive mode of the sentence.
+
+Example:
+
+```
+I remember sitting at the old wooden ______
+```
+
+Memory mode favors tokens associated with recalled objects.
+
+### 3.8 Guna — Energetic Compatibility
+
+Guna represents the energetic relationship between tokens.
+
+Three primary energy states are considered:
+
+| Guna   | Meaning                          |
+|--------|----------------------------------|
+| Sattva | harmony and clarity              |
+| Rajas  | action and dynamism              |
+| Tamas  | obstruction or incompatibility   |
+
+Guna evaluates how a candidate token interacts with surrounding tokens.
+
+Example:
+
+Sentence:
+
+```
+He calmly arranged the room and placed the cup on the ______
+```
+
+Tokens such as *table* or *shelf* produce harmonious relationships, while disruptive tokens create energetic conflict.
+
+Guna therefore models relational harmony in language.
+
+### 3.9 Kosha — Layer Weighting Mechanism
+
+Kosha determines which semantic layer should dominate token evaluation.
+
+Language can arise from different levels:
+
+* physical description
+* mental narrative
+* intellectual reasoning
+* deeper conceptual abstraction
+
+Kosha dynamically assigns weights to the semantic evaluators.
+
+Example contexts:
+
+| Context                  | Dominant Layer    |
+|--------------------------|-------------------|
+| physical description     | JEPA emphasis     |
+| narrative storytelling   | CSR emphasis      |
+| analytical reasoning     | Vritti emphasis   |
+
+Kosha therefore acts as a routing mechanism for semantic influence.
+
+### 3.10 Bliss — Coherence Integration
+
+Bliss measures the degree of agreement across semantic fields.
+
+When multiple evaluators produce consistent scores for a token, coherence is high.
+
+When evaluators disagree strongly, coherence decreases.
+
+Example:
+
+Token **table**:
+
+| Field    | Score      |
+|----------|------------|
+| Ontology | high       |
+| JEPA     | high       |
+| CSR      | neutral    |
+| Vritti   | high       |
+| Guna     | harmonious |
+
+High agreement → high Bliss → token favored.
+
+Token **database**:
+
+| Field    | Score    |
+|----------|----------|
+| Ontology | abstract |
+| JEPA     | low      |
+| Vritti   | mismatch |
+| Guna     | conflict |
+
+Low agreement → low Bliss → token suppressed.
+
+Bliss therefore acts as the integration metric for the architecture.
+
+### 3.11 Integrated Token Evaluation
+
+For each candidate token `w`, the system computes evaluation scores from each primitive:
+
+```
+S_ont(w),  S_jepa(w),  S_csr(w),  S_vritti(w),  S_guna(w)
+```
+
+Kosha determines weighting:
+
+```
+α_i
+```
+
+Bliss measures cross-field coherence.
+
+The integrated token score is then computed before final probability normalization.
+
+### 3.12 Architectural Summary
+
+The proposed architecture transforms language generation into a structured evaluation process in which:
+
+* the transformer provides contextual proposals
+* semantic primitives evaluate token meaning
+* governance layers weight and integrate evaluations
+* token selection emerges from semantic agreement
+
+This modular structure allows the model to incorporate multiple dimensions of meaning while maintaining compatibility with transformer-based language modeling.
