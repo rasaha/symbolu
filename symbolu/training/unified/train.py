@@ -2493,6 +2493,7 @@ def train(config: UnifiedTrainingConfig):
 
     # V10.7.1: Track first iteration for diagnostic logging (works with resumed training)
     _first_iter_logged = False
+    _mem_baseline = 0.0  # V10.7.1: Memory baseline for first-iter diagnostics
 
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
