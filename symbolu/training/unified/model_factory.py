@@ -45,6 +45,52 @@ try:
 except ImportError:
     GEN2_AVAILABLE = False
 
+# Import Conscious Generation modules (optional)
+try:
+    from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
+    from symbolu.training.conscious_generation.token_cache import TokenPrimitiveCache
+    from symbolu.training.conscious_generation.primitives.ontology_scorer import (
+        OntologyCompatibilityScorer,
+    )
+    from symbolu.training.conscious_generation.losses.ontological_structure import (
+        OntologicalStructureLoss,
+    )
+    from symbolu.training.conscious_generation.primitives import (
+        BaseScorer,
+        JEPATokenScorer,
+        CSRTokenScorer,
+        VrittiTokenScorer,
+        GunaTokenScorer,
+        TokenEvaluationTensor,
+    )
+    from symbolu.training.conscious_generation.governance.kosha_router import (
+        KoshaPrimitiveRouter,
+    )
+    from symbolu.training.conscious_generation.governance.bliss_gate import (
+        BlissTokenGate,
+    )
+    from symbolu.training.conscious_generation.integration.token_scorer import (
+        IntegratedTokenScorer,
+    )
+    from symbolu.training.conscious_generation.losses.kosha_routing import (
+        KoshaRoutingLoss,
+    )
+    from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+        PrimitiveAuxiliaryLosses,
+    )
+    from symbolu.training.conscious_generation.losses.bliss_coherence import (
+        BlissCoherenceLoss,
+    )
+    from symbolu.training.conscious_generation.integration.field_softmax import (
+        FieldIntegratedSoftmax,
+    )
+    from symbolu.training.conscious_generation.integration.two_stage_generator import (
+        TwoStageGenerator,
+    )
+    CONSCIOUS_GENERATION_AVAILABLE = True
+except ImportError:
+    CONSCIOUS_GENERATION_AVAILABLE = False
+
 
 def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Module:
     """Create model based on configuration."""
@@ -398,6 +444,225 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
 
         if config.checkpoint_offload_cpu:
             print(f"  [Metabolic] CPU activation offloading requested (requires custom forward)")
+
+    # =========================================================================
+    # Conscious Generation: Phase 1 — Token-Side Ontological Foundation
+    # Instantiate TokenOntologyProjector, TokenPrimitiveCache, OntologyScorer,
+    # and OntologicalStructureLoss when enabled for ontological_hybrid.
+    # =========================================================================
+    conscious_gen_modules = None
+    if config.enable_conscious_generation:
+        if not CONSCIOUS_GENERATION_AVAILABLE:
+            raise ImportError(
+                "Conscious Generation modules not available. "
+                "Check symbolu/training/conscious_generation/ imports."
+            )
+        if config.model_type not in ("ontological_hybrid", "ontological_binding_cache"):
+            print(
+                f"  [Conscious Gen] WARNING: enable_conscious_generation=True but "
+                f"model_type={config.model_type}. Conscious generation is designed "
+                f"for ontological_hybrid. Proceeding anyway."
+            )
+
+        token_projector = TokenOntologyProjector(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        # Single cache with Phase 1 + Phase 2 buffer dimensions
+        token_cache = TokenPrimitiveCache(
+            projector=token_projector,
+            vocab_size=config.vocab_size,
+            state_dim=config.token_ontology_dim,
+            refresh_interval=config.ontology_cache_refresh_interval,
+            jepa_dim=config.jepa_token_dim,
+            csr_dim=config.csr_token_dim,
+        )
+
+        ontology_scorer = OntologyCompatibilityScorer(
+            state_dim=config.token_ontology_dim,
+            use_low_rank=config.ontology_scorer_use_low_rank,
+            rank=config.ontology_scorer_rank,
+        )
+
+        ontology_loss = OntologicalStructureLoss(
+            state_dim=config.token_ontology_dim,
+            loss_type=config.ontology_loss_type,
+            temperature=config.ontology_loss_temperature,
+        ) if config.lambda_ont > 0 else None
+
+        # Phase 2: Primitive Scoring Heads
+        base_scorer = BaseScorer()
+
+        jepa_scorer = JEPATokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            jepa_dim=config.jepa_token_dim,
+            use_low_rank=config.use_low_rank_primitives,
+            rank=config.primitive_rank,
+        )
+
+        csr_scorer = CSRTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            csr_dim=config.csr_token_dim,
+            use_low_rank=config.use_low_rank_primitives,
+            rank=config.primitive_rank,
+        )
+
+        vritti_scorer = VrittiTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        guna_scorer = GunaTokenScorer(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+        )
+
+        token_eval_tensor = TokenEvaluationTensor(
+            base_scorer=base_scorer,
+            ontology_scorer=ontology_scorer,
+            jepa_scorer=jepa_scorer,
+            csr_scorer=csr_scorer,
+            vritti_scorer=vritti_scorer,
+            guna_scorer=guna_scorer,
+            shortlist_k=config.primitive_shortlist_k,
+        )
+
+        # Register Phase 2 scorers with cache for refresh
+        token_cache.set_scorers(
+            jepa_scorer=jepa_scorer,
+            csr_scorer=csr_scorer,
+            vritti_scorer=vritti_scorer,
+            guna_scorer=guna_scorer,
+        )
+
+        conscious_gen_modules = {
+            "token_projector": token_projector,
+            "token_cache": token_cache,
+            "ontology_scorer": ontology_scorer,
+            "base_scorer": base_scorer,
+            "jepa_scorer": jepa_scorer,
+            "csr_scorer": csr_scorer,
+            "vritti_scorer": vritti_scorer,
+            "guna_scorer": guna_scorer,
+            "token_eval_tensor": token_eval_tensor,
+        }
+
+        # Attach to model as a ModuleDict so parameters are tracked
+        model.conscious_gen = nn.ModuleDict({
+            "token_projector": token_projector,
+            "token_cache": token_cache,
+            "ontology_scorer": ontology_scorer,
+            "base_scorer": base_scorer,
+            "jepa_scorer": jepa_scorer,
+            "csr_scorer": csr_scorer,
+            "vritti_scorer": vritti_scorer,
+            "guna_scorer": guna_scorer,
+            "token_eval_tensor": token_eval_tensor,
+        })
+        if ontology_loss is not None:
+            model.conscious_gen["ontology_loss"] = ontology_loss
+
+        print(f"\n  [Conscious Gen Phase 1] Token-Side Ontological Foundation")
+        print(f"    TokenOntologyProjector: {embed_dim}D -> {config.token_ontology_dim}D")
+        print(f"    TokenPrimitiveCache: V={config.vocab_size}, refresh every {config.ontology_cache_refresh_interval} steps")
+        print(f"    OntologyScorer: {'low-rank r=' + str(config.ontology_scorer_rank) if config.ontology_scorer_use_low_rank else 'full bilinear'}")
+        if config.lambda_ont > 0:
+            print(f"    OntologicalStructureLoss: type={config.ontology_loss_type}, lambda={config.lambda_ont}, tau={config.ontology_loss_temperature}")
+        else:
+            print(f"    OntologicalStructureLoss: DISABLED (lambda_ont=0)")
+
+        print(f"  [Conscious Gen Phase 2] Primitive Scoring Heads")
+        print(f"    JEPATokenScorer: d_j={config.jepa_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        print(f"    CSRTokenScorer: d_c={config.csr_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        print(f"    VrittiTokenScorer: 5 classes (dot-product)")
+        print(f"    GunaTokenScorer: 3 classes (bilinear G)")
+        print(f"    TokenEvaluationTensor: K={config.primitive_shortlist_k}, 6 primitives")
+
+        # Phase 3: Governance Integration
+        kosha_router = KoshaPrimitiveRouter(
+            embed_dim=embed_dim,
+            state_dim=config.token_ontology_dim,
+            init_mode=config.kosha_routing_init,
+        )
+
+        bliss_gate = BlissTokenGate(
+            lambda_B=config.bliss_lambda_B,
+        )
+
+        integrated_scorer = IntegratedTokenScorer(
+            kosha_router=kosha_router,
+            bliss_gate=bliss_gate,
+        )
+
+        model.conscious_gen["kosha_router"] = kosha_router
+        model.conscious_gen["bliss_gate"] = bliss_gate
+        model.conscious_gen["integrated_scorer"] = integrated_scorer
+
+        # Phase 3 losses: instantiate when lambda > 0 OR when curriculum is enabled
+        # (curriculum starts lambdas at 0 and ramps them up later)
+        _cg_curriculum = getattr(config, 'enable_cg_curriculum', False)
+        _any_prim_loss = (_cg_curriculum or config.lambda_jepa_token > 0
+                         or config.lambda_csr_token > 0
+                         or config.lambda_vritti_token > 0
+                         or config.lambda_guna_token > 0)
+        if _any_prim_loss:
+            prim_aux_losses = PrimitiveAuxiliaryLosses()
+            model.conscious_gen["primitive_aux_losses"] = prim_aux_losses
+
+        if _cg_curriculum or config.lambda_kosha_routing > 0:
+            kosha_routing_loss = KoshaRoutingLoss()
+            model.conscious_gen["kosha_routing_loss"] = kosha_routing_loss
+
+        if _cg_curriculum or config.lambda_bliss_token > 0:
+            bliss_coherence_loss = BlissCoherenceLoss()
+            model.conscious_gen["bliss_coherence_loss"] = bliss_coherence_loss
+
+        print(f"  [Conscious Gen Phase 3] Governance Integration")
+        print(f"    KoshaPrimitiveRouter: init={config.kosha_routing_init}")
+        print(f"    BlissTokenGate: lambda_B={config.bliss_lambda_B}")
+        _p3_losses = []
+        if config.lambda_kosha_routing > 0:
+            _p3_losses.append(f"L_kosha={config.lambda_kosha_routing}")
+        if config.lambda_bliss_token > 0:
+            _p3_losses.append(f"L_bliss={config.lambda_bliss_token}")
+        if config.lambda_jepa_token > 0:
+            _p3_losses.append(f"L_jepa={config.lambda_jepa_token}")
+        if config.lambda_csr_token > 0:
+            _p3_losses.append(f"L_csr={config.lambda_csr_token}")
+        if config.lambda_vritti_token > 0:
+            _p3_losses.append(f"L_vritti={config.lambda_vritti_token}")
+        if config.lambda_guna_token > 0:
+            _p3_losses.append(f"L_guna={config.lambda_guna_token}")
+        if _p3_losses:
+            print(f"    Losses: {', '.join(_p3_losses)}")
+        else:
+            print(f"    Losses: ALL DISABLED (all lambda=0)")
+
+        # Phase 4: Field-Integrated Generation
+        # Also create when curriculum is enabled (Stage D will activate it)
+        if config.use_field_integrated_softmax or _cg_curriculum:
+            field_softmax = FieldIntegratedSoftmax(
+                vocab_size=config.vocab_size,
+                temperature=config.field_softmax_temperature,
+                use_agreement_energy=config.use_agreement_energy,
+                agreement_energy_weight=config.agreement_energy_weight,
+            )
+            two_stage_gen = TwoStageGenerator(
+                token_eval_tensor=model.conscious_gen["token_eval_tensor"],
+                integrated_scorer=integrated_scorer,
+                field_softmax=field_softmax,
+                shortlist_k=config.primitive_shortlist_k,
+            )
+            model.conscious_gen["field_softmax"] = field_softmax
+            model.conscious_gen["two_stage_generator"] = two_stage_gen
+
+            print(f"  [Conscious Gen Phase 4] Field-Integrated Generation")
+            print(f"    FieldIntegratedSoftmax: τ={config.field_softmax_temperature}, "
+                  f"agreement_energy={config.use_agreement_energy}")
+            print(f"    TwoStageGenerator: K={config.primitive_shortlist_k}")
 
     return model.to(device)
 

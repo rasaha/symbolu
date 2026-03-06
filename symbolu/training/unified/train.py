@@ -2217,6 +2217,51 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n     ⚠️  Starting in FOUNDATION phase - pure LM training")
         print(f"     ⚠️  Auxiliary systems will engage automatically as PPL improves\n")
 
+    # Conscious Generation Curriculum (Phase 5: Stage A→D with PPL-gated progression)
+    cg_stage_manager = None
+    cg_governance_diag = None
+    if config.enable_conscious_generation and config.enable_cg_curriculum:
+        try:
+            from symbolu.training.conscious_generation.curriculum.stages import CurriculumStageManager
+            from symbolu.training.conscious_generation.diagnostics.governance_diagnostics import GovernanceDiagnostics
+
+            _cg_stage_proportions = tuple(
+                float(x) for x in config.cg_curriculum_stage_proportions.split(",")
+            )
+            if len(_cg_stage_proportions) != 4:
+                raise ValueError(
+                    f"cg_curriculum_stage_proportions must have 4 values (A,B,C,D), "
+                    f"got {len(_cg_stage_proportions)}: {_cg_stage_proportions}"
+                )
+            _cg_target_lambdas = {
+                "lambda_ont": config.lambda_ont,
+                "lambda_kosha_routing": config.lambda_kosha_routing,
+                "lambda_bliss_token": config.lambda_bliss_token,
+                "lambda_jepa_token": config.lambda_jepa_token,
+                "lambda_csr_token": config.lambda_csr_token,
+                "lambda_vritti_token": config.lambda_vritti_token,
+                "lambda_guna_token": config.lambda_guna_token,
+            }
+            cg_stage_manager = CurriculumStageManager(
+                target_lambdas=_cg_target_lambdas,
+                total_steps=config.max_steps,
+                stage_proportions=_cg_stage_proportions,
+                ppl_var_threshold=config.cg_curriculum_ppl_var_threshold,
+                stability_window=config.cg_curriculum_stability_window,
+                ramp_mode=config.cg_curriculum_ramp_mode,
+            )
+            print(f"\n  [Conscious Gen Phase 5] Staged Curriculum ENABLED")
+            print(f"    Stages: A(backbone) -> B(ontology) -> C(primitives) -> D(integrated)")
+            print(f"    Proportions: {_cg_stage_proportions}")
+            print(f"    Ramp mode: {config.cg_curriculum_ramp_mode}")
+            print(f"    PPL var threshold: {config.cg_curriculum_ppl_var_threshold}")
+
+            if config.enable_cg_diagnostics:
+                cg_governance_diag = GovernanceDiagnostics(window_size=100)
+                print(f"    Governance diagnostics: ENABLED")
+        except ImportError as e:
+            print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -2655,7 +2700,15 @@ def train(config: UnifiedTrainingConfig):
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
-                    outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
+                    # Phase 3/4 governance needs hidden states for primitive scoring + routing
+                    _need_hidden = (config.enable_conscious_generation
+                                    and hasattr(model, 'conscious_gen')
+                                    and 'integrated_scorer' in model.conscious_gen)
+                    if enable_decorr or _need_hidden:
+                        outputs = model(x, return_decorr_loss=enable_decorr,
+                                        return_last_hidden=_need_hidden)
+                    else:
+                        outputs = model(x)
 
                 if not tbptt_backward_done:
                     if isinstance(outputs, dict):
@@ -4351,6 +4404,329 @@ def train(config: UnifiedTrainingConfig):
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
                               f"wr_scale={_wr_scale:.1f}")
 
+            # =====================================================================
+            # CONSCIOUS GENERATION Phase 1+2: Token Ontology Cache + L_ont Loss
+            # Refreshes O_tok + Phase 2 buffers (P_tok, R_tok, V_tok, G_tok)
+            # periodically, computes ontological structure loss for 32D manifold.
+            # =====================================================================
+            if config.enable_conscious_generation and hasattr(model, 'conscious_gen'):
+                try:
+                    # Phase 5: Apply curriculum lambda overrides for this step
+                    if cg_stage_manager is not None:
+                        _cg_lambdas = cg_stage_manager.step(global_step)
+                        for _lk, _lv in _cg_lambdas.items():
+                            if hasattr(config, _lk):
+                                setattr(config, _lk, _lv)
+                        # Dynamic Phase 4 toggle based on curriculum stage
+                        config.use_field_integrated_softmax = cg_stage_manager.use_field_integrated_softmax
+
+                    # Get embedding weight (need non-detached for gradient flow through projector)
+                    _cg_emb_weight = None
+                    _cg_inner = getattr(model, 'hybrid', model)
+                    _cg_tok_emb = getattr(_cg_inner, 'token_embed', None)
+                    if _cg_tok_emb is None:
+                        _cg_tok_emb = getattr(_cg_inner, 'embed_tokens', None)
+                    if _cg_tok_emb is None:
+                        _cg_tok_emb = getattr(_cg_inner, 'wte', None)
+                    if _cg_tok_emb is not None and hasattr(_cg_tok_emb, 'weight'):
+                        _cg_emb_weight = _cg_tok_emb.weight
+
+                    if _cg_emb_weight is not None:
+                        # Refresh token primitive cache periodically
+                        _cg_cache = model.conscious_gen['token_cache']
+                        _cg_cache.maybe_refresh(_cg_emb_weight.detach(), global_step)
+
+                        # Compute L_ont: ontological structure loss
+                        if config.lambda_ont > 0 and 'ontology_loss' in model.conscious_gen:
+                            _cg_projector = model.conscious_gen['token_projector']
+                            _cg_loss_fn = model.conscious_gen['ontology_loss']
+
+                            # Project target tokens through the projector (with gradients)
+                            _cg_target_emb = _cg_tok_emb(y)
+                            _cg_target_codes = _cg_projector(_cg_target_emb)
+
+                            _cg_result = _cg_loss_fn(_cg_target_codes, y)
+                            _cg_ont_loss = _cg_result['loss']
+
+                            if torch.isfinite(_cg_ont_loss):
+                                loss = loss + config.lambda_ont * _cg_ont_loss
+                                metrics['cg_ont_loss'] = _cg_ont_loss.item()
+                                metrics['cg_ont_pos_sim'] = _cg_result['avg_pos_sim'].item()
+                                metrics['cg_ont_neg_sim'] = _cg_result['avg_neg_sim'].item()
+
+                        # =========================================================
+                        # Phase 3/4: Governance — Kosha routing, Bliss gating, losses
+                        # Phase 3: aux losses only (Z* computed but not used for LM)
+                        # Phase 4: Z* replaces base logits for L_LM (end-to-end)
+                        # Requires: logits, hidden states, sovereign state
+                        # =========================================================
+                        _cg_has_p3 = 'integrated_scorer' in model.conscious_gen
+                        _cg_any_p3_loss = (config.lambda_kosha_routing > 0
+                                          or config.lambda_bliss_token > 0
+                                          or config.lambda_jepa_token > 0
+                                          or config.lambda_csr_token > 0
+                                          or config.lambda_vritti_token > 0
+                                          or config.lambda_guna_token > 0)
+                        _cg_phase4 = config.use_field_integrated_softmax
+
+                        if _cg_has_p3 and (_cg_any_p3_loss or _cg_phase4) and logits is not None:
+                            # Extract hidden states and sovereign state from outputs
+                            _cg_hidden = None
+                            _cg_sov_state = None
+                            if isinstance(outputs, dict):
+                                _cg_hidden = outputs.get('last_hidden_state', None)
+                                _cg_sov_state = outputs.get('state', None)
+
+                            if _cg_hidden is not None and _cg_sov_state is not None:
+                                # Build T_t via TokenEvaluationTensor
+                                # Phase 3: Detach logits but keep hidden/o_ctx live
+                                #   (primitive scorers train via aux losses only).
+                                # Phase 4: Keep ALL inputs live for end-to-end gradients
+                                #   through Z* -> B -> α -> S_f -> h_t -> transformer.
+                                _cg_tet = model.conscious_gen['token_eval_tensor']
+                                if _cg_phase4:
+                                    # End-to-end: gradients flow through everything
+                                    _cg_tet_result = _cg_tet(
+                                        logits=logits,
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        cache=_cg_cache,
+                                    )
+                                else:
+                                    _cg_tet_result = _cg_tet(
+                                        logits=logits.detach(),
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        cache=_cg_cache,
+                                    )
+                                _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
+                                _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
+
+                                # Run IntegratedTokenScorer (Kosha + Bliss)
+                                # Phase 3: Detach hidden/o_ctx (router trains its MLP
+                                #   only, no backbone gradients from governance).
+                                # Phase 4: Keep live for end-to-end training.
+                                _cg_integ = model.conscious_gen['integrated_scorer']
+                                if _cg_phase4:
+                                    _cg_integ_result = _cg_integ(
+                                        T=_cg_T,
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                else:
+                                    _cg_integ_result = _cg_integ(
+                                        T=_cg_T,
+                                        hidden=_cg_hidden.detach(),
+                                        o_ctx=_cg_sov_state.detach(),
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
+                                _cg_B = _cg_integ_result['B']            # (B, T, K)
+                                _cg_D = _cg_integ_result['D']            # (B, T, K)
+
+                                # Phase 4: Replace L_LM with field-integrated cross-entropy
+                                # Strategy: subtract old LM CE, add field-integrated CE.
+                                # This preserves all aux losses accumulated between
+                                # compute_phase_loss() and this point (~40 loss terms).
+                                if _cg_phase4 and 'field_softmax' in model.conscious_gen:
+                                    _cg_Z_star = _cg_integ_result['Z_star']  # (B, T, K)
+                                    _cg_fs = model.conscious_gen['field_softmax']
+                                    _cg_fs_result = _cg_fs(
+                                        Z_star=_cg_Z_star,
+                                        candidate_ids=_cg_cand_ids,
+                                        T=_cg_T,
+                                        Z=_cg_integ_result.get('Z'),
+                                        B=_cg_B,
+                                    )
+                                    _cg_log_probs = _cg_fs_result['log_probs']  # (B, T, V)
+
+                                    # Mask positions where target is NOT in shortlist
+                                    # (log_prob = -inf → nll = inf). Only compute loss
+                                    # over positions where re-ranking is meaningful.
+                                    _cg_target_in_shortlist = (
+                                        _cg_cand_ids == y.unsqueeze(-1)
+                                    ).any(dim=-1)  # (B, T) bool
+                                    _cg_field_targets = y.clone()
+                                    _cg_field_targets[~_cg_target_in_shortlist] = -100
+
+                                    _cg_lm_loss = F.nll_loss(
+                                        _cg_log_probs.reshape(-1, _cg_log_probs.shape[-1]),
+                                        _cg_field_targets.reshape(-1),
+                                        ignore_index=-100,
+                                    )
+                                    if torch.isfinite(_cg_lm_loss):
+                                        # Recompute old LM CE (detached) to subtract it
+                                        with torch.no_grad():
+                                            _cg_V = logits.shape[-1]
+                                            _cg_old_lm = F.cross_entropy(
+                                                logits.reshape(-1, _cg_V),
+                                                y.reshape(-1),
+                                                ignore_index=-100,
+                                            )
+                                        # Swap: remove old LM loss, add field-integrated
+                                        loss = loss - _cg_old_lm + _cg_lm_loss
+                                        metrics['cg_field_lm_loss'] = _cg_lm_loss.item()
+                                        metrics['cg_phase4_active'] = 1.0
+                                        # Track shortlist coverage
+                                        _cg_coverage = _cg_target_in_shortlist.float().mean()
+                                        metrics['cg_shortlist_coverage'] = _cg_coverage.item()
+                                    else:
+                                        # Non-finite field loss — fall back to standard LM
+                                        metrics['cg_phase4_fallback'] = 1.0
+
+                                # Kosha routing loss
+                                if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:
+                                    _cg_kr_fn = model.conscious_gen['kosha_routing_loss']
+                                    _cg_kr_result = _cg_kr_fn(
+                                        alpha=_cg_alpha,
+                                        T=_cg_T,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    _cg_kr_loss = _cg_kr_result['loss']
+                                    if torch.isfinite(_cg_kr_loss):
+                                        loss = loss + config.lambda_kosha_routing * _cg_kr_loss
+                                        metrics['cg_kosha_routing_loss'] = _cg_kr_loss.item()
+
+                                # Bliss coherence loss
+                                if config.lambda_bliss_token > 0 and 'bliss_coherence_loss' in model.conscious_gen:
+                                    _cg_bl_fn = model.conscious_gen['bliss_coherence_loss']
+                                    _cg_bl_result = _cg_bl_fn(
+                                        B=_cg_B,
+                                        D=_cg_D,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    _cg_bl_loss = _cg_bl_result['loss']
+                                    if torch.isfinite(_cg_bl_loss):
+                                        loss = loss + config.lambda_bliss_token * _cg_bl_loss
+                                        metrics['cg_bliss_loss'] = _cg_bl_loss.item()
+                                        metrics['cg_bliss_pos'] = _cg_bl_result['pos_bliss'].item()
+                                        metrics['cg_bliss_neg'] = _cg_bl_result['neg_bliss'].item()
+
+                                # Primitive auxiliary losses
+                                _cg_prim_lambdas = {
+                                    'jepa': config.lambda_jepa_token,
+                                    'csr': config.lambda_csr_token,
+                                    'vritti': config.lambda_vritti_token,
+                                    'guna': config.lambda_guna_token,
+                                }
+                                if any(v > 0 for v in _cg_prim_lambdas.values()) and 'primitive_aux_losses' in model.conscious_gen:
+                                    _cg_pa_fn = model.conscious_gen['primitive_aux_losses']
+                                    _cg_pa_result = _cg_pa_fn(
+                                        T=_cg_T,
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                    for _prim_name, _prim_lam in _cg_prim_lambdas.items():
+                                        if _prim_lam > 0:
+                                            _prim_loss_key = f"L_{_prim_name}"
+                                            _prim_loss = _cg_pa_result.get(_prim_loss_key, None)
+                                            if _prim_loss is not None and torch.isfinite(_prim_loss):
+                                                loss = loss + _prim_lam * _prim_loss
+                                                metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
+
+                                # Log Kosha routing diagnostics
+                                if global_step % config.log_every == 0 and global_step > 0:
+                                    _cg_alpha_mean = _cg_alpha.mean(dim=(0, 1))
+                                    metrics['cg_alpha_entropy'] = -(
+                                        _cg_alpha * (_cg_alpha + 1e-8).log()
+                                    ).sum(dim=-1).mean().item()
+                                    metrics['cg_bliss_mean'] = _cg_B.mean().item()
+                                    metrics['cg_disagree_mean'] = _cg_D.mean().item()
+
+                                # Phase 5: Update governance diagnostics tracker
+                                if cg_governance_diag is not None:
+                                    cg_governance_diag.update(
+                                        alpha=_cg_alpha,
+                                        B=_cg_B,
+                                        D=_cg_D,
+                                        T=_cg_T,
+                                        Z_star=_cg_integ_result.get('Z_star'),
+                                        target_ids=y,
+                                        candidate_ids=_cg_cand_ids,
+                                        base_logits=logits.detach(),
+                                    )
+
+                        # Log diagnostics periodically
+                        if (global_step % config.log_every == 0 and global_step > 0 and
+                            (accumulation_step + 1) % config.gradient_accumulation == 0):
+                            _cg_diag = _cg_cache.get_diagnostics()
+                            if _cg_diag.get('initialized', False):
+                                _cg_msg = (f"  [Conscious Gen] Step {global_step} | "
+                                          f"O_tok refresh={_cg_diag['step']}")
+                                if 'cg_ont_loss' in metrics:
+                                    _cg_msg += (f" | L_ont={metrics['cg_ont_loss']:.4f}"
+                                               f" | pos_sim={metrics.get('cg_ont_pos_sim', 0):.3f}"
+                                               f" | neg_sim={metrics.get('cg_ont_neg_sim', 0):.3f}")
+                                # Phase 2 buffer norms
+                                _p2_norms = []
+                                for _buf_name in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                    _norm_key = f"{_buf_name}_mean_norm"
+                                    if _norm_key in _cg_diag and _cg_diag[_norm_key] > 0:
+                                        _p2_norms.append(f"{_buf_name}={_cg_diag[_norm_key]:.3f}")
+                                if _p2_norms:
+                                    _cg_msg += f" | norms: {', '.join(_p2_norms)}"
+                                # Phase 3 governance metrics
+                                if 'cg_alpha_entropy' in metrics:
+                                    _cg_msg += f" | α_H={metrics['cg_alpha_entropy']:.3f}"
+                                if 'cg_bliss_mean' in metrics:
+                                    _cg_msg += f" | B={metrics['cg_bliss_mean']:.3f}"
+                                # Phase 4 field-integrated generation
+                                if 'cg_field_lm_loss' in metrics:
+                                    _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                print(_cg_msg)
+
+                            # TensorBoard logging
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                if 'cg_ont_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_ont', metrics['cg_ont_loss'], global_step)
+                                    writer.add_scalar('conscious_gen/ont_pos_sim', metrics.get('cg_ont_pos_sim', 0), global_step)
+                                    writer.add_scalar('conscious_gen/ont_neg_sim', metrics.get('cg_ont_neg_sim', 0), global_step)
+                                writer.add_scalar('conscious_gen/O_tok_std', _cg_diag.get('O_tok_std', 0), global_step)
+                                writer.add_scalar('conscious_gen/bhava_entropy', _cg_diag.get('bhava_entropy', 0), global_step)
+                                # Phase 2 buffer norms
+                                for _buf_name in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                    _norm_key = f"{_buf_name}_mean_norm"
+                                    if _norm_key in _cg_diag:
+                                        writer.add_scalar(f'conscious_gen/{_norm_key}', _cg_diag[_norm_key], global_step)
+                                # Phase 3 governance metrics
+                                if 'cg_alpha_entropy' in metrics:
+                                    writer.add_scalar('conscious_gen/alpha_entropy', metrics['cg_alpha_entropy'], global_step)
+                                if 'cg_bliss_mean' in metrics:
+                                    writer.add_scalar('conscious_gen/bliss_mean', metrics['cg_bliss_mean'], global_step)
+                                if 'cg_disagree_mean' in metrics:
+                                    writer.add_scalar('conscious_gen/disagree_mean', metrics['cg_disagree_mean'], global_step)
+                                if 'cg_kosha_routing_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_kosha_routing', metrics['cg_kosha_routing_loss'], global_step)
+                                if 'cg_bliss_loss' in metrics:
+                                    writer.add_scalar('conscious_gen/L_bliss', metrics['cg_bliss_loss'], global_step)
+                                for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                    _pk = f'cg_L_{_pn}'
+                                    if _pk in metrics:
+                                        writer.add_scalar(f'conscious_gen/L_{_pn}_token', metrics[_pk], global_step)
+
+                            # Phase 5: Log governance diagnostics summary
+                            if cg_governance_diag is not None:
+                                _cg_gov_summary = cg_governance_diag.get_summary()
+                                for _gk, _gv in _cg_gov_summary.items():
+                                    metrics[_gk] = _gv
+                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                    for _gk, _gv in _cg_gov_summary.items():
+                                        writer.add_scalar(f'conscious_gen/{_gk}', _gv, global_step)
+
+                            # Phase 5: Log curriculum stage info
+                            if cg_stage_manager is not None:
+                                _cg_stage_diag = cg_stage_manager.get_diagnostics()
+                                for _sk, _sv in _cg_stage_diag.items():
+                                    if isinstance(_sv, (int, float)):
+                                        metrics[_sk] = _sv
+
+                except Exception as e:
+                    if global_step % 500 == 0:
+                        print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
 
@@ -5813,6 +6189,14 @@ def train(config: UnifiedTrainingConfig):
                     if tb_writer is not None and not kosha_graduated:
                         tb_writer.add_scalar("gyro/mean_ppl", kosha_graduation_monitor.mean_ppl, global_step)
                         tb_writer.add_scalar("gyro/ppl_variance", kosha_graduation_monitor.variance, global_step)
+
+                # Conscious Generation Curriculum: PPL-gated stage transitions
+                if cg_stage_manager is not None:
+                    _cg_transition = cg_stage_manager.update(val_ppl, global_step)
+                    if _cg_transition:
+                        print(_cg_transition)
+                        print(f"  [CG Curriculum] Current lambdas: {cg_stage_manager.step(global_step)}")
+                        print(f"  [CG Curriculum] Field-integrated softmax: {cg_stage_manager.use_field_integrated_softmax}")
 
                 # Curriculum Controller Update - check for phase transitions
                 if curriculum_controller is not None:
@@ -8001,6 +8385,98 @@ def main():
     parser.add_argument("--confidence_vritti_kl_weight", type=float, default=0.1,
                        help="Weight for Vritti KL auxiliary loss in risk gating")
 
+    # ==========================================================================
+    # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # ==========================================================================
+    parser.add_argument("--enable_conscious_generation", action="store_true",
+                       help="Enable conscious generation modules (token-side ontological projection)")
+    parser.add_argument("--token_ontology_dim", type=int, default=32,
+                       help="Ontological code dimension (must match SOVEREIGN_STATE_DIM)")
+    parser.add_argument("--ontology_cache_refresh_interval", type=int, default=100,
+                       help="Steps between O_tok cache refresh")
+    parser.add_argument("--lambda_ont", type=float, default=0.0,
+                       help="Ontological structure loss weight (0 = disabled)")
+    parser.add_argument("--ontology_loss_type", type=str, default="contrastive",
+                       choices=["contrastive", "prototype"],
+                       help="Ontological structure loss formulation")
+    parser.add_argument("--ontology_loss_temperature", type=float, default=0.1,
+                       help="Temperature for contrastive ontological structure loss")
+    parser.add_argument("--ontology_scorer_use_low_rank", action="store_true", default=True,
+                       help="Use low-rank M_ont = A B^T factorization")
+    parser.add_argument("--ontology_scorer_rank", type=int, default=8,
+                       help="Rank for low-rank bilinear factorization")
+
+    # Conscious Generation Phase 2: Primitive Scoring Heads
+    parser.add_argument("--jepa_token_dim", type=int, default=16,
+                       help="JEPA token representation dimension (d_j)")
+    parser.add_argument("--csr_token_dim", type=int, default=16,
+                       help="CSR token representation dimension (d_c)")
+    parser.add_argument("--primitive_shortlist_k", type=int, default=128,
+                       help="Top-K base logits for primitive evaluation")
+    parser.add_argument("--use_low_rank_primitives", action="store_true", default=True,
+                       help="Use low-rank factorization for primitive bilinear forms")
+    parser.add_argument("--primitive_rank", type=int, default=8,
+                       help="Rank for primitive low-rank factorization")
+    parser.add_argument("--use_shared_token_basis", action="store_true", default=False,
+                       help="Share intermediate projection across primitives")
+
+    # Conscious Generation Phase 3: Governance Integration
+    parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
+                       help="Kosha routing loss weight")
+    parser.add_argument("--lambda_bliss_token", type=float, default=0.0,
+                       help="Bliss token-level coherence loss weight")
+    parser.add_argument("--lambda_jepa_token", type=float, default=0.0,
+                       help="JEPA token-level plausibility loss")
+    parser.add_argument("--lambda_csr_token", type=float, default=0.0,
+                       help="CSR token-level resonance loss")
+    parser.add_argument("--lambda_vritti_token", type=float, default=0.0,
+                       help="Vritti token-level cognitive mode loss")
+    parser.add_argument("--lambda_guna_token", type=float, default=0.0,
+                       help="Guna token-level energetic loss")
+    parser.add_argument("--bliss_lambda_B", type=float, default=1.0,
+                       help="Lambda_B temperature for Bliss gate")
+    parser.add_argument("--kosha_routing_init", type=str, default="uniform",
+                       choices=["uniform", "base_dominant"],
+                       help="Kosha router initialization mode")
+
+    # Conscious Generation Phase 4: Field-Integrated Generation
+    parser.add_argument("--use_field_integrated_softmax", action="store_true",
+                       help="Replace standard logits with Z*(w) for L_LM")
+    parser.add_argument("--field_softmax_temperature", type=float, default=1.0,
+                       help="Temperature scaling for integrated softmax")
+    parser.add_argument("--use_agreement_energy", action="store_true",
+                       help="Enable pairwise agreement term A_t(w)")
+    parser.add_argument("--agreement_energy_weight", type=float, default=0.1,
+                       help="Beta weight for agreement-energy synergy term")
+
+    # Conscious Generation Phase 5: Curriculum, Validation, and Ablation
+    parser.add_argument("--enable_cg_curriculum", action="store_true",
+                       help="Enable staged curriculum (A->D) for conscious generation")
+    parser.add_argument("--cg_curriculum_ramp_mode", type=str, default="cosine",
+                       choices=["linear", "cosine", "step"],
+                       help="Lambda ramp mode for curriculum stages")
+    parser.add_argument("--cg_curriculum_ppl_var_threshold", type=float, default=0.5,
+                       help="Max PPL variance for stage transition")
+    parser.add_argument("--cg_curriculum_stability_window", type=int, default=5,
+                       help="Eval steps for PPL stability check")
+    parser.add_argument("--cg_curriculum_stage_proportions", type=str,
+                       default="0.30,0.20,0.25,0.25",
+                       help="Stage A,B,C,D proportions (comma-separated, must sum to 1.0)")
+    parser.add_argument("--enable_cg_diagnostics", action="store_true",
+                       help="Enable governance diagnostics tracking")
+
+    # Conscious Generation Phase Test
+    parser.add_argument("--test_cg_phases", action="store_true",
+                       help="Run conscious generation phase tests instead of training. "
+                            "Smoke-tests Phases 1-5 with synthetic data.")
+    parser.add_argument("--test_cg_phases_list", type=int, nargs="*", default=None,
+                       help="Which CG phases to test (e.g., --test_cg_phases_list 1 2 3)")
+    parser.add_argument("--test_cg_phase5_only", action="store_true",
+                       help="Only test Phase 5 (curriculum) — no model needed")
+    parser.add_argument("--test_cg_no_loop", action="store_true",
+                       help="Skip integration training loop (unit tests only)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -8019,6 +8495,30 @@ def main():
     # Handle --use_amp convenience flag
     if args.use_amp:
         args.mixed_precision = "bf16"
+
+    # Handle CG phase test redirect
+    if args.test_cg_phases or args.test_cg_phase5_only:
+        print("=" * 70)
+        print("  CONSCIOUS GENERATION PHASE TEST MODE")
+        print("=" * 70)
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts", "test_cg_phases.py")
+        script_path = os.path.normpath(script_path)
+        cg_cmd = [sys.executable, script_path]
+        if args.test_cg_phase5_only:
+            cg_cmd.append("--phase5-only")
+        elif args.test_cg_phases_list:
+            cg_cmd.extend(["--phases"] + [str(p) for p in args.test_cg_phases_list])
+        cg_cmd.extend(["--steps", str(args.max_steps)])
+        cg_cmd.extend(["--eval-every", str(args.eval_every)])
+        cg_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.model_size == "tiny":
+            cg_cmd.append("--tiny")
+        if args.test_cg_no_loop:
+            cg_cmd.append("--no-loop")
+        print(f"\nRunning: {' '.join(cg_cmd)}\n")
+        result = subprocess.run(cg_cmd)
+        sys.exit(result.returncode)
 
     # Handle stress test redirect
     if args.stress_test:
@@ -8642,6 +9142,43 @@ def main():
         kv_teacher_mode=args.kv_teacher_mode,
         kv_collapse_check_interval=args.kv_collapse_check_interval,
         kv_kl_clamp_max=args.kv_kl_clamp_max,
+        # Conscious Generation (Phase 1+)
+        enable_conscious_generation=args.enable_conscious_generation,
+        token_ontology_dim=args.token_ontology_dim,
+        ontology_cache_refresh_interval=args.ontology_cache_refresh_interval,
+        lambda_ont=args.lambda_ont,
+        ontology_loss_type=args.ontology_loss_type,
+        ontology_loss_temperature=args.ontology_loss_temperature,
+        ontology_scorer_use_low_rank=args.ontology_scorer_use_low_rank,
+        ontology_scorer_rank=args.ontology_scorer_rank,
+        # Conscious Generation (Phase 2)
+        jepa_token_dim=args.jepa_token_dim,
+        csr_token_dim=args.csr_token_dim,
+        primitive_shortlist_k=args.primitive_shortlist_k,
+        use_low_rank_primitives=args.use_low_rank_primitives,
+        primitive_rank=args.primitive_rank,
+        use_shared_token_basis=args.use_shared_token_basis,
+        # Conscious Generation (Phase 3)
+        lambda_kosha_routing=args.lambda_kosha_routing,
+        lambda_bliss_token=args.lambda_bliss_token,
+        lambda_jepa_token=args.lambda_jepa_token,
+        lambda_csr_token=args.lambda_csr_token,
+        lambda_vritti_token=args.lambda_vritti_token,
+        lambda_guna_token=args.lambda_guna_token,
+        bliss_lambda_B=args.bliss_lambda_B,
+        kosha_routing_init=args.kosha_routing_init,
+        # Conscious Generation (Phase 4)
+        use_field_integrated_softmax=args.use_field_integrated_softmax,
+        field_softmax_temperature=args.field_softmax_temperature,
+        use_agreement_energy=args.use_agreement_energy,
+        agreement_energy_weight=args.agreement_energy_weight,
+        # Conscious Generation (Phase 5)
+        enable_cg_curriculum=args.enable_cg_curriculum,
+        cg_curriculum_ramp_mode=args.cg_curriculum_ramp_mode,
+        cg_curriculum_ppl_var_threshold=args.cg_curriculum_ppl_var_threshold,
+        cg_curriculum_stability_window=args.cg_curriculum_stability_window,
+        cg_curriculum_stage_proportions=args.cg_curriculum_stage_proportions,
+        enable_cg_diagnostics=args.enable_cg_diagnostics,
     )
 
     # ==========================================================================

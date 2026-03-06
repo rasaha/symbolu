@@ -918,6 +918,51 @@ class UnifiedTrainingConfig:
     confidence_alpha_risk: float = 0.5            # Risk scaling coefficient
     confidence_vritti_kl_weight: float = 0.1      # Weight for Vritti KL aux loss
 
+    # ==========================================================================
+    # Conscious Generation (Phase 1+): Token-Side Ontological Foundation
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
+    # ==========================================================================
+    enable_conscious_generation: bool = False      # Master toggle for conscious generation modules
+    token_ontology_dim: int = 32                   # Must match SOVEREIGN_STATE_DIM
+    ontology_cache_refresh_interval: int = 100     # Steps between O_tok cache refresh
+    lambda_ont: float = 0.0                        # Ontological structure loss weight (0 = disabled)
+    ontology_loss_type: str = "contrastive"        # "contrastive" (InfoNCE) or "prototype"
+    ontology_loss_temperature: float = 0.1         # Temperature for contrastive loss
+    ontology_scorer_use_low_rank: bool = True      # Low-rank M_ont = A B^T (saves params)
+    ontology_scorer_rank: int = 8                  # Rank for low-rank factorization
+
+    # Phase 2: Primitive Scoring Heads
+    jepa_token_dim: int = 16                       # d_j for JEPA token representations
+    csr_token_dim: int = 16                        # d_c for CSR token representations
+    primitive_shortlist_k: int = 128               # Top-K base logits for primitive evaluation
+    use_low_rank_primitives: bool = True           # Low-rank M_f = A_f B_f^T (reduces params)
+    primitive_rank: int = 8                        # Rank for low-rank factorization
+    use_shared_token_basis: bool = False           # Share intermediate projection across primitives
+
+    # Phase 3: Governance Integration
+    lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
+    lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
+    lambda_jepa_token: float = 0.0                 # JEPA token-level plausibility loss
+    lambda_csr_token: float = 0.0                  # CSR token-level resonance loss
+    lambda_vritti_token: float = 0.0               # Vritti token-level cognitive mode loss
+    lambda_guna_token: float = 0.0                 # Guna token-level energetic loss
+    bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
+    kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
+
+    # Phase 4: Field-Integrated Generation
+    use_field_integrated_softmax: bool = False      # Replace standard logits with Z*(w) for L_LM
+    field_softmax_temperature: float = 1.0          # Temperature scaling for integrated softmax
+    use_agreement_energy: bool = False              # Enable pairwise agreement term A_t(w)
+    agreement_energy_weight: float = 0.1            # β weight for agreement-energy synergy term
+
+    # Phase 5: Curriculum, Validation, and Ablation
+    enable_cg_curriculum: bool = False              # Enable staged curriculum (A→D) for conscious gen
+    cg_curriculum_ramp_mode: str = "cosine"         # Lambda ramp mode: linear, cosine, step
+    cg_curriculum_ppl_var_threshold: float = 0.5    # Max PPL variance for stage transition
+    cg_curriculum_stability_window: int = 5         # Eval steps for PPL stability check
+    cg_curriculum_stage_proportions: str = "0.30,0.20,0.25,0.25"  # Stage A,B,C,D proportions
+    enable_cg_diagnostics: bool = False             # Enable governance diagnostics tracking
+
 
 # Model size presets
 MODEL_PRESETS = {
