@@ -1374,3 +1374,521 @@ P(w_t = w | x_{<t}) = exp(Z_t*(w)) / Σ_{u ∈ V} exp(Z_t*(u))
 So the end generation is no longer "the most statistically likely next word."
 
 It is "the token with the strongest integrated semantic agreement."
+
+---
+
+## Step 6 — Training Flow: How the Primitives Are Learned Jointly During Pretraining and Finetuning
+
+This section defines how the transformer, the 32D ontological manifold, and the architectural primitives are trained together so that token embeddings and semantic-governance fields co-evolve into a single generation system.
+
+### 6.1 Training Objective of the Architecture
+
+The training objective is not to bolt auxiliary classifiers onto a finished language model. The objective is to make the model learn that:
+
+* token prediction
+* semantic identity
+* physical plausibility
+* mental resonance
+* cognitive mode
+* energetic compatibility
+* coherence across fields
+
+are all part of the same generative act.
+
+So training must shape a hidden state that is useful for both:
+
+1. standard next-token prediction
+2. structured semantic-field evaluation
+
+This means the model is trained as a joint system, not as a base transformer plus external adapters.
+
+### 6.2 Three Levels of Learning
+
+The training flow should be understood in three levels.
+
+**Level 1 — Language Backbone Learning**
+
+The transformer learns contextual language structure in the usual way:
+
+```
+x_{<t} → h_t
+```
+
+This gives the model its base semantic continuation capability.
+
+**Level 2 — Ontological Structuring**
+
+The hidden state is projected into the 32D ontological manifold:
+
+```
+o_t = W_o h_t
+```
+
+This manifold learns to organize semantic meaning into a structured coordinate space.
+
+**Level 3 — Primitive Specialization**
+
+Each primitive learns to interpret either the context state, token state, or both:
+
+* JEPA learns physical / causal plausibility
+* CSR learns phonemic / mental resonance
+* Vritti learns cognitive mode
+* Guna learns energetic compatibility
+* Kosha learns weighting across fields
+* Bliss learns cross-field agreement structure
+
+So the full training path is:
+
+```
+tokens
+  ↓
+token embeddings
+  ↓
+transformer hidden state
+  ↓
+32D ontological state
+  ↓
+primitive-specific projections
+  ↓
+integrated token score
+  ↓
+probability distribution
+  ↓
+losses backpropagate jointly
+```
+
+### 6.3 Phase 1 — Pretraining the Shared Generative Backbone
+
+In the first phase, the model should learn a stable language backbone.
+
+Inputs:
+
+* raw text sequences
+* token embeddings
+* transformer hidden states
+
+Loss:
+
+```
+L_LM
+```
+
+using either:
+
+* standard softmax initially, or
+* the integrated softmax in a weak form with low primitive weights
+
+Purpose:
+
+* learn syntax
+* learn context dependence
+* learn base semantic continuation
+* create a strong hidden representation before strong semantic governance is imposed
+
+At this stage, primitive heads may be present but lightly weighted.
+
+This avoids early training instability.
+
+### 6.4 Phase 2 — Learning the 32D Ontological Manifold
+
+Once the language backbone is stable, the next stage is to teach the model that hidden states should organize into a semantic coordinate system.
+
+Projection:
+
+```
+o_t = W_o h_t ∈ ℝ³²
+```
+
+The ontological manifold should learn to encode:
+
+* semantic type
+* object / concept distinction
+* relational identity
+* action / entity / attribute structure
+* abstract vs physical status
+* context-dependent sense disambiguation
+
+This is trained using an ontological structure objective:
+
+```
+L_ont
+```
+
+Possible forms:
+
+**Contrastive ontological loss**
+
+Tokens or spans with similar semantic role are pulled together; dissimilar ones are pushed apart.
+
+```
+L_ont^contrast
+```
+
+**Prototype loss**
+
+Each semantic class has a prototype in ontology space; tokens are encouraged toward the correct prototype.
+
+```
+L_ont^proto
+```
+
+**Contextual sense separation loss**
+
+Different meanings of the same surface token should occupy different ontological regions depending on context.
+
+Example:
+
+* *table* as furniture
+* *table* as database object
+
+This stage teaches the ontology to become the central semantic manifold rather than a passive projection layer.
+
+### 6.5 Phase 3 — Primitive-Specific Supervision
+
+Now each primitive learns to read structured signals from the shared hidden state and ontological space.
+
+#### 6.5.1 JEPA Training
+
+JEPA learns physical and causal plausibility.
+
+Context representation:
+
+```
+p_t = f_jepa-ctx(h_t, o_t)
+```
+
+Token representation:
+
+```
+p_w = f_jepa-tok(e_w, o_w)
+```
+
+Objective:
+
+* positive pairs: physically plausible token-context continuations
+* negative pairs: implausible or mismatched continuations
+
+Loss:
+
+```
+L_jepa
+```
+
+This can be formulated as:
+
+* contrastive ranking loss
+* predictive world-state alignment loss
+* masked physical-continuation discrimination
+
+Example: "He placed the cup on the ___"
+
+* positive: table, shelf
+* negative: query, algorithm
+
+JEPA learns world-grounded plausibility, not merely co-occurrence.
+
+#### 6.5.2 CSR Training
+
+CSR learns the phonemic and mental resonance of tokens relative to context.
+
+Token resonance code:
+
+```
+r_w = f_csr-tok(w)
+```
+
+Context resonance state:
+
+```
+r_t = f_csr-ctx(h_t, o_t, x_{<t})
+```
+
+Loss:
+
+```
+L_csr
+```
+
+CSR supervision can come from:
+
+* phoneme-derived target structures
+* resonance polarity labels
+* calm vs agitated vs conflicting tone alignment
+* sentence-level affective consistency tasks
+
+Purpose: teach the model that token choice is partly constrained by mental-acoustic fit, not only semantic continuation.
+
+#### 6.5.3 Vritti Training
+
+Vritti learns active cognition mode.
+
+Context vritti distribution:
+
+```
+q_t^(v) = softmax(W_v [h_t ; o_t])
+```
+
+Possible classes:
+
+* valid cognition
+* imagination
+* misperception
+* memory
+* dormancy
+
+Loss:
+
+```
+L_vritti
+```
+
+Training signals may come from:
+
+* factual corpora
+* fiction / speculative corpora
+* memory / recollection narratives
+* contradictory or deceptive examples
+* suppressed / implicit knowledge cases
+
+Purpose: teach the model to distinguish not just *what* is being said, but the *mode* in which it is being said.
+
+#### 6.5.4 Guna Training
+
+Guna learns energetic compatibility between context and candidate tokens.
+
+Context guna distribution:
+
+```
+q_t^(g) = softmax(W_g [h_t ; o_t])
+```
+
+Token guna signature:
+
+```
+q_w^(g) = softmax(U_g [e_w ; o_w])
+```
+
+Loss:
+
+```
+L_guna
+```
+
+Training signals may include:
+
+* harmonious continuations
+* action-driving continuations
+* obstructive / incompatible continuations
+* relational compatibility labels across token groups
+
+Purpose: teach the model whether a token contributes clarity, dynamism, or disharmony in a given relational field.
+
+#### 6.5.5 Kosha Training
+
+Kosha learns which primitives should dominate under different contexts.
+
+Weights:
+
+```
+α_t = softmax(W_k [h_t ; o_t])
+```
+
+Loss:
+
+```
+L_kosha
+```
+
+Kosha can be trained through:
+
+* explicit layer labels, where available
+* weak supervision from corpus type
+* agreement-based routing targets
+* meta-learning over primitive success
+
+Example:
+
+* physical narrative → JEPA weight higher
+* introspective narrative → CSR and Vritti weight higher
+* technical reasoning → ontology and Vritti weight higher
+
+Purpose: teach the model not just to score tokens, but to know which kind of scoring matters most.
+
+#### 6.5.6 Bliss Training
+
+Bliss is not trained as a separate semantic label only. It is trained as a coherence functional over field agreement.
+
+For token `w`:
+
+```
+D_t(w) = Σ_f α_{t,f} (S_{f,t}(w) - μ_t(w))²
+```
+
+```
+B_t(w) = exp(-λ_B D_t(w))
+```
+
+Loss:
+
+```
+L_bliss
+```
+
+Bliss-related supervision should encourage:
+
+* agreement on good tokens
+* disagreement on incoherent tokens
+* stable ranking under field conflict
+
+Purpose: teach the system to favor integrated consensus rather than isolated field spikes.
+
+### 6.6 Joint Pretraining Loss
+
+The full pretraining objective becomes:
+
+```
+L_total = L_LM
+        + λ_ont L_ont
+        + λ_jepa L_jepa
+        + λ_csr L_csr
+        + λ_vritti L_vritti
+        + λ_guna L_guna
+        + λ_kosha L_kosha
+        + λ_bliss L_bliss
+```
+
+where the `λ` terms are curriculum-controlled weights.
+
+At early stages:
+
+* `λ` values should be small
+
+At later stages:
+
+* primitive weights can rise as the backbone stabilizes
+
+This prevents the semantic fields from destabilizing basic language learning too early.
+
+### 6.7 Curriculum Strategy
+
+A staged curriculum is strongly recommended.
+
+**Stage A — Backbone stabilization**
+
+Train mostly with `L_LM`, with weak ontology and primitive losses.
+
+**Stage B — Ontology formation**
+
+Increase `λ_ont`, so semantic structure emerges in the 32D manifold.
+
+**Stage C — Primitive specialization**
+
+Increase JEPA, CSR, Vritti, Guna, and Kosha losses.
+
+**Stage D — Integrated generation**
+
+Switch next-token loss fully to the new integrated softmax:
+
+```
+P(w_t = w | x_{<t}) = exp(Z_t*(w)) / Σ_{u ∈ V} exp(Z_t*(u))
+```
+
+At this stage the model learns that end generation itself is governed by field agreement.
+
+### 6.8 How Co-Evolution Happens
+
+This is the heart of the design.
+
+Co-evolution means:
+
+* token embeddings shape hidden states
+* hidden states shape ontology
+* ontology supports primitive interpretation
+* primitive losses push hidden states and embeddings to become more semantically structured
+* final token loss pushes all components to cooperate on generation
+
+So the gradients flow in both directions:
+
+**From token prediction into semantics**
+
+If a token should be chosen but ontology or JEPA mis-scores it, gradients push those primitives to improve.
+
+**From semantic primitives into embeddings**
+
+If embeddings fail to separate physical vs abstract senses, primitive losses reshape embeddings indirectly through shared hidden states and projections.
+
+Thus the token space and semantic-governance space do not remain separate. They gradually become aligned parts of one generative system.
+
+### 6.9 Finetuning Phase
+
+After pretraining, finetuning should sharpen the model for high-value behaviors.
+
+Finetuning goals:
+
+* reduce hallucination
+* improve sense disambiguation
+* improve cognitive-mode consistency
+* improve tone and resonance stability
+* improve governance under ambiguous contexts
+
+Finetuning data may include:
+
+* factual QA for JEPA grounding
+* emotionally nuanced text for CSR
+* fiction vs fact corpora for Vritti
+* relational harmony / incompatibility tasks for Guna
+* domain-specific routing tasks for Kosha
+* multi-field agreement tasks for Bliss
+
+Loss remains the same general form, but task-specific weights are increased depending on the finetuning objective.
+
+### 6.10 Inference-Time Consequence of Training
+
+Because the system was jointly trained, inference is no longer:
+
+```
+h_t → plain logits
+```
+
+It becomes:
+
+```
+h_t → o_t → {S_ont, S_jepa, S_csr, S_vritti, S_guna}
+    → α_t → B_t → Z_t*(w) → P(w)
+```
+
+This works only because training has already taught all components to participate in the same token decision.
+
+That is the key difference from post-hoc biasing.
+
+### 6.11 Practical Minimal Training Recipe
+
+For a first prototype, the safest recipe is:
+
+1. train transformer LM backbone
+2. add 32D ontology projection
+3. train ontology contrastive loss
+4. add JEPA, CSR, Vritti, Guna heads
+5. add Kosha weighting head
+6. compute Bliss as agreement functional
+7. replace plain logits with integrated score
+8. finetune end-to-end with mixed losses
+
+This gives a clean path from concept to implementation.
+
+### 6.12 Summary
+
+The primitives are learned jointly by making them participate directly in the token-generation objective.
+
+During training:
+
+* the transformer learns contextual language structure
+* the 32D ontology learns semantic organization
+* JEPA learns physical plausibility
+* CSR learns mental resonance
+* Vritti learns cognition mode
+* Guna learns energetic compatibility
+* Kosha learns contextual weighting
+* Bliss learns cross-field coherence
+
+These are not independent modules attached after training. They are co-trained components of one integrated generation architecture.
