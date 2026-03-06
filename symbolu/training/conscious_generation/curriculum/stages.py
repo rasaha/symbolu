@@ -129,9 +129,10 @@ class CurriculumStageManager:
             target = self._get_target(key)
             if target > 0:
                 self.scheduler.set_schedule(key, current, target, ramp, global_step)
-        # Kosha routing starts at 0.05 target (per spec)
+        # Kosha routing starts at 0.05 target (per spec); ramp from current value
+        kosha_current = self.scheduler.get(LAMBDA_KOSHA, 0.0)
         kosha_target = max(self._get_target(LAMBDA_KOSHA), 0.05)
-        self.scheduler.set_schedule(LAMBDA_KOSHA, 0.0, kosha_target, ramp, global_step)
+        self.scheduler.set_schedule(LAMBDA_KOSHA, kosha_current, kosha_target, ramp, global_step)
         self._field_integrated_active = False
 
     def _configure_stage_d(self, global_step: int):
@@ -149,8 +150,8 @@ class CurriculumStageManager:
             return False
         recent = self.ppl_history[-self.stability_window:]
         mean_ppl = sum(recent) / len(recent)
-        if mean_ppl == 0:
-            return True
+        if mean_ppl <= 0:
+            return False  # Pathological PPL, do not treat as stable
         variance = sum((p - mean_ppl) ** 2 for p in recent) / len(recent)
         return variance < self.ppl_var_threshold
 

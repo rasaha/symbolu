@@ -2228,6 +2228,11 @@ def train(config: UnifiedTrainingConfig):
             _cg_stage_proportions = tuple(
                 float(x) for x in config.cg_curriculum_stage_proportions.split(",")
             )
+            if len(_cg_stage_proportions) != 4:
+                raise ValueError(
+                    f"cg_curriculum_stage_proportions must have 4 values (A,B,C,D), "
+                    f"got {len(_cg_stage_proportions)}: {_cg_stage_proportions}"
+                )
             _cg_target_lambdas = {
                 "lambda_ont": config.lambda_ont,
                 "lambda_kosha_routing": config.lambda_kosha_routing,

@@ -104,7 +104,7 @@ class GovernanceDiagnostics:
         # Integrated rank: position of target in Z_star ordering
         target_mask = (candidate_ids == target_ids.unsqueeze(-1))  # (..., K)
         if target_mask.any():
-            target_z = (Z_star * target_mask.float()).sum(dim=-1)
+            target_z = (Z_star * target_mask.float()).amax(dim=-1)
             integrated_ranks = (Z_star >= target_z.unsqueeze(-1)).sum(dim=-1).float().mean().item()
             shift = base_ranks - integrated_ranks
             self._rank_shifts.append(shift)
