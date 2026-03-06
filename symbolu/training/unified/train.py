@@ -985,10 +985,10 @@ def train(config: UnifiedTrainingConfig):
         gradient_throttle = GradientNormThrottle(
             ema_decay=0.99,           # Slow adaptation to gradient baseline
             spike_threshold=2.0,       # Trigger if gradient > 2x average
-            min_factor=0.3,           # Never reduce LR below 30%
+            min_factor=0.05,          # Allow deeper damping on severe spikes
             warmup_steps=config.warmup_steps,  # Skip throttling during warmup
         )
-        print(f"  Gradient Throttle: ENABLED (spike>2x → LR×0.3 min)")
+        print(f"  Gradient Throttle: ENABLED (spike>2x → LR×0.05 min)")
 
     # Toroidal Evolutionary Bridge (O12 → O1 Recursive Intelligence)
     evolutionary_bridge = None
@@ -2493,6 +2493,7 @@ def train(config: UnifiedTrainingConfig):
 
     # V10.7.1: Track first iteration for diagnostic logging (works with resumed training)
     _first_iter_logged = False
+    _mem_baseline = 0.0  # V10.7.1: Memory baseline for first-iter diagnostics
 
     while global_step < config.max_steps:
         # V9.9.3: Sovereign Reset Protocol - skip one step after seq_len transition
@@ -4305,12 +4306,26 @@ def train(config: UnifiedTrainingConfig):
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
                         # V10.16.1: Use explicit query_mask from batch if available
                         # (e.g. AssociativeRecallDataset provides True only at answer positions).
-                        # Fall back to (y != -100) for general LM training.
+                        # V10.17: For general LM training, only apply retrieval loss at
+                        # positions BEYOND the local attention window. Tokens within the
+                        # window can be predicted by local attention alone — forcing slot
+                        # memory to retrieve them dilutes the learning signal (qmask=1.0
+                        # means ~50k→500 token narrowing instead of precise recall).
+                        # Positions beyond the window genuinely need long-range memory.
                         _retr_query_mask = None
                         if isinstance(batch, dict) and 'query_mask' in batch:
                             _retr_query_mask = batch['query_mask'].to(device)
                         if _retr_query_mask is None:
-                            _retr_query_mask = (y != -100)  # [B, N] general LM fallback
+                            _valid = (y != -100)  # [B, N]
+                            _B, _N = y.shape
+                            _win = getattr(config, 'window_size', 0)
+                            if _win > 0 and _N > _win:
+                                # Only positions beyond the local window are retrieval queries
+                                _pos_mask = torch.zeros(_B, _N, dtype=torch.bool, device=y.device)
+                                _pos_mask[:, _win:] = True
+                                _retr_query_mask = _valid & _pos_mask
+                            else:
+                                _retr_query_mask = _valid
                         _retr_loss = _sm.compute_retrieval_loss(
                             x=_sh,
                             slot_keys=_sk,
@@ -4323,9 +4338,9 @@ def train(config: UnifiedTrainingConfig):
                         _retr_loss_val = _retr_loss.item()
                     # Step the router noise counter
                     _sm._router_step += 1
-                    # Log slot diagnostics periodically
-                    if global_step % config.log_every == 0:
-                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(15.0))))
+                    # Log slot diagnostics periodically (only on last accumulation step)
+                    if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
+                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(8.0))))
                         _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
                         print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
                               f"qmask={_mask_frac:.4f} "
@@ -4379,10 +4394,14 @@ def train(config: UnifiedTrainingConfig):
 
             # V9.7.0: Capture RAW gradient norm BEFORE clipping for Kosha Time axis
             # This gives meaningful t values instead of always 0 (post-clip is always ~1.0)
-            raw_grad_norm = sum(
-                p.grad.norm().item() for p in model.parameters()
+            # Fix: compute true global L2 norm = sqrt(sum(||p.grad||²))
+            # Previous code used sum(||p.grad||) which is L1-of-L2-norms and
+            # overestimates the true norm, causing the throttle to trigger
+            # too aggressively and crush LR unnecessarily.
+            raw_grad_norm = (sum(
+                p.grad.norm().item() ** 2 for p in model.parameters()
                 if p.grad is not None
-            )
+            )) ** 0.5
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
@@ -4413,32 +4432,45 @@ def train(config: UnifiedTrainingConfig):
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
 
-            # V10.15: Clip slot memory gradients separately (tighter bound)
-            # Slot keys live on the unit hypersphere — large gradients push them
-            # off-manifold and cause the exponential variance growth seen in logs.
+            # V10.15/V10.17: Clip slot memory gradients with per-element capping.
+            # Slot keys live on the unit hypersphere — even a single large gradient
+            # element can push keys off-manifold and trigger 8M× variance cascades.
+            # Norm clipping (V10.15) was insufficient: it scales all elements
+            # proportionally, so with many params individual elements stay large.
+            # Per-element value clipping caps EACH gradient independently.
             if hasattr(model, 'slot_memory') and model.slot_memory is not None:
                 _slot_params_with_grad = [
                     p for p in model.slot_memory.parameters()
                     if p.grad is not None
                 ]
                 if _slot_params_with_grad:
+                    # First: per-element cap (prevents any single catastrophic update)
+                    torch.nn.utils.clip_grad_value_(_slot_params_with_grad, 0.01)
+                    # Second: norm clip as safety net
                     torch.nn.utils.clip_grad_norm_(
-                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                        _slot_params_with_grad, config.max_grad_norm * 0.01
                     )
 
-            # V10.16: Clip phase attention OV circuit params separately.
-            # The v_proj (741x spike) and W_k_fused (311x spike) are the primary
-            # gradient explosion sources — sin/cos backprop and division by small
-            # normalizer create amplification cascades. Clip these at 0.5x base
-            # before global clipping to prevent cross-layer contamination.
+            # V10.17/V10.18: Clip phase attention OV circuit params separately.
+            # The v_proj (741x spike) and W_k_fused (2183x spike at step 1270) are
+            # the primary gradient explosion sources — sin/cos backprop and division
+            # by small normalizer create amplification cascades.
+            # V10.18: Group norm clip alone was insufficient — with ~10 blocks × 3
+            # params, the per-parameter budget was too large and cross-layer cascading
+            # caused norms to escalate 5.9→117.1 over 150 steps despite throttle.
+            # Per-element value clipping (same approach that stabilized slot memory)
+            # caps EACH gradient element independently before norm clipping.
             _phase_attn_ov_params = [
                 p for n, p in model.named_parameters()
                 if p.grad is not None and 'phase_attn' in n
                 and any(k in n for k in ('v_proj', 'W_k_fused', 'W_q_fused'))
             ]
             if _phase_attn_ov_params:
+                # First: per-element cap (prevents cross-layer cascade buildup)
+                torch.nn.utils.clip_grad_value_(_phase_attn_ov_params, 0.005)
+                # Second: group norm clip as safety net (tightened from 0.1x)
                 torch.nn.utils.clip_grad_norm_(
-                    _phase_attn_ov_params, config.max_grad_norm * 0.5
+                    _phase_attn_ov_params, config.max_grad_norm * 0.05
                 )
 
             # Gradient clipping: per-layer or global
@@ -6323,6 +6355,41 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("lra/mean_entropy", lra_results["summary"]["mean_entropy"], global_step)
 
                 model.train()
+
+                # V10.21: Slot ablation eval — measure slot memory contribution
+                # Runs every 500 steps: temporarily disables slot read output,
+                # re-evaluates, and prints the PPL delta. If slots help, PPL
+                # should be HIGHER without them.
+                if (
+                    global_step % 500 == 0
+                    and hasattr(model, 'slot_memory')
+                    and model.slot_memory is not None
+                ):
+                    _sm = model.slot_memory
+                    # Save original warmstart state and force alpha=0
+                    _orig_step = _sm._router_step
+                    _orig_center = _sm._read_warmstart_center
+                    _sm._read_warmstart_center = float('inf')  # Forces alpha → 0
+                    model.eval()
+                    with torch.no_grad():
+                        _no_slot_loss, _no_slot_metrics = evaluate(
+                            model, val_loader, device, config, autocast_dtype,
+                            sovereign_loss=sovereign_loss,
+                            sovereign_engine=sovereign_engine,
+                            cached_val_batches=cached_val_batches,
+                        )
+                    _no_slot_ppl = _no_slot_metrics['ppl']
+                    _slot_delta = _no_slot_ppl - val_ppl
+                    _slot_pct = (_slot_delta / max(val_ppl, 1.0)) * 100
+                    _sign = "+" if _slot_delta > 0 else ""
+                    print(f"  🧩 [SLOT ABLATION] With slots: {val_ppl:.2f} | "
+                          f"Without: {_no_slot_ppl:.2f} | "
+                          f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
+                          f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                    # Restore
+                    _sm._read_warmstart_center = _orig_center
+                    _sm._router_step = _orig_step
+                    model.train()
 
             # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
             if config.sample_every > 0 and global_step % config.sample_every == 0:

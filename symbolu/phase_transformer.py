@@ -2245,12 +2245,16 @@ class PhaseAttentionLayer(nn.Module):
         # V10.8: Fused query projection — one GEMM, then split
         q_fused = self.W_q_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_q_raw = q_fused[:, :, 0]  # [B, N, H, D_h]
-        a_q = torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
+        # V10.17: Amplitude floor prevents sigmoid collapse toward 0.
+        # When a_q ≈ 0, the normalizer (a_q * a_k_cumsum) hits the clamp floor
+        # and gradients through the sigmoid/cumsum path explode (2183x variance
+        # spikes observed on W_k_fused). Floor at 0.05 guarantees minimum amplitude.
+        a_q = 0.05 + 0.95 * torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V10.8: Fused key projection — one GEMM, then split
         k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
-        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
+        a_k = 0.05 + 0.95 * torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
         # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
@@ -2524,11 +2528,14 @@ class PhaseAttentionLayer(nn.Module):
         # Capture final normalizer state for chunk continuation
         final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
 
-        # V10.16: Clamp normalizer minimum to 0.1 to prevent gradient explosion.
-        # When sigmoid amplitudes collapse toward 0 (e.g., after LR warmup ends),
-        # the old epsilon of 1e-6 allowed numerator/normalizer to produce extreme
-        # outputs, causing cascading gradient spikes through v_proj and W_k_fused.
-        normalizer = (a_q * a_k_cumsum).clamp(min=0.1)  # [B, N, H, D_h], always positive
+        # V10.19: Detached normalizer — same pattern as slot key normalization (line 8576).
+        # The division numerator/normalizer creates ∂L/∂normalizer = -numerator/normalizer²,
+        # which is -100x when normalizer hits the 0.1 clamp floor. This gradient propagates
+        # back through a_q → W_q_fused and cumsum(a_k) → W_k_fused, causing the variance
+        # spikes (906x on v_proj, 34x on W_k_fused) that cascade to full backbone divergence
+        # around step 720. Detaching preserves correct forward normalization while keeping
+        # amplitude gradients flowing only through the numerator (bounded, healthy signal).
+        normalizer = (a_q * a_k_cumsum).clamp(min=0.1).detach()  # [B, N, H, D_h]
 
         # V9.6.12: Cosine mode selection for interaction kernel
         # Use aggregated state (channels already combined) for readout
@@ -6031,6 +6038,20 @@ class HybridAttentionLayer(nn.Module):
                     ).mean(dim=2)
                 phase_memory = torch.cat([prev_for_xattn, phase_memory], dim=1)
 
+            # V10.21: RMS-normalize phase_memory before local cross-attention.
+            # phase_memory is a cumsum output — magnitudes grow linearly with
+            # sequence position. When local_attn's complex_proj → k_proj/v_proj
+            # processes unbounded magnitudes, the softmax attention gradients
+            # create 300-500× spikes in W_k_fused and v_proj (step 700: 430×,
+            # 487×) that cascade through blocks 3-7 into full PPL collapse.
+            # RMS normalization bounds the magnitudes to O(1) while preserving
+            # relative structure and gradient flow. Using detached denominator
+            # (same pattern as phase normalizer V10.19) to prevent the
+            # normalization Jacobian from creating new amplification paths.
+            if phase_memory is not None:
+                _pm_rms = (phase_memory.abs() ** 2).mean(dim=-1, keepdim=True).sqrt().clamp(min=1e-6)
+                phase_memory = phase_memory / _pm_rms.detach()
+
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
             # V10.2.1 GRADIENT ROUTING (Requirement 7):
@@ -6482,7 +6503,7 @@ class PhaseTransformer(nn.Module):
                     block,
                     x,
                     True,  # causal_mask
-                    use_reentrant=False,
+                    use_reentrant=True,
                 )
             else:
                 x = block(x, causal_mask=True)
@@ -6551,7 +6572,7 @@ class PhaseTransformer(nn.Module):
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = block(x, causal_mask=True)
@@ -6932,26 +6953,31 @@ class HybridPhaseTransformer(nn.Module):
         x = self.embed_dropout(x)
 
         # Transformer blocks
+        # V11.0.1: Only use gradient checkpointing when grad is enabled.
+        # OntologicalHybridTransformer calls forward_hidden under torch.no_grad(),
+        # where checkpointing is wasteful and can interfere with the subsequent
+        # checkpointed forward pass (metadata mismatch on recomputation).
+        _use_gc = self.gradient_checkpointing and self.training and torch.is_grad_enabled()
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
             is_hybrid_block = i >= self.local_layers
             block_intent = intent_phase if is_hybrid_block else None
 
-            if self.gradient_checkpointing and self.training:
+            if _use_gc:
                 if is_hybrid_block and intent_phase is not None:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 if is_hybrid_block:
@@ -7046,6 +7072,8 @@ class HybridPhaseTransformer(nn.Module):
 
             # Decorrelation loss incompatible with gradient checkpointing
             # (checkpoint can't handle tuple returns cleanly)
+            # V11.0.1: use_reentrant=True avoids strict metadata check that fails
+            # with complex tensors (torch.polar) and OntologicalHybrid double-forward.
             use_checkpoint = self.gradient_checkpointing and self.training and not return_decorr_loss
 
             if use_checkpoint:
@@ -7055,14 +7083,14 @@ class HybridPhaseTransformer(nn.Module):
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 # Normal forward pass (potentially with decorr_loss)
@@ -7196,7 +7224,13 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            result['_slot_hidden'] = x  # Post-norm hidden for query matching
+            # V10.14.9: Detach hidden states for retrieval loss. Without this,
+            # retrieval loss gradients flow through _slot_hidden back into ALL
+            # transformer blocks (phase_attn.W_k_fused, v_proj, complex_proj),
+            # creating a secondary training signal that destabilizes the backbone
+            # around step 650 and cascades into slot memory gradient explosions.
+            # Retrieval loss should only train slot memory parameters.
+            result['_slot_hidden'] = x.detach()  # Post-norm hidden for query matching
 
         return result
 
@@ -8170,7 +8204,7 @@ class LocalOnlyTransformer(nn.Module):
         hidden_states = [] if should_extract else None
         for i, block in enumerate(self.blocks):
             if self.gradient_checkpointing and self.training:
-                x = checkpoint(block, x, True, use_reentrant=False)
+                x = checkpoint(block, x, True, use_reentrant=True)
             else:
                 x = block(x, causal_mask=True)
 
@@ -8362,8 +8396,13 @@ class SlotMemoryGCT(nn.Module):
         # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
         # route to the same slot. Scale=5 gives enough sharpness to differentiate
         # while allowing more balanced slot utilization.
+        # V10.20: Lowered from 5→3. Logs showed wr_scale learning to 5.9 during
+        # calibration, which made assignment ultra-peaky and concentrated write
+        # pressure on few slots — amplifying the 1.2M× gradient variance spikes.
+        # Starting at 3 with tighter max clamp (8 instead of 15) keeps assignments
+        # sharp enough for differentiation without explosive write concentration.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(5.0))  # exp(log(5)) = 5.0
+            torch.tensor(math.log(3.0))  # exp(log(3)) = 3.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8487,9 +8526,18 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.8: Clamp temperature to [3, 15]. At scale=10+ all tokens
         # pick the same top slot → winner-take-all collapse. Capping at 15
         # prevents runaway; floor of 3 prevents assignments from going uniform.
-        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=15.0)
+        # V10.20: Tightened max from 15→8. Logs showed scale learning to 5.9,
+        # concentrating writes on few slots and causing 1.2M× gradient spikes.
+        # Max of 8 still allows sharp differentiation without explosive peakiness.
+        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=8.0)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
-        _sk_norm = F.normalize(slot_keys, dim=-1)       # [B, K, D_key]
+        # V10.20: Detach slot_keys before F.normalize in assignment computation.
+        # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
+        # gradient variance when many tokens write to the same slot. Since slot_keys
+        # are updated via EMA (line 8577), they don't need assignment-path gradients —
+        # the learning signal comes through the EMA update itself. Detaching here
+        # severs the 1.2M× amplification path through slot_keys_init.
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)       # [B, K, D_key]
         assignment_logits = torch.bmm(
             _wk_norm, _sk_norm.transpose(1, 2)
         ) * _scale  # cosine_sim * temperature
@@ -8539,9 +8587,24 @@ class SlotMemoryGCT(nn.Module):
         )
 
         # Normalize by write pressure (avoid division by zero)
-        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=1e-6)
+        # V10.20: Raised clamp floor from 1e-6 to 0.1. The old floor allowed
+        # 1/1e-6 = 1M× gradient amplification through the pressure division,
+        # which was the root cause of the 1.2M× slot_keys_init variance spikes.
+        # Floor of 0.1 caps amplification at 10× — consistent with the phase
+        # attention normalizer clamp.
+        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=0.1)
         incoming_keys = incoming_keys / pressure_norm
         incoming_vals = incoming_vals / pressure_norm
+
+        # V10.20: L2-normalize incoming write vectors before EMA update.
+        # Without this, unbounded incoming_keys magnitude drifts slot_keys
+        # off the unit hypersphere, causing F.normalize Jacobian explosion
+        # in subsequent forward passes. Normalizing here ensures the EMA
+        # interpolates between unit vectors, keeping slot keys well-conditioned.
+        _ik_norm = incoming_keys.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        incoming_keys = incoming_keys / _ik_norm
+        _iv_norm = incoming_vals.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        incoming_vals = incoming_vals / _iv_norm
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
@@ -8614,7 +8677,12 @@ class SlotMemoryGCT(nn.Module):
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
         _read_scale = torch.exp(self._write_log_scale)
         _q_norm = F.normalize(queries, dim=-1)
-        _sk_norm = F.normalize(slot_keys, dim=-1)
+        # V10.20: Detach slot_keys in read path (same rationale as write path).
+        # Slot keys learn through EMA updates, not through read attention gradients.
+        # The LM learning signal flows through slot_vals (retrieved content),
+        # not through slot_keys (routing). Detaching prevents F.normalize Jacobian
+        # explosion while preserving the value-path gradient.
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _read_scale
@@ -8672,7 +8740,8 @@ class SlotMemoryGCT(nn.Module):
         queries = self.write_key_proj(x)  # [B, N, D_key]
         _scale = torch.exp(self._write_log_scale)
         _q_norm = F.normalize(queries, dim=-1)
-        _sk_norm = F.normalize(slot_keys, dim=-1)
+        # V10.20: Detach slot_keys (consistent with read/write paths).
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _scale  # [B, N, K]

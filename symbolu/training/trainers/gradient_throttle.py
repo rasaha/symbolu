@@ -7,7 +7,7 @@ Acts as a physical safety layer that prevents destructive weight updates during
 training instabilities.
 
 Usage:
-    throttle = GradientNormThrottle(ema_decay=0.99, spike_threshold=2.0, min_factor=0.3)
+    throttle = GradientNormThrottle(ema_decay=0.99, spike_threshold=2.0, min_factor=0.05)
 
     # In training loop, after loss.backward() and before optimizer.step():
     factor, grad_norm = throttle.step(model, optimizer, base_lr)
@@ -39,7 +39,7 @@ class GradientNormThrottle:
         self,
         ema_decay: float = 0.99,
         spike_threshold: float = 2.0,
-        min_factor: float = 0.3,
+        min_factor: float = 0.05,
         warmup_steps: int = 100,
     ):
         self.ema_decay = ema_decay
@@ -145,10 +145,21 @@ class GradientNormThrottle:
         if factor < 1.0:
             self.total_throttle_time += 1
 
-        # Apply to optimizer
-        target_lr = base_lr * factor
+        # Apply to optimizer — preserve relative LR scaling between param groups.
+        # Each group may have a different base LR (e.g., slot memory at 0.1x).
+        # We track each group's "unthrottled" LR and detect when external systems
+        # (adaptive controller, scheduler, stress probes) change it between steps.
         for param_group in optimizer.param_groups:
-            param_group['lr'] = target_lr
+            if '_throttle_applied_lr' in param_group \
+                    and param_group['lr'] != param_group['_throttle_applied_lr']:
+                # External system changed LR since last throttle — update base
+                param_group['_unthrottled_lr'] = param_group['lr']
+            elif '_unthrottled_lr' not in param_group:
+                # First time — snapshot current LR as unthrottled base
+                param_group['_unthrottled_lr'] = param_group['lr']
+            # Apply throttle factor to the unthrottled base (preserves relative scaling)
+            param_group['lr'] = param_group['_unthrottled_lr'] * factor
+            param_group['_throttle_applied_lr'] = param_group['lr']
 
         # Update EMA (slowly adapt to new normal)
         self.ema_grad_norm = (

@@ -13273,13 +13273,27 @@ def train(config: UnifiedTrainingConfig):
                 if (isinstance(outputs, dict) and '_slot_keys' in outputs
                         and hasattr(model, 'slot_memory') and model.slot_memory is not None
                         and hasattr(model, 'retrieval_loss_weight') and model.retrieval_loss_weight > 0):
-                    # V10.16.1: Use explicit query_mask from batch if available,
-                    # fall back to (y != -100) for general LM training.
+                    # V10.16.1: Use explicit query_mask from batch if available.
+                    # V10.17: For general LM training, only apply retrieval loss at
+                    # positions BEYOND the local attention window. Tokens within the
+                    # window can be predicted by local attention alone — forcing slot
+                    # memory to retrieve them dilutes the learning signal (qmask=1.0
+                    # means ~50k→500 token narrowing instead of precise recall).
+                    # Positions beyond the window genuinely need long-range memory.
                     _retr_query_mask = None
                     if isinstance(batch, dict) and 'query_mask' in batch:
                         _retr_query_mask = batch['query_mask'].to(device)
                     if _retr_query_mask is None:
-                        _retr_query_mask = (y != -100)
+                        _valid = (y != -100)  # [B, N]
+                        _B, _N = y.shape
+                        _win = getattr(config, 'window_size', 0)
+                        if _win > 0 and _N > _win:
+                            # Only positions beyond the local window are retrieval queries
+                            _pos_mask = torch.zeros(_B, _N, dtype=torch.bool, device=y.device)
+                            _pos_mask[:, _win:] = True
+                            _retr_query_mask = _valid & _pos_mask
+                        else:
+                            _retr_query_mask = _valid
                     _retr_loss = model.slot_memory.compute_retrieval_loss(
                         x=outputs['_slot_hidden'],
                         slot_keys=outputs['_slot_keys'],
