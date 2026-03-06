@@ -85,7 +85,7 @@ class CurriculumStageManager:
         self.current_stage_idx = 0
         self.ppl_history: List[float] = []
         self.stage_history: List[Tuple[int, str]] = [(0, self.STAGE_A)]
-        self.steps_in_stage = 0
+        self.stage_entry_step = 0  # global_step when current stage began
         self._field_integrated_active = False
 
         # Lambda scheduler
@@ -112,7 +112,7 @@ class CurriculumStageManager:
     def _configure_stage_b(self, global_step: int):
         """Stage B: Ontology Formation — ramp λ_ont to target; weak JEPA/CSR."""
         ramp = self._ramp_steps_for_stage(self.STAGE_B)
-        self.scheduler.set_schedule(LAMBDA_ONT, 0.01, self._get_target(LAMBDA_ONT), ramp, global_step)
+        self.scheduler.set_schedule(LAMBDA_ONT, 0.01, max(self._get_target(LAMBDA_ONT), 0.01), ramp, global_step)
         self.scheduler.set_schedule(LAMBDA_JEPA, 0.0, 0.01, ramp, global_step)
         self.scheduler.set_schedule(LAMBDA_CSR, 0.0, 0.01, ramp, global_step)
         # Others stay at 0
@@ -173,13 +173,13 @@ class CurriculumStageManager:
         self.ppl_history.append(val_ppl)
         if len(self.ppl_history) > 200:
             self.ppl_history = self.ppl_history[-200:]
-        self.steps_in_stage += 1
 
         # Check for stage advancement
         if self.current_stage_idx >= len(self.STAGES) - 1:
             return None  # Already at Stage D
 
-        if self.steps_in_stage < self._min_steps_in_stage():
+        steps_in_stage = global_step - self.stage_entry_step
+        if steps_in_stage < self._min_steps_in_stage():
             return None  # Not enough time in current stage
 
         if not self._is_ppl_stable():
@@ -189,7 +189,7 @@ class CurriculumStageManager:
         old_stage = self.current_stage
         self.current_stage_idx += 1
         self.current_stage = self.STAGES[self.current_stage_idx]
-        self.steps_in_stage = 0
+        self.stage_entry_step = global_step
         self.stage_history.append((global_step, self.current_stage))
 
         # Configure new stage
@@ -225,7 +225,7 @@ class CurriculumStageManager:
         result = {
             "cg_curriculum_stage": self.current_stage,
             "cg_curriculum_stage_idx": self.current_stage_idx,
-            "cg_curriculum_steps_in_stage": self.steps_in_stage,
+            "cg_curriculum_stage_entry_step": self.stage_entry_step,
             "cg_field_integrated_active": self._field_integrated_active,
         }
         result.update(self.scheduler.get_diagnostics())

@@ -93,14 +93,19 @@ class BlissCoherenceLoss(nn.Module):
 
         # Sort descending and take top negatives (hardest negatives first)
         B_neg_sorted = B_neg.sort(dim=-1, descending=True).values
-        n_neg = min(B_neg_sorted.shape[-1] - 1, self.max_neg_samples)
-        B_neg_sampled = B_neg_sorted[..., :n_neg]
+        n_neg = min(max(B_neg_sorted.shape[-1] - 1, 0), self.max_neg_samples)
 
         # Positive loss: -log(B(w_correct)) — encourage high Bliss for correct
         pos_loss = -torch.log(B_pos + 1e-8).mean()
 
         # Negative loss: -log(1 - B(w_neg)) — encourage low Bliss for incorrect
-        neg_loss = -torch.log(1.0 - B_neg_sampled + 1e-8).mean()
+        # Guard against empty negatives (K=1 case): skip neg term entirely
+        if n_neg > 0:
+            B_neg_sampled = B_neg_sorted[..., :n_neg]
+            neg_loss = -torch.log(1.0 - B_neg_sampled + 1e-8).mean()
+        else:
+            neg_loss = torch.tensor(0.0, device=B.device, dtype=B.dtype)
+            B_neg_sampled = B_neg_sorted[..., :0]  # empty for diagnostics
 
         loss = pos_loss + self.neg_weight * neg_loss
 
@@ -112,7 +117,7 @@ class BlissCoherenceLoss(nn.Module):
         return {
             "loss": loss,
             "pos_bliss": B_pos.mean().detach(),
-            "neg_bliss": B_neg_sampled.mean().detach(),
+            "neg_bliss": B_neg_sampled.mean().detach() if n_neg > 0 else torch.tensor(0.0, device=B.device),
             "pos_disagreement": D_pos.mean().detach(),
             "neg_disagreement": mean_neg_D,
         }

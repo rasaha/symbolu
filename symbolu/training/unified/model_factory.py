@@ -601,18 +601,22 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         model.conscious_gen["bliss_gate"] = bliss_gate
         model.conscious_gen["integrated_scorer"] = integrated_scorer
 
-        # Phase 3 losses (only instantiate when their lambda > 0)
-        _any_prim_loss = (config.lambda_jepa_token > 0 or config.lambda_csr_token > 0
-                         or config.lambda_vritti_token > 0 or config.lambda_guna_token > 0)
+        # Phase 3 losses: instantiate when lambda > 0 OR when curriculum is enabled
+        # (curriculum starts lambdas at 0 and ramps them up later)
+        _cg_curriculum = getattr(config, 'enable_cg_curriculum', False)
+        _any_prim_loss = (_cg_curriculum or config.lambda_jepa_token > 0
+                         or config.lambda_csr_token > 0
+                         or config.lambda_vritti_token > 0
+                         or config.lambda_guna_token > 0)
         if _any_prim_loss:
             prim_aux_losses = PrimitiveAuxiliaryLosses()
             model.conscious_gen["primitive_aux_losses"] = prim_aux_losses
 
-        if config.lambda_kosha_routing > 0:
+        if _cg_curriculum or config.lambda_kosha_routing > 0:
             kosha_routing_loss = KoshaRoutingLoss()
             model.conscious_gen["kosha_routing_loss"] = kosha_routing_loss
 
-        if config.lambda_bliss_token > 0:
+        if _cg_curriculum or config.lambda_bliss_token > 0:
             bliss_coherence_loss = BlissCoherenceLoss()
             model.conscious_gen["bliss_coherence_loss"] = bliss_coherence_loss
 
@@ -638,7 +642,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    Losses: ALL DISABLED (all lambda=0)")
 
         # Phase 4: Field-Integrated Generation
-        if config.use_field_integrated_softmax:
+        # Also create when curriculum is enabled (Stage D will activate it)
+        if config.use_field_integrated_softmax or _cg_curriculum:
             field_softmax = FieldIntegratedSoftmax(
                 vocab_size=config.vocab_size,
                 temperature=config.field_softmax_temperature,

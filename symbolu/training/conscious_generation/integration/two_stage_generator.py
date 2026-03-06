@@ -65,7 +65,6 @@ class TwoStageGenerator(nn.Module):
         Returns:
             Dict with keys:
                 'log_probs': Full-vocab log-probabilities (..., V).
-                'probs': Full-vocab probabilities (..., V).
                 'Z_star': Bliss-gated scores (..., K).
                 'alpha': Kosha routing weights (..., 6).
                 'B': Bliss values (..., K).
@@ -105,7 +104,6 @@ class TwoStageGenerator(nn.Module):
         # Merge all results
         return {
             "log_probs": softmax_result["log_probs"],
-            "probs": softmax_result["probs"],
             "shortlist_log_probs": softmax_result["shortlist_log_probs"],
             "Z_star": Z_star,
             "T": T,

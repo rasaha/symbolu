@@ -8099,7 +8099,7 @@ class OntologicalHybridTransformer(nn.Module):
                         o_ctx=o_ctx_last.unsqueeze(1),    # (B, 1, state_dim)
                         cache=_cache,
                     )
-                    probs = gen_result['probs'][:, 0, :]  # (B, V)
+                    probs = gen_result['log_probs'][:, 0, :].exp()  # (B, V)
                     next_token = torch.multinomial(probs, num_samples=1)
                     input_ids = torch.cat([input_ids, next_token], dim=1)
                     continue

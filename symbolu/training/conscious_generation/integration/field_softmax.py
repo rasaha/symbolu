@@ -102,7 +102,6 @@ class FieldIntegratedSoftmax(nn.Module):
         Returns:
             Dict with keys:
                 'log_probs': Full-vocab log-probabilities (..., V).
-                'probs': Full-vocab probabilities (..., V).
                 'shortlist_log_probs': Log-probs over shortlist only (..., K).
         """
         if self.use_agreement_energy and T is not None and Z is not None and B is not None:
@@ -130,6 +129,5 @@ class FieldIntegratedSoftmax(nn.Module):
 
         return {
             "log_probs": full_log_probs,
-            "probs": full_log_probs.exp(),
             "shortlist_log_probs": shortlist_log_probs,
         }
