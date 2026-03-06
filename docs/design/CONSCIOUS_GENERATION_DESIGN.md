@@ -888,3 +888,472 @@ During training it learns to encode signals that represent:
 * coherence
 
 These signals are interpreted by the architectural primitives and integrated to determine final token probability.
+
+---
+
+## Step 5 — Token Evaluation Tensor, Primitive Equations, and the New Probability Function
+
+This section defines the mathematical abstraction of each architectural primitive and the final inference rule that replaces standard single-logit token generation with integrated multi-field token evaluation.
+
+### 5.1 Standard Transformer Baseline
+
+A standard transformer produces, at decoding step `t`,
+
+```
+h_t ∈ ℝ^{d_h}
+```
+
+and vocabulary logits
+
+```
+z_t(w) = e_w⊤ W_h h_t + b_w
+```
+
+for each token `w ∈ V`, followed by
+
+```
+P_std(w_t = w | x_{<t}) = exp(z_t(w)) / Σ_{u ∈ V} exp(z_t(u))
+```
+
+This gives one scalar score per token.
+
+The new architecture replaces this with a token evaluation tensor in which each candidate token is scored by multiple semantic-governance fields.
+
+### 5.2 Token Evaluation Tensor
+
+For vocabulary `V` and primitive set
+
+```
+F = {base, ont, jepa, csr, vritti, guna}
+```
+
+define, for each candidate token `w`, a field-score vector
+
+```
+S_t(w) = [ S_base,t(w)
+            S_ont,t(w)
+            S_jepa,t(w)
+            S_csr,t(w)
+            S_vritti,t(w)
+            S_guna,t(w) ] ∈ ℝ⁶
+```
+
+Across the full vocabulary this forms the token evaluation tensor
+
+```
+T_t ∈ ℝ^{|V| × 6}
+```
+
+where each row corresponds to one token and each column to one primitive.
+
+This is the mathematical object that replaces the old idea of "one logit vector."
+
+### 5.3 Core States Used by All Primitives
+
+At step `t`, define:
+
+* transformer hidden state: `h_t ∈ ℝ^{d_h}`
+* token embedding for candidate token `w`: `e_w ∈ ℝ^{d_e}`
+* ontological state of context: `o_t = W_o h_t ∈ ℝ³²`
+* token ontological code: `o_w = U_o e_w ∈ ℝ³²`
+* context summary for semantic governance: `c_t = φ(h_t, x_{<t})`
+
+where `φ` may be the final hidden state, pooled hidden state, or a learned summary head.
+
+### 5.4 Mathematical Abstraction of Each Primitive
+
+#### 5.4.1 Base Transformer Semantic Score
+
+This is the standard semantic continuation score from the transformer:
+
+```
+S_base,t(w) = z_t(w)
+```
+
+or more explicitly
+
+```
+S_base,t(w) = e_w⊤ W_b h_t + b_w
+```
+
+This remains the statistical-language backbone.
+
+#### 5.4.2 Ontological Compatibility Score
+
+The ontology primitive measures whether token `w` fits the current semantic manifold.
+
+A simple form is cosine or bilinear compatibility:
+
+```
+S_ont,t(w) = o_t⊤ M_ont o_w
+```
+
+or normalized form
+
+```
+S_ont,t(w) = (A_ont o_t)⊤ (B_ont o_w) / (|A_ont o_t| · |B_ont o_w|)
+```
+
+Interpretation: this score answers, "Does this token belong to the semantic reality currently active?"
+
+Example: physical "table" should score higher than abstract "database" in a cup-on-surface context.
+
+#### 5.4.3 JEPA Physical / Causal Plausibility Score
+
+JEPA evaluates whether token `w` is plausible relative to the implied world state.
+
+Let
+
+```
+p_t = f_jepa-ctx(h_t) ∈ ℝ^{d_j}
+```
+
+be the predicted physical/causal context state, and
+
+```
+p_w = f_jepa-tok(e_w, o_w) ∈ ℝ^{d_j}
+```
+
+be the world-state signature of token `w`.
+
+Then
+
+```
+S_jepa,t(w) = p_t⊤ M_jepa p_w
+```
+
+or similarity form
+
+```
+S_jepa,t(w) = -‖p_t - p_w‖²
+```
+
+Interpretation: this score answers, "If this token is chosen, does it fit the physically plausible continuation of the world?"
+
+#### 5.4.4 CSR Mental / Phonemic Resonance Score
+
+CSR evaluates whether the token's phonemic-emotional signature matches the mental tone of the context.
+
+Let the token's CSR representation be
+
+```
+r_w = f_csr-tok(w) ∈ ℝ^{d_c}
+```
+
+derived from the Sanskrit phoneme / vrtti-resonance model, and the context CSR state be
+
+```
+r_t = f_csr-ctx(h_t, x_{<t}) ∈ ℝ^{d_c}
+```
+
+Then
+
+```
+S_csr,t(w) = r_t⊤ M_csr r_w
+```
+
+or
+
+```
+S_csr,t(w) = -‖r_t - r_w‖²
+```
+
+Interpretation: this score answers, "Does this token resonate with the mental-emotional tone already present?"
+
+#### 5.4.5 Vritti Cognitive-Mode Compatibility Score
+
+Vritti classifies the active cognition mode of the sentence and checks whether token `w` fits it.
+
+Let the context vritti distribution be
+
+```
+q_t^(v) = softmax(W_v h_t) ∈ Δ^{K_v - 1}
+```
+
+where `K_v` is the number of vritti classes, e.g.
+
+* valid cognition
+* imagination
+* misperception
+* memory
+* dormancy
+
+Let token `w` have a learned vritti profile
+
+```
+q_w^(v) = softmax(U_v e_w)
+```
+
+Then define compatibility as
+
+```
+S_vritti,t(w) = -KL(q_t^(v) ‖ q_w^(v))
+```
+
+or
+
+```
+S_vritti,t(w) = (q_t^(v))⊤ q_w^(v)
+```
+
+Interpretation: this score answers, "Is this token appropriate for the active mode of cognition?"
+
+#### 5.4.6 Guna Energetic Compatibility Score
+
+Guna evaluates how the token participates energetically relative to surrounding objects and the sentence field.
+
+Let context guna state be
+
+```
+q_t^(g) = softmax(W_g h_t) ∈ Δ²
+```
+
+over the three gunas: Sattva, Rajas, Tamas.
+
+Let token `w` have guna signature
+
+```
+q_w^(g) = softmax(U_g e_w)
+```
+
+Then
+
+```
+S_guna,t(w) = (q_t^(g))⊤ G q_w^(g)
+```
+
+where `G ∈ ℝ^{3×3}` is a learned or structured compatibility matrix.
+
+A simple structured version could reward:
+
+* Sattva–Sattva harmony
+* Rajas–Rajas action continuity
+* Tamas mismatches with harmonious contexts
+
+Interpretation: this score answers, "How does this token affect the energetic relation of the whole sentence?"
+
+### 5.5 Governance Primitives
+
+These do not act like ordinary token scorers only; they govern how the above field scores are combined.
+
+#### 5.5.1 Kosha Weighting Function
+
+Kosha determines which semantic layer should dominate in the current context.
+
+Let Kosha weights be
+
+```
+α_t = softmax(W_k h_t) ∈ Δ⁵
+```
+
+or over the chosen active evaluators
+
+```
+α_t = [α_base, α_ont, α_jepa, α_csr, α_vritti, α_guna]
+```
+
+with
+
+```
+Σ_f α_{t,f} = 1
+```
+
+These weights are context-dependent and can also depend on ontology:
+
+```
+α_t = softmax(W_k [h_t ; o_t])
+```
+
+Interpretation: Kosha answers, "Which layer of being should have more influence right now?"
+
+#### 5.5.2 Bliss / Coherence Function
+
+Bliss measures agreement across primitive scores for token `w`.
+
+Let the primitive score vector for token `w` be `S_t(w)`.
+
+First compute a weighted mean score:
+
+```
+μ_t(w) = Σ_f α_{t,f} S_{f,t}(w)
+```
+
+Then define disagreement:
+
+```
+D_t(w) = Σ_f α_{t,f} (S_{f,t}(w) - μ_t(w))²
+```
+
+This is the weighted variance across fields.
+
+Define Bliss as a coherence gate:
+
+```
+B_t(w) = exp(-λ_B D_t(w))
+```
+
+with `λ_B > 0`.
+
+So:
+
+* high agreement → `D_t(w)` small → `B_t(w)` near 1
+* strong disagreement → `D_t(w)` large → `B_t(w)` near 0
+
+Interpretation: Bliss answers, "Do the semantic realities agree on this token?"
+
+### 5.6 Integrated Token Score
+
+Now define the pre-normalized integrated score for token `w`.
+
+**Additive core form**
+
+```
+Z_t(w) = Σ_f α_{t,f} S_{f,t}(w)
+```
+
+**Bliss-gated form**
+
+```
+Z_t*(w) = B_t(w) · Z_t(w)
+```
+
+This is the simplest coherent form.
+
+### 5.7 The New Softmax
+
+Now the standard softmax is replaced by a field-integrated softmax:
+
+```
+P(w_t = w | x_{<t}) = exp(Z_t*(w)) / Σ_{u ∈ V} exp(Z_t*(u))
+```
+
+This is still formally a softmax, but it is no longer over plain transformer logits. It is over integrated semantic-governance scores.
+
+**That is the critical evolution.**
+
+Standard transformer:
+
+```
+softmax(z_t(w))
+```
+
+New architecture:
+
+```
+softmax( B_t(w) Σ_f α_{t,f} S_{f,t}(w) )
+```
+
+So probability is now a function of:
+
+* statistical continuation
+* ontological fit
+* physical plausibility
+* mental resonance
+* cognitive-mode fit
+* energetic compatibility
+* cross-field coherence
+
+### 5.8 Interpretation of the New Softmax
+
+In standard softmax, tokens compete only by scalar contextual likelihood.
+
+In the new softmax, tokens compete by consensus across semantic realities.
+
+So the selected token is the one that best satisfies:
+
+* what the sentence means
+* what the world allows
+* what the tone carries
+* what cognition mode is active
+* what energy relation is harmonious
+* whether all those perspectives agree
+
+### 5.9 Optional Stronger Form: Agreement-Energy Softmax
+
+A more expressive form is to include a pairwise agreement energy term.
+
+Define
+
+```
+A_t(w) = Σ_{f<g} β_{fg} S_{f,t}(w) S_{g,t}(w)
+```
+
+where `β_{fg}` measures synergy between fields.
+
+Then:
+
+```
+Z̃_t(w) = Σ_f α_{t,f} S_{f,t}(w) + A_t(w)
+```
+
+and optionally
+
+```
+P(w_t = w | x_{<t}) = exp(Z̃_t(w)) / Σ_{u ∈ V} exp(Z̃_t(u))
+```
+
+This rewards tokens not only for high individual field scores but for mutual reinforcement across fields.
+
+This may be closer to "conscious integration," but the simpler Bliss-gated version is the safer initial design.
+
+### 5.10 Training Objective
+
+To learn these primitives jointly, total loss can be:
+
+```
+L = L_LM + λ_ont L_ont + λ_jepa L_jepa + λ_csr L_csr
+    + λ_vritti L_vritti + λ_guna L_guna + λ_bliss L_coh
+```
+
+where
+
+* `L_LM`: next-token loss using the new integrated softmax
+* auxiliary losses teach each primitive's state head
+* coherence loss stabilizes agreement structure
+
+This makes the primitives train alongside token embeddings and transformer states, not after the fact.
+
+### 5.11 Minimal Practical Version
+
+For first implementation, use:
+
+1. base score
+2. ontology score
+3. JEPA score
+4. CSR score
+5. Vritti score
+6. Guna score
+7. Kosha weights
+8. Bliss variance gate
+9. integrated softmax
+
+That gives a clean trainable system without overcomplicating the first prototype.
+
+### 5.12 Final Summary
+
+The architectural primitives become mathematical scoring functions over candidate tokens:
+
+* transformer gives the base semantic proposal
+* ontology gives semantic identity fit
+* JEPA gives physical plausibility
+* CSR gives mental resonance
+* Vritti gives cognitive-mode fit
+* Guna gives energetic compatibility
+* Kosha gives contextual weighting
+* Bliss gives coherence gating
+
+These combine into an integrated token score:
+
+```
+Z_t*(w) = B_t(w) Σ_f α_{t,f} S_{f,t}(w)
+```
+
+and final generation is defined by:
+
+```
+P(w_t = w | x_{<t}) = exp(Z_t*(w)) / Σ_{u ∈ V} exp(Z_t*(u))
+```
+
+So the end generation is no longer "the most statistically likely next word."
+
+It is "the token with the strongest integrated semantic agreement."
