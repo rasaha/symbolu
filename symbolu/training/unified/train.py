@@ -4352,9 +4352,9 @@ def train(config: UnifiedTrainingConfig):
                               f"wr_scale={_wr_scale:.1f}")
 
             # =====================================================================
-            # CONSCIOUS GENERATION Phase 1: Token Ontology Cache + L_ont Loss
-            # Refreshes O_tok cache periodically, computes ontological structure
-            # loss to encourage semantic clustering in the 32D manifold.
+            # CONSCIOUS GENERATION Phase 1+2: Token Ontology Cache + L_ont Loss
+            # Refreshes O_tok + Phase 2 buffers (P_tok, R_tok, V_tok, G_tok)
+            # periodically, computes ontological structure loss for 32D manifold.
             # =====================================================================
             if config.enable_conscious_generation and hasattr(model, 'conscious_gen'):
                 try:
@@ -4403,6 +4403,14 @@ def train(config: UnifiedTrainingConfig):
                                     _cg_msg += (f" | L_ont={metrics['cg_ont_loss']:.4f}"
                                                f" | pos_sim={metrics.get('cg_ont_pos_sim', 0):.3f}"
                                                f" | neg_sim={metrics.get('cg_ont_neg_sim', 0):.3f}")
+                                # Phase 2 buffer norms
+                                _p2_norms = []
+                                for _buf_name in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                    _norm_key = f"{_buf_name}_mean_norm"
+                                    if _norm_key in _cg_diag and _cg_diag[_norm_key] > 0:
+                                        _p2_norms.append(f"{_buf_name}={_cg_diag[_norm_key]:.3f}")
+                                if _p2_norms:
+                                    _cg_msg += f" | norms: {', '.join(_p2_norms)}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -4413,6 +4421,11 @@ def train(config: UnifiedTrainingConfig):
                                     writer.add_scalar('conscious_gen/ont_neg_sim', metrics.get('cg_ont_neg_sim', 0), global_step)
                                 writer.add_scalar('conscious_gen/O_tok_std', _cg_diag.get('O_tok_std', 0), global_step)
                                 writer.add_scalar('conscious_gen/bhava_entropy', _cg_diag.get('bhava_entropy', 0), global_step)
+                                # Phase 2 buffer norms
+                                for _buf_name in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                    _norm_key = f"{_buf_name}_mean_norm"
+                                    if _norm_key in _cg_diag:
+                                        writer.add_scalar(f'conscious_gen/{_norm_key}', _cg_diag[_norm_key], global_step)
 
                 except Exception as e:
                     if global_step % 500 == 0:

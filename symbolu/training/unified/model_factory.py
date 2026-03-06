@@ -445,11 +445,14 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             state_dim=config.token_ontology_dim,
         )
 
+        # Single cache with Phase 1 + Phase 2 buffer dimensions
         token_cache = TokenPrimitiveCache(
             projector=token_projector,
             vocab_size=config.vocab_size,
             state_dim=config.token_ontology_dim,
             refresh_interval=config.ontology_cache_refresh_interval,
+            jepa_dim=config.jepa_token_dim,
+            csr_dim=config.csr_token_dim,
         )
 
         ontology_scorer = OntologyCompatibilityScorer(
@@ -504,28 +507,17 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         )
 
         # Register Phase 2 scorers with cache for refresh
-        token_cache_with_phase2 = TokenPrimitiveCache(
-            projector=token_projector,
-            vocab_size=config.vocab_size,
-            state_dim=config.token_ontology_dim,
-            refresh_interval=config.ontology_cache_refresh_interval,
-            jepa_dim=config.jepa_token_dim,
-            csr_dim=config.csr_token_dim,
-        )
-        token_cache_with_phase2.set_scorers(
+        token_cache.set_scorers(
             jepa_scorer=jepa_scorer,
             csr_scorer=csr_scorer,
             vritti_scorer=vritti_scorer,
             guna_scorer=guna_scorer,
         )
-        # Replace Phase 1 cache with extended version
-        token_cache = token_cache_with_phase2
 
         conscious_gen_modules = {
             "token_projector": token_projector,
             "token_cache": token_cache,
             "ontology_scorer": ontology_scorer,
-            "ontology_loss": ontology_loss,
             "base_scorer": base_scorer,
             "jepa_scorer": jepa_scorer,
             "csr_scorer": csr_scorer,
