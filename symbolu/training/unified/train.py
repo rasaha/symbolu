@@ -4338,8 +4338,8 @@ def train(config: UnifiedTrainingConfig):
                         _retr_loss_val = _retr_loss.item()
                     # Step the router noise counter
                     _sm._router_step += 1
-                    # Log slot diagnostics periodically
-                    if global_step % config.log_every == 0:
+                    # Log slot diagnostics periodically (only on last accumulation step)
+                    if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
                         _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(8.0))))
                         _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
                         print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
