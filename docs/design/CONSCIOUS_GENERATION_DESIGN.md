@@ -2221,3 +2221,479 @@ During inference:
 7. Softmax selects the next token.
 
 This transforms token generation into multi-layer semantic evaluation, producing more grounded and coherent language.
+
+---
+
+## Step 8 — Computational Efficiency and Implementation Strategy
+
+This section explains how the architecture can be implemented without making decoding prohibitively expensive. The central challenge is obvious:
+
+A standard language model computes one logit per token. This architecture appears to compute multiple primitive scores per token, which could be too costly if done naively over the full vocabulary at every step.
+
+So the implementation must preserve the conceptual design while making the computation tractable.
+
+### 8.1 Core Computational Challenge
+
+At decoding step `t`, a naive implementation would compute for every token `w ∈ V`:
+
+* `S_base(w)`
+* `S_ont(w)`
+* `S_jepa(w)`
+* `S_csr(w)`
+* `S_vritti(w)`
+* `S_guna(w)`
+* `B(w)`
+
+If vocabulary size is `V ≈ 50,000`, that means evaluating multiple semantic heads across the whole vocabulary at every token step.
+
+That is too expensive unless the computation is factored carefully.
+
+So the implementation strategy should follow one rule:
+
+**Compute expensive context-dependent states once, and compute token-dependent scores with cheap vector operations.**
+
+### 8.2 High-Level Efficiency Principle
+
+The architecture should be split into two computational categories.
+
+**A. Context-side computations**
+
+These depend only on the current hidden state `h_t` and are computed once per decoding step.
+
+Examples:
+
+* ontology context state `o_t`
+* JEPA context state `p_t`
+* CSR context state `r_t`
+* Vritti context distribution `q_t^(v)`
+* Guna context distribution `q_t^(g)`
+* Kosha weights `α_t`
+
+**B. Token-side cached representations**
+
+These depend only on the token vocabulary and can be precomputed or updated infrequently.
+
+Examples:
+
+* token ontology codes `o_w`
+* token JEPA signatures `p_w`
+* token CSR signatures `r_w`
+* token Vritti profiles `q_w^(v)`
+* token Guna profiles `q_w^(g)`
+
+Then inference becomes mostly:
+
+* one forward pass for context
+* several matrix multiplications between context vectors and cached token matrices
+
+That makes the design practical.
+
+### 8.3 Cached Token Primitive Tables
+
+The most important optimization is to precompute token-side primitive representations.
+
+For the vocabulary `V`, define matrices:
+
+```
+O_tok ∈ ℝ^{V × 32}
+P_tok ∈ ℝ^{V × d_j}
+R_tok ∈ ℝ^{V × d_c}
+V_tok ∈ ℝ^{V × K_v}
+G_tok ∈ ℝ^{V × 3}
+```
+
+where rows correspond to tokens.
+
+These can be computed from token embeddings:
+
+```
+o_w = U_o e_w
+p_w = f_jepa-tok(e_w, o_w)
+r_w = f_csr-tok(w)
+q_w^(v) = softmax(U_v e_w)
+q_w^(g) = softmax(U_g e_w)
+```
+
+Since token embeddings change during training, these cached tables are refreshed periodically during training and reused during inference.
+
+This converts per-token primitive scoring into dense batched linear algebra.
+
+### 8.4 Efficient Score Computation by Matrix Operations
+
+At step `t`, compute context-side vectors once:
+
+```
+o_t,  p_t,  r_t,  q_t^(v),  q_t^(g),  α_t
+```
+
+Then scores across the full vocabulary can be computed efficiently.
+
+**Ontology score**
+
+```
+S_ont = O_tok (M_ont o_t)
+```
+
+This yields a vector in `ℝ^V`.
+
+**JEPA score**
+
+```
+S_jepa = P_tok (M_jepa p_t)
+```
+
+**CSR score**
+
+```
+S_csr = R_tok (M_csr r_t)
+```
+
+**Vritti score**
+
+If using dot-product compatibility:
+
+```
+S_vritti = V_tok q_t^(v)
+```
+
+**Guna score**
+
+```
+S_guna = G_tok (G⊤ q_t^(g))
+```
+
+All of these are just matrix-vector products. That is much cheaper than running a separate network for every token candidate.
+
+So the architecture should be implemented as:
+
+* one transformer pass
+* several projection heads
+* several vocabulary-wide matrix products
+* one integrated score
+* one softmax
+
+This is computationally reasonable.
+
+### 8.5 Two-Stage Candidate Pruning
+
+Even with efficient matrix operations, scoring the full vocabulary through every field may still be expensive for large models or low-latency generation.
+
+So the safest production strategy is two-stage evaluation.
+
+**Stage 1 — Base proposal shortlist**
+
+Use the transformer base logits to get top-K token candidates:
+
+```
+C_t = TopK(S_base)
+```
+
+where K might be 64, 128, or 256.
+
+This is cheap because standard vocab projection already exists.
+
+**Stage 2 — Full semantic re-ranking**
+
+Compute full primitive evaluation only over the shortlist:
+
+```
+w ∈ C_t
+```
+
+Now all ontology, JEPA, CSR, Vritti, Guna, Kosha, and Bliss scoring are done on a small candidate set.
+
+This preserves the conceptual model while massively reducing compute.
+
+This should be the default implementation for real-time decoding.
+
+### 8.6 When to Use Full-Vocabulary vs Shortlist Scoring
+
+There should be two operating modes.
+
+**Full-vocabulary integration**
+
+Use during:
+
+* research evaluation
+* smaller vocabularies
+* offline generation
+* training diagnostics
+
+Pros:
+
+* exact semantic competition across all tokens
+
+Cons:
+
+* slower
+
+**Shortlist re-ranking**
+
+Use during:
+
+* real-time inference
+* deployment
+* large-vocabulary systems
+
+Pros:
+
+* fast
+* easy to scale
+* preserves most of the semantic benefit
+
+Cons:
+
+* if the correct token never enters the shortlist, semantic fields cannot rescue it
+
+So the document should explicitly recommend: **train with wider coverage, deploy with shortlist re-ranking.**
+
+### 8.7 Low-Rank Factorization of Primitive Heads
+
+To further reduce cost, primitive scoring heads should be low-rank.
+
+Instead of a full matrix `M_ont`, use:
+
+```
+M_ont = A_ont B_ont⊤
+```
+
+with rank `r ≪ 32`.
+
+Similarly for JEPA and CSR:
+
+```
+M_jepa = A_jepa B_jepa⊤
+M_csr = A_csr B_csr⊤
+```
+
+This reduces parameter count and compute while preserving expressive power.
+
+This is especially useful if the token primitive tables are large.
+
+### 8.8 Shared Projections Across Primitives
+
+Another major efficiency gain is to share intermediate projections.
+
+Instead of learning completely separate token-side transforms for every primitive, define a shared token semantic basis:
+
+```
+u_w = U_shared e_w
+```
+
+Then derive primitive signatures from that basis:
+
+```
+o_w = A_o u_w
+p_w = A_j u_w
+r_w = A_c u_w
+q_w^(v) = softmax(A_v u_w)
+q_w^(g) = softmax(A_g u_w)
+```
+
+Likewise on the context side:
+
+```
+u_t = W_shared h_t
+```
+
+Then derive context primitive states from `u_t`.
+
+This makes the whole architecture more parameter-efficient and encourages aligned semantic geometry across primitives.
+
+### 8.9 Efficient Bliss Computation
+
+Bliss can become expensive if computed with many pairwise interactions or nonlinear terms.
+
+So the initial implementation should use a simple weighted variance form:
+
+```
+μ(w) = Σ_f α_f S_f(w)
+D(w) = Σ_f α_f (S_f(w) - μ(w))²
+B(w) = exp(-λ_B D(w))
+```
+
+This is cheap because:
+
+* only a few primitive scores exist
+* variance is computed over a tiny field dimension, not over hidden dimensions
+
+So Bliss is not a major bottleneck.
+
+It should remain a lightweight coherence gate in v1.
+
+### 8.10 Training-Time Implementation Strategy
+
+Training must also be staged efficiently.
+
+**Phase A — standard backbone first**
+
+Train mostly as a normal transformer with weak primitive heads.
+
+**Phase B — ontology and primitive supervision**
+
+Compute primitive losses, but not necessarily full integrated softmax over full vocabulary on every step.
+
+**Phase C — sampled candidate training**
+
+Instead of full vocab integration, train with:
+
+* correct token
+* hard negatives
+* top-K negatives from base logits
+* semantically confusable negatives
+
+This is important.
+
+For many primitive losses, you do not need full-vocabulary evaluation. You only need a candidate subset that teaches the model to distinguish:
+
+* physically plausible vs implausible
+* harmonious vs conflicting
+* factual vs imaginary
+* furniture table vs database table
+
+This makes training much cheaper.
+
+### 8.11 Inference Stack in Practice
+
+A practical inference implementation should look like this.
+
+**Step 1**
+Run transformer and get `h_t`.
+
+**Step 2**
+Compute:
+* base logits
+* ontology context state
+* primitive context states
+* Kosha weights
+
+**Step 3**
+Take top-K base tokens.
+
+**Step 4**
+Lookup cached primitive signatures for those K tokens.
+
+**Step 5**
+Compute:
+* `S_ont`
+* `S_jepa`
+* `S_csr`
+* `S_vritti`
+* `S_guna`
+
+**Step 6**
+Compute Bliss and integrated score.
+
+**Step 7**
+Run semantic re-ranked softmax over shortlist.
+
+This gives most of the benefit at acceptable cost.
+
+### 8.12 Memory Considerations
+
+The architecture trades compute for cached token semantic tables.
+
+If vocabulary is V and primitive dimensions are modest, memory remains manageable.
+
+For example, with:
+
+* V = 50,000
+* ontology = 32 dims
+* JEPA = 16 dims
+* CSR = 16 dims
+* Vritti = 5 dims
+* Guna = 3 dims
+
+Total cached token features are roughly:
+
+```
+50,000 × (32 + 16 + 16 + 5 + 3) = 50,000 × 72 = 3,600,000 floats
+```
+
+which is very manageable on modern hardware, especially with fp16 or bf16.
+
+So this architecture is more memory-friendly than it first appears.
+
+### 8.13 Implementation Tiers
+
+The document explicitly defines three implementation tiers.
+
+**Tier 1 — Research prototype**
+
+* full primitive heads
+* top-K re-ranking
+* simple Bliss variance gate
+* shared token caches
+
+Best for validating the concept.
+
+**Tier 2 — Efficient deployment model**
+
+* shortlist re-ranking only
+* low-rank primitive heads
+* shared semantic basis
+* periodic token cache refresh
+
+Best for real-time deployment.
+
+**Tier 3 — Full semantic generation engine**
+
+* wider candidate sets
+* richer agreement-energy terms
+* optional iterative refinement
+* deeper primitive coupling inside attention blocks
+
+Best for advanced versions after proof of concept.
+
+### 8.14 Compatibility with Existing Transformer Infrastructure
+
+A major advantage of this design is that it does not require replacing the transformer backbone.
+
+It can be implemented as:
+
+* standard transformer hidden states
+* added ontology projection head
+* added primitive heads
+* semantic re-ranking layer before final token selection
+
+So it is compatible with:
+
+* standard pretraining stacks
+* existing tokenizers
+* existing vocabularies
+* standard KV-cache decoding
+* current GPU inference pipelines
+
+This is important strategically.
+
+The architecture changes how logits are interpreted and integrated, not the entire low-level transformer engine.
+
+### 8.15 Recommended First Implementation
+
+For the first real implementation, the best compromise is:
+
+1. keep the transformer unchanged
+2. add a 32D ontology projection
+3. add lightweight JEPA, CSR, Vritti, Guna heads
+4. compute Kosha weights from context
+5. use cached token primitive signatures
+6. shortlist with top-128 base logits
+7. re-rank with integrated score
+8. apply semantic softmax over shortlist
+
+This is the most realistic path from theory to code.
+
+### 8.16 Summary
+
+The architecture is computationally feasible if implemented with the right factoring.
+
+Key principles:
+
+* compute context-side states once
+* cache token-side primitive signatures
+* use matrix-vector scoring
+* shortlist candidates before full semantic evaluation
+* keep Bliss lightweight
+* use shared and low-rank projections where possible
+
+So although the conceptual model is richer than a standard transformer, the runtime cost can be kept within practical bounds.
