@@ -3043,3 +3043,272 @@ The experiments verify:
 * each primitive contributes measurable improvements
 * governance layers improve coherence
 * integrated token scoring produces more grounded language generation
+
+---
+
+## Step 10 — Relationship to Existing Architectures
+
+This section explains how the proposed architecture differs from existing language model designs and why the additional semantic primitives provide new capabilities beyond current approaches.
+
+The goal is not to replace transformers, but to extend them from statistical token prediction systems into structured semantic inference systems.
+
+### 10.1 Standard Transformer Language Models
+
+#### Architecture
+
+Standard language models operate as follows:
+
+```
+tokens → embeddings → transformer → logits → softmax
+```
+
+Token probability is determined by:
+
+$$P(w_t) = \text{softmax}(z_t)$$
+
+where *z_t* is a vector of token logits derived from the hidden state.
+
+#### Characteristics
+
+| Property | Transformer |
+|---|---|
+| Token prediction | statistical continuation |
+| Semantic structure | implicit in embeddings |
+| Grounding | none |
+| Reasoning | emergent |
+| Token selection | single scalar logit |
+
+#### Limitation
+
+The transformer treats language generation as a statistical sequence modeling problem.
+
+It does not explicitly represent:
+
+* physical plausibility
+* cognitive mode
+* relational harmony
+* semantic ontology
+* cross-field agreement
+
+Meaning is encoded only implicitly inside the hidden state.
+
+### 10.2 RLHF-Based Language Models
+
+Reinforcement Learning from Human Feedback modifies transformer outputs by optimizing a reward model.
+
+#### Architecture
+
+```
+transformer → output
+        ↓
+  reward model
+        ↓
+  policy optimization
+```
+
+The reward model encourages outputs that humans prefer.
+
+#### Characteristics
+
+| Property | RLHF |
+|---|---|
+| Goal | align outputs with human preference |
+| Semantic structure | still implicit |
+| Training signal | reward optimization |
+| Generation mechanism | unchanged |
+
+#### Limitation
+
+RLHF changes behavior, not internal representation.
+
+The architecture still relies on:
+
+$$\text{softmax}(z_t)$$
+
+Token probability remains a purely statistical function of hidden states.
+
+Thus RLHF improves alignment but does not add semantic reasoning structure.
+
+### 10.3 Constitutional AI
+
+Constitutional AI uses explicit principles to guide model behavior.
+
+#### Architecture
+
+```
+transformer output
+        ↓
+   self critique
+        ↓
+     revision
+```
+
+The model critiques its own outputs using predefined rules.
+
+#### Characteristics
+
+| Property | Constitutional AI |
+|---|---|
+| Goal | enforce ethical constraints |
+| Mechanism | critique and revision |
+| Semantic structure | implicit |
+| Token generation | unchanged |
+
+#### Limitation
+
+Constitutional AI operates after generation.
+
+It modifies outputs but does not change how tokens are evaluated internally.
+
+### 10.4 World Models and JEPA
+
+Joint Embedding Predictive Architectures (JEPA) aim to model the structure of the world rather than predict raw tokens.
+
+#### Architecture
+
+```
+context → latent world representation → prediction
+```
+
+JEPA systems focus on:
+
+* physical prediction
+* representation learning
+* world modeling
+
+#### Characteristics
+
+| Property | JEPA |
+|---|---|
+| Focus | world representation |
+| Prediction | future states |
+| Grounding | physical |
+| Language generation | indirect |
+
+#### Limitation
+
+JEPA models are not designed for token generation in natural language.
+
+They typically operate in vision or structured environments rather than linguistic generation.
+
+### 10.5 Retrieval-Augmented Generation (RAG)
+
+RAG improves generation by retrieving external documents.
+
+#### Architecture
+
+```
+query → retrieval → context augmentation → transformer
+```
+
+#### Characteristics
+
+| Property | RAG |
+|---|---|
+| Knowledge source | external database |
+| Semantic grounding | retrieved information |
+| Generation | still transformer-based |
+
+#### Limitation
+
+RAG improves knowledge access, not semantic reasoning inside token selection.
+
+The token generation mechanism remains unchanged.
+
+### 10.6 Proposed Architecture
+
+The proposed architecture integrates multiple semantic primitives directly into the token probability function.
+
+#### Generation Pipeline
+
+```
+context
+  ↓
+transformer hidden state
+  ↓
+ontological projection
+  ↓
+primitive evaluation (JEPA, CSR, Vritti, Guna)
+  ↓
+Kosha weighting
+  ↓
+Bliss coherence
+  ↓
+integrated token score
+  ↓
+softmax
+```
+
+#### Key Idea
+
+Token probability is determined by multi-field semantic agreement rather than only statistical continuation.
+
+$$Z(w) = B(w) \sum_f \alpha_f S_f(w)$$
+
+$$P(w) = \text{softmax}(Z(w))$$
+
+### 10.7 Architectural Comparison
+
+| Feature | Transformer | RLHF | Constitutional AI | RAG | Proposed Architecture |
+|---|---|---|---|---|---|
+| Token prediction | statistical | statistical | statistical | statistical | multi-field evaluation |
+| Ontology | implicit | implicit | implicit | implicit | explicit |
+| Physical grounding | none | none | none | indirect | JEPA primitive |
+| Mental resonance | none | none | none | none | CSR primitive |
+| Cognitive mode | none | none | none | none | Vritti primitive |
+| Energetic compatibility | none | none | none | none | Guna primitive |
+| Governance | none | reward | rules | retrieval | Kosha |
+| Coherence integration | implicit | implicit | post-hoc | implicit | Bliss |
+
+### 10.8 Conceptual Difference
+
+Existing architectures treat language generation as:
+
+> **sequence prediction**
+
+The proposed architecture treats generation as:
+
+> **multi-layer semantic agreement**
+
+A token is selected when:
+
+* its semantic identity fits the ontology
+* it is physically plausible
+* its tone matches the mental field
+* it fits the cognitive mode
+* it harmonizes with surrounding relations
+* the semantic fields agree
+
+Thus token generation becomes a structured semantic inference process.
+
+### 10.9 Compatibility with Transformers
+
+The architecture does not discard transformers.
+
+Instead it augments the transformer output stage.
+
+Transformer hidden states provide:
+
+* contextual reasoning
+* compositional language modeling
+
+Semantic primitives then evaluate token candidates before final selection.
+
+Thus the system combines:
+
+```
+statistical language modeling + structured semantic evaluation
+```
+
+### 10.10 Summary
+
+Current language model architectures improve generation primarily through:
+
+* scaling
+* reinforcement learning
+* retrieval
+* post-hoc critique
+
+The proposed architecture instead modifies how token probability itself is computed.
+
+By integrating ontology, physical grounding, mental resonance, cognitive modes, energetic compatibility, and coherence governance, the system transforms token selection into a multi-layer semantic decision.
