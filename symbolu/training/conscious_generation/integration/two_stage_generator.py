@@ -79,6 +79,7 @@ class TwoStageGenerator(nn.Module):
             hidden=hidden,
             o_ctx=o_ctx,
             cache=cache,
+            k=self.shortlist_k,
         )
         T = tet_result['T']                        # (..., K, 6)
         candidate_ids = tet_result['candidate_ids']  # (..., K)
@@ -97,6 +98,8 @@ class TwoStageGenerator(nn.Module):
             Z_star=Z_star,
             candidate_ids=candidate_ids,
             T=T,
+            Z=integ_result.get("Z"),
+            B=integ_result.get("B"),
         )
 
         # Merge all results

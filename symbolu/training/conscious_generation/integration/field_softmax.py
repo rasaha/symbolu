@@ -7,9 +7,9 @@ P(w) = exp(Z*(w) / τ) / Σ_{u ∈ C_t} exp(Z*(u) / τ)
 where Z*(w) = B(w) · Z(w) is the Bliss-gated integrated score from Phase 3,
 and C_t is the top-K candidate shortlist from base logits.
 
-Optional agreement-energy extension:
+Optional agreement-energy extension (spec §5.9):
   A_t(w) = Σ_{f<g} β_{fg} S_f(w) S_g(w)     — pairwise primitive synergy
-  Z̃*(w) = B(w) · (Z(w) + β · A_t(w))
+  Z̃*(w) = B(w) · (Z(w) + A_t(w))            — Bliss gates the augmented score
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 4 (D.6)
 """
@@ -22,17 +22,17 @@ from typing import Dict, Optional
 
 class FieldIntegratedSoftmax(nn.Module):
     """
-    Computes token probability distribution from field-integrated scores Z*(w).
+    Computes token probability distribution from field-integrated scores.
 
-    Takes the integrated scorer output (Z_star, candidate_ids) and produces a
-    full-vocabulary log-probability tensor suitable for cross-entropy loss or
-    sampling.
+    When agreement_energy is disabled: uses Z_star = B * Z directly.
+    When enabled: recomputes Z̃* = B * (Z + A) from Z, B, T components
+    so the pairwise synergy is gated by Bliss (per spec).
 
     Args:
         vocab_size: Full vocabulary size (for scatter into full-vocab tensor).
         temperature: Softmax temperature (τ). Default 1.0.
         use_agreement_energy: If True, add pairwise agreement term A_t(w).
-        agreement_energy_weight: β coefficient for agreement energy.
+        agreement_energy_weight: Initial β coefficient for agreement energy.
         num_primitives: Number of primitives (for agreement energy pairs).
     """
 
@@ -48,7 +48,6 @@ class FieldIntegratedSoftmax(nn.Module):
         self.vocab_size = vocab_size
         self.temperature = temperature
         self.use_agreement_energy = use_agreement_energy
-        self.agreement_energy_weight = agreement_energy_weight
 
         if use_agreement_energy:
             # Learnable pairwise coupling β_{fg} for each pair of primitives
@@ -79,6 +78,8 @@ class FieldIntegratedSoftmax(nn.Module):
         Z_star: torch.Tensor,
         candidate_ids: torch.Tensor,
         T: Optional[torch.Tensor] = None,
+        Z: Optional[torch.Tensor] = None,
+        B: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Compute field-integrated log-probabilities over the full vocabulary.
@@ -88,9 +89,14 @@ class FieldIntegratedSoftmax(nn.Module):
         full-vocabulary shape for compatibility with standard cross-entropy.
 
         Args:
-            Z_star: Bliss-gated integrated scores (..., K).
+            Z_star: Bliss-gated integrated scores (..., K). Used directly when
+                    agreement_energy is disabled.
             candidate_ids: Token indices in shortlist (..., K).
             T: Token Evaluation Tensor (..., K, 6). Required if
+               use_agreement_energy is True.
+            Z: Raw Kosha-weighted scores (..., K). Required if
+               use_agreement_energy is True.
+            B: Bliss coherence values (..., K). Required if
                use_agreement_energy is True.
 
         Returns:
@@ -99,12 +105,12 @@ class FieldIntegratedSoftmax(nn.Module):
                 'probs': Full-vocab probabilities (..., V).
                 'shortlist_log_probs': Log-probs over shortlist only (..., K).
         """
-        scores = Z_star
-
-        # Optional: add agreement energy
-        if self.use_agreement_energy and T is not None:
+        if self.use_agreement_energy and T is not None and Z is not None and B is not None:
+            # Spec: Z̃*(w) = B(w) · (Z(w) + A_t(w))
             A = self._compute_agreement_energy(T)
-            scores = scores + A
+            scores = B * (Z + A)
+        else:
+            scores = Z_star
 
         # Temperature scaling
         scores = scores / self.temperature

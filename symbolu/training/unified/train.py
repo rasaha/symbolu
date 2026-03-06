@@ -2655,7 +2655,15 @@ def train(config: UnifiedTrainingConfig):
                     if not _first_iter_logged and accumulation_step == 0 and device.type == 'cuda':
                         _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
-                    outputs = model(x, return_decorr_loss=enable_decorr) if enable_decorr else model(x)
+                    # Phase 3/4 governance needs hidden states for primitive scoring + routing
+                    _need_hidden = (config.enable_conscious_generation
+                                    and hasattr(model, 'conscious_gen')
+                                    and 'integrated_scorer' in model.conscious_gen)
+                    if enable_decorr or _need_hidden:
+                        outputs = model(x, return_decorr_loss=enable_decorr,
+                                        return_last_hidden=_need_hidden)
+                    else:
+                        outputs = model(x)
 
                 if not tbptt_backward_done:
                     if isinstance(outputs, dict):
@@ -4464,6 +4472,9 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_D = _cg_integ_result['D']            # (B, T, K)
 
                                 # Phase 4: Replace L_LM with field-integrated cross-entropy
+                                # Strategy: subtract old LM CE, add field-integrated CE.
+                                # This preserves all aux losses accumulated between
+                                # compute_phase_loss() and this point (~40 loss terms).
                                 if _cg_phase4 and 'field_softmax' in model.conscious_gen:
                                     _cg_Z_star = _cg_integ_result['Z_star']  # (B, T, K)
                                     _cg_fs = model.conscious_gen['field_softmax']
@@ -4471,29 +4482,44 @@ def train(config: UnifiedTrainingConfig):
                                         Z_star=_cg_Z_star,
                                         candidate_ids=_cg_cand_ids,
                                         T=_cg_T,
+                                        Z=_cg_integ_result.get('Z'),
+                                        B=_cg_B,
                                     )
                                     _cg_log_probs = _cg_fs_result['log_probs']  # (B, T, V)
-                                    # Replace the standard LM loss with field-integrated CE.
-                                    # NLL loss on log-probs = cross-entropy.
+
+                                    # Mask positions where target is NOT in shortlist
+                                    # (log_prob = -inf → nll = inf). Only compute loss
+                                    # over positions where re-ranking is meaningful.
+                                    _cg_target_in_shortlist = (
+                                        _cg_cand_ids == y.unsqueeze(-1)
+                                    ).any(dim=-1)  # (B, T) bool
+                                    _cg_field_targets = y.clone()
+                                    _cg_field_targets[~_cg_target_in_shortlist] = -100
+
                                     _cg_lm_loss = F.nll_loss(
                                         _cg_log_probs.reshape(-1, _cg_log_probs.shape[-1]),
-                                        y.reshape(-1),
+                                        _cg_field_targets.reshape(-1),
                                         ignore_index=-100,
                                     )
                                     if torch.isfinite(_cg_lm_loss):
-                                        # Replace the base LM loss component. The original
-                                        # `loss` from compute_phase_loss includes LM + z_loss.
-                                        # We subtract the old LM CE and add the integrated one.
-                                        # Simpler: just recompute total from integrated loss.
-                                        _cg_old_lm_metrics = metrics.copy()
-                                        loss = _cg_lm_loss
-                                        # Re-add z-loss if it was active
-                                        z_loss_weight = getattr(config, 'z_loss_weight', 1e-4)
-                                        if z_loss_weight > 0 and logits is not None:
-                                            _cg_log_z = torch.logsumexp(logits, dim=-1)
-                                            loss = loss + z_loss_weight * (_cg_log_z ** 2).mean()
+                                        # Recompute old LM CE (detached) to subtract it
+                                        with torch.no_grad():
+                                            _cg_V = logits.shape[-1]
+                                            _cg_old_lm = F.cross_entropy(
+                                                logits.reshape(-1, _cg_V),
+                                                y.reshape(-1),
+                                                ignore_index=-100,
+                                            )
+                                        # Swap: remove old LM loss, add field-integrated
+                                        loss = loss - _cg_old_lm + _cg_lm_loss
                                         metrics['cg_field_lm_loss'] = _cg_lm_loss.item()
                                         metrics['cg_phase4_active'] = 1.0
+                                        # Track shortlist coverage
+                                        _cg_coverage = _cg_target_in_shortlist.float().mean()
+                                        metrics['cg_shortlist_coverage'] = _cg_coverage.item()
+                                    else:
+                                        # Non-finite field loss — fall back to standard LM
+                                        metrics['cg_phase4_fallback'] = 1.0
 
                                 # Kosha routing loss
                                 if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:

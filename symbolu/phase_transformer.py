@@ -8079,7 +8079,8 @@ class OntologicalHybridTransformer(nn.Module):
         )
 
         for _ in range(max_new_tokens):
-            result = self(input_ids, reset_state=(self.prev_state is None))
+            result = self(input_ids, reset_state=(self.prev_state is None),
+                          return_last_hidden=_has_two_stage)
             logits = result['logits'][:, -1, :]  # (B, V)
 
             if _has_two_stage:
@@ -8091,10 +8092,12 @@ class OntologicalHybridTransformer(nn.Module):
                     o_ctx_last = o_ctx[:, -1, :] if o_ctx.dim() == 3 else o_ctx
                     # TwoStageGenerator handles shortlist + scoring + softmax
                     gen = self.conscious_gen['two_stage_generator']
+                    _cache = self.conscious_gen['token_cache'] if 'token_cache' in self.conscious_gen else None
                     gen_result = gen(
-                        logits=logits.unsqueeze(1),    # (B, 1, V)
+                        logits=logits.unsqueeze(1),       # (B, 1, V)
                         hidden=hidden_last.unsqueeze(1),  # (B, 1, D)
                         o_ctx=o_ctx_last.unsqueeze(1),    # (B, 1, state_dim)
+                        cache=_cache,
                     )
                     probs = gen_result['probs'][:, 0, :]  # (B, V)
                     next_token = torch.multinomial(probs, num_samples=1)
