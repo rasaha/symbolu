@@ -4416,3 +4416,401 @@ This allows any scenario in Section B.5 to define its own ramp-up schedule, cont
 │ Safety       │ 5.0  │ 3.0  │ 0.3  │ 7-8  │ B1=1.0, SRK 1.5×        │
 └──────────────┴──────┴──────┴──────┴──────┴──────────────────────────┘
 ```
+
+---
+
+## Appendix C — Unified System Architecture
+
+### C.1 Purpose
+
+The system described in this document integrates multiple layers of semantic and governance signals into a neural language generation architecture.
+
+Because the system includes several interacting components — neural token generation, semantic primitives, ontological projections, and governance monitoring — this appendix provides a conceptual overview of how these components interact during training and inference.
+
+The earlier sections of this document describe the mechanics of individual components: primitives (Section 3), ontological projections (Section 4), token scoring (Section 5), training objectives (Section 7), and architecture (Section 2). Those sections remain the authoritative reference for algorithmic detail. This appendix explains how the pieces relate conceptually — a system map rather than a specification.
+
+The architecture can be understood as three interacting computational planes.
+
+#### Figure C-1: Token Generation with Semantic Field Integration
+
+```
+                        GOVERNANCE PLANE
+               ---------------------------------
+               |                               |
+               |   SRK Trajectory Signals      |
+               |   Sovereign Monitoring        |
+               |   Coherence / Stability       |
+               |                               |
+               ---------------------------------
+                           ▲
+                           │ monitoring
+                           │
+                           │
+                  SEMANTIC FIELD PLANE
+       ------------------------------------------------
+       |                                              |
+       |            Ontological Projection            |
+       |                 (12D / 32D)                  |
+       |                                              |
+       |  JEPA        CSR        Vritti        Guna   |
+       | Physical   Mental     Cognitive   Relational |
+       | Grounding  Resonance     Mode      Influence |
+       |                                              |
+       |         Kosha Governance Weighting           |
+       |                Bliss Coherence               |
+       ------------------------------------------------
+                           ▲
+                           │ primitive scores
+                           │
+                           │
+                      MODEL PLANE
+       ------------------------------------------------
+       |                                              |
+       |      Phase-Quad Local Attention Network      |
+       |                                              |
+       |  Local Attention Path  (syntax structure)    |
+       |  Quad Retrieval Path   (associative memory)  |
+       |  Phase Memory Path     (global context)      |
+       |                                              |
+       |        Transformer Hidden States h_t         |
+       |                                              |
+       ------------------------------------------------
+                           │
+                           │
+                           ▼
+                Integrated Token Scoring
+                   Z(w) = Σ α_f S_f(w)
+
+                           │
+                           ▼
+                    Softmax Selection
+
+                           │
+                           ▼
+                    Generated Token
+```
+
+During training, semantic primitives provide auxiliary supervision signals that shape the model's internal representations. During inference, primitive compatibility scores contribute to integrated token scoring before softmax selection.
+
+---
+
+### C.2 Three-Plane Architecture
+
+The system consists of three coordinated computational planes:
+
+| Plane | Role |
+|-------|------|
+| **Model Plane** | Neural architecture responsible for token generation |
+| **Semantic Field Plane** | Structured semantic primitives influencing representation learning |
+| **Governance Plane** | Monitoring and trajectory signals ensuring stability and interpretability |
+
+These planes exchange signals during training and inference but maintain clear functional separation. No plane can override another unilaterally — the weight governance system (Appendix B) mediates all cross-plane influence through calibrated loss weights and curriculum gates.
+
+---
+
+### C.3 Plane Structure
+
+#### C.3.1 Model Plane
+
+```
+─────────────────────────────────────────
+ Model Plane
+─────────────────────────────────────────
+
+ Phase-Quad Local Attention Architecture
+
+   Local attention path      (spatial reasoning)
+   Quad retrieval memory     (long-range retrieval)
+   Phase memory state        (temporal persistence)
+   Feed-forward network      (nonlinear transformation)
+
+   → h_t (contextual hidden state)
+   → Next-token probability distribution
+```
+
+The model plane performs the core neural computation of token generation. It produces contextual hidden states that the semantic primitives consume, and token probability distributions that the governance plane monitors. This is the only plane that directly touches the vocabulary — all other planes operate in latent representation space.
+
+#### C.3.2 Semantic Field Plane
+
+```
+─────────────────────────────────────────
+ Semantic Field Plane
+─────────────────────────────────────────
+
+ Ontological Projection    (structured concept space)
+ JEPA latent prediction    (physical grounding)
+ CSR phoneme resonance     (sound-meaning coupling)
+ Vritti classification     (cognitive mode)
+ Guna modulation           (relational influence)
+ Kosha weighting / routing (sheath governance)
+ Bliss coherence           (cross-signal agreement)
+```
+
+The semantic plane contains structured signals that shape the model's internal representations. Each primitive captures a distinct aspect of language meaning:
+
+| Primitive | Role | What it captures |
+|-----------|------|-----------------|
+| **Ontology** | Conceptual identity | *What* a token means in 12D semantic space |
+| **JEPA** | Physical grounding | *Where* a concept sits in embodied experience |
+| **CSR** | Phonemic resonance | *How* a token sounds and its sound-meaning coupling |
+| **Vritti** | Cognitive mode | *Which* mental operation is active (perception, error, imagination, memory, rest) |
+| **Guna** | Relational influence | *Why* a token is chosen (clarity, activity, inertia) |
+| **Kosha** | Governance weighting | *Which layer* of awareness governs the decision |
+| **Bliss** | Cross-signal coherence | *Whether* the primitives agree on the choice |
+
+These primitives are evaluated for candidate tokens during generation (Section 5), and provide auxiliary training objectives during learning (Section 7, Appendix B).
+
+#### C.3.3 Governance Plane
+
+```
+─────────────────────────────────────────
+ Governance Plane
+─────────────────────────────────────────
+
+ Sovereign Signals
+   R-Signal        (ontological intent alignment)
+   S-Signal        (referent accuracy)
+   C-Signal        (phonetic structure)
+
+ SRK Trajectory Monitoring
+   Forward score   (linguistic feasibility)
+   Backward score  (ontological feasibility)
+   B1 Consistency  (forward-backward agreement)
+
+ Coherence / Stability Monitoring
+   S3 Global Coherence   (field-level alignment)
+   S5 Semantic Entropy    (distribution health)
+   S8 Stability Constraint (entropy anchoring)
+```
+
+The governance plane evaluates system-level properties of generation. It does not generate tokens or compute representations — it observes the model plane's outputs and the semantic plane's evaluations, and produces diagnostic and supervisory signals.
+
+These signals serve two purposes:
+1. **During training:** They contribute auxiliary loss terms that shape model parameters (mediated by the curriculum controller, Appendix B.3).
+2. **During inference:** They provide interpretable diagnostics — coherence scores, entropy health, trajectory stability — that external systems can use for monitoring, filtering, or intervention.
+
+---
+
+### C.4 Signal Flow
+
+The three planes interact through controlled signal interfaces:
+
+```
+                    ┌─────────────────────┐
+                    │  Governance Plane    │
+                    │                     │
+                    │  R/S/C Signals      │
+                    │  SRK Trajectory     │
+                    │  Coherence Monitor  │
+                    └──────▲──────────────┘
+                           │ observes
+                           │
+                    ┌──────┴──────────────┐
+                    │ Semantic Field Plane │
+                    │                     │
+                    │  Onto · JEPA · CSR  │
+                    │  Vritti · Guna      │◄────── Kosha weights (α_f)
+                    │  Kosha · Bliss      │
+                    └──▲───────────┬──────┘
+            upward     │           │  downward
+          (features)   │           │  (gradients)
+                    ┌──┴───────────▼──────┐
+                    │    Model Plane       │
+                    │                     │
+                    │  Local + Quad +     │
+                    │  Phase Attention    │
+                    │  → h_t → logits    │
+                    └─────────────────────┘
+```
+
+#### C.4.1 Upward Signals (Model → Semantic)
+
+The neural model produces representations that allow semantic primitives to evaluate candidate tokens:
+
+- **Hidden state vectors** (`h_t`) — consumed by ontological projection, Vritti classification, Kosha routing
+- **Token embeddings** — consumed by CSR phoneme alignment, JEPA latent prediction
+- **Phase memory states** — consumed by Guna modulation, Bliss coherence measurement
+- **Attention patterns** — consumed by coherence monitoring
+
+These representations are used to compute:
+- Ontological projections (12D concept space coordinates)
+- Phoneme resonance scores (CSR alignment at Layer 7)
+- Physical grounding signals (JEPA prediction targets)
+- Cognitive mode classifications (Vritti probability distributions)
+
+#### C.4.2 Downward Signals (Semantic → Model)
+
+Semantic primitives influence training through auxiliary objectives. The total training loss combines the primary language modeling objective with weighted auxiliary terms:
+
+```
+L_total = λ_LM · L_LM
+        + λ_JEPA · L_JEPA
+        + λ_CSR · L_CSR
+        + λ_Onto · L_Ontology
+        + λ_KV · L_KoshaVritti
+        + λ_Guna · L_Guna
+        + λ_Bhava · L_Bhava
+        + ...
+```
+
+Gradients from these objectives update the model parameters, shaping the representations the model produces. The weight governance system (Appendix B) ensures these gradients never overwhelm the primary LM objective.
+
+During inference, downward signals take the form of token-level scoring adjustments rather than gradient updates (see C.5).
+
+#### C.4.3 Lateral Signals (Governance ↔ Semantic)
+
+The governance plane observes semantic primitive outputs and modulates their influence:
+- **Kosha routing** determines which primitives receive higher weighting (`α_f`)
+- **Entropy monitoring** triggers B1 consistency scaling when the semantic field becomes chaotic (Appendix B.4.2)
+- **Phase controller intervention** adjusts steering force when primitives detect collapse or stagnation
+
+---
+
+### C.5 Integrated Token Scoring
+
+During inference, candidate tokens are evaluated using compatibility scores derived from the semantic primitives. This is the mechanism by which the semantic field plane directly influences generation output.
+
+The integrated token score is defined as:
+
+```
+Z(w) = Σ_f  α_f · S_f(w)
+```
+
+where:
+- `S_f(w)` represents primitive compatibility scores for candidate token `w`
+- `f` ranges over ontology, JEPA, CSR, Vritti, and Guna
+- `α_f` represents governance weights derived from Kosha signals
+
+A coherence functional evaluates agreement between primitives:
+
+```
+Z*(w) = B(w) · Z(w)
+```
+
+where `B(w)` is the Bliss coherence functional — a measure of whether the primitives *agree* that token `w` is appropriate. High Bliss amplifies the integrated score; low Bliss attenuates it, preventing incoherent token selections even when individual primitive scores are high.
+
+Token probabilities are then computed via the Field-Integrated Softmax:
+
+```
+P(w_t = w) = exp(Z*(w)) / Σ_u exp(Z*(u))
+```
+
+This replaces the standard softmax over raw logits with a semantically-informed distribution. The key architectural insight is that primitives operate at the *token candidate* level, not the hidden state level — they evaluate "should this word appear here?" rather than modifying the representation from which logits are derived.
+
+---
+
+### C.6 Relationship to Symbol-U Reasoning System
+
+The symbolic reasoning framework described in the associated patent operates *above* the neural generation architecture described in this document.
+
+```
+┌───────────────────────────────────────────┐
+│  Symbolic Reasoning Layer (Patent)        │
+│                                           │
+│  Aspect relevance evaluation              │
+│  Domain alignment verification            │
+│  Resonance compatibility assessment       │
+│  Reasoning trajectory validation          │
+│                                           │
+│  Operates on: complete candidate responses│
+└──────────────────▲────────────────────────┘
+                   │ evaluates
+┌──────────────────┴────────────────────────┐
+│  Neural Generation System (This Document) │
+│                                           │
+│  Model Plane + Semantic Plane +           │
+│  Governance Plane                         │
+│                                           │
+│  Produces: token-by-token generation      │
+└───────────────────────────────────────────┘
+```
+
+The neural model produces candidate responses, which may then be evaluated by symbolic reasoning mechanisms that assess:
+- **Aspect relevance** — does the response address the correct conceptual dimensions?
+- **Domain alignment** — is the response consistent with the domain's semantic constraints?
+- **Resonance compatibility** — do the phonemic and semantic signals agree at the response level?
+- **Reasoning trajectory stability** — does the chain of reasoning maintain consistency from premise to conclusion?
+
+This separation ensures that:
+- Neural generation remains efficient (token-level, GPU-optimized)
+- Symbolic reasoning provides higher-level validation (response-level, interpretable)
+- The two systems can evolve independently — neural improvements in semantic grounding benefit symbolic reasoning without requiring changes to the symbolic layer
+
+---
+
+### C.7 Architectural Benefits
+
+The three-plane architecture provides several concrete advantages:
+
+**Separation of Responsibilities**
+
+| Plane | Function | Failure mode if absent |
+|-------|----------|----------------------|
+| Model | Token generation | No output |
+| Semantic | Representation shaping | Semantically flat generation |
+| Governance | System monitoring | Undetected collapse, drift, or hallucination |
+
+Each plane can be tested, diagnosed, and improved independently. A regression in the semantic plane (e.g., CSR phoneme alignment degrading) is visible through governance diagnostics without requiring end-to-end generation evaluation.
+
+**Training Stability**
+
+Auxiliary signals cannot dominate the primary language modeling objective. The three-tier weight governance (Appendix B) enforces this through:
+1. Static weight ratios (Tier 1) — LM always anchored at 1.0
+2. PPL-gated curriculum (Tier 2) — auxiliary signals introduced only after basic competence
+3. Runtime adaptive modulation (Tier 3) — graduated intervention prevents oscillation
+
+The v9.9.0 training diagnosis (documented in `TRAINING_DIAGNOSIS_FIX_v9.9.0.md`) confirmed that this architecture successfully prevents the "17 controllers fighting" failure mode when the curriculum controller gates auxiliary introduction correctly.
+
+**Modular Experimentation**
+
+Semantic primitives can be added, removed, or modified without changing the core model architecture:
+- Adding a new primitive requires: (1) a scoring head, (2) a loss function, (3) a weight parameter in `UnifiedTrainingConfig`
+- Removing a primitive requires: setting its weight to 0.0 (no code changes)
+- The curriculum controller automatically manages when new primitives activate based on PPL readiness
+
+This modularity is demonstrated by the scenario configurations in Appendix B.5, where the same architecture serves five fundamentally different deployment targets by adjusting weights alone.
+
+**Interpretability**
+
+The semantic and governance planes provide interpretable diagnostics for model behavior:
+- Ontological projections show *where* in concept space the model is operating
+- Vritti classifications reveal *which* cognitive mode is active
+- Kosha routing exposes *which* layer of awareness governs each decision
+- Governance coherence scores quantify *how consistent* the generation is
+- SRK trajectory monitoring tracks *whether* reasoning chains are stable
+
+These diagnostics are available during both training (logged to TensorBoard) and inference (accessible via the governance plane's observation interface).
+
+---
+
+### C.8 Summary
+
+The architecture integrates neural token generation with structured semantic primitives and governance signals across three coordinated planes:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   Governance Plane    monitors, diagnoses, intervenes       │
+│          ↕                                                  │
+│   Semantic Field Plane    evaluates, shapes, scores         │
+│          ↕                                                  │
+│   Model Plane    generates tokens                           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│   Weight Governance (Appendix B) mediates all               │
+│   cross-plane influence through calibrated loss weights     │
+│   and PPL-gated curriculum progression.                     │
+├─────────────────────────────────────────────────────────────┤
+│   Symbolic Reasoning (Patent) operates above all three      │
+│   planes, evaluating complete candidate responses.          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This design enables:
+- Richer semantic grounding than flat token prediction
+- Interpretable supervision signals at every layer of the system
+- Modular experimentation with semantic primitives via weight-only configuration
+- Stable training dynamics through three-tier weight governance
+- Clear separation between token-level neural generation and response-level symbolic reasoning
+
+The earlier appendices provide the operational detail: Appendix A covers the implementation migration path from the current architecture to the design target, and Appendix B specifies the weight governance system and scenario-specific configurations. This appendix provides the conceptual frame that connects them.
