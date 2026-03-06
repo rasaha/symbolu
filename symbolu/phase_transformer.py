@@ -8058,15 +8058,50 @@ class OntologicalHybridTransformer(nn.Module):
         max_new_tokens: int = 50,
         temperature: float = 1.0,
         top_k: int = 50,
+        use_field_integrated: bool = False,
     ) -> torch.Tensor:
-        """Generation with Ontological state tracking."""
+        """Generation with Ontological state tracking.
+
+        Args:
+            use_field_integrated: If True and conscious_gen Phase 4 modules are
+                present, use TwoStageGenerator for field-integrated token selection
+                instead of standard logit-based sampling.
+        """
         # Reset state at start of generation
         self.prev_state = None
         self.prev_bhava = None  # V11.0.0: Reset Bhava tracking too
 
+        # Check for Phase 4 two-stage generation
+        _has_two_stage = (
+            use_field_integrated
+            and hasattr(self, 'conscious_gen')
+            and 'two_stage_generator' in self.conscious_gen
+        )
+
         for _ in range(max_new_tokens):
             result = self(input_ids, reset_state=(self.prev_state is None))
-            logits = result['logits'][:, -1, :]
+            logits = result['logits'][:, -1, :]  # (B, V)
+
+            if _has_two_stage:
+                # Phase 4: Two-stage field-integrated generation
+                hidden = result.get('last_hidden_state', None)
+                o_ctx = result.get('state', None)
+                if hidden is not None and o_ctx is not None:
+                    hidden_last = hidden[:, -1, :]  # (B, D)
+                    o_ctx_last = o_ctx[:, -1, :] if o_ctx.dim() == 3 else o_ctx
+                    # TwoStageGenerator handles shortlist + scoring + softmax
+                    gen = self.conscious_gen['two_stage_generator']
+                    gen_result = gen(
+                        logits=logits.unsqueeze(1),    # (B, 1, V)
+                        hidden=hidden_last.unsqueeze(1),  # (B, 1, D)
+                        o_ctx=o_ctx_last.unsqueeze(1),    # (B, 1, state_dim)
+                    )
+                    probs = gen_result['probs'][:, 0, :]  # (B, V)
+                    next_token = torch.multinomial(probs, num_samples=1)
+                    input_ids = torch.cat([input_ids, next_token], dim=1)
+                    continue
+
+            # Standard generation path
             logits = logits / temperature
             if top_k > 0:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))

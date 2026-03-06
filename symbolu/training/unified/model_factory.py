@@ -81,6 +81,12 @@ try:
     from symbolu.training.conscious_generation.losses.bliss_coherence import (
         BlissCoherenceLoss,
     )
+    from symbolu.training.conscious_generation.integration.field_softmax import (
+        FieldIntegratedSoftmax,
+    )
+    from symbolu.training.conscious_generation.integration.two_stage_generator import (
+        TwoStageGenerator,
+    )
     CONSCIOUS_GENERATION_AVAILABLE = True
 except ImportError:
     CONSCIOUS_GENERATION_AVAILABLE = False
@@ -630,6 +636,28 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    Losses: {', '.join(_p3_losses)}")
         else:
             print(f"    Losses: ALL DISABLED (all lambda=0)")
+
+        # Phase 4: Field-Integrated Generation
+        if config.use_field_integrated_softmax:
+            field_softmax = FieldIntegratedSoftmax(
+                vocab_size=config.vocab_size,
+                temperature=config.field_softmax_temperature,
+                use_agreement_energy=config.use_agreement_energy,
+                agreement_energy_weight=config.agreement_energy_weight,
+            )
+            two_stage_gen = TwoStageGenerator(
+                token_eval_tensor=model.conscious_gen["token_eval_tensor"],
+                integrated_scorer=integrated_scorer,
+                field_softmax=field_softmax,
+                shortlist_k=config.primitive_shortlist_k,
+            )
+            model.conscious_gen["field_softmax"] = field_softmax
+            model.conscious_gen["two_stage_generator"] = two_stage_gen
+
+            print(f"  [Conscious Gen Phase 4] Field-Integrated Generation")
+            print(f"    FieldIntegratedSoftmax: τ={config.field_softmax_temperature}, "
+                  f"agreement_energy={config.use_agreement_energy}")
+            print(f"    TwoStageGenerator: K={config.primitive_shortlist_k}")
 
     return model.to(device)
 

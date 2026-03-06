@@ -949,6 +949,12 @@ class UnifiedTrainingConfig:
     bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
     kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
 
+    # Phase 4: Field-Integrated Generation
+    use_field_integrated_softmax: bool = False      # Replace standard logits with Z*(w) for L_LM
+    field_softmax_temperature: float = 1.0          # Temperature scaling for integrated softmax
+    use_agreement_energy: bool = False              # Enable pairwise agreement term A_t(w)
+    agreement_energy_weight: float = 0.1            # β weight for agreement-energy synergy term
+
 
 # Model size presets
 MODEL_PRESETS = {

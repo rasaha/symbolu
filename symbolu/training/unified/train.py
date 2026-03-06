@@ -4393,7 +4393,9 @@ def train(config: UnifiedTrainingConfig):
                                 metrics['cg_ont_neg_sim'] = _cg_result['avg_neg_sim'].item()
 
                         # =========================================================
-                        # Phase 3: Governance — Kosha routing, Bliss gating, losses
+                        # Phase 3/4: Governance — Kosha routing, Bliss gating, losses
+                        # Phase 3: aux losses only (Z* computed but not used for LM)
+                        # Phase 4: Z* replaces base logits for L_LM (end-to-end)
                         # Requires: logits, hidden states, sovereign state
                         # =========================================================
                         _cg_has_p3 = 'integrated_scorer' in model.conscious_gen
@@ -4403,8 +4405,9 @@ def train(config: UnifiedTrainingConfig):
                                           or config.lambda_csr_token > 0
                                           or config.lambda_vritti_token > 0
                                           or config.lambda_guna_token > 0)
+                        _cg_phase4 = config.use_field_integrated_softmax
 
-                        if _cg_has_p3 and _cg_any_p3_loss and logits is not None:
+                        if _cg_has_p3 and (_cg_any_p3_loss or _cg_phase4) and logits is not None:
                             # Extract hidden states and sovereign state from outputs
                             _cg_hidden = None
                             _cg_sov_state = None
@@ -4414,33 +4417,83 @@ def train(config: UnifiedTrainingConfig):
 
                             if _cg_hidden is not None and _cg_sov_state is not None:
                                 # Build T_t via TokenEvaluationTensor
-                                # Detach logits (base LM logits shouldn't be perturbed
-                                # by aux losses), but keep hidden/o_ctx live so primitive
-                                # scorers receive gradients from PrimitiveAuxiliaryLosses.
+                                # Phase 3: Detach logits but keep hidden/o_ctx live
+                                #   (primitive scorers train via aux losses only).
+                                # Phase 4: Keep ALL inputs live for end-to-end gradients
+                                #   through Z* -> B -> α -> S_f -> h_t -> transformer.
                                 _cg_tet = model.conscious_gen['token_eval_tensor']
-                                _cg_tet_result = _cg_tet(
-                                    logits=logits.detach() if logits is not None else None,
-                                    hidden=_cg_hidden,
-                                    o_ctx=_cg_sov_state,
-                                    cache=_cg_cache,
-                                )
+                                if _cg_phase4:
+                                    # End-to-end: gradients flow through everything
+                                    _cg_tet_result = _cg_tet(
+                                        logits=logits,
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        cache=_cg_cache,
+                                    )
+                                else:
+                                    _cg_tet_result = _cg_tet(
+                                        logits=logits.detach(),
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        cache=_cg_cache,
+                                    )
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
-                                # Detach hidden/o_ctx here: Kosha router trains its own
-                                # MLP weights but shouldn't backprop into the transformer
-                                # backbone during Phase 3 (Phase 4 enables end-to-end).
+                                # Phase 3: Detach hidden/o_ctx (router trains its MLP
+                                #   only, no backbone gradients from governance).
+                                # Phase 4: Keep live for end-to-end training.
                                 _cg_integ = model.conscious_gen['integrated_scorer']
-                                _cg_integ_result = _cg_integ(
-                                    T=_cg_T,
-                                    hidden=_cg_hidden.detach(),
-                                    o_ctx=_cg_sov_state.detach(),
-                                    candidate_ids=_cg_cand_ids,
-                                )
+                                if _cg_phase4:
+                                    _cg_integ_result = _cg_integ(
+                                        T=_cg_T,
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                        candidate_ids=_cg_cand_ids,
+                                    )
+                                else:
+                                    _cg_integ_result = _cg_integ(
+                                        T=_cg_T,
+                                        hidden=_cg_hidden.detach(),
+                                        o_ctx=_cg_sov_state.detach(),
+                                        candidate_ids=_cg_cand_ids,
+                                    )
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
                                 _cg_B = _cg_integ_result['B']            # (B, T, K)
                                 _cg_D = _cg_integ_result['D']            # (B, T, K)
+
+                                # Phase 4: Replace L_LM with field-integrated cross-entropy
+                                if _cg_phase4 and 'field_softmax' in model.conscious_gen:
+                                    _cg_Z_star = _cg_integ_result['Z_star']  # (B, T, K)
+                                    _cg_fs = model.conscious_gen['field_softmax']
+                                    _cg_fs_result = _cg_fs(
+                                        Z_star=_cg_Z_star,
+                                        candidate_ids=_cg_cand_ids,
+                                        T=_cg_T,
+                                    )
+                                    _cg_log_probs = _cg_fs_result['log_probs']  # (B, T, V)
+                                    # Replace the standard LM loss with field-integrated CE.
+                                    # NLL loss on log-probs = cross-entropy.
+                                    _cg_lm_loss = F.nll_loss(
+                                        _cg_log_probs.reshape(-1, _cg_log_probs.shape[-1]),
+                                        y.reshape(-1),
+                                        ignore_index=-100,
+                                    )
+                                    if torch.isfinite(_cg_lm_loss):
+                                        # Replace the base LM loss component. The original
+                                        # `loss` from compute_phase_loss includes LM + z_loss.
+                                        # We subtract the old LM CE and add the integrated one.
+                                        # Simpler: just recompute total from integrated loss.
+                                        _cg_old_lm_metrics = metrics.copy()
+                                        loss = _cg_lm_loss
+                                        # Re-add z-loss if it was active
+                                        z_loss_weight = getattr(config, 'z_loss_weight', 1e-4)
+                                        if z_loss_weight > 0 and logits is not None:
+                                            _cg_log_z = torch.logsumexp(logits, dim=-1)
+                                            loss = loss + z_loss_weight * (_cg_log_z ** 2).mean()
+                                        metrics['cg_field_lm_loss'] = _cg_lm_loss.item()
+                                        metrics['cg_phase4_active'] = 1.0
 
                                 # Kosha routing loss
                                 if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:
@@ -4527,6 +4580,9 @@ def train(config: UnifiedTrainingConfig):
                                     _cg_msg += f" | α_H={metrics['cg_alpha_entropy']:.3f}"
                                 if 'cg_bliss_mean' in metrics:
                                     _cg_msg += f" | B={metrics['cg_bliss_mean']:.3f}"
+                                # Phase 4 field-integrated generation
+                                if 'cg_field_lm_loss' in metrics:
+                                    _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
