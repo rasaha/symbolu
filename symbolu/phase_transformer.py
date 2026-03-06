@@ -6503,7 +6503,7 @@ class PhaseTransformer(nn.Module):
                     block,
                     x,
                     True,  # causal_mask
-                    use_reentrant=False,
+                    use_reentrant=True,
                 )
             else:
                 x = block(x, causal_mask=True)
@@ -6572,7 +6572,7 @@ class PhaseTransformer(nn.Module):
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = block(x, causal_mask=True)
@@ -6953,26 +6953,31 @@ class HybridPhaseTransformer(nn.Module):
         x = self.embed_dropout(x)
 
         # Transformer blocks
+        # V11.0.1: Only use gradient checkpointing when grad is enabled.
+        # OntologicalHybridTransformer calls forward_hidden under torch.no_grad(),
+        # where checkpointing is wasteful and can interfere with the subsequent
+        # checkpointed forward pass (metadata mismatch on recomputation).
+        _use_gc = self.gradient_checkpointing and self.training and torch.is_grad_enabled()
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
             is_hybrid_block = i >= self.local_layers
             block_intent = intent_phase if is_hybrid_block else None
 
-            if self.gradient_checkpointing and self.training:
+            if _use_gc:
                 if is_hybrid_block and intent_phase is not None:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 if is_hybrid_block:
@@ -7067,6 +7072,8 @@ class HybridPhaseTransformer(nn.Module):
 
             # Decorrelation loss incompatible with gradient checkpointing
             # (checkpoint can't handle tuple returns cleanly)
+            # V11.0.1: use_reentrant=True avoids strict metadata check that fails
+            # with complex tensors (torch.polar) and OntologicalHybrid double-forward.
             use_checkpoint = self.gradient_checkpointing and self.training and not return_decorr_loss
 
             if use_checkpoint:
@@ -7076,14 +7083,14 @@ class HybridPhaseTransformer(nn.Module):
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 # Normal forward pass (potentially with decorr_loss)
@@ -8197,7 +8204,7 @@ class LocalOnlyTransformer(nn.Module):
         hidden_states = [] if should_extract else None
         for i, block in enumerate(self.blocks):
             if self.gradient_checkpointing and self.training:
-                x = checkpoint(block, x, True, use_reentrant=False)
+                x = checkpoint(block, x, True, use_reentrant=True)
             else:
                 x = block(x, causal_mask=True)
 
