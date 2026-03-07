@@ -29,6 +29,7 @@ Usage:
 """
 
 import argparse
+import json
 import random
 import torch
 import torch.nn.functional as F
@@ -56,15 +57,54 @@ FILLER_SENTENCES = [
 
 
 def load_model(checkpoint_path: str, device: torch.device):
-    """Load model from checkpoint."""
+    """Load model from checkpoint.
+
+    Supports both legacy single-file format (checkpoint['model']) and
+    split-file format ({stem}_model.pt + config.json).
+    """
     print(f"Loading checkpoint: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    ckpt_path = Path(checkpoint_path)
 
-    config_dict = checkpoint.get('config', {})
-    config = TrainingConfig(**config_dict)
+    # Detect split-file format: file named *_model.pt with a sibling config.json
+    is_split = ckpt_path.stem.endswith("_model")
 
-    model = create_model(config)
-    model.load_state_dict(checkpoint['model'], strict=False)
+    if is_split:
+        # Split format: file IS the raw state_dict
+        state_dict = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        # Load config from config.json in same directory
+        config_json = ckpt_path.parent / "config.json"
+        if config_json.exists():
+            with open(config_json) as f:
+                config_dict = json.load(f)
+        else:
+            raise FileNotFoundError(
+                f"config.json not found in {ckpt_path.parent}. "
+                "Cannot reconstruct model without config."
+            )
+        config = TrainingConfig(**config_dict)
+        model = create_model(config)
+        model.load_state_dict(state_dict, strict=False)
+    else:
+        # Legacy single-file format
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        if isinstance(checkpoint, dict) and 'model' in checkpoint:
+            config_dict = checkpoint.get('config', {})
+            config = TrainingConfig(**config_dict)
+            model = create_model(config)
+            model.load_state_dict(checkpoint['model'], strict=False)
+        else:
+            # Raw state_dict without wrapping — try config.json
+            config_json = ckpt_path.parent / "config.json"
+            if config_json.exists():
+                with open(config_json) as f:
+                    config_dict = json.load(f)
+            else:
+                config_dict = {}
+            config = TrainingConfig(**config_dict)
+            model = create_model(config)
+            state_dict = checkpoint if isinstance(checkpoint, dict) else checkpoint
+            model.load_state_dict(state_dict, strict=False)
+
     model.to(device)
     model.eval()
 

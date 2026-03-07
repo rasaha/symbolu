@@ -271,16 +271,30 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
     # If loading checkpoint, extract max_seq_len from it
     max_seq_len = config.max_context + 1024  # Default with safety margin
     ckpt = None
+    is_split = False
     if config.checkpoint and os.path.exists(config.checkpoint):
-        ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
-        if "config" in ckpt:
-            max_seq_len = ckpt["config"].get("max_seq_len", max_seq_len)
-        elif "model" in ckpt:
-            # Infer from pos_embed shape
-            for key, val in ckpt["model"].items():
-                if "pos_embed" in key:
-                    max_seq_len = val.shape[0]
-                    break
+        ckpt_path = Path(config.checkpoint)
+        is_split = ckpt_path.stem.endswith("_model")
+
+        if is_split:
+            # Split-file format: *_model.pt is a raw state_dict
+            ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
+            # Load config from config.json in same directory
+            config_json = ckpt_path.parent / "config.json"
+            if config_json.exists():
+                with open(config_json) as f:
+                    saved_config = json.load(f)
+                max_seq_len = saved_config.get("max_seq_len", max_seq_len)
+        else:
+            ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
+            if isinstance(ckpt, dict) and "config" in ckpt:
+                max_seq_len = ckpt["config"].get("max_seq_len", max_seq_len)
+            elif isinstance(ckpt, dict) and "model" in ckpt:
+                # Infer from pos_embed shape
+                for key, val in ckpt["model"].items():
+                    if "pos_embed" in key:
+                        max_seq_len = val.shape[0]
+                        break
 
     if config.model_type == "phase":
         model = PhaseTransformer(
@@ -315,8 +329,10 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
     # Load checkpoint weights (ckpt already loaded above for config extraction)
     if ckpt is not None:
         print(f"Loading checkpoint from {config.checkpoint}")
-        # ckpt was already loaded above to extract max_seq_len
-        if "model" in ckpt:
+        if is_split:
+            # Split format: ckpt IS the raw state_dict
+            model.load_state_dict(ckpt, strict=False)
+        elif isinstance(ckpt, dict) and "model" in ckpt:
             model.load_state_dict(ckpt["model"], strict=False)
         else:
             model.load_state_dict(ckpt, strict=False)
