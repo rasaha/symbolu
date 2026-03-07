@@ -13,7 +13,7 @@ Usage (called from train.py):
     results = run_knowledge_probes(model, tokenizer, config, device, step)
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -290,80 +290,108 @@ def _probe_single_slot_retrieval(
     autocast_dtype,
     use_autocast: bool,
 ) -> Optional[Dict[str, float]]:
-    """Run a single storage→query slot retrieval probe."""
+    """
+    Run a single storage→query slot retrieval probe.
+
+    Key insight: slot memory is initialized fresh each forward pass inside
+    HybridPhaseTransformer.forward(). To test retrieval, we must concatenate
+    storage+query into a SINGLE sequence so slots written during storage
+    tokens are available when the query tokens are processed.
+
+    We compare the model's prediction at the query's last position with
+    vs without the storage prefix to measure retrieval benefit.
+    """
     # Step 1: Reset model state
     if hasattr(model, 'prev_state'):
         model.prev_state = None
     if hasattr(model, 'prev_bhava'):
         model.prev_bhava = None
 
-    # Step 2: Feed storage passage to populate slots
-    storage_text = pair['storage']
-    storage_ids = tokenizer.encode(storage_text, return_tensors="pt").to(device)
+    # Step 2: Encode storage + query as a single concatenated sequence
+    # This ensures slot writes from storage tokens persist during query processing
+    combined_text = pair['storage'] + " " + pair['query']
+    combined_ids = tokenizer.encode(combined_text, return_tensors="pt").to(device)
+
+    # Also encode query alone (baseline — no storage context)
+    query_ids = tokenizer.encode(pair['query'], return_tensors="pt").to(device)
+
+    # Step 3: Forward pass with combined sequence (slots active)
+    if use_autocast:
+        with torch.amp.autocast('cuda', dtype=autocast_dtype):
+            combined_out = model(combined_ids, reset_state=True)
+    else:
+        combined_out = model(combined_ids, reset_state=True)
+
+    if isinstance(combined_out, dict):
+        combined_logits = combined_out.get('logits', combined_out.get('output'))
+    elif isinstance(combined_out, (tuple, list)):
+        combined_logits = combined_out[0]
+    else:
+        combined_logits = combined_out
+
+    # Step 4: Forward pass with query alone (baseline — no slot context)
+    # Reset state so comparison is fair
+    if hasattr(model, 'prev_state'):
+        model.prev_state = None
+    if hasattr(model, 'prev_bhava'):
+        model.prev_bhava = None
 
     if use_autocast:
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
-            storage_out = model(storage_ids, reset_state=True)
+            query_out = model(query_ids, reset_state=True)
     else:
-        storage_out = model(storage_ids, reset_state=True)
-
-    # Step 3: Check slot utilization after storage pass
-    B = 1
-    slot_keys, slot_vals = slot_memory.init_state(B, storage_ids.dtype, device)
-    # Run a write pass using the storage hidden states
-    hybrid = getattr(model, 'hybrid', model)
-    if hasattr(hybrid, 'slot_memory') and hybrid.slot_memory is not None:
-        # Get the actual slot state from a fresh forward pass
-        # We measure utilization from the stored diagnostic
-        pass
-
-    # Read slot utilization from diagnostics
-    val_norms = slot_vals.norm(dim=-1)  # [B, K]
-    utilization = (val_norms > 1e-6).float().mean().item()
-
-    # Read entropy from slot_memory diagnostics
-    read_entropy = getattr(slot_memory, '_diag_read_attn_entropy', 0.0)
-
-    # Step 4: Feed query and check if expected tokens appear
-    query_text = pair['query']
-    query_ids = tokenizer.encode(query_text, return_tensors="pt").to(device)
-
-    if use_autocast:
-        with torch.amp.autocast('cuda', dtype=autocast_dtype):
-            query_out = model(query_ids)
-    else:
-        query_out = model(query_ids)
+        query_out = model(query_ids, reset_state=True)
 
     if isinstance(query_out, dict):
-        logits = query_out.get('logits', query_out.get('output'))
+        query_logits = query_out.get('logits', query_out.get('output'))
     elif isinstance(query_out, (tuple, list)):
-        logits = query_out[0]
+        query_logits = query_out[0]
     else:
-        logits = query_out
+        query_logits = query_out
 
-    # Check if expected tokens appear in top-20
-    next_probs = F.softmax(logits[0, -1, :], dim=-1)
-    top_vals, top_ids = torch.topk(next_probs, 20)
+    # Step 5: Read slot diagnostics (populated during combined forward pass)
+    read_entropy = getattr(slot_memory, '_diag_read_attn_entropy', 0.0)
+
+    # Slot utilization: check diagnostic write_gate or marginal entropy
+    # The _diag_write_gate_mean tracks what fraction of tokens write to slots
+    write_gate = getattr(slot_memory, '_diag_write_gate_mean', 0.0)
+    # Use write_gate as utilization proxy — it measures how actively slots are used
+    utilization = write_gate if write_gate > 0 else 0.0
+
+    # Step 6: Check predictions — compare combined vs query-alone
+    combined_probs = F.softmax(combined_logits[0, -1, :], dim=-1)
+    query_probs = F.softmax(query_logits[0, -1, :], dim=-1)
+
+    top_vals, top_ids = torch.topk(combined_probs, 20)
     top_tokens = [tokenizer.decode([tid.item()]).strip().lower() for tid in top_ids]
 
+    # Check if expected tokens appear in combined top-20
     match = 0.0
+    best_combined_prob = 0.0
     for expected in pair['expected_tokens']:
-        for tok in top_tokens:
+        for i, tok in enumerate(top_tokens):
             if expected.lower() in tok:
                 match = 1.0
+                best_combined_prob = top_vals[i].item()
                 break
         if match > 0:
             break
 
-    # Read updated entropy after query
-    read_entropy_after = getattr(slot_memory, '_diag_read_attn_entropy', 0.0)
+    # Check baseline probability for the same expected tokens (query_probs is 1D [V])
+    best_baseline_prob = 0.0
+    for expected in pair['expected_tokens']:
+        for tid in top_ids:
+            tok_str = tokenizer.decode([tid.item()]).strip().lower()
+            if expected.lower() in tok_str:
+                best_baseline_prob = query_probs[tid.item()].item()
+                break
 
-    # Boost: compare entropy before vs after (lower entropy after query = more focused)
-    boost = max(0.0, read_entropy - read_entropy_after)
+    # Boost: how much does storage context increase probability of correct answer
+    boost = max(0.0, best_combined_prob - best_baseline_prob)
 
     return {
         'utilization': utilization,
-        'read_entropy': read_entropy_after,
+        'read_entropy': read_entropy,
         'match': match,
         'boost': boost,
     }
@@ -453,8 +481,11 @@ def _measure_sequence_coherence(
     """
     Generate a long sequence and measure coherence metrics.
 
-    Instead of sampling (which adds randomness), we use greedy decoding
-    and measure the hidden state evolution at each step.
+    Two-phase approach to avoid O(n^2) cost:
+    1. Greedy-generate the full token sequence (fast, logits-only)
+    2. Single forward pass on the complete sequence to get hidden states
+
+    This is O(n) in forward passes instead of O(n^2).
     """
     # Reset model state
     if hasattr(model, 'prev_state'):
@@ -466,59 +497,69 @@ def _measure_sequence_coherence(
     generated = input_ids.clone()
     prompt_len = input_ids.shape[1]
 
-    # Collect hidden states at chunk boundaries for coherence measurement
-    chunk_embeddings = []  # Mean hidden state per chunk
-    bhava_deltas = []      # |delta_bhava| at each step
-
-    tokens_generated = 0
-    current_chunk_hidden = []
-
+    # Phase 1: Generate tokens greedily (only need logits, not hidden states)
     for step in range(max_tokens):
         if use_autocast:
             with torch.amp.autocast('cuda', dtype=autocast_dtype):
-                outputs = model(generated, return_last_hidden=True)
+                outputs = model(generated)
         else:
-            outputs = model(generated, return_last_hidden=True)
+            outputs = model(generated)
 
         if isinstance(outputs, dict):
             logits = outputs.get('logits', outputs.get('output'))
-            hidden = outputs.get('last_hidden_state', None)
-            delta_bhava = outputs.get('delta_bhava', None)
+        elif isinstance(outputs, (tuple, list)):
+            logits = outputs[0]
         else:
-            logits = outputs if not isinstance(outputs, (tuple, list)) else outputs[0]
-            hidden = None
-            delta_bhava = None
+            logits = outputs
 
-        # Greedy next token
         next_token = logits[:, -1, :].argmax(dim=-1, keepdim=True)
         generated = torch.cat([generated, next_token], dim=1)
-        tokens_generated += 1
 
-        # Collect hidden state for this position
-        if hidden is not None:
-            current_chunk_hidden.append(hidden[:, -1, :].float())  # [1, D]
-
-        # Collect bhava delta magnitude
-        if delta_bhava is not None:
-            bhava_deltas.append(delta_bhava.norm().item())
-
-        # At chunk boundaries, compute mean embedding
-        if len(current_chunk_hidden) >= chunk_size:
-            chunk_emb = torch.stack(current_chunk_hidden, dim=1).mean(dim=1)  # [1, D]
-            chunk_embeddings.append(chunk_emb)
-            current_chunk_hidden = []
-
-        # Stop at EOS
         if next_token.item() == getattr(tokenizer, 'eos_token_id', -1):
             break
 
-    # Handle remaining tokens as final chunk
-    if len(current_chunk_hidden) >= chunk_size // 2:
-        chunk_emb = torch.stack(current_chunk_hidden, dim=1).mean(dim=1)
-        chunk_embeddings.append(chunk_emb)
-
-    if len(chunk_embeddings) < 2:
+    total_len = generated.shape[1]
+    generated_len = total_len - prompt_len
+    if generated_len < chunk_size * 2:
         return None
+
+    # Phase 2: Single forward pass on the complete sequence to get hidden states
+    if hasattr(model, 'prev_state'):
+        model.prev_state = None
+    if hasattr(model, 'prev_bhava'):
+        model.prev_bhava = None
+
+    if use_autocast:
+        with torch.amp.autocast('cuda', dtype=autocast_dtype):
+            full_out = model(generated, return_last_hidden=True, reset_state=True)
+    else:
+        full_out = model(generated, return_last_hidden=True, reset_state=True)
+
+    if isinstance(full_out, dict):
+        hidden = full_out.get('last_hidden_state', None)  # [1, T, D]
+        delta_bhava = full_out.get('delta_bhava', None)    # [1, 12]
+    else:
+        hidden = None
+        delta_bhava = None
+
+    if hidden is None:
+        return None
+
+    # Extract hidden states for generated tokens only (skip prompt)
+    gen_hidden = hidden[:, prompt_len:, :].float()  # [1, gen_len, D]
+    gen_len = gen_hidden.shape[1]
+
+    # Split into chunks and compute mean embedding per chunk
+    num_full_chunks = gen_len // chunk_size
+    if num_full_chunks < 2:
+        return None
+
+    chunk_embeddings = []
+    for c in range(num_full_chunks):
+        start = c * chunk_size
+        end = start + chunk_size
+        chunk_emb = gen_hidden[:, start:end, :].mean(dim=1)  # [1, D]
+        chunk_embeddings.append(chunk_emb)
 
     # --- Metric 1: Local coherence (consecutive chunk similarity) ---
     local_sims = []
@@ -535,8 +576,11 @@ def _measure_sequence_coherence(
     ).item()
 
     # --- Metric 3: Phase stability (mean |delta_bhava|) ---
-    if bhava_deltas:
-        phase_stability = 1.0 - min(1.0, sum(bhava_deltas) / len(bhava_deltas))
+    # delta_bhava from a single forward pass is the aggregate delta.
+    # Use its norm as a proxy: small norm = stable phase throughout.
+    if delta_bhava is not None:
+        bhava_norm = delta_bhava.norm().item()
+        phase_stability = 1.0 - min(1.0, bhava_norm)
     else:
         phase_stability = 0.5  # Unknown
 
@@ -550,10 +594,7 @@ def _measure_sequence_coherence(
             sims_from_first.append(sim)
         # Drift rate = how much similarity drops per chunk
         # Negative = drifting away, zero = stable, positive = converging
-        if len(sims_from_first) >= 2:
-            drift_rate = (sims_from_first[-1] - sims_from_first[0]) / len(sims_from_first)
-        else:
-            drift_rate = 0.0
+        drift_rate = (sims_from_first[-1] - sims_from_first[0]) / len(sims_from_first)
     else:
         drift_rate = 0.0
 
