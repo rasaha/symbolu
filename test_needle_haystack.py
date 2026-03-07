@@ -524,6 +524,9 @@ def run_needle_test(config: NeedleConfig) -> Dict:
                         device=device,
                     )
 
+                    if sample_idx == 0 and depth_idx == 0:
+                        print(f"  [DEBUG] Expected: '{expected_answer}' | Generated: '{generated[:80]}'")
+
                     if success:
                         successes += 1
 
