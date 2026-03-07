@@ -8458,10 +8458,14 @@ class SlotMemoryGCT(nn.Module):
         # Novelty gate: only write when the token carries new binding info
         # sigmoid(gate) → 0 means "don't write", 1 means "write"
         self.write_novelty_gate = nn.Linear(embed_dim, 1)
-        # V10.14.4: Initialize gate bias to 0 (sigmoid(0) = 0.5).
-        # Previous bias=-1 (sigmoid=0.27) was too conservative: combined with
-        # weak gradient signal to the gate, it collapsed to 0.017 and killed writes.
-        nn.init.constant_(self.write_novelty_gate.bias, 0.0)
+        # V11.x: Initialize gate bias to +1.0 (sigmoid(1) ≈ 0.73).
+        # Previous bias=0.0 (sigmoid=0.5) combined with weak indirect gradient
+        # signal caused the gate to drift down to 0.072 (barely above the 0.05
+        # floor). Starting higher gives the write path a real chance to bootstrap:
+        # slots get meaningful writes → retrieval loss provides gradient → gate
+        # can learn to modulate. If writing is too aggressive, the gate will
+        # learn to close — but starting too low creates a chicken-and-egg trap.
+        nn.init.constant_(self.write_novelty_gate.bias, 1.0)
         # V10.14.7: Raised floor from 0.01→0.05 to ensure minimum write
         # pressure while retrieval loss bootstraps. At 0.01, EMA updates
         # were too tiny to move slot_vals from zero init → no retrieval signal.
