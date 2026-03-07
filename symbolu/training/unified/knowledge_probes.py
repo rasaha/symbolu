@@ -319,11 +319,12 @@ def _probe_single_slot_retrieval(
     query_ids = tokenizer.encode(pair['query'], return_tensors="pt").to(device)
 
     # Step 3: Forward pass with combined sequence (slots active)
+    # Note: state already reset above (prev_state/prev_bhava = None)
     if use_autocast:
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
-            combined_out = model(combined_ids, reset_state=True)
+            combined_out = model(combined_ids)
     else:
-        combined_out = model(combined_ids, reset_state=True)
+        combined_out = model(combined_ids)
 
     if isinstance(combined_out, dict):
         combined_logits = combined_out.get('logits', combined_out.get('output'))
@@ -347,9 +348,9 @@ def _probe_single_slot_retrieval(
 
     if use_autocast:
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
-            query_out = model(query_ids, reset_state=True)
+            query_out = model(query_ids)
     else:
-        query_out = model(query_ids, reset_state=True)
+        query_out = model(query_ids)
 
     if isinstance(query_out, dict):
         query_logits = query_out.get('logits', query_out.get('output'))
@@ -511,9 +512,9 @@ def _measure_sequence_coherence(
         try:
             if use_autocast:
                 with torch.amp.autocast('cuda', dtype=autocast_dtype):
-                    outputs = model(generated, reset_state=(step == 0))
+                    outputs = model(generated)
             else:
-                outputs = model(generated, reset_state=(step == 0))
+                outputs = model(generated)
         except Exception:
             # Sequence may have exceeded max_seq_len — stop generation
             break
@@ -552,9 +553,9 @@ def _measure_sequence_coherence(
 
     if use_autocast:
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
-            full_out = model(generated, return_last_hidden=True, reset_state=True)
+            full_out = model(generated, return_last_hidden=True)
     else:
-        full_out = model(generated, return_last_hidden=True, reset_state=True)
+        full_out = model(generated, return_last_hidden=True)
 
     if isinstance(full_out, dict):
         hidden = full_out.get('last_hidden_state', None)  # [1, T, D]
