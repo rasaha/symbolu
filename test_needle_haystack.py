@@ -459,13 +459,14 @@ def run_needle_test(config: NeedleConfig) -> Dict:
     num_params = sum(p.numel() for p in model.parameters())
     print(f"  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
-    # Generate context lengths to test
-    context_lengths = np.linspace(
-        config.min_context,
-        config.max_context,
-        config.num_context_lengths,
-        dtype=int
-    ).tolist()
+    # Generate context lengths to test (powers of 2 within range)
+    context_lengths = [
+        2**p for p in range(
+            int(np.log2(config.min_context)),
+            int(np.log2(config.max_context)) + 1
+        )
+        if 2**p >= config.min_context and 2**p <= config.max_context
+    ]
 
     # Generate depth percentages to test
     depths = np.linspace(0.0, 1.0, config.num_depths).tolist()
