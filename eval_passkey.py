@@ -320,7 +320,7 @@ def main():
                         help="Path to model checkpoint")
     parser.add_argument("--samples", type=int, default=10,
                         help="Samples per context length")
-    parser.add_argument("--lengths", type=str, default="256,512,768,1024",
+    parser.add_argument("--lengths", type=str, default="256,512,1024,2048",
                         help="Comma-separated context lengths to test")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device (cuda/cpu)")
@@ -328,8 +328,8 @@ def main():
                         help="Random seed for reproducibility")
     args = parser.parse_args()
 
-    # Parse context lengths
-    context_lengths = [int(x.strip()) for x in args.lengths.split(",")]
+    # Parse context lengths (will be filtered after model load)
+    requested_lengths = [int(x.strip()) for x in args.lengths.split(",")]
 
     # Set seed
     random.seed(args.seed)
@@ -347,6 +347,12 @@ def main():
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
     model, config = load_model(args.checkpoint, device)
+
+    # Cap context lengths to model's max_seq_len
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    context_lengths = [c for c in requested_lengths if c <= max_seq_len]
+    if not context_lengths:
+        context_lengths = [min(max_seq_len, requested_lengths[0])]
 
     # Run evaluation
     print("\n" + "=" * 60)
