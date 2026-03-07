@@ -114,6 +114,7 @@ def load_model(checkpoint_path: str, device: torch.device):
             model.load_state_dict(state_dict, strict=False)
 
     model.to(device)
+    model.to(torch.bfloat16)
     model.eval()
 
     num_params = sum(p.numel() for p in model.parameters())

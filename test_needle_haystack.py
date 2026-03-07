@@ -338,6 +338,7 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
             model.load_state_dict(ckpt, strict=False)
 
     model = model.to(device)
+    model.to(torch.bfloat16)
     model.eval()
 
     return model
