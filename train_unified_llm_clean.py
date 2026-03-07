@@ -14539,7 +14539,7 @@ def train(config: UnifiedTrainingConfig):
                         # Log health metrics
                         print(f"\n  📊 [PHASE HEALTH] Step {global_step}")
                         print(f"     ├─ R_k (key collapse):    {health_metrics['R_k']:.4f} {'⚠️' if health_metrics['R_k'] > 0.5 else '✓'}")
-                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f}")
+                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f} {'⚠️' if health_metrics['R_q'] > 0.5 else '✓'}")
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
