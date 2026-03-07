@@ -329,7 +329,13 @@ def _probe_single_slot_retrieval(
     else:
         combined_logits = combined_out
 
-    # Step 4: Forward pass with query alone (baseline — no slot context)
+    # Step 4: Read slot diagnostics NOW (before query-only pass overwrites them)
+    # These were populated during the combined forward pass
+    read_entropy = getattr(slot_memory, '_diag_read_attn_entropy', 0.0)
+    write_gate = getattr(slot_memory, '_diag_write_gate_mean', 0.0)
+    utilization = write_gate if write_gate > 0 else 0.0
+
+    # Step 5: Forward pass with query alone (baseline — no slot context)
     # Reset state so comparison is fair
     if hasattr(model, 'prev_state'):
         model.prev_state = None
@@ -348,15 +354,6 @@ def _probe_single_slot_retrieval(
         query_logits = query_out[0]
     else:
         query_logits = query_out
-
-    # Step 5: Read slot diagnostics (populated during combined forward pass)
-    read_entropy = getattr(slot_memory, '_diag_read_attn_entropy', 0.0)
-
-    # Slot utilization: check diagnostic write_gate or marginal entropy
-    # The _diag_write_gate_mean tracks what fraction of tokens write to slots
-    write_gate = getattr(slot_memory, '_diag_write_gate_mean', 0.0)
-    # Use write_gate as utilization proxy — it measures how actively slots are used
-    utilization = write_gate if write_gate > 0 else 0.0
 
     # Step 6: Check predictions — compare combined vs query-alone
     combined_probs = F.softmax(combined_logits[0, -1, :], dim=-1)
