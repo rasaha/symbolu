@@ -114,7 +114,6 @@ def load_model(checkpoint_path: str, device: torch.device):
             model.load_state_dict(state_dict, strict=False)
 
     model.to(device)
-    model.to(torch.bfloat16)
     model.eval()
 
     num_params = sum(p.numel() for p in model.parameters())
@@ -216,7 +215,7 @@ def generate_completion(model, tokenizer, prompt: str, device: torch.device, max
     if tokens.shape[1] > max_len - max_new_tokens:
         tokens = tokens[:, -(max_len - max_new_tokens):]
 
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         generated = tokens.clone()
 
         for _ in range(max_new_tokens):

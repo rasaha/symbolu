@@ -338,7 +338,6 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
             model.load_state_dict(ckpt, strict=False)
 
     model = model.to(device)
-    model.to(torch.bfloat16)
     model.eval()
 
     return model
@@ -378,7 +377,7 @@ def test_needle_retrieval(
 
     # Generate response
     generated = []
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         for _ in range(max_gen_tokens):
             output = model(input_tensor)
             if isinstance(output, dict):
