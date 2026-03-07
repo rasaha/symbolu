@@ -45,6 +45,13 @@ try:
 except ImportError:
     GEN2_AVAILABLE = False
 
+# Import Mistral CG wrapper (optional)
+try:
+    from symbolu.training.unified.mistral_wrapper import MistralCGWrapper
+    MISTRAL_CG_AVAILABLE = True
+except ImportError:
+    MISTRAL_CG_AVAILABLE = False
+
 # Import Conscious Generation modules (optional)
 try:
     from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
@@ -417,6 +424,35 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         else:
             print(f"    Binding Annotator: DISABLED (pure attention, no semantic selection)")
 
+    elif config.model_type == "mistral_cg":
+        # Frozen Mistral backbone + trainable CG adapter modules
+        if not MISTRAL_CG_AVAILABLE:
+            raise ImportError(
+                "MistralCGWrapper not available. Check: pip install transformers"
+            )
+        quantize = config.mistral_quantize if config.mistral_quantize != "none" else None
+        model = MistralCGWrapper(
+            model_name=config.mistral_model_name,
+            quantize=quantize,
+            state_dim=config.state_dim,
+            project_per_head_dim=config.project_per_head_dim,
+            phase_adapter_hidden=config.mistral_phase_adapter_hidden,
+            device_map=config.mistral_device_map,
+            trust_remote_code=config.mistral_trust_remote_code,
+        )
+        # Override dims for CG module creation below
+        embed_dim = model.mistral_hidden_dim
+        num_heads = model.num_heads
+        # Override vocab_size to match Mistral's tokenizer
+        config.vocab_size = model.vocab_size
+        print(f"\n  [Mistral CG] Frozen Backbone + Trainable CG Adapter")
+        print(f"    Model: {config.mistral_model_name}")
+        print(f"    Quantization: {config.mistral_quantize}")
+        print(f"    Backbone hidden_dim: {embed_dim}")
+        print(f"    State dim: {config.state_dim}D Sovereign State")
+        print(f"    Phase adapter hidden: {config.mistral_phase_adapter_hidden}")
+        model.print_trainable_summary()
+
     else:
         raise ValueError(f"Unknown model type: {config.model_type}")
 
@@ -457,7 +493,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                 "Conscious Generation modules not available. "
                 "Check symbolu/training/conscious_generation/ imports."
             )
-        if config.model_type not in ("ontological_hybrid", "ontological_binding_cache"):
+        if config.model_type not in ("ontological_hybrid", "ontological_binding_cache", "mistral_cg"):
             print(
                 f"  [Conscious Gen] WARNING: enable_conscious_generation=True but "
                 f"model_type={config.model_type}. Conscious generation is designed "
@@ -664,6 +700,17 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                   f"agreement_energy={config.use_agreement_energy}")
             print(f"    TwoStageGenerator: K={config.primitive_shortlist_k}")
 
+    # For mistral_cg with device_map="auto", backbone handles its own placement;
+    # only move trainable adapter layers. For all other models, move to device.
+    if config.model_type == "mistral_cg":
+        # Move only trainable CG adapter layers to the right device
+        model.state_projector.to(device)
+        model.intent_projector.to(device)
+        model.phase_adapter.to(device)
+        model.adapter_gate.data = model.adapter_gate.data.to(device)
+        if hasattr(model, 'conscious_gen'):
+            model.conscious_gen.to(device)
+        return model
     return model.to(device)
 
 

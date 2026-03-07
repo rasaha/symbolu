@@ -271,16 +271,30 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
     # If loading checkpoint, extract max_seq_len from it
     max_seq_len = config.max_context + 1024  # Default with safety margin
     ckpt = None
+    is_split = False
     if config.checkpoint and os.path.exists(config.checkpoint):
-        ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
-        if "config" in ckpt:
-            max_seq_len = ckpt["config"].get("max_seq_len", max_seq_len)
-        elif "model" in ckpt:
-            # Infer from pos_embed shape
-            for key, val in ckpt["model"].items():
-                if "pos_embed" in key:
-                    max_seq_len = val.shape[0]
-                    break
+        ckpt_path = Path(config.checkpoint)
+        is_split = ckpt_path.stem.endswith("_model")
+
+        if is_split:
+            # Split-file format: *_model.pt is a raw state_dict
+            ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
+            # Load config from config.json in same directory
+            config_json = ckpt_path.parent / "config.json"
+            if config_json.exists():
+                with open(config_json) as f:
+                    saved_config = json.load(f)
+                max_seq_len = saved_config.get("max_seq_len", max_seq_len)
+        else:
+            ckpt = torch.load(config.checkpoint, map_location=device, weights_only=False)
+            if isinstance(ckpt, dict) and "config" in ckpt:
+                max_seq_len = ckpt["config"].get("max_seq_len", max_seq_len)
+            elif isinstance(ckpt, dict) and "model" in ckpt:
+                # Infer from pos_embed shape
+                for key, val in ckpt["model"].items():
+                    if "pos_embed" in key:
+                        max_seq_len = val.shape[0]
+                        break
 
     if config.model_type == "phase":
         model = PhaseTransformer(
@@ -315,8 +329,10 @@ def load_model(config: NeedleConfig, device: torch.device) -> torch.nn.Module:
     # Load checkpoint weights (ckpt already loaded above for config extraction)
     if ckpt is not None:
         print(f"Loading checkpoint from {config.checkpoint}")
-        # ckpt was already loaded above to extract max_seq_len
-        if "model" in ckpt:
+        if is_split:
+            # Split format: ckpt IS the raw state_dict
+            model.load_state_dict(ckpt, strict=False)
+        elif isinstance(ckpt, dict) and "model" in ckpt:
             model.load_state_dict(ckpt["model"], strict=False)
         else:
             model.load_state_dict(ckpt, strict=False)
@@ -361,7 +377,7 @@ def test_needle_retrieval(
 
     # Generate response
     generated = []
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         for _ in range(max_gen_tokens):
             output = model(input_tensor)
             if isinstance(output, dict):
@@ -443,13 +459,14 @@ def run_needle_test(config: NeedleConfig) -> Dict:
     num_params = sum(p.numel() for p in model.parameters())
     print(f"  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
-    # Generate context lengths to test
-    context_lengths = np.linspace(
-        config.min_context,
-        config.max_context,
-        config.num_context_lengths,
-        dtype=int
-    ).tolist()
+    # Generate context lengths to test (powers of 2 within range)
+    context_lengths = [
+        2**p for p in range(
+            int(np.log2(config.min_context)),
+            int(np.log2(config.max_context)) + 1
+        )
+        if 2**p >= config.min_context and 2**p <= config.max_context
+    ]
 
     # Generate depth percentages to test
     depths = np.linspace(0.0, 1.0, config.num_depths).tolist()
@@ -506,6 +523,9 @@ def run_needle_test(config: NeedleConfig) -> Dict:
                         tokenizer=tokenizer,
                         device=device,
                     )
+
+                    if sample_idx == 0 and depth_idx == 0:
+                        print(f"  [DEBUG] Expected: '{expected_answer}' | Generated: '{generated[:80]}'")
 
                     if success:
                         successes += 1

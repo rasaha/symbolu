@@ -963,6 +963,16 @@ class UnifiedTrainingConfig:
     cg_curriculum_stage_proportions: str = "0.30,0.20,0.25,0.25"  # Stage A,B,C,D proportions
     enable_cg_diagnostics: bool = False             # Enable governance diagnostics tracking
 
+    # ==========================================================================
+    # Mistral CG Wrapper (--model_type mistral_cg)
+    # Pre-trained Mistral backbone + trainable CG modules
+    # ==========================================================================
+    mistral_model_name: str = "mistralai/Mistral-7B-v0.3"  # HuggingFace model ID
+    mistral_quantize: str = "none"                          # "none", "4bit", "8bit"
+    mistral_device_map: str = "auto"                        # Device placement strategy
+    mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
+    mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
+
 
 # Model size presets
 MODEL_PRESETS = {

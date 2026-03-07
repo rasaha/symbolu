@@ -13,6 +13,7 @@ diagnose specific retrieval capabilities.
 """
 
 import argparse
+import dataclasses
 import json
 import random
 import string
@@ -29,6 +30,14 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from symbolu.phase_transformer import PhaseTransformer, HybridPhaseTransformer
+from train import TrainingConfig, create_model
+
+
+def _make_config(config_dict: dict) -> TrainingConfig:
+    """Create TrainingConfig, ignoring unknown fields."""
+    valid_fields = {f.name for f in dataclasses.fields(TrainingConfig)}
+    filtered = {k: v for k, v in config_dict.items() if k in valid_fields}
+    return TrainingConfig(**filtered)
 
 
 # Model presets matching train.py
@@ -285,55 +294,50 @@ class SyntheticRetrievalTest:
 
 
 def load_model(checkpoint_path: str, model_size: str, max_context: int, device: str):
-    """Load model from checkpoint."""
+    """Load model from checkpoint, reading config from config.json or checkpoint dict."""
     import os
-    preset = MODEL_PRESETS[model_size]
+    ckpt_path = Path(checkpoint_path)
 
-    # Check for config file to get correct max_seq_len
-    config_path = os.path.join(os.path.dirname(checkpoint_path), "config.json")
-    checkpoint_max_seq_len = 131072  # Default for this checkpoint
-    if os.path.exists(config_path):
-        import json
-        with open(config_path) as f:
-            ckpt_config = json.load(f)
-            checkpoint_max_seq_len = ckpt_config.get("max_seq_len", 131072)
+    # Check if this is a split checkpoint (raw state_dict + config.json)
+    config_json = ckpt_path.parent / "config.json"
+    is_split = ckpt_path.stat().st_size < 500 * 1024 * 1024  # < 500MB likely split
 
-    print(f"Using max_seq_len={checkpoint_max_seq_len} from checkpoint config")
-
-    # Try hybrid first, fall back to phase
-    try:
-        model = HybridPhaseTransformer(
-            vocab_size=50257,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
-            max_seq_len=checkpoint_max_seq_len,
-            dropout=0.0,
-            local_layers=2,
-            window_size=128,
-            local_backend="unfold",
-        )
-    except Exception as e:
-        print(f"HybridPhaseTransformer failed: {e}, trying PhaseTransformer")
-        model = PhaseTransformer(
-            vocab_size=50257,
-            embed_dim=preset["embed_dim"],
-            num_layers=preset["num_layers"],
-            num_heads=preset["num_heads"],
-            ff_dim=preset["ff_dim"],
-            max_seq_len=checkpoint_max_seq_len,
-            dropout=0.0,
-        )
-
-    # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    if "model_state_dict" in checkpoint:
-        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-    elif "model" in checkpoint:
-        model.load_state_dict(checkpoint["model"], strict=False)
+    if is_split and config_json.exists():
+        state_dict = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        with open(config_json) as f:
+            config_dict = json.load(f)
+        config = _make_config(config_dict)
+        model = create_model(config)
+        if isinstance(state_dict, dict) and 'model' in state_dict:
+            model.load_state_dict(state_dict['model'], strict=False)
+        elif isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
+            model.load_state_dict(state_dict['model_state_dict'], strict=False)
+        else:
+            model.load_state_dict(state_dict, strict=False)
     else:
-        model.load_state_dict(checkpoint, strict=False)
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        if isinstance(checkpoint, dict) and 'config' in checkpoint:
+            config_dict = checkpoint['config']
+        elif config_json.exists():
+            with open(config_json) as f:
+                config_dict = json.load(f)
+        else:
+            # Fallback to preset
+            preset = MODEL_PRESETS[model_size]
+            config_dict = {
+                "embed_dim": preset["embed_dim"],
+                "num_layers": preset["num_layers"],
+                "num_heads": preset["num_heads"],
+                "ff_dim": preset["ff_dim"],
+            }
+        config = _make_config(config_dict)
+        model = create_model(config)
+        if isinstance(checkpoint, dict) and 'model' in checkpoint:
+            model.load_state_dict(checkpoint['model'], strict=False)
+        elif isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        else:
+            model.load_state_dict(checkpoint, strict=False)
 
     model.to(device)
     model.eval()
@@ -346,10 +350,15 @@ def check_answer(model, tokenizer, context: str, question: str, expected: str, d
     # Encode input
     full_input = context + question
     input_ids = tokenizer.encode(full_input)
+    # Truncate to model's max_seq_len to avoid positional embedding OOB
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    max_gen = len(expected) + 10
+    if len(input_ids) > max_seq_len - max_gen:
+        input_ids = input_ids[-(max_seq_len - max_gen):]
     input_tensor = torch.tensor([input_ids], device=device)
 
     # Generate continuation
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=device if isinstance(device, str) else device.type, dtype=torch.bfloat16):
         # Generate a few tokens
         generated = []
         current_input = input_tensor
@@ -369,6 +378,10 @@ def check_answer(model, tokenizer, context: str, question: str, expected: str, d
 
             next_token_tensor = torch.tensor([[next_token]], device=device)
             current_input = torch.cat([current_input, next_token_tensor], dim=1)
+
+            # Truncate to max_seq_len
+            if current_input.shape[1] > max_seq_len:
+                current_input = current_input[:, -max_seq_len:]
 
             # Stop if we've generated enough
             if len(generated) > len(expected) + 5:
@@ -407,12 +420,14 @@ def run_test(args):
     # Initialize test generator
     test_gen = SyntheticRetrievalTest(tokenizer)
 
-    # Context lengths to test
-    context_lengths = [1024, 2048, 4096, 8192]
-    if args.max_context >= 16384:
-        context_lengths.append(16384)
-    if args.max_context >= 32768:
-        context_lengths.append(32768)
+    # Context lengths to test — cap to model's max_seq_len
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    all_lengths = [1024, 2048, 4096, 8192, 16384, 32768]
+    context_lengths = [c for c in all_lengths if c <= max_seq_len and c <= args.max_context]
+    if not context_lengths:
+        context_lengths = [min(max_seq_len, 1024)]
+    print(f"  Model max_seq_len: {max_seq_len}")
+    print(f"  Testing context lengths: {context_lengths}")
 
     results = {
         "test_date": datetime.now().isoformat(),

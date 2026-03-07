@@ -7026,10 +7026,11 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache"],
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
                        help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
-                            "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State])")
+                            "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State], "
+                            "mistral_cg = Frozen Mistral backbone + trainable CG modules)")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -7406,6 +7407,19 @@ def main():
                             "V9.8.0: Replaces arbitrary 124D with principled ontology.")
     parser.add_argument("--project_per_head_dim", action="store_true",
                        help="Project state delta to [H, D_h] instead of [H] for finer control")
+
+    # Mistral CG Wrapper (--model_type mistral_cg)
+    parser.add_argument("--mistral_model_name", type=str, default="mistralai/Mistral-7B-v0.3",
+                       help="HuggingFace model ID for Mistral backbone")
+    parser.add_argument("--mistral_quantize", type=str, default="none",
+                       choices=["none", "4bit", "8bit"],
+                       help="Quantization mode for Mistral backbone (4bit saves most VRAM)")
+    parser.add_argument("--mistral_device_map", type=str, default="auto",
+                       help="Device placement strategy for Mistral backbone")
+    parser.add_argument("--mistral_trust_remote_code", action="store_true",
+                       help="Trust remote code when loading Mistral model")
+    parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
+                       help="Hidden dimension for phase-conditioned adapter MLP")
 
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
@@ -9179,6 +9193,12 @@ def main():
         cg_curriculum_stability_window=args.cg_curriculum_stability_window,
         cg_curriculum_stage_proportions=args.cg_curriculum_stage_proportions,
         enable_cg_diagnostics=args.enable_cg_diagnostics,
+        # Mistral CG Wrapper
+        mistral_model_name=args.mistral_model_name,
+        mistral_quantize=args.mistral_quantize,
+        mistral_device_map=args.mistral_device_map,
+        mistral_trust_remote_code=args.mistral_trust_remote_code,
+        mistral_phase_adapter_hidden=args.mistral_phase_adapter_hidden,
     )
 
     # ==========================================================================
