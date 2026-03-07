@@ -721,6 +721,12 @@ class UnifiedTrainingConfig:
         "The primary difference between a stack and a queue is that",  # Definitions (FineWeb)
     )
 
+    # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+    knowledge_probe_every: int = 0    # Run probes every N steps (0 = disabled)
+    knowledge_probe_top_k: int = 10   # Top-K to check for factual probes
+    knowledge_probe_coherence_tokens: int = 256  # Tokens to generate for coherence test
+    knowledge_probe_chunk_size: int = 64  # Chunk size for coherence measurement
+
     # LRA Validation (Long-Range Retrieval)
     lra_validate_every: int = 0  # Run LRA validation every N steps (0 = disabled)
     lra_haystack_lengths: str = "256,512,1024"  # Comma-separated lengths

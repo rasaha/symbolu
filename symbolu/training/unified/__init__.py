@@ -150,6 +150,11 @@ from symbolu.training.unified.evaluation import (
     ReadinessIndex,
 )
 
+# --- knowledge probes ---
+from symbolu.training.unified.knowledge_probes import (
+    run_knowledge_probes,
+)
+
 # --- losses ---
 from symbolu.training.unified.losses import (
     compute_ontological_loss,
@@ -270,6 +275,8 @@ __all__ = [
     "compute_sample_metrics",
     "run_quality_samples",
     "ReadinessIndex",
+    # knowledge probes
+    "run_knowledge_probes",
     # losses
     "compute_ontological_loss",
     "_build_sovereign_state",

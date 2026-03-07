@@ -432,6 +432,7 @@ from symbolu.training.unified import (
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    run_knowledge_probes,
     LRAValidator,
     run_phase_rotation_test,
     print_phase_rotation_results,
@@ -6797,6 +6798,13 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+            # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+            if config.knowledge_probe_every > 0 and global_step % config.knowledge_probe_every == 0:
+                if tokenizer is not None:
+                    model.eval()
+                    run_knowledge_probes(model, tokenizer, config, device, global_step)
+                    model.train()
+
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0 and not config.no_save:
                 # V9.8.10: Ensure scheduled alpha is applied before saving
@@ -7803,6 +7811,18 @@ def main():
     # Quality Sampling
     parser.add_argument("--sample_every", type=int, default=50,
                        help="Generate quality samples every N steps (0 = disabled)")
+
+    # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+    parser.add_argument("--knowledge_probe_every", type=int, default=0,
+                       help="Run knowledge probes every N steps (0 = disabled). "
+                            "Measures factual accuracy, slot retrieval precision, "
+                            "and phase coherence — signals orthogonal to PPL.")
+    parser.add_argument("--knowledge_probe_top_k", type=int, default=10,
+                       help="Top-K predictions to check for factual probes")
+    parser.add_argument("--knowledge_probe_coherence_tokens", type=int, default=256,
+                       help="Max tokens to generate for coherence measurement")
+    parser.add_argument("--knowledge_probe_chunk_size", type=int, default=64,
+                       help="Chunk size for coherence similarity measurement")
 
     # LRA Validation (Long-Range Retrieval)
     parser.add_argument("--lra_validate_every", type=int, default=0,
@@ -8867,6 +8887,11 @@ def main():
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
+        # Knowledge Probes
+        knowledge_probe_every=args.knowledge_probe_every,
+        knowledge_probe_top_k=args.knowledge_probe_top_k,
+        knowledge_probe_coherence_tokens=args.knowledge_probe_coherence_tokens,
+        knowledge_probe_chunk_size=args.knowledge_probe_chunk_size,
         # LRA Validation
         lra_validate_every=args.lra_validate_every,
         lra_haystack_lengths=args.lra_haystack_lengths,
