@@ -4362,12 +4362,14 @@ def train(config: UnifiedTrainingConfig):
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
                         # V10.16.1: Use explicit query_mask from batch if available
                         # (e.g. AssociativeRecallDataset provides True only at answer positions).
-                        # V10.17: For general LM training, only apply retrieval loss at
-                        # positions BEYOND the local attention window. Tokens within the
-                        # window can be predicted by local attention alone — forcing slot
-                        # memory to retrieve them dilutes the learning signal (qmask=1.0
-                        # means ~50k→500 token narrowing instead of precise recall).
-                        # Positions beyond the window genuinely need long-range memory.
+                        # V10.21: Densified retrieval supervision. V10.17 only supervised
+                        # positions beyond window_size, reasoning that within-window tokens
+                        # "don't need slots." But the retrieval loss gradient also teaches
+                        # write_val_proj WHAT to store — excluding within-window positions
+                        # starved that signal. Now supervise from window_size//2 onward:
+                        # positions 0..win/2 are pure local context (excluded), positions
+                        # win/2..win are "can predict locally but slot content is useful
+                        # training signal", positions win+ are "genuinely need long-range."
                         _retr_query_mask = None
                         if isinstance(batch, dict) and 'query_mask' in batch:
                             _retr_query_mask = batch['query_mask'].to(device)
@@ -4375,10 +4377,10 @@ def train(config: UnifiedTrainingConfig):
                             _valid = (y != -100)  # [B, N]
                             _B, _N = y.shape
                             _win = getattr(config, 'window_size', 0)
-                            if _win > 0 and _N > _win:
-                                # Only positions beyond the local window are retrieval queries
+                            _retr_start = max(_win // 2, 1)  # V10.21: half-window threshold
+                            if _retr_start > 0 and _N > _retr_start:
                                 _pos_mask = torch.zeros(_B, _N, dtype=torch.bool, device=y.device)
-                                _pos_mask[:, _win:] = True
+                                _pos_mask[:, _retr_start:] = True
                                 _retr_query_mask = _valid & _pos_mask
                             else:
                                 _retr_query_mask = _valid
@@ -7154,7 +7156,7 @@ def main():
                        help="Global token update mode (default: slots)")
     parser.add_argument("--slots_write_lr", type=float, default=0.1,
                        help="EMA learning rate for slot writes (default: 0.1)")
-    parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
+    parser.add_argument("--retrieval_loss_weight", type=float, default=2.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
 
     # ==========================================================================

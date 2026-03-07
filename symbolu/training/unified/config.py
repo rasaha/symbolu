@@ -152,7 +152,7 @@ class UnifiedTrainingConfig:
     num_global_tokens: int = 64  # Number of memory slots
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
     slots_write_lr: float = 0.1  # EMA learning rate for slot writes
-    retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
+    retrieval_loss_weight: float = 2.0  # V10.21: Increased from 1.0 to compensate for gradient attenuation
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
