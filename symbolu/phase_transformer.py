@@ -6863,6 +6863,12 @@ class HybridPhaseTransformer(nn.Module):
                     write_lr=slots_write_lr,
                     dropout=dropout,
                 )
+                # V10.21: Gradient scale for slot read output in residual stream.
+                # 0.0 = fully detached (old behavior), 1.0 = full gradient.
+                # 0.1 = LM loss sends 10% gradient through read path to slot params,
+                # enough to teach slot_vals what to store without overwhelming
+                # the retrieval loss signal.
+                self._slot_read_grad_scale = 0.1
                 # No legacy GCT modules needed — slot_memory handles everything
                 self.global_tokens = None  # Slots init is inside SlotMemoryGCT
                 self.gct_read_attn = None  # Read is via SlotMemoryGCT.read()
@@ -7154,12 +7160,16 @@ class HybridPhaseTransformer(nn.Module):
                 if self.global_update_mode == "slots":
                     # V10.14: Read via SlotMemoryGCT (never modifies slot state)
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Detach read output so LM loss cannot suppress
-                    # read_output_proj. Retrieval loss trains read_output_proj
-                    # independently. Warmstart alpha ramps mixing from 0→1 so
-                    # early noisy reads don't disrupt LM training.
+                    # V10.21: Let LM loss gradients flow to slot parameters
+                    # through the read path, scaled down to prevent LM loss from
+                    # dominating slot learning. The warmstart alpha ramps from
+                    # 0→1 so early noisy reads don't disrupt LM training.
+                    # Gradient scale: slot_out gets full forward value but only
+                    # slot_read_grad_scale fraction of the backward gradient.
                     _alpha = self.slot_memory.read_warmstart_alpha
-                    x = x + _alpha * _slot_out.detach()
+                    _grad_scale = getattr(self, '_slot_read_grad_scale', 0.1)
+                    _slot_out_scaled = _slot_out * _grad_scale + _slot_out.detach() * (1.0 - _grad_scale)
+                    x = x + _alpha * _slot_out_scaled
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7266,13 +7276,13 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            # V10.14.9: Detach hidden states for retrieval loss. Without this,
-            # retrieval loss gradients flow through _slot_hidden back into ALL
-            # transformer blocks (phase_attn.W_k_fused, v_proj, complex_proj),
-            # creating a secondary training signal that destabilizes the backbone
-            # around step 650 and cascades into slot memory gradient explosions.
-            # Retrieval loss should only train slot memory parameters.
-            result['_slot_hidden'] = x.detach()  # Post-norm hidden for query matching
+            # V10.21: Gradient-scaled hidden for retrieval loss. Previously fully
+            # detached (V10.14.9) which prevented retrieval loss from teaching the
+            # backbone to produce slot-friendly representations. Now allows 10%
+            # gradient flow — enough signal for backbone to learn what to write
+            # to slots, without the destabilization seen at full gradient (step 650).
+            _retr_grad_scale = getattr(self, '_slot_read_grad_scale', 0.1)
+            result['_slot_hidden'] = x * _retr_grad_scale + x.detach() * (1.0 - _retr_grad_scale)
 
         return result
 
@@ -7376,9 +7386,11 @@ class HybridPhaseTransformer(nn.Module):
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Detach + warmstart (mirrors forward())
+                    # V10.21: Gradient-scaled read (mirrors forward())
                     _alpha = self.slot_memory.read_warmstart_alpha
-                    x = x + _alpha * _slot_out.detach()
+                    _grad_scale = getattr(self, '_slot_read_grad_scale', 0.1)
+                    _slot_out_scaled = _slot_out * _grad_scale + _slot_out.detach() * (1.0 - _grad_scale)
+                    x = x + _alpha * _slot_out_scaled
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False

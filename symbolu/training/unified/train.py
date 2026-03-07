@@ -4811,12 +4811,13 @@ def train(config: UnifiedTrainingConfig):
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
 
-            # V10.15/V10.17: Clip slot memory gradients with per-element capping.
-            # Slot keys live on the unit hypersphere — even a single large gradient
-            # element can push keys off-manifold and trigger 8M× variance cascades.
-            # Norm clipping (V10.15) was insufficient: it scales all elements
-            # proportionally, so with many params individual elements stay large.
-            # Per-element value clipping caps EACH gradient independently.
+            # V10.21: Relaxed slot gradient clipping. Previously 0.01 per-element
+            # and max_grad_norm*0.01 norm — so tight that slot params were effectively
+            # frozen. With V10.21 gradient-scaled read (10% of LM gradient flows to
+            # slots), incoming gradients are already attenuated. Relax to 0.1 per-element
+            # and max_grad_norm*0.1 norm to let slots actually learn.
+            # Slot keys still live on the unit hypersphere (re-normalized after EMA),
+            # so per-element clipping still prevents off-manifold jumps.
             if hasattr(model, 'slot_memory') and model.slot_memory is not None:
                 _slot_params_with_grad = [
                     p for p in model.slot_memory.parameters()
@@ -4824,10 +4825,10 @@ def train(config: UnifiedTrainingConfig):
                 ]
                 if _slot_params_with_grad:
                     # First: per-element cap (prevents any single catastrophic update)
-                    torch.nn.utils.clip_grad_value_(_slot_params_with_grad, 0.01)
+                    torch.nn.utils.clip_grad_value_(_slot_params_with_grad, 0.1)
                     # Second: norm clip as safety net
                     torch.nn.utils.clip_grad_norm_(
-                        _slot_params_with_grad, config.max_grad_norm * 0.01
+                        _slot_params_with_grad, config.max_grad_norm * 0.1
                     )
 
             # V10.17/V10.18: Clip phase attention OV circuit params separately.
