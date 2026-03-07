@@ -1029,6 +1029,7 @@ def enable_phase_diversity_capture(model: nn.Module, enable: bool = True) -> int
             module.capture_phase_for_diversity = enable
             if not enable:
                 module._captured_phi_k = None  # Clear captured data
+                module._captured_phi_q = None  # Clear captured data
             count += 1
     return count
 
@@ -1051,6 +1052,24 @@ def collect_captured_phases(model: nn.Module) -> List[torch.Tensor]:
     return phases
 
 
+def collect_captured_phases_q(model: nn.Module) -> List[torch.Tensor]:
+    """
+    Collect all captured phi_q tensors from PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+
+    Returns:
+        List of phi_q tensors [B, N, H, D_h] from each layer
+    """
+    phases = []
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            if hasattr(module, '_captured_phi_q') and module._captured_phi_q is not None:
+                phases.append(module._captured_phi_q)
+    return phases
+
+
 def compute_model_phase_diversity_loss(
     model: nn.Module,
     lambda_uniform: float = 0.001,
@@ -1060,49 +1079,70 @@ def compute_model_phase_diversity_loss(
     Compute phase diversity loss across all PhaseAttentionLayer modules.
 
     V9.9.10: Aggregates diversity losses from all captured phases.
+    V11.x: Now includes phi_q for symmetric regularization (prevents R_q collapse).
     Uses ChatGPT's enhanced uniformity + entropy proxy approach.
 
     Args:
-        model: Model with captured phi_k tensors
+        model: Model with captured phi_k and phi_q tensors
         lambda_uniform: Weight for uniformity loss (default 0.001)
         lambda_entropy: Weight for entropy proxy loss (default 0.001)
 
     Returns:
-        total_loss: Combined loss across all layers
+        total_loss: Combined loss across all layers (phi_k + phi_q)
         metrics: Dict with aggregate metrics
     """
-    phases = collect_captured_phases(model)
+    phases_k = collect_captured_phases(model)
+    phases_q = collect_captured_phases_q(model)
 
-    if not phases:
+    if not phases_k and not phases_q:
         # No phases captured, return zero loss
         device = next(model.parameters()).device
         return torch.tensor(0.0, device=device, requires_grad=False), {
             'phase_uniform_loss': 0.0,
             'phase_entropy_proxy': 0.0,
+            'phase_uniform_loss_q': 0.0,
+            'phase_entropy_proxy_q': 0.0,
             'phase_diversity_loss': 0.0,
             'num_layers_captured': 0,
         }
 
-    # Compute loss for each layer and average
-    total_uniform = 0.0
-    total_entropy = 0.0
+    # Compute loss for phi_k (keys) — existing behavior
+    total_uniform_k = 0.0
+    total_entropy_k = 0.0
     total_loss = None
 
-    for phi_k in phases:
+    for phi_k in phases_k:
         loss, metrics = compute_phase_diversity_losses(phi_k, lambda_uniform, lambda_entropy)
-        total_uniform += metrics['phase_uniform_loss']
-        total_entropy += metrics['phase_entropy_proxy']
+        total_uniform_k += metrics['phase_uniform_loss']
+        total_entropy_k += metrics['phase_entropy_proxy']
         if total_loss is None:
             total_loss = loss
         else:
             total_loss = total_loss + loss
 
-    num_layers = len(phases)
+    # Compute loss for phi_q (queries) — V11.x symmetric regularization
+    total_uniform_q = 0.0
+    total_entropy_q = 0.0
+
+    for phi_q in phases_q:
+        loss, metrics = compute_phase_diversity_losses(phi_q, lambda_uniform, lambda_entropy)
+        total_uniform_q += metrics['phase_uniform_loss']
+        total_entropy_q += metrics['phase_entropy_proxy']
+        if total_loss is None:
+            total_loss = loss
+        else:
+            total_loss = total_loss + loss
+
+    num_layers_k = len(phases_k)
+    num_layers_q = len(phases_q)
+    num_layers = max(num_layers_k, num_layers_q, 1)
     avg_loss = total_loss / num_layers if total_loss is not None else torch.tensor(0.0)
 
     return avg_loss, {
-        'phase_uniform_loss': total_uniform / num_layers,
-        'phase_entropy_proxy': total_entropy / num_layers,
+        'phase_uniform_loss': total_uniform_k / max(num_layers_k, 1),
+        'phase_entropy_proxy': total_entropy_k / max(num_layers_k, 1),
+        'phase_uniform_loss_q': total_uniform_q / max(num_layers_q, 1),
+        'phase_entropy_proxy_q': total_entropy_q / max(num_layers_q, 1),
         'phase_diversity_loss': avg_loss.item() if torch.is_tensor(avg_loss) else avg_loss,
         'num_layers_captured': num_layers,
     }
@@ -2061,9 +2101,10 @@ class PhaseAttentionLayer(nn.Module):
         self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
 
         # V9.9.10: Phase diversity loss capture
-        # When enabled, captures phi_k for computing repulsion + entropy losses
+        # When enabled, captures phi_k and phi_q for computing repulsion + entropy losses
         self.capture_phase_for_diversity = False  # Set True during training
         self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
+        self._captured_phi_q = None  # [B, N, H, D_h] stored during forward (V11.x: symmetric regularization)
 
         # V9.9.12c: Health dashboard capture (diagnostic only, no gradients)
         # Uses separate _health_* attributes to avoid overwriting diversity capture
@@ -2273,10 +2314,11 @@ class PhaseAttentionLayer(nn.Module):
             phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
             phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
 
-        # V9.9.10: Capture phi_k for phase diversity loss computation
+        # V9.9.10: Capture phi_k and phi_q for phase diversity loss computation
         # Only capture during training when flag is set (saves memory in eval)
         if self.capture_phase_for_diversity and self.training:
             self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
+            self._captured_phi_q = phi_q  # [B, N, H, D_h] - V11.x: symmetric regularization
 
         # V9.9.12c: Capture for health diagnostics (read-only, detached)
         # Use separate attributes to avoid overwriting diversity capture's
@@ -8416,10 +8458,14 @@ class SlotMemoryGCT(nn.Module):
         # Novelty gate: only write when the token carries new binding info
         # sigmoid(gate) → 0 means "don't write", 1 means "write"
         self.write_novelty_gate = nn.Linear(embed_dim, 1)
-        # V10.14.4: Initialize gate bias to 0 (sigmoid(0) = 0.5).
-        # Previous bias=-1 (sigmoid=0.27) was too conservative: combined with
-        # weak gradient signal to the gate, it collapsed to 0.017 and killed writes.
-        nn.init.constant_(self.write_novelty_gate.bias, 0.0)
+        # V11.x: Initialize gate bias to +1.0 (sigmoid(1) ≈ 0.73).
+        # Previous bias=0.0 (sigmoid=0.5) combined with weak indirect gradient
+        # signal caused the gate to drift down to 0.072 (barely above the 0.05
+        # floor). Starting higher gives the write path a real chance to bootstrap:
+        # slots get meaningful writes → retrieval loss provides gradient → gate
+        # can learn to modulate. If writing is too aggressive, the gate will
+        # learn to close — but starting too low creates a chicken-and-egg trap.
+        nn.init.constant_(self.write_novelty_gate.bias, 1.0)
         # V10.14.7: Raised floor from 0.01→0.05 to ensure minimum write
         # pressure while retrieval loss bootstraps. At 0.01, EMA updates
         # were too tiny to move slot_vals from zero init → no retrieval signal.

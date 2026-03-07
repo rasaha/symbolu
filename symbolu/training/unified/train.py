@@ -2820,6 +2820,8 @@ def train(config: UnifiedTrainingConfig):
                         phase_div_weight_for_srk = current_weight   # Store weight separately
                         metrics['phase_uniform_loss'] = phase_div_metrics['phase_uniform_loss']
                         metrics['phase_entropy_proxy'] = current_R
+                        metrics['phase_uniform_loss_q'] = phase_div_metrics.get('phase_uniform_loss_q', 0.0)
+                        metrics['phase_entropy_proxy_q'] = phase_div_metrics.get('phase_entropy_proxy_q', 0.0)
                         metrics['phase_diversity_loss'] = phase_div_loss.item()
                         metrics['phase_diversity_weight'] = current_weight
 
@@ -5756,7 +5758,7 @@ def train(config: UnifiedTrainingConfig):
                         # Log health metrics
                         print(f"\n  📊 [PHASE HEALTH] Step {global_step}")
                         print(f"     ├─ R_k (key collapse):    {health_metrics['R_k']:.4f} {'⚠️' if health_metrics['R_k'] > 0.5 else '✓'}")
-                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f}")
+                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f} {'⚠️' if health_metrics['R_q'] > 0.5 else '✓'}")
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
@@ -5775,13 +5777,18 @@ def train(config: UnifiedTrainingConfig):
                         for k, v in health_metrics.items():
                             metrics[f'health_{k}'] = v
 
-                        # V11.3: Auto-enable phase diversity when R_k collapse detected
-                        # If R_k > 0.5 (collapsed) and phase diversity is not active,
-                        # automatically enable adaptive phase diversity to push keys apart.
+                        # V11.3: Auto-enable phase diversity when R_k or R_q collapse detected
+                        # If R_k > 0.5 OR R_q > 0.5 (collapsed) and phase diversity is not active,
+                        # automatically enable adaptive phase diversity to push phases apart.
+                        # V11.x: Now also triggers on R_q collapse (symmetric regularization).
                         # This is a self-healing mechanism — no restart needed.
-                        if (health_metrics['R_k'] > 0.5 and
+                        _rk_collapsed = health_metrics['R_k'] > 0.5
+                        _rq_collapsed = health_metrics['R_q'] > 0.5
+                        if ((_rk_collapsed or _rq_collapsed) and
                                 not phase_diversity_enabled and
                                 config.model_type in ('phase', 'hybrid', 'ontological_hybrid')):
+                            # Seed with whichever R is worse
+                            _seed_R = max(health_metrics['R_k'], health_metrics['R_q'])
                             num_phase_layers = enable_phase_diversity_capture(model, enable=True)
                             phase_diversity_controller = AdaptivePhaseDiversityController(
                                 warmup_steps=config.warmup_steps,
@@ -5793,25 +5800,28 @@ def train(config: UnifiedTrainingConfig):
                                 task_loss_scaling=True,
                                 task_loss_alpha=0.40,
                             )
-                            # Seed R_ema with actual R_k to avoid warmup lag
-                            phase_diversity_controller.R_ema = health_metrics['R_k']
+                            # Seed R_ema with worst R to avoid warmup lag
+                            phase_diversity_controller.R_ema = _seed_R
                             phase_diversity_enabled = True
                             _rk_above_threshold_count = 0  # V11.3.1: Track for emergency escalation
-                            print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] R_k={health_metrics['R_k']:.4f} > 0.5 — enabling adaptive phase diversity")
-                            print(f"     ├─ Target R: 0.45 (current R_k: {health_metrics['R_k']:.4f})")
+                            _trigger = "R_k" if _rk_collapsed else "R_q"
+                            _trigger_val = health_metrics['R_k'] if _rk_collapsed else health_metrics['R_q']
+                            print(f"\n  🚨 [AUTO-PHASE-DIVERSITY] {_trigger}={_trigger_val:.4f} > 0.5 — enabling adaptive phase diversity")
+                            print(f"     ├─ Target R: 0.45 (current R_k: {health_metrics['R_k']:.4f}, R_q: {health_metrics['R_q']:.4f})")
                             print(f"     ├─ Mode: TASK-SCALED+STALL-DETECT (α=0.40, log-scaled)")
                             print(f"     ├─ λ_max: 0.5, η: 0.3 (collapse guard, not diversity maximizer)")
                             print(f"     └─ Layers: {num_phase_layers}")
 
-                        # V11.3.3: R_k Emergency Escalation (robust)
+                        # V11.3.3: R_k/R_q Emergency Escalation (robust)
                         # V11.3.2 required 5 CONSECUTIVE checks above 0.5, but R_k
                         # oscillates right at the boundary (0.499→0.501→0.499), so the
                         # counter kept resetting and the emergency never fired.
                         # Fix: lower threshold to 0.45, reduce patience to 3, and
-                        # only decrement (not reset) when R_k dips below threshold.
+                        # only decrement (not reset) when R dips below threshold.
+                        # V11.x: Also triggers on R_q > 0.45 (symmetric monitoring).
                         elif (phase_diversity_enabled and
                                 phase_diversity_controller is not None and
-                                health_metrics['R_k'] > 0.45):
+                                (health_metrics['R_k'] > 0.45 or health_metrics['R_q'] > 0.45)):
                             if not hasattr(phase_diversity_controller, '_rk_emergency_count'):
                                 phase_diversity_controller._rk_emergency_count = 0
                             phase_diversity_controller._rk_emergency_count += 1
@@ -5824,26 +5834,29 @@ def train(config: UnifiedTrainingConfig):
                                 phase_diversity_controller.lambda_floor = floor_val
                                 phase_diversity_controller.eta = min(0.5, phase_diversity_controller.eta * 2)
                                 phase_diversity_controller._rk_emergency_count = 0
-                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] R_k={health_metrics['R_k']:.4f} stuck above 0.45 "
-                                      f"for 3+ evals — force-escalating:")
+                                _worst_R_label = "R_k" if health_metrics['R_k'] >= health_metrics['R_q'] else "R_q"
+                                _worst_R_val = max(health_metrics['R_k'], health_metrics['R_q'])
+                                print(f"\n  🔴 [PHASE-DIV EMERGENCY] {_worst_R_label}={_worst_R_val:.4f} stuck above 0.45 "
+                                      f"for 3+ evals — force-escalating (R_k={health_metrics['R_k']:.4f}, R_q={health_metrics['R_q']:.4f}):")
                                 print(f"     ├─ λ: {old_lambda:.4f} → {floor_val:.4f} "
                                       f"(jumped to λ_max/2, floor set)")
                                 print(f"     ├─ η: {phase_diversity_controller.eta:.2f} (doubled for faster response)")
                                 print(f"     └─ λ_floor={floor_val:.4f} prevents task-loss formula from overriding")
                         else:
-                            # R_k below 0.45 — decrement counter (don't hard-reset)
-                            # Only fully clear floor once R_k drops well below threshold
+                            # Both R_k and R_q below 0.45 — decrement counter (don't hard-reset)
+                            # Only fully clear floor once both R values drop well below threshold
                             if (phase_diversity_enabled and
                                     phase_diversity_controller is not None and
                                     hasattr(phase_diversity_controller, '_rk_emergency_count')):
                                 # Decrement by 1 instead of resetting to 0
                                 phase_diversity_controller._rk_emergency_count = max(
                                     0, phase_diversity_controller._rk_emergency_count - 1)
-                                # Only clear floor when R_k is genuinely healthy (< 0.35)
+                                # Only clear floor when both R_k and R_q are genuinely healthy (< 0.35)
                                 if (health_metrics['R_k'] < 0.35 and
+                                        health_metrics['R_q'] < 0.35 and
                                         hasattr(phase_diversity_controller, 'lambda_floor')):
                                     if phase_diversity_controller.lambda_floor > 0:
-                                        print(f"  ✅ [PHASE-DIV] R_k={health_metrics['R_k']:.4f} healthy — clearing emergency λ_floor")
+                                        print(f"  ✅ [PHASE-DIV] R_k={health_metrics['R_k']:.4f}, R_q={health_metrics['R_q']:.4f} healthy — clearing emergency λ_floor")
                                     phase_diversity_controller.lambda_floor = 0.0
 
                     except Exception as e:

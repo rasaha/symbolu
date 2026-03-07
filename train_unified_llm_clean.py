@@ -8319,6 +8319,99 @@ def compute_sample_metrics(text: str) -> Dict[str, float]:
     }
 
 
+# V11.x: Factual evaluation prompts with ground-truth expected answers.
+# Each entry: (prompt, list_of_acceptable_answers, category)
+# Answers are checked as case-insensitive substrings of the generated text.
+FACTUAL_EVAL_PROMPTS = [
+    # Basic facts
+    ("The capital of France is", ["paris"], "fact"),
+    ("The chemical symbol for water is", ["h2o"], "fact"),
+    ("The speed of light is approximately", ["300", "3 ×", "3×", "3x10", "186,000"], "fact"),
+    # Arithmetic
+    ("2 + 2 =", ["4"], "arithmetic"),
+    ("The square root of 144 is", ["12"], "arithmetic"),
+    ("If x = 5, then 3x + 1 =", ["16"], "arithmetic"),
+    # Logical completion
+    ("The opposite of hot is", ["cold"], "logic"),
+    ("An animal that barks is a", ["dog"], "logic"),
+    # Factual continuation
+    ("The Earth orbits around the", ["sun"], "fact"),
+    ("There are 365 days in a", ["year"], "fact"),
+]
+
+
+def run_factual_eval(
+    model: nn.Module,
+    tokenizer,
+    device: torch.device,
+    step: int,
+    amp_dtype=None,
+    logger=None,
+) -> Dict[str, float]:
+    """
+    Run factual evaluation with ground-truth answer checking.
+
+    Uses greedy decoding (temperature=0) for deterministic evaluation
+    of factual knowledge. Returns accuracy scores by category.
+    """
+    def log(msg):
+        if logger:
+            logger.info(msg)
+        else:
+            print(msg)
+
+    correct_by_cat: Dict[str, int] = {}
+    total_by_cat: Dict[str, int] = {}
+    correct_total = 0
+
+    log(f"  📋 FACTUAL EVAL (Step {step})")
+
+    for prompt, expected_answers, category in FACTUAL_EVAL_PROMPTS:
+        total_by_cat[category] = total_by_cat.get(category, 0) + 1
+        try:
+            # Near-greedy decoding for deterministic factual evaluation
+            # Use temperature=0.01 (not 0.0) to avoid division-by-zero in generate_sample
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=32,
+                temperature=0.01,
+                top_p=1.0,
+                top_k=0,
+                repetition_penalty=1.0,
+                no_repeat_ngram_size=0,
+                amp_dtype=amp_dtype,
+            )
+            # Check if any expected answer appears in generation
+            gen_lower = generated.lower()
+            hit = any(ans.lower() in gen_lower for ans in expected_answers)
+            if hit:
+                correct_by_cat[category] = correct_by_cat.get(category, 0) + 1
+                correct_total += 1
+            mark = "✓" if hit else "✗"
+            # Show compact output
+            gen_short = generated.strip().replace('\n', ' ')[:80]
+            log(f"     {mark} [{category}] \"{prompt}\" → \"{gen_short}\"")
+        except Exception as e:
+            log(f"     ✗ [{category}] \"{prompt}\" → ERROR: {e}")
+
+    # Summary
+    total = len(FACTUAL_EVAL_PROMPTS)
+    overall_acc = correct_total / total if total > 0 else 0.0
+    cat_summary = []
+    for cat in sorted(total_by_cat.keys()):
+        c = correct_by_cat.get(cat, 0)
+        t = total_by_cat[cat]
+        cat_summary.append(f"{cat}={c}/{t}")
+    log(f"  📊 Factual Accuracy: {correct_total}/{total} ({overall_acc*100:.0f}%) | {', '.join(cat_summary)}")
+    log("")
+
+    return {
+        'factual_accuracy': overall_acc,
+        'factual_correct': correct_total,
+        'factual_total': total,
+    }
+
+
 def run_quality_samples(
     model: nn.Module,
     tokenizer,
@@ -8401,8 +8494,8 @@ def run_quality_samples(
             generated = generate_sample(
                 model, tokenizer, prompt, device,
                 max_new_tokens=128,
-                temperature=0.9,
-                top_p=0.95,
+                temperature=0.7,
+                top_p=0.9,
                 top_k=50,
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
@@ -14539,7 +14632,7 @@ def train(config: UnifiedTrainingConfig):
                         # Log health metrics
                         print(f"\n  📊 [PHASE HEALTH] Step {global_step}")
                         print(f"     ├─ R_k (key collapse):    {health_metrics['R_k']:.4f} {'⚠️' if health_metrics['R_k'] > 0.5 else '✓'}")
-                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f}")
+                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f} {'⚠️' if health_metrics['R_q'] > 0.5 else '✓'}")
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
@@ -15104,6 +15197,13 @@ def train(config: UnifiedTrainingConfig):
                 if tokenizer is not None:
                     model.eval()
                     run_quality_samples(model, tokenizer, config, device, global_step)
+                    # V11.x: Factual eval with ground-truth scoring
+                    _amp_dt = autocast_dtype if config.mixed_precision != "none" else None
+                    factual_metrics = run_factual_eval(
+                        model, tokenizer, device, global_step, amp_dtype=_amp_dt
+                    )
+                    for k, v in factual_metrics.items():
+                        metrics[k] = v
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
