@@ -252,7 +252,10 @@ def run_slot_retrieval_probes(
                     read_entropies.append(result['read_entropy'])
                     retrieval_matches.append(result['match'])
                     retrieval_boosts.append(result['boost'])
-            except Exception:
+            except Exception as e:
+                import traceback
+                print(f"  ⚠️ Slot probe failed for '{pair['query'][:40]}...': {e}")
+                traceback.print_exc()
                 continue
 
     n = max(len(utilizations), 1)
@@ -452,7 +455,10 @@ def run_phase_coherence_probes(
                     all_longrange_coherence.append(result['longrange_coherence'])
                     all_phase_stability.append(result['phase_stability'])
                     all_drift_rates.append(result['drift_rate'])
-            except Exception:
+            except Exception as e:
+                import traceback
+                print(f"  ⚠️ Coherence probe failed for prompt '{prompt[:40]}...': {e}")
+                traceback.print_exc()
                 continue
 
     n = max(len(all_local_coherence), 1)
@@ -495,12 +501,22 @@ def _measure_sequence_coherence(
     prompt_len = input_ids.shape[1]
 
     # Phase 1: Generate tokens greedily (only need logits, not hidden states)
+    # Reset state before generation so ontological model starts fresh
+    if hasattr(model, 'prev_state'):
+        model.prev_state = None
+    if hasattr(model, 'prev_bhava'):
+        model.prev_bhava = None
+
     for step in range(max_tokens):
-        if use_autocast:
-            with torch.amp.autocast('cuda', dtype=autocast_dtype):
-                outputs = model(generated)
-        else:
-            outputs = model(generated)
+        try:
+            if use_autocast:
+                with torch.amp.autocast('cuda', dtype=autocast_dtype):
+                    outputs = model(generated, reset_state=(step == 0))
+            else:
+                outputs = model(generated, reset_state=(step == 0))
+        except Exception:
+            # Sequence may have exceeded max_seq_len — stop generation
+            break
 
         if isinstance(outputs, dict):
             logits = outputs.get('logits', outputs.get('output'))
@@ -525,6 +541,14 @@ def _measure_sequence_coherence(
         model.prev_state = None
     if hasattr(model, 'prev_bhava'):
         model.prev_bhava = None
+
+    # Truncate to max_seq_len if needed to avoid positional encoding errors
+    _max_len = getattr(model, 'max_seq_len', None)
+    if _max_len is None:
+        _inner = getattr(model, 'hybrid', model)
+        _max_len = getattr(_inner, 'max_seq_len', None)
+    if _max_len is not None and generated.shape[1] > _max_len:
+        generated = generated[:, :_max_len]
 
     if use_autocast:
         with torch.amp.autocast('cuda', dtype=autocast_dtype):
@@ -688,6 +712,20 @@ def run_knowledge_probes(
             log(f"  {emoji} Slot Retrieval: match={slots['retrieval_match']*100:.0f}% "
                 f"util={slots['slot_utilization']*100:.0f}% "
                 f"entropy={slots['read_entropy']:.2f}")
+            # Show training-time diagnostics for context
+            _sm = _get_slot_memory(model)
+            if _sm is not None:
+                _train_wg = getattr(_sm, '_diag_write_gate_mean', None)
+                _train_re = getattr(_sm, '_diag_read_attn_entropy', None)
+                _train_ae = getattr(_sm, '_diag_assignment_entropy', None)
+                _warmstart = _sm.read_warmstart_alpha if hasattr(_sm, 'read_warmstart_alpha') else None
+                if _train_wg is not None:
+                    log(f"     (training: write_gate={_train_wg:.3f} "
+                        f"assign_H={_train_ae:.3f} "
+                        f"read_H={_train_re:.3f} "
+                        f"warmstart_α={_warmstart:.3f})")
+                    log(f"     num_probes={slots.get('num_probes', 0)} "
+                        f"boost={slots.get('retrieval_boost', 0):.4f}")
         else:
             log(f"  ○ Slot Memory: not available in this model configuration")
 
@@ -705,12 +743,18 @@ def run_knowledge_probes(
         )
         results['coherence'] = coherence
 
-        emoji = "🟢" if coherence['local_coherence'] > 0.8 else "🟡" if coherence['local_coherence'] > 0.5 else "🔴"
-        drift_emoji = "↗" if coherence['drift_rate'] > 0 else "↘" if coherence['drift_rate'] < -0.02 else "→"
-        log(f"  {emoji} Phase Coherence: local={coherence['local_coherence']:.3f} "
-            f"longrange={coherence['longrange_coherence']:.3f} "
-            f"stability={coherence['phase_stability']:.3f} "
-            f"drift={drift_emoji}{abs(coherence['drift_rate']):.4f}")
+        _n_prompts = coherence.get('num_prompts', 0)
+        if _n_prompts == 0:
+            log(f"  🔴 Phase Coherence: ALL PROBES FAILED (0/{len(COHERENCE_PROMPTS)} succeeded)")
+            log(f"     Check ⚠️ warnings above for error details")
+        else:
+            emoji = "🟢" if coherence['local_coherence'] > 0.8 else "🟡" if coherence['local_coherence'] > 0.5 else "🔴"
+            drift_emoji = "↗" if coherence['drift_rate'] > 0 else "↘" if coherence['drift_rate'] < -0.02 else "→"
+            log(f"  {emoji} Phase Coherence: local={coherence['local_coherence']:.3f} "
+                f"longrange={coherence['longrange_coherence']:.3f} "
+                f"stability={coherence['phase_stability']:.3f} "
+                f"drift={drift_emoji}{abs(coherence['drift_rate']):.4f} "
+                f"({_n_prompts}/{len(COHERENCE_PROMPTS)} prompts)")
 
     except Exception as e:
         log(f"  ⚠️ Coherence probes failed: {e}")
