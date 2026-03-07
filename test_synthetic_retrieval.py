@@ -350,6 +350,11 @@ def check_answer(model, tokenizer, context: str, question: str, expected: str, d
     # Encode input
     full_input = context + question
     input_ids = tokenizer.encode(full_input)
+    # Truncate to model's max_seq_len to avoid positional embedding OOB
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    max_gen = len(expected) + 10
+    if len(input_ids) > max_seq_len - max_gen:
+        input_ids = input_ids[-(max_seq_len - max_gen):]
     input_tensor = torch.tensor([input_ids], device=device)
 
     # Generate continuation
@@ -373,6 +378,10 @@ def check_answer(model, tokenizer, context: str, question: str, expected: str, d
 
             next_token_tensor = torch.tensor([[next_token]], device=device)
             current_input = torch.cat([current_input, next_token_tensor], dim=1)
+
+            # Truncate to max_seq_len
+            if current_input.shape[1] > max_seq_len:
+                current_input = current_input[:, -max_seq_len:]
 
             # Stop if we've generated enough
             if len(generated) > len(expected) + 5:
@@ -411,12 +420,14 @@ def run_test(args):
     # Initialize test generator
     test_gen = SyntheticRetrievalTest(tokenizer)
 
-    # Context lengths to test
-    context_lengths = [1024, 2048, 4096, 8192]
-    if args.max_context >= 16384:
-        context_lengths.append(16384)
-    if args.max_context >= 32768:
-        context_lengths.append(32768)
+    # Context lengths to test — cap to model's max_seq_len
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    all_lengths = [1024, 2048, 4096, 8192, 16384, 32768]
+    context_lengths = [c for c in all_lengths if c <= max_seq_len and c <= args.max_context]
+    if not context_lengths:
+        context_lengths = [min(max_seq_len, 1024)]
+    print(f"  Model max_seq_len: {max_seq_len}")
+    print(f"  Testing context lengths: {context_lengths}")
 
     results = {
         "test_date": datetime.now().isoformat(),
