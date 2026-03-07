@@ -29,6 +29,7 @@ Usage:
 """
 
 import argparse
+import dataclasses
 import json
 import random
 import torch
@@ -41,6 +42,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from transformers import GPT2Tokenizer
 from train import TrainingConfig, create_model
+
+
+def _make_config(config_dict: dict) -> TrainingConfig:
+    """Create TrainingConfig, ignoring unknown fields from newer configs."""
+    valid_fields = {f.name for f in dataclasses.fields(TrainingConfig)}
+    filtered = {k: v for k, v in config_dict.items() if k in valid_fields}
+    return TrainingConfig(**filtered)
 
 
 # Filler text patterns (boring, repetitive content)
@@ -81,7 +89,7 @@ def load_model(checkpoint_path: str, device: torch.device):
                 f"config.json not found in {ckpt_path.parent}. "
                 "Cannot reconstruct model without config."
             )
-        config = TrainingConfig(**config_dict)
+        config = _make_config(config_dict)
         model = create_model(config)
         model.load_state_dict(state_dict, strict=False)
     else:
@@ -89,7 +97,7 @@ def load_model(checkpoint_path: str, device: torch.device):
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         if isinstance(checkpoint, dict) and 'model' in checkpoint:
             config_dict = checkpoint.get('config', {})
-            config = TrainingConfig(**config_dict)
+            config = _make_config(config_dict)
             model = create_model(config)
             model.load_state_dict(checkpoint['model'], strict=False)
         else:
@@ -100,7 +108,7 @@ def load_model(checkpoint_path: str, device: torch.device):
                     config_dict = json.load(f)
             else:
                 config_dict = {}
-            config = TrainingConfig(**config_dict)
+            config = _make_config(config_dict)
             model = create_model(config)
             state_dict = checkpoint if isinstance(checkpoint, dict) else checkpoint
             model.load_state_dict(state_dict, strict=False)
