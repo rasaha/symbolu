@@ -8622,12 +8622,12 @@ class SlotMemoryGCT(nn.Module):
         """
         B, N, D = x.shape
 
-        # V10.14.1: Selective detach — stop gradients from slot write flowing
-        # back to the transformer backbone, but KEEP gradients to slot memory
-        # parameters (write_key_proj, write_val_proj, novelty_gate, _write_log_scale).
-        # Without this, main LM loss gradients through the slot write path
-        # destabilize backbone training (write_gate collapses to ~0.04).
-        x_write = x.detach()  # Always detach input to write path
+        # V10.24: Soft detach — pass 10% of gradient through to write path.
+        # Full detach (V10.14.1) prevented main LM loss from encouraging writes,
+        # starving write_novelty_gate of signal. 10% leak lets the LM loss
+        # gently push the gate open when slot reads help prediction, while
+        # still blocking 90% of gradient to prevent backbone destabilization.
+        x_write = x * 0.1 + x.detach() * 0.9
 
         # Novelty gate: which tokens should write? [B, N, 1]
         # V10.14.4: Floor clamp prevents gate death — ensures minimum write pressure
