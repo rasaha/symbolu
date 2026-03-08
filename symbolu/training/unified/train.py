@@ -5146,17 +5146,14 @@ def train(config: UnifiedTrainingConfig):
                         if config.enable_sovereign_phase_controller:
                             log_msg = f"  {icon} [SPC] {status_str} | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
                         else:
-                            # When disabled, show what WOULD happen
-                            if spc_result['would_trigger']:
-                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
-                            else:
-                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] Level:{spc_result['level'].upper()}"
+                            # SPC disabled — skip diagnostic noise
+                            log_msg = None
 
-                        if spc_result['rotations']:
-                            rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
-                            log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
-
-                        print(log_msg)
+                        if log_msg is not None:
+                            if spc_result['rotations']:
+                                rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
+                                log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
+                            print(log_msg)
 
                 # SGP Metabolic Step: Inject persisted gradients to Authority layers
                 pulse_applied = sgp_controller.sgp_metabolic_step({
