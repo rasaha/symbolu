@@ -423,8 +423,10 @@ class GradientVarianceTracker:
         self._prev_grads: Dict[str, torch.Tensor] = {}
         self._baseline_set = False
         self._step = 0
+        self._global_step = 0
         # V9.9.1: Rate-limit alerts per layer (only alert once per window_size steps)
-        self._last_alert_step: Dict[str, int] = {}
+        self._last_alert_internal: Dict[str, int] = {}  # Internal step for rate-limiting
+        self._last_alert_step: Dict[str, int] = {}  # Global step for cross-domain queries
         # V9.9.1: EMA factor for baseline updates (adapts to LR changes)
         # V10.15: Increased from 0.01 to 0.05 so baseline tracks LR warmup
         # faster, preventing false positive spike alerts during warmup phase
@@ -454,16 +456,23 @@ class GradientVarianceTracker:
         return count
 
     @torch.no_grad()
-    def record(self, model: torch.nn.Module) -> Dict[str, any]:
+    def record(self, model: torch.nn.Module, global_step: int = None) -> Dict[str, any]:
         """
         Record gradient statistics for one training step.
 
         Call AFTER backward(), BEFORE optimizer.step().
 
+        Args:
+            model: The model whose gradients to track.
+            global_step: If provided, used for spike timestamps (supports
+                         resume where global_step != internal step count).
+                         Falls back to internal counter if not provided.
+
         Returns:
             Dict with gradient health metrics and any spike alerts.
         """
         self._step += 1
+        self._global_step = global_step if global_step is not None else self._step
         results = {'step': self._step, 'alerts': []}
 
         total_norm = 0.0
@@ -514,9 +523,12 @@ class GradientVarianceTracker:
 
                 if variance > self.variance_spike_factor * baseline:
                     # V9.9.1: Rate-limit alerts — at most once per window_size steps per layer
-                    last_alert = self._last_alert_step.get(name, -self.window_size)
-                    if self._step - last_alert >= self.window_size:
-                        self._last_alert_step[name] = self._step
+                    # Use internal _step for rate-limiting (monotonic), but store
+                    # _global_step in _last_alert_step for cross-domain queries
+                    last_alert_internal = self._last_alert_internal.get(name, -self.window_size)
+                    if self._step - last_alert_internal >= self.window_size:
+                        self._last_alert_internal[name] = self._step
+                        self._last_alert_step[name] = self._global_step
                         alert = (
                             f"Gradient variance spike: {name} "
                             f"var={variance:.6f} vs baseline={baseline:.6f} "

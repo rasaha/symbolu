@@ -4861,7 +4861,7 @@ def train(config: UnifiedTrainingConfig):
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
             if gradient_variance_tracker is not None:
-                grad_health = gradient_variance_tracker.record(model)
+                grad_health = gradient_variance_tracker.record(model, global_step=global_step)
                 metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
                 if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
                     for alert in grad_health['alerts']:

@@ -5319,7 +5319,7 @@ class AdaptiveTrainingController:
                     if self._grad_variance_tracker is not None and self._last_boost_step > 0:
                         spike_count = self._grad_variance_tracker.get_spike_count_since(self._last_boost_step)
                         if spike_count >= self._spike_dampen_threshold:
-                            # Scale down: 10 spikes → 0.5x boost factor, 20+ → near 1.0 (no boost)
+                            # Linear dampening: threshold(10)→0.75x, 2x threshold(20)→0.5x, 4x threshold(40)→no boost
                             dampen = max(0.0, 1.0 - spike_count / (self._spike_dampen_threshold * 4))
                             effective_boost = 1.0 + (self.lr_boost_factor - 1.0) * dampen
                             print(f"\n  🛡️  [AdaptiveTraining] BOOST DAMPENED: {spike_count} params spiked after last boost → factor {self.lr_boost_factor:.2f} → {effective_boost:.3f}")
@@ -5328,7 +5328,7 @@ class AdaptiveTrainingController:
                     hard_cap = self.base_lr * self._max_boost_from_base
                     new_lr = min(self.lr_max, hard_cap, current_lr * effective_boost)
 
-                    if new_lr > current_lr and new_lr != current_lr:
+                    if new_lr > current_lr:
                         for pg in self.optimizer.param_groups:
                             pg['lr'] = new_lr
                         # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
