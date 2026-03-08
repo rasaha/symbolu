@@ -718,3 +718,202 @@ class AdaptiveTrainingController:
             "adjustment_log": self.adjustment_log[-10:],  # Last 10 adjustments
         }
 
+
+# =============================================================================
+# V10.22: Adaptive Slot Memory LR Controller
+# =============================================================================
+# Dynamically adjusts the slot param group LR scale based on:
+#   - retr_loss velocity (plateau → boost, spike → decay)
+#   - slot ablation delta (neutral → boost, helping → hold)
+#   - write_gate level (too low → boost to prevent slot shutdown)
+# Also maintains the slot LR ratio when the main LR changes.
+# =============================================================================
+
+class AdaptiveSlotLRController:
+    """Adaptively scales slot memory param group LR relative to main LR."""
+
+    def __init__(
+        self,
+        optimizer,
+        initial_scale: float = 0.1,
+        scale_min: float = 0.1,
+        scale_max: float = 0.5,
+        boost_factor: float = 1.5,
+        decay_factor: float = 0.7,
+        retr_loss_plateau_threshold: float = 3.0,  # % velocity magnitude below this = plateau
+        retr_loss_spike_threshold: float = 15.0,    # % velocity above this = spike
+        write_gate_emergency: float = 0.05,          # Below this, force boost
+        history_window: int = 5,                      # Number of observations for velocity
+        min_steps_between_adjustments: int = 500,
+    ):
+        self.optimizer = optimizer
+        self.current_scale = initial_scale
+        self.scale_min = scale_min
+        self.scale_max = scale_max
+        self.boost_factor = boost_factor
+        self.decay_factor = decay_factor
+        self.retr_loss_plateau_threshold = retr_loss_plateau_threshold
+        self.retr_loss_spike_threshold = retr_loss_spike_threshold
+        self.write_gate_emergency = write_gate_emergency
+        self.history_window = history_window
+        self.min_steps_between_adjustments = min_steps_between_adjustments
+
+        # State
+        self.retr_loss_history: List[float] = []
+        self.ablation_delta_history: List[float] = []
+        self.write_gate_history: List[float] = []
+        self.last_adjustment_step: int = 0
+        self.boost_count: int = 0
+        self.decay_count: int = 0
+        self.adjustment_log: List[Dict] = []
+
+    def record_retr_loss(self, retr_loss: float):
+        """Record retrieval loss observation (call every eval)."""
+        self.retr_loss_history.append(retr_loss)
+        if len(self.retr_loss_history) > 20:
+            self.retr_loss_history = self.retr_loss_history[-20:]
+
+    def record_ablation_delta(self, delta: float):
+        """Record slot ablation PPL delta (call every ablation eval)."""
+        self.ablation_delta_history.append(delta)
+        if len(self.ablation_delta_history) > 10:
+            self.ablation_delta_history = self.ablation_delta_history[-10:]
+
+    def record_write_gate(self, write_gate: float):
+        """Record mean write gate value."""
+        self.write_gate_history.append(write_gate)
+        if len(self.write_gate_history) > 20:
+            self.write_gate_history = self.write_gate_history[-20:]
+
+    def _retr_loss_velocity(self) -> Optional[float]:
+        """Compute % change in retr_loss over recent window. Negative = improving."""
+        if len(self.retr_loss_history) < self.history_window:
+            return None
+        recent = self.retr_loss_history[-self.history_window:]
+        if recent[0] == 0:
+            return None
+        return ((recent[-1] - recent[0]) / abs(recent[0])) * 100
+
+    def update(self, global_step: int) -> Dict[str, Any]:
+        """
+        Make an adaptive LR scale decision. Call at eval time (after ablation).
+
+        Returns dict with actions taken.
+        """
+        actions = {"step": global_step, "adjustments": []}
+
+        if global_step - self.last_adjustment_step < self.min_steps_between_adjustments:
+            self.sync_slot_lr()
+            return actions
+
+        old_scale = self.current_scale
+        reason = None
+
+        # --- Signal 1: Write gate emergency (model shutting off slot writes) ---
+        if self.write_gate_history:
+            recent_wg = self.write_gate_history[-3:] if len(self.write_gate_history) >= 3 else self.write_gate_history
+            avg_wg = sum(recent_wg) / len(recent_wg)
+            if avg_wg < self.write_gate_emergency:
+                self.current_scale = min(self.scale_max, self.current_scale * self.boost_factor)
+                reason = f"write_gate_emergency (avg={avg_wg:.3f}<{self.write_gate_emergency})"
+
+        # --- Signal 2: Retrieval loss velocity ---
+        if reason is None:
+            velocity = self._retr_loss_velocity()
+            if velocity is not None:
+                if velocity > self.retr_loss_spike_threshold:
+                    # retr_loss increasing sharply — decay
+                    self.current_scale = max(self.scale_min, self.current_scale * self.decay_factor)
+                    reason = f"retr_loss_spike (vel={velocity:+.1f}%)"
+                elif abs(velocity) < self.retr_loss_plateau_threshold:
+                    # retr_loss plateauing — check ablation to decide
+                    if self.ablation_delta_history:
+                        last_delta = self.ablation_delta_history[-1]
+                        if last_delta < 1.0:
+                            # Slots neutral or hurting + plateau → boost
+                            self.current_scale = min(self.scale_max, self.current_scale * self.boost_factor)
+                            reason = f"retr_plateau+neutral (vel={velocity:+.1f}%, delta={last_delta:+.1f})"
+                        # else: slots helping even though plateau → hold
+                    else:
+                        # No ablation data yet, but plateau → modest boost
+                        self.current_scale = min(self.scale_max, self.current_scale * 1.2)
+                        reason = f"retr_plateau_no_ablation (vel={velocity:+.1f}%)"
+                # else: velocity is negative (improving) → hold, slots learning fine
+
+        # --- Signal 3: Ablation showing slots hurting ---
+        if reason is None and self.ablation_delta_history:
+            last_delta = self.ablation_delta_history[-1]
+            if last_delta < -1.0:
+                # Slots actively hurting — decay scale to reduce slot influence
+                self.current_scale = max(self.scale_min, self.current_scale * self.decay_factor)
+                reason = f"slots_hurting (delta={last_delta:+.1f})"
+
+        # Clamp
+        self.current_scale = max(self.scale_min, min(self.scale_max, self.current_scale))
+
+        if reason is not None and self.current_scale != old_scale:
+            direction = "BOOST" if self.current_scale > old_scale else "DECAY"
+            if direction == "BOOST":
+                self.boost_count += 1
+            else:
+                self.decay_count += 1
+            self.last_adjustment_step = global_step
+
+            main_lr = self.optimizer.param_groups[0]['lr']
+            new_slot_lr = main_lr * self.current_scale
+            print(f"  🎚️ [SLOT-LR] {direction}: scale {old_scale:.3f} → {self.current_scale:.3f} "
+                  f"(slot_lr={new_slot_lr:.2e}) | {reason}")
+
+            actions["adjustments"].append({
+                "direction": direction,
+                "old_scale": old_scale,
+                "new_scale": self.current_scale,
+                "reason": reason,
+            })
+            self.adjustment_log.append(actions)
+
+        # Always sync after update
+        self.sync_slot_lr()
+        return actions
+
+    def sync_slot_lr(self):
+        """
+        Ensure optimizer param_groups[1] (slot group) reflects current scale.
+
+        Call this after ANY global LR change to maintain the ratio.
+        Other systems (AdaptLR, scheduler, stress-probe) set all param groups
+        to the same LR — this restores the slot ratio.
+        """
+        if len(self.optimizer.param_groups) < 2:
+            return
+        main_lr = self.optimizer.param_groups[0]['lr']
+        self.optimizer.param_groups[1]['lr'] = main_lr * self.current_scale
+
+    def get_status_string(self) -> str:
+        velocity = self._retr_loss_velocity()
+        vel_str = f"{velocity:+.1f}%" if velocity is not None else "N/A"
+        return (f"SlotLR: scale={self.current_scale:.3f} "
+                f"vel={vel_str} "
+                f"boosts={self.boost_count} decays={self.decay_count}")
+
+    def state_dict(self) -> Dict[str, Any]:
+        """For checkpoint saving."""
+        return {
+            "current_scale": self.current_scale,
+            "retr_loss_history": self.retr_loss_history,
+            "ablation_delta_history": self.ablation_delta_history,
+            "write_gate_history": self.write_gate_history,
+            "last_adjustment_step": self.last_adjustment_step,
+            "boost_count": self.boost_count,
+            "decay_count": self.decay_count,
+        }
+
+    def load_state_dict(self, state: Dict[str, Any]):
+        """For checkpoint loading."""
+        self.current_scale = state.get("current_scale", self.current_scale)
+        self.retr_loss_history = state.get("retr_loss_history", [])
+        self.ablation_delta_history = state.get("ablation_delta_history", [])
+        self.write_gate_history = state.get("write_gate_history", [])
+        self.last_adjustment_step = state.get("last_adjustment_step", 0)
+        self.boost_count = state.get("boost_count", 0)
+        self.decay_count = state.get("decay_count", 0)

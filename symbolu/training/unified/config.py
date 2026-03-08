@@ -155,6 +155,14 @@ class UnifiedTrainingConfig:
     retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
     slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
 
+    # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
+    # based on retrieval loss velocity, slot ablation delta, and write gate health
+    enable_adaptive_slot_lr: bool = False
+    slot_lr_scale_min: float = 0.1   # Floor for adaptive slot LR scale
+    slot_lr_scale_max: float = 0.5   # Ceiling for adaptive slot LR scale
+    slot_lr_boost_factor: float = 1.5  # Multiply scale by this when boosting
+    slot_lr_decay_factor: float = 0.7  # Multiply scale by this when decaying
+
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
     # ==========================================================================

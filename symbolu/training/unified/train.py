@@ -412,6 +412,7 @@ from symbolu.training.unified import (
     # phase_controllers
     SovereignPhaseController,
     AdaptiveTrainingController,
+    AdaptiveSlotLRController,
     # scheduling
     DynamicWindowScheduler,
     AdaptiveWarmupScheduler,
@@ -1656,6 +1657,20 @@ def train(config: UnifiedTrainingConfig):
                     pg['lr'] = max_allowed
                 adaptive_controller.emergency_count += 1
                 adaptive_controller.boost_blocked = True
+
+    # V10.22: Adaptive Slot LR Controller
+    adaptive_slot_lr = None
+    if config.enable_adaptive_slot_lr and _slot_params:
+        adaptive_slot_lr = AdaptiveSlotLRController(
+            optimizer=optimizer,
+            initial_scale=config.slot_memory_lr_scale,
+            scale_min=config.slot_lr_scale_min,
+            scale_max=config.slot_lr_scale_max,
+            boost_factor=config.slot_lr_boost_factor,
+            decay_factor=config.slot_lr_decay_factor,
+        )
+        print(f"  [V10.22] Adaptive Slot LR: ENABLED "
+              f"(scale={config.slot_memory_lr_scale} → [{config.slot_lr_scale_min}, {config.slot_lr_scale_max}])")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -4456,6 +4471,10 @@ def train(config: UnifiedTrainingConfig):
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
                               f"wr_scale={_wr_scale:.1f} "
                               f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f}")
+                        # V10.22: Feed signals to adaptive slot LR controller
+                        if adaptive_slot_lr is not None:
+                            adaptive_slot_lr.record_retr_loss(_retr_loss_val)
+                            adaptive_slot_lr.record_write_gate(getattr(_sm, '_diag_write_gate_mean', 0))
 
             # =====================================================================
             # CONSCIOUS GENERATION Phase 1+2: Token Ontology Cache + L_ont Loss
@@ -4976,6 +4995,10 @@ def train(config: UnifiedTrainingConfig):
             # Only enforce after warmup to not interfere with warmup ramp
             if adaptive_controller is not None and warmup_complete:
                 adaptive_controller.enforce_lr_bounds(global_step)
+
+            # V10.22: Sync slot LR ratio after any global LR change
+            if adaptive_slot_lr is not None:
+                adaptive_slot_lr.sync_slot_lr()
 
             # Update alpha schedule for phase/hybrid models
             # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
@@ -6715,6 +6738,9 @@ def train(config: UnifiedTrainingConfig):
                     if adaptive_adjustments.get("actions"):
                         # Already logged by the controller
                         pass
+                    # V10.22: Sync slot LR after adaptive controller may have changed main LR
+                    if adaptive_slot_lr is not None:
+                        adaptive_slot_lr.sync_slot_lr()
 
                     # TensorBoard logging for adaptive controller
                     if tb_writer is not None:
@@ -6762,6 +6788,9 @@ def train(config: UnifiedTrainingConfig):
                 # Log Adaptive Training Controller status
                 if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
                     print(f"  --> {adaptive_controller.get_status_string()}")
+                if adaptive_slot_lr is not None:
+                    adaptive_slot_lr.update(global_step)
+                    print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -6834,6 +6863,10 @@ def train(config: UnifiedTrainingConfig):
                           f"Without: {_no_slot_ppl:.2f} | "
                           f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
                           f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                    # V10.22: Feed ablation delta and trigger adaptive slot LR update
+                    if adaptive_slot_lr is not None:
+                        adaptive_slot_lr.record_ablation_delta(_slot_delta)
+                        _slot_lr_actions = adaptive_slot_lr.update(global_step)
                     # Restore
                     _sm._read_warmstart_center = _orig_center
                     _sm._router_step = _orig_step
@@ -7207,6 +7240,17 @@ def main():
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
                        help="Slot param LR multiplier vs main LR (default: 0.1)")
+    # V10.22: Adaptive slot LR
+    parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
+                       help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
+    parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
+                       help="Floor for adaptive slot LR scale (default: 0.1)")
+    parser.add_argument("--slot_lr_scale_max", type=float, default=0.5,
+                       help="Ceiling for adaptive slot LR scale (default: 0.5)")
+    parser.add_argument("--slot_lr_boost_factor", type=float, default=1.5,
+                       help="Multiply scale by this when boosting (default: 1.5)")
+    parser.add_argument("--slot_lr_decay_factor", type=float, default=0.7,
+                       help="Multiply scale by this when decaying (default: 0.7)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
@@ -8669,6 +8713,12 @@ def main():
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
         slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
+        # V10.22: Adaptive slot LR
+        enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
+        slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
+        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.5),
+        slot_lr_boost_factor=getattr(args, 'slot_lr_boost_factor', 1.5),
+        slot_lr_decay_factor=getattr(args, 'slot_lr_decay_factor', 0.7),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
