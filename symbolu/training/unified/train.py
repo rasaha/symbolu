@@ -6736,6 +6736,15 @@ def train(config: UnifiedTrainingConfig):
                     if adaptive_adjustments.get("actions"):
                         # Already logged by the controller
                         pass
+
+                    # Notify gradient variance tracker of LR changes to prevent
+                    # false-positive spike alerts (variance scales ~factor²)
+                    if gradient_variance_tracker is not None and adaptive_adjustments.get("actions"):
+                        for action in adaptive_adjustments["actions"]:
+                            if action.startswith("LR_BOOST"):
+                                gradient_variance_tracker.notify_lr_change(config.adaptive_lr_boost)
+                            elif action.startswith("LR_DECAY"):
+                                gradient_variance_tracker.notify_lr_change(config.adaptive_lr_decay)
                     # V10.22: Sync slot LR after adaptive controller may have changed main LR
                     if adaptive_slot_lr is not None:
                         adaptive_slot_lr.sync_slot_lr()

@@ -430,6 +430,17 @@ class GradientVarianceTracker:
         # faster, preventing false positive spike alerts during warmup phase
         self._baseline_ema_alpha = 0.05
 
+    def notify_lr_change(self, factor: float):
+        """Scale baselines when LR changes abruptly (e.g. LR boost).
+
+        Gradient norms scale ~linearly with LR, so variance scales ~factor².
+        Without this, a 1.5x LR boost causes every layer to exceed the spike
+        threshold and flood the log with false-positive alerts.
+        """
+        scale = factor ** 2
+        for name in self._baseline_variance:
+            self._baseline_variance[name] *= scale
+
     @torch.no_grad()
     def record(self, model: torch.nn.Module) -> Dict[str, any]:
         """
