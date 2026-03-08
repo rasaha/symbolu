@@ -147,6 +147,7 @@ from symbolu.training.unified.evaluation import (
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    run_factual_eval,
     ReadinessIndex,
 )
 
@@ -269,6 +270,7 @@ __all__ = [
     "generate_sample",
     "compute_sample_metrics",
     "run_quality_samples",
+    "run_factual_eval",
     "ReadinessIndex",
     # losses
     "compute_ontological_loss",

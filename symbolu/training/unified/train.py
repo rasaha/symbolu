@@ -432,6 +432,7 @@ from symbolu.training.unified import (
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    run_factual_eval,
     LRAValidator,
     run_phase_rotation_test,
     print_phase_rotation_results,
@@ -6794,6 +6795,13 @@ def train(config: UnifiedTrainingConfig):
                 if tokenizer is not None:
                     model.eval()
                     run_quality_samples(model, tokenizer, config, device, global_step)
+                    # V11.x: Factual eval with ground-truth scoring
+                    _amp_dt = autocast_dtype if config.mixed_precision != "none" else None
+                    factual_metrics = run_factual_eval(
+                        model, tokenizer, device, global_step, amp_dtype=_amp_dt
+                    )
+                    for k, v in factual_metrics.items():
+                        metrics[k] = v
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
