@@ -8512,9 +8512,10 @@ class SlotMemoryGCT(nn.Module):
         self._gate_target_min = 0.20      # Never tighten below this
         self._gate_target_max = 0.60      # Never relax above this
         self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
-        self._retr_loss_ema = None        # EMA of retrieval loss
-        self._retr_loss_prev_ema = None   # Previous EMA for trend detection
-        self._gate_ema = 0.0              # EMA of write_gate value
+        self._retr_loss_window: List[float] = []  # Window for trend detection
+        self._gate_window: List[float] = []       # Gate value window
+        self._gate_adapt_window = 200     # Steps to accumulate before adapting
+        self._gate_adapt_counter = 0      # Steps since last adaptation
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -9031,46 +9032,54 @@ class SlotMemoryGCT(nn.Module):
     def update_write_gate_target(self, retr_loss: float):
         """V10.27: Adapt write gate ceiling based on retrieval loss trend.
 
-        Called each step after computing retrieval loss. Tracks whether
-        writes are actually improving retrieval:
-        - retr_loss improving → relax ceiling (writes are useful)
-        - retr_loss stagnant + gate high → tighten ceiling (churn)
+        Called each step after computing retrieval loss. Accumulates a
+        window of retr_loss and gate values, then adjusts the ceiling
+        every _gate_adapt_window steps based on the window-level trend.
+
+        Rules (applied once per window, not per step):
+        - retr_loss decreased over window → relax ceiling (writes helping)
+        - retr_loss flat/increased + gate above target → tighten (churn)
 
         Args:
             retr_loss: Current retrieval loss value.
         """
-        alpha = 0.05  # EMA smoothing
-
-        # Update gate EMA
         gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
-        self._gate_ema = (1 - alpha) * self._gate_ema + alpha * gate_val
 
-        # Initialize retr_loss EMA on first call
-        if self._retr_loss_ema is None:
-            self._retr_loss_ema = retr_loss
-            self._retr_loss_prev_ema = retr_loss
+        self._retr_loss_window.append(retr_loss)
+        self._gate_window.append(gate_val)
+        self._gate_adapt_counter += 1
+
+        # Only adapt every _gate_adapt_window steps
+        if self._gate_adapt_counter < self._gate_adapt_window:
             return
 
-        # Save previous EMA before updating
-        self._retr_loss_prev_ema = self._retr_loss_ema
-        self._retr_loss_ema = (1 - alpha) * self._retr_loss_ema + alpha * retr_loss
+        # Compute window-level trend: compare first half mean to second half mean
+        n = len(self._retr_loss_window)
+        half = n // 2
+        first_half_retr = sum(self._retr_loss_window[:half]) / max(half, 1)
+        second_half_retr = sum(self._retr_loss_window[half:]) / max(n - half, 1)
+        retr_delta = second_half_retr - first_half_retr  # negative = improving
 
-        # Compute trend: negative = improving, positive = worsening
-        retr_delta = self._retr_loss_ema - self._retr_loss_prev_ema
+        gate_mean = sum(self._gate_window) / n
 
-        # Adaptive rules:
-        if retr_delta < -0.005:
-            # Retrieval improving → relax ceiling (writes are helping)
+        # Adaptive rules (symmetric rates to prevent ratchet effect):
+        if retr_delta < -0.05:
+            # Retrieval improving over window → relax ceiling
             self._gate_target = min(
                 self._gate_target_max,
-                self._gate_target + 0.002
+                self._gate_target + 0.02
             )
-        elif retr_delta > -0.001 and self._gate_ema > self._gate_target:
-            # Retrieval stagnant/worsening AND gate is above target → tighten
+        elif retr_delta > -0.01 and gate_mean > self._gate_target:
+            # Retrieval stagnant/worsening AND gate above target → tighten
             self._gate_target = max(
                 self._gate_target_min,
-                self._gate_target - 0.005
+                self._gate_target - 0.02
             )
+
+        # Reset window
+        self._retr_loss_window.clear()
+        self._gate_window.clear()
+        self._gate_adapt_counter = 0
 
 
 @dataclass
