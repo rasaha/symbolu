@@ -112,6 +112,7 @@ from symbolu.training.unified.training_state import (
 from symbolu.training.unified.phase_controllers import (
     SovereignPhaseController,
     AdaptiveTrainingController,
+    AdaptiveSlotLRController,
 )
 
 # --- scheduling ---
@@ -247,6 +248,7 @@ __all__ = [
     # phase_controllers
     "SovereignPhaseController",
     "AdaptiveTrainingController",
+    "AdaptiveSlotLRController",
     # scheduling
     "DynamicWindowScheduler",
     "AdaptiveWarmupScheduler",
