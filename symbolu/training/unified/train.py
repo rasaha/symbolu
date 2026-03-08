@@ -7156,8 +7156,8 @@ def main():
                        help="EMA learning rate for slot writes (default: 0.1)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
-    parser.add_argument("--slot_memory_lr_scale", type=float, default=0.3,
-                       help="Slot param LR multiplier vs main LR (default: 0.3)")
+    parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
+                       help="Slot param LR multiplier vs main LR (default: 0.1)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
@@ -8619,7 +8619,7 @@ def main():
         global_update_mode=getattr(args, 'global_update_mode', 'slots'),
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
-        slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.3),
+        slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay

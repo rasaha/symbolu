@@ -153,7 +153,7 @@ class UnifiedTrainingConfig:
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
     slots_write_lr: float = 0.1  # EMA learning rate for slot writes
     retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
-    slot_memory_lr_scale: float = 0.3  # Slot param LR multiplier vs main LR
+    slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
