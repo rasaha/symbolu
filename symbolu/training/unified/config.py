@@ -151,7 +151,7 @@ class UnifiedTrainingConfig:
     global_tokens_enabled: bool = False  # Enable GCT memory slots
     num_global_tokens: int = 64  # Number of memory slots
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
-    slots_write_lr: float = 0.1  # EMA learning rate for slot writes
+    slots_write_lr: float = 0.15  # EMA learning rate for slot writes (V10.22: 0.1→0.3 overshot, settling at 0.15)
     retrieval_loss_weight: float = 2.0  # V10.21: Increased from 1.0 to compensate for gradient attenuation
 
     # ==========================================================================

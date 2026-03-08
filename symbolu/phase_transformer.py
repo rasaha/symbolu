@@ -6735,7 +6735,7 @@ class HybridPhaseTransformer(nn.Module):
         global_token_write_detach: bool = True,  # Detach tokens in write path (auto-disabled for slots mode)
         phase_to_global: bool = False,  # Phase→Global integration
         # V10.14: Slot memory parameters (when global_update_mode="slots")
-        slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
+        slots_write_lr: float = 0.15,  # EMA learning rate for slot writes (V10.22: 0.1→0.15)
         retrieval_loss_weight: float = 0.1,  # Weight for auxiliary retrieval loss
     ):
         super().__init__()
@@ -7850,7 +7850,7 @@ class OntologicalHybridTransformer(nn.Module):
         global_tokens_enabled: bool = False,
         num_global_tokens: int = 16,
         global_update_mode: str = "pool",
-        slots_write_lr: float = 0.1,
+        slots_write_lr: float = 0.15,
         retrieval_loss_weight: float = 0.1,
     ):
         super().__init__()

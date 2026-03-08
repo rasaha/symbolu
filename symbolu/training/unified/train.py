@@ -7156,8 +7156,8 @@ def main():
     parser.add_argument("--global_update_mode", type=str, default="slots",
                        choices=["pool", "attn-lite", "slots"],
                        help="Global token update mode (default: slots)")
-    parser.add_argument("--slots_write_lr", type=float, default=0.1,
-                       help="EMA learning rate for slot writes (default: 0.1)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.15,
+                       help="EMA learning rate for slot writes (default: 0.15)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=2.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
 
