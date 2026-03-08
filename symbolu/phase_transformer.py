@@ -8495,10 +8495,12 @@ class SlotMemoryGCT(nn.Module):
         # can learn to modulate. If writing is too aggressive, the gate will
         # learn to close — but starting too low creates a chicken-and-egg trap.
         nn.init.constant_(self.write_novelty_gate.bias, 1.0)
-        # V10.14.7: Raised floor from 0.01→0.05 to ensure minimum write
-        # pressure while retrieval loss bootstraps. At 0.01, EMA updates
-        # were too tiny to move slot_vals from zero init → no retrieval signal.
-        self._novelty_gate_floor = 0.05
+        # V10.14.7: Raised floor from 0.01→0.05→0.15 to ensure minimum write
+        # pressure while retrieval loss bootstraps. At 0.05, write_gate
+        # collapsed to ~0.06 and slots never bootstrapped (bootstrap paradox:
+        # memory must be useful to be written, but must be written to become useful).
+        # Floor of 0.15 guarantees ≥15% write activity to break the loop.
+        self._novelty_gate_floor = 0.15
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
