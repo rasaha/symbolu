@@ -8648,8 +8648,12 @@ class SlotMemoryGCT(nn.Module):
         # prevents runaway; floor of 3 prevents assignments from going uniform.
         # V10.20: Tightened max from 15→8. Logs showed scale learning to 5.9,
         # concentrating writes on few slots and causing 1.2M× gradient spikes.
-        # Max of 8 still allows sharp differentiation without explosive peakiness.
-        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=8.0)
+        # V10.23: Lowered max from 8→4. At wr_scale=8.0 (hit max clamp for 400+
+        # steps), softmax assignment is ultra-peaky → gradients through assignment
+        # back to novelty_gate are negligible → write_gate stuck at floor (0.155).
+        # Max of 4 keeps assignments differentiated while allowing meaningful
+        # gradient flow to the write gate so it can learn to open above the floor.
+        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=4.0)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
         # V10.20: Detach slot_keys before F.normalize in assignment computation.
         # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
