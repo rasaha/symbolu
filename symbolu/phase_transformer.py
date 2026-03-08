@@ -8538,10 +8538,12 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.6d: Read output is detached before adding to residual (LM
         # can't suppress read_output_proj). But we still ramp the mixing
         # coefficient from 0→1 so early noisy reads don't disrupt LM training.
-        # Uses same _router_step counter. Sigmoid centered at 500 steps,
-        # tau=100 → effectively 0 for first ~300 steps, ~1 after ~700.
-        self._read_warmstart_center = 500
-        self._read_warmstart_tau = 100
+        # Uses same _router_step counter. Sigmoid centered at 2000 steps,
+        # tau=300 → effectively 0 for first ~1100 steps, ~0.5 at 2000, ~1 after ~2900.
+        # V10.21: Shifted later (was center=500, tau=100) to let slots bootstrap
+        # meaningful content before mixing reads into the residual stream.
+        self._read_warmstart_center = 2000
+        self._read_warmstart_tau = 300
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None

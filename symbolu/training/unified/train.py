@@ -1350,9 +1350,11 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
-    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
-    # gradient variance explosions from cosine-similarity key matching
-    _slot_memory_lr_scale = 0.1
+    # V10.15: Separate param groups for slot memory to prevent
+    # gradient variance explosions from cosine-similarity key matching.
+    # V10.21: Raised from 0.1x to 0.3x — slots were learning too slowly
+    # with zero init + detached writes. Monitor for gradient spikes.
+    _slot_memory_lr_scale = 0.3
     _slot_param_ids = set()
     _slot_params = []
     _main_params = []
@@ -2275,10 +2277,10 @@ def train(config: UnifiedTrainingConfig):
             window_size_high_ppl=config.window_size_high_ppl,
             window_size_low_ppl=config.window_size_low_ppl,
         )
-        print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
-        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
-        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
-        print(f"     └─ Linear interpolation between thresholds")
+        print(f"\n  🔄 [PPL-Window] Adaptive Window Curriculum ENABLED (alpha values are DIAGNOSTIC ONLY — not used in Protected Phase mode)")
+        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: window={config.window_size_high_ppl} (α_phase={config.alpha_phase_ppl_high:.2f} diagnostic)")
+        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  window={config.window_size_low_ppl} (α_phase={config.alpha_phase_ppl_low:.2f} diagnostic)")
+        print(f"     └─ NOTE: In Protected Phase mode, α does NOT gate outputs. Gradient flow via architecture + aux losses.")
         if config.enable_adaptive_window:
             print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)\n")
         else:
@@ -5356,7 +5358,7 @@ def train(config: UnifiedTrainingConfig):
                     # Add alpha for phase/hybrid models (including ontological_hybrid)
                     # V9.8.10: Check if model type contains "phase" or "hybrid"
                     if "phase" in config.model_type or "hybrid" in config.model_type:
-                        log_msg += f" | α_phase: {current_alpha:.2f}"
+                        log_msg += f" | α(diag): {current_alpha:.2f}"
 
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
                     if friction_alignment != 0.0 or friction_dominance != 1.0:
