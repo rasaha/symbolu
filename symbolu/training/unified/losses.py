@@ -298,6 +298,13 @@ def forward_chunked(
 
     outputs = {'logits': logits}
 
+    # V10.14.10: Propagate slot tensors from last chunk for retrieval loss.
+    # The training loop expects _slot_keys/_slot_vals/_slot_hidden in the
+    # output dict to compute auxiliary retrieval loss for slot memory.
+    for _slot_key in ('_slot_keys', '_slot_vals', '_slot_hidden'):
+        if _slot_key in result:
+            outputs[_slot_key] = result[_slot_key]
+
     # Decorrelation loss not supported in chunked mode yet
     # (would need to accumulate across chunks)
     if return_decorr_loss:

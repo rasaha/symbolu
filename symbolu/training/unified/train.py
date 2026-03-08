@@ -2665,6 +2665,47 @@ def train(config: UnifiedTrainingConfig):
                     if device.type == 'cuda':
                         _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
+                    # V10.14.10: Build aux_loss_fn for slot retrieval loss in TBPTT
+                    _tbptt_aux_loss_fn = None
+                    if config.global_tokens_enabled and config.global_update_mode == "slots":
+                        _tbptt_sm = getattr(model, 'slot_memory', None)
+                        if _tbptt_sm is None:
+                            _tbptt_inner = getattr(model, 'hybrid', model)
+                            _tbptt_sm = getattr(_tbptt_inner, 'slot_memory', None)
+                        _tbptt_lm_head = getattr(model, 'lm_head', None)
+                        if _tbptt_lm_head is None:
+                            _tbptt_inner = getattr(model, 'hybrid', model)
+                            _tbptt_lm_head = getattr(_tbptt_inner, 'lm_head', None)
+                        if _tbptt_sm is not None and _tbptt_lm_head is not None:
+                            def _tbptt_aux_loss_fn(result_dict, chunk_targets,
+                                                   _sm=_tbptt_sm, _lm=_tbptt_lm_head,
+                                                   _cfg=config):
+                                _sk = result_dict.get('_slot_keys')
+                                _sv = result_dict.get('_slot_vals')
+                                _sh = result_dict.get('_slot_hidden')
+                                if _sk is None or _sv is None or _sh is None:
+                                    return None
+                                # Router loss
+                                _aux = _sm.compute_sharpness_loss()
+                                # Query mask: positions beyond local window
+                                _valid = (chunk_targets != -100)
+                                _B, _N = chunk_targets.shape
+                                _win = getattr(_cfg, 'window_size', 0)
+                                if _win > 0 and _N > _win:
+                                    _pos_mask = torch.zeros(_B, _N, dtype=torch.bool,
+                                                            device=chunk_targets.device)
+                                    _pos_mask[:, _win:] = True
+                                    _qmask = _valid & _pos_mask
+                                else:
+                                    _qmask = _valid
+                                _retr = _sm.compute_retrieval_loss(
+                                    x=_sh, slot_keys=_sk, slot_vals=_sv,
+                                    query_mask=_qmask, target_ids=chunk_targets,
+                                    lm_head=_lm,
+                                )
+                                _sm._router_step += 1
+                                return _aux + _cfg.retrieval_loss_weight * _retr
+
                     tbptt_result = forward_chunked_tbptt(
                         model=model,
                         input_ids=x,
@@ -2675,6 +2716,7 @@ def train(config: UnifiedTrainingConfig):
                         grad_scaler=scaler,
                         autocast_dtype=autocast_dtype if config.mixed_precision != "none" else None,
                         gradient_accumulation=config.gradient_accumulation,
+                        aux_loss_fn=_tbptt_aux_loss_fn,
                     )
                     # Create synthetic outputs/loss for downstream logging
                     loss = torch.tensor(tbptt_result['total_loss'], device=device)
@@ -4359,6 +4401,13 @@ def train(config: UnifiedTrainingConfig):
                     _sv = _out_dict.get('_slot_vals')
                     _sh = _out_dict.get('_slot_hidden')
                     _retr_loss_val = 0.0
+                    # V10.14.10: Warn on first occurrence when slot tensors are missing
+                    if (_sk is None or _sv is None or _sh is None) and global_step <= 1:
+                        _missing = [k for k, v in [('_slot_keys', _sk), ('_slot_vals', _sv),
+                                                    ('_slot_hidden', _sh)] if v is None]
+                        print(f"  [SLOTS WARNING] Slot memory enabled but forward output "
+                              f"missing: {_missing}. Retrieval loss will be 0 — "
+                              f"slots receive no auxiliary learning signal!")
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
                         # V10.16.1: Use explicit query_mask from batch if available
                         # (e.g. AssociativeRecallDataset provides True only at answer positions).

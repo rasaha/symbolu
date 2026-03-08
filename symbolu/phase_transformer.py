@@ -2925,6 +2925,7 @@ def forward_chunked_tbptt(
     grad_scaler: Optional[Any] = None,
     autocast_dtype: Optional[torch.dtype] = None,
     gradient_accumulation: int = 1,
+    aux_loss_fn: Optional[callable] = None,
 ) -> Dict[str, Any]:
     """
     Chunked forward + backward with Truncated BPTT for Phase state machines.
@@ -2951,6 +2952,10 @@ def forward_chunked_tbptt(
         gradient_accumulation: Number of gradient accumulation steps. Loss is scaled
                               by 1/(num_chunks * gradient_accumulation) so that
                               TBPTT gradient magnitude matches the standard path.
+        aux_loss_fn: Optional Callable(result_dict, chunk_targets) -> scalar loss.
+                     V10.14.10: Called per-chunk with the full result dict (including
+                     _slot_keys, _slot_vals, _slot_hidden) to compute auxiliary losses
+                     like slot retrieval loss that need to be backpropagated per-chunk.
 
     Returns:
         Dict with:
@@ -3001,6 +3006,12 @@ def forward_chunked_tbptt(
             )
             chunk_logits = result['logits']
             chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+
+        # V10.14.10: Add auxiliary loss (e.g. slot retrieval loss) per-chunk
+        if aux_loss_fn is not None:
+            _aux_loss = aux_loss_fn(result, chunk_targets)
+            if _aux_loss is not None:
+                chunk_loss = chunk_loss + _aux_loss
 
         # V10.8: Scale loss for BOTH chunk mean AND gradient accumulation
         scaled_loss = chunk_loss / loss_divisor
@@ -7448,6 +7459,15 @@ class HybridPhaseTransformer(nn.Module):
         logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
+
+        # V10.14.10: Expose slot state from chunked forward for retrieval loss.
+        # Without this, forward_chunked/TBPTT paths silently skip retrieval loss
+        # (slot tensors missing → _retr_loss_val = 0.0 with no warning).
+        if self.global_tokens_enabled and self.global_update_mode == "slots":
+            result['_slot_keys'] = _slot_keys
+            result['_slot_vals'] = _slot_vals
+            result['_slot_hidden'] = x.detach()
+
         return result, next_layer_states
 
     def diagnose_chunk_continuity(
