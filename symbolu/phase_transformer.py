@@ -7154,12 +7154,19 @@ class HybridPhaseTransformer(nn.Module):
                 if self.global_update_mode == "slots":
                     # V10.14: Read via SlotMemoryGCT (never modifies slot state)
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Detach read output so LM loss cannot suppress
-                    # read_output_proj. Retrieval loss trains read_output_proj
-                    # independently. Warmstart alpha ramps mixing from 0→1 so
-                    # early noisy reads don't disrupt LM training.
+                    # V10.14.6d: Mostly detach read output so LM loss cannot
+                    # suppress read_output_proj. Retrieval loss trains
+                    # read_output_proj independently.
+                    # V10.21: Leak 3% live gradient from LM loss into read path.
+                    # Full detach starved the read head: its only learning signal
+                    # was retrieval loss, causing read_H to plateau at ~3.7 (near
+                    # uniform over K=64). A small leak lets the LM loss teach
+                    # "reading from the right slot helps prediction" without the
+                    # early-training suppression that motivated full detach.
                     _alpha = self.slot_memory.read_warmstart_alpha
-                    x = x + _alpha * _slot_out.detach()
+                    _leak = 0.03
+                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                    x = x + _alpha * _slot_mixed
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7376,9 +7383,11 @@ class HybridPhaseTransformer(nn.Module):
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
                     _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Detach + warmstart (mirrors forward())
+                    # V10.21: Gradient leak + warmstart (mirrors forward())
                     _alpha = self.slot_memory.read_warmstart_alpha
-                    x = x + _alpha * _slot_out.detach()
+                    _leak = 0.03
+                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                    x = x + _alpha * _slot_mixed
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
@@ -8504,9 +8513,13 @@ class SlotMemoryGCT(nn.Module):
         # expects layer-normed input; without this, raw slot values have
         # arbitrary scale → lm_head predictions are garbage.
         self.retr_read_norm = nn.LayerNorm(embed_dim)
-        # Kept for checkpoint compat; read now uses _write_log_scale
+        # V10.21: Re-enable separate read temperature. Previously collapsed
+        # because LM loss suppressed reads (V10.14.3 comment). But read output
+        # is now detached from LM loss, so that suppression no longer applies.
+        # Init at log(2.0) — lower than write scale (3.0) to start slightly
+        # sharper. Clamped to [1.0, 5.0] in read() to prevent collapse/explosion.
         self._read_log_scale = nn.Parameter(
-            torch.tensor(math.log((_key_dim) ** -0.5))
+            torch.tensor(math.log(2.0))
         )
 
         # --- Router noise (MoE-style symmetry breaking) ---
@@ -8537,6 +8550,7 @@ class SlotMemoryGCT(nn.Module):
         self._diag_slot_key_norm = None
         self._diag_slot_val_norm = None
         self._diag_read_attn_entropy = None
+        self._diag_read_scale = None  # V10.21: separate read temperature
         self._last_slot_keys = None  # V10.14.8: for orthogonality loss
 
     @property
@@ -8756,10 +8770,14 @@ class SlotMemoryGCT(nn.Module):
         # the write path used, enabling content-based key-value lookup.
         queries = self.write_key_proj(x)  # [B, N, D_key]
 
-        # V10.14.5: Cosine similarity for reads (matching write path).
+        # V10.21: Cosine similarity for reads with SEPARATE temperature.
         # Both queries and slot keys are L2-normalized.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        _read_scale = torch.exp(self._write_log_scale)
+        # Separate from write scale: read needs to learn its own sharpness
+        # since reads are detached from LM loss (different gradient regime).
+        _read_scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(1.0), max=math.log(5.0))
+        )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys in read path (same rationale as write path).
         # Slot keys learn through EMA updates, not through read attention gradients.
@@ -8783,6 +8801,7 @@ class SlotMemoryGCT(nn.Module):
         with torch.no_grad():
             _w_log = torch.log(attn_weights.clamp(min=1e-8))
             self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
+            self._diag_read_scale = _read_scale.item()
 
         return output
 
