@@ -700,6 +700,10 @@ class UnifiedTrainingConfig:
     adaptive_grad_norm_spike: float = 100.0  # Gradient norm above this triggers decay
     adaptive_emergency_decay: float = 0.5    # Aggressive decay factor for emergencies
     adaptive_consecutive_spike_limit: int = 3  # After N consecutive spikes, halt boosts
+    # V10.23: Spike-aware boost dampening
+    adaptive_max_boost_from_base: float = 2.0   # Max LR = base_lr * this (cap compounding boosts)
+    adaptive_spike_dampen_threshold: int = 10   # If >=N params spiked after last boost, dampen next
+    adaptive_boost_cooldown_steps: int = 400    # Min steps between consecutive boosts
 
     # Auto Batch Sizing (VRAM-based startup probing)
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup

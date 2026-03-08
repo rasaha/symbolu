@@ -373,6 +373,10 @@ class AdaptiveTrainingController:
         grad_norm_spike_threshold: float = 100.0,  # Gradient norm above this triggers decay
         emergency_decay_factor: float = 0.5,     # Aggressive decay for emergencies
         consecutive_spike_limit: int = 3,        # After N consecutive spikes, halt boosts
+        # V10.23: Spike-aware boost dampening
+        max_boost_from_base: float = 2.0,         # Max LR = base_lr * this (cap compounding)
+        spike_dampen_threshold: int = 10,          # If >=N params spiked after last boost, dampen next
+        boost_cooldown_steps: int = 400,           # Min steps between boosts
     ):
         self.optimizer = optimizer
         self.base_lr = base_lr
@@ -422,17 +426,29 @@ class AdaptiveTrainingController:
         self.consecutive_spikes = 0  # V9.8.2: Track consecutive loss spikes
         self.boost_blocked = False  # V9.8.2: Block boosts after too many spikes
 
+        # V10.23: Spike-aware boost dampening
+        self._grad_variance_tracker = None  # Set via set_grad_variance_tracker()
+        self._last_boost_step = 0  # Step of last LR boost
+        self._max_boost_from_base: float = max_boost_from_base  # Max LR as multiple of base_lr
+        self._spike_dampen_threshold: int = spike_dampen_threshold  # Spike count to trigger dampening
+        self._boost_cooldown_steps: int = boost_cooldown_steps  # Min steps between boosts
+
         print(f"\n  [AdaptiveTraining] Controller initialized:")
         print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {self.lr_max:.2e})")
         print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
         print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
+        print(f"    V10.23: Boost cap={max_boost_from_base}x base, spike_dampen>={spike_dampen_threshold} params, cooldown={boost_cooldown_steps} steps")
         print(f"    Plateau detection: {plateau_window} evals, {plateau_threshold}% threshold")
         print(f"    V9.9.1: Scheduler-aware LR adjustments ENABLED")
 
     def set_scheduler(self, scheduler):
         """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
         self._scheduler = scheduler
+
+    def set_grad_variance_tracker(self, tracker):
+        """V10.23: Link to gradient variance tracker for spike-aware boost dampening."""
+        self._grad_variance_tracker = tracker
 
     def _compute_velocity(self) -> float:
         """Compute PPL velocity (% change per eval)."""
@@ -605,19 +621,43 @@ class AdaptiveTrainingController:
                     print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST SKIPPED ({reason}) - cosine schedule below floor, boost would be futile")
                     self._floor_boost_skip_logged = True
             else:
-                # Only boost if we're not already at max
-                new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
-                if new_lr != current_lr and new_lr > current_lr:
-                    for pg in self.optimizer.param_groups:
-                        pg['lr'] = new_lr
-                    # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
-                    if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
-                        self._scheduler.adjust_base_lr(new_lr)
-                    self.boost_count += 1
+                # V10.23: Cooldown — don't boost if too soon after last boost
+                steps_since_boost = global_step - self._last_boost_step
+                if self._last_boost_step > 0 and steps_since_boost < self._boost_cooldown_steps:
                     reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
-                    adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
-                    print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
-                    self.last_adjustment_step = global_step
+                    print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST COOLDOWN ({reason}) - {steps_since_boost}/{self._boost_cooldown_steps} steps since last boost")
+                else:
+                    # V10.23: Compute effective boost factor with spike dampening
+                    effective_boost = self.lr_boost_factor
+
+                    # Check if previous boost caused widespread spikes
+                    if self._grad_variance_tracker is not None and self._last_boost_step > 0:
+                        spike_count = self._grad_variance_tracker.get_spike_count_since(self._last_boost_step)
+                        if spike_count >= self._spike_dampen_threshold:
+                            # Scale down: 10 spikes → 0.5x boost factor, 20+ → near 1.0 (no boost)
+                            dampen = max(0.0, 1.0 - spike_count / (self._spike_dampen_threshold * 4))
+                            effective_boost = 1.0 + (self.lr_boost_factor - 1.0) * dampen
+                            print(f"\n  🛡️  [AdaptiveTraining] BOOST DAMPENED: {spike_count} params spiked after last boost → factor {self.lr_boost_factor:.2f} → {effective_boost:.3f}")
+
+                    # V10.23: Hard cap — never exceed max_boost_from_base * base_lr
+                    hard_cap = self.base_lr * self._max_boost_from_base
+                    new_lr = min(self.lr_max, hard_cap, current_lr * effective_boost)
+
+                    if new_lr > current_lr and new_lr != current_lr:
+                        for pg in self.optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                        if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                            self._scheduler.adjust_base_lr(new_lr)
+                        self.boost_count += 1
+                        self._last_boost_step = global_step
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                        print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                        self.last_adjustment_step = global_step
+                    elif new_lr <= current_lr:
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST CAPPED ({reason}) - already at {current_lr:.2e} (cap: {hard_cap:.2e})")
         elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
             # Log that boost was blocked
             reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"

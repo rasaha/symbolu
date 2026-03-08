@@ -441,6 +441,18 @@ class GradientVarianceTracker:
         for name in self._baseline_variance:
             self._baseline_variance[name] *= scale
 
+    def get_spike_count_since(self, since_step: int) -> int:
+        """Return number of unique params that spiked since given step.
+
+        Used by AdaptiveTrainingController to dampen future boosts when
+        previous boosts caused widespread gradient instability.
+        """
+        count = 0
+        for name, last_step in self._last_alert_step.items():
+            if last_step >= since_step:
+                count += 1
+        return count
+
     @torch.no_grad()
     def record(self, model: torch.nn.Module) -> Dict[str, any]:
         """

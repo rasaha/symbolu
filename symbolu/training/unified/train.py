@@ -1641,9 +1641,16 @@ def train(config: UnifiedTrainingConfig):
             grad_norm_spike_threshold=config.adaptive_grad_norm_spike,
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
+            # V10.23: Spike-aware boost dampening
+            max_boost_from_base=config.adaptive_max_boost_from_base,
+            spike_dampen_threshold=config.adaptive_spike_dampen_threshold,
+            boost_cooldown_steps=config.adaptive_boost_cooldown_steps,
         )
         # V9.9.1: Link scheduler to controller so LR boosts/decays persist
         adaptive_controller.set_scheduler(scheduler)
+        # V10.23: Link gradient variance tracker for spike-aware boost dampening
+        if gradient_variance_tracker is not None:
+            adaptive_controller.set_grad_variance_tracker(gradient_variance_tracker)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
