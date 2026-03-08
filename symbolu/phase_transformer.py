@@ -8957,12 +8957,18 @@ class SlotMemoryGCT(nn.Module):
         L_bal = (marginal * torch.log(marginal * K + eps)).sum()
 
         # --- Term 3: Gate sparsity (V10.14.6) ---
-        # L1 penalty on novelty gate mean: pushes gate toward 0 (closed).
-        # Retrieval loss pushes back open for tokens with useful bindings.
-        # The tension creates content-vs-filler selectivity.
-        L_gate = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        # V10.14.7 removed L_gate (pushed gate→0, causing chicken-and-egg collapse).
+        # But without ANY gate signal, the 10% gradient leak through x_write lets
+        # LM loss weakly push gate→floor (0.15). Gate has no upward pressure →
+        # collapses → slots starve → retr_loss plateaus at ~5.0.
+        #
+        # Fix: Log-barrier utilization loss. Penalizes gates near 0 but is gentle
+        # above ~0.3. This gives the gate a positive learning signal without
+        # overwhelming retrieval loss like the old L_gate did.
+        # L_gate_util = -mean(log(gate)) — strong near 0, weak near 1.
+        L_gate_util = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
         if self._last_novelty is not None:
-            L_gate = self._last_novelty.mean()
+            L_gate_util = -torch.log(self._last_novelty + eps).mean()
 
         # Store diagnostics (normalized by max entropy for readability)
         max_entropy = math.log(K)
@@ -8974,14 +8980,11 @@ class SlotMemoryGCT(nn.Module):
             self._diag_L_sharp = L_sharp.item()
             self._diag_L_bal = L_bal.item()
 
-        # V10.14.7: Removed L_gate term.
-        # L_gate (0.02 * mean(novelty)) was a direct gradient pushing gate→0,
-        # overwhelming the very indirect retrieval loss gradient through the
-        # EMA write chain. This caused a chicken-and-egg collapse:
-        #   gate→0 → slots stay empty → no retrieval signal → gate stays at 0.
-        # Without L_gate, gate stays near sigmoid(0)=0.5 from init, writes
-        # happen, slots fill with content, and retrieval loss naturally shapes
-        # the gate toward selective writing once it has signal to work with.
+        # V10.14.7: Removed old L_gate (mean(novelty) pushed gate→0).
+        # V10.26: Added L_gate_util (log-barrier) — pushes gate OPEN.
+        # Weight 0.01: -log(0.15)=1.90 → contributes ~0.019 to loss.
+        # At gate=0.3: -log(0.3)=1.20 → ~0.012. Gentle enough not to
+        # overwhelm retrieval loss but prevents floor collapse.
         # --- Term 4: Slot key orthogonality (V10.14.8) ---
         # Penalize slot keys for being too similar. Without this, EMA updates
         # drift keys toward the mean token embedding → all slots become identical.
@@ -9000,7 +9003,7 @@ class SlotMemoryGCT(nn.Module):
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
         # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
         # when fully collapsed, providing meaningful gradient to redistribute.
-        return 0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho
+        return 0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho + 0.01 * L_gate_util
 
 
 @dataclass
