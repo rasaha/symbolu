@@ -8570,7 +8570,11 @@ class SlotMemoryGCT(nn.Module):
         self._router_noise_std = 0.5
         self._router_noise_warmup = 10000  # steps to decay noise toward floor
         self._router_noise_floor = 0.1  # minimum noise std (never fully zero)
-        self._router_step = 0  # updated externally by training loop
+        # V10.27: Register as buffer so it's saved/restored with state_dict().
+        # Without this, resume resets _router_step to 0, which re-suppresses
+        # slot reads (warmstart_alpha → 0) and resets router noise for ~500 steps.
+        self.register_buffer('_router_step_buf', torch.tensor(0, dtype=torch.long))
+        self._router_step = 0  # Mirror for easy access; synced in properties
 
         # --- Read warmstart ---
         # V10.14.6d: Read output is detached before adding to residual (LM
@@ -8589,6 +8593,17 @@ class SlotMemoryGCT(nn.Module):
         self._diag_read_attn_entropy = None
         self._diag_read_scale = None  # V10.21: separate read temperature
         self._last_slot_keys = None  # V10.14.8: for orthogonality loss
+
+    def state_dict(self, *args, **kwargs):
+        """V10.27: Sync _router_step int → buffer before saving."""
+        self._router_step_buf.fill_(self._router_step)
+        return super().state_dict(*args, **kwargs)
+
+    def load_state_dict(self, state_dict, *args, **kwargs):
+        """V10.27: Restore _router_step from buffer after loading."""
+        result = super().load_state_dict(state_dict, *args, **kwargs)
+        self._router_step = int(self._router_step_buf.item())
+        return result
 
     @property
     def read_warmstart_alpha(self) -> float:

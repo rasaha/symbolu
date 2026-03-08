@@ -12513,16 +12513,23 @@ def train(config: UnifiedTrainingConfig):
     _slot_memory_lr_scale = 0.1
     _slot_param_ids = set()
     _slot_params = []
+    _slot_no_wd_params = []  # V10.27: Params that receive zero gradient (exclude from WD)
     _main_params = []
     if hasattr(model, 'slot_memory') and model.slot_memory is not None:
-        for p in model.slot_memory.parameters():
+        _sm = model.slot_memory
+        # V10.27: slot_keys_init receives zero gradient (all uses detach slot_keys).
+        _no_wd_names = {'slot_keys_init'}
+        for name, p in _sm.named_parameters():
             _slot_param_ids.add(id(p))
-            _slot_params.append(p)
+            if name in _no_wd_names:
+                _slot_no_wd_params.append(p)
+            else:
+                _slot_params.append(p)
         for p in model.parameters():
             if id(p) not in _slot_param_ids:
                 _main_params.append(p)
-        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
-              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
+              f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
     else:
         _main_params = list(model.parameters())
 
@@ -12534,6 +12541,12 @@ def train(config: UnifiedTrainingConfig):
         _param_groups.append({
             'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
             'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+    if _slot_no_wd_params:
+        # V10.27: slot_keys_init gets zero gradient from all losses — exclude from WD
+        _param_groups.append({
+            'params': _slot_no_wd_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': 0.0, 'betas': (config.beta1, config.beta2),
         })
 
     if config.use_8bit_optimizer:
