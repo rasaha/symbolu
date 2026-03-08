@@ -8867,7 +8867,10 @@ class SlotMemoryGCT(nn.Module):
 
         # Same attention as read(): cosine similarity with shared key space.
         queries = self.write_key_proj(x)  # [B, N, D_key]
-        _scale = torch.exp(self._write_log_scale)
+        # V10.23: Use same clamp as write() — unclamped scale was 8.0 while
+        # write() was clamped to 4.0, making retrieval attention ultra-peaky
+        # and distorting the gradient signal back to write parameters.
+        _scale = torch.exp(self._write_log_scale).clamp(min=3.0, max=4.0)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
