@@ -5800,8 +5800,9 @@ def train(config: UnifiedTrainingConfig):
                         _val_ppl_no_improve_count = 0  # Reset for next patience window
 
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
-                # Runs during evaluation intervals to monitor behavioral stability
-                if config.model_type in ('phase', 'hybrid', 'ontological_hybrid'):
+                # Runs at --phase_health_interval (default 500) to reduce log noise
+                _ph_interval = getattr(config, 'phase_health_interval', 500)
+                if config.model_type in ('phase', 'hybrid', 'ontological_hybrid') and global_step % _ph_interval == 0:
                     try:
                         enable_health_diagnostics_capture(model, True)
                         # Run a single forward pass to capture phase tensors
@@ -7833,6 +7834,8 @@ def main():
                        help="Steps to ramp onto loss to 0 after disengage")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
+    parser.add_argument("--phase_health_interval", type=int, default=500,
+                       help="Log phase health diagnostics every N steps (default: 500)")
     parser.add_argument("--save_every", type=int, default=1000,
                        help="Save checkpoint every N steps")
     parser.add_argument("--no_save", action="store_true",
