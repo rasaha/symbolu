@@ -13466,8 +13466,11 @@ def train(config: UnifiedTrainingConfig):
                     metrics['slot_sharpness_loss'] = _sharp_loss.item()
                     if _retr_loss.item() > 0:
                         loss = loss + model.retrieval_loss_weight * _retr_loss
-                        metrics['retrieval_loss'] = _retr_loss.item()
+                        _retr_val = _retr_loss.item()
+                        metrics['retrieval_loss'] = _retr_val
                         metrics['retrieval_weight'] = model.retrieval_loss_weight
+                        # V10.27: Feed retr_loss to adaptive gate ceiling
+                        model.slot_memory.update_write_gate_target(_retr_val)
                     # Expose slot diagnostics
                     if model.slot_memory._diag_write_gate_mean is not None:
                         metrics['slot_write_gate'] = model.slot_memory._diag_write_gate_mean

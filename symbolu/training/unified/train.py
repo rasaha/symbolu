@@ -4463,6 +4463,8 @@ def train(config: UnifiedTrainingConfig):
                         )
                         loss = loss + config.retrieval_loss_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
+                        # V10.27: Feed retr_loss to adaptive gate ceiling
+                        _sm.update_write_gate_target(_retr_loss_val)
                     # Step the router noise counter
                     _sm._router_step += 1
                     # Log slot diagnostics periodically (only on last accumulation step)
@@ -4477,7 +4479,8 @@ def train(config: UnifiedTrainingConfig):
                               f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
                               f"wr_scale={_wr_scale:.1f} "
-                              f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f}")
+                              f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f} "
+                              f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f}")
                         # V10.22: Feed signals to adaptive slot LR controller
                         if adaptive_slot_lr is not None:
                             adaptive_slot_lr.record_retr_loss(_retr_loss_val)

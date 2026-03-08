@@ -8502,6 +8502,20 @@ class SlotMemoryGCT(nn.Module):
         # Floor of 0.15 guarantees ≥15% write activity to break the loop.
         self._novelty_gate_floor = 0.15
 
+        # V10.27: Adaptive write gate ceiling — prevents runaway gate opening.
+        # The gate has three upward forces (L_gate_util, LM leak, retr_loss)
+        # but no downward pressure since L_gate sparsity was removed in V10.14.7.
+        # This adds a soft quadratic ceiling that adapts based on write utility:
+        # if retr_loss is improving → ceiling relaxes (writes are helpful),
+        # if retr_loss stagnates while gate is high → ceiling tightens (churn).
+        self._gate_target = 0.35          # Adaptive ceiling (starts moderate)
+        self._gate_target_min = 0.20      # Never tighten below this
+        self._gate_target_max = 0.60      # Never relax above this
+        self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._retr_loss_ema = None        # EMA of retrieval loss
+        self._retr_loss_prev_ema = None   # Previous EMA for trend detection
+        self._gate_ema = 0.0              # EMA of write_gate value
+
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
         # are in [-1, 1]. Scale=10 gives softmax logits in [-10, 10] — sharp
@@ -9003,7 +9017,60 @@ class SlotMemoryGCT(nn.Module):
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
         # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
         # when fully collapsed, providing meaningful gradient to redistribute.
-        return 0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho + 0.01 * L_gate_util
+        # V10.27: Adaptive gate ceiling — soft quadratic penalty above target.
+        # Below target: only log-barrier (pushes open, existing behavior).
+        # Above target: quadratic penalty pushes closed, preventing churn.
+        L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        if self._last_novelty is not None:
+            gate_mean = self._last_novelty.mean()
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target) ** 2
+
+        return (0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho
+                + 0.01 * L_gate_util + self._gate_ceil_weight * L_gate_ceil)
+
+    def update_write_gate_target(self, retr_loss: float):
+        """V10.27: Adapt write gate ceiling based on retrieval loss trend.
+
+        Called each step after computing retrieval loss. Tracks whether
+        writes are actually improving retrieval:
+        - retr_loss improving → relax ceiling (writes are useful)
+        - retr_loss stagnant + gate high → tighten ceiling (churn)
+
+        Args:
+            retr_loss: Current retrieval loss value.
+        """
+        alpha = 0.05  # EMA smoothing
+
+        # Update gate EMA
+        gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
+        self._gate_ema = (1 - alpha) * self._gate_ema + alpha * gate_val
+
+        # Initialize retr_loss EMA on first call
+        if self._retr_loss_ema is None:
+            self._retr_loss_ema = retr_loss
+            self._retr_loss_prev_ema = retr_loss
+            return
+
+        # Save previous EMA before updating
+        self._retr_loss_prev_ema = self._retr_loss_ema
+        self._retr_loss_ema = (1 - alpha) * self._retr_loss_ema + alpha * retr_loss
+
+        # Compute trend: negative = improving, positive = worsening
+        retr_delta = self._retr_loss_ema - self._retr_loss_prev_ema
+
+        # Adaptive rules:
+        if retr_delta < -0.005:
+            # Retrieval improving → relax ceiling (writes are helping)
+            self._gate_target = min(
+                self._gate_target_max,
+                self._gate_target + 0.002
+            )
+        elif retr_delta > -0.001 and self._gate_ema > self._gate_target:
+            # Retrieval stagnant/worsening AND gate is above target → tighten
+            self._gate_target = max(
+                self._gate_target_min,
+                self._gate_target - 0.005
+            )
 
 
 @dataclass
