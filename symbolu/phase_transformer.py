@@ -6748,6 +6748,9 @@ class HybridPhaseTransformer(nn.Module):
         # V10.14: Slot memory parameters (when global_update_mode="slots")
         slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
         retrieval_loss_weight: float = 0.1,  # Weight for auxiliary retrieval loss
+        # V11: Slot memory experiment — read interval and late-layer writes
+        global_read_interval: int = 1,  # Read slots every N layers (1 = every layer)
+        global_write_start_layer: int = 0,  # Only write to slots from this layer onward
     ):
         super().__init__()
 
@@ -6852,6 +6855,8 @@ class HybridPhaseTransformer(nn.Module):
         self.global_update_enabled = global_update_enabled
         self.global_update_mode = global_update_mode
         self.global_update_interval = global_update_interval
+        self.global_read_interval = global_read_interval
+        self.global_write_start_layer = global_write_start_layer
         # V10.14.1: Slot memory uses selective detach internally (detaches x
         # at write entry to protect backbone, keeps grad to slot params via
         # aux losses). The global_token_write_detach flag controls whether
@@ -7163,21 +7168,23 @@ class HybridPhaseTransformer(nn.Module):
             # =================================================================
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
-                    # V10.14: Read via SlotMemoryGCT (never modifies slot state)
-                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Mostly detach read output so LM loss cannot
-                    # suppress read_output_proj. Retrieval loss trains
-                    # read_output_proj independently.
-                    # V10.21: Leak 3% live gradient from LM loss into read path.
-                    # Full detach starved the read head: its only learning signal
-                    # was retrieval loss, causing read_H to plateau at ~3.7 (near
-                    # uniform over K=64). A small leak lets the LM loss teach
-                    # "reading from the right slot helps prediction" without the
-                    # early-training suppression that motivated full detach.
-                    _alpha = self.slot_memory.read_warmstart_alpha
-                    _leak = 0.03
-                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                    x = x + _alpha * _slot_mixed
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        # V10.14: Read via SlotMemoryGCT (never modifies slot state)
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V10.14.6d: Mostly detach read output so LM loss cannot
+                        # suppress read_output_proj. Retrieval loss trains
+                        # read_output_proj independently.
+                        # V10.21: Leak 3% live gradient from LM loss into read path.
+                        # Full detach starved the read head: its only learning signal
+                        # was retrieval loss, causing read_H to plateau at ~3.7 (near
+                        # uniform over K=64). A small leak lets the LM loss teach
+                        # "reading from the right slot helps prediction" without the
+                        # early-training suppression that motivated full detach.
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        _leak = 0.03
+                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                        x = x + _alpha * _slot_mixed
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7189,7 +7196,7 @@ class HybridPhaseTransformer(nn.Module):
             # V10.13/V10.14: GCT — Memory WRITE
             # =================================================================
             if self.global_tokens_enabled and self.global_update_enabled:
-                if (i % self.global_update_interval) == 0:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
                     if self.global_update_mode == "slots":
                         # V10.14.1: Competitive slot write — the ONLY way slots update
                         # Always pass detach=False for slots: write() uses x.detach()
@@ -7393,12 +7400,14 @@ class HybridPhaseTransformer(nn.Module):
             # V10.13/V10.14: GCT read/write (same logic as forward())
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
-                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.21: Gradient leak + warmstart (mirrors forward())
-                    _alpha = self.slot_memory.read_warmstart_alpha
-                    _leak = 0.03
-                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                    x = x + _alpha * _slot_mixed
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V10.21: Gradient leak + warmstart (mirrors forward())
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        _leak = 0.03
+                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                        x = x + _alpha * _slot_mixed
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
@@ -7406,7 +7415,7 @@ class HybridPhaseTransformer(nn.Module):
                     x = x + _gct_out
 
             if self.global_tokens_enabled and self.global_update_enabled:
-                if (i % self.global_update_interval) == 0:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
                     if self.global_update_mode == "slots":
                         # V10.14.1: Always detach=False for slots (see comment above)
                         _slot_keys, _slot_vals = self.slot_memory.write(
@@ -7869,6 +7878,9 @@ class OntologicalHybridTransformer(nn.Module):
         global_update_mode: str = "pool",
         slots_write_lr: float = 0.1,
         retrieval_loss_weight: float = 0.1,
+        # V11: Slot memory experiment
+        global_read_interval: int = 1,
+        global_write_start_layer: int = 0,
     ):
         super().__init__()
 
@@ -7901,6 +7913,8 @@ class OntologicalHybridTransformer(nn.Module):
             global_update_mode=global_update_mode,
             slots_write_lr=slots_write_lr,
             retrieval_loss_weight=retrieval_loss_weight,
+            global_read_interval=global_read_interval,
+            global_write_start_layer=global_write_start_layer,
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
@@ -8507,6 +8521,7 @@ class SlotMemoryGCT(nn.Module):
         self._gate_target_min = 0.20      # Never tighten below this
         self._gate_target_max = 0.60      # Never relax above this
         self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
         self._gate_adapt_window = 200     # Steps to accumulate before adapting
@@ -8515,6 +8530,7 @@ class SlotMemoryGCT(nn.Module):
         # V10.28: Adaptive constraint relaxation — detect when slots are
         # over-constrained (uniform usage, scale at clamp, gate at ceiling)
         # and progressively relax to allow specialization.
+        self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
         self._wr_scale_max = 2.0          # Write scale upper clamp (starts conservative)
         self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
@@ -8570,6 +8586,15 @@ class SlotMemoryGCT(nn.Module):
         self._L_sharp_weight = 0.1
         self._L_sharp_weight_min = 0.01
         self._L_sharp_weight_max = 0.3
+
+        # (i) Adaptive write_lr (EMA interpolation coefficient for slot updates)
+        # Higher → slots update faster toward incoming content
+        # Lower → slots retain existing content longer
+        # Adapt based on retrieval loss trend: if retrieval is improving, slots
+        # are being written usefully → allow faster writes. If stagnating,
+        # slow down to preserve good content already stored.
+        self._write_lr_min = 0.05            # Floor: always some update
+        self._write_lr_max = 0.5             # Ceiling: never overwrite >50%
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -8653,8 +8678,44 @@ class SlotMemoryGCT(nn.Module):
         '_gate_target', '_gate_ceil_weight', '_wr_scale_max', '_L_bal_weight',
         '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
         '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
-        '_L_sharp_weight',
+        '_L_sharp_weight', 'write_lr',
     )
+
+    # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
+    _ADAPTIVE_DEFAULTS = {
+        '_gate_target': 0.35,
+        '_gate_ceil_weight': 5.0,
+        '_gate_ceil_margin': 0.05,
+        '_wr_scale_max': 2.0,
+        '_L_bal_weight': 1.0,
+        '_novelty_gate_floor': 0.15,
+        '_adaptive_retr_loss_weight': 1.0,
+        '_H_target': 1.0,
+        '_L_ortho_weight': 0.5,
+        '_read_scale_max': 5.0,
+        '_soft_detach_leak': 0.1,
+        '_L_sharp_weight': 0.1,
+        'write_lr': 0.1,
+    }
+
+    def reset_constraints(self):
+        """V11: Reset all adaptive constraint state to initial defaults.
+
+        Use when resuming a checkpoint with --disable_slot_adaptive_constraints
+        to undo any drift from the previous run's controller.
+        """
+        for key, default in self._ADAPTIVE_DEFAULTS.items():
+            setattr(self, key, default)
+        # Clear accumulated windows so stale history doesn't leak
+        self._constraint_relax_window.clear()
+        self._constraint_relax_counter = 0
+        self._gate_mean_window.clear()
+        self._L_ortho_window.clear()
+        self._retr_loss_history.clear()
+        self._lm_loss_history.clear()
+        self._retr_loss_window.clear()
+        self._gate_window.clear()
+        self._gate_adapt_counter = 0
 
     def state_dict(self, *args, **kwargs):
         """V10.27/29: Sync runtime state before saving."""
@@ -9137,7 +9198,7 @@ class SlotMemoryGCT(nn.Module):
         L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
         if self._last_novelty is not None:
             gate_mean = self._last_novelty.mean()
-            L_gate_ceil = torch.relu(gate_mean - self._gate_target) ** 2
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin) ** 2
 
         # V10.29: All loss weights are adaptive
         return (self._L_sharp_weight * L_sharp + self._L_bal_weight * L_bal
@@ -9158,6 +9219,10 @@ class SlotMemoryGCT(nn.Module):
         Args:
             retr_loss: Current retrieval loss value.
         """
+        # V11: Skip adaptation when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
         gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
 
         self._retr_loss_window.append(retr_loss)
@@ -9199,7 +9264,7 @@ class SlotMemoryGCT(nn.Module):
     def update_constraint_relaxation(self, retr_loss: float, lm_loss: float = 0.0):
         """V10.29: Unified adaptive hyperparameter controller.
 
-        Manages 10 adaptive parameters based on slot health signals.
+        Manages 11 adaptive parameters based on slot health signals.
         All start conservative for fresh training, relax/tighten based
         on sustained symptoms detected over _constraint_relax_interval steps.
 
@@ -9214,6 +9279,10 @@ class SlotMemoryGCT(nn.Module):
             retr_loss: Current retrieval loss value.
             lm_loss: Current LM loss value (for ratio-based adaptation).
         """
+        # V11: Skip all adaptive adjustments when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
         marginal_H = getattr(self, '_diag_marginal_entropy', None)
         if marginal_H is None:
             return
@@ -9257,12 +9326,10 @@ class SlotMemoryGCT(nn.Module):
 
         # BUG 3 fix: Use window-averaged gate_mean
         avg_gate = sum(self._gate_mean_window) / max(len(self._gate_mean_window), 1)
-        wr_scale = torch.exp(self._write_log_scale).clamp(
-            min=1.5, max=self._wr_scale_max
-        ).item()
-        read_scale = torch.exp(
-            self._read_log_scale.clamp(min=math.log(1.0), max=math.log(self._read_scale_max))
-        ).item()
+        _raw_wr_scale = torch.exp(self._write_log_scale).item()
+        wr_scale = max(1.5, min(_raw_wr_scale, self._wr_scale_max))
+        _raw_rd_scale = torch.exp(self._read_log_scale).item()
+        read_scale = max(1.0, min(_raw_rd_scale, self._read_scale_max))
         per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
         # BUG 4 fix: Use window-averaged L_ortho
         avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
@@ -9283,10 +9350,12 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized)")
 
         # ── (2) Write scale max clamp ─────────────────────────────────────
-        if wr_scale >= self._wr_scale_max * 0.98 and self._wr_scale_max < self._wr_scale_max_limit:
+        # Use raw (unclamped) scale: only relax when the optimizer is actively
+        # pushing the parameter above the clamp, not just because init > clamp.
+        if _raw_wr_scale > self._wr_scale_max * 1.02 and self._wr_scale_max < self._wr_scale_max_limit:
             old = self._wr_scale_max
             self._wr_scale_max = min(self._wr_scale_max_limit, self._wr_scale_max + 0.5)
-            changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (pinned)")
+            changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (optimizer pushing)")
 
         # ── (3) Gate ceiling weight (only) ────────────────────────────────
         # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
@@ -9368,10 +9437,11 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (collapsing)")
 
         # ── (8) Read scale max clamp ──────────────────────────────────────
-        if read_scale >= self._read_scale_max * 0.98 and self._read_scale_max < self._read_scale_max_limit:
+        # Same fix as (2): use raw unclamped scale to detect genuine optimizer push.
+        if _raw_rd_scale > self._read_scale_max * 1.02 and self._read_scale_max < self._read_scale_max_limit:
             old = self._read_scale_max
             self._read_scale_max = min(self._read_scale_max_limit, self._read_scale_max + 1.0)
-            changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (pinned)")
+            changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
 
         # ── (9) Soft detach leak ──────────────────────────────────────────
         if avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
@@ -9394,6 +9464,30 @@ class SlotMemoryGCT(nn.Module):
             old = self._L_sharp_weight
             self._L_sharp_weight = min(self._L_sharp_weight_max, self._L_sharp_weight * 1.3)
             changes.append(f"L_sharp: {old:.3f}→{self._L_sharp_weight:.3f} (off target)")
+
+        # ── (11) Adaptive write_lr (EMA coefficient) ─────────────────────
+        # Retrieval loss improving → writes are useful → allow faster EMA
+        # Retrieval loss stagnating/worsening → slow down to preserve content
+        half = len(self._retr_loss_history) // 2
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if second_half < first_half * 0.90 and self.write_lr < self._write_lr_max:
+                # Retrieval improving (>10% drop) → writes are useful, speed up
+                old = self.write_lr
+                self.write_lr = min(self._write_lr_max, self.write_lr * 1.15)
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr improving)")
+            elif second_half > first_half * 1.05 and self.write_lr > self._write_lr_min:
+                # Retrieval worsening (>5% rise) → slow down writes
+                old = self.write_lr
+                self.write_lr = max(self._write_lr_min, self.write_lr * 0.85)
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr worsening)")
+        # Also: if gate is collapsed, lower write_lr to reduce churn
+        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr > self._write_lr_min:
+            old = self.write_lr
+            self.write_lr = max(self._write_lr_min, self.write_lr * 0.90)
+            if not any('write_lr' in c for c in changes):
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (gate collapsed)")
 
         # ── Log changes ───────────────────────────────────────────────────
         if changes:

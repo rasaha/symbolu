@@ -524,6 +524,32 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # V11: Disable/reset adaptive constraint relaxation if requested
+    if config.global_tokens_enabled:
+        _sm = getattr(model, 'slot_memory', None)
+        if _sm is None:
+            _sm = getattr(getattr(model, 'hybrid', model), 'slot_memory', None)
+        if _sm is not None:
+            if config.reset_slot_constraints:
+                _sm.reset_constraints()
+                print(f"  Slot Constraints: RESET to initial defaults")
+            if config.disable_slot_adaptive_constraints:
+                _sm.enable_adaptive_constraints = False
+                print(f"  Slot Adaptive Constraints: DISABLED")
+            # V11: Override gate ceiling parameters from CLI
+            _gate_overrides = []
+            if getattr(config, 'slot_gate_target', None) is not None:
+                _sm._gate_target = config.slot_gate_target
+                _gate_overrides.append(f"target={config.slot_gate_target}")
+            if getattr(config, 'slot_gate_ceil_weight', None) is not None:
+                _sm._gate_ceil_weight = config.slot_gate_ceil_weight
+                _gate_overrides.append(f"weight={config.slot_gate_ceil_weight}")
+            if getattr(config, 'slot_gate_ceil_margin', None) is not None:
+                _sm._gate_ceil_margin = config.slot_gate_ceil_margin
+                _gate_overrides.append(f"margin={config.slot_gate_ceil_margin}")
+            if _gate_overrides:
+                print(f"  Gate Ceiling: {', '.join(_gate_overrides)}")
+
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
         health_report = run_architecture_health_check(model, config, device)
@@ -1681,19 +1707,20 @@ def train(config: UnifiedTrainingConfig):
                 adaptive_controller.emergency_count += 1
                 adaptive_controller.boost_blocked = True
 
-    # V10.22: Adaptive Slot LR Controller
+    # V10.23: Three-phase proportional Slot LR Controller (auto-enabled)
     adaptive_slot_lr = None
-    if config.enable_adaptive_slot_lr and _slot_params:
+    if _slot_params and config.slot_lr_eta > 0:
         adaptive_slot_lr = AdaptiveSlotLRController(
             optimizer=optimizer,
             initial_scale=config.slot_memory_lr_scale,
             scale_min=config.slot_lr_scale_min,
             scale_max=config.slot_lr_scale_max,
-            boost_factor=config.slot_lr_boost_factor,
-            decay_factor=config.slot_lr_decay_factor,
+            eta=config.slot_lr_eta,
+            stabilize_after_steps=config.slot_lr_stabilize_after,
         )
-        print(f"  [V10.22] Adaptive Slot LR: ENABLED "
-              f"(scale={config.slot_memory_lr_scale} → [{config.slot_lr_scale_min}, {config.slot_lr_scale_max}])")
+        print(f"  [V10.23] Slot LR Controller: Phase 1 (until warmup_complete + signal) "
+              f"→ Phase 2 (eta={config.slot_lr_eta}, scale=[{config.slot_lr_scale_min}, {config.slot_lr_scale_max}]) "
+              f"→ Phase 3 (auto-stabilize)")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -2312,15 +2339,21 @@ def train(config: UnifiedTrainingConfig):
             enable_adaptive_window=config.enable_adaptive_window,
             window_size_high_ppl=config.window_size_high_ppl,
             window_size_low_ppl=config.window_size_low_ppl,
+            enable_adaptive_alpha=config.enable_adaptive_alpha,
+            adaptive_alpha_min=config.adaptive_alpha_min,
+            adaptive_alpha_max=config.adaptive_alpha_max,
         )
         print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
         print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
         print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
         print(f"     └─ Linear interpolation between thresholds")
         if config.enable_adaptive_window:
-            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)\n")
-        else:
-            print()
+            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)")
+        if config.enable_adaptive_alpha:
+            print(f"     🎛️  Adaptive Alpha: ENABLED (post-curriculum, ablation-driven)")
+            print(f"        α_phase bounds: [{config.adaptive_alpha_min:.2f}, {config.adaptive_alpha_max:.2f}]")
+            print(f"        Dead zone: -0.5% to +1.0% (hysteresis)")
+        print()
 
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
@@ -6833,7 +6866,7 @@ def train(config: UnifiedTrainingConfig):
                 if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
                     print(f"  --> {adaptive_controller.get_status_string()}")
                 if adaptive_slot_lr is not None:
-                    adaptive_slot_lr.update(global_step)
+                    adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
                     print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
@@ -6910,7 +6943,10 @@ def train(config: UnifiedTrainingConfig):
                     # V10.22: Feed ablation delta and trigger adaptive slot LR update
                     if adaptive_slot_lr is not None:
                         adaptive_slot_lr.record_ablation_delta(_slot_delta)
-                        _slot_lr_actions = adaptive_slot_lr.update(global_step)
+                        _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # Post-curriculum adaptive alpha: feed ablation % to curriculum
+                    if ppl_alpha_curriculum is not None:
+                        ppl_alpha_curriculum.update_from_ablation(_slot_pct)
                     # Restore
                     _sm._read_warmstart_center = _orig_center
                     _sm._router_step = _orig_step
@@ -7284,17 +7320,31 @@ def main():
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
                        help="Slot param LR multiplier vs main LR (default: 0.1)")
-    # V10.22: Adaptive slot LR
-    parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
-                       help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
+    # V11: Slot memory experiment — read interval and late-layer writes
+    parser.add_argument("--global_read_interval", type=int, default=1,
+                       help="Read slots every N layers (default: 1 = every layer)")
+    parser.add_argument("--global_write_start_layer", type=int, default=0,
+                       help="Only write to slots from this layer onward (default: 0)")
+    parser.add_argument("--disable_slot_adaptive_constraints", action="store_true",
+                       help="Disable adaptive constraint relaxation controller for slot memory")
+    parser.add_argument("--reset_slot_constraints", action="store_true",
+                       help="Reset adaptive constraints to initial defaults on resume (undo drift from prior runs)")
+    parser.add_argument("--slot_gate_target", type=float, default=None,
+                       help="Write gate soft ceiling target (default: 0.35)")
+    parser.add_argument("--slot_gate_ceil_weight", type=float, default=None,
+                       help="Gate ceiling penalty weight (default: 5.0, 0=disable ceiling)")
+    parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
+                       help="Free exploration zone above gate target before penalty (default: 0.05)")
+    # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
+    # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
-                       help="Floor for adaptive slot LR scale (default: 0.1)")
-    parser.add_argument("--slot_lr_scale_max", type=float, default=0.5,
-                       help="Ceiling for adaptive slot LR scale (default: 0.5)")
-    parser.add_argument("--slot_lr_boost_factor", type=float, default=1.5,
-                       help="Multiply scale by this when boosting (default: 1.5)")
-    parser.add_argument("--slot_lr_decay_factor", type=float, default=0.7,
-                       help="Multiply scale by this when decaying (default: 0.7)")
+                       help="Floor for slot LR scale (default: 0.1)")
+    parser.add_argument("--slot_lr_scale_max", type=float, default=0.8,
+                       help="Ceiling for slot LR scale (default: 0.8)")
+    parser.add_argument("--slot_lr_eta", type=float, default=0.03,
+                       help="Proportional controller gain; 0 disables adaptation (default: 0.03)")
+    parser.add_argument("--slot_lr_stabilize_after", type=int, default=None,
+                       help="Hard step limit to freeze slot LR (default: None = auto-detect convergence)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
@@ -7358,6 +7408,13 @@ def main():
                        help="Window size when PPL >= ppl_high_threshold (fast phase learning)")
     parser.add_argument("--window_size_low_ppl", type=int, default=256,
                        help="Window size when PPL <= ppl_low_threshold (better local context)")
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    parser.add_argument("--enable_adaptive_alpha", action="store_true",
+                       help="After PPL curriculum settles, adapt alpha_phase based on slot ablation delta")
+    parser.add_argument("--adaptive_alpha_min", type=float, default=0.20,
+                       help="Floor for adaptive alpha_phase (default: 0.20)")
+    parser.add_argument("--adaptive_alpha_max", type=float, default=0.60,
+                       help="Ceiling for adaptive alpha_phase (default: 0.60)")
 
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
@@ -8759,12 +8816,19 @@ def main():
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
         slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
-        # V10.22: Adaptive slot LR
-        enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
+        # V11: Slot memory experiment
+        global_read_interval=getattr(args, 'global_read_interval', 1),
+        global_write_start_layer=getattr(args, 'global_write_start_layer', 0),
+        disable_slot_adaptive_constraints=getattr(args, 'disable_slot_adaptive_constraints', False),
+        reset_slot_constraints=getattr(args, 'reset_slot_constraints', False),
+        slot_gate_target=getattr(args, 'slot_gate_target', None),
+        slot_gate_ceil_weight=getattr(args, 'slot_gate_ceil_weight', None),
+        slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
+        # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
-        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.5),
-        slot_lr_boost_factor=getattr(args, 'slot_lr_boost_factor', 1.5),
-        slot_lr_decay_factor=getattr(args, 'slot_lr_decay_factor', 0.7),
+        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
+        slot_lr_eta=getattr(args, 'slot_lr_eta', 0.03),
+        slot_lr_stabilize_after=getattr(args, 'slot_lr_stabilize_after', None),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
@@ -8957,6 +9021,10 @@ def main():
         enable_adaptive_window=args.enable_adaptive_window,
         window_size_high_ppl=args.window_size_high_ppl,
         window_size_low_ppl=args.window_size_low_ppl,
+        # Post-curriculum adaptive alpha
+        enable_adaptive_alpha=args.enable_adaptive_alpha,
+        adaptive_alpha_min=args.adaptive_alpha_min,
+        adaptive_alpha_max=args.adaptive_alpha_max,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.10/V9.9.12: Phase diversity loss

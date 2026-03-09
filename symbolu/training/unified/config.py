@@ -155,13 +155,24 @@ class UnifiedTrainingConfig:
     retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
     slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
 
-    # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
-    # based on retrieval loss velocity, slot ablation delta, and write gate health
-    enable_adaptive_slot_lr: bool = False
-    slot_lr_scale_min: float = 0.1   # Floor for adaptive slot LR scale
-    slot_lr_scale_max: float = 0.5   # Ceiling for adaptive slot LR scale
-    slot_lr_boost_factor: float = 1.5  # Multiply scale by this when boosting
-    slot_lr_decay_factor: float = 0.7  # Multiply scale by this when decaying
+    # V11: Slot memory experiment — read interval and late-layer writes
+    global_read_interval: int = 1  # Read slots every N layers (1 = every layer)
+    global_write_start_layer: int = 0  # Only write to slots from this layer onward
+    disable_slot_adaptive_constraints: bool = False  # Disable adaptive constraint relaxation
+    reset_slot_constraints: bool = False  # Reset adaptive constraints to defaults on resume
+    slot_gate_target: Optional[float] = None  # Override gate ceiling target (default: 0.35)
+    slot_gate_ceil_weight: Optional[float] = None  # Override gate ceiling penalty weight (default: 5.0)
+    slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
+
+    # V10.23: Three-phase proportional slot LR controller
+    # Phase 1 (bootstrap): fixed LR until warmup_complete + sufficient signal history
+    # Phase 2 (adaptive): continuous proportional control via LR *= e^(eta * health_score)
+    # Phase 3 (stabilize): freeze when scale converges or step limit reached
+    # Auto-enabled when slot memory params exist. Set slot_lr_eta=0 to disable.
+    slot_lr_scale_min: float = 0.1    # Floor for slot LR scale
+    slot_lr_scale_max: float = 0.8    # Ceiling for slot LR scale
+    slot_lr_eta: float = 0.03         # Proportional controller gain (0 = disabled)
+    slot_lr_stabilize_after: Optional[int] = None  # Hard step limit for phase 3 (None = auto-detect only)
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
@@ -188,6 +199,10 @@ class UnifiedTrainingConfig:
     enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
     window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
     window_size_low_ppl: int = 256        # Window size when PPL <= ppl_low_threshold
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    enable_adaptive_alpha: bool = False    # Adapt alpha_phase from slot ablation after curriculum settles
+    adaptive_alpha_min: float = 0.20      # Floor for adaptive alpha_phase
+    adaptive_alpha_max: float = 0.60      # Ceiling for adaptive alpha_phase
 
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)
