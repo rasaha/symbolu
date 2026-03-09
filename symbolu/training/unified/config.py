@@ -164,13 +164,16 @@ class UnifiedTrainingConfig:
     slot_gate_ceil_weight: Optional[float] = None  # Override gate ceiling penalty weight (default: 5.0)
     slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
 
-    # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
-    # based on retrieval loss velocity, slot ablation delta, and write gate health
-    enable_adaptive_slot_lr: bool = False
-    slot_lr_scale_min: float = 0.1   # Floor for adaptive slot LR scale
-    slot_lr_scale_max: float = 0.5   # Ceiling for adaptive slot LR scale
-    slot_lr_boost_factor: float = 1.5  # Multiply scale by this when boosting
-    slot_lr_decay_factor: float = 0.7  # Multiply scale by this when decaying
+    # V10.23: Three-phase proportional slot LR controller
+    # Phase 1 (bootstrap): fixed LR during warmup, no adaptation
+    # Phase 2 (adaptive): continuous proportional control via LR *= e^(eta * health_score)
+    # Phase 3 (stabilize): freeze when scale converges or step limit reached
+    # Auto-enabled when slot memory params exist. Set slot_lr_eta=0 to disable.
+    slot_lr_scale_min: float = 0.1    # Floor for slot LR scale
+    slot_lr_scale_max: float = 0.8    # Ceiling for slot LR scale
+    slot_lr_eta: float = 0.03         # Proportional controller gain (0 = disabled)
+    slot_lr_bootstrap_steps: int = 2000  # Phase 1 duration (fixed LR)
+    slot_lr_stabilize_after: Optional[int] = None  # Hard step limit for phase 3 (None = auto-detect only)
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)

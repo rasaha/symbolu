@@ -1707,19 +1707,21 @@ def train(config: UnifiedTrainingConfig):
                 adaptive_controller.emergency_count += 1
                 adaptive_controller.boost_blocked = True
 
-    # V10.22: Adaptive Slot LR Controller
+    # V10.23: Three-phase proportional Slot LR Controller (auto-enabled)
     adaptive_slot_lr = None
-    if config.enable_adaptive_slot_lr and _slot_params:
+    if _slot_params and config.slot_lr_eta > 0:
         adaptive_slot_lr = AdaptiveSlotLRController(
             optimizer=optimizer,
             initial_scale=config.slot_memory_lr_scale,
             scale_min=config.slot_lr_scale_min,
             scale_max=config.slot_lr_scale_max,
-            boost_factor=config.slot_lr_boost_factor,
-            decay_factor=config.slot_lr_decay_factor,
+            eta=config.slot_lr_eta,
+            bootstrap_steps=config.slot_lr_bootstrap_steps,
+            stabilize_after_steps=config.slot_lr_stabilize_after,
         )
-        print(f"  [V10.22] Adaptive Slot LR: ENABLED "
-              f"(scale={config.slot_memory_lr_scale} → [{config.slot_lr_scale_min}, {config.slot_lr_scale_max}])")
+        print(f"  [V10.23] Slot LR Controller: Phase 1 (bootstrap={config.slot_lr_bootstrap_steps} steps) "
+              f"→ Phase 2 (eta={config.slot_lr_eta}, scale=[{config.slot_lr_scale_min}, {config.slot_lr_scale_max}]) "
+              f"→ Phase 3 (auto-stabilize)")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -7325,17 +7327,17 @@ def main():
                        help="Gate ceiling penalty weight (default: 5.0, 0=disable ceiling)")
     parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
                        help="Free exploration zone above gate target before penalty (default: 0.05)")
-    # V10.22: Adaptive slot LR
-    parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
-                       help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
+    # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
-                       help="Floor for adaptive slot LR scale (default: 0.1)")
-    parser.add_argument("--slot_lr_scale_max", type=float, default=0.5,
-                       help="Ceiling for adaptive slot LR scale (default: 0.5)")
-    parser.add_argument("--slot_lr_boost_factor", type=float, default=1.5,
-                       help="Multiply scale by this when boosting (default: 1.5)")
-    parser.add_argument("--slot_lr_decay_factor", type=float, default=0.7,
-                       help="Multiply scale by this when decaying (default: 0.7)")
+                       help="Floor for slot LR scale (default: 0.1)")
+    parser.add_argument("--slot_lr_scale_max", type=float, default=0.8,
+                       help="Ceiling for slot LR scale (default: 0.8)")
+    parser.add_argument("--slot_lr_eta", type=float, default=0.03,
+                       help="Proportional controller gain; 0 disables adaptation (default: 0.03)")
+    parser.add_argument("--slot_lr_bootstrap_steps", type=int, default=2000,
+                       help="Phase 1 duration: fixed LR before adaptation begins (default: 2000)")
+    parser.add_argument("--slot_lr_stabilize_after", type=int, default=None,
+                       help="Hard step limit to freeze slot LR (default: None = auto-detect convergence)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
@@ -8808,12 +8810,12 @@ def main():
         slot_gate_target=getattr(args, 'slot_gate_target', None),
         slot_gate_ceil_weight=getattr(args, 'slot_gate_ceil_weight', None),
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
-        # V10.22: Adaptive slot LR
-        enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
+        # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
-        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.5),
-        slot_lr_boost_factor=getattr(args, 'slot_lr_boost_factor', 1.5),
-        slot_lr_decay_factor=getattr(args, 'slot_lr_decay_factor', 0.7),
+        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
+        slot_lr_eta=getattr(args, 'slot_lr_eta', 0.03),
+        slot_lr_bootstrap_steps=getattr(args, 'slot_lr_bootstrap_steps', 2000),
+        slot_lr_stabilize_after=getattr(args, 'slot_lr_stabilize_after', None),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
