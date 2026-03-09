@@ -159,6 +159,7 @@ class UnifiedTrainingConfig:
     global_read_interval: int = 1  # Read slots every N layers (1 = every layer)
     global_write_start_layer: int = 0  # Only write to slots from this layer onward
     disable_slot_adaptive_constraints: bool = False  # Disable adaptive constraint relaxation
+    reset_slot_constraints: bool = False  # Reset adaptive constraints to defaults on resume
 
     # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
     # based on retrieval loss velocity, slot ablation delta, and write gate health

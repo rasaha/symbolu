@@ -8671,6 +8671,40 @@ class SlotMemoryGCT(nn.Module):
         '_L_sharp_weight',
     )
 
+    # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
+    _ADAPTIVE_DEFAULTS = {
+        '_gate_target': 0.35,
+        '_gate_ceil_weight': 5.0,
+        '_wr_scale_max': 2.0,
+        '_L_bal_weight': 1.0,
+        '_novelty_gate_floor': 0.15,
+        '_adaptive_retr_loss_weight': 1.0,
+        '_H_target': 1.0,
+        '_L_ortho_weight': 0.5,
+        '_read_scale_max': 5.0,
+        '_soft_detach_leak': 0.1,
+        '_L_sharp_weight': 0.1,
+    }
+
+    def reset_constraints(self):
+        """V11: Reset all adaptive constraint state to initial defaults.
+
+        Use when resuming a checkpoint with --disable_slot_adaptive_constraints
+        to undo any drift from the previous run's controller.
+        """
+        for key, default in self._ADAPTIVE_DEFAULTS.items():
+            setattr(self, key, default)
+        # Clear accumulated windows so stale history doesn't leak
+        self._constraint_relax_window.clear()
+        self._constraint_relax_counter = 0
+        self._gate_mean_window.clear()
+        self._L_ortho_window.clear()
+        self._retr_loss_history.clear()
+        self._lm_loss_history.clear()
+        self._retr_loss_window.clear()
+        self._gate_window.clear()
+        self._gate_adapt_counter = 0
+
     def state_dict(self, *args, **kwargs):
         """V10.27/29: Sync runtime state before saving."""
         self._router_step_buf.fill_(self._router_step)
