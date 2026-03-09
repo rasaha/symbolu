@@ -1716,10 +1716,9 @@ def train(config: UnifiedTrainingConfig):
             scale_min=config.slot_lr_scale_min,
             scale_max=config.slot_lr_scale_max,
             eta=config.slot_lr_eta,
-            bootstrap_steps=config.slot_lr_bootstrap_steps,
             stabilize_after_steps=config.slot_lr_stabilize_after,
         )
-        print(f"  [V10.23] Slot LR Controller: Phase 1 (bootstrap={config.slot_lr_bootstrap_steps} steps) "
+        print(f"  [V10.23] Slot LR Controller: Phase 1 (until warmup_complete + signal) "
               f"→ Phase 2 (eta={config.slot_lr_eta}, scale=[{config.slot_lr_scale_min}, {config.slot_lr_scale_max}]) "
               f"→ Phase 3 (auto-stabilize)")
 
@@ -6861,7 +6860,7 @@ def train(config: UnifiedTrainingConfig):
                 if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
                     print(f"  --> {adaptive_controller.get_status_string()}")
                 if adaptive_slot_lr is not None:
-                    adaptive_slot_lr.update(global_step)
+                    adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
                     print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
@@ -6938,7 +6937,7 @@ def train(config: UnifiedTrainingConfig):
                     # V10.22: Feed ablation delta and trigger adaptive slot LR update
                     if adaptive_slot_lr is not None:
                         adaptive_slot_lr.record_ablation_delta(_slot_delta)
-                        _slot_lr_actions = adaptive_slot_lr.update(global_step)
+                        _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
                     # Restore
                     _sm._read_warmstart_center = _orig_center
                     _sm._router_step = _orig_step
@@ -7328,14 +7327,13 @@ def main():
     parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
                        help="Free exploration zone above gate target before penalty (default: 0.05)")
     # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
+    # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
                        help="Floor for slot LR scale (default: 0.1)")
     parser.add_argument("--slot_lr_scale_max", type=float, default=0.8,
                        help="Ceiling for slot LR scale (default: 0.8)")
     parser.add_argument("--slot_lr_eta", type=float, default=0.03,
                        help="Proportional controller gain; 0 disables adaptation (default: 0.03)")
-    parser.add_argument("--slot_lr_bootstrap_steps", type=int, default=2000,
-                       help="Phase 1 duration: fixed LR before adaptation begins (default: 2000)")
     parser.add_argument("--slot_lr_stabilize_after", type=int, default=None,
                        help="Hard step limit to freeze slot LR (default: None = auto-detect convergence)")
 
@@ -8814,7 +8812,6 @@ def main():
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
         slot_lr_eta=getattr(args, 'slot_lr_eta', 0.03),
-        slot_lr_bootstrap_steps=getattr(args, 'slot_lr_bootstrap_steps', 2000),
         slot_lr_stabilize_after=getattr(args, 'slot_lr_stabilize_after', None),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor

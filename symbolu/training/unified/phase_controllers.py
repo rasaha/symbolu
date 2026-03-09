@@ -773,7 +773,9 @@ class AdaptiveSlotLRController:
     """
     Three-phase proportional slot LR controller.
 
-    Phase 1 (bootstrap): Fixed slot LR — let the model settle before adapting.
+    Phase 1 (bootstrap): Fixed slot LR — waits for warmup_complete signal from
+                         the training loop (PPL-based or step-based) AND sufficient
+                         signal history before adapting. No arbitrary step count.
     Phase 2 (adaptive):  Continuous proportional control via exponential update:
                          LR_slot(t+1) = LR_slot(t) * e^(eta * s)
                          where s = weighted health score from write gate, retr loss
@@ -798,7 +800,7 @@ class AdaptiveSlotLRController:
         # Gate target for health score
         target_gate: float = 0.20,
         # Phase transition thresholds
-        bootstrap_steps: int = 2000,
+        min_observations_for_phase2: int = 3,  # Need at least N signal observations before adapting
         stabilize_after_steps: Optional[int] = None,  # None = never auto-freeze
         stabilize_scale_variance_threshold: float = 0.005,  # Auto-freeze when scale variance drops below this
         # History
@@ -813,7 +815,7 @@ class AdaptiveSlotLRController:
         self.weight_retr_velocity = weight_retr_velocity
         self.weight_ablation = weight_ablation
         self.target_gate = target_gate
-        self.bootstrap_steps = bootstrap_steps
+        self.min_observations_for_phase2 = min_observations_for_phase2
         self.stabilize_after_steps = stabilize_after_steps
         self.stabilize_scale_variance_threshold = stabilize_scale_variance_threshold
         self.history_window = history_window
@@ -892,19 +894,27 @@ class AdaptiveSlotLRController:
         score = sum(s * w for s, w in zip(signals, weights)) / total_weight
         return score
 
-    def update(self, global_step: int) -> Dict[str, Any]:
+    def update(self, global_step: int, warmup_complete: bool = False) -> Dict[str, Any]:
         """
         Three-phase update. Call at eval time.
+
+        Args:
+            global_step: Current training step.
+            warmup_complete: Whether LR warmup has finished (PPL-based or step-based).
+                Phase 1→2 transition requires this AND sufficient signal history.
+
         Returns dict with phase info and any scale change.
         """
         actions: Dict[str, Any] = {"step": global_step, "phase": self.phase, "adjustments": []}
 
-        # --- Phase transitions ---
-        if self.phase == 1 and global_step >= self.bootstrap_steps:
-            self.phase = 2
-            self.phase_transitions.append({"from": 1, "to": 2, "step": global_step})
-            print(f"  [SLOT-LR] Phase 1→2: bootstrap complete at step {global_step}, "
-                  f"entering proportional control (scale={self.current_scale:.4f})")
+        # --- Phase 1→2: requires warmup done + enough observations to compute health ---
+        if self.phase == 1 and warmup_complete:
+            n_obs = len(self.write_gate_history) + len(self.retr_loss_history)
+            if n_obs >= self.min_observations_for_phase2:
+                self.phase = 2
+                self.phase_transitions.append({"from": 1, "to": 2, "step": global_step})
+                print(f"  [SLOT-LR] Phase 1→2: warmup complete + {n_obs} observations, "
+                      f"entering proportional control (scale={self.current_scale:.4f})")
 
         if self.phase == 2:
             # Check for auto-stabilize: scale variance over recent window

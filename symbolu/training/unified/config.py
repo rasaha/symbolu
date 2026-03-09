@@ -165,14 +165,13 @@ class UnifiedTrainingConfig:
     slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
 
     # V10.23: Three-phase proportional slot LR controller
-    # Phase 1 (bootstrap): fixed LR during warmup, no adaptation
+    # Phase 1 (bootstrap): fixed LR until warmup_complete + sufficient signal history
     # Phase 2 (adaptive): continuous proportional control via LR *= e^(eta * health_score)
     # Phase 3 (stabilize): freeze when scale converges or step limit reached
     # Auto-enabled when slot memory params exist. Set slot_lr_eta=0 to disable.
     slot_lr_scale_min: float = 0.1    # Floor for slot LR scale
     slot_lr_scale_max: float = 0.8    # Ceiling for slot LR scale
     slot_lr_eta: float = 0.03         # Proportional controller gain (0 = disabled)
-    slot_lr_bootstrap_steps: int = 2000  # Phase 1 duration (fixed LR)
     slot_lr_stabilize_after: Optional[int] = None  # Hard step limit for phase 3 (None = auto-detect only)
 
     # ==========================================================================
