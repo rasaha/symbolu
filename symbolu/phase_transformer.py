@@ -8508,10 +8508,10 @@ class SlotMemoryGCT(nn.Module):
         # This adds a soft quadratic ceiling that adapts based on write utility:
         # if retr_loss is improving → ceiling relaxes (writes are helpful),
         # if retr_loss stagnates while gate is high → ceiling tightens (churn).
-        self._gate_target = 0.35          # Adaptive ceiling (starts moderate)
+        self._gate_target = 0.50          # Adaptive ceiling (starts moderate)
         self._gate_target_min = 0.20      # Never tighten below this
         self._gate_target_max = 0.60      # Never relax above this
-        self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._gate_ceil_weight = 1.0      # Quadratic penalty weight above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
         self._gate_adapt_window = 200     # Steps to accumulate before adapting
@@ -8687,7 +8687,7 @@ class SlotMemoryGCT(nn.Module):
         # stay differentiated enough for meaningful gradient flow, letting the
         # gate learn to open above the 0.15 floor via both retrieval loss and
         # the 10% LM-loss leak (V10.24).
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=2.0)
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=4.0)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
         # V10.20: Detach slot_keys before F.normalize in assignment computation.
         # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
@@ -8904,7 +8904,7 @@ class SlotMemoryGCT(nn.Module):
         # V10.25: Match write() clamp [1.5, 2.0] — retrieval loss is the
         # ONLY gradient source for slot values, so peaky attention here
         # (scale 3-4) kills the learning signal just like in write().
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=2.0)
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=4.0)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9041,7 +9041,7 @@ class SlotMemoryGCT(nn.Module):
             gate_mean = self._last_novelty.mean()
             L_gate_ceil = torch.relu(gate_mean - self._gate_target) ** 2
 
-        return (0.1 * L_sharp + 1.0 * L_bal + 0.5 * L_ortho
+        return (0.1 * L_sharp + 0.3 * L_bal + 0.5 * L_ortho
                 + 0.01 * L_gate_util + self._gate_ceil_weight * L_gate_ceil)
 
     def update_write_gate_target(self, retr_loss: float):
