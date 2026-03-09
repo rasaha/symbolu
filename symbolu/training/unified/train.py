@@ -4542,7 +4542,9 @@ def train(config: UnifiedTrainingConfig):
                               f"retr_w={getattr(_sm, '_adaptive_retr_loss_weight', 1.0):.2f} "
                               f"gate_floor={getattr(_sm, '_novelty_gate_floor', 0.15):.2f} "
                               f"leak={getattr(_sm, '_soft_detach_leak', 0.1):.2f} "
-                              f"L_bal_w={getattr(_sm, '_L_bal_weight', 1.0):.2f}")
+                              f"L_bal_w={getattr(_sm, '_L_bal_weight', 1.0):.2f} "
+                              f"q_norm={getattr(_sm, '_diag_retr_query_norm', 0):.2f} "
+                              f"retr_norm={getattr(_sm, '_diag_retr_retrieved_norm', 0):.2f}")
                         # V10.22: Feed signals to adaptive slot LR controller
                         if adaptive_slot_lr is not None:
                             adaptive_slot_lr.record_retr_loss(_retr_loss_val)

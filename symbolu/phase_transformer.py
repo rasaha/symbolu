@@ -7107,6 +7107,13 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # V11.3: Capture pre-attention hidden state for retrieval loss.
+        # Post-backbone x is redundant with lm_head(x) — slots trained on it
+        # just learn to copy the backbone's own prediction. Pre-attention x
+        # (token embed + position, zero attention context) forces slots to
+        # provide information the query genuinely lacks.
+        _x_pre_attn = x.detach()
+
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
         decorr_losses = [] if return_decorr_loss else None
@@ -7291,13 +7298,13 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            # V10.14.9: Detach hidden states for retrieval loss. Without this,
-            # retrieval loss gradients flow through _slot_hidden back into ALL
-            # transformer blocks (phase_attn.W_k_fused, v_proj, complex_proj),
-            # creating a secondary training signal that destabilizes the backbone
-            # around step 650 and cascades into slot memory gradient explosions.
-            # Retrieval loss should only train slot memory parameters.
-            result['_slot_hidden'] = x.detach()  # Post-norm hidden for query matching
+            # V11.3: Use pre-attention hidden state for retrieval loss queries.
+            # Previously used post-backbone x.detach(), which made retrieval
+            # redundant — slots learned to copy what the backbone already knows.
+            # Pre-attention x (embed + position only) forces slots to provide
+            # information that attention hasn't yet injected.
+            # Already detached at capture point (line ~7114).
+            result['_slot_hidden'] = _x_pre_attn  # Pre-attention for non-redundant retrieval
 
         return result
 
@@ -7348,6 +7355,9 @@ class HybridPhaseTransformer(nn.Module):
         positions = chunk_offset + torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
+
+        # V11.3: Pre-attention capture (mirrors forward())
+        _x_pre_attn = x.detach()
 
         # Initialize states if not provided
         if prev_layer_states is None:
@@ -7475,7 +7485,8 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            result['_slot_hidden'] = x.detach()
+            # V11.3: Pre-attention hidden (mirrors forward())
+            result['_slot_hidden'] = _x_pre_attn
 
         return result, next_layer_states
 
@@ -9102,6 +9113,11 @@ class SlotMemoryGCT(nn.Module):
         retrieval_loss = F.cross_entropy(
             query_logits, query_targets, ignore_index=-100
         )
+
+        # V11.3: Diagnostics for pre-attention retrieval experiment
+        with torch.no_grad():
+            self._diag_retr_query_norm = x[query_mask].norm(dim=-1).mean().item()
+            self._diag_retr_retrieved_norm = query_retrieved.norm(dim=-1).mean().item()
 
         return retrieval_loss
 
