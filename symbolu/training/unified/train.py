@@ -6941,6 +6941,8 @@ def train(config: UnifiedTrainingConfig):
                           f"Without: {_no_slot_ppl:.2f} | "
                           f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
                           f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                    # V11.2: Feed ablation delta to SlotMemory for retr_weight guard
+                    _sm._last_ablation_delta = _slot_delta
                     # V10.22: Feed ablation delta and trigger adaptive slot LR update
                     if adaptive_slot_lr is not None:
                         adaptive_slot_lr.record_ablation_delta(_slot_delta)

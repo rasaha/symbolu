@@ -8561,6 +8561,8 @@ class SlotMemoryGCT(nn.Module):
         self._adaptive_retr_loss_weight_max = 2.0
         self._retr_loss_history: List[float] = []  # Track for dominance detection
         self._lm_loss_history: List[float] = []    # Need LM loss for ratio
+        # V11.2: Ablation-aware retr_weight guard — don't decay when slots neutral/helping
+        self._last_ablation_delta: Optional[float] = None  # Set by training loop after ablation
 
         # (c) H_target (sharpness entropy target) — adapt to slot utilization
         self._H_target = 1.0                # nats, ~2-3 active slots
@@ -9434,14 +9436,25 @@ class SlotMemoryGCT(nn.Module):
         # ── (5) Retrieval loss weight ─────────────────────────────────────
         # BUG 7 fix: This weight is used AS-IS in train.py (replacing, not
         # multiplying with, config.retrieval_loss_weight when adaptive is active).
+        # V11.2: Ablation-aware guard — don't decay if slots are neutral or helping.
+        # Only decay when ablation shows slots are actively hurting (delta < -1.0)
+        # or when no ablation data is available yet (None = pre-ablation warmup).
+        _ablation_allows_decay = (
+            self._last_ablation_delta is None  # No ablation yet, allow warmup decay
+            or self._last_ablation_delta < -1.0  # Slots actively hurting
+        )
         if avg_lm > 0 and avg_retr > avg_lm * 0.5 and self._adaptive_retr_loss_weight > self._adaptive_retr_loss_weight_min:
-            old = self._adaptive_retr_loss_weight
-            self._adaptive_retr_loss_weight = max(
-                self._adaptive_retr_loss_weight_min,
-                self._adaptive_retr_loss_weight * 0.8
-            )
-            changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
-                           f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
+            if _ablation_allows_decay:
+                old = self._adaptive_retr_loss_weight
+                self._adaptive_retr_loss_weight = max(
+                    self._adaptive_retr_loss_weight_min,
+                    self._adaptive_retr_loss_weight * 0.8
+                )
+                changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
+                               f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
+            else:
+                changes.append(f"retr_weight: {self._adaptive_retr_loss_weight:.2f} "
+                               f"(held: ablation Δ={self._last_ablation_delta:+.2f}, slots not hurting)")
         elif avg_lm > 0 and avg_retr < avg_lm * 0.1 and self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_max:
             half = len(self._retr_loss_history) // 2
             if half > 0:
