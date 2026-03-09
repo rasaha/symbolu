@@ -8535,6 +8535,8 @@ class SlotMemoryGCT(nn.Module):
         self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
         self._L_bal_weight_floor = 0.1    # Minimum balance weight
+        # V11.1: Track L_bal relaxation reason for diagnostics
+        self._L_bal_last_reason = ""
         self._constraint_relax_window: List[float] = []  # marginal_H history
         self._constraint_relax_counter = 0
         self._constraint_relax_interval = 500  # Steps between adaptation checks
@@ -9339,15 +9341,53 @@ class SlotMemoryGCT(nn.Module):
 
         changes = []
 
-        # ── (1) L_bal weight: marginal_H-based ────────────────────────────
-        if avg_marginal_H > 0.95 and self._L_bal_weight > self._L_bal_weight_floor:
-            old = self._L_bal_weight
-            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * 0.7)
-            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (too uniform)")
-        elif avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+        # ── (1) L_bal weight: adaptive retr_loss-driven ─────────────────
+        # V11.1: Replace hard-coded marginal_H threshold with signal-driven
+        # relaxation. The old threshold (marginal_H > 0.95) was too high —
+        # L_bal successfully enforced uniformity (marginal_H ≈ 0.93) which
+        # prevented slot specialization entirely.
+        #
+        # New logic: L_bal exists to prevent collapse (1-2 slots dominating).
+        # But if retr_loss is improving, slots are learning useful content,
+        # so L_bal should relax to let natural specialization emerge.
+        # If marginal_H drops too low (<0.7), slots have over-specialized
+        # and L_bal should increase to redistribute.
+        #
+        # Three conditions for relaxation (any one triggers):
+        # (a) retr_loss improving over window → slots learning, let them specialize
+        # (b) marginal_H high AND no collapse risk → uniform = L_bal succeeded too well
+        # (c) Collapse guard: marginal_H < 0.7 → re-apply L_bal
+        half = len(self._retr_loss_history) // 2
+        retr_improving = False
+        retr_velocity = 0.0
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if first_half > 0:
+                retr_velocity = (second_half - first_half) / first_half  # negative = improving
+                retr_improving = retr_velocity < -0.02  # >2% improvement
+
+        if avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+            # Collapse guard: slots over-specialized, strengthen balance
             old = self._L_bal_weight
             self._L_bal_weight = min(1.0, self._L_bal_weight * 1.5)
-            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized)")
+            self._L_bal_last_reason = "over-specialized"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized, mH={avg_marginal_H:.3f})")
+        elif retr_improving and avg_marginal_H > 0.80 and self._L_bal_weight > self._L_bal_weight_floor:
+            # Retr loss improving + slots still fairly uniform → relax L_bal
+            # Decay rate proportional to improvement velocity (faster improvement → faster relaxation)
+            decay_rate = max(0.5, 1.0 + retr_velocity * 5.0)  # e.g. vel=-0.05 → decay=0.75
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * decay_rate)
+            self._L_bal_last_reason = "retr_improving"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (retr improving {retr_velocity:+.1%}, mH={avg_marginal_H:.3f})")
+        elif avg_marginal_H > 0.92 and not retr_improving and self._L_bal_weight > self._L_bal_weight_floor:
+            # Even without retr improvement, if slots are very uniform, gently relax
+            # (but slower than the retr-driven path — 0.85x vs velocity-proportional)
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * 0.85)
+            self._L_bal_last_reason = "too_uniform"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (too uniform, mH={avg_marginal_H:.3f})")
 
         # ── (2) Write scale max clamp ─────────────────────────────────────
         # Use raw (unclamped) scale: only relax when the optimizer is actively
