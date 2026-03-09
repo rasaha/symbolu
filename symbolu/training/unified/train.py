@@ -525,7 +525,7 @@ def train(config: UnifiedTrainingConfig):
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
     # V11: Disable/reset adaptive constraint relaxation if requested
-    if config.global_tokens_enabled and (config.disable_slot_adaptive_constraints or config.reset_slot_constraints):
+    if config.global_tokens_enabled:
         _sm = getattr(model, 'slot_memory', None)
         if _sm is None:
             _sm = getattr(getattr(model, 'hybrid', model), 'slot_memory', None)
@@ -536,6 +536,19 @@ def train(config: UnifiedTrainingConfig):
             if config.disable_slot_adaptive_constraints:
                 _sm.enable_adaptive_constraints = False
                 print(f"  Slot Adaptive Constraints: DISABLED")
+            # V11: Override gate ceiling parameters from CLI
+            _gate_overrides = []
+            if getattr(config, 'slot_gate_target', None) is not None:
+                _sm._gate_target = config.slot_gate_target
+                _gate_overrides.append(f"target={config.slot_gate_target}")
+            if getattr(config, 'slot_gate_ceil_weight', None) is not None:
+                _sm._gate_ceil_weight = config.slot_gate_ceil_weight
+                _gate_overrides.append(f"weight={config.slot_gate_ceil_weight}")
+            if getattr(config, 'slot_gate_ceil_margin', None) is not None:
+                _sm._gate_ceil_margin = config.slot_gate_ceil_margin
+                _gate_overrides.append(f"margin={config.slot_gate_ceil_margin}")
+            if _gate_overrides:
+                print(f"  Gate Ceiling: {', '.join(_gate_overrides)}")
 
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
@@ -7306,6 +7319,12 @@ def main():
                        help="Disable adaptive constraint relaxation controller for slot memory")
     parser.add_argument("--reset_slot_constraints", action="store_true",
                        help="Reset adaptive constraints to initial defaults on resume (undo drift from prior runs)")
+    parser.add_argument("--slot_gate_target", type=float, default=None,
+                       help="Write gate soft ceiling target (default: 0.35)")
+    parser.add_argument("--slot_gate_ceil_weight", type=float, default=None,
+                       help="Gate ceiling penalty weight (default: 5.0, 0=disable ceiling)")
+    parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
+                       help="Free exploration zone above gate target before penalty (default: 0.05)")
     # V10.22: Adaptive slot LR
     parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
                        help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
@@ -8786,6 +8805,9 @@ def main():
         global_write_start_layer=getattr(args, 'global_write_start_layer', 0),
         disable_slot_adaptive_constraints=getattr(args, 'disable_slot_adaptive_constraints', False),
         reset_slot_constraints=getattr(args, 'reset_slot_constraints', False),
+        slot_gate_target=getattr(args, 'slot_gate_target', None),
+        slot_gate_ceil_weight=getattr(args, 'slot_gate_ceil_weight', None),
+        slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
         # V10.22: Adaptive slot LR
         enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),

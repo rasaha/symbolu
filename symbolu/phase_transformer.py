@@ -8521,6 +8521,7 @@ class SlotMemoryGCT(nn.Module):
         self._gate_target_min = 0.20      # Never tighten below this
         self._gate_target_max = 0.60      # Never relax above this
         self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
         self._gate_adapt_window = 200     # Steps to accumulate before adapting
@@ -8675,6 +8676,7 @@ class SlotMemoryGCT(nn.Module):
     _ADAPTIVE_DEFAULTS = {
         '_gate_target': 0.35,
         '_gate_ceil_weight': 5.0,
+        '_gate_ceil_margin': 0.05,
         '_wr_scale_max': 2.0,
         '_L_bal_weight': 1.0,
         '_novelty_gate_floor': 0.15,
@@ -9186,7 +9188,7 @@ class SlotMemoryGCT(nn.Module):
         L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
         if self._last_novelty is not None:
             gate_mean = self._last_novelty.mean()
-            L_gate_ceil = torch.relu(gate_mean - self._gate_target) ** 2
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin) ** 2
 
         # V10.29: All loss weights are adaptive
         return (self._L_sharp_weight * L_sharp + self._L_bal_weight * L_bal

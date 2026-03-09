@@ -160,6 +160,9 @@ class UnifiedTrainingConfig:
     global_write_start_layer: int = 0  # Only write to slots from this layer onward
     disable_slot_adaptive_constraints: bool = False  # Disable adaptive constraint relaxation
     reset_slot_constraints: bool = False  # Reset adaptive constraints to defaults on resume
+    slot_gate_target: Optional[float] = None  # Override gate ceiling target (default: 0.35)
+    slot_gate_ceil_weight: Optional[float] = None  # Override gate ceiling penalty weight (default: 5.0)
+    slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
 
     # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
     # based on retrieval loss velocity, slot ablation delta, and write gate health
