@@ -199,6 +199,10 @@ class UnifiedTrainingConfig:
     enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
     window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
     window_size_low_ppl: int = 256        # Window size when PPL <= ppl_low_threshold
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    enable_adaptive_alpha: bool = False    # Adapt alpha_phase from slot ablation after curriculum settles
+    adaptive_alpha_min: float = 0.20      # Floor for adaptive alpha_phase
+    adaptive_alpha_max: float = 0.60      # Ceiling for adaptive alpha_phase
 
     # Decorrelation loss (to force phase and local to learn different features)
     decorr_loss_weight: float = 0.0  # Weight for decorrelation loss (0=disabled, 0.1=recommended)

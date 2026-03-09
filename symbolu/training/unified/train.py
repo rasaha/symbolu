@@ -2339,15 +2339,21 @@ def train(config: UnifiedTrainingConfig):
             enable_adaptive_window=config.enable_adaptive_window,
             window_size_high_ppl=config.window_size_high_ppl,
             window_size_low_ppl=config.window_size_low_ppl,
+            enable_adaptive_alpha=config.enable_adaptive_alpha,
+            adaptive_alpha_min=config.adaptive_alpha_min,
+            adaptive_alpha_max=config.adaptive_alpha_max,
         )
         print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
         print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
         print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
         print(f"     └─ Linear interpolation between thresholds")
         if config.enable_adaptive_window:
-            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)\n")
-        else:
-            print()
+            print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)")
+        if config.enable_adaptive_alpha:
+            print(f"     🎛️  Adaptive Alpha: ENABLED (post-curriculum, ablation-driven)")
+            print(f"        α_phase bounds: [{config.adaptive_alpha_min:.2f}, {config.adaptive_alpha_max:.2f}]")
+            print(f"        Dead zone: -0.5% to +1.0% (hysteresis)")
+        print()
 
     # V2.3.4: Sequence Length Curriculum Controller
     seq_len_curriculum = None
@@ -6938,6 +6944,9 @@ def train(config: UnifiedTrainingConfig):
                     if adaptive_slot_lr is not None:
                         adaptive_slot_lr.record_ablation_delta(_slot_delta)
                         _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # Post-curriculum adaptive alpha: feed ablation % to curriculum
+                    if ppl_alpha_curriculum is not None:
+                        ppl_alpha_curriculum.update_from_ablation(_slot_pct)
                     # Restore
                     _sm._read_warmstart_center = _orig_center
                     _sm._router_step = _orig_step
@@ -7399,6 +7408,13 @@ def main():
                        help="Window size when PPL >= ppl_high_threshold (fast phase learning)")
     parser.add_argument("--window_size_low_ppl", type=int, default=256,
                        help="Window size when PPL <= ppl_low_threshold (better local context)")
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    parser.add_argument("--enable_adaptive_alpha", action="store_true",
+                       help="After PPL curriculum settles, adapt alpha_phase based on slot ablation delta")
+    parser.add_argument("--adaptive_alpha_min", type=float, default=0.20,
+                       help="Floor for adaptive alpha_phase (default: 0.20)")
+    parser.add_argument("--adaptive_alpha_max", type=float, default=0.60,
+                       help="Ceiling for adaptive alpha_phase (default: 0.60)")
 
     # Decorrelation loss (to force phase and local to learn different features)
     parser.add_argument("--decorr_loss_weight", type=float, default=0.0,
@@ -9005,6 +9021,10 @@ def main():
         enable_adaptive_window=args.enable_adaptive_window,
         window_size_high_ppl=args.window_size_high_ppl,
         window_size_low_ppl=args.window_size_low_ppl,
+        # Post-curriculum adaptive alpha
+        enable_adaptive_alpha=args.enable_adaptive_alpha,
+        adaptive_alpha_min=args.adaptive_alpha_min,
+        adaptive_alpha_max=args.adaptive_alpha_max,
         # Decorrelation loss (to force phase and local to learn different features)
         decorr_loss_weight=args.decorr_loss_weight,
         # V9.9.10/V9.9.12: Phase diversity loss

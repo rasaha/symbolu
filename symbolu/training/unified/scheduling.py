@@ -506,6 +506,10 @@ class PPLAlphaCurriculum:
         enable_adaptive_window: bool = False,
         window_size_high_ppl: int = 128,  # Small window when PPL high (fast phase)
         window_size_low_ppl: int = 256,   # Large window when PPL low (local context)
+        # Post-curriculum adaptive alpha (slot ablation-driven)
+        enable_adaptive_alpha: bool = False,
+        adaptive_alpha_min: float = 0.20,
+        adaptive_alpha_max: float = 0.60,
     ):
         self.alpha_high = alpha_high
         self.alpha_low = alpha_low
@@ -519,6 +523,19 @@ class PPLAlphaCurriculum:
         self.window_size_low_ppl = window_size_low_ppl
         self.current_window_size = window_size_high_ppl if enable_adaptive_window else None
         self.window_transition_logged = False
+
+        # Post-curriculum adaptive alpha: once PPL settles below ppl_low,
+        # adjust alpha_phase based on slot ablation delta. Separate control
+        # loop from the PPL curriculum — only activates after curriculum ends.
+        self.enable_adaptive_alpha = enable_adaptive_alpha
+        self.adaptive_alpha_min = adaptive_alpha_min
+        self.adaptive_alpha_max = adaptive_alpha_max
+        self._ablation_pct_ema: float = 0.0       # EMA of slot ablation %
+        self._ablation_ema_decay: float = 0.7      # EMA decay (heavy smoothing, few samples)
+        self._ablation_seen: int = 0                # Number of ablation readings received
+        self._curriculum_settled: bool = False       # True once PPL stays below ppl_low
+        self._settled_count: int = 0                 # Consecutive evals below ppl_low
+        self._settled_threshold: int = 3             # Need 3 consecutive to confirm settled
 
         # State
         self.ppl_ema = None
@@ -564,6 +581,23 @@ class PPLAlphaCurriculum:
             self.transition_logged = True
             self.last_transition_ppl = self.ppl_ema
 
+        # Post-curriculum adaptive alpha: once settled, alpha_phase is
+        # driven by update_from_ablation() instead of the PPL formula.
+        if self.enable_adaptive_alpha:
+            if ppl <= self.ppl_low:
+                self._settled_count += 1
+                if self._settled_count >= self._settled_threshold and not self._curriculum_settled:
+                    self._curriculum_settled = True
+                    print(f"  [PPL-Alpha] Curriculum settled (PPL={ppl:.1f} < {self.ppl_low:.0f} "
+                          f"for {self._settled_count} evals). Adaptive alpha ACTIVE.")
+            else:
+                self._settled_count = 0
+            # Once settled, use the adaptively-adjusted alpha_phase
+            # (which starts at alpha_low and adjusts from ablation signal)
+            if self._curriculum_settled:
+                alpha_phase = self.current_alpha_phase  # Keep current adaptive value
+                alpha_local = 1.0 - alpha_phase
+
         self.current_alpha_phase = alpha_phase
         self.current_alpha_local = alpha_local
 
@@ -581,6 +615,60 @@ class PPLAlphaCurriculum:
                 self.window_transition_logged = True
 
         return alpha_phase, alpha_local
+
+    def update_from_ablation(self, ablation_pct: float) -> bool:
+        """Post-curriculum adaptive alpha: adjust alpha_phase based on slot ablation.
+
+        Called after each slot ablation eval. Only acts once the PPL curriculum
+        has settled (PPL below ppl_low for several evals).
+
+        Args:
+            ablation_pct: Slot ablation delta as percentage. Positive = slots help.
+                          e.g., +0.3 means "PPL is 0.3% higher without slots"
+
+        Returns:
+            True if alpha_phase was adjusted, False otherwise.
+        """
+        if not self.enable_adaptive_alpha or not self._curriculum_settled:
+            return False
+
+        # Update EMA of ablation percentage
+        self._ablation_seen += 1
+        if self._ablation_seen == 1:
+            self._ablation_pct_ema = ablation_pct
+        else:
+            self._ablation_pct_ema = (
+                self._ablation_ema_decay * self._ablation_pct_ema
+                + (1 - self._ablation_ema_decay) * ablation_pct
+            )
+
+        # Need at least 2 readings before acting
+        if self._ablation_seen < 2:
+            return False
+
+        old_alpha = self.current_alpha_phase
+
+        # Dead zone: -0.5% to +1.0% → no change (hysteresis)
+        if self._ablation_pct_ema > 1.0:
+            # Slots are helping meaningfully → give them more weight
+            self.current_alpha_phase = min(
+                self.adaptive_alpha_max,
+                self.current_alpha_phase + 0.02
+            )
+        elif self._ablation_pct_ema < -0.5:
+            # Slots are hurting → reduce their weight (faster retreat)
+            self.current_alpha_phase = max(
+                self.adaptive_alpha_min,
+                self.current_alpha_phase - 0.03
+            )
+
+        self.current_alpha_local = 1.0 - self.current_alpha_phase
+
+        if self.current_alpha_phase != old_alpha:
+            print(f"  [PPL-Alpha] Adaptive α_phase: {old_alpha:.3f} → {self.current_alpha_phase:.3f} "
+                  f"(ablation EMA={self._ablation_pct_ema:+.2f}%)")
+            return True
+        return False
 
     def get_alphas(self) -> tuple:
         """Return current alpha values."""
@@ -601,13 +689,22 @@ class PPLAlphaCurriculum:
 
     def state_dict(self) -> dict:
         """Return state for checkpointing."""
-        return {
+        d = {
             "ppl_ema": self.ppl_ema,
             "current_alpha_phase": self.current_alpha_phase,
             "current_alpha_local": self.current_alpha_local,
             "transition_logged": self.transition_logged,
             "last_transition_ppl": self.last_transition_ppl,
         }
+        # Adaptive alpha state
+        if self.enable_adaptive_alpha:
+            d["adaptive_alpha"] = {
+                "ablation_pct_ema": self._ablation_pct_ema,
+                "ablation_seen": self._ablation_seen,
+                "curriculum_settled": self._curriculum_settled,
+                "settled_count": self._settled_count,
+            }
+        return d
 
     def load_state_dict(self, state: dict):
         """Restore state from checkpoint."""
@@ -616,6 +713,16 @@ class PPLAlphaCurriculum:
         self.current_alpha_local = state.get("current_alpha_local", 1.0 - self.alpha_high)
         self.transition_logged = state.get("transition_logged", False)
         self.last_transition_ppl = state.get("last_transition_ppl")
+        # Restore adaptive alpha state
+        aa = state.get("adaptive_alpha")
+        if aa and self.enable_adaptive_alpha:
+            self._ablation_pct_ema = aa.get("ablation_pct_ema", 0.0)
+            self._ablation_seen = aa.get("ablation_seen", 0)
+            self._curriculum_settled = aa.get("curriculum_settled", False)
+            self._settled_count = aa.get("settled_count", 0)
+            if self._curriculum_settled:
+                print(f"  [PPL-Alpha] Restored adaptive alpha state "
+                      f"(α={self.current_alpha_phase:.3f}, ablation EMA={self._ablation_pct_ema:+.2f}%)")
 
 
 class ResonanceStateScheduler:
