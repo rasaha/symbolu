@@ -8587,6 +8587,15 @@ class SlotMemoryGCT(nn.Module):
         self._L_sharp_weight_min = 0.01
         self._L_sharp_weight_max = 0.3
 
+        # (i) Adaptive write_lr (EMA interpolation coefficient for slot updates)
+        # Higher → slots update faster toward incoming content
+        # Lower → slots retain existing content longer
+        # Adapt based on retrieval loss trend: if retrieval is improving, slots
+        # are being written usefully → allow faster writes. If stagnating,
+        # slow down to preserve good content already stored.
+        self._write_lr_min = 0.05            # Floor: always some update
+        self._write_lr_max = 0.5             # Ceiling: never overwrite >50%
+
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
         # are in [-1, 1]. Scale=10 gives softmax logits in [-10, 10] — sharp
@@ -8669,7 +8678,7 @@ class SlotMemoryGCT(nn.Module):
         '_gate_target', '_gate_ceil_weight', '_wr_scale_max', '_L_bal_weight',
         '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
         '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
-        '_L_sharp_weight',
+        '_L_sharp_weight', 'write_lr',
     )
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
@@ -8686,6 +8695,7 @@ class SlotMemoryGCT(nn.Module):
         '_read_scale_max': 5.0,
         '_soft_detach_leak': 0.1,
         '_L_sharp_weight': 0.1,
+        'write_lr': 0.1,
     }
 
     def reset_constraints(self):
@@ -9254,7 +9264,7 @@ class SlotMemoryGCT(nn.Module):
     def update_constraint_relaxation(self, retr_loss: float, lm_loss: float = 0.0):
         """V10.29: Unified adaptive hyperparameter controller.
 
-        Manages 10 adaptive parameters based on slot health signals.
+        Manages 11 adaptive parameters based on slot health signals.
         All start conservative for fresh training, relax/tighten based
         on sustained symptoms detected over _constraint_relax_interval steps.
 
@@ -9453,6 +9463,30 @@ class SlotMemoryGCT(nn.Module):
             old = self._L_sharp_weight
             self._L_sharp_weight = min(self._L_sharp_weight_max, self._L_sharp_weight * 1.3)
             changes.append(f"L_sharp: {old:.3f}→{self._L_sharp_weight:.3f} (off target)")
+
+        # ── (11) Adaptive write_lr (EMA coefficient) ─────────────────────
+        # Retrieval loss improving → writes are useful → allow faster EMA
+        # Retrieval loss stagnating/worsening → slow down to preserve content
+        half = len(self._retr_loss_history) // 2
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if second_half < first_half * 0.90 and self.write_lr < self._write_lr_max:
+                # Retrieval improving (>10% drop) → writes are useful, speed up
+                old = self.write_lr
+                self.write_lr = min(self._write_lr_max, self.write_lr * 1.15)
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr improving)")
+            elif second_half > first_half * 1.05 and self.write_lr > self._write_lr_min:
+                # Retrieval worsening (>5% rise) → slow down writes
+                old = self.write_lr
+                self.write_lr = max(self._write_lr_min, self.write_lr * 0.85)
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr worsening)")
+        # Also: if gate is collapsed, lower write_lr to reduce churn
+        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr > self._write_lr_min:
+            old = self.write_lr
+            self.write_lr = max(self._write_lr_min, self.write_lr * 0.90)
+            if not any('write_lr' in c for c in changes):
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (gate collapsed)")
 
         # ── Log changes ───────────────────────────────────────────────────
         if changes:
