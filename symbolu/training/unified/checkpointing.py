@@ -291,8 +291,8 @@ def load_checkpoint(
                 optimizer.load_state_dict(checkpoint["optimizer"])
                 print(f"    \u2713 Optimizer state restored")
         except ValueError as e:
-            if "different number of parameter groups" in str(e):
-                print(f"    \u26a0 Optimizer param groups changed (e.g. new slot memory group): starting optimizer fresh")
+            if "parameter group" in str(e):
+                print(f"    \u26a0 Optimizer param groups changed (e.g. new slot params): starting optimizer fresh")
             else:
                 raise
 
