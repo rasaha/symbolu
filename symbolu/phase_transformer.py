@@ -9326,12 +9326,10 @@ class SlotMemoryGCT(nn.Module):
 
         # BUG 3 fix: Use window-averaged gate_mean
         avg_gate = sum(self._gate_mean_window) / max(len(self._gate_mean_window), 1)
-        wr_scale = torch.exp(self._write_log_scale).clamp(
-            min=1.5, max=self._wr_scale_max
-        ).item()
-        read_scale = torch.exp(
-            self._read_log_scale.clamp(min=math.log(1.0), max=math.log(self._read_scale_max))
-        ).item()
+        _raw_wr_scale = torch.exp(self._write_log_scale).item()
+        wr_scale = max(1.5, min(_raw_wr_scale, self._wr_scale_max))
+        _raw_rd_scale = torch.exp(self._read_log_scale).item()
+        read_scale = max(1.0, min(_raw_rd_scale, self._read_scale_max))
         per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
         # BUG 4 fix: Use window-averaged L_ortho
         avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
@@ -9352,10 +9350,12 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized)")
 
         # ── (2) Write scale max clamp ─────────────────────────────────────
-        if wr_scale >= self._wr_scale_max * 0.98 and self._wr_scale_max < self._wr_scale_max_limit:
+        # Use raw (unclamped) scale: only relax when the optimizer is actively
+        # pushing the parameter above the clamp, not just because init > clamp.
+        if _raw_wr_scale > self._wr_scale_max * 1.02 and self._wr_scale_max < self._wr_scale_max_limit:
             old = self._wr_scale_max
             self._wr_scale_max = min(self._wr_scale_max_limit, self._wr_scale_max + 0.5)
-            changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (pinned)")
+            changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (optimizer pushing)")
 
         # ── (3) Gate ceiling weight (only) ────────────────────────────────
         # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
@@ -9437,10 +9437,11 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (collapsing)")
 
         # ── (8) Read scale max clamp ──────────────────────────────────────
-        if read_scale >= self._read_scale_max * 0.98 and self._read_scale_max < self._read_scale_max_limit:
+        # Same fix as (2): use raw unclamped scale to detect genuine optimizer push.
+        if _raw_rd_scale > self._read_scale_max * 1.02 and self._read_scale_max < self._read_scale_max_limit:
             old = self._read_scale_max
             self._read_scale_max = min(self._read_scale_max_limit, self._read_scale_max + 1.0)
-            changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (pinned)")
+            changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
 
         # ── (9) Soft detach leak ──────────────────────────────────────────
         if avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
