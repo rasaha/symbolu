@@ -8749,6 +8749,12 @@ class SlotMemoryGCT(nn.Module):
                 setattr(self, key, val)
         if adaptive_vals:
             print(f"  [SLOTS] Restored {len(adaptive_vals)} adaptive params from checkpoint")
+        # V11.2b: Enforce current floor on loaded retr_weight
+        if self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_min:
+            old = self._adaptive_retr_loss_weight
+            self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
+            print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
+                  f"(clamped to new floor)")
         return result
 
     @property
