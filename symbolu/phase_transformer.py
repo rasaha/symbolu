@@ -7182,16 +7182,10 @@ class HybridPhaseTransformer(nn.Module):
                         # V10.14.6d: Mostly detach read output so LM loss cannot
                         # suppress read_output_proj. Retrieval loss trains
                         # read_output_proj independently.
-                        # V10.21: Leak 3% live gradient from LM loss into read path.
-                        # Full detach starved the read head: its only learning signal
-                        # was retrieval loss, causing read_H to plateau at ~3.7 (near
-                        # uniform over K=64). A small leak lets the LM loss teach
-                        # "reading from the right slot helps prediction" without the
-                        # early-training suppression that motivated full detach.
+                        # V11.5: Full gradient — no detach. Let LM loss fully
+                        # steer what the model does with slot reads.
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.15  # Was 0.03; raised to let LM loss teach read path
-                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                        x = x + _alpha * _slot_mixed
+                        x = x + _alpha * _slot_out
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7413,11 +7407,9 @@ class HybridPhaseTransformer(nn.Module):
                     # V11: Only read every global_read_interval layers
                     if (i % self.global_read_interval) == 0:
                         _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                        # V10.21: Gradient leak + warmstart (mirrors forward())
+                        # V11.5: Full gradient — no detach (mirrors forward())
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.15  # Was 0.03; raised to let LM loss teach read path
-                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                        x = x + _alpha * _slot_mixed
+                        x = x + _alpha * _slot_out
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
