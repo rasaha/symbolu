@@ -7284,6 +7284,11 @@ def main():
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
                        help="Slot param LR multiplier vs main LR (default: 0.1)")
+    # V11: Slot memory experiment — read interval and late-layer writes
+    parser.add_argument("--global_read_interval", type=int, default=1,
+                       help="Read slots every N layers (default: 1 = every layer)")
+    parser.add_argument("--global_write_start_layer", type=int, default=0,
+                       help="Only write to slots from this layer onward (default: 0)")
     # V10.22: Adaptive slot LR
     parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
                        help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
@@ -8759,6 +8764,9 @@ def main():
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
         slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
+        # V11: Slot memory experiment
+        global_read_interval=getattr(args, 'global_read_interval', 1),
+        global_write_start_layer=getattr(args, 'global_write_start_layer', 0),
         # V10.22: Adaptive slot LR
         enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),

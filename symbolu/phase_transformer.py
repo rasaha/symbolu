@@ -6748,6 +6748,9 @@ class HybridPhaseTransformer(nn.Module):
         # V10.14: Slot memory parameters (when global_update_mode="slots")
         slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
         retrieval_loss_weight: float = 0.1,  # Weight for auxiliary retrieval loss
+        # V11: Slot memory experiment — read interval and late-layer writes
+        global_read_interval: int = 1,  # Read slots every N layers (1 = every layer)
+        global_write_start_layer: int = 0,  # Only write to slots from this layer onward
     ):
         super().__init__()
 
@@ -6852,6 +6855,8 @@ class HybridPhaseTransformer(nn.Module):
         self.global_update_enabled = global_update_enabled
         self.global_update_mode = global_update_mode
         self.global_update_interval = global_update_interval
+        self.global_read_interval = global_read_interval
+        self.global_write_start_layer = global_write_start_layer
         # V10.14.1: Slot memory uses selective detach internally (detaches x
         # at write entry to protect backbone, keeps grad to slot params via
         # aux losses). The global_token_write_detach flag controls whether
@@ -7163,21 +7168,23 @@ class HybridPhaseTransformer(nn.Module):
             # =================================================================
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
-                    # V10.14: Read via SlotMemoryGCT (never modifies slot state)
-                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.14.6d: Mostly detach read output so LM loss cannot
-                    # suppress read_output_proj. Retrieval loss trains
-                    # read_output_proj independently.
-                    # V10.21: Leak 3% live gradient from LM loss into read path.
-                    # Full detach starved the read head: its only learning signal
-                    # was retrieval loss, causing read_H to plateau at ~3.7 (near
-                    # uniform over K=64). A small leak lets the LM loss teach
-                    # "reading from the right slot helps prediction" without the
-                    # early-training suppression that motivated full detach.
-                    _alpha = self.slot_memory.read_warmstart_alpha
-                    _leak = 0.03
-                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                    x = x + _alpha * _slot_mixed
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        # V10.14: Read via SlotMemoryGCT (never modifies slot state)
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V10.14.6d: Mostly detach read output so LM loss cannot
+                        # suppress read_output_proj. Retrieval loss trains
+                        # read_output_proj independently.
+                        # V10.21: Leak 3% live gradient from LM loss into read path.
+                        # Full detach starved the read head: its only learning signal
+                        # was retrieval loss, causing read_H to plateau at ~3.7 (near
+                        # uniform over K=64). A small leak lets the LM loss teach
+                        # "reading from the right slot helps prediction" without the
+                        # early-training suppression that motivated full detach.
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        _leak = 0.03
+                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                        x = x + _alpha * _slot_mixed
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7189,7 +7196,7 @@ class HybridPhaseTransformer(nn.Module):
             # V10.13/V10.14: GCT — Memory WRITE
             # =================================================================
             if self.global_tokens_enabled and self.global_update_enabled:
-                if (i % self.global_update_interval) == 0:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
                     if self.global_update_mode == "slots":
                         # V10.14.1: Competitive slot write — the ONLY way slots update
                         # Always pass detach=False for slots: write() uses x.detach()
@@ -7393,12 +7400,14 @@ class HybridPhaseTransformer(nn.Module):
             # V10.13/V10.14: GCT read/write (same logic as forward())
             if self.global_tokens_enabled:
                 if self.global_update_mode == "slots":
-                    _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                    # V10.21: Gradient leak + warmstart (mirrors forward())
-                    _alpha = self.slot_memory.read_warmstart_alpha
-                    _leak = 0.03
-                    _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                    x = x + _alpha * _slot_mixed
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V10.21: Gradient leak + warmstart (mirrors forward())
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        _leak = 0.03
+                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
+                        x = x + _alpha * _slot_mixed
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
@@ -7406,7 +7415,7 @@ class HybridPhaseTransformer(nn.Module):
                     x = x + _gct_out
 
             if self.global_tokens_enabled and self.global_update_enabled:
-                if (i % self.global_update_interval) == 0:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
                     if self.global_update_mode == "slots":
                         # V10.14.1: Always detach=False for slots (see comment above)
                         _slot_keys, _slot_vals = self.slot_memory.write(
@@ -7869,6 +7878,9 @@ class OntologicalHybridTransformer(nn.Module):
         global_update_mode: str = "pool",
         slots_write_lr: float = 0.1,
         retrieval_loss_weight: float = 0.1,
+        # V11: Slot memory experiment
+        global_read_interval: int = 1,
+        global_write_start_layer: int = 0,
     ):
         super().__init__()
 
@@ -7901,6 +7913,8 @@ class OntologicalHybridTransformer(nn.Module):
             global_update_mode=global_update_mode,
             slots_write_lr=slots_write_lr,
             retrieval_loss_weight=retrieval_loss_weight,
+            global_read_interval=global_read_interval,
+            global_write_start_layer=global_write_start_layer,
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]

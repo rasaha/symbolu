@@ -215,6 +215,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             global_update_mode=config.global_update_mode,
             slots_write_lr=config.slots_write_lr,
             retrieval_loss_weight=config.retrieval_loss_weight,
+            global_read_interval=config.global_read_interval,
+            global_write_start_layer=config.global_write_start_layer,
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
@@ -229,6 +231,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.global_tokens_enabled:
             print(f"  Global Tokens: ENABLED ({config.num_global_tokens} slots, mode={config.global_update_mode})")
             print(f"  Slot Write LR: {config.slots_write_lr}, Retrieval Loss Weight: {config.retrieval_loss_weight}")
+            if config.global_read_interval > 1:
+                print(f"  Slot Read Interval: every {config.global_read_interval} layers")
+            if config.global_write_start_layer > 0:
+                print(f"  Slot Write Start Layer: {config.global_write_start_layer}")
         # V10.2.1: Log chunking settings
         if config.enable_chunking:
             print(f"  Chunking: ENABLED (chunk_size={config.chunk_size})")
@@ -314,6 +320,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             global_update_mode=config.global_update_mode,
             slots_write_lr=config.slots_write_lr,
             retrieval_loss_weight=config.retrieval_loss_weight,
+            global_read_interval=config.global_read_interval,
+            global_write_start_layer=config.global_write_start_layer,
         )
         print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled (V11.0.0: Separated Planes)")
         print(f"    Full Sovereign State: {config.state_dim}D (diagnostics/control/learning)")
