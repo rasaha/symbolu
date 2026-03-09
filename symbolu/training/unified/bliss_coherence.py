@@ -423,24 +423,56 @@ class GradientVarianceTracker:
         self._prev_grads: Dict[str, torch.Tensor] = {}
         self._baseline_set = False
         self._step = 0
+        self._global_step = 0
         # V9.9.1: Rate-limit alerts per layer (only alert once per window_size steps)
-        self._last_alert_step: Dict[str, int] = {}
+        self._last_alert_internal: Dict[str, int] = {}  # Internal step for rate-limiting
+        self._last_alert_step: Dict[str, int] = {}  # Global step for cross-domain queries
         # V9.9.1: EMA factor for baseline updates (adapts to LR changes)
         # V10.15: Increased from 0.01 to 0.05 so baseline tracks LR warmup
         # faster, preventing false positive spike alerts during warmup phase
         self._baseline_ema_alpha = 0.05
 
+    def notify_lr_change(self, factor: float):
+        """Scale baselines when LR changes abruptly (e.g. LR boost).
+
+        Gradient norms scale ~linearly with LR, so variance scales ~factor².
+        Without this, a 1.5x LR boost causes every layer to exceed the spike
+        threshold and flood the log with false-positive alerts.
+        """
+        scale = factor ** 2
+        for name in self._baseline_variance:
+            self._baseline_variance[name] *= scale
+
+    def get_spike_count_since(self, since_step: int) -> int:
+        """Return number of unique params that spiked since given step.
+
+        Used by AdaptiveTrainingController to dampen future boosts when
+        previous boosts caused widespread gradient instability.
+        """
+        count = 0
+        for name, last_step in self._last_alert_step.items():
+            if last_step >= since_step:
+                count += 1
+        return count
+
     @torch.no_grad()
-    def record(self, model: torch.nn.Module) -> Dict[str, any]:
+    def record(self, model: torch.nn.Module, global_step: int = None) -> Dict[str, any]:
         """
         Record gradient statistics for one training step.
 
         Call AFTER backward(), BEFORE optimizer.step().
 
+        Args:
+            model: The model whose gradients to track.
+            global_step: If provided, used for spike timestamps (supports
+                         resume where global_step != internal step count).
+                         Falls back to internal counter if not provided.
+
         Returns:
             Dict with gradient health metrics and any spike alerts.
         """
         self._step += 1
+        self._global_step = global_step if global_step is not None else self._step
         results = {'step': self._step, 'alerts': []}
 
         total_norm = 0.0
@@ -491,9 +523,12 @@ class GradientVarianceTracker:
 
                 if variance > self.variance_spike_factor * baseline:
                     # V9.9.1: Rate-limit alerts — at most once per window_size steps per layer
-                    last_alert = self._last_alert_step.get(name, -self.window_size)
-                    if self._step - last_alert >= self.window_size:
-                        self._last_alert_step[name] = self._step
+                    # Use internal _step for rate-limiting (monotonic), but store
+                    # _global_step in _last_alert_step for cross-domain queries
+                    last_alert_internal = self._last_alert_internal.get(name, -self.window_size)
+                    if self._step - last_alert_internal >= self.window_size:
+                        self._last_alert_internal[name] = self._step
+                        self._last_alert_step[name] = self._global_step
                         alert = (
                             f"Gradient variance spike: {name} "
                             f"var={variance:.6f} vs baseline={baseline:.6f} "

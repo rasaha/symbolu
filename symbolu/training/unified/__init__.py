@@ -112,6 +112,7 @@ from symbolu.training.unified.training_state import (
 from symbolu.training.unified.phase_controllers import (
     SovereignPhaseController,
     AdaptiveTrainingController,
+    AdaptiveSlotLRController,
 )
 
 # --- scheduling ---
@@ -147,6 +148,7 @@ from symbolu.training.unified.evaluation import (
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    run_factual_eval,
     ReadinessIndex,
 )
 
@@ -246,6 +248,7 @@ __all__ = [
     # phase_controllers
     "SovereignPhaseController",
     "AdaptiveTrainingController",
+    "AdaptiveSlotLRController",
     # scheduling
     "DynamicWindowScheduler",
     "AdaptiveWarmupScheduler",
@@ -269,6 +272,7 @@ __all__ = [
     "generate_sample",
     "compute_sample_metrics",
     "run_quality_samples",
+    "run_factual_eval",
     "ReadinessIndex",
     # losses
     "compute_ontological_loss",

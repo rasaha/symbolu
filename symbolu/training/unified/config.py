@@ -153,6 +153,15 @@ class UnifiedTrainingConfig:
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
     slots_write_lr: float = 0.1  # EMA learning rate for slot writes
     retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
+    slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
+
+    # V10.22: Adaptive slot LR — dynamically adjusts slot_memory_lr_scale
+    # based on retrieval loss velocity, slot ablation delta, and write gate health
+    enable_adaptive_slot_lr: bool = False
+    slot_lr_scale_min: float = 0.1   # Floor for adaptive slot LR scale
+    slot_lr_scale_max: float = 0.5   # Ceiling for adaptive slot LR scale
+    slot_lr_boost_factor: float = 1.5  # Multiply scale by this when boosting
+    slot_lr_decay_factor: float = 0.7  # Multiply scale by this when decaying
 
     # ==========================================================================
     # PHASE-FIRST CURRICULUM (unified inverse curriculum for phase attention)
@@ -691,6 +700,10 @@ class UnifiedTrainingConfig:
     adaptive_grad_norm_spike: float = 100.0  # Gradient norm above this triggers decay
     adaptive_emergency_decay: float = 0.5    # Aggressive decay factor for emergencies
     adaptive_consecutive_spike_limit: int = 3  # After N consecutive spikes, halt boosts
+    # V10.23: Spike-aware boost dampening
+    adaptive_max_boost_from_base: float = 2.0   # Max LR = base_lr * this (cap compounding boosts)
+    adaptive_spike_dampen_threshold: int = 10   # If >=N params spiked after last boost, dampen next
+    adaptive_boost_cooldown_steps: int = 400    # Min steps between consecutive boosts
 
     # Auto Batch Sizing (VRAM-based startup probing)
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup

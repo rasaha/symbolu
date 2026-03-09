@@ -5059,6 +5059,10 @@ class AdaptiveTrainingController:
         grad_norm_spike_threshold: float = 100.0,  # Gradient norm above this triggers decay
         emergency_decay_factor: float = 0.5,     # Aggressive decay for emergencies
         consecutive_spike_limit: int = 3,        # After N consecutive spikes, halt boosts
+        # V10.23: Spike-aware boost dampening
+        max_boost_from_base: float = 2.0,         # Max LR = base_lr * this (cap compounding)
+        spike_dampen_threshold: int = 10,          # If >=N params spiked after last boost, dampen next
+        boost_cooldown_steps: int = 400,           # Min steps between boosts
     ):
         self.optimizer = optimizer
         self.base_lr = base_lr
@@ -5108,17 +5112,29 @@ class AdaptiveTrainingController:
         self.consecutive_spikes = 0  # V9.8.2: Track consecutive loss spikes
         self.boost_blocked = False  # V9.8.2: Block boosts after too many spikes
 
+        # V10.23: Spike-aware boost dampening
+        self._grad_variance_tracker = None  # Set via set_grad_variance_tracker()
+        self._last_boost_step = 0  # Step of last LR boost
+        self._max_boost_from_base: float = max_boost_from_base
+        self._spike_dampen_threshold: int = spike_dampen_threshold
+        self._boost_cooldown_steps: int = boost_cooldown_steps
+
         print(f"\n  [AdaptiveTraining] Controller initialized:")
         print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {self.lr_max:.2e})")
         print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
         print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
+        print(f"    V10.23: Boost cap={max_boost_from_base}x base, spike_dampen>={spike_dampen_threshold} params, cooldown={boost_cooldown_steps} steps")
         print(f"    V9.9.1: Scheduler-aware LR adjustments ENABLED")
 
     def set_scheduler(self, scheduler):
         """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
         self._scheduler = scheduler
         print(f"    Plateau detection: {self.plateau_window} evals, {self.plateau_threshold}% threshold")
+
+    def set_grad_variance_tracker(self, tracker):
+        """V10.23: Link to gradient variance tracker for spike-aware boost dampening."""
+        self._grad_variance_tracker = tracker
 
     def _compute_velocity(self) -> float:
         """Compute PPL velocity (% change per eval)."""
@@ -5290,19 +5306,43 @@ class AdaptiveTrainingController:
                     print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST SKIPPED ({reason}) - cosine schedule below floor, boost would be futile")
                     self._floor_boost_skip_logged = True
             else:
-                # Only boost if we're not already at max
-                new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
-                if new_lr != current_lr and new_lr > current_lr:
-                    for pg in self.optimizer.param_groups:
-                        pg['lr'] = new_lr
-                    # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
-                    if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
-                        self._scheduler.adjust_base_lr(new_lr)
-                    self.boost_count += 1
+                # V10.23: Cooldown — don't boost if too soon after last boost
+                steps_since_boost = global_step - self._last_boost_step
+                if self._last_boost_step > 0 and steps_since_boost < self._boost_cooldown_steps:
                     reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
-                    adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
-                    print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
-                    self.last_adjustment_step = global_step
+                    print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST COOLDOWN ({reason}) - {steps_since_boost}/{self._boost_cooldown_steps} steps since last boost")
+                else:
+                    # V10.23: Compute effective boost factor with spike dampening
+                    effective_boost = self.lr_boost_factor
+
+                    # Check if previous boost caused widespread spikes
+                    if self._grad_variance_tracker is not None and self._last_boost_step > 0:
+                        spike_count = self._grad_variance_tracker.get_spike_count_since(self._last_boost_step)
+                        if spike_count >= self._spike_dampen_threshold:
+                            # Linear dampening: threshold(10)→0.75x, 2x threshold(20)→0.5x, 4x threshold(40)→no boost
+                            dampen = max(0.0, 1.0 - spike_count / (self._spike_dampen_threshold * 4))
+                            effective_boost = 1.0 + (self.lr_boost_factor - 1.0) * dampen
+                            print(f"\n  🛡️  [AdaptiveTraining] BOOST DAMPENED: {spike_count} params spiked after last boost → factor {self.lr_boost_factor:.2f} → {effective_boost:.3f}")
+
+                    # V10.23: Hard cap — never exceed max_boost_from_base * base_lr
+                    hard_cap = self.base_lr * self._max_boost_from_base
+                    new_lr = min(self.lr_max, hard_cap, current_lr * effective_boost)
+
+                    if new_lr > current_lr:
+                        for pg in self.optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                        if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                            self._scheduler.adjust_base_lr(new_lr)
+                        self.boost_count += 1
+                        self._last_boost_step = global_step
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                        print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                        self.last_adjustment_step = global_step
+                    elif new_lr <= current_lr:
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST CAPPED ({reason}) - already at {current_lr:.2e} (cap: {hard_cap:.2e})")
         elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
             # Log that boost was blocked
             reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
@@ -9057,6 +9097,10 @@ class UnifiedTrainingConfig:
     adaptive_grad_norm_spike: float = 100.0  # Gradient norm above this triggers decay
     adaptive_emergency_decay: float = 0.5    # Aggressive decay factor for emergencies
     adaptive_consecutive_spike_limit: int = 3  # After N consecutive spikes, halt boosts
+    # V10.23: Spike-aware boost dampening
+    adaptive_max_boost_from_base: float = 2.0   # Max LR = base_lr * this (cap compounding boosts)
+    adaptive_spike_dampen_threshold: int = 10   # If >=N params spiked after last boost, dampen next
+    adaptive_boost_cooldown_steps: int = 400    # Min steps between consecutive boosts
 
     # Auto Batch Sizing (VRAM-based startup probing)
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
@@ -12469,16 +12513,23 @@ def train(config: UnifiedTrainingConfig):
     _slot_memory_lr_scale = 0.1
     _slot_param_ids = set()
     _slot_params = []
+    _slot_no_wd_params = []  # V10.27: Params that receive zero gradient (exclude from WD)
     _main_params = []
     if hasattr(model, 'slot_memory') and model.slot_memory is not None:
-        for p in model.slot_memory.parameters():
+        _sm = model.slot_memory
+        # V10.27: slot_keys_init receives zero gradient (all uses detach slot_keys).
+        _no_wd_names = {'slot_keys_init'}
+        for name, p in _sm.named_parameters():
             _slot_param_ids.add(id(p))
-            _slot_params.append(p)
+            if name in _no_wd_names:
+                _slot_no_wd_params.append(p)
+            else:
+                _slot_params.append(p)
         for p in model.parameters():
             if id(p) not in _slot_param_ids:
                 _main_params.append(p)
-        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
-              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
+              f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
     else:
         _main_params = list(model.parameters())
 
@@ -12490,6 +12541,12 @@ def train(config: UnifiedTrainingConfig):
         _param_groups.append({
             'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
             'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+    if _slot_no_wd_params:
+        # V10.27: slot_keys_init gets zero gradient from all losses — exclude from WD
+        _param_groups.append({
+            'params': _slot_no_wd_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': 0.0, 'betas': (config.beta1, config.beta2),
         })
 
     if config.use_8bit_optimizer:
@@ -12719,9 +12776,15 @@ def train(config: UnifiedTrainingConfig):
             grad_norm_spike_threshold=config.adaptive_grad_norm_spike,
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
+            # V10.23: Spike-aware boost dampening
+            max_boost_from_base=config.adaptive_max_boost_from_base,
+            spike_dampen_threshold=config.adaptive_spike_dampen_threshold,
+            boost_cooldown_steps=config.adaptive_boost_cooldown_steps,
         )
         # V9.9.1: Link scheduler to controller so LR boosts/decays persist
         adaptive_controller.set_scheduler(scheduler)
+        # V10.23: Link gradient variance tracker for spike-aware boost dampening
+        # (only available when gradient tracker is initialized in modular train.py)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
@@ -13416,8 +13479,11 @@ def train(config: UnifiedTrainingConfig):
                     metrics['slot_sharpness_loss'] = _sharp_loss.item()
                     if _retr_loss.item() > 0:
                         loss = loss + model.retrieval_loss_weight * _retr_loss
-                        metrics['retrieval_loss'] = _retr_loss.item()
+                        _retr_val = _retr_loss.item()
+                        metrics['retrieval_loss'] = _retr_val
                         metrics['retrieval_weight'] = model.retrieval_loss_weight
+                        # V10.27: Feed retr_loss to adaptive gate ceiling
+                        model.slot_memory.update_write_gate_target(_retr_val)
                     # Expose slot diagnostics
                     if model.slot_memory._diag_write_gate_mean is not None:
                         metrics['slot_write_gate'] = model.slot_memory._diag_write_gate_mean
@@ -13427,6 +13493,8 @@ def train(config: UnifiedTrainingConfig):
                         metrics['slot_read_entropy'] = model.slot_memory._diag_read_attn_entropy
                     if hasattr(model.slot_memory, '_diag_marginal_entropy'):
                         metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
+                    if hasattr(model.slot_memory, '_gate_target'):
+                        metrics['slot_gate_ceil'] = model.slot_memory._gate_target
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -16660,6 +16728,13 @@ def main():
                        help="Aggressive LR decay factor for emergencies")
     parser.add_argument("--adaptive_consecutive_spike_limit", type=int, default=3,
                        help="After N consecutive loss spikes, block LR boosts")
+    # V10.23: Spike-aware boost dampening
+    parser.add_argument("--adaptive_max_boost_from_base", type=float, default=2.0,
+                       help="Max LR as multiple of base_lr (caps compounding boosts)")
+    parser.add_argument("--adaptive_spike_dampen_threshold", type=int, default=10,
+                       help="If >=N params spiked after last boost, dampen next boost")
+    parser.add_argument("--adaptive_boost_cooldown_steps", type=int, default=400,
+                       help="Min steps between consecutive LR boosts")
 
     # Auto Batch Sizing (VRAM-based startup probing)
     parser.add_argument("--enable_auto_batch", action="store_true",
@@ -17248,6 +17323,10 @@ def main():
         adaptive_grad_norm_spike=args.adaptive_grad_norm_spike,
         adaptive_emergency_decay=args.adaptive_emergency_decay,
         adaptive_consecutive_spike_limit=args.adaptive_consecutive_spike_limit,
+        # V10.23: Spike-aware boost dampening
+        adaptive_max_boost_from_base=args.adaptive_max_boost_from_base,
+        adaptive_spike_dampen_threshold=args.adaptive_spike_dampen_threshold,
+        adaptive_boost_cooldown_steps=args.adaptive_boost_cooldown_steps,
         # Auto Batch Sizing
         enable_auto_batch=args.enable_auto_batch,
         auto_batch_target_utilization=args.auto_batch_target_utilization,

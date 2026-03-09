@@ -1157,3 +1157,87 @@ class ReadinessIndex:
         return self.consecutive_stable_count, self.required_consecutive_stable
 
 
+# ==========================================================================
+# V11.x: FACTUAL EVALUATION (knowledge probes)
+# ==========================================================================
+
+# Each entry: (prompt, list_of_acceptable_answers, category)
+# Answers are checked as case-insensitive substrings of the generated text.
+FACTUAL_EVAL_PROMPTS = [
+    # Basic facts
+    ("The capital of France is", ["paris"], "fact"),
+    ("The chemical symbol for water is", ["h2o"], "fact"),
+    ("The speed of light is approximately", ["300", "3 ×", "3×", "3x10", "186,000"], "fact"),
+    # Arithmetic
+    ("2 + 2 =", ["4"], "arithmetic"),
+    ("The square root of 144 is", ["12"], "arithmetic"),
+    ("If x = 5, then 3x + 1 =", ["16"], "arithmetic"),
+    # Logical completion
+    ("The opposite of hot is", ["cold"], "logic"),
+    ("An animal that barks is a", ["dog"], "logic"),
+    # Factual continuation
+    ("The Earth orbits around the", ["sun"], "fact"),
+    ("There are 365 days in a", ["year"], "fact"),
+]
+
+
+def run_factual_eval(
+    model: nn.Module,
+    tokenizer,
+    device: torch.device,
+    step: int,
+    amp_dtype=None,
+) -> Dict[str, float]:
+    """
+    Run factual evaluation with ground-truth answer checking.
+
+    Uses near-greedy decoding (temperature=0.01) for deterministic evaluation
+    of factual knowledge. Returns accuracy scores by category.
+    """
+    correct_by_cat: Dict[str, int] = {}
+    total_by_cat: Dict[str, int] = {}
+    correct_total = 0
+
+    print(f"  📋 FACTUAL EVAL (Step {step})")
+
+    for prompt, expected_answers, category in FACTUAL_EVAL_PROMPTS:
+        total_by_cat[category] = total_by_cat.get(category, 0) + 1
+        try:
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=32,
+                temperature=0.01,
+                top_p=1.0,
+                top_k=0,
+                repetition_penalty=1.0,
+                no_repeat_ngram_size=0,
+                autocast_dtype=amp_dtype,
+            )
+            gen_lower = generated.lower()
+            hit = any(ans.lower() in gen_lower for ans in expected_answers)
+            if hit:
+                correct_by_cat[category] = correct_by_cat.get(category, 0) + 1
+                correct_total += 1
+            mark = "✓" if hit else "✗"
+            gen_short = generated.strip().replace('\n', ' ')[:80]
+            print(f"     {mark} [{category}] \"{prompt}\" → \"{gen_short}\"")
+        except Exception as e:
+            print(f"     ✗ [{category}] \"{prompt}\" → ERROR: {e}")
+
+    total = len(FACTUAL_EVAL_PROMPTS)
+    overall_acc = correct_total / total if total > 0 else 0.0
+    cat_summary = []
+    for cat in sorted(total_by_cat.keys()):
+        c = correct_by_cat.get(cat, 0)
+        t = total_by_cat[cat]
+        cat_summary.append(f"{cat}={c}/{t}")
+    print(f"  📊 Factual Accuracy: {correct_total}/{total} ({overall_acc*100:.0f}%) | {', '.join(cat_summary)}")
+    print("")
+
+    return {
+        'factual_accuracy': overall_acc,
+        'factual_correct': correct_total,
+        'factual_total': total,
+    }
+
+

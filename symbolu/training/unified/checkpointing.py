@@ -281,14 +281,20 @@ def load_checkpoint(
 
     # Restore optimizer state
     if optimizer is not None:
-        if use_split and optim_path.exists():
-            optim_state = torch.load(optim_path, map_location=device, weights_only=False)
-            optimizer.load_state_dict(optim_state)
-            del optim_state  # Free memory immediately
-            print(f"    \u2713 Optimizer state restored (from split file)")
-        elif "optimizer" in checkpoint:
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            print(f"    \u2713 Optimizer state restored")
+        try:
+            if use_split and optim_path.exists():
+                optim_state = torch.load(optim_path, map_location=device, weights_only=False)
+                optimizer.load_state_dict(optim_state)
+                del optim_state  # Free memory immediately
+                print(f"    \u2713 Optimizer state restored (from split file)")
+            elif "optimizer" in checkpoint:
+                optimizer.load_state_dict(checkpoint["optimizer"])
+                print(f"    \u2713 Optimizer state restored")
+        except ValueError as e:
+            if "different number of parameter groups" in str(e):
+                print(f"    \u26a0 Optimizer param groups changed (e.g. new slot memory group): starting optimizer fresh")
+            else:
+                raise
 
     # Restore scheduler state
     if scheduler is not None and "scheduler" in checkpoint:

@@ -412,6 +412,7 @@ from symbolu.training.unified import (
     # phase_controllers
     SovereignPhaseController,
     AdaptiveTrainingController,
+    AdaptiveSlotLRController,
     # scheduling
     DynamicWindowScheduler,
     AdaptiveWarmupScheduler,
@@ -432,6 +433,7 @@ from symbolu.training.unified import (
     generate_sample,
     compute_sample_metrics,
     run_quality_samples,
+    run_factual_eval,
     LRAValidator,
     run_phase_rotation_test,
     print_phase_rotation_results,
@@ -1349,21 +1351,29 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
-    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
-    # gradient variance explosions from cosine-similarity key matching
-    _slot_memory_lr_scale = 0.1
+    # V10.15: Separate param groups for slot memory (configurable LR scale)
+    # to prevent gradient variance explosions from cosine-similarity key matching
+    _slot_memory_lr_scale = config.slot_memory_lr_scale
     _slot_param_ids = set()
     _slot_params = []
+    _slot_no_wd_params = []  # V10.27: Params that receive zero gradient (exclude from WD)
     _main_params = []
     if hasattr(model, 'slot_memory') and model.slot_memory is not None:
-        for p in model.slot_memory.parameters():
+        _sm = model.slot_memory
+        # V10.27: slot_keys_init receives zero gradient (all uses detach slot_keys).
+        # Weight decay on a zero-grad param just shrinks it pointlessly.
+        _no_wd_names = {'slot_keys_init'}
+        for name, p in _sm.named_parameters():
             _slot_param_ids.add(id(p))
-            _slot_params.append(p)
+            if name in _no_wd_names:
+                _slot_no_wd_params.append(p)
+            else:
+                _slot_params.append(p)
         for p in model.parameters():
             if id(p) not in _slot_param_ids:
                 _main_params.append(p)
-        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params, "
-              f"LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
+              f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
     else:
         _main_params = list(model.parameters())
 
@@ -1375,6 +1385,14 @@ def train(config: UnifiedTrainingConfig):
         _param_groups.append({
             'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
             'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+    if _slot_no_wd_params:
+        # V10.27: slot_keys_init gets zero gradient from all losses (every use
+        # detaches slot_keys). Weight decay on a zero-grad param only shrinks
+        # its magnitude, which is harmless (write path renormalizes) but wasteful.
+        _param_groups.append({
+            'params': _slot_no_wd_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': 0.0, 'betas': (config.beta1, config.beta2),
         })
 
     if config.use_8bit_optimizer:
@@ -1639,9 +1657,16 @@ def train(config: UnifiedTrainingConfig):
             grad_norm_spike_threshold=config.adaptive_grad_norm_spike,
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
+            # V10.23: Spike-aware boost dampening
+            max_boost_from_base=config.adaptive_max_boost_from_base,
+            spike_dampen_threshold=config.adaptive_spike_dampen_threshold,
+            boost_cooldown_steps=config.adaptive_boost_cooldown_steps,
         )
         # V9.9.1: Link scheduler to controller so LR boosts/decays persist
         adaptive_controller.set_scheduler(scheduler)
+        # V10.23: Link gradient variance tracker for spike-aware boost dampening
+        if gradient_variance_tracker is not None:
+            adaptive_controller.set_grad_variance_tracker(gradient_variance_tracker)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
@@ -1655,6 +1680,20 @@ def train(config: UnifiedTrainingConfig):
                     pg['lr'] = max_allowed
                 adaptive_controller.emergency_count += 1
                 adaptive_controller.boost_blocked = True
+
+    # V10.22: Adaptive Slot LR Controller
+    adaptive_slot_lr = None
+    if config.enable_adaptive_slot_lr and _slot_params:
+        adaptive_slot_lr = AdaptiveSlotLRController(
+            optimizer=optimizer,
+            initial_scale=config.slot_memory_lr_scale,
+            scale_min=config.slot_lr_scale_min,
+            scale_max=config.slot_lr_scale_max,
+            boost_factor=config.slot_lr_boost_factor,
+            decay_factor=config.slot_lr_decay_factor,
+        )
+        print(f"  [V10.22] Adaptive Slot LR: ENABLED "
+              f"(scale={config.slot_memory_lr_scale} → [{config.slot_lr_scale_min}, {config.slot_lr_scale_max}])")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -2664,6 +2703,47 @@ def train(config: UnifiedTrainingConfig):
                     if device.type == 'cuda':
                         _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
+                    # V10.14.10: Build aux_loss_fn for slot retrieval loss in TBPTT
+                    _tbptt_aux_loss_fn = None
+                    if config.global_tokens_enabled and config.global_update_mode == "slots":
+                        _tbptt_sm = getattr(model, 'slot_memory', None)
+                        if _tbptt_sm is None:
+                            _tbptt_inner = getattr(model, 'hybrid', model)
+                            _tbptt_sm = getattr(_tbptt_inner, 'slot_memory', None)
+                        _tbptt_lm_head = getattr(model, 'lm_head', None)
+                        if _tbptt_lm_head is None:
+                            _tbptt_inner = getattr(model, 'hybrid', model)
+                            _tbptt_lm_head = getattr(_tbptt_inner, 'lm_head', None)
+                        if _tbptt_sm is not None and _tbptt_lm_head is not None:
+                            def _tbptt_aux_loss_fn(result_dict, chunk_targets,
+                                                   _sm=_tbptt_sm, _lm=_tbptt_lm_head,
+                                                   _cfg=config):
+                                _sk = result_dict.get('_slot_keys')
+                                _sv = result_dict.get('_slot_vals')
+                                _sh = result_dict.get('_slot_hidden')
+                                if _sk is None or _sv is None or _sh is None:
+                                    return None
+                                # Router loss
+                                _aux = _sm.compute_sharpness_loss()
+                                # Query mask: positions beyond local window
+                                _valid = (chunk_targets != -100)
+                                _B, _N = chunk_targets.shape
+                                _win = getattr(_cfg, 'window_size', 0)
+                                if _win > 0 and _N > _win:
+                                    _pos_mask = torch.zeros(_B, _N, dtype=torch.bool,
+                                                            device=chunk_targets.device)
+                                    _pos_mask[:, _win:] = True
+                                    _qmask = _valid & _pos_mask
+                                else:
+                                    _qmask = _valid
+                                _retr = _sm.compute_retrieval_loss(
+                                    x=_sh, slot_keys=_sk, slot_vals=_sv,
+                                    query_mask=_qmask, target_ids=chunk_targets,
+                                    lm_head=_lm,
+                                )
+                                _sm._router_step += 1
+                                return _aux + _cfg.retrieval_loss_weight * _retr
+
                     tbptt_result = forward_chunked_tbptt(
                         model=model,
                         input_ids=x,
@@ -2674,6 +2754,7 @@ def train(config: UnifiedTrainingConfig):
                         grad_scaler=scaler,
                         autocast_dtype=autocast_dtype if config.mixed_precision != "none" else None,
                         gradient_accumulation=config.gradient_accumulation,
+                        aux_loss_fn=_tbptt_aux_loss_fn,
                     )
                     # Create synthetic outputs/loss for downstream logging
                     loss = torch.tensor(tbptt_result['total_loss'], device=device)
@@ -4340,6 +4421,8 @@ def train(config: UnifiedTrainingConfig):
             # V10.14: Slot memory auxiliary losses (retrieval + router balancing)
             if config.global_tokens_enabled and config.global_update_mode == "slots":
                 _out_dict = outputs if isinstance(outputs, dict) else {}
+                # V10.29: Capture LM loss before aux losses for adaptive ratio tracking
+                _lm_loss_val = loss.item() if isinstance(loss, torch.Tensor) else float(loss)
                 # Get slot_memory from model (handles OntologicalHybrid wrapper)
                 _sm = getattr(model, 'slot_memory', None)
                 if _sm is None:
@@ -4358,6 +4441,13 @@ def train(config: UnifiedTrainingConfig):
                     _sv = _out_dict.get('_slot_vals')
                     _sh = _out_dict.get('_slot_hidden')
                     _retr_loss_val = 0.0
+                    # V10.14.10: Warn on first occurrence when slot tensors are missing
+                    if (_sk is None or _sv is None or _sh is None) and global_step <= 1:
+                        _missing = [k for k, v in [('_slot_keys', _sk), ('_slot_vals', _sv),
+                                                    ('_slot_hidden', _sh)] if v is None]
+                        print(f"  [SLOTS WARNING] Slot memory enabled but forward output "
+                              f"missing: {_missing}. Retrieval loss will be 0 — "
+                              f"slots receive no auxiliary learning signal!")
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
                         # V10.16.1: Use explicit query_mask from batch if available
                         # (e.g. AssociativeRecallDataset provides True only at answer positions).
@@ -4389,13 +4479,21 @@ def train(config: UnifiedTrainingConfig):
                             target_ids=y,
                             lm_head=_lm_head,
                         )
-                        loss = loss + config.retrieval_loss_weight * _retr_loss
+                        # V10.29.1: Use adaptive retrieval loss weight (replaces
+                        # config weight when adaptive is active, not compounded).
+                        _adaptive_rw = getattr(_sm, '_adaptive_retr_loss_weight', None)
+                        _effective_retr_weight = _adaptive_rw if _adaptive_rw is not None else config.retrieval_loss_weight
+                        loss = loss + _effective_retr_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
+                        # V10.27: Feed retr_loss to adaptive gate ceiling
+                        _sm.update_write_gate_target(_retr_loss_val)
+                        # V10.29: Unified adaptive constraint relaxation (passes lm_loss)
+                        _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
                     # Step the router noise counter
                     _sm._router_step += 1
                     # Log slot diagnostics periodically (only on last accumulation step)
                     if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
-                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(max=math.log(8.0))))
+                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(min=math.log(1.5), max=math.log(getattr(_sm, '_wr_scale_max', 2.0)))))
                         _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
                         print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
                               f"qmask={_mask_frac:.4f} "
@@ -4404,7 +4502,16 @@ def train(config: UnifiedTrainingConfig):
                               f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "
                               f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
-                              f"wr_scale={_wr_scale:.1f}")
+                              f"wr_scale={_wr_scale:.1f} "
+                              f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f} "
+                              f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f} "
+                              f"retr_w={getattr(_sm, '_adaptive_retr_loss_weight', 1.0):.2f} "
+                              f"gate_floor={getattr(_sm, '_novelty_gate_floor', 0.15):.2f} "
+                              f"leak={getattr(_sm, '_soft_detach_leak', 0.1):.2f}")
+                        # V10.22: Feed signals to adaptive slot LR controller
+                        if adaptive_slot_lr is not None:
+                            adaptive_slot_lr.record_retr_loss(_retr_loss_val)
+                            adaptive_slot_lr.record_write_gate(getattr(_sm, '_diag_write_gate_mean', 0))
 
             # =====================================================================
             # CONSCIOUS GENERATION Phase 1+2: Token Ontology Cache + L_ont Loss
@@ -4784,7 +4891,7 @@ def train(config: UnifiedTrainingConfig):
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
             if gradient_variance_tracker is not None:
-                grad_health = gradient_variance_tracker.record(model)
+                grad_health = gradient_variance_tracker.record(model, global_step=global_step)
                 metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
                 if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
                     for alert in grad_health['alerts']:
@@ -4925,6 +5032,10 @@ def train(config: UnifiedTrainingConfig):
             # Only enforce after warmup to not interfere with warmup ramp
             if adaptive_controller is not None and warmup_complete:
                 adaptive_controller.enforce_lr_bounds(global_step)
+
+            # V10.22: Sync slot LR ratio after any global LR change
+            if adaptive_slot_lr is not None:
+                adaptive_slot_lr.sync_slot_lr()
 
             # Update alpha schedule for phase/hybrid models
             # V9.9.8: Skip global alpha schedule when per-layer phase weights are enabled
@@ -5072,17 +5183,14 @@ def train(config: UnifiedTrainingConfig):
                         if config.enable_sovereign_phase_controller:
                             log_msg = f"  {icon} [SPC] {status_str} | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
                         else:
-                            # When disabled, show what WOULD happen
-                            if spc_result['would_trigger']:
-                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] WOULD TRIGGER | Level:{spc_result['level'].upper()} | Force:{spc_result['steering_force']:.2f}"
-                            else:
-                                log_msg = f"  {icon} [SPC-DIAGNOSTIC] Level:{spc_result['level'].upper()}"
+                            # SPC disabled — skip diagnostic noise
+                            log_msg = None
 
-                        if spc_result['rotations']:
-                            rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
-                            log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
-
-                        print(log_msg)
+                        if log_msg is not None:
+                            if spc_result['rotations']:
+                                rotation_strs = [f"{k}:{v:.2f}rad" for k, v in list(spc_result['rotations'].items())[:3]]
+                                log_msg += f" | Rotations:[{','.join(rotation_strs)}]"
+                            print(log_msg)
 
                 # SGP Metabolic Step: Inject persisted gradients to Authority layers
                 pulse_applied = sgp_controller.sgp_metabolic_step({
@@ -5729,8 +5837,9 @@ def train(config: UnifiedTrainingConfig):
                         _val_ppl_no_improve_count = 0  # Reset for next patience window
 
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
-                # Runs during evaluation intervals to monitor behavioral stability
-                if config.model_type in ('phase', 'hybrid', 'ontological_hybrid'):
+                # Runs at --phase_health_interval (default 500) to reduce log noise
+                _ph_interval = getattr(config, 'phase_health_interval', 500)
+                if config.model_type in ('phase', 'hybrid', 'ontological_hybrid') and global_step % _ph_interval == 0:
                     try:
                         enable_health_diagnostics_capture(model, True)
                         # Run a single forward pass to capture phase tensors
@@ -6665,6 +6774,18 @@ def train(config: UnifiedTrainingConfig):
                         # Already logged by the controller
                         pass
 
+                    # Notify gradient variance tracker of LR changes to prevent
+                    # false-positive spike alerts (variance scales ~factor²)
+                    if gradient_variance_tracker is not None and adaptive_adjustments.get("actions"):
+                        for action in adaptive_adjustments["actions"]:
+                            if action.startswith("LR_BOOST"):
+                                gradient_variance_tracker.notify_lr_change(config.adaptive_lr_boost)
+                            elif action.startswith("LR_DECAY"):
+                                gradient_variance_tracker.notify_lr_change(config.adaptive_lr_decay)
+                    # V10.22: Sync slot LR after adaptive controller may have changed main LR
+                    if adaptive_slot_lr is not None:
+                        adaptive_slot_lr.sync_slot_lr()
+
                     # TensorBoard logging for adaptive controller
                     if tb_writer is not None:
                         telemetry = adaptive_controller.get_telemetry()
@@ -6711,6 +6832,9 @@ def train(config: UnifiedTrainingConfig):
                 # Log Adaptive Training Controller status
                 if adaptive_controller is not None and len(adaptive_controller.val_ppl_history) >= 2:
                     print(f"  --> {adaptive_controller.get_status_string()}")
+                if adaptive_slot_lr is not None:
+                    adaptive_slot_lr.update(global_step)
+                    print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -6783,6 +6907,10 @@ def train(config: UnifiedTrainingConfig):
                           f"Without: {_no_slot_ppl:.2f} | "
                           f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
                           f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                    # V10.22: Feed ablation delta and trigger adaptive slot LR update
+                    if adaptive_slot_lr is not None:
+                        adaptive_slot_lr.record_ablation_delta(_slot_delta)
+                        _slot_lr_actions = adaptive_slot_lr.update(global_step)
                     # Restore
                     _sm._read_warmstart_center = _orig_center
                     _sm._router_step = _orig_step
@@ -6793,6 +6921,13 @@ def train(config: UnifiedTrainingConfig):
                 if tokenizer is not None:
                     model.eval()
                     run_quality_samples(model, tokenizer, config, device, global_step)
+                    # V11.x: Factual eval with ground-truth scoring
+                    _amp_dt = autocast_dtype if config.mixed_precision != "none" else None
+                    factual_metrics = run_factual_eval(
+                        model, tokenizer, device, global_step, amp_dtype=_amp_dt
+                    )
+                    for k, v in factual_metrics.items():
+                        metrics[k] = v
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
@@ -7147,6 +7282,19 @@ def main():
                        help="EMA learning rate for slot writes (default: 0.1)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+    parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
+                       help="Slot param LR multiplier vs main LR (default: 0.1)")
+    # V10.22: Adaptive slot LR
+    parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
+                       help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
+    parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
+                       help="Floor for adaptive slot LR scale (default: 0.1)")
+    parser.add_argument("--slot_lr_scale_max", type=float, default=0.5,
+                       help="Ceiling for adaptive slot LR scale (default: 0.5)")
+    parser.add_argument("--slot_lr_boost_factor", type=float, default=1.5,
+                       help="Multiply scale by this when boosting (default: 1.5)")
+    parser.add_argument("--slot_lr_decay_factor", type=float, default=0.7,
+                       help="Multiply scale by this when decaying (default: 0.7)")
 
     # ==========================================================================
     # V10.2.1: CHUNKING FOR LONG SEQUENCES
@@ -7732,6 +7880,8 @@ def main():
                        help="Steps to ramp onto loss to 0 after disengage")
     parser.add_argument("--eval_every", type=int, default=100,
                        help="Evaluate every N steps")
+    parser.add_argument("--phase_health_interval", type=int, default=500,
+                       help="Log phase health diagnostics every N steps (default: 500)")
     parser.add_argument("--save_every", type=int, default=1000,
                        help="Save checkpoint every N steps")
     parser.add_argument("--no_save", action="store_true",
@@ -8608,6 +8758,13 @@ def main():
         global_update_mode=getattr(args, 'global_update_mode', 'slots'),
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
+        slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
+        # V10.22: Adaptive slot LR
+        enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
+        slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
+        slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.5),
+        slot_lr_boost_factor=getattr(args, 'slot_lr_boost_factor', 1.5),
+        slot_lr_decay_factor=getattr(args, 'slot_lr_decay_factor', 0.7),
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay
