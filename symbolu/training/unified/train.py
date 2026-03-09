@@ -6912,11 +6912,11 @@ def train(config: UnifiedTrainingConfig):
                 model.train()
 
                 # V10.21: Slot ablation eval — measure slot memory contribution
-                # Runs every 500 steps: temporarily disables slot read output,
+                # Runs every 200 steps: temporarily disables slot read output,
                 # re-evaluates, and prints the PPL delta. If slots help, PPL
                 # should be HIGHER without them.
                 if (
-                    global_step % 500 == 0
+                    global_step % 200 == 0
                     and hasattr(model, 'slot_memory')
                     and model.slot_memory is not None
                 ):

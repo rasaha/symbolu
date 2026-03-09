@@ -8557,7 +8557,7 @@ class SlotMemoryGCT(nn.Module):
         # (b) Retrieval loss weight — scale down when retr_loss dominates,
         #     scale up when slots are helping (caller tracks this externally)
         self._adaptive_retr_loss_weight = 1.0
-        self._adaptive_retr_loss_weight_min = 0.3
+        self._adaptive_retr_loss_weight_min = 0.5
         self._adaptive_retr_loss_weight_max = 2.0
         self._retr_loss_history: List[float] = []  # Track for dominance detection
         self._lm_loss_history: List[float] = []    # Need LM loss for ratio
