@@ -8522,10 +8522,14 @@ class SlotMemoryGCT(nn.Module):
         self._constraint_relax_window: List[float] = []  # marginal_H history
         self._constraint_relax_counter = 0
         self._constraint_relax_interval = 500  # Steps between adaptation checks
+        # V10.29 audit fix: Accumulate gate_mean and L_ortho in windows
+        # (not stale single-batch snapshots) for reliable decisions.
+        self._gate_mean_window: List[float] = []
+        self._L_ortho_window: List[float] = []
 
         # V10.29: Extended adaptive hyperparameters — all start conservative
         # and adapt based on slot health signals. Unified adaptation in
-        # update_adaptive_hyperparams() runs every _constraint_relax_interval steps.
+        # update_constraint_relaxation() runs every _constraint_relax_interval steps.
 
         # (a) Novelty gate floor — raise when gate collapsed, lower when healthy
         self._novelty_gate_floor = 0.15
@@ -8644,15 +8648,42 @@ class SlotMemoryGCT(nn.Module):
         self._diag_read_scale = None  # V10.21: separate read temperature
         self._last_slot_keys = None  # V10.14.8: for orthogonality loss
 
+    # V10.29: List of adaptive scalar attributes to persist across checkpoints.
+    _ADAPTIVE_KEYS = (
+        '_gate_target', '_gate_ceil_weight', '_wr_scale_max', '_L_bal_weight',
+        '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
+        '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
+        '_L_sharp_weight',
+    )
+
     def state_dict(self, *args, **kwargs):
-        """V10.27: Sync _router_step int → buffer before saving."""
+        """V10.27/29: Sync runtime state before saving."""
         self._router_step_buf.fill_(self._router_step)
-        return super().state_dict(*args, **kwargs)
+        sd = super().state_dict(*args, **kwargs)
+        # V10.29: Persist adaptive hyperparams as prefixed keys
+        for key in self._ADAPTIVE_KEYS:
+            sd[f'_adaptive.{key}'] = getattr(self, key)
+        return sd
 
     def load_state_dict(self, state_dict, *args, **kwargs):
-        """V10.27: Restore _router_step from buffer after loading."""
+        """V10.27/29: Restore runtime state after loading."""
+        # V10.29: Extract adaptive keys before super() (which would reject them)
+        adaptive_vals = {}
+        keys_to_remove = []
+        for k in list(state_dict.keys()):
+            if k.startswith('_adaptive.'):
+                adaptive_vals[k[len('_adaptive.'):]] = state_dict[k]
+                keys_to_remove.append(k)
+        for k in keys_to_remove:
+            del state_dict[k]
         result = super().load_state_dict(state_dict, *args, **kwargs)
         self._router_step = int(self._router_step_buf.item())
+        # Restore adaptive values (with validation)
+        for key, val in adaptive_vals.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
+        if adaptive_vals:
+            print(f"  [SLOTS] Restored {len(adaptive_vals)} adaptive params from checkpoint")
         return result
 
     @property
@@ -9073,6 +9104,8 @@ class SlotMemoryGCT(nn.Module):
             self._diag_per_token_entropy = per_token_H.mean().item()
             self._diag_L_sharp = L_sharp.item()
             self._diag_L_bal = L_bal.item()
+            # V10.29.1: Store for adaptive controller (avoids recomputation)
+            self._diag_L_ortho = None  # Set below after L_ortho is computed
 
         # V10.14.7: Removed old L_gate (mean(novelty) pushed gate→0).
         # V10.26: Added L_gate_util (log-barrier) — pushes gate OPEN.
@@ -9092,6 +9125,7 @@ class SlotMemoryGCT(nn.Module):
             _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
             _off_diag = _sim - _eye.unsqueeze(0)
             L_ortho = (_off_diag ** 2).mean()
+            self._diag_L_ortho = L_ortho.item()
 
         # V10.14.8: L_bal weight 0.02→1.0. At 0.02 the balance loss contributed
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
@@ -9165,26 +9199,16 @@ class SlotMemoryGCT(nn.Module):
     def update_constraint_relaxation(self, retr_loss: float, lm_loss: float = 0.0):
         """V10.29: Unified adaptive hyperparameter controller.
 
-        Supersedes V10.28. Manages 8 adaptive parameters based on slot health
-        signals. All start conservative for fresh training, relax/tighten based
+        Manages 10 adaptive parameters based on slot health signals.
+        All start conservative for fresh training, relax/tighten based
         on sustained symptoms detected over _constraint_relax_interval steps.
 
-        Adaptive parameters and their triggers:
-        ────────────────────────────────────────────────────────────────────────
-        HIGH PRIORITY:
-        (1) L_bal weight        — marginal_H > 0.95 → reduce; < 0.7 → increase
-        (2) wr_scale max clamp  — scale pinned at max → widen
-        (3) gate_ceil_weight    — gate pinned at ceiling → soften + raise ceiling
-        (4) novelty_gate_floor  — gate collapsed at floor → raise; healthy → lower
-        (5) retr_loss_weight    — retr_loss dominates LM loss → reduce weight
-        (6) H_target            — many slots active → raise target; few → lower
-        (7) L_ortho weight      — ortho loss near 0 → reduce; slots collapsing → raise
-        (8) read_scale max      — read scale pinned → widen (mirrors write)
-
-        MEDIUM PRIORITY:
-        (9) soft_detach_leak    — gate collapsed → increase leak for rescue
-        (10) L_sharp weight     — sharpness in range → reduce; too diffuse → raise
-        (11) router noise       — handled inline in write() based on marginal_H
+        Audit fixes (V10.29.1):
+        - gate_mean and L_ortho use window averages, not stale single-batch
+        - gate_target only modified by update_write_gate_target() (no double-write)
+        - gate floor clamped to never exceed gate_target - 0.05
+        - lists bounded to 2× interval as safety cap
+        - retr_loss_weight is absolute (not multiplied with config weight)
 
         Args:
             retr_loss: Current retrieval loss value.
@@ -9194,11 +9218,35 @@ class SlotMemoryGCT(nn.Module):
         if marginal_H is None:
             return
 
+        # Accumulate per-step signals into windows
         self._constraint_relax_window.append(marginal_H)
         self._retr_loss_history.append(retr_loss)
         if lm_loss > 0:
             self._lm_loss_history.append(lm_loss)
+        # BUG 3 fix: Accumulate gate_mean per step (not stale single-batch)
+        _cur_gate = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
+        self._gate_mean_window.append(_cur_gate)
+        # BUG 4 fix: Accumulate L_ortho per step
+        _cur_ortho = getattr(self, '_diag_L_ortho', None)
+        if _cur_ortho is None and hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
+            with torch.no_grad():
+                _sk = F.normalize(self._last_slot_keys, dim=-1)
+                _sim = torch.bmm(_sk, _sk.transpose(1, 2))
+                _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
+                _cur_ortho = ((_sim - _eye.unsqueeze(0)) ** 2).mean().item()
+        if _cur_ortho is not None:
+            self._L_ortho_window.append(_cur_ortho)
+
         self._constraint_relax_counter += 1
+
+        # BUG 6 fix: Cap list sizes to 2× interval as safety bound.
+        # Prevents unbounded growth if counter logic is bypassed.
+        _max_len = self._constraint_relax_interval * 2
+        for _lst in (self._constraint_relax_window, self._retr_loss_history,
+                     self._lm_loss_history, self._gate_mean_window,
+                     self._L_ortho_window):
+            if len(_lst) > _max_len:
+                del _lst[:len(_lst) - _max_len]
 
         if self._constraint_relax_counter < self._constraint_relax_interval:
             return
@@ -9207,7 +9255,8 @@ class SlotMemoryGCT(nn.Module):
         n = len(self._constraint_relax_window)
         avg_marginal_H = sum(self._constraint_relax_window) / n
 
-        gate_mean = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
+        # BUG 3 fix: Use window-averaged gate_mean
+        avg_gate = sum(self._gate_mean_window) / max(len(self._gate_mean_window), 1)
         wr_scale = torch.exp(self._write_log_scale).clamp(
             min=1.5, max=self._wr_scale_max
         ).item()
@@ -9215,13 +9264,8 @@ class SlotMemoryGCT(nn.Module):
             self._read_log_scale.clamp(min=math.log(1.0), max=math.log(self._read_scale_max))
         ).item()
         per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
-        L_ortho_val = 0.0
-        if hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
-            with torch.no_grad():
-                _sk = F.normalize(self._last_slot_keys, dim=-1)
-                _sim = torch.bmm(_sk, _sk.transpose(1, 2))
-                _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
-                L_ortho_val = ((_sim - _eye.unsqueeze(0)) ** 2).mean().item()
+        # BUG 4 fix: Use window-averaged L_ortho
+        avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
 
         avg_retr = sum(self._retr_loss_history) / len(self._retr_loss_history)
         avg_lm = sum(self._lm_loss_history) / max(len(self._lm_loss_history), 1) if self._lm_loss_history else 0.0
@@ -9244,17 +9288,17 @@ class SlotMemoryGCT(nn.Module):
             self._wr_scale_max = min(self._wr_scale_max_limit, self._wr_scale_max + 0.5)
             changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (pinned)")
 
-        # ── (3) Gate ceiling weight + target ──────────────────────────────
-        if gate_mean > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
+        # ── (3) Gate ceiling weight (only) ────────────────────────────────
+        # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
+        # exclusively owned by update_write_gate_target() (200-step window).
+        if avg_gate > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
             old_w = self._gate_ceil_weight
             self._gate_ceil_weight = max(1.0, self._gate_ceil_weight * 0.7)
-            self._gate_target = min(self._gate_target_max, self._gate_target + 0.03)
-            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f}, "
-                           f"target→{self._gate_target:.2f} (pinned)")
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (pinned)")
 
         # ── (4) Novelty gate floor ────────────────────────────────────────
         # Gate collapsed at floor for sustained period → raise floor to rescue
-        if gate_mean <= self._novelty_gate_floor * 1.05 and self._novelty_gate_floor < self._novelty_gate_floor_max:
+        if avg_gate <= self._novelty_gate_floor * 1.05 and self._novelty_gate_floor < self._novelty_gate_floor_max:
             old = self._novelty_gate_floor
             self._novelty_gate_floor = min(
                 self._novelty_gate_floor_max,
@@ -9262,7 +9306,7 @@ class SlotMemoryGCT(nn.Module):
             )
             changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} (collapsed)")
         # Gate well above floor → can lower floor for more dynamic range
-        elif gate_mean > self._novelty_gate_floor * 2.0 and self._novelty_gate_floor > self._novelty_gate_floor_min:
+        elif avg_gate > self._novelty_gate_floor * 2.0 and self._novelty_gate_floor > self._novelty_gate_floor_min:
             old = self._novelty_gate_floor
             self._novelty_gate_floor = max(
                 self._novelty_gate_floor_min,
@@ -9270,8 +9314,17 @@ class SlotMemoryGCT(nn.Module):
             )
             changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} (healthy)")
 
+        # BUG 2 fix: Enforce floor < ceiling invariant (min 0.05 gap)
+        _max_floor = self._gate_target - 0.05
+        if self._novelty_gate_floor > _max_floor:
+            old = self._novelty_gate_floor
+            self._novelty_gate_floor = max(self._novelty_gate_floor_min, _max_floor)
+            changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} "
+                           f"(clamped: floor must be < ceiling {self._gate_target:.2f})")
+
         # ── (5) Retrieval loss weight ─────────────────────────────────────
-        # If retr_loss >> lm_loss, it dominates training and distorts LM
+        # BUG 7 fix: This weight is used AS-IS in train.py (replacing, not
+        # multiplying with, config.retrieval_loss_weight when adaptive is active).
         if avg_lm > 0 and avg_retr > avg_lm * 0.5 and self._adaptive_retr_loss_weight > self._adaptive_retr_loss_weight_min:
             old = self._adaptive_retr_loss_weight
             self._adaptive_retr_loss_weight = max(
@@ -9280,14 +9333,12 @@ class SlotMemoryGCT(nn.Module):
             )
             changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
                            f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
-        # If retr_loss is small relative to LM and improving → can increase
         elif avg_lm > 0 and avg_retr < avg_lm * 0.1 and self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_max:
-            # Check if retr_loss is actually improving (second half < first half)
             half = len(self._retr_loss_history) // 2
             if half > 0:
                 first_half = sum(self._retr_loss_history[:half]) / half
                 second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
-                if second_half < first_half * 0.95:  # Improving by >5%
+                if second_half < first_half * 0.95:
                     old = self._adaptive_retr_loss_weight
                     self._adaptive_retr_loss_weight = min(
                         self._adaptive_retr_loss_weight_max,
@@ -9297,26 +9348,21 @@ class SlotMemoryGCT(nn.Module):
                                    f"(small & improving)")
 
         # ── (6) H_target (sharpness entropy target) ──────────────────────
-        # If per-token entropy is well above target → target may be too low
-        # (model wants broader attention, more slots per token)
         if per_token_H > self._H_target * 1.5 and self._H_target < self._H_target_max:
             old = self._H_target
             self._H_target = min(self._H_target_max, self._H_target + 0.1)
             changes.append(f"H_target: {old:.2f}→{self._H_target:.2f} (entropy too high)")
-        # If per-token entropy well below target → target may be too high
         elif per_token_H < self._H_target * 0.5 and self._H_target > self._H_target_min:
             old = self._H_target
             self._H_target = max(self._H_target_min, self._H_target - 0.1)
             changes.append(f"H_target: {old:.2f}→{self._H_target:.2f} (already sharp)")
 
-        # ── (7) L_ortho weight ────────────────────────────────────────────
-        # If slots are already orthogonal (low L_ortho), reduce weight
-        if L_ortho_val < 0.01 and self._L_ortho_weight > self._L_ortho_weight_min:
+        # ── (7) L_ortho weight (uses window avg) ─────────────────────────
+        if avg_ortho < 0.01 and self._L_ortho_weight > self._L_ortho_weight_min:
             old = self._L_ortho_weight
             self._L_ortho_weight = max(self._L_ortho_weight_min, self._L_ortho_weight * 0.7)
             changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (already orthogonal)")
-        # If slots are collapsing (high L_ortho), increase weight
-        elif L_ortho_val > 0.1 and self._L_ortho_weight < self._L_ortho_weight_max:
+        elif avg_ortho > 0.1 and self._L_ortho_weight < self._L_ortho_weight_max:
             old = self._L_ortho_weight
             self._L_ortho_weight = min(self._L_ortho_weight_max, self._L_ortho_weight * 1.3)
             changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (collapsing)")
@@ -9327,25 +9373,23 @@ class SlotMemoryGCT(nn.Module):
             self._read_scale_max = min(self._read_scale_max_limit, self._read_scale_max + 1.0)
             changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (pinned)")
 
-        # ── (9) Soft detach leak (medium priority) ────────────────────────
-        # Gate collapsed → increase leak to rescue write path
-        if gate_mean <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+        # ── (9) Soft detach leak ──────────────────────────────────────────
+        if avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
             old = self._soft_detach_leak
             self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + 0.03)
             changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed)")
-        # Gate healthy → can reduce leak to protect LM gradients
-        elif gate_mean > 0.3 and self._soft_detach_leak > self._soft_detach_leak_min:
+        elif avg_gate > 0.3 and self._soft_detach_leak > self._soft_detach_leak_min:
             old = self._soft_detach_leak
             self._soft_detach_leak = max(self._soft_detach_leak_min, self._soft_detach_leak - 0.01)
             changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate healthy)")
 
-        # ── (10) L_sharp weight (medium priority) ─────────────────────────
-        # Sharpness in good range (per_token_H close to target) → reduce weight
+        # ── (10) L_sharp weight ───────────────────────────────────────────
+        # Note: Uses per_token_H which is last-batch (acceptable since
+        # H_target adjusts slowly and L_sharp is medium priority).
         if abs(per_token_H - self._H_target) < 0.2 and self._L_sharp_weight > self._L_sharp_weight_min:
             old = self._L_sharp_weight
             self._L_sharp_weight = max(self._L_sharp_weight_min, self._L_sharp_weight * 0.8)
             changes.append(f"L_sharp: {old:.3f}→{self._L_sharp_weight:.3f} (in range)")
-        # Sharpness way off → increase weight
         elif abs(per_token_H - self._H_target) > 1.0 and self._L_sharp_weight < self._L_sharp_weight_max:
             old = self._L_sharp_weight
             self._L_sharp_weight = min(self._L_sharp_weight_max, self._L_sharp_weight * 1.3)
@@ -9357,10 +9401,12 @@ class SlotMemoryGCT(nn.Module):
             for c in changes:
                 print(f"    → {c}")
 
-        # Reset windows
+        # Reset all windows
         self._constraint_relax_window.clear()
         self._retr_loss_history.clear()
         self._lm_loss_history.clear()
+        self._gate_mean_window.clear()
+        self._L_ortho_window.clear()
         self._constraint_relax_counter = 0
 
 

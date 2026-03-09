@@ -4479,8 +4479,10 @@ def train(config: UnifiedTrainingConfig):
                             target_ids=y,
                             lm_head=_lm_head,
                         )
-                        # V10.29: Use adaptive retrieval loss weight
-                        _effective_retr_weight = config.retrieval_loss_weight * getattr(_sm, '_adaptive_retr_loss_weight', 1.0)
+                        # V10.29.1: Use adaptive retrieval loss weight (replaces
+                        # config weight when adaptive is active, not compounded).
+                        _adaptive_rw = getattr(_sm, '_adaptive_retr_loss_weight', None)
+                        _effective_retr_weight = _adaptive_rw if _adaptive_rw is not None else config.retrieval_loss_weight
                         loss = loss + _effective_retr_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
                         # V10.27: Feed retr_loss to adaptive gate ceiling
