@@ -4421,6 +4421,8 @@ def train(config: UnifiedTrainingConfig):
             # V10.14: Slot memory auxiliary losses (retrieval + router balancing)
             if config.global_tokens_enabled and config.global_update_mode == "slots":
                 _out_dict = outputs if isinstance(outputs, dict) else {}
+                # V10.29: Capture LM loss before aux losses for adaptive ratio tracking
+                _lm_loss_val = loss.item() if isinstance(loss, torch.Tensor) else float(loss)
                 # Get slot_memory from model (handles OntologicalHybrid wrapper)
                 _sm = getattr(model, 'slot_memory', None)
                 if _sm is None:
@@ -4477,12 +4479,14 @@ def train(config: UnifiedTrainingConfig):
                             target_ids=y,
                             lm_head=_lm_head,
                         )
-                        loss = loss + config.retrieval_loss_weight * _retr_loss
+                        # V10.29: Use adaptive retrieval loss weight
+                        _effective_retr_weight = config.retrieval_loss_weight * getattr(_sm, '_adaptive_retr_loss_weight', 1.0)
+                        loss = loss + _effective_retr_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
                         # V10.27: Feed retr_loss to adaptive gate ceiling
                         _sm.update_write_gate_target(_retr_loss_val)
-                        # V10.28: Adaptive constraint relaxation
-                        _sm.update_constraint_relaxation(_retr_loss_val)
+                        # V10.29: Unified adaptive constraint relaxation (passes lm_loss)
+                        _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
                     # Step the router noise counter
                     _sm._router_step += 1
                     # Log slot diagnostics periodically (only on last accumulation step)
@@ -4498,7 +4502,10 @@ def train(config: UnifiedTrainingConfig):
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
                               f"wr_scale={_wr_scale:.1f} "
                               f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f} "
-                              f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f}")
+                              f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f} "
+                              f"retr_w={getattr(_sm, '_adaptive_retr_loss_weight', 1.0):.2f} "
+                              f"gate_floor={getattr(_sm, '_novelty_gate_floor', 0.15):.2f} "
+                              f"leak={getattr(_sm, '_soft_detach_leak', 0.1):.2f}")
                         # V10.22: Feed signals to adaptive slot LR controller
                         if adaptive_slot_lr is not None:
                             adaptive_slot_lr.record_retr_loss(_retr_loss_val)
