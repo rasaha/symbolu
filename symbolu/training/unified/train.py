@@ -6911,49 +6911,51 @@ def train(config: UnifiedTrainingConfig):
 
                 model.train()
 
-                # V10.21: Slot ablation eval — measure slot memory contribution
-                # Runs every 200 steps: temporarily disables slot read output,
-                # re-evaluates, and prints the PPL delta. If slots help, PPL
-                # should be HIGHER without them.
-                if (
-                    global_step % 200 == 0
-                    and hasattr(model, 'slot_memory')
-                    and model.slot_memory is not None
-                ):
-                    _sm = model.slot_memory
-                    # Save original warmstart state and force alpha=0
-                    _orig_step = _sm._router_step
-                    _orig_center = _sm._read_warmstart_center
-                    _sm._read_warmstart_center = float('inf')  # Forces alpha → 0
-                    model.eval()
-                    with torch.no_grad():
-                        _no_slot_loss, _no_slot_metrics = evaluate(
-                            model, val_loader, device, config, autocast_dtype,
-                            sovereign_loss=sovereign_loss,
-                            sovereign_engine=sovereign_engine,
-                            cached_val_batches=cached_val_batches,
-                        )
-                    _no_slot_ppl = _no_slot_metrics['ppl']
-                    _slot_delta = _no_slot_ppl - val_ppl
-                    _slot_pct = (_slot_delta / max(val_ppl, 1.0)) * 100
-                    _sign = "+" if _slot_delta > 0 else ""
-                    print(f"  🧩 [SLOT ABLATION] With slots: {val_ppl:.2f} | "
-                          f"Without: {_no_slot_ppl:.2f} | "
-                          f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
-                          f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
-                    # V11.2: Feed ablation delta to SlotMemory for retr_weight guard
-                    _sm._last_ablation_delta = _slot_delta
-                    # V10.22: Feed ablation delta and trigger adaptive slot LR update
-                    if adaptive_slot_lr is not None:
-                        adaptive_slot_lr.record_ablation_delta(_slot_delta)
-                        _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
-                    # Post-curriculum adaptive alpha: feed ablation % to curriculum
-                    if ppl_alpha_curriculum is not None:
-                        ppl_alpha_curriculum.update_from_ablation(_slot_pct)
-                    # Restore
-                    _sm._read_warmstart_center = _orig_center
-                    _sm._router_step = _orig_step
-                    model.train()
+
+            # V10.21/V11.2b: Slot ablation eval — independent clock from eval.
+            # Runs every 200 steps: temporarily disables slot read output,
+            # runs its own mini-eval, and prints the PPL delta.
+            # Uses last_val_ppl (cached from most recent eval) as the with-slots baseline.
+            if (
+                global_step % 200 == 0
+                and hasattr(model, 'slot_memory')
+                and model.slot_memory is not None
+                and last_val_ppl < float('inf')  # Need at least one eval first
+            ):
+                _sm = model.slot_memory
+                # Save original warmstart state and force alpha=0
+                _orig_step = _sm._router_step
+                _orig_center = _sm._read_warmstart_center
+                _sm._read_warmstart_center = float('inf')  # Forces alpha → 0
+                model.eval()
+                with torch.no_grad():
+                    _no_slot_loss, _no_slot_metrics = evaluate(
+                        model, val_loader, device, config, autocast_dtype,
+                        sovereign_loss=sovereign_loss,
+                        sovereign_engine=sovereign_engine,
+                        cached_val_batches=cached_val_batches,
+                    )
+                _no_slot_ppl = _no_slot_metrics['ppl']
+                _slot_delta = _no_slot_ppl - last_val_ppl
+                _slot_pct = (_slot_delta / max(last_val_ppl, 1.0)) * 100
+                _sign = "+" if _slot_delta > 0 else ""
+                print(f"  🧩 [SLOT ABLATION] With slots: {last_val_ppl:.2f} | "
+                      f"Without: {_no_slot_ppl:.2f} | "
+                      f"Delta: {_sign}{_slot_delta:.2f} ({_sign}{_slot_pct:.1f}%)"
+                      f"{' ✓ slots helping' if _slot_delta > 1.0 else ' ○ slots neutral' if _slot_delta > -1.0 else ' ✗ slots hurting'}")
+                # V11.2: Feed ablation delta to SlotMemory for retr_weight guard
+                _sm._last_ablation_delta = _slot_delta
+                # V10.22: Feed ablation delta and trigger adaptive slot LR update
+                if adaptive_slot_lr is not None:
+                    adaptive_slot_lr.record_ablation_delta(_slot_delta)
+                    _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                # Post-curriculum adaptive alpha: feed ablation % to curriculum
+                if ppl_alpha_curriculum is not None:
+                    ppl_alpha_curriculum.update_from_ablation(_slot_pct)
+                # Restore
+                _sm._read_warmstart_center = _orig_center
+                _sm._router_step = _orig_step
+                model.train()
 
             # Quality Sampling (OUTSIDE eval block - runs independently of eval_every)
             if config.sample_every > 0 and global_step % config.sample_every == 0:
