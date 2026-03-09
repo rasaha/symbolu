@@ -8257,8 +8257,8 @@ def main():
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
-    parser.add_argument("--enable_sgp", action="store_true", default=True,
-                       help="Enable SGP synchronized with Sattvic Controller")
+    parser.add_argument("--enable_sgp", action="store_true", default=False,
+                       help="Enable SGP synchronized with Sattvic Controller (requires CSR)")
     parser.add_argument("--disable_sgp", action="store_true",
                        help="Disable SGP")
     parser.add_argument("--sgp_base_rate", type=int, default=200,
