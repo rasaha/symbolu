@@ -2215,6 +2215,8 @@ def train(config: UnifiedTrainingConfig):
     step_start_time = time.time()
     running_loss = 0.0
     accumulation_step = 0
+    _retr_loss_val = None  # V11.3: Init for post-optimizer slot adaptive calls
+    _lm_loss_val = 0.0
     _skip_next_step = False  # V9.9.3: Sovereign Reset Protocol - skip step after seq_len transition
 
     # Toroidal Bridge tracking
@@ -4518,10 +4520,9 @@ def train(config: UnifiedTrainingConfig):
                         _effective_retr_weight = _adaptive_rw if _adaptive_rw is not None else config.retrieval_loss_weight
                         loss = loss + _effective_retr_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
-                        # V10.27: Feed retr_loss to adaptive gate ceiling
-                        _sm.update_write_gate_target(_retr_loss_val)
-                        # V10.29: Unified adaptive constraint relaxation (passes lm_loss)
-                        _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
+                        # V10.27/V11.3: Adaptive gate + constraint calls moved to
+                        # post-optimizer-step (once per global step, not per micro-step)
+                        # to avoid interval counters firing grad_accum× too fast.
                     # Step the router noise counter
                     _sm._router_step += 1
                     # Log slot diagnostics periodically (only on last accumulation step)
@@ -5035,6 +5036,12 @@ def train(config: UnifiedTrainingConfig):
                 )
 
             optimizer.zero_grad()
+
+            # V11.3: Slot adaptive calls — once per global step (not per micro-step).
+            # Moved from accumulation loop so interval counters count global steps.
+            if _sm is not None and _retr_loss_val is not None:
+                _sm.update_write_gate_target(_retr_loss_val)
+                _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
 
             # Update scheduler - warmup ALWAYS runs, even with adaptive training
             # Adaptive training only takes over AFTER warmup ends
