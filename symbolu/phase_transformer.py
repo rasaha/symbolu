@@ -8508,14 +8508,25 @@ class SlotMemoryGCT(nn.Module):
         # This adds a soft quadratic ceiling that adapts based on write utility:
         # if retr_loss is improving → ceiling relaxes (writes are helpful),
         # if retr_loss stagnates while gate is high → ceiling tightens (churn).
-        self._gate_target = 0.50          # Adaptive ceiling (starts moderate)
+        self._gate_target = 0.35          # Adaptive ceiling (starts moderate)
         self._gate_target_min = 0.20      # Never tighten below this
         self._gate_target_max = 0.60      # Never relax above this
-        self._gate_ceil_weight = 1.0      # Quadratic penalty weight above target
+        self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
         self._gate_adapt_window = 200     # Steps to accumulate before adapting
         self._gate_adapt_counter = 0      # Steps since last adaptation
+
+        # V10.28: Adaptive constraint relaxation — detect when slots are
+        # over-constrained (uniform usage, scale at clamp, gate at ceiling)
+        # and progressively relax to allow specialization.
+        self._wr_scale_max = 2.0          # Write scale upper clamp (starts conservative)
+        self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
+        self._L_bal_weight = 1.0          # Balance loss weight (starts full)
+        self._L_bal_weight_floor = 0.1    # Minimum balance weight
+        self._constraint_relax_window: List[float] = []  # marginal_H history
+        self._constraint_relax_counter = 0
+        self._constraint_relax_interval = 500  # Steps between adaptation checks
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -8687,7 +8698,7 @@ class SlotMemoryGCT(nn.Module):
         # stay differentiated enough for meaningful gradient flow, letting the
         # gate learn to open above the 0.15 floor via both retrieval loss and
         # the 10% LM-loss leak (V10.24).
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=4.0)
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
         # V10.20: Detach slot_keys before F.normalize in assignment computation.
         # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
@@ -8904,7 +8915,7 @@ class SlotMemoryGCT(nn.Module):
         # V10.25: Match write() clamp [1.5, 2.0] — retrieval loss is the
         # ONLY gradient source for slot values, so peaky attention here
         # (scale 3-4) kills the learning signal just like in write().
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=4.0)
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9041,7 +9052,7 @@ class SlotMemoryGCT(nn.Module):
             gate_mean = self._last_novelty.mean()
             L_gate_ceil = torch.relu(gate_mean - self._gate_target) ** 2
 
-        return (0.1 * L_sharp + 0.3 * L_bal + 0.5 * L_ortho
+        return (0.1 * L_sharp + self._L_bal_weight * L_bal + 0.5 * L_ortho
                 + 0.01 * L_gate_util + self._gate_ceil_weight * L_gate_ceil)
 
     def update_write_gate_target(self, retr_loss: float):
@@ -9095,6 +9106,96 @@ class SlotMemoryGCT(nn.Module):
         self._retr_loss_window.clear()
         self._gate_window.clear()
         self._gate_adapt_counter = 0
+
+    def update_constraint_relaxation(self, retr_loss: float):
+        """V10.28: Adaptively relax slot constraints when over-constrained.
+
+        Detects three symptoms of a regularization trap:
+        1. marginal_H > 0.95 sustained → slots too uniform → reduce L_bal weight
+        2. wr_scale pinned at max clamp → model wants sharper routing → widen clamp
+        3. write_gate pinned at ceiling → gate wants to open → raise ceiling + soften weight
+
+        Called each step. Accumulates diagnostics over _constraint_relax_interval
+        steps, then applies relaxation if symptoms are detected.
+
+        All relaxation is gradual (small steps) and bounded (has floors/ceilings)
+        so fresh training starts conservative and only relaxes when needed.
+        """
+        marginal_H = getattr(self, '_diag_marginal_entropy', None)
+        if marginal_H is None:
+            return
+
+        self._constraint_relax_window.append(marginal_H)
+        self._constraint_relax_counter += 1
+
+        if self._constraint_relax_counter < self._constraint_relax_interval:
+            return
+
+        # Compute window statistics
+        n = len(self._constraint_relax_window)
+        avg_marginal_H = sum(self._constraint_relax_window) / n
+
+        gate_mean = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
+        wr_scale = torch.exp(self._write_log_scale).clamp(
+            min=1.5, max=self._wr_scale_max
+        ).item()
+
+        relaxed_any = False
+
+        # Symptom 1: Slots too uniform (marginal_H > 0.95 sustained)
+        # Reduce L_bal weight to allow differentiation
+        if avg_marginal_H > 0.95 and self._L_bal_weight > self._L_bal_weight_floor:
+            old_w = self._L_bal_weight
+            self._L_bal_weight = max(
+                self._L_bal_weight_floor,
+                self._L_bal_weight * 0.7  # 30% reduction per interval
+            )
+            print(f"\n  🔓 [SLOT ADAPT] marginal_H={avg_marginal_H:.3f} > 0.95 "
+                  f"(too uniform) → L_bal weight: {old_w:.3f} → {self._L_bal_weight:.3f}")
+            relaxed_any = True
+
+        # Symptom 2: Write scale pinned at max clamp
+        # Model wants sharper routing but clamp prevents it → widen
+        if wr_scale >= self._wr_scale_max * 0.98 and self._wr_scale_max < self._wr_scale_max_limit:
+            old_max = self._wr_scale_max
+            self._wr_scale_max = min(
+                self._wr_scale_max_limit,
+                self._wr_scale_max + 0.5  # Widen by 0.5 per interval
+            )
+            print(f"\n  🔓 [SLOT ADAPT] wr_scale={wr_scale:.2f} pinned at max "
+                  f"→ clamp widened: {old_max:.1f} → {self._wr_scale_max:.1f}")
+            relaxed_any = True
+
+        # Symptom 3: Write gate pinned at ceiling → soften ceiling weight
+        if gate_mean > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
+            old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = max(1.0, self._gate_ceil_weight * 0.7)
+            # Also nudge the ceiling up
+            self._gate_target = min(
+                self._gate_target_max,
+                self._gate_target + 0.03
+            )
+            print(f"\n  🔓 [SLOT ADAPT] write_gate={gate_mean:.3f} pinned at "
+                  f"ceiling={self._gate_target:.2f} → ceil_weight: "
+                  f"{old_w:.1f} → {self._gate_ceil_weight:.1f}, "
+                  f"target: {self._gate_target:.2f}")
+            relaxed_any = True
+
+        # Recovery: if marginal_H drops below 0.7 (over-specialized), tighten back
+        if avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+            old_w = self._L_bal_weight
+            self._L_bal_weight = min(1.0, self._L_bal_weight * 1.5)
+            print(f"\n  🔒 [SLOT ADAPT] marginal_H={avg_marginal_H:.3f} < 0.70 "
+                  f"(over-specialized) → L_bal weight: {old_w:.3f} → {self._L_bal_weight:.3f}")
+            relaxed_any = True
+
+        if not relaxed_any and self._constraint_relax_counter >= self._constraint_relax_interval:
+            # Log current state periodically for visibility
+            pass  # Silent when no action needed
+
+        # Reset window
+        self._constraint_relax_window.clear()
+        self._constraint_relax_counter = 0
 
 
 @dataclass

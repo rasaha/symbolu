@@ -4481,11 +4481,13 @@ def train(config: UnifiedTrainingConfig):
                         _retr_loss_val = _retr_loss.item()
                         # V10.27: Feed retr_loss to adaptive gate ceiling
                         _sm.update_write_gate_target(_retr_loss_val)
+                        # V10.28: Adaptive constraint relaxation
+                        _sm.update_constraint_relaxation(_retr_loss_val)
                     # Step the router noise counter
                     _sm._router_step += 1
                     # Log slot diagnostics periodically (only on last accumulation step)
                     if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
-                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(min=math.log(1.5), max=math.log(2.0))))
+                        _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(min=math.log(1.5), max=math.log(getattr(_sm, '_wr_scale_max', 2.0)))))
                         _mask_frac = _retr_query_mask.float().mean().item() if _retr_query_mask is not None else 0.0
                         print(f"  [SLOTS] retr_loss={_retr_loss_val:.4f} "
                               f"qmask={_mask_frac:.4f} "
