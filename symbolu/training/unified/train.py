@@ -2776,8 +2776,16 @@ def train(config: UnifiedTrainingConfig):
                                     query_mask=_qmask, target_ids=chunk_targets,
                                     lm_head=_lm,
                                 )
+                                # V11.4: Slot-only prediction loss (TBPTT path)
+                                _slot_pred = torch.tensor(0.0, device=_sh.device)
+                                if _cfg.slot_prediction_loss_weight > 0:
+                                    _slot_pred = _sm.compute_slot_prediction_loss(
+                                        x=_sh, slot_keys=_sk, slot_vals=_sv,
+                                        query_mask=_qmask, target_ids=chunk_targets,
+                                    )
                                 _sm._router_step += 1
-                                return _aux + _cfg.retrieval_loss_weight * _retr
+                                return (_aux + _cfg.retrieval_loss_weight * _retr
+                                        + _cfg.slot_prediction_loss_weight * _slot_pred)
 
                     tbptt_result = forward_chunked_tbptt(
                         model=model,
@@ -4476,6 +4484,7 @@ def train(config: UnifiedTrainingConfig):
                     _sv = _out_dict.get('_slot_vals')
                     _sh = _out_dict.get('_slot_hidden')
                     _retr_loss_val = 0.0
+                    _slot_pred_loss_val = 0.0
                     # V10.14.10: Warn on first occurrence when slot tensors are missing
                     if (_sk is None or _sv is None or _sh is None) and global_step <= 1:
                         _missing = [k for k, v in [('_slot_keys', _sk), ('_slot_vals', _sv),
@@ -4520,6 +4529,25 @@ def train(config: UnifiedTrainingConfig):
                         _effective_retr_weight = _adaptive_rw if _adaptive_rw is not None else config.retrieval_loss_weight
                         loss = loss + _effective_retr_weight * _retr_loss
                         _retr_loss_val = _retr_loss.item()
+
+                        # V11.4: Slot-only prediction loss — separate head tests
+                        # whether slot content is predictively useful for next-token.
+                        # This is NOT another self-consistency loop: it uses a separate
+                        # prediction head that can only succeed if slots contain
+                        # LM-relevant information. The arbiter is still ablation delta.
+                        if config.slot_prediction_loss_weight > 0:
+                            _slot_pred_loss = _sm.compute_slot_prediction_loss(
+                                x=_sh,
+                                slot_keys=_sk,
+                                slot_vals=_sv,
+                                query_mask=_retr_query_mask,
+                                target_ids=y,
+                            )
+                            loss = loss + config.slot_prediction_loss_weight * _slot_pred_loss
+                            _slot_pred_loss_val = _slot_pred_loss.item()
+                        else:
+                            _slot_pred_loss_val = 0.0
+
                         # V10.27/V11.3: Adaptive gate + constraint calls moved to
                         # post-optimizer-step (once per global step, not per micro-step)
                         # to avoid interval counters firing grad_accum× too fast.
@@ -4545,6 +4573,14 @@ def train(config: UnifiedTrainingConfig):
                               f"L_bal_w={getattr(_sm, '_L_bal_weight', 1.0):.2f} "
                               f"q_norm={getattr(_sm, '_diag_retr_query_norm', 0):.2f} "
                               f"retr_norm={getattr(_sm, '_diag_retr_retrieved_norm', 0):.2f}")
+                        # V11.4: Log slot-only prediction diagnostics
+                        if _slot_pred_loss_val > 0:
+                            _sp_ppl = math.exp(min(_slot_pred_loss_val, 20.0))  # Cap to avoid overflow
+                            _sp_acc = getattr(_sm, '_diag_slot_pred_acc', 0.0)
+                            print(f"  [SLOT-PRED] loss={_slot_pred_loss_val:.4f} "
+                                  f"ppl={_sp_ppl:.1f} "
+                                  f"acc={_sp_acc:.4f} "
+                                  f"w={config.slot_prediction_loss_weight:.2f}")
                         # V10.22: Feed signals to adaptive slot LR controller
                         if adaptive_slot_lr is not None:
                             adaptive_slot_lr.record_retr_loss(_retr_loss_val)
@@ -7332,6 +7368,8 @@ def main():
                        help="EMA learning rate for slot writes (default: 0.1)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+    parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
+                       help="V11.4: Weight for slot-only prediction loss (default: 0.1)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
                        help="Slot param LR multiplier vs main LR (default: 0.1)")
     # V11: Slot memory experiment — read interval and late-layer writes
@@ -8829,6 +8867,7 @@ def main():
         global_update_mode=getattr(args, 'global_update_mode', 'slots'),
         slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
         retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 1.0),
+        slot_prediction_loss_weight=getattr(args, 'slot_prediction_loss_weight', 0.1),
         slot_memory_lr_scale=getattr(args, 'slot_memory_lr_scale', 0.1),
         # V11: Slot memory experiment
         global_read_interval=getattr(args, 'global_read_interval', 1),

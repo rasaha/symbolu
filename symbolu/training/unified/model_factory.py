@@ -231,6 +231,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if config.global_tokens_enabled:
             print(f"  Global Tokens: ENABLED ({config.num_global_tokens} slots, mode={config.global_update_mode})")
             print(f"  Slot Write LR: {config.slots_write_lr}, Retrieval Loss Weight: {config.retrieval_loss_weight}")
+            if config.slot_prediction_loss_weight > 0:
+                print(f"  Slot Prediction Loss: ENABLED (weight={config.slot_prediction_loss_weight})")
             if config.global_read_interval > 1:
                 print(f"  Slot Read Interval: every {config.global_read_interval} layers")
             if config.global_write_start_layer > 0:

@@ -8644,6 +8644,26 @@ class SlotMemoryGCT(nn.Module):
         # expects layer-normed input; without this, raw slot values have
         # arbitrary scale → lm_head predictions are garbage.
         self.retr_read_norm = nn.LayerNorm(embed_dim)
+
+        # V11.4: Slot-only prediction head — tests whether slot content carries
+        # information useful for next-token prediction, independent of the main
+        # backbone. Uses a separate bottleneck head (not shared lm_head) so
+        # improvements here genuinely reflect slot content quality.
+        # Architecture: slot retrieval → LayerNorm → D→D/4 → GELU → D/4→V
+        # Gradients flow back into: read_output_proj, slot_vals (via retrieval
+        # attention), write_val_proj (via slot_vals computation graph).
+        # They do NOT flow into: backbone layers, token embeddings, lm_head.
+        _bottleneck_dim = embed_dim // 4
+        self.slot_pred_head = nn.Sequential(
+            nn.Linear(embed_dim, _bottleneck_dim, bias=False),
+            nn.GELU(),
+            nn.Linear(_bottleneck_dim, 50257, bias=False),  # GPT-2 vocab
+        )
+        self.slot_pred_norm = nn.LayerNorm(embed_dim)
+        # Diagnostics for slot prediction
+        self._diag_slot_pred_loss: float = 0.0
+        self._diag_slot_pred_acc: float = 0.0
+
         # V10.21: Re-enable separate read temperature. Previously collapsed
         # because LM loss suppressed reads (V10.14.3 comment). But read output
         # is now detached from LM loss, so that suppression no longer applies.
@@ -9120,6 +9140,102 @@ class SlotMemoryGCT(nn.Module):
             self._diag_retr_retrieved_norm = query_retrieved.norm(dim=-1).mean().item()
 
         return retrieval_loss
+
+    def compute_slot_prediction_loss(
+        self,
+        x: torch.Tensor,              # [B, N, D] — token representations (pre-attention)
+        slot_keys: torch.Tensor,       # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,       # [B, K, D] — slot values
+        query_mask: torch.Tensor,      # [B, N] — True at query positions
+        target_ids: torch.Tensor,      # [B, N] — target token IDs
+    ) -> torch.Tensor:
+        """
+        V11.4: Slot-only predictive usefulness test.
+
+        Tests whether slot content carries information useful for next-token
+        prediction, using a SEPARATE prediction head (not shared lm_head).
+        This eliminates the failure mode where retrieval loss improves because
+        lm_head improves, rather than because slots contain better content.
+
+        Slot-derived tensor: slot_vals → attention-weighted retrieval →
+            read_output_proj → slot_pred_norm → slot_pred_head → CE loss
+
+        The query is formed from x (pre-attention embeddings), which provides
+        only positional/token identity info — no backbone computation.
+        The prediction comes entirely from what the slots contain.
+
+        Cannot bypass slots: the only path to the prediction head goes through
+        slot_vals retrieval. If slots contain no useful info, this loss stays
+        at ~log(50257) ≈ 10.8 (random).
+
+        Gradient flow:
+          ✓ read_output_proj (projection of retrieved content)
+          ✓ slot_vals (via retrieval attention weighted sum)
+          ✓ write_val_proj (via slot_vals computation graph)
+          ✓ slot_pred_head (the separate prediction bottleneck)
+          ✓ slot_pred_norm (normalization before prediction)
+          ✗ backbone layers (x is detached at capture point)
+          ✗ lm_head (not used — separate head)
+          ✗ token embeddings (detached in x)
+
+        This loss tests usefulness to generation, NOT self-consistency:
+          - Retrieval loss = "can slots reconstruct what was stored?" (self-referential)
+          - Slot prediction loss = "can slots predict the next token?" (LM-useful)
+
+        Success criterion is NOT this loss improving alone — it's whether
+        ablation delta moves off zero. If this loss improves but ablation
+        stays flat, slots are still learning in isolation.
+
+        Returns:
+            slot_pred_loss: Scalar CE loss from slot-only prediction.
+        """
+        if query_mask is None or not query_mask.any():
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Retrieve from slots using same attention mechanism as read()
+        queries = self.write_key_proj(x)  # [B, N, D_key]
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        _q_norm = F.normalize(queries, dim=-1)
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # [B, N, K]
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+
+        # Retrieve weighted slot values — this is the slot-derived representation
+        raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
+
+        # Route through read_output_proj (shared with retrieval loss path)
+        projected = self.read_output_proj(raw_retrieved)  # [B, N, D]
+
+        # Select query positions
+        query_retrieved = projected[query_mask]  # [num_queries, D]
+        query_targets = target_ids[query_mask]
+
+        if query_retrieved.shape[0] == 0:
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Normalize then predict through SEPARATE head (not lm_head)
+        query_retrieved = self.slot_pred_norm(query_retrieved)  # [num_queries, D]
+        slot_logits = self.slot_pred_head(query_retrieved)  # [num_queries, V]
+
+        slot_pred_loss = F.cross_entropy(
+            slot_logits, query_targets, ignore_index=-100
+        )
+
+        # Diagnostics: loss + top-1 accuracy
+        with torch.no_grad():
+            self._diag_slot_pred_loss = slot_pred_loss.item()
+            preds = slot_logits.argmax(dim=-1)
+            valid = query_targets != -100
+            if valid.any():
+                self._diag_slot_pred_acc = (
+                    (preds[valid] == query_targets[valid]).float().mean().item()
+                )
+            else:
+                self._diag_slot_pred_acc = 0.0
+
+        return slot_pred_loss
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """

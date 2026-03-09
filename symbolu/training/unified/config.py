@@ -153,6 +153,7 @@ class UnifiedTrainingConfig:
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
     slots_write_lr: float = 0.1  # EMA learning rate for slot writes
     retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
+    slot_prediction_loss_weight: float = 0.1  # V11.4: Weight for slot-only prediction loss
     slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
 
     # V11: Slot memory experiment — read interval and late-layer writes
