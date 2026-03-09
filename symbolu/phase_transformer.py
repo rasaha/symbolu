@@ -7182,7 +7182,7 @@ class HybridPhaseTransformer(nn.Module):
                         # "reading from the right slot helps prediction" without the
                         # early-training suppression that motivated full detach.
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.03
+                        _leak = 0.15  # Was 0.03; raised to let LM loss teach read path
                         _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
                         x = x + _alpha * _slot_mixed
                 else:
@@ -7405,7 +7405,7 @@ class HybridPhaseTransformer(nn.Module):
                         _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
                         # V10.21: Gradient leak + warmstart (mirrors forward())
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.03
+                        _leak = 0.15  # Was 0.03; raised to let LM loss teach read path
                         _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
                         x = x + _alpha * _slot_mixed
                 else:
@@ -8663,10 +8663,10 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.6d: Read output is detached before adding to residual (LM
         # can't suppress read_output_proj). But we still ramp the mixing
         # coefficient from 0→1 so early noisy reads don't disrupt LM training.
-        # Uses same _router_step counter. Sigmoid centered at 500 steps,
-        # tau=100 → effectively 0 for first ~300 steps, ~1 after ~700.
-        self._read_warmstart_center = 500
-        self._read_warmstart_tau = 100
+        # Uses same _router_step counter. Sigmoid centered at 100 steps,
+        # tau=25 → effectively 0 for first ~50 steps, ~1 after ~150.
+        self._read_warmstart_center = 100
+        self._read_warmstart_tau = 25
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
