@@ -8529,6 +8529,7 @@ class SlotMemoryGCT(nn.Module):
         # V10.28: Adaptive constraint relaxation — detect when slots are
         # over-constrained (uniform usage, scale at clamp, gate at ceiling)
         # and progressively relax to allow specialization.
+        self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
         self._wr_scale_max = 2.0          # Write scale upper clamp (starts conservative)
         self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
@@ -9228,6 +9229,10 @@ class SlotMemoryGCT(nn.Module):
             retr_loss: Current retrieval loss value.
             lm_loss: Current LM loss value (for ratio-based adaptation).
         """
+        # V11: Skip all adaptive adjustments when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
         marginal_H = getattr(self, '_diag_marginal_entropy', None)
         if marginal_H is None:
             return

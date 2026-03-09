@@ -524,6 +524,15 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # V11: Disable adaptive constraint relaxation if requested
+    if config.disable_slot_adaptive_constraints and config.global_tokens_enabled:
+        _sm = getattr(model, 'slot_memory', None)
+        if _sm is None:
+            _sm = getattr(getattr(model, 'hybrid', model), 'slot_memory', None)
+        if _sm is not None:
+            _sm.enable_adaptive_constraints = False
+            print(f"  Slot Adaptive Constraints: DISABLED")
+
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
         health_report = run_architecture_health_check(model, config, device)
@@ -7289,6 +7298,8 @@ def main():
                        help="Read slots every N layers (default: 1 = every layer)")
     parser.add_argument("--global_write_start_layer", type=int, default=0,
                        help="Only write to slots from this layer onward (default: 0)")
+    parser.add_argument("--disable_slot_adaptive_constraints", action="store_true",
+                       help="Disable adaptive constraint relaxation controller for slot memory")
     # V10.22: Adaptive slot LR
     parser.add_argument("--enable_adaptive_slot_lr", action="store_true",
                        help="Dynamically adjust slot LR scale based on retr_loss velocity and ablation delta")
@@ -8767,6 +8778,7 @@ def main():
         # V11: Slot memory experiment
         global_read_interval=getattr(args, 'global_read_interval', 1),
         global_write_start_layer=getattr(args, 'global_write_start_layer', 0),
+        disable_slot_adaptive_constraints=getattr(args, 'disable_slot_adaptive_constraints', False),
         # V10.22: Adaptive slot LR
         enable_adaptive_slot_lr=getattr(args, 'enable_adaptive_slot_lr', False),
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
