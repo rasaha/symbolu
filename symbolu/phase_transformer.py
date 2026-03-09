@@ -9207,6 +9207,10 @@ class SlotMemoryGCT(nn.Module):
         Args:
             retr_loss: Current retrieval loss value.
         """
+        # V11: Skip adaptation when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
         gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
 
         self._retr_loss_window.append(retr_loss)
