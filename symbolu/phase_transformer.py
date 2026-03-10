@@ -8619,11 +8619,11 @@ class SlotMemoryGCT(nn.Module):
         # V14-hotfix: Start at 0.5 (was 0.1) — the LM loss is the only signal
         # that knows what is "useful", so it needs to reach slot weights from
         # the start.  Curriculum ramps to 1.0 (full gradient) by step 12k.
-        self._soft_detach_leak = 0.5        # Start with 50% gradient leak
+        self._soft_detach_leak = 0.9        # V17: Start at 90% (was 50%) — LM gradient must reach writes early
         self._soft_detach_leak_min = 0.05   # Minimum leak (emergency only)
         self._soft_detach_leak_max = 1.0    # V14: Full gradient by curriculum end
         self._leak_curriculum_target = 1.0  # V14: Target leak at curriculum end
-        self._leak_curriculum_steps = 12000 # V14: Steps to reach full gradient
+        self._leak_curriculum_steps = 4000  # V17: Shortened from 12K — reach full gradient faster
         self._slot_pred_loss_window: List[float] = []  # Track slot_pred_loss for ppl-based ramp
         self._leak_ramp_ppl_threshold = 300.0  # Ramp leak when slot_pred_ppl drops below this
 
@@ -8696,9 +8696,9 @@ class SlotMemoryGCT(nn.Module):
         # content, building a functional relationship with memory. After the
         # freeze period, the gate unfreezes and can learn position-dependent
         # gating on top of the already-established slot integration.
-        self._read_gate_freeze_steps = 2000  # Freeze gate for first 2K steps
+        self._read_gate_freeze_steps = 500   # V17: Shortened from 2K — by PPL~600 slots have enough signal
         self._read_gate_frozen = True  # Start frozen
-        self._read_gate_freeze_value = 0.5  # Fixed gate value during freeze
+        self._read_gate_freeze_value = 1.0  # V17: Fully open (was 0.5) — force backbone to integrate slot reads
         # Start with gate params frozen
         self.read_gate_proj.weight.requires_grad = False
         self.read_gate_proj.bias.requires_grad = False
@@ -8811,7 +8811,7 @@ class SlotMemoryGCT(nn.Module):
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
         '_read_scale_max': 64.0,
-        '_soft_detach_leak': 0.5,        # V14-hotfix: Start at 50% (was 0.1)
+        '_soft_detach_leak': 0.9,        # V17: Start at 90% (was 50%) for early LM gradient
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
         '_coherence_floor': 0.3,          # V16: Semantic coherence gate floor
@@ -8958,11 +8958,11 @@ class SlotMemoryGCT(nn.Module):
         # V14-hotfix: Force new leak/ceiling values on resume from old checkpoints.
         # Old checkpoint may have _soft_detach_leak=0.1 and _gate_ceil_weight=5.0
         # which would undo the realignment.
-        if self._soft_detach_leak < 0.5:
+        if self._soft_detach_leak < 0.9:
             _old_leak = self._soft_detach_leak
-            self._soft_detach_leak = 0.5
-            print(f"  [SLOTS] V14: _soft_detach_leak {_old_leak:.2f} → 0.50 "
-                  f"(forced to new start for gradient curriculum)")
+            self._soft_detach_leak = 0.9
+            print(f"  [SLOTS] V17: _soft_detach_leak {_old_leak:.2f} → 0.90 "
+                  f"(forced to new start for stronger gradient curriculum)")
         if self._soft_detach_leak_max < 1.0:
             self._soft_detach_leak_max = 1.0
             print(f"  [SLOTS] V14: _soft_detach_leak_max raised to 1.0 (full gradient by curriculum end)")
@@ -9930,7 +9930,7 @@ class SlotMemoryGCT(nn.Module):
         _curriculum_target = getattr(self, '_leak_curriculum_target', 1.0)
         _curriculum_steps = getattr(self, '_leak_curriculum_steps', 12000)
         _router_step = getattr(self, '_router_step', 0)
-        _curriculum_leak = 0.5 + (_curriculum_target - 0.5) * min(1.0, _router_step / max(1, _curriculum_steps))
+        _curriculum_leak = 0.9 + (_curriculum_target - 0.9) * min(1.0, _router_step / max(1, _curriculum_steps))
         if self._soft_detach_leak < _curriculum_leak:
             old = self._soft_detach_leak
             self._soft_detach_leak = min(self._soft_detach_leak_max, _curriculum_leak)
