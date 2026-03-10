@@ -12993,6 +12993,11 @@ def train(config: UnifiedTrainingConfig):
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
 
+    # v2.2.1: Kosha Gyroscope Graduation tracking
+    kosha_graduation_monitor = None  # Not yet implemented - placeholder
+    kosha_graduated = False
+    vritti_resonance = None  # v2.3.0: Vritti Resonance Loss - placeholder
+
     # PPL-Gated Curriculum Controller
     curriculum_controller = None
     if config.enable_curriculum:
