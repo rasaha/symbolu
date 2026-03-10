@@ -8615,13 +8615,13 @@ class SlotMemoryGCT(nn.Module):
         # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
         # route to the same slot. Scale=5 gives enough sharpness to differentiate
         # while allowing more balanced slot utilization.
-        # V10.20: Lowered from 5→3→2. Init must match _wr_scale_max (2.0) so
-        # the parameter sits at the clamp boundary, not above it. When the param
-        # is above max, clamp output is constant → zero gradient → stuck forever.
-        # At the boundary, downward gradients flow through and the gyroscope can
-        # widen _wr_scale_max to let it learn upward too.
+        # V10.20→V12.3: Init at 1.8, safely below _wr_scale_max (2.0).
+        # Hard clamp kills gradient when value >= max, so init AT the boundary
+        # gives zero gradient and the parameter never moves. At 1.8 the param
+        # is inside the clamp's pass-through region → gradients flow → optimizer
+        # can push toward the ceiling → gyroscope detects pressure and relaxes.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(2.0))  # exp(log(2)) = 2.0 = _wr_scale_max
+            torch.tensor(math.log(1.8))  # exp(log(1.8)) ≈ 1.8, below _wr_scale_max=2.0
         )
 
         # --- READ path: query → slot attention ---
@@ -8780,16 +8780,17 @@ class SlotMemoryGCT(nn.Module):
             self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
             print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
                   f"(clamped to new floor)")
-        # V12.2: If loaded _write_log_scale is above _wr_scale_max, clamp it
-        # down. Otherwise the clamp output is constant and gradient is zero —
-        # the parameter can never learn.
-        _wr_ceil = math.log(self._wr_scale_max)
-        if self._write_log_scale.item() > _wr_ceil:
+        # V12.3: If loaded _write_log_scale is at or above _wr_scale_max,
+        # pull it to 90% of max. Hard clamp kills gradient at the boundary
+        # (value >= max → grad = 0), so we need to be strictly inside.
+        _wr_target = self._wr_scale_max * 0.9  # e.g. 2.0 * 0.9 = 1.8
+        _wr_target_log = math.log(_wr_target)
+        if self._write_log_scale.item() >= math.log(self._wr_scale_max) - 0.01:
             _old_wr = math.exp(self._write_log_scale.item())
             with torch.no_grad():
-                self._write_log_scale.fill_(_wr_ceil)
-            print(f"  [SLOTS] V12.2: _write_log_scale {math.log(_old_wr):.2f} (scale={_old_wr:.1f}) "
-                  f"→ {_wr_ceil:.2f} (scale={self._wr_scale_max:.1f}) (above ceiling, overridden)")
+                self._write_log_scale.fill_(_wr_target_log)
+            print(f"  [SLOTS] V12.3: _write_log_scale {math.log(_old_wr):.2f} (scale={_old_wr:.1f}) "
+                  f"→ {_wr_target_log:.2f} (scale={_wr_target:.1f}) (at/above ceiling, pulled inside)")
         # V12.1: If loaded _read_log_scale is below new floor, override it.
         # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
         # and the parameter can never learn upward.
