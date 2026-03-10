@@ -8973,15 +8973,17 @@ class SlotMemoryGCT(nn.Module):
         incoming_keys = incoming_keys / pressure_norm
         incoming_vals = incoming_vals / pressure_norm
 
-        # V10.20: L2-normalize incoming write vectors before EMA update.
+        # V10.20: L2-normalize incoming KEYS before EMA update.
         # Without this, unbounded incoming_keys magnitude drifts slot_keys
         # off the unit hypersphere, causing F.normalize Jacobian explosion
         # in subsequent forward passes. Normalizing here ensures the EMA
         # interpolates between unit vectors, keeping slot keys well-conditioned.
         _ik_norm = incoming_keys.norm(dim=-1, keepdim=True).clamp(min=1e-6)
         incoming_keys = incoming_keys / _ik_norm
-        _iv_norm = incoming_vals.norm(dim=-1, keepdim=True).clamp(min=1e-6)
-        incoming_vals = incoming_vals / _iv_norm
+        # V12.4: Do NOT normalize incoming_vals. Values carry magnitude info
+        # (how strongly a concept is represented), and L2-norm destroys it —
+        # all slot values get forced onto the unit sphere, reducing expressiveness.
+        # Keys need normalization (cosine routing), values don't.
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
@@ -9119,9 +9121,11 @@ class SlotMemoryGCT(nn.Module):
         # V12: Use read_query_proj (matches read() path) so retrieval loss
         # gradients train the read projection, not the write projection.
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        # Conservative clamp for retrieval loss: broad attention ensures
-        # multiple slot values get gradient signal (not just the top-1).
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        # V12.4: Match read() path scale — previously used _wr_scale_max (2.0)
+        # by copy-paste error, creating 9x temperature mismatch vs read() (18+).
+        # Retrieval loss trained read_query_proj for near-uniform attention
+        # while read() used peaky softmax → stuck retr_loss.
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9215,7 +9219,8 @@ class SlotMemoryGCT(nn.Module):
 
         # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        # V12.4: Match read() path scale (same fix as compute_retrieval_loss).
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
@@ -9561,10 +9566,17 @@ class SlotMemoryGCT(nn.Module):
         # ── (3) Gate ceiling weight (only) ────────────────────────────────
         # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
         # exclusively owned by update_write_gate_target() (200-step window).
+        # V12.4: Bidirectional — decay when gate near target, strengthen when
+        # gate has collapsed well below target (was one-way ratchet before).
         if avg_gate > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
             old_w = self._gate_ceil_weight
             self._gate_ceil_weight = max(1.0, self._gate_ceil_weight * 0.7)
-            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (pinned)")
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (near target, relaxing)")
+        elif avg_gate < self._gate_target * 0.5 and self._gate_ceil_weight < 5.0:
+            # Gate well below target — strengthen ceiling to push it open
+            old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = min(5.0, self._gate_ceil_weight * 1.3)
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (gate low, strengthening)")
 
         # ── (4) Novelty gate floor ────────────────────────────────────────
         # Gate collapsed at floor for sustained period → raise floor to rescue
