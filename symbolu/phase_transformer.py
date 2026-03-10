@@ -8521,8 +8521,8 @@ class SlotMemoryGCT(nn.Module):
         # This adds a soft quadratic ceiling that adapts based on write utility:
         # if retr_loss is improving → ceiling relaxes (writes are helpful),
         # if retr_loss stagnates while gate is high → ceiling tightens (churn).
-        self._gate_target = 0.35          # Adaptive ceiling (starts moderate)
-        self._gate_target_min = 0.20      # Never tighten below this
+        self._gate_target = 0.40          # Adaptive ceiling (raised from 0.35 to match new floor)
+        self._gate_target_min = 0.40      # Never tighten below this (raised from 0.20 to break ceiling-ablation feedback loop)
         self._gate_target_max = 0.60      # Never relax above this
         self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
         self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
@@ -8744,7 +8744,7 @@ class SlotMemoryGCT(nn.Module):
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
     _ADAPTIVE_DEFAULTS = {
-        '_gate_target': 0.35,
+        '_gate_target': 0.40,
         '_gate_ceil_weight': 5.0,
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
         '_wr_scale_max': 4.0,
@@ -8882,6 +8882,14 @@ class SlotMemoryGCT(nn.Module):
                     nn.init.constant_(self.read_gate_proj.bias, -2.0)
                 print(f"  [SLOTS] V13.1: read_gate_proj reset to zero-init "
                       f"(was norm={_gate_w_norm:.3f}, gate will start at ~0.12)")
+        # V13.2: Enforce gate_target floor on resume. Old checkpoints may have
+        # _gate_target tightened below the new floor (0.40), creating a feedback
+        # loop where the ceiling caps the write gate before slots prove useful.
+        if self._gate_target < self._gate_target_min:
+            _old_target = self._gate_target
+            self._gate_target = self._gate_target_min
+            print(f"  [SLOTS] V13.2: _gate_target {_old_target:.2f} → {self._gate_target_min:.2f} "
+                  f"(clamped to new floor)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
