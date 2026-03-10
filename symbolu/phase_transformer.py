@@ -8651,7 +8651,13 @@ class SlotMemoryGCT(nn.Module):
         # The model learns per-position when slot reads help.  Gate starts near
         # zero (bias=-2.0 → sigmoid≈0.12) so it's safe by default, then opens
         # where slots add value.  Full LM gradients flow through the gate.
+        # V13.1: Zero-init WEIGHT too. Default Kaiming init + hidden states with
+        # norm ~35 produces weight·x >> 2.0, overwhelming the -2.0 bias and
+        # pushing the gate to ~0.55 immediately. With zero weight, the gate
+        # output is purely sigmoid(bias)=0.12 regardless of input, and the
+        # weight then learns from scratch which directions should open it.
         self.read_gate_proj = nn.Linear(embed_dim, 1)
+        nn.init.zeros_(self.read_gate_proj.weight)
         nn.init.constant_(self.read_gate_proj.bias, -2.0)
         # Diagnostic: average gate activation across positions
         self._diag_read_gate_mean: float = 0.0
@@ -8864,6 +8870,18 @@ class SlotMemoryGCT(nn.Module):
                 self._read_log_scale.fill_(_rd_above_floor)
             print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
                   f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
+        # V13.1: Reset read_gate_proj to zero-init on resume. Checkpoints
+        # saved with Kaiming-init weights have random weight·x >> bias, pushing
+        # the gate to ~0.55 immediately instead of starting at sigmoid(-2)=0.12.
+        # Zero the weight so the gate starts content-independent and learns from scratch.
+        if hasattr(self, 'read_gate_proj'):
+            _gate_w_norm = self.read_gate_proj.weight.data.norm().item()
+            if _gate_w_norm > 0.01:  # Only reset if not already near-zero
+                with torch.no_grad():
+                    nn.init.zeros_(self.read_gate_proj.weight)
+                    nn.init.constant_(self.read_gate_proj.bias, -2.0)
+                print(f"  [SLOTS] V13.1: read_gate_proj reset to zero-init "
+                      f"(was norm={_gate_w_norm:.3f}, gate will start at ~0.12)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
