@@ -8582,7 +8582,7 @@ class SlotMemoryGCT(nn.Module):
         # (spread ~0.05), so scale=5 produces near-uniform softmax over 16 slots.
         # Floor=18 ≈ num_slots. Ceiling=64 gives gyroscope room to widen.
         self._read_scale_max = 64.0         # High ceiling so optimizer isn't clamped
-        self._read_scale_max_limit = 64.0   # Already at max — no gyroscope widening needed
+        self._read_scale_max_limit = 128.0  # V12.4: Allow gyroscope to widen if optimizer pushes
 
         # (f) Router noise — tie decay to marginal_H instead of fixed schedule
         self._adaptive_router_noise = True  # Enable marginal_H-based noise
@@ -8915,13 +8915,16 @@ class SlotMemoryGCT(nn.Module):
             # V10.14.8: Decay toward floor instead of 0
             _noise_decay = max(0.0, 1.0 - self._router_step / self._router_noise_warmup)
             _noise_std = self._router_noise_floor + (self._router_noise_std - self._router_noise_floor) * _noise_decay
-            # V10.29: If marginal_H is high (slots uniform), keep noise higher
-            # to maintain exploration; if slots are differentiated, let it decay.
+            # V10.29/V12.4: If marginal_H is high (slots uniform), boost noise
+            # to maintain exploration; if differentiated, accelerate decay.
+            # V12.4: Scale boost by _noise_decay so it fades with training
+            # instead of holding at a fixed 50% forever. At step 0 boost=25%
+            # of initial; at warmup end boost=0 (floor only).
             if self._adaptive_router_noise:
                 _mH = getattr(self, '_diag_marginal_entropy', None)
                 if _mH is not None and _mH > 0.90:
-                    # Slots still uniform — boost noise to at least 50% of initial
-                    _noise_std = max(_noise_std, self._router_noise_std * 0.5)
+                    _boost = self._router_noise_std * 0.25 * (0.5 + 0.5 * _noise_decay)
+                    _noise_std = max(_noise_std, _boost)
                 elif _mH is not None and _mH < 0.5:
                     # Slots well-differentiated — accelerate decay
                     _noise_std = max(self._router_noise_floor, _noise_std * 0.5)
@@ -9345,16 +9348,27 @@ class SlotMemoryGCT(nn.Module):
         # Penalize slot keys for being too similar. Without this, EMA updates
         # drift keys toward the mean token embedding → all slots become identical.
         # L_ortho = ||K·K^T - I||_F^2 / K^2 (normalized Frobenius norm)
+        # V12.4: Apply to BOTH _last_slot_keys (post-EMA, indirect gradient)
+        # AND slot_keys_init (direct gradient to the learnable parameter).
+        # Previously only applied to _last_slot_keys, but gradient through EMA
+        # is attenuated by η≈0.1 and the .clone() + detach in the assignment
+        # path makes it very indirect. Direct term on slot_keys_init ensures
+        # the initial key configuration stays orthogonal.
         L_ortho = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        # (a) Post-EMA keys (existing)
         if hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
             _sk = F.normalize(self._last_slot_keys, dim=-1)  # [B, K, D]
-            # Cosine similarity matrix: [B, K, K]
-            _sim = torch.bmm(_sk, _sk.transpose(1, 2))  # diagonal = 1.0
-            # Zero out diagonal (self-similarity is always 1, not informative)
+            _sim = torch.bmm(_sk, _sk.transpose(1, 2))
             _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
             _off_diag = _sim - _eye.unsqueeze(0)
             L_ortho = (_off_diag ** 2).mean()
             self._diag_L_ortho = L_ortho.item()
+        # (b) Direct term on slot_keys_init (learnable parameter)
+        _sk_init = F.normalize(self.slot_keys_init, dim=-1)  # [K, D_key]
+        _sim_init = _sk_init @ _sk_init.t()  # [K, K]
+        _eye_init = torch.eye(self.num_slots, device=_sim_init.device, dtype=_sim_init.dtype)
+        L_ortho_init = ((_sim_init - _eye_init) ** 2).mean()
+        L_ortho = L_ortho + L_ortho_init
 
         # V10.14.8: L_bal weight 0.02→1.0. At 0.02 the balance loss contributed
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
