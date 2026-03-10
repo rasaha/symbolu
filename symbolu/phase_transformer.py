@@ -8529,7 +8529,7 @@ class SlotMemoryGCT(nn.Module):
         # slots get meaningful writes → retrieval loss provides gradient → gate
         # can learn to modulate. If writing is too aggressive, the gate will
         # learn to close — but starting too low creates a chicken-and-egg trap.
-        nn.init.constant_(self.write_novelty_gate.bias, 1.0)
+        nn.init.constant_(self.write_novelty_gate.bias, 2.0)  # V18: sigmoid(2)≈0.88 — start wide open
         # V10.14.7: Gate floor moved to V10.29 adaptive block below.
 
         # V10.27: Adaptive write gate ceiling — prevents runaway gate opening.
@@ -8538,9 +8538,9 @@ class SlotMemoryGCT(nn.Module):
         # This adds a soft quadratic ceiling that adapts based on write utility:
         # if retr_loss is improving → ceiling relaxes (writes are helpful),
         # if retr_loss stagnates while gate is high → ceiling tightens (churn).
-        self._gate_target = 0.40          # Adaptive ceiling (raised from 0.35 to match new floor)
-        self._gate_target_min = 0.40      # Never tighten below this (raised from 0.20 to break ceiling-ablation feedback loop)
-        self._gate_target_max = 0.60      # Never relax above this
+        self._gate_target = 0.80          # V18: Forced open — bootstrap slot content before learning to gate
+        self._gate_target_min = 0.70      # V18: High floor to keep gate open during bootstrap
+        self._gate_target_max = 0.90      # V18: Allow near-full write
         self._gate_ceil_weight = 50.0     # V14-hotfix: Linear+ReLU penalty weight (was 5.0 quadratic)
         self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
@@ -8576,9 +8576,9 @@ class SlotMemoryGCT(nn.Module):
         # update_constraint_relaxation() runs every _constraint_relax_interval steps.
 
         # (a) Novelty gate floor — raise when gate collapsed, lower when healthy
-        self._novelty_gate_floor = 0.15
-        self._novelty_gate_floor_min = 0.05   # Can drop to give more dynamic range
-        self._novelty_gate_floor_max = 0.30   # Emergency rescue ceiling
+        self._novelty_gate_floor = 0.50         # V18: Force gate open — slots must get content to bootstrap
+        self._novelty_gate_floor_min = 0.30   # V18: Even minimum is aggressive
+        self._novelty_gate_floor_max = 0.70   # V18: Rescue ceiling also raised
 
         # (b) Retrieval loss weight — scale down when retr_loss dominates,
         #     scale up when slots are helping (caller tracks this externally)
@@ -8801,12 +8801,12 @@ class SlotMemoryGCT(nn.Module):
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
     _ADAPTIVE_DEFAULTS = {
-        '_gate_target': 0.40,
+        '_gate_target': 0.80,             # V18: Forced open for bootstrap
         '_gate_ceil_weight': 50.0,       # V14-hotfix: Linear+ReLU (was 5.0 quadratic)
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
         '_wr_scale_max': 4.0,
         '_L_bal_weight': 1.0,
-        '_novelty_gate_floor': 0.15,
+        '_novelty_gate_floor': 0.50,     # V18: Forced open for bootstrap
         '_adaptive_retr_loss_weight': 1.0,
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
