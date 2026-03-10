@@ -7108,12 +7108,15 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        # V11.3: Capture pre-attention hidden state for retrieval loss.
-        # Post-backbone x is redundant with lm_head(x) — slots trained on it
-        # just learn to copy the backbone's own prediction. Pre-attention x
-        # (token embed + position, zero attention context) forces slots to
-        # provide information the query genuinely lacks.
-        _x_pre_attn = x.detach()
+        # V11.3→V14-hotfix: Query source for slot retrieval/prediction losses.
+        # V11.3 used pre-attention embeddings (token embed + position only),
+        # making slots a simple bigram lookup table.
+        # V14: Capture after last Local layer instead (set below in the loop).
+        # By that point the model has processed local syntax, so the query
+        # becomes "I've seen these N words, what global fact comes next?"
+        # rather than "I am token X, what is X usually near?"
+        _x_pre_attn = x.detach()  # Fallback only; overwritten after Local block
+        _x_post_local = None  # Will be set after layer (local_layers - 1)
 
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
@@ -7170,6 +7173,12 @@ class HybridPhaseTransformer(nn.Module):
                         x = block(x, causal_mask=True, intent_phase=block_intent)
                 else:
                     x = block(x, causal_mask=True)
+
+            # V14-hotfix: Capture hidden state after last Local layer for slot
+            # query source.  Local layers process syntax; this gives the slot
+            # queries richer context than raw embeddings.
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
 
             # =================================================================
             # V10.13/V10.14: GCT — Token READ from memory
@@ -7299,7 +7308,9 @@ class HybridPhaseTransformer(nn.Module):
             # Pre-attention x (embed + position only) forces slots to provide
             # information that attention hasn't yet injected.
             # Already detached at capture point (line ~7114).
-            result['_slot_hidden'] = _x_pre_attn  # Pre-attention for non-redundant retrieval
+            # V14-hotfix: Use post-local hidden state (richer syntax context)
+            # instead of pre-attention embeddings (bare token+position).
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
 
         return result
 
@@ -7351,8 +7362,10 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        # V11.3: Pre-attention capture (mirrors forward())
+        # V11.3→V14-hotfix: Pre-attention capture (fallback), overwritten by
+        # post-local capture below.
         _x_pre_attn = x.detach()
+        _x_post_local = None
 
         # Initialize states if not provided
         if prev_layer_states is None:
@@ -7401,6 +7414,10 @@ class HybridPhaseTransformer(nn.Module):
             else:
                 # Local-only blocks: no state to manage
                 x = block(x, causal_mask=True)
+
+            # V14-hotfix: Capture post-local hidden state (mirrors forward())
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
 
             # V10.13/V10.14: GCT read/write (same logic as forward())
             if self.global_tokens_enabled:
@@ -7478,8 +7495,8 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            # V11.3: Pre-attention hidden (mirrors forward())
-            result['_slot_hidden'] = _x_pre_attn
+            # V14-hotfix: Post-local hidden state (mirrors forward())
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
 
         return result, next_layer_states
 
@@ -8524,7 +8541,7 @@ class SlotMemoryGCT(nn.Module):
         self._gate_target = 0.40          # Adaptive ceiling (raised from 0.35 to match new floor)
         self._gate_target_min = 0.40      # Never tighten below this (raised from 0.20 to break ceiling-ablation feedback loop)
         self._gate_target_max = 0.60      # Never relax above this
-        self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._gate_ceil_weight = 50.0     # V14-hotfix: Linear+ReLU penalty weight (was 5.0 quadratic)
         self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
@@ -8599,9 +8616,14 @@ class SlotMemoryGCT(nn.Module):
         # though slots weren't storing useful info (ppl=395).  Now: when
         # slot_pred_ppl drops below threshold, ramp leak so LM gradients
         # flow into writes and accelerate slot content improvement.
-        self._soft_detach_leak = 0.1        # Default 10% gradient leak
-        self._soft_detach_leak_min = 0.05   # Minimum leak
-        self._soft_detach_leak_max = 0.5    # V13: Raised from 0.3→0.5 to allow stronger signal
+        # V14-hotfix: Start at 0.5 (was 0.1) — the LM loss is the only signal
+        # that knows what is "useful", so it needs to reach slot weights from
+        # the start.  Curriculum ramps to 1.0 (full gradient) by step 12k.
+        self._soft_detach_leak = 0.5        # Start with 50% gradient leak
+        self._soft_detach_leak_min = 0.05   # Minimum leak (emergency only)
+        self._soft_detach_leak_max = 1.0    # V14: Full gradient by curriculum end
+        self._leak_curriculum_target = 1.0  # V14: Target leak at curriculum end
+        self._leak_curriculum_steps = 12000 # V14: Steps to reach full gradient
         self._slot_pred_loss_window: List[float] = []  # Track slot_pred_loss for ppl-based ramp
         self._leak_ramp_ppl_threshold = 300.0  # Ramp leak when slot_pred_ppl drops below this
 
@@ -9225,11 +9247,14 @@ class SlotMemoryGCT(nn.Module):
         # V12: Use read_query_proj (matches read() path) so retrieval loss
         # gradients train the read projection, not the write projection.
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        # V12.4: Match read() path scale — previously used _wr_scale_max (2.0)
-        # by copy-paste error, creating 9x temperature mismatch vs read() (18+).
-        # Retrieval loss trained read_query_proj for near-uniform attention
-        # while read() used peaky softmax → stuck retr_loss.
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
+        # V14-hotfix: Sync scale with read() exactly. Previously used
+        # exp(x).clamp() (clamp in linear space) while read() uses
+        # exp(x.clamp()) (clamp in log space). The mismatch means retrieval
+        # loss evaluates at a different temperature than inference read(),
+        # causing gradients to optimize for the wrong sharpness.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9323,8 +9348,11 @@ class SlotMemoryGCT(nn.Module):
 
         # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        # V12.4: Match read() path scale (same fix as compute_retrieval_loss).
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
+        # V14-hotfix: Sync scale with read() exactly — clamp in log space,
+        # same floor (log(18.0)) so loss evaluates at inference temperature.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
         _q_norm = F.normalize(queries, dim=-1)
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
@@ -9476,13 +9504,14 @@ class SlotMemoryGCT(nn.Module):
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
         # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
         # when fully collapsed, providing meaningful gradient to redistribute.
-        # V10.27: Adaptive gate ceiling — soft quadratic penalty above target.
-        # Below target: only log-barrier (pushes open, existing behavior).
-        # Above target: quadratic penalty pushes closed, preventing churn.
+        # V14-hotfix: Hard gate ceiling — Linear+ReLU penalty (was soft quadratic).
+        # Quadratic was too gentle at small violations and too aggressive at large
+        # ones, creating unstable oscillations.  Linear penalty with high weight
+        # (50.0) provides consistent, strong enforcement.
         L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
         if self._last_novelty is not None:
             gate_mean = self._last_novelty.mean()
-            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin) ** 2
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin)
 
         # V10.29: All loss weights are adaptive
         return (self._L_sharp_weight * L_sharp + self._L_bal_weight * L_bal
@@ -9788,25 +9817,20 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
 
         # ── (9) Soft detach leak ──────────────────────────────────────────
-        # V13/B1-fix: Ramp based on slot_pred_ppl (content quality signal),
-        # not gate health.  The gate being healthy (0.4) doesn't mean slots
-        # contain useful info — it just means tokens are writing.  The real
-        # question is: does slot content help predict next tokens?
-        # When slot_pred_ppl drops below threshold, ramp leak so LM loss
-        # gradients flow into the write path, accelerating content improvement.
-        # Secondary: still rescue on gate collapse as emergency fallback.
-        _avg_sp_loss = (sum(self._slot_pred_loss_window) / len(self._slot_pred_loss_window)
-                        if self._slot_pred_loss_window else 99.0)
-        _avg_sp_ppl = math.exp(min(_avg_sp_loss, 20.0))
-        if _avg_sp_ppl < self._leak_ramp_ppl_threshold and self._soft_detach_leak < self._soft_detach_leak_max:
-            # Slots show signal — ramp leak to let LM loss shape writes
-            # Ramp speed proportional to how far below threshold (faster when clearly useful)
-            _ppl_ratio = _avg_sp_ppl / self._leak_ramp_ppl_threshold  # 0→1, lower=better
-            _step_size = 0.02 + 0.03 * (1.0 - _ppl_ratio)  # 0.02 at threshold, 0.05 at ppl→0
+        # V14-hotfix: Deterministic curriculum — ramp leak linearly from 0.5
+        # to 1.0 over _leak_curriculum_steps.  The LM loss is the only signal
+        # that knows what is "useful" for generation; the retrieval loss only
+        # knows what is "storable".  Adaptive ramp was too slow (waited for
+        # ppl < 300 that never came).  Curriculum forces integration.
+        _curriculum_target = getattr(self, '_leak_curriculum_target', 1.0)
+        _curriculum_steps = getattr(self, '_leak_curriculum_steps', 12000)
+        _router_step = getattr(self, '_router_step', 0)
+        _curriculum_leak = 0.5 + (_curriculum_target - 0.5) * min(1.0, _router_step / max(1, _curriculum_steps))
+        if self._soft_detach_leak < _curriculum_leak:
             old = self._soft_detach_leak
-            self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + _step_size)
+            self._soft_detach_leak = min(self._soft_detach_leak_max, _curriculum_leak)
             changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
-                           f"(slot_pred_ppl={_avg_sp_ppl:.0f} < {self._leak_ramp_ppl_threshold:.0f})")
+                           f"(curriculum step {_router_step}/{_curriculum_steps})")
         elif avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
             # Emergency fallback: gate collapsed, need gradient to rescue writes
             old = self._soft_detach_leak
