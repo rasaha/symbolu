@@ -8622,12 +8622,12 @@ class SlotMemoryGCT(nn.Module):
         )
 
         # --- READ path: query → slot attention ---
-        # V10.14.2: Read queries share write_key_proj (same key space).
-        # V10.14.3: Read also shares _write_log_scale (same temperature).
-        #   The separate _read_log_scale collapsed to 0.057 because the main
-        #   LM loss actively suppresses noisy reads. But _write_log_scale is
-        #   pushed UP by sharpness loss → shared scale prevents read collapse.
-        # read_query_proj kept for backward compat but unused.
+        # V12: Separate read_query_proj ACTIVE. Previously shared write_key_proj
+        # (V10.14.2), but write and read are different tasks — write asks "where
+        # to store" while read asks "what do I need." Shared projection meant
+        # write gradients dominated, leaving read queries unable to discriminate
+        # between slots (read_H pegged at max entropy ~4.0 for 16 slots).
+        # Separate projection lets retrieval loss train read queries independently.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.read_dropout = nn.Dropout(dropout)
@@ -8778,6 +8778,15 @@ class SlotMemoryGCT(nn.Module):
             self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
             print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
                   f"(clamped to new floor)")
+        # V12: Re-ramp read warmstart on resume so fresh read_query_proj
+        # doesn't immediately dump noisy reads into the residual stream.
+        # Shift warmstart center to current step → sigmoid re-ramps over
+        # ~100 steps from ~0 to ~1, giving read_query_proj time to learn.
+        _step = int(self._router_step_buf.item())
+        if _step > self._read_warmstart_center + 200:
+            self._read_warmstart_center = _step
+            print(f"  [SLOTS] V12: read warmstart re-centered to step {_step} "
+                  f"(read_query_proj now active, re-ramping)")
         return result
 
     @property
@@ -9012,19 +9021,16 @@ class SlotMemoryGCT(nn.Module):
         Returns:
             read_output: [B, N, D] — retrieved information
         """
-        # V10.14.2: Read queries use write_key_proj (shared key space).
-        # This ensures read queries naturally match the same slot keys that
-        # the write path used, enabling content-based key-value lookup.
-        queries = self.write_key_proj(x)  # [B, N, D_key]
+        # V12: Separate read_query_proj — read queries learn independently
+        # from write queries, trained by retrieval loss only.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
 
-        # V10.21: Cosine similarity for reads with SEPARATE temperature.
-        # Both queries and slot keys are L2-normalized.
-        # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        # Separate from write scale: read needs to learn its own sharpness
-        # since reads are detached from LM loss (different gradient regime).
-        # V10.29: Read scale max adapts like write scale max
+        # V12: Read scale floor raised to 4.0 (from 1.0). With cosine
+        # similarity, scale=2.0 can't amplify small sim differences enough
+        # to break uniform attention over 16 slots. Floor=4.0 ensures
+        # minimum sharpness while _read_log_scale can still learn higher.
         _read_scale = torch.exp(
-            self._read_log_scale.clamp(min=math.log(1.0), max=math.log(self._read_scale_max))
+            self._read_log_scale.clamp(min=math.log(4.0), max=math.log(self._read_scale_max))
         )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys in read path (same rationale as write path).
@@ -9087,12 +9093,12 @@ class SlotMemoryGCT(nn.Module):
         if query_mask is None or not query_mask.any():
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Same attention as read(): cosine similarity with shared key space.
-        queries = self.write_key_proj(x)  # [B, N, D_key]
-        # V10.25: Match write() clamp [1.5, 2.0] — retrieval loss is the
-        # ONLY gradient source for slot values, so peaky attention here
-        # (scale 3-4) kills the learning signal just like in write().
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        # V12: Use read_query_proj (matches read() path) so retrieval loss
+        # gradients train the read projection, not the write projection.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # Conservative clamp for retrieval loss: broad attention ensures
+        # multiple slot values get gradient signal (not just the top-1).
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._wr_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9184,9 +9190,9 @@ class SlotMemoryGCT(nn.Module):
         if query_mask is None or not query_mask.any():
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Retrieve from slots using same attention mechanism as read()
-        queries = self.write_key_proj(x)  # [B, N, D_key]
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._wr_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
