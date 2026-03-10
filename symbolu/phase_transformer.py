@@ -8643,6 +8643,13 @@ class SlotMemoryGCT(nn.Module):
         # slow down to preserve good content already stored.
         self._write_lr_min = 0.05            # Floor: always some update
         self._write_lr_max = 0.5             # Ceiling: never overwrite >50%
+        # Plasticity Schedule: keep write_lr high (0.5) during bootstrap phase
+        # (first 5k steps), then linearly cool to 0.1 over the next 5k steps
+        # for stability during the Refinement phase.
+        self._plasticity_high = 0.5          # Bootstrap phase write_lr
+        self._plasticity_low = 0.1           # Refinement phase write_lr
+        self._plasticity_warmup_end = 5000   # Steps at full plasticity
+        self._plasticity_cooldown_end = 10000  # Steps when cooldown finishes
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -9201,7 +9208,21 @@ class SlotMemoryGCT(nn.Module):
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
-        eta = self.write_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
+        # Plasticity Schedule: override write_lr based on training phase.
+        # Bootstrap (0–5k): full plasticity at 0.5
+        # Cooldown (5k–10k): linear decay 0.5 → 0.1
+        # Refinement (10k+): stable at 0.1 (Sovereign Controller can still adjust)
+        _step = self._router_step
+        if _step < self._plasticity_warmup_end:
+            _effective_lr = self._plasticity_high
+        elif _step < self._plasticity_cooldown_end:
+            _cool_progress = (_step - self._plasticity_warmup_end) / max(
+                1, self._plasticity_cooldown_end - self._plasticity_warmup_end
+            )
+            _effective_lr = self._plasticity_high + (self._plasticity_low - self._plasticity_high) * _cool_progress
+        else:
+            _effective_lr = self.write_lr  # Sovereign Controller takes over
+        eta = _effective_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
 
         if detach:
             incoming_keys = incoming_keys.detach()
