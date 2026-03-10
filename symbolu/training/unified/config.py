@@ -686,6 +686,10 @@ class UnifiedTrainingConfig:
     enable_12d_health_monitor: bool = True  # Track ontology projection health (SVD, variance, drift)
     health_monitor_interval: int = 100      # Steps between 12D health checks
     enable_gradient_tracker: bool = True    # Track gradient variance & direction stability
+    enable_variance_dampen: bool = True    # V10.24: Adaptive LR dampening on variance spikes
+    variance_dampen_threshold: int = 3     # Min spiking layers to engage dampening
+    variance_dampen_min: float = 0.5       # Floor for variance dampening factor
+    variance_dampen_recovery: float = 0.02 # Recovery rate per step toward 1.0
 
     # Phase 3: Bliss Gating (adaptive λ_eff for CSR injection)
     enable_bliss_gating: bool = False        # Phase 3: Bliss modulates csr_lambda via sigmoid gate

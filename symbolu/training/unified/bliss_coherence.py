@@ -414,7 +414,9 @@ class GradientVarianceTracker:
     to detect instability from dual injection paths and coherence feedback.
     """
 
-    def __init__(self, window_size: int = 100, variance_spike_factor: float = 10.0):
+    def __init__(self, window_size: int = 100, variance_spike_factor: float = 10.0,
+                 adaptive_dampen: bool = True, dampen_threshold_layers: int = 3,
+                 dampen_min_factor: float = 0.5, dampen_recovery_rate: float = 0.02):
         self.window_size = window_size
         self.variance_spike_factor = variance_spike_factor
 
@@ -431,6 +433,16 @@ class GradientVarianceTracker:
         # V10.15: Increased from 0.01 to 0.05 so baseline tracks LR warmup
         # faster, preventing false positive spike alerts during warmup phase
         self._baseline_ema_alpha = 0.05
+
+        # V10.24: Adaptive variance dampening — when multiple layers spike
+        # simultaneously, reduce LR to let gradients stabilize before they
+        # cascade into destructive weight updates.
+        self.adaptive_dampen = adaptive_dampen
+        self.dampen_threshold_layers = dampen_threshold_layers  # N layers spiking → engage
+        self.dampen_min_factor = dampen_min_factor  # Floor for LR multiplier
+        self.dampen_recovery_rate = dampen_recovery_rate  # How fast factor recovers per step
+        self._dampen_factor = 1.0  # Current LR multiplier (1.0 = no dampening)
+        self._spiking_layers_count = 0  # Layers spiking this step
 
     def notify_lr_change(self, factor: float):
         """Scale baselines when LR changes abruptly (e.g. LR boost).
@@ -549,5 +561,38 @@ class GradientVarianceTracker:
 
         results['total_grad_norm'] = total_norm ** 0.5
         results['param_count'] = param_count
+
+        # V10.24: Adaptive variance dampening
+        # Count how many tracked layers are currently above spike threshold
+        spiking_now = 0
+        tracked_with_baseline = 0
+        for name, history in self._grad_history.items():
+            if len(history) >= self.window_size and name in self._baseline_variance:
+                tracked_with_baseline += 1
+                norms = history
+                mean_val = sum(norms) / len(norms)
+                var = sum((x - mean_val) ** 2 for x in norms) / len(norms)
+                if var > self.variance_spike_factor * self._baseline_variance[name]:
+                    spiking_now += 1
+
+        self._spiking_layers_count = spiking_now
+        results['spiking_layers'] = spiking_now
+        results['tracked_layers'] = tracked_with_baseline
+
+        if self.adaptive_dampen:
+            if spiking_now >= self.dampen_threshold_layers:
+                # Proportional dampening: more spiking layers → stronger dampening
+                # Scale: 3 layers → 0.85, 6 layers → 0.70, 10+ → dampen_min_factor
+                spike_ratio = min(spiking_now / max(tracked_with_baseline, 1), 1.0)
+                target = max(1.0 - spike_ratio, self.dampen_min_factor)
+                # Snap down fast (one step), recover slowly
+                self._dampen_factor = min(self._dampen_factor, target)
+            else:
+                # Recover gradually toward 1.0
+                self._dampen_factor = min(
+                    1.0, self._dampen_factor + self.dampen_recovery_rate
+                )
+
+        results['variance_dampen_factor'] = self._dampen_factor
 
         return results

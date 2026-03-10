@@ -843,8 +843,15 @@ def train(config: UnifiedTrainingConfig):
         print(f"  [Appendix G] 12D Health Monitor: ENABLED (every {config.health_monitor_interval} steps)")
 
     if config.enable_gradient_tracker:
-        gradient_variance_tracker = GradientVarianceTracker(window_size=100)
-        print(f"  [Appendix G] Gradient Variance Tracker: ENABLED (window=100)")
+        gradient_variance_tracker = GradientVarianceTracker(
+            window_size=100,
+            adaptive_dampen=config.enable_variance_dampen,
+            dampen_threshold_layers=config.variance_dampen_threshold,
+            dampen_min_factor=config.variance_dampen_min,
+            dampen_recovery_rate=config.variance_dampen_recovery,
+        )
+        dampen_str = f", adaptive_dampen={'ON' if config.enable_variance_dampen else 'OFF'}"
+        print(f"  [Appendix G] Gradient Variance Tracker: ENABLED (window=100{dampen_str})")
 
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
@@ -4974,7 +4981,7 @@ def train(config: UnifiedTrainingConfig):
             if gradient_variance_tracker is not None:
                 grad_health = gradient_variance_tracker.record(model, global_step=global_step)
                 metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
-                if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                if grad_health.get('alerts') and global_step % config.log_every == 0:
                     for alert in grad_health['alerts']:
                         print(f"  [GRAD ALERT] {alert}", flush=True)
 
@@ -4983,7 +4990,7 @@ def train(config: UnifiedTrainingConfig):
                     jepa_proj_grad_health = gradient_variance_tracker.record(
                         jepa_injection_projector
                     )
-                    if jepa_proj_grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                    if jepa_proj_grad_health.get('alerts') and global_step % config.log_every == 0:
                         for alert in jepa_proj_grad_health['alerts']:
                             print(f"  [GRAD ALERT JEPA-Proj] {alert}", flush=True)
 
@@ -4997,6 +5004,26 @@ def train(config: UnifiedTrainingConfig):
                 )
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+            # V10.24: Adaptive variance dampening — when the GradientVarianceTracker
+            # detects sustained oscillation across multiple layers (not just a one-off
+            # norm spike), scale down LR proportionally. The throttle catches acute
+            # spikes; this catches chronic instability that the throttle misses.
+            # Applied temporarily: LR is scaled down before optimizer.step(), then
+            # restored after, so the throttle's _unthrottled_lr tracking isn't corrupted.
+            variance_dampen = 1.0
+            _pre_dampen_lrs = None
+            if gradient_variance_tracker is not None and grad_health is not None:
+                variance_dampen = grad_health.get('variance_dampen_factor', 1.0)
+                if variance_dampen < 1.0:
+                    _pre_dampen_lrs = [pg['lr'] for pg in optimizer.param_groups]
+                    for pg in optimizer.param_groups:
+                        pg['lr'] *= variance_dampen
+                    metrics['variance_dampen'] = variance_dampen
+                    if global_step % config.log_every == 0:
+                        spiking = grad_health.get('spiking_layers', 0)
+                        tracked = grad_health.get('tracked_layers', 0)
+                        print(f"  [GRAD VARIANCE] {spiking}/{tracked} layers spiking | LR x{variance_dampen:.2f}")
 
             # V10.15/V10.17: Clip slot memory gradients with per-element capping.
             # Slot keys live on the unit hypersphere — even a single large gradient
@@ -5065,6 +5092,14 @@ def train(config: UnifiedTrainingConfig):
                 scaler.update()
             else:
                 optimizer.step()
+
+            # V10.24: Restore LR after variance dampening (temporary per-step reduction)
+            if _pre_dampen_lrs is not None:
+                for pg, orig_lr in zip(optimizer.param_groups, _pre_dampen_lrs):
+                    pg['lr'] = orig_lr
+                    # Also update throttle's tracking so it doesn't snapshot the dampened LR
+                    if '_throttle_applied_lr' in pg:
+                        pg['_throttle_applied_lr'] = orig_lr
 
             # Formula [1331] 9:3 Split: Update gradient scaler warmup schedule
             hgs_metrics = {}
@@ -5528,6 +5563,10 @@ def train(config: UnifiedTrainingConfig):
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
 
+                    # Gradient norm (tracked every step, logged every log_every)
+                    if 'grad_total_norm' in metrics:
+                        log_msg += f" | GradN: {metrics['grad_total_norm']:.2f}"
+
                     # Add decorr_loss if enabled
                     if 'decorr_loss' in metrics:
                         log_msg += f" | Decorr: {metrics['decorr_loss']:.4f}"
@@ -5892,6 +5931,14 @@ def train(config: UnifiedTrainingConfig):
                     except Exception as e:
                         if global_step % 100 == 0:
                             print(f"    ⚠️ [SOVEREIGN] Diagnostic error: {e}", flush=True)
+
+                # TensorBoard: Log gradient norm at log_every cadence for variance visibility
+                if tb_writer is not None and 'grad_total_norm' in metrics:
+                    tb_writer.add_scalar("grad/total_norm", metrics['grad_total_norm'], global_step)
+                    if 'raw_grad_norm' in dir() and raw_grad_norm is not None:
+                        tb_writer.add_scalar("grad/raw_norm_pre_clip", raw_grad_norm, global_step)
+                    if 'variance_dampen' in metrics:
+                        tb_writer.add_scalar("grad/variance_dampen", metrics['variance_dampen'], global_step)
 
                 step_start_time = time.time()
 
