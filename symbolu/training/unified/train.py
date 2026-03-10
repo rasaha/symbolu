@@ -6375,8 +6375,9 @@ def train(config: UnifiedTrainingConfig):
                         # Graduation ceremony!
                         print(f"\n  {'='*60}")
                         print(f"  🎓 KOSHA GYROSCOPE GRADUATION at step {global_step}")
-                        print(f"     Mean PPL: {kosha_graduation_monitor.mean_ppl:.2f} < {config.gyroscope_graduation_ppl}")
-                        print(f"     PPL σ:    {kosha_graduation_monitor.variance:.3f} < {config.gyroscope_graduation_variance}")
+                        grad_info = kosha_graduation_monitor.graduation_info
+                        print(f"     Mean PPL: {grad_info['avg_ppl']:.2f} < {config.gyroscope_graduation_ppl}")
+                        print(f"     PPL σ:    {grad_info['std_ppl']:.3f} < {config.gyroscope_graduation_variance}")
                         print(f"     Model has learned to self-regulate!")
                         print(f"     Gyroscope transitioning to ramp-down phase...")
 
