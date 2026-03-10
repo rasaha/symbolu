@@ -8489,7 +8489,10 @@ class SlotMemoryGCT(nn.Module):
         super().__init__()
         self.num_slots = num_slots
         self.embed_dim = embed_dim
-        self.write_lr = write_lr
+        # Triple-Patch: write_lr as nn.Parameter (init 0.5) so the Sovereign
+        # Controller optimizer can adjust it via gradients, in addition to the
+        # existing manual adaptive schedule.
+        self.write_lr = nn.Parameter(torch.tensor(0.5))
         self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
 
@@ -9151,7 +9154,13 @@ class SlotMemoryGCT(nn.Module):
         _coh_progress = min(1.0, self._router_step / max(1, self._coherence_floor_decay_steps))
         _coh_floor = self._coherence_floor + (self._coherence_floor_min - self._coherence_floor) * _coh_progress
         coherence = torch.clamp(coherence, min=_coh_floor)
-        gated_assignment = gated_assignment * coherence
+        # Triple-Patch: Bypass coherence gating for first 2k steps to break
+        # the Coherence Catch-22 (slots empty → coherence≈0 → writes blocked
+        # → slots stay empty). After 2k steps, coherence gating kicks in.
+        if self._router_step < 2000:
+            gated_assignment = gated_assignment * torch.ones_like(coherence)
+        else:
+            gated_assignment = gated_assignment * coherence
 
         # Aggregate writes per slot: sum over tokens
         # effective_write[b, k] = sum_t(gated_assignment[b, t, k])
@@ -9266,12 +9275,13 @@ class SlotMemoryGCT(nn.Module):
             self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
         )
         _q_norm = F.normalize(queries, dim=-1)
-        # V10.20: Detach slot_keys in read path (same rationale as write path).
-        # Slot keys learn through EMA updates, not through read attention gradients.
-        # The LM learning signal flows through slot_vals (retrieved content),
-        # not through slot_keys (routing). Detaching prevents F.normalize Jacobian
-        # explosion while preserving the value-path gradient.
-        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        # Triple-Patch: Enable key learning in read path. Previously detached
+        # to prevent F.normalize Jacobian explosion, but this severed the
+        # gradient path from LM loss → read attention → slot_keys, preventing
+        # keys from learning which slots to route to. With write_lr=0.5 and
+        # coherence bypass, keys now get strong EMA signal; allowing read-path
+        # gradients lets the LM loss directly shape key geometry.
+        _sk_norm = F.normalize(slot_keys, dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _read_scale
@@ -9967,22 +9977,22 @@ class SlotMemoryGCT(nn.Module):
         if half > 0:
             first_half = sum(self._retr_loss_history[:half]) / half
             second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
-            if second_half < first_half * 0.90 and self.write_lr < self._write_lr_max:
+            if second_half < first_half * 0.90 and self.write_lr.item() < self._write_lr_max:
                 # Retrieval improving (>10% drop) → writes are useful, speed up
-                old = self.write_lr
-                self.write_lr = min(self._write_lr_max, self.write_lr * 1.15)
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr improving)")
-            elif second_half > first_half * 1.05 and self.write_lr > self._write_lr_min:
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(min(self._write_lr_max, old * 1.15))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr improving)")
+            elif second_half > first_half * 1.05 and self.write_lr.item() > self._write_lr_min:
                 # Retrieval worsening (>5% rise) → slow down writes
-                old = self.write_lr
-                self.write_lr = max(self._write_lr_min, self.write_lr * 0.85)
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr worsening)")
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(max(self._write_lr_min, old * 0.85))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr worsening)")
         # Also: if gate is collapsed, lower write_lr to reduce churn
-        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr > self._write_lr_min:
-            old = self.write_lr
-            self.write_lr = max(self._write_lr_min, self.write_lr * 0.90)
+        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr.item() > self._write_lr_min:
+            old = self.write_lr.item()
+            self.write_lr.data.fill_(max(self._write_lr_min, old * 0.90))
             if not any('write_lr' in c for c in changes):
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (gate collapsed)")
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (gate collapsed)")
 
         # ── Log changes ───────────────────────────────────────────────────
         if changes:
