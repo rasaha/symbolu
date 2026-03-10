@@ -4986,9 +4986,11 @@ def train(config: UnifiedTrainingConfig):
                         print(f"  [GRAD ALERT] {alert}", flush=True)
 
                 # Phase 4: Track JEPA projector gradients separately
+                # update_dampen=False: JEPA projector is a tiny auxiliary model —
+                # its spike count must not corrupt the main model's dampening state.
                 if jepa_injection_projector is not None:
                     jepa_proj_grad_health = gradient_variance_tracker.record(
-                        jepa_injection_projector
+                        jepa_injection_projector, update_dampen=False,
                     )
                     if jepa_proj_grad_health.get('alerts') and global_step % config.log_every == 0:
                         for alert in jepa_proj_grad_health['alerts']:
