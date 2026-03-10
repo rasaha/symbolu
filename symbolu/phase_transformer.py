@@ -8767,7 +8767,7 @@ class SlotMemoryGCT(nn.Module):
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
     _ADAPTIVE_DEFAULTS = {
         '_gate_target': 0.40,
-        '_gate_ceil_weight': 5.0,
+        '_gate_ceil_weight': 50.0,       # V14-hotfix: Linear+ReLU (was 5.0 quadratic)
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
         '_wr_scale_max': 4.0,
         '_L_bal_weight': 1.0,
@@ -8776,7 +8776,7 @@ class SlotMemoryGCT(nn.Module):
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
         '_read_scale_max': 64.0,
-        '_soft_detach_leak': 0.1,
+        '_soft_detach_leak': 0.5,        # V14-hotfix: Start at 50% (was 0.1)
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
     }
@@ -8912,6 +8912,22 @@ class SlotMemoryGCT(nn.Module):
             self._gate_target = self._gate_target_min
             print(f"  [SLOTS] V13.2: _gate_target {_old_target:.2f} → {self._gate_target_min:.2f} "
                   f"(clamped to new floor)")
+        # V14-hotfix: Force new leak/ceiling values on resume from old checkpoints.
+        # Old checkpoint may have _soft_detach_leak=0.1 and _gate_ceil_weight=5.0
+        # which would undo the realignment.
+        if self._soft_detach_leak < 0.5:
+            _old_leak = self._soft_detach_leak
+            self._soft_detach_leak = 0.5
+            print(f"  [SLOTS] V14: _soft_detach_leak {_old_leak:.2f} → 0.50 "
+                  f"(forced to new start for gradient curriculum)")
+        if self._soft_detach_leak_max < 1.0:
+            self._soft_detach_leak_max = 1.0
+            print(f"  [SLOTS] V14: _soft_detach_leak_max raised to 1.0 (full gradient by curriculum end)")
+        if self._gate_ceil_weight < 50.0:
+            _old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = 50.0
+            print(f"  [SLOTS] V14: _gate_ceil_weight {_old_w:.1f} → 50.0 "
+                  f"(linear+ReLU penalty)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
