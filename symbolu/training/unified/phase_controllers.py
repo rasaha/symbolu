@@ -849,40 +849,67 @@ class AdaptiveSlotLRController:
         """
         Compute composite slot health score s in roughly [-1, +1].
         Positive = slots need more LR (boost), negative = slots need less (decay).
+
+        V11.1: Fixed three signal bugs that created a death spiral:
+        1. Gate signal penalized gate being above target (normal operation)
+        2. Retr velocity treated improvement as "hold" instead of "boost"
+        3. Together they kept health score permanently negative → LR at floor
         """
         signals = []
         weights = []
 
-        # Signal 1: Write gate deficit — (target_gate - gate_mean)
-        # Positive when gate is below target (needs boost)
+        # Signal 1: Write gate — only penalize extremes
+        # V11.1: Gate above target is normal healthy operation (not a decay signal).
+        # Only signal negative if gate is collapsed near floor, or so high it's
+        # writing noise. The "sweet spot" range [floor*1.5, target*2] is neutral.
         if self.write_gate_history:
             recent_wg = self.write_gate_history[-self.history_window:]
             gate_mean = sum(recent_wg) / len(recent_wg)
-            # Normalize to roughly [-1, 1] range
-            gate_signal = max(-1.0, min(1.0, (self.target_gate - gate_mean) / max(self.target_gate, 0.01)))
+            gate_floor = 0.05  # Match slot memory gate_floor default
+            if gate_mean < gate_floor * 1.5:
+                # Gate collapsed — boost LR to rescue
+                gate_signal = 0.5
+            elif gate_mean > self.target_gate * 3.0:
+                # Gate too open — writing everything, back off
+                gate_signal = -0.5
+            else:
+                # Normal operation — neutral
+                gate_signal = 0.0
             signals.append(gate_signal)
             weights.append(self.weight_gate)
 
-        # Signal 2: Retrieval loss velocity (negative = improving = good = needs no boost)
+        # Signal 2: Retrieval loss velocity
+        # V11.1: Improving retr_loss = slots are learning useful content.
+        # This should be a POSITIVE signal (boost LR to learn faster),
+        # not "hold" as before. Only back off if retr_loss is spiking.
         if len(self.retr_loss_history) >= self.history_window:
             recent = self.retr_loss_history[-self.history_window:]
             if recent[0] != 0:
                 velocity_pct = ((recent[-1] - recent[0]) / abs(recent[0])) * 100
-                # Plateau (low velocity) → positive signal (try harder)
-                # Spiking (high positive velocity) → negative signal (back off)
-                # Improving (negative velocity) → near zero (hold)
-                vel_signal = max(-1.0, min(1.0, velocity_pct / 20.0))
+                # Improving (negative velocity) → positive signal (boost, learning works)
+                # Plateau (near zero) → slight positive (try harder)
+                # Spiking (positive velocity) → negative (back off)
+                # Flip sign: improvement should boost, not suppress
+                vel_signal = max(-1.0, min(1.0, -velocity_pct / 20.0))
                 signals.append(vel_signal)
                 weights.append(self.weight_retr_velocity)
 
-        # Signal 3: Ablation delta — negative delta means slots are hurting
+        # Signal 3: Ablation delta
+        # V11.1: When ablation delta ≈ 0, this is ambiguous (could mean slots
+        # haven't specialized yet, not that they're harmful). Use asymmetric
+        # response: negative delta is a clear "decay" signal, but zero/small
+        # positive should be neutral, not a strong signal either way.
         if self.ablation_delta_history:
             last_delta = self.ablation_delta_history[-1]
-            # delta > 0 means slots help (signal negative = no boost needed)
-            # delta < 0 means slots hurt (signal positive only if we think more LR helps,
-            # but actually if slots hurt we should decay — so invert)
-            # Rescale: delta of +/-5 PPL is a strong signal
-            abl_signal = max(-1.0, min(1.0, -last_delta / 5.0))
+            if last_delta < -1.0:
+                # Slots actively hurting — strong decay signal
+                abl_signal = max(-1.0, last_delta / 5.0)
+            elif last_delta > 1.0:
+                # Slots helping — moderate boost to consolidate
+                abl_signal = min(0.5, last_delta / 10.0)
+            else:
+                # Near zero — neutral (don't suppress based on ambiguity)
+                abl_signal = 0.0
             signals.append(abl_signal)
             weights.append(self.weight_ablation)
 
@@ -918,11 +945,16 @@ class AdaptiveSlotLRController:
 
         if self.phase == 2:
             # Check for auto-stabilize: scale variance over recent window
+            # V11.1: Don't freeze if scale is pinned at a boundary — that's
+            # low variance from clamping, not genuine convergence. Only
+            # stabilize when scale has settled in the interior of [min, max].
             if len(self.scale_history) >= 10:
                 recent_scales = self.scale_history[-10:]
                 mean_s = sum(recent_scales) / len(recent_scales)
                 variance = sum((x - mean_s) ** 2 for x in recent_scales) / len(recent_scales)
-                if variance < self.stabilize_scale_variance_threshold:
+                at_boundary = (mean_s <= self.scale_min * 1.05 or
+                               mean_s >= self.scale_max * 0.95)
+                if variance < self.stabilize_scale_variance_threshold and not at_boundary:
                     self.phase = 3
                     self.phase_transitions.append({"from": 2, "to": 3, "step": global_step,
                                                    "reason": f"scale_converged (var={variance:.6f})"})
@@ -942,10 +974,33 @@ class AdaptiveSlotLRController:
             self.sync_slot_lr()
             return actions
 
-        # --- Phase 3: Frozen ---
+        # --- Phase 3: Frozen (with escape hatch) ---
+        # V11.1: If frozen at a boundary (scale ≈ min or max), allow re-entry
+        # to phase 2 if health score suggests the freeze was premature.
+        # This breaks the death spiral where bad signals → floor → "converged."
         if self.phase == 3:
-            self.sync_slot_lr()
-            return actions
+            at_floor = self.current_scale <= self.scale_min * 1.05
+            at_ceiling = self.current_scale >= self.scale_max * 0.95
+            if at_floor or at_ceiling:
+                health_score = self._compute_health_score()
+                # If health says boost but we're at floor (or decay but at ceiling),
+                # the freeze was premature — re-enter phase 2
+                if health_score is not None:
+                    should_unfreeze = (at_floor and health_score > 0.1) or \
+                                     (at_ceiling and health_score < -0.1)
+                    if should_unfreeze:
+                        self.phase = 2
+                        self.phase_transitions.append({
+                            "from": 3, "to": 2, "step": global_step,
+                            "reason": f"boundary_escape (scale={self.current_scale:.4f}, "
+                                      f"health={health_score:+.3f})"
+                        })
+                        print(f"  [SLOT-LR] Phase 3→2: unfreezing from boundary "
+                              f"(scale={self.current_scale:.4f}, health={health_score:+.3f})")
+                        # Fall through to phase 2 processing below
+            if self.phase == 3:
+                self.sync_slot_lr()
+                return actions
 
         # --- Phase 2: Proportional control ---
         health_score = self._compute_health_score()

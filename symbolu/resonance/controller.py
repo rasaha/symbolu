@@ -229,6 +229,17 @@ class SattvicController:
                 self.mode_collapse_detected = False
                 self.boost_trigger_type = None
                 self.steps_since_boost_start = 0
+                # Fall through to decay logic to compute post-release λ
+            else:
+                # HOLD the boosted λ — do NOT fall through to decay
+                # Log diagnostics every 25 steps during hold for visibility
+                if self.steps_since_boost_start % 25 == 0:
+                    print(f"  🔒 [SATTVIC HOLD] Step {step}: λ={self.lambda_csr:.3f}, "
+                          f"entropy={entropy:.3f}, variance={entropy_variance:.6f}, "
+                          f"duration={self.steps_since_boost_start}/{50}min "
+                          f"(type={self.boost_trigger_type})")
+                self._record_history(step, "boost_hold")
+                return self.lambda_csr
 
         # 3. SATTVIC DECAY: Knowledge-Based Release
         if knowledge >= self.config.know_threshold:
@@ -311,21 +322,42 @@ class SattvicController:
         if self.steps_since_boost_start < 50:
             return False  # Keep boosting!
 
-        # 2. Check if Stagnation is actually broken (Variance-based)
-        # We want variance to be healthy again, not just entropy level.
-        # Use 5x the trigger threshold to ensure variance has meaningfully increased
+        # 2. Check recovery based on what triggered the boost
         is_stagnation_broken = current_variance > (self.config.variance_threshold * 5)
 
-        # 3. Emergency Release (if Entropy gets too high/hallucination)
-        # V9.9.1 FIX: Raised from 0.65 to 0.95 — during early training entropy is
-        # naturally 0.9+ as PPL is high, which caused immediate release after every
-        # 50-step hysteresis window. Only release for truly dangerous entropy levels.
+        # 3. For collapse-triggered boosts, check entropy recovery directly
+        # (variance is an indirect proxy — entropy itself must recover above floor + buffer)
+        is_entropy_recovered = False
+        if self.boost_trigger_type == "collapse":
+            recovery_target = self.config.entropy_floor + self.config.collapse_release_buffer
+            is_entropy_recovered = current_entropy > recovery_target
+
+        # 4. Emergency Release (if Entropy gets too high/hallucination)
         is_entropy_unsafe = current_entropy > 0.95
 
-        if is_stagnation_broken or is_entropy_unsafe:
-            reason = "stagnation broken" if is_stagnation_broken else "entropy unsafe"
-            print(f"  ✅ [SATTVIC RELEASE] Step {step}: {reason} (variance={current_variance:.6f}, entropy={current_entropy:.3f}, duration={self.steps_since_boost_start})")
-            return True  # Release
+        # Release decision depends on trigger type
+        should_release = False
+        reason = ""
+
+        if is_entropy_unsafe:
+            should_release = True
+            reason = "entropy unsafe"
+        elif self.boost_trigger_type == "collapse" and is_entropy_recovered:
+            should_release = True
+            reason = f"entropy recovered above {self.config.entropy_floor + self.config.collapse_release_buffer:.2f}"
+        elif self.boost_trigger_type == "stagnation" and is_stagnation_broken:
+            should_release = True
+            reason = "stagnation broken"
+        elif self.boost_trigger_type == "collapse" and is_stagnation_broken and is_entropy_recovered:
+            # Both conditions met for collapse — strongest signal
+            should_release = True
+            reason = "collapse fully resolved"
+
+        if should_release:
+            print(f"  ✅ [SATTVIC RELEASE] Step {step}: {reason} "
+                  f"(type={self.boost_trigger_type}, variance={current_variance:.6f}, "
+                  f"entropy={current_entropy:.3f}, duration={self.steps_since_boost_start})")
+            return True
 
         return False  # Keep boosting
 

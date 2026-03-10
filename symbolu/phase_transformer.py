@@ -6878,6 +6878,7 @@ class HybridPhaseTransformer(nn.Module):
                     num_heads=num_heads,
                     write_lr=slots_write_lr,
                     dropout=dropout,
+                    vocab_size=vocab_size,
                 )
                 # No legacy GCT modules needed — slot_memory handles everything
                 self.global_tokens = None  # Slots init is inside SlotMemoryGCT
@@ -7107,6 +7108,13 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # V11.3: Capture pre-attention hidden state for retrieval loss.
+        # Post-backbone x is redundant with lm_head(x) — slots trained on it
+        # just learn to copy the backbone's own prediction. Pre-attention x
+        # (token embed + position, zero attention context) forces slots to
+        # provide information the query genuinely lacks.
+        _x_pre_attn = x.detach()
+
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
         decorr_losses = [] if return_decorr_loss else None
@@ -7175,16 +7183,10 @@ class HybridPhaseTransformer(nn.Module):
                         # V10.14.6d: Mostly detach read output so LM loss cannot
                         # suppress read_output_proj. Retrieval loss trains
                         # read_output_proj independently.
-                        # V10.21: Leak 3% live gradient from LM loss into read path.
-                        # Full detach starved the read head: its only learning signal
-                        # was retrieval loss, causing read_H to plateau at ~3.7 (near
-                        # uniform over K=64). A small leak lets the LM loss teach
-                        # "reading from the right slot helps prediction" without the
-                        # early-training suppression that motivated full detach.
+                        # V11.5: Full gradient — no detach. Let LM loss fully
+                        # steer what the model does with slot reads.
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.03
-                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                        x = x + _alpha * _slot_mixed
+                        x = x + _alpha * _slot_out
                 else:
                     # Legacy: cross-attention to global tokens
                     _gct_out = self.gct_read_attn(
@@ -7291,13 +7293,13 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            # V10.14.9: Detach hidden states for retrieval loss. Without this,
-            # retrieval loss gradients flow through _slot_hidden back into ALL
-            # transformer blocks (phase_attn.W_k_fused, v_proj, complex_proj),
-            # creating a secondary training signal that destabilizes the backbone
-            # around step 650 and cascades into slot memory gradient explosions.
-            # Retrieval loss should only train slot memory parameters.
-            result['_slot_hidden'] = x.detach()  # Post-norm hidden for query matching
+            # V11.3: Use pre-attention hidden state for retrieval loss queries.
+            # Previously used post-backbone x.detach(), which made retrieval
+            # redundant — slots learned to copy what the backbone already knows.
+            # Pre-attention x (embed + position only) forces slots to provide
+            # information that attention hasn't yet injected.
+            # Already detached at capture point (line ~7114).
+            result['_slot_hidden'] = _x_pre_attn  # Pre-attention for non-redundant retrieval
 
         return result
 
@@ -7348,6 +7350,9 @@ class HybridPhaseTransformer(nn.Module):
         positions = chunk_offset + torch.arange(N, device=input_ids.device).unsqueeze(0)
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
+
+        # V11.3: Pre-attention capture (mirrors forward())
+        _x_pre_attn = x.detach()
 
         # Initialize states if not provided
         if prev_layer_states is None:
@@ -7403,11 +7408,9 @@ class HybridPhaseTransformer(nn.Module):
                     # V11: Only read every global_read_interval layers
                     if (i % self.global_read_interval) == 0:
                         _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
-                        # V10.21: Gradient leak + warmstart (mirrors forward())
+                        # V11.5: Full gradient — no detach (mirrors forward())
                         _alpha = self.slot_memory.read_warmstart_alpha
-                        _leak = 0.03
-                        _slot_mixed = _leak * _slot_out + (1.0 - _leak) * _slot_out.detach()
-                        x = x + _alpha * _slot_mixed
+                        x = x + _alpha * _slot_out
                 else:
                     _gct_out = self.gct_read_attn(
                         x, _gct_state, _gct_state, need_weights=False
@@ -7475,7 +7478,8 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            result['_slot_hidden'] = x.detach()
+            # V11.3: Pre-attention hidden (mirrors forward())
+            result['_slot_hidden'] = _x_pre_attn
 
         return result, next_layer_states
 
@@ -8458,16 +8462,16 @@ class SlotMemoryGCT(nn.Module):
         self,
         num_slots: int = 64,
         embed_dim: int = 768,
-        num_heads: int = 12,
+        num_heads: int = 12,  # Accepted for API compat, unused internally
         write_lr: float = 0.1,
         dropout: float = 0.1,
         write_key_dim: Optional[int] = None,
         write_top_k: int = 4,
+        vocab_size: int = 50257,
     ):
         super().__init__()
         self.num_slots = num_slots
         self.embed_dim = embed_dim
-        self.num_heads = num_heads
         self.write_lr = write_lr
         self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
@@ -8531,10 +8535,17 @@ class SlotMemoryGCT(nn.Module):
         # over-constrained (uniform usage, scale at clamp, gate at ceiling)
         # and progressively relax to allow specialization.
         self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
-        self._wr_scale_max = 2.0          # Write scale upper clamp (starts conservative)
-        self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
+        # V12.5: Raised from 2.0→4.0. The gradient explosion concerns that
+        # motivated the 2.0 ceiling are now addressed by: detached slot_keys
+        # in assignment (V10.20), L2-normalized incoming_keys, write_pressure
+        # floor at 0.1, and detached-norm slot key renormalization. With those
+        # in place, scale=4 is safe and gives the parameter room to learn.
+        self._wr_scale_max = 4.0          # Write scale upper clamp
+        self._wr_scale_max_limit = 8.0    # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
         self._L_bal_weight_floor = 0.1    # Minimum balance weight
+        # V11.1: Track L_bal relaxation reason for diagnostics
+        self._L_bal_last_reason = ""
         self._constraint_relax_window: List[float] = []  # marginal_H history
         self._constraint_relax_counter = 0
         self._constraint_relax_interval = 500  # Steps between adaptation checks
@@ -8555,10 +8566,12 @@ class SlotMemoryGCT(nn.Module):
         # (b) Retrieval loss weight — scale down when retr_loss dominates,
         #     scale up when slots are helping (caller tracks this externally)
         self._adaptive_retr_loss_weight = 1.0
-        self._adaptive_retr_loss_weight_min = 0.3
+        self._adaptive_retr_loss_weight_min = 0.5
         self._adaptive_retr_loss_weight_max = 2.0
         self._retr_loss_history: List[float] = []  # Track for dominance detection
         self._lm_loss_history: List[float] = []    # Need LM loss for ratio
+        # V11.2: Ablation-aware retr_weight guard — don't decay when slots neutral/helping
+        self._last_ablation_delta: Optional[float] = None  # Set by training loop after ablation
 
         # (c) H_target (sharpness entropy target) — adapt to slot utilization
         self._H_target = 1.0                # nats, ~2-3 active slots
@@ -8571,8 +8584,11 @@ class SlotMemoryGCT(nn.Module):
         self._L_ortho_weight_max = 1.0
 
         # (e) Read scale clamp max — mirrors write scale adaptive clamp
-        self._read_scale_max = 5.0          # Starts at current hardcoded max
-        self._read_scale_max_limit = 8.0    # Can widen to this
+        # V12.1: Raised from 5.0/8.0. Cosine sims in high-d cluster tightly
+        # (spread ~0.05), so scale=5 produces near-uniform softmax over 16 slots.
+        # Floor=18 ≈ num_slots. Ceiling=64 gives gyroscope room to widen.
+        self._read_scale_max = 64.0         # High ceiling so optimizer isn't clamped
+        self._read_scale_max_limit = 128.0  # V12.4: Allow gyroscope to widen if optimizer pushes
 
         # (f) Router noise — tie decay to marginal_H instead of fixed schedule
         self._adaptive_router_noise = True  # Enable marginal_H-based noise
@@ -8605,22 +8621,22 @@ class SlotMemoryGCT(nn.Module):
         # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
         # route to the same slot. Scale=5 gives enough sharpness to differentiate
         # while allowing more balanced slot utilization.
-        # V10.20: Lowered from 5→3. Logs showed wr_scale learning to 5.9 during
-        # calibration, which made assignment ultra-peaky and concentrated write
-        # pressure on few slots — amplifying the 1.2M× gradient variance spikes.
-        # Starting at 3 with tighter max clamp (8 instead of 15) keeps assignments
-        # sharp enough for differentiation without explosive write concentration.
+        # V10.20→V12.3: Init at 1.8, safely below _wr_scale_max (2.0).
+        # Hard clamp kills gradient when value >= max, so init AT the boundary
+        # gives zero gradient and the parameter never moves. At 1.8 the param
+        # is inside the clamp's pass-through region → gradients flow → optimizer
+        # can push toward the ceiling → gyroscope detects pressure and relaxes.
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(3.0))  # exp(log(3)) = 3.0
+            torch.tensor(math.log(1.8))  # exp(log(1.8)) ≈ 1.8, below _wr_scale_max=2.0
         )
 
         # --- READ path: query → slot attention ---
-        # V10.14.2: Read queries share write_key_proj (same key space).
-        # V10.14.3: Read also shares _write_log_scale (same temperature).
-        #   The separate _read_log_scale collapsed to 0.057 because the main
-        #   LM loss actively suppresses noisy reads. But _write_log_scale is
-        #   pushed UP by sharpness loss → shared scale prevents read collapse.
-        # read_query_proj kept for backward compat but unused.
+        # V12: Separate read_query_proj ACTIVE. Previously shared write_key_proj
+        # (V10.14.2), but write and read are different tasks — write asks "where
+        # to store" while read asks "what do I need." Shared projection meant
+        # write gradients dominated, leaving read queries unable to discriminate
+        # between slots (read_H pegged at max entropy ~4.0 for 16 slots).
+        # Separate projection lets retrieval loss train read queries independently.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
         self.read_dropout = nn.Dropout(dropout)
@@ -8629,13 +8645,32 @@ class SlotMemoryGCT(nn.Module):
         # expects layer-normed input; without this, raw slot values have
         # arbitrary scale → lm_head predictions are garbage.
         self.retr_read_norm = nn.LayerNorm(embed_dim)
-        # V10.21: Re-enable separate read temperature. Previously collapsed
-        # because LM loss suppressed reads (V10.14.3 comment). But read output
-        # is now detached from LM loss, so that suppression no longer applies.
-        # Init at log(2.0) — lower than write scale (3.0) to start slightly
-        # sharper. Clamped to [1.0, 5.0] in read() to prevent collapse/explosion.
+
+        # V11.4: Slot-only prediction head — tests whether slot content carries
+        # information useful for next-token prediction, independent of the main
+        # backbone. Uses a separate bottleneck head (not shared lm_head) so
+        # improvements here genuinely reflect slot content quality.
+        # Architecture: slot retrieval → LayerNorm → D→D/4 → GELU → D/4→V
+        # Gradients flow back into: read_output_proj, slot_vals (via retrieval
+        # attention), write_val_proj (via slot_vals computation graph).
+        # They do NOT flow into: backbone layers, token embeddings, lm_head.
+        _bottleneck_dim = embed_dim // 4
+        self.slot_pred_head = nn.Sequential(
+            nn.Linear(embed_dim, _bottleneck_dim, bias=False),
+            nn.GELU(),
+            nn.Linear(_bottleneck_dim, vocab_size, bias=False),
+        )
+        self.slot_pred_norm = nn.LayerNorm(embed_dim)
+        # Diagnostics for slot prediction
+        self._diag_slot_pred_loss: float = 0.0
+        self._diag_slot_pred_acc: float = 0.0
+
+        # V12.1: Read temperature. With cosine similarity over 16 slots,
+        # scale must be high enough to break uniform softmax. Cosine sims
+        # cluster tightly in high-d (~0.05 spread), so scale=5 can't produce
+        # sharp attention. Init at log(18.0) = floor, learnable up to 64.
         self._read_log_scale = nn.Parameter(
-            torch.tensor(math.log(2.0))
+            torch.tensor(math.log(18.0))
         )
 
         # --- Router noise (MoE-style symmetry breaking) ---
@@ -8659,10 +8694,10 @@ class SlotMemoryGCT(nn.Module):
         # V10.14.6d: Read output is detached before adding to residual (LM
         # can't suppress read_output_proj). But we still ramp the mixing
         # coefficient from 0→1 so early noisy reads don't disrupt LM training.
-        # Uses same _router_step counter. Sigmoid centered at 500 steps,
-        # tau=100 → effectively 0 for first ~300 steps, ~1 after ~700.
-        self._read_warmstart_center = 500
-        self._read_warmstart_tau = 100
+        # Uses same _router_step counter. Sigmoid centered at 100 steps,
+        # tau=25 → effectively 0 for first ~50 steps, ~1 after ~150.
+        self._read_warmstart_center = 100
+        self._read_warmstart_tau = 25
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
@@ -8685,14 +8720,14 @@ class SlotMemoryGCT(nn.Module):
     _ADAPTIVE_DEFAULTS = {
         '_gate_target': 0.35,
         '_gate_ceil_weight': 5.0,
-        '_gate_ceil_margin': 0.05,
-        '_wr_scale_max': 2.0,
+        # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
+        '_wr_scale_max': 4.0,
         '_L_bal_weight': 1.0,
         '_novelty_gate_floor': 0.15,
         '_adaptive_retr_loss_weight': 1.0,
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
-        '_read_scale_max': 5.0,
+        '_read_scale_max': 64.0,
         '_soft_detach_leak': 0.1,
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
@@ -8745,6 +8780,50 @@ class SlotMemoryGCT(nn.Module):
                 setattr(self, key, val)
         if adaptive_vals:
             print(f"  [SLOTS] Restored {len(adaptive_vals)} adaptive params from checkpoint")
+        # V11.2b: Enforce current floor on loaded retr_weight
+        if self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_min:
+            old = self._adaptive_retr_loss_weight
+            self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
+            print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
+                  f"(clamped to new floor)")
+        # V12.5: Bump loaded _wr_scale_max if below current default (4.0).
+        # Old checkpoints saved _wr_scale_max=2.0 which creates the ceiling trap.
+        _wr_default = self._ADAPTIVE_DEFAULTS['_wr_scale_max']
+        if self._wr_scale_max < _wr_default:
+            _old_max = self._wr_scale_max
+            self._wr_scale_max = _wr_default
+            print(f"  [SLOTS] V12.5: _wr_scale_max {_old_max:.1f}→{_wr_default:.1f} "
+                  f"(raised to current default)")
+        # V12.3: If loaded _write_log_scale is at or above _wr_scale_max,
+        # pull it to 90% of max. Hard clamp kills gradient at the boundary
+        # (value >= max → grad = 0), so we need to be strictly inside.
+        _wr_target = self._wr_scale_max * 0.9
+        _wr_target_log = math.log(_wr_target)
+        if self._write_log_scale.item() >= math.log(self._wr_scale_max) - 0.01:
+            _old_wr = math.exp(self._write_log_scale.item())
+            with torch.no_grad():
+                self._write_log_scale.fill_(_wr_target_log)
+            print(f"  [SLOTS] V12.3: _write_log_scale {math.log(_old_wr):.2f} (scale={_old_wr:.1f}) "
+                  f"→ {_wr_target_log:.2f} (scale={_wr_target:.1f}) (at/above ceiling, pulled inside)")
+        # V12.1: If loaded _read_log_scale is below new floor, override it.
+        # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
+        # and the parameter can never learn upward.
+        _rd_floor = math.log(18.0)
+        if self._read_log_scale.item() < _rd_floor:
+            _old_scale = math.exp(self._read_log_scale.item())
+            with torch.no_grad():
+                self._read_log_scale.fill_(_rd_floor)
+            print(f"  [SLOTS] V12.1: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
+                  f"→ {_rd_floor:.2f} (scale=18.0) (below new floor, overridden)")
+        # V12: Re-ramp read warmstart on resume so fresh read_query_proj
+        # doesn't immediately dump noisy reads into the residual stream.
+        # Shift warmstart center to current step → sigmoid re-ramps over
+        # ~100 steps from ~0 to ~1, giving read_query_proj time to learn.
+        _step = int(self._router_step_buf.item())
+        if _step > self._read_warmstart_center + 200:
+            self._read_warmstart_center = _step
+            print(f"  [SLOTS] V12: read warmstart re-centered to step {_step} "
+                  f"(read_query_proj now active, re-ramping)")
         return result
 
     @property
@@ -8850,13 +8929,16 @@ class SlotMemoryGCT(nn.Module):
             # V10.14.8: Decay toward floor instead of 0
             _noise_decay = max(0.0, 1.0 - self._router_step / self._router_noise_warmup)
             _noise_std = self._router_noise_floor + (self._router_noise_std - self._router_noise_floor) * _noise_decay
-            # V10.29: If marginal_H is high (slots uniform), keep noise higher
-            # to maintain exploration; if slots are differentiated, let it decay.
+            # V10.29/V12.4: If marginal_H is high (slots uniform), boost noise
+            # to maintain exploration; if differentiated, accelerate decay.
+            # V12.4: Scale boost by _noise_decay so it fades with training
+            # instead of holding at a fixed 50% forever. At step 0 boost=25%
+            # of initial; at warmup end boost=0 (floor only).
             if self._adaptive_router_noise:
                 _mH = getattr(self, '_diag_marginal_entropy', None)
                 if _mH is not None and _mH > 0.90:
-                    # Slots still uniform — boost noise to at least 50% of initial
-                    _noise_std = max(_noise_std, self._router_noise_std * 0.5)
+                    _boost = self._router_noise_std * 0.25 * (0.5 + 0.5 * _noise_decay)
+                    _noise_std = max(_noise_std, _boost)
                 elif _mH is not None and _mH < 0.5:
                     # Slots well-differentiated — accelerate decay
                     _noise_std = max(self._router_noise_floor, _noise_std * 0.5)
@@ -8908,15 +8990,17 @@ class SlotMemoryGCT(nn.Module):
         incoming_keys = incoming_keys / pressure_norm
         incoming_vals = incoming_vals / pressure_norm
 
-        # V10.20: L2-normalize incoming write vectors before EMA update.
+        # V10.20: L2-normalize incoming KEYS before EMA update.
         # Without this, unbounded incoming_keys magnitude drifts slot_keys
         # off the unit hypersphere, causing F.normalize Jacobian explosion
         # in subsequent forward passes. Normalizing here ensures the EMA
         # interpolates between unit vectors, keeping slot keys well-conditioned.
         _ik_norm = incoming_keys.norm(dim=-1, keepdim=True).clamp(min=1e-6)
         incoming_keys = incoming_keys / _ik_norm
-        _iv_norm = incoming_vals.norm(dim=-1, keepdim=True).clamp(min=1e-6)
-        incoming_vals = incoming_vals / _iv_norm
+        # V12.4: Do NOT normalize incoming_vals. Values carry magnitude info
+        # (how strongly a concept is represented), and L2-norm destroys it —
+        # all slot values get forced onto the unit sphere, reducing expressiveness.
+        # Keys need normalization (cosine routing), values don't.
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
@@ -8944,7 +9028,6 @@ class SlotMemoryGCT(nn.Module):
         # Store assignment for sharpness loss (WITH grad — this is the learning signal)
         self._last_assignment = assignment  # [B, N, K]
         self._last_novelty = novelty  # [B, N, 1]
-        self._last_gated_assignment = gated_assignment  # [B, N, K] — for gate gradient
         # V10.14.8: Store updated slot keys for orthogonality loss
         self._last_slot_keys = new_slot_keys  # [B, K, D_key]
 
@@ -8979,19 +9062,16 @@ class SlotMemoryGCT(nn.Module):
         Returns:
             read_output: [B, N, D] — retrieved information
         """
-        # V10.14.2: Read queries use write_key_proj (shared key space).
-        # This ensures read queries naturally match the same slot keys that
-        # the write path used, enabling content-based key-value lookup.
-        queries = self.write_key_proj(x)  # [B, N, D_key]
+        # V12: Separate read_query_proj — read queries learn independently
+        # from write queries, trained by retrieval loss only.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
 
-        # V10.21: Cosine similarity for reads with SEPARATE temperature.
-        # Both queries and slot keys are L2-normalized.
-        # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        # Separate from write scale: read needs to learn its own sharpness
-        # since reads are detached from LM loss (different gradient regime).
-        # V10.29: Read scale max adapts like write scale max
+        # V12.1: Read scale floor raised to 18.0 (from 4.0). With cosine
+        # similarity in high-d, slot sims cluster within ~0.05 spread.
+        # Over 16 slots, scale=5 → near-uniform softmax. Floor=18 ≈ num_slots
+        # so a 0.05 sim gap → logit gap of 0.9 → sharp peak.
         _read_scale = torch.exp(
-            self._read_log_scale.clamp(min=math.log(1.0), max=math.log(self._read_scale_max))
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
         )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys in read path (same rationale as write path).
@@ -9054,12 +9134,14 @@ class SlotMemoryGCT(nn.Module):
         if query_mask is None or not query_mask.any():
             return torch.tensor(0.0, device=x.device, dtype=x.dtype)
 
-        # Same attention as read(): cosine similarity with shared key space.
-        queries = self.write_key_proj(x)  # [B, N, D_key]
-        # V10.25: Match write() clamp [1.5, 2.0] — retrieval loss is the
-        # ONLY gradient source for slot values, so peaky attention here
-        # (scale 3-4) kills the learning signal just like in write().
-        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        # V12: Use read_query_proj (matches read() path) so retrieval loss
+        # gradients train the read projection, not the write projection.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # V12.4: Match read() path scale — previously used _wr_scale_max (2.0)
+        # by copy-paste error, creating 9x temperature mismatch vs read() (18+).
+        # Retrieval loss trained read_query_proj for near-uniform attention
+        # while read() used peaky softmax → stuck retr_loss.
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9093,7 +9175,109 @@ class SlotMemoryGCT(nn.Module):
             query_logits, query_targets, ignore_index=-100
         )
 
+        # V11.3: Diagnostics for pre-attention retrieval experiment
+        with torch.no_grad():
+            self._diag_retr_query_norm = x[query_mask].norm(dim=-1).mean().item()
+            self._diag_retr_retrieved_norm = query_retrieved.norm(dim=-1).mean().item()
+
         return retrieval_loss
+
+    def compute_slot_prediction_loss(
+        self,
+        x: torch.Tensor,              # [B, N, D] — token representations (pre-attention)
+        slot_keys: torch.Tensor,       # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,       # [B, K, D] — slot values
+        query_mask: torch.Tensor,      # [B, N] — True at query positions
+        target_ids: torch.Tensor,      # [B, N] — target token IDs
+    ) -> torch.Tensor:
+        """
+        V11.4: Slot-only predictive usefulness test.
+
+        Tests whether slot content carries information useful for next-token
+        prediction, using a SEPARATE prediction head (not shared lm_head).
+        This eliminates the failure mode where retrieval loss improves because
+        lm_head improves, rather than because slots contain better content.
+
+        Slot-derived tensor: slot_vals → attention-weighted retrieval →
+            read_output_proj → slot_pred_norm → slot_pred_head → CE loss
+
+        The query is formed from x (pre-attention embeddings), which provides
+        only positional/token identity info — no backbone computation.
+        The prediction comes entirely from what the slots contain.
+
+        Cannot bypass slots: the only path to the prediction head goes through
+        slot_vals retrieval. If slots contain no useful info, this loss stays
+        at ~log(50257) ≈ 10.8 (random).
+
+        Gradient flow:
+          ✓ read_output_proj (projection of retrieved content)
+          ✓ slot_vals (via retrieval attention weighted sum)
+          ✓ write_val_proj (via slot_vals computation graph)
+          ✓ slot_pred_head (the separate prediction bottleneck)
+          ✓ slot_pred_norm (normalization before prediction)
+          ✗ backbone layers (x is detached at capture point)
+          ✗ lm_head (not used — separate head)
+          ✗ token embeddings (detached in x)
+
+        This loss tests usefulness to generation, NOT self-consistency:
+          - Retrieval loss = "can slots reconstruct what was stored?" (self-referential)
+          - Slot prediction loss = "can slots predict the next token?" (LM-useful)
+
+        Success criterion is NOT this loss improving alone — it's whether
+        ablation delta moves off zero. If this loss improves but ablation
+        stays flat, slots are still learning in isolation.
+
+        Returns:
+            slot_pred_loss: Scalar CE loss from slot-only prediction.
+        """
+        if query_mask is None or not query_mask.any():
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # V12.4: Match read() path scale (same fix as compute_retrieval_loss).
+        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
+        _q_norm = F.normalize(queries, dim=-1)
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # [B, N, K]
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+
+        # Retrieve weighted slot values — this is the slot-derived representation
+        raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
+
+        # Route through read_output_proj (shared with retrieval loss path)
+        projected = self.read_output_proj(raw_retrieved)  # [B, N, D]
+
+        # Select query positions
+        query_retrieved = projected[query_mask]  # [num_queries, D]
+        query_targets = target_ids[query_mask]
+
+        if query_retrieved.shape[0] == 0:
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Normalize then predict through SEPARATE head (not lm_head)
+        query_retrieved = self.slot_pred_norm(query_retrieved)  # [num_queries, D]
+        slot_logits = self.slot_pred_head(query_retrieved)  # [num_queries, V]
+
+        slot_pred_loss = F.cross_entropy(
+            slot_logits, query_targets, ignore_index=-100
+        )
+
+        # Diagnostics: loss + top-1 accuracy
+        with torch.no_grad():
+            self._diag_slot_pred_loss = slot_pred_loss.item()
+            preds = slot_logits.argmax(dim=-1)
+            valid = query_targets != -100
+            if valid.any():
+                self._diag_slot_pred_acc = (
+                    (preds[valid] == query_targets[valid]).float().mean().item()
+                )
+            else:
+                self._diag_slot_pred_acc = 0.0
+
+        return slot_pred_loss
 
     def compute_sharpness_loss(self) -> torch.Tensor:
         """
@@ -9120,7 +9304,8 @@ class SlotMemoryGCT(nn.Module):
             router_loss: λ_sharp * L_sharp + λ_bal * L_bal + λ_gate * L_gate
         """
         if self._last_assignment is None:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.slot_keys_init.device,
+                                dtype=self.slot_keys_init.dtype)
 
         assignment = self._last_assignment  # [B, N, K]
         K = self.num_slots
@@ -9177,16 +9362,27 @@ class SlotMemoryGCT(nn.Module):
         # Penalize slot keys for being too similar. Without this, EMA updates
         # drift keys toward the mean token embedding → all slots become identical.
         # L_ortho = ||K·K^T - I||_F^2 / K^2 (normalized Frobenius norm)
+        # V12.4: Apply to BOTH _last_slot_keys (post-EMA, indirect gradient)
+        # AND slot_keys_init (direct gradient to the learnable parameter).
+        # Previously only applied to _last_slot_keys, but gradient through EMA
+        # is attenuated by η≈0.1 and the .clone() + detach in the assignment
+        # path makes it very indirect. Direct term on slot_keys_init ensures
+        # the initial key configuration stays orthogonal.
         L_ortho = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        # (a) Post-EMA keys (existing)
         if hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
             _sk = F.normalize(self._last_slot_keys, dim=-1)  # [B, K, D]
-            # Cosine similarity matrix: [B, K, K]
-            _sim = torch.bmm(_sk, _sk.transpose(1, 2))  # diagonal = 1.0
-            # Zero out diagonal (self-similarity is always 1, not informative)
+            _sim = torch.bmm(_sk, _sk.transpose(1, 2))
             _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
             _off_diag = _sim - _eye.unsqueeze(0)
             L_ortho = (_off_diag ** 2).mean()
             self._diag_L_ortho = L_ortho.item()
+        # (b) Direct term on slot_keys_init (learnable parameter)
+        _sk_init = F.normalize(self.slot_keys_init, dim=-1)  # [K, D_key]
+        _sim_init = _sk_init @ _sk_init.t()  # [K, K]
+        _eye_init = torch.eye(self.num_slots, device=_sim_init.device, dtype=_sim_init.dtype)
+        L_ortho_init = ((_sim_init - _eye_init) ** 2).mean()
+        L_ortho = L_ortho + L_ortho_init
 
         # V10.14.8: L_bal weight 0.02→1.0. At 0.02 the balance loss contributed
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
@@ -9223,7 +9419,7 @@ class SlotMemoryGCT(nn.Module):
         if not self.enable_adaptive_constraints:
             return
 
-        gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
+        gate_val = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
 
         self._retr_loss_window.append(retr_loss)
         self._gate_window.append(gate_val)
@@ -9329,7 +9525,7 @@ class SlotMemoryGCT(nn.Module):
         _raw_wr_scale = torch.exp(self._write_log_scale).item()
         wr_scale = max(1.5, min(_raw_wr_scale, self._wr_scale_max))
         _raw_rd_scale = torch.exp(self._read_log_scale).item()
-        read_scale = max(1.0, min(_raw_rd_scale, self._read_scale_max))
+        read_scale = max(18.0, min(_raw_rd_scale, self._read_scale_max))
         per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
         # BUG 4 fix: Use window-averaged L_ortho
         avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
@@ -9339,15 +9535,53 @@ class SlotMemoryGCT(nn.Module):
 
         changes = []
 
-        # ── (1) L_bal weight: marginal_H-based ────────────────────────────
-        if avg_marginal_H > 0.95 and self._L_bal_weight > self._L_bal_weight_floor:
-            old = self._L_bal_weight
-            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * 0.7)
-            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (too uniform)")
-        elif avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+        # ── (1) L_bal weight: adaptive retr_loss-driven ─────────────────
+        # V11.1: Replace hard-coded marginal_H threshold with signal-driven
+        # relaxation. The old threshold (marginal_H > 0.95) was too high —
+        # L_bal successfully enforced uniformity (marginal_H ≈ 0.93) which
+        # prevented slot specialization entirely.
+        #
+        # New logic: L_bal exists to prevent collapse (1-2 slots dominating).
+        # But if retr_loss is improving, slots are learning useful content,
+        # so L_bal should relax to let natural specialization emerge.
+        # If marginal_H drops too low (<0.7), slots have over-specialized
+        # and L_bal should increase to redistribute.
+        #
+        # Three conditions for relaxation (any one triggers):
+        # (a) retr_loss improving over window → slots learning, let them specialize
+        # (b) marginal_H high AND no collapse risk → uniform = L_bal succeeded too well
+        # (c) Collapse guard: marginal_H < 0.7 → re-apply L_bal
+        half = len(self._retr_loss_history) // 2
+        retr_improving = False
+        retr_velocity = 0.0
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if first_half > 0:
+                retr_velocity = (second_half - first_half) / first_half  # negative = improving
+                retr_improving = retr_velocity < -0.02  # >2% improvement
+
+        if avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+            # Collapse guard: slots over-specialized, strengthen balance
             old = self._L_bal_weight
             self._L_bal_weight = min(1.0, self._L_bal_weight * 1.5)
-            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized)")
+            self._L_bal_last_reason = "over-specialized"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized, mH={avg_marginal_H:.3f})")
+        elif retr_improving and avg_marginal_H > 0.80 and self._L_bal_weight > self._L_bal_weight_floor:
+            # Retr loss improving + slots still fairly uniform → relax L_bal
+            # Decay rate proportional to improvement velocity (faster improvement → faster relaxation)
+            decay_rate = max(0.5, 1.0 + retr_velocity * 5.0)  # e.g. vel=-0.05 → decay=0.75
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * decay_rate)
+            self._L_bal_last_reason = "retr_improving"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (retr improving {retr_velocity:+.1%}, mH={avg_marginal_H:.3f})")
+        elif avg_marginal_H > 0.92 and not retr_improving and self._L_bal_weight > self._L_bal_weight_floor:
+            # Even without retr improvement, if slots are very uniform, gently relax
+            # (but slower than the retr-driven path — 0.85x vs velocity-proportional)
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * 0.85)
+            self._L_bal_last_reason = "too_uniform"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (too uniform, mH={avg_marginal_H:.3f})")
 
         # ── (2) Write scale max clamp ─────────────────────────────────────
         # Use raw (unclamped) scale: only relax when the optimizer is actively
@@ -9360,10 +9594,17 @@ class SlotMemoryGCT(nn.Module):
         # ── (3) Gate ceiling weight (only) ────────────────────────────────
         # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
         # exclusively owned by update_write_gate_target() (200-step window).
+        # V12.4: Bidirectional — decay when gate near target, strengthen when
+        # gate has collapsed well below target (was one-way ratchet before).
         if avg_gate > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
             old_w = self._gate_ceil_weight
             self._gate_ceil_weight = max(1.0, self._gate_ceil_weight * 0.7)
-            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (pinned)")
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (near target, relaxing)")
+        elif avg_gate < self._gate_target * 0.5 and self._gate_ceil_weight < 5.0:
+            # Gate well below target — strengthen ceiling to push it open
+            old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = min(5.0, self._gate_ceil_weight * 1.3)
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (gate low, strengthening)")
 
         # ── (4) Novelty gate floor ────────────────────────────────────────
         # Gate collapsed at floor for sustained period → raise floor to rescue
@@ -9394,14 +9635,25 @@ class SlotMemoryGCT(nn.Module):
         # ── (5) Retrieval loss weight ─────────────────────────────────────
         # BUG 7 fix: This weight is used AS-IS in train.py (replacing, not
         # multiplying with, config.retrieval_loss_weight when adaptive is active).
+        # V11.2: Ablation-aware guard — don't decay if slots are neutral or helping.
+        # Only decay when ablation shows slots are actively hurting (delta < -1.0)
+        # or when no ablation data is available yet (None = pre-ablation warmup).
+        _ablation_allows_decay = (
+            self._last_ablation_delta is None  # No ablation yet, allow warmup decay
+            or self._last_ablation_delta < -1.0  # Slots actively hurting
+        )
         if avg_lm > 0 and avg_retr > avg_lm * 0.5 and self._adaptive_retr_loss_weight > self._adaptive_retr_loss_weight_min:
-            old = self._adaptive_retr_loss_weight
-            self._adaptive_retr_loss_weight = max(
-                self._adaptive_retr_loss_weight_min,
-                self._adaptive_retr_loss_weight * 0.8
-            )
-            changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
-                           f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
+            if _ablation_allows_decay:
+                old = self._adaptive_retr_loss_weight
+                self._adaptive_retr_loss_weight = max(
+                    self._adaptive_retr_loss_weight_min,
+                    self._adaptive_retr_loss_weight * 0.8
+                )
+                changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
+                               f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
+            else:
+                changes.append(f"retr_weight: {self._adaptive_retr_loss_weight:.2f} "
+                               f"(held: ablation Δ={self._last_ablation_delta:+.2f}, slots not hurting)")
         elif avg_lm > 0 and avg_retr < avg_lm * 0.1 and self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_max:
             half = len(self._retr_loss_history) // 2
             if half > 0:
