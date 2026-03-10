@@ -5002,8 +5002,17 @@ def train(config: UnifiedTrainingConfig):
                     if p.grad is not None
                 ]
                 if _slot_params_with_grad:
-                    # First: per-element cap (prevents any single catastrophic update)
-                    torch.nn.utils.clip_grad_value_(_slot_params_with_grad, 0.01)
+                    # V12.6: Scalar params (log-scales) need looser clip — 0.01 × slot_lr
+                    # ≈ 2.8e-7 per step makes them effectively frozen. Forward-pass
+                    # .clamp() on scales provides safety bounds regardless.
+                    _scalar_params = [p for p in _slot_params_with_grad if p.numel() == 1]
+                    _matrix_params = [p for p in _slot_params_with_grad if p.numel() > 1]
+                    # Per-element cap for high-dimensional matrices (stability)
+                    if _matrix_params:
+                        torch.nn.utils.clip_grad_value_(_matrix_params, 0.01)
+                    # Looser clip for scalars (wr/rd log-scale)
+                    if _scalar_params:
+                        torch.nn.utils.clip_grad_value_(_scalar_params, 1.0)
                     # Second: norm clip as safety net
                     torch.nn.utils.clip_grad_norm_(
                         _slot_params_with_grad, config.max_grad_norm * 0.01
