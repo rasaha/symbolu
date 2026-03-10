@@ -7108,12 +7108,15 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        # V11.3: Capture pre-attention hidden state for retrieval loss.
-        # Post-backbone x is redundant with lm_head(x) — slots trained on it
-        # just learn to copy the backbone's own prediction. Pre-attention x
-        # (token embed + position, zero attention context) forces slots to
-        # provide information the query genuinely lacks.
-        _x_pre_attn = x.detach()
+        # V11.3→V14-hotfix: Query source for slot retrieval/prediction losses.
+        # V11.3 used pre-attention embeddings (token embed + position only),
+        # making slots a simple bigram lookup table.
+        # V14: Capture after last Local layer instead (set below in the loop).
+        # By that point the model has processed local syntax, so the query
+        # becomes "I've seen these N words, what global fact comes next?"
+        # rather than "I am token X, what is X usually near?"
+        _x_pre_attn = x.detach()  # Fallback only; overwritten after Local block
+        _x_post_local = None  # Will be set after layer (local_layers - 1)
 
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
@@ -7170,6 +7173,12 @@ class HybridPhaseTransformer(nn.Module):
                         x = block(x, causal_mask=True, intent_phase=block_intent)
                 else:
                     x = block(x, causal_mask=True)
+
+            # V14-hotfix: Capture hidden state after last Local layer for slot
+            # query source.  Local layers process syntax; this gives the slot
+            # queries richer context than raw embeddings.
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
 
             # =================================================================
             # V10.13/V10.14: GCT — Token READ from memory
@@ -7299,7 +7308,9 @@ class HybridPhaseTransformer(nn.Module):
             # Pre-attention x (embed + position only) forces slots to provide
             # information that attention hasn't yet injected.
             # Already detached at capture point (line ~7114).
-            result['_slot_hidden'] = _x_pre_attn  # Pre-attention for non-redundant retrieval
+            # V14-hotfix: Use post-local hidden state (richer syntax context)
+            # instead of pre-attention embeddings (bare token+position).
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
 
         return result
 
@@ -7351,8 +7362,10 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
-        # V11.3: Pre-attention capture (mirrors forward())
+        # V11.3→V14-hotfix: Pre-attention capture (fallback), overwritten by
+        # post-local capture below.
         _x_pre_attn = x.detach()
+        _x_post_local = None
 
         # Initialize states if not provided
         if prev_layer_states is None:
@@ -7401,6 +7414,10 @@ class HybridPhaseTransformer(nn.Module):
             else:
                 # Local-only blocks: no state to manage
                 x = block(x, causal_mask=True)
+
+            # V14-hotfix: Capture post-local hidden state (mirrors forward())
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
 
             # V10.13/V10.14: GCT read/write (same logic as forward())
             if self.global_tokens_enabled:
@@ -7478,8 +7495,8 @@ class HybridPhaseTransformer(nn.Module):
         if self.global_tokens_enabled and self.global_update_mode == "slots":
             result['_slot_keys'] = _slot_keys
             result['_slot_vals'] = _slot_vals
-            # V11.3: Pre-attention hidden (mirrors forward())
-            result['_slot_hidden'] = _x_pre_attn
+            # V14-hotfix: Post-local hidden state (mirrors forward())
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
 
         return result, next_layer_states
 
@@ -8472,7 +8489,10 @@ class SlotMemoryGCT(nn.Module):
         super().__init__()
         self.num_slots = num_slots
         self.embed_dim = embed_dim
-        self.write_lr = write_lr
+        # Triple-Patch: write_lr as nn.Parameter (init 0.5) so the Sovereign
+        # Controller optimizer can adjust it via gradients, in addition to the
+        # existing manual adaptive schedule.
+        self.write_lr = nn.Parameter(torch.tensor(0.5))
         self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
 
@@ -8512,7 +8532,7 @@ class SlotMemoryGCT(nn.Module):
         # slots get meaningful writes → retrieval loss provides gradient → gate
         # can learn to modulate. If writing is too aggressive, the gate will
         # learn to close — but starting too low creates a chicken-and-egg trap.
-        nn.init.constant_(self.write_novelty_gate.bias, 1.0)
+        nn.init.constant_(self.write_novelty_gate.bias, 2.0)  # V18: sigmoid(2)≈0.88 — start wide open
         # V10.14.7: Gate floor moved to V10.29 adaptive block below.
 
         # V10.27: Adaptive write gate ceiling — prevents runaway gate opening.
@@ -8521,10 +8541,10 @@ class SlotMemoryGCT(nn.Module):
         # This adds a soft quadratic ceiling that adapts based on write utility:
         # if retr_loss is improving → ceiling relaxes (writes are helpful),
         # if retr_loss stagnates while gate is high → ceiling tightens (churn).
-        self._gate_target = 0.35          # Adaptive ceiling (starts moderate)
-        self._gate_target_min = 0.20      # Never tighten below this
-        self._gate_target_max = 0.60      # Never relax above this
-        self._gate_ceil_weight = 5.0      # Quadratic penalty weight above target
+        self._gate_target = 0.80          # V18: Forced open — bootstrap slot content before learning to gate
+        self._gate_target_min = 0.70      # V18: High floor to keep gate open during bootstrap
+        self._gate_target_max = 0.90      # V18: Allow near-full write
+        self._gate_ceil_weight = 50.0     # V14-hotfix: Linear+ReLU penalty weight (was 5.0 quadratic)
         self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
         self._retr_loss_window: List[float] = []  # Window for trend detection
         self._gate_window: List[float] = []       # Gate value window
@@ -8559,9 +8579,9 @@ class SlotMemoryGCT(nn.Module):
         # update_constraint_relaxation() runs every _constraint_relax_interval steps.
 
         # (a) Novelty gate floor — raise when gate collapsed, lower when healthy
-        self._novelty_gate_floor = 0.15
-        self._novelty_gate_floor_min = 0.05   # Can drop to give more dynamic range
-        self._novelty_gate_floor_max = 0.30   # Emergency rescue ceiling
+        self._novelty_gate_floor = 0.50         # V18: Force gate open — slots must get content to bootstrap
+        self._novelty_gate_floor_min = 0.30   # V18: Even minimum is aggressive
+        self._novelty_gate_floor_max = 0.70   # V18: Rescue ceiling also raised
 
         # (b) Retrieval loss weight — scale down when retr_loss dominates,
         #     scale up when slots are helping (caller tracks this externally)
@@ -8593,10 +8613,22 @@ class SlotMemoryGCT(nn.Module):
         # (f) Router noise — tie decay to marginal_H instead of fixed schedule
         self._adaptive_router_noise = True  # Enable marginal_H-based noise
 
-        # (g) Soft detach leak fraction — larger when gate collapsed
-        self._soft_detach_leak = 0.1        # Default 10% gradient leak
-        self._soft_detach_leak_min = 0.05   # Minimum leak
-        self._soft_detach_leak_max = 0.3    # Emergency boost
+        # (g) Soft detach leak fraction — ramps up when slots show signal
+        # V13/B1-fix: Trigger based on slot_pred_ppl (content quality), not
+        # gate health.  Gate at 0.4 (healthy) was suppressing the ramp even
+        # though slots weren't storing useful info (ppl=395).  Now: when
+        # slot_pred_ppl drops below threshold, ramp leak so LM gradients
+        # flow into writes and accelerate slot content improvement.
+        # V14-hotfix: Start at 0.5 (was 0.1) — the LM loss is the only signal
+        # that knows what is "useful", so it needs to reach slot weights from
+        # the start.  Curriculum ramps to 1.0 (full gradient) by step 12k.
+        self._soft_detach_leak = 0.9        # V17: Start at 90% (was 50%) — LM gradient must reach writes early
+        self._soft_detach_leak_min = 0.05   # Minimum leak (emergency only)
+        self._soft_detach_leak_max = 1.0    # V14: Full gradient by curriculum end
+        self._leak_curriculum_target = 1.0  # V14: Target leak at curriculum end
+        self._leak_curriculum_steps = 4000  # V17: Shortened from 12K — reach full gradient faster
+        self._slot_pred_loss_window: List[float] = []  # Track slot_pred_loss for ppl-based ramp
+        self._leak_ramp_ppl_threshold = 300.0  # Ramp leak when slot_pred_ppl drops below this
 
         # (h) L_sharp weight — reduce once sharpness is in good range
         self._L_sharp_weight = 0.1
@@ -8611,6 +8643,13 @@ class SlotMemoryGCT(nn.Module):
         # slow down to preserve good content already stored.
         self._write_lr_min = 0.05            # Floor: always some update
         self._write_lr_max = 0.5             # Ceiling: never overwrite >50%
+        # Plasticity Schedule: keep write_lr high (0.5) during bootstrap phase
+        # (first 5k steps), then linearly cool to 0.1 over the next 5k steps
+        # for stability during the Refinement phase.
+        self._plasticity_high = 0.5          # Bootstrap phase write_lr
+        self._plasticity_low = 0.1           # Refinement phase write_lr
+        self._plasticity_warmup_end = 5000   # Steps at full plasticity
+        self._plasticity_cooldown_end = 10000  # Steps when cooldown finishes
 
         # Write key scale: learnable inverse temperature for cosine similarity.
         # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
@@ -8639,6 +8678,42 @@ class SlotMemoryGCT(nn.Module):
         # Separate projection lets retrieval loss train read queries independently.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        # V13/B2: Learned read gate — replaces blind residual addition
+        # `x = x + alpha * slot_out` with `x = x + alpha * sigma(gate) * slot_out`.
+        # The model learns per-position when slot reads help.  Gate starts near
+        # zero (bias=-2.0 → sigmoid≈0.12) so it's safe by default, then opens
+        # where slots add value.  Full LM gradients flow through the gate.
+        # V15: "Open Door" read gate — bias=0.0 (sigmoid=0.50) with small
+        # positive weight init (std=0.01). Previous V13.1 used zero weight +
+        # bias=-2.0 (sigmoid=0.12), which created a cold-start trap: the gate
+        # was so closed that LM loss received negligible gradient through slot
+        # reads, so the gate never learned to open. Slot ablation stayed at
+        # +0.0% through 200+ steps despite slot_pred_ppl improving 50K→3.4K.
+        #
+        # The fix: start the gate at 50% open. The model is forced to deal
+        # with slot content immediately. LM loss has a strong gradient signal
+        # to either improve slot content (if helpful) or close the gate (if
+        # harmful). Small positive weight (not zero) lets the gate learn
+        # position-dependent gating from the start. If slot reads hurt, the
+        # gate will learn to close — but it won't get stuck near-zero.
+        self.read_gate_proj = nn.Linear(embed_dim, 1)
+        nn.init.normal_(self.read_gate_proj.weight, mean=0.0, std=0.01)
+        nn.init.constant_(self.read_gate_proj.bias, 0.0)
+        # V15.1: Frozen-gate curriculum — for the first N steps, the read gate
+        # is fixed at 0.5 (read_gate_proj.requires_grad=False). This prevents
+        # the model from taking the easy path of just closing the gate to avoid
+        # noisy slot reads. Instead, the backbone is forced to adapt to slot
+        # content, building a functional relationship with memory. After the
+        # freeze period, the gate unfreezes and can learn position-dependent
+        # gating on top of the already-established slot integration.
+        self._read_gate_freeze_steps = 500   # V17: Shortened from 2K — by PPL~600 slots have enough signal
+        self._read_gate_frozen = True  # Start frozen
+        self._read_gate_freeze_value = 1.0  # V17: Fully open (was 0.5) — force backbone to integrate slot reads
+        # Start with gate params frozen
+        self.read_gate_proj.weight.requires_grad = False
+        self.read_gate_proj.bias.requires_grad = False
+        # Diagnostic: average gate activation across positions
+        self._diag_read_gate_mean: float = 0.0
         self.read_dropout = nn.Dropout(dropout)
         # V10.14.6: Retrieval readout norm — raw slot values go through this
         # LayerNorm before lm_head in compute_retrieval_loss. The lm_head
@@ -8703,6 +8778,18 @@ class SlotMemoryGCT(nn.Module):
         self._read_warmstart_center = 100
         self._read_warmstart_tau = 25
 
+        # --- V16: Semantic Coherence Gate ---
+        # Modulates write assignment by value-space coherence between token
+        # and slot content: S[i,j] = cosine_sim(write_val[i], slot_val[j]).
+        # Prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots, directly improving ablation delta.
+        # Floor decays from initial value to 0 over warmup steps, letting
+        # writes bootstrap before coherence filtering tightens.
+        self._coherence_floor = 0.3          # Initial floor (lets writes through early)
+        self._coherence_floor_min = 0.0      # Final floor after warmup
+        self._coherence_floor_decay_steps = 4000  # Steps to decay floor to min
+        self._diag_coherence_mean: float = 0.0  # Mean coherence score
+
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
         self._diag_assignment_entropy = None
@@ -8718,23 +8805,26 @@ class SlotMemoryGCT(nn.Module):
         '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
         '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
         '_L_sharp_weight', 'write_lr',
+        '_read_gate_frozen',  # V15.1: Persisted so resume knows freeze state
+        '_coherence_floor',   # V16: Semantic coherence gate floor
     )
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
     _ADAPTIVE_DEFAULTS = {
-        '_gate_target': 0.35,
-        '_gate_ceil_weight': 5.0,
+        '_gate_target': 0.80,             # V18: Forced open for bootstrap
+        '_gate_ceil_weight': 50.0,       # V14-hotfix: Linear+ReLU (was 5.0 quadratic)
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
         '_wr_scale_max': 4.0,
         '_L_bal_weight': 1.0,
-        '_novelty_gate_floor': 0.15,
+        '_novelty_gate_floor': 0.50,     # V18: Forced open for bootstrap
         '_adaptive_retr_loss_weight': 1.0,
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
         '_read_scale_max': 64.0,
-        '_soft_detach_leak': 0.1,
+        '_soft_detach_leak': 0.9,        # V17: Start at 90% (was 50%) for early LM gradient
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
+        '_coherence_floor': 0.3,          # V16: Semantic coherence gate floor
     }
 
     def reset_constraints(self):
@@ -8754,6 +8844,7 @@ class SlotMemoryGCT(nn.Module):
         self._lm_loss_history.clear()
         self._retr_loss_window.clear()
         self._gate_window.clear()
+        self._slot_pred_loss_window.clear()
         self._gate_adapt_counter = 0
 
     def state_dict(self, *args, **kwargs):
@@ -8847,6 +8938,49 @@ class SlotMemoryGCT(nn.Module):
                 self._read_log_scale.fill_(_rd_above_floor)
             print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
                   f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
+        # V15/V15.1: On resume, check if we're still in the freeze period.
+        # If _router_step < freeze_steps, keep gate frozen. Otherwise unfreeze.
+        # This replaces V13.1's zero-init reset (which was for the old -2.0 bias).
+        if hasattr(self, 'read_gate_proj') and hasattr(self, '_read_gate_freeze_steps'):
+            if self._router_step >= self._read_gate_freeze_steps:
+                # Past freeze period — unfreeze gate if still frozen
+                if self._read_gate_frozen:
+                    self._read_gate_frozen = False
+                    self.read_gate_proj.weight.requires_grad = True
+                    self.read_gate_proj.bias.requires_grad = True
+                    print(f"  [SLOTS] V15.1: Read gate unfrozen on resume "
+                          f"(step {self._router_step} >= {self._read_gate_freeze_steps})")
+            else:
+                # Still in freeze period — ensure gate stays frozen
+                self._read_gate_frozen = True
+                self.read_gate_proj.weight.requires_grad = False
+                self.read_gate_proj.bias.requires_grad = False
+                print(f"  [SLOTS] V15.1: Read gate stays frozen on resume "
+                      f"(step {self._router_step} < {self._read_gate_freeze_steps})")
+        # V13.2: Enforce gate_target floor on resume. Old checkpoints may have
+        # _gate_target tightened below the new floor (0.40), creating a feedback
+        # loop where the ceiling caps the write gate before slots prove useful.
+        if self._gate_target < self._gate_target_min:
+            _old_target = self._gate_target
+            self._gate_target = self._gate_target_min
+            print(f"  [SLOTS] V13.2: _gate_target {_old_target:.2f} → {self._gate_target_min:.2f} "
+                  f"(clamped to new floor)")
+        # V14-hotfix: Force new leak/ceiling values on resume from old checkpoints.
+        # Old checkpoint may have _soft_detach_leak=0.1 and _gate_ceil_weight=5.0
+        # which would undo the realignment.
+        if self._soft_detach_leak < 0.9:
+            _old_leak = self._soft_detach_leak
+            self._soft_detach_leak = 0.9
+            print(f"  [SLOTS] V17: _soft_detach_leak {_old_leak:.2f} → 0.90 "
+                  f"(forced to new start for stronger gradient curriculum)")
+        if self._soft_detach_leak_max < 1.0:
+            self._soft_detach_leak_max = 1.0
+            print(f"  [SLOTS] V14: _soft_detach_leak_max raised to 1.0 (full gradient by curriculum end)")
+        if self._gate_ceil_weight < 50.0:
+            _old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = 50.0
+            print(f"  [SLOTS] V14: _gate_ceil_weight {_old_w:.1f} → 50.0 "
+                  f"(linear+ReLU penalty)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
@@ -8864,6 +8998,22 @@ class SlotMemoryGCT(nn.Module):
             -(self._router_step - self._read_warmstart_center)
             / max(self._read_warmstart_tau, 1.0)
         ))
+
+    def maybe_unfreeze_read_gate(self):
+        """V15.1: Unfreeze read gate after the curriculum freeze period.
+
+        Called every step after _router_step increments. Once _router_step
+        reaches _read_gate_freeze_steps, the gate parameters are unfrozen
+        and the model can learn position-dependent gating on top of the
+        slot integration that the backbone learned during the freeze.
+        """
+        if self._read_gate_frozen and self._router_step >= self._read_gate_freeze_steps:
+            self._read_gate_frozen = False
+            self.read_gate_proj.weight.requires_grad = True
+            self.read_gate_proj.bias.requires_grad = True
+            print(f"  [SLOTS] V15.1: Read gate UNFROZEN at step {self._router_step} "
+                  f"(was fixed at {self._read_gate_freeze_value} for "
+                  f"{self._read_gate_freeze_steps} steps). Gate now learnable.")
 
     def init_state(self, batch_size: int, dtype: torch.dtype, device: torch.device):
         """Initialize slot state for a new batch.
@@ -8996,6 +9146,29 @@ class SlotMemoryGCT(nn.Module):
         # [B, N, K] * [B, N, 1] → [B, N, K]
         gated_assignment = assignment * novelty
 
+        # V16: Semantic Coherence Gate — modulate assignment by value-space
+        # similarity between the token's write content and slot's existing content.
+        # This prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots. Key insight: cosine key similarity (routing) can match
+        # tokens to "nearby" slots that store unrelated content; value coherence
+        # filters these out.  A decaying floor handles cold-start (slot_vals ≈ 0
+        # early → all coherences ≈ 0 → floor lets writes bootstrap).
+        _wv_norm = F.normalize(write_vals, dim=-1)                  # [B, N, D]
+        _sv_norm = F.normalize(slot_vals.detach(), dim=-1)          # [B, K, D]
+        coherence = torch.bmm(_wv_norm, _sv_norm.transpose(1, 2))  # [B, N, K]
+        # Floor decays linearly from _coherence_floor to _coherence_floor_min
+        # over _coherence_floor_decay_steps, then stays at min.
+        _coh_progress = min(1.0, self._router_step / max(1, self._coherence_floor_decay_steps))
+        _coh_floor = self._coherence_floor + (self._coherence_floor_min - self._coherence_floor) * _coh_progress
+        coherence = torch.clamp(coherence, min=_coh_floor)
+        # Triple-Patch: Bypass coherence gating for first 2k steps to break
+        # the Coherence Catch-22 (slots empty → coherence≈0 → writes blocked
+        # → slots stay empty). After 2k steps, coherence gating kicks in.
+        if self._router_step < 2000:
+            gated_assignment = gated_assignment * torch.ones_like(coherence)
+        else:
+            gated_assignment = gated_assignment * coherence
+
         # Aggregate writes per slot: sum over tokens
         # effective_write[b, k] = sum_t(gated_assignment[b, t, k])
         # This is the total write pressure on each slot
@@ -9035,7 +9208,21 @@ class SlotMemoryGCT(nn.Module):
 
         # EMA update rate per slot: η * min(write_pressure, 1.0)
         # Slots with no write pressure don't update; heavy pressure caps at η
-        eta = self.write_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
+        # Plasticity Schedule: override write_lr based on training phase.
+        # Bootstrap (0–5k): full plasticity at 0.5
+        # Cooldown (5k–10k): linear decay 0.5 → 0.1
+        # Refinement (10k+): stable at 0.1 (Sovereign Controller can still adjust)
+        _step = self._router_step
+        if _step < self._plasticity_warmup_end:
+            _effective_lr = self._plasticity_high
+        elif _step < self._plasticity_cooldown_end:
+            _cool_progress = (_step - self._plasticity_warmup_end) / max(
+                1, self._plasticity_cooldown_end - self._plasticity_warmup_end
+            )
+            _effective_lr = self._plasticity_high + (self._plasticity_low - self._plasticity_high) * _cool_progress
+        else:
+            _effective_lr = self.write_lr  # Sovereign Controller takes over
+        eta = _effective_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
 
         if detach:
             incoming_keys = incoming_keys.detach()
@@ -9070,6 +9257,10 @@ class SlotMemoryGCT(nn.Module):
             self._diag_assignment_entropy = -(assignment * _a_log).sum(dim=-1).mean().item()
             self._diag_slot_key_norm = new_slot_keys.norm(dim=-1).mean().item()
             self._diag_slot_val_norm = new_slot_vals.norm(dim=-1).mean().item()
+            # V16: Mean semantic coherence (before floor clamp)
+            self._diag_coherence_mean = torch.bmm(
+                _wv_norm, _sv_norm.transpose(1, 2)
+            ).mean().item()
 
         return new_slot_keys, new_slot_vals
 
@@ -9105,12 +9296,13 @@ class SlotMemoryGCT(nn.Module):
             self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
         )
         _q_norm = F.normalize(queries, dim=-1)
-        # V10.20: Detach slot_keys in read path (same rationale as write path).
-        # Slot keys learn through EMA updates, not through read attention gradients.
-        # The LM learning signal flows through slot_vals (retrieved content),
-        # not through slot_keys (routing). Detaching prevents F.normalize Jacobian
-        # explosion while preserving the value-path gradient.
-        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        # Triple-Patch: Enable key learning in read path. Previously detached
+        # to prevent F.normalize Jacobian explosion, but this severed the
+        # gradient path from LM loss → read attention → slot_keys, preventing
+        # keys from learning which slots to route to. With write_lr=0.5 and
+        # coherence bypass, keys now get strong EMA signal; allowing read-path
+        # gradients lets the LM loss directly shape key geometry.
+        _sk_norm = F.normalize(slot_keys, dim=-1)
         attn_logits = torch.bmm(
             _q_norm, _sk_norm.transpose(1, 2)
         ) * _read_scale
@@ -9123,11 +9315,34 @@ class SlotMemoryGCT(nn.Module):
         # Project to output space
         output = self.read_output_proj(retrieved)
 
+        # V13/B2: Learned per-position gating.  The gate decides how much
+        # slot-derived information to inject at each position.  Input is the
+        # query token's hidden state `x` (NOT retrieved content) — the model
+        # decides based on its OWN state whether it needs slot info, before
+        # seeing what the slot returned.  This prevents the gate from just
+        # learning "is this slot content zero/noisy" → actually forces the
+        # model to learn WHEN to use memory.
+        # NOTE: gate is applied here (inside read()) so compute_retrieval_loss
+        # and compute_slot_prediction_loss are NOT gated — those losses train
+        # the read/write projections directly, independent of LM usefulness.
+        # V15.1: During frozen-gate phase, use fixed gate value instead of
+        # learned projection. This forces the backbone to adapt to slot reads.
+        if self._read_gate_frozen:
+            _gate = torch.full(
+                (x.shape[0], x.shape[1], 1),
+                self._read_gate_freeze_value,
+                device=x.device, dtype=x.dtype,
+            )
+        else:
+            _gate = torch.sigmoid(self.read_gate_proj(x))  # [B, N, 1]
+        output = output * _gate
+
         # Diagnostics
         with torch.no_grad():
             _w_log = torch.log(attn_weights.clamp(min=1e-8))
             self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
             self._diag_read_scale = _read_scale.item()
+            self._diag_read_gate_mean = _gate.mean().item()
 
         return output
 
@@ -9168,11 +9383,14 @@ class SlotMemoryGCT(nn.Module):
         # V12: Use read_query_proj (matches read() path) so retrieval loss
         # gradients train the read projection, not the write projection.
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        # V12.4: Match read() path scale — previously used _wr_scale_max (2.0)
-        # by copy-paste error, creating 9x temperature mismatch vs read() (18+).
-        # Retrieval loss trained read_query_proj for near-uniform attention
-        # while read() used peaky softmax → stuck retr_loss.
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
+        # V14-hotfix: Sync scale with read() exactly. Previously used
+        # exp(x).clamp() (clamp in linear space) while read() uses
+        # exp(x.clamp()) (clamp in log space). The mismatch means retrieval
+        # loss evaluates at a different temperature than inference read(),
+        # causing gradients to optimize for the wrong sharpness.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys (consistent with read/write paths).
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
@@ -9266,8 +9484,11 @@ class SlotMemoryGCT(nn.Module):
 
         # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
         queries = self.read_query_proj(x)  # [B, N, D_key]
-        # V12.4: Match read() path scale (same fix as compute_retrieval_loss).
-        _scale = torch.exp(self._read_log_scale).clamp(min=1.5, max=self._read_scale_max)
+        # V14-hotfix: Sync scale with read() exactly — clamp in log space,
+        # same floor (log(18.0)) so loss evaluates at inference temperature.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
         _q_norm = F.normalize(queries, dim=-1)
         _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
         attn_logits = torch.bmm(
@@ -9419,13 +9640,14 @@ class SlotMemoryGCT(nn.Module):
         # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
         # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
         # when fully collapsed, providing meaningful gradient to redistribute.
-        # V10.27: Adaptive gate ceiling — soft quadratic penalty above target.
-        # Below target: only log-barrier (pushes open, existing behavior).
-        # Above target: quadratic penalty pushes closed, preventing churn.
+        # V14-hotfix: Hard gate ceiling — Linear+ReLU penalty (was soft quadratic).
+        # Quadratic was too gentle at small violations and too aggressive at large
+        # ones, creating unstable oscillations.  Linear penalty with high weight
+        # (50.0) provides consistent, strong enforcement.
         L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
         if self._last_novelty is not None:
             gate_mean = self._last_novelty.mean()
-            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin) ** 2
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin)
 
         # V10.29: All loss weights are adaptive
         return (self._L_sharp_weight * L_sharp + self._L_bal_weight * L_bal
@@ -9519,6 +9741,10 @@ class SlotMemoryGCT(nn.Module):
         self._retr_loss_history.append(retr_loss)
         if lm_loss > 0:
             self._lm_loss_history.append(lm_loss)
+        # V13/B1: Accumulate slot_pred_loss for ppl-based leak ramp
+        _cur_sp_loss = getattr(self, '_diag_slot_pred_loss', 0.0) or 0.0
+        if _cur_sp_loss > 0:
+            self._slot_pred_loss_window.append(_cur_sp_loss)
         # BUG 3 fix: Accumulate gate_mean per step (not stale single-batch)
         _cur_gate = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
         self._gate_mean_window.append(_cur_gate)
@@ -9540,7 +9766,7 @@ class SlotMemoryGCT(nn.Module):
         _max_len = self._constraint_relax_interval * 2
         for _lst in (self._constraint_relax_window, self._retr_loss_history,
                      self._lm_loss_history, self._gate_mean_window,
-                     self._L_ortho_window):
+                     self._L_ortho_window, self._slot_pred_loss_window):
             if len(_lst) > _max_len:
                 del _lst[:len(_lst) - _max_len]
 
@@ -9727,14 +9953,31 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
 
         # ── (9) Soft detach leak ──────────────────────────────────────────
-        if avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+        # V14-hotfix: Deterministic curriculum — ramp leak linearly from 0.5
+        # to 1.0 over _leak_curriculum_steps.  The LM loss is the only signal
+        # that knows what is "useful" for generation; the retrieval loss only
+        # knows what is "storable".  Adaptive ramp was too slow (waited for
+        # ppl < 300 that never came).  Curriculum forces integration.
+        _curriculum_target = getattr(self, '_leak_curriculum_target', 1.0)
+        _curriculum_steps = getattr(self, '_leak_curriculum_steps', 12000)
+        _router_step = getattr(self, '_router_step', 0)
+        _curriculum_leak = 0.9 + (_curriculum_target - 0.9) * min(1.0, _router_step / max(1, _curriculum_steps))
+        if self._soft_detach_leak < _curriculum_leak:
+            old = self._soft_detach_leak
+            self._soft_detach_leak = min(self._soft_detach_leak_max, _curriculum_leak)
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(curriculum step {_router_step}/{_curriculum_steps})")
+        elif avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+            # Emergency fallback: gate collapsed, need gradient to rescue writes
             old = self._soft_detach_leak
             self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + 0.03)
-            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed)")
-        elif avg_gate > 0.3 and self._soft_detach_leak > self._soft_detach_leak_min:
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed, emergency)")
+        elif _avg_sp_ppl > self._leak_ramp_ppl_threshold * 1.5 and self._soft_detach_leak > self._soft_detach_leak_min:
+            # Slots carry no useful info — don't waste gradient budget on writes
             old = self._soft_detach_leak
             self._soft_detach_leak = max(self._soft_detach_leak_min, self._soft_detach_leak - 0.01)
-            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate healthy)")
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(slot_pred_ppl={_avg_sp_ppl:.0f}, no signal)")
 
         # ── (10) L_sharp weight ───────────────────────────────────────────
         # Note: Uses per_token_H which is last-batch (acceptable since
@@ -9755,22 +9998,22 @@ class SlotMemoryGCT(nn.Module):
         if half > 0:
             first_half = sum(self._retr_loss_history[:half]) / half
             second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
-            if second_half < first_half * 0.90 and self.write_lr < self._write_lr_max:
+            if second_half < first_half * 0.90 and self.write_lr.item() < self._write_lr_max:
                 # Retrieval improving (>10% drop) → writes are useful, speed up
-                old = self.write_lr
-                self.write_lr = min(self._write_lr_max, self.write_lr * 1.15)
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr improving)")
-            elif second_half > first_half * 1.05 and self.write_lr > self._write_lr_min:
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(min(self._write_lr_max, old * 1.15))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr improving)")
+            elif second_half > first_half * 1.05 and self.write_lr.item() > self._write_lr_min:
                 # Retrieval worsening (>5% rise) → slow down writes
-                old = self.write_lr
-                self.write_lr = max(self._write_lr_min, self.write_lr * 0.85)
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (retr worsening)")
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(max(self._write_lr_min, old * 0.85))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr worsening)")
         # Also: if gate is collapsed, lower write_lr to reduce churn
-        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr > self._write_lr_min:
-            old = self.write_lr
-            self.write_lr = max(self._write_lr_min, self.write_lr * 0.90)
+        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr.item() > self._write_lr_min:
+            old = self.write_lr.item()
+            self.write_lr.data.fill_(max(self._write_lr_min, old * 0.90))
             if not any('write_lr' in c for c in changes):
-                changes.append(f"write_lr: {old:.3f}→{self.write_lr:.3f} (gate collapsed)")
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (gate collapsed)")
 
         # ── Log changes ───────────────────────────────────────────────────
         if changes:
@@ -9784,6 +10027,7 @@ class SlotMemoryGCT(nn.Module):
         self._lm_loss_history.clear()
         self._gate_mean_window.clear()
         self._L_ortho_window.clear()
+        self._slot_pred_loss_window.clear()
         self._constraint_relax_counter = 0
 
 

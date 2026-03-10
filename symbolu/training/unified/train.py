@@ -549,6 +549,10 @@ def train(config: UnifiedTrainingConfig):
                 _gate_overrides.append(f"margin={config.slot_gate_ceil_margin}")
             if _gate_overrides:
                 print(f"  Gate Ceiling: {', '.join(_gate_overrides)}")
+            # V16: Semantic coherence gate floor override
+            if getattr(config, 'slot_coherence_floor', None) is not None:
+                _sm._coherence_floor = config.slot_coherence_floor
+                print(f"  Coherence Floor: {config.slot_coherence_floor}")
 
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
@@ -2784,6 +2788,7 @@ def train(config: UnifiedTrainingConfig):
                                         query_mask=_qmask, target_ids=chunk_targets,
                                     )
                                 _sm._router_step += 1
+                                _sm.maybe_unfreeze_read_gate()
                                 return (_aux + _cfg.retrieval_loss_weight * _retr
                                         + _cfg.slot_prediction_loss_weight * _slot_pred)
 
@@ -4553,6 +4558,7 @@ def train(config: UnifiedTrainingConfig):
                         # to avoid interval counters firing grad_accum× too fast.
                     # Step the router noise counter
                     _sm._router_step += 1
+                    _sm.maybe_unfreeze_read_gate()
                     # Log slot diagnostics periodically (only on last accumulation step)
                     if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
                         _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(min=math.log(1.5), max=math.log(getattr(_sm, '_wr_scale_max', 2.0)))))
@@ -4572,7 +4578,9 @@ def train(config: UnifiedTrainingConfig):
                               f"leak={getattr(_sm, '_soft_detach_leak', 0.1):.2f} "
                               f"L_bal_w={getattr(_sm, '_L_bal_weight', 1.0):.2f} "
                               f"q_norm={getattr(_sm, '_diag_retr_query_norm', 0):.2f} "
-                              f"retr_norm={getattr(_sm, '_diag_retr_retrieved_norm', 0):.2f}")
+                              f"retr_norm={getattr(_sm, '_diag_retr_retrieved_norm', 0):.2f} "
+                              f"rd_gate={getattr(_sm, '_diag_read_gate_mean', 0):.3f} "
+                              f"coh={getattr(_sm, '_diag_coherence_mean', 0):.3f}")
                         # V11.4: Log slot-only prediction diagnostics
                         if _slot_pred_loss_val > 0:
                             _sp_ppl = math.exp(min(_slot_pred_loss_val, 20.0))  # Cap to avoid overflow
@@ -6241,7 +6249,8 @@ def train(config: UnifiedTrainingConfig):
                 # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF, freedom to learn
                 # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED, gentle guidance
                 # Phase 3: POLISHING (PPL < 30) - Gyroscope ACTIVE, firm homeostasis
-                if not config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
+                # Only activates when explicitly enabled via --enable_kosha_gyroscope
+                if config.enable_kosha_gyroscope and kosha_gyroscope is None and KOSHA_GYROSCOPE_AVAILABLE:
 
                     # Phase transition: CONSTRUCTION -> REFINEMENT
                     if (gyroscope_phase == "CONSTRUCTION" and
@@ -6375,8 +6384,9 @@ def train(config: UnifiedTrainingConfig):
                         # Graduation ceremony!
                         print(f"\n  {'='*60}")
                         print(f"  🎓 KOSHA GYROSCOPE GRADUATION at step {global_step}")
-                        print(f"     Mean PPL: {kosha_graduation_monitor.mean_ppl:.2f} < {config.gyroscope_graduation_ppl}")
-                        print(f"     PPL σ:    {kosha_graduation_monitor.variance:.3f} < {config.gyroscope_graduation_variance}")
+                        grad_info = kosha_graduation_monitor.graduation_info
+                        print(f"     Mean PPL: {grad_info['avg_ppl']:.2f} < {config.gyroscope_graduation_ppl}")
+                        print(f"     PPL σ:    {grad_info['std_ppl']:.3f} < {config.gyroscope_graduation_variance}")
                         print(f"     Model has learned to self-regulate!")
                         print(f"     Gyroscope transitioning to ramp-down phase...")
 
@@ -6401,9 +6411,11 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("gyro/graduation_step", global_step, global_step)
 
                     # TensorBoard logging for gyroscope during training
-                    if tb_writer is not None and not kosha_graduated:
-                        tb_writer.add_scalar("gyro/mean_ppl", kosha_graduation_monitor.mean_ppl, global_step)
-                        tb_writer.add_scalar("gyro/ppl_variance", kosha_graduation_monitor.variance, global_step)
+                    if tb_writer is not None and not kosha_graduated and kosha_graduation_monitor is not None:
+                        grad_status = kosha_graduation_monitor.get_status()
+                        if 'avg_ppl' in grad_status:
+                            tb_writer.add_scalar("gyro/mean_ppl", grad_status['avg_ppl'], global_step)
+                            tb_writer.add_scalar("gyro/ppl_variance", grad_status['std_ppl'], global_step)
 
                 # Conscious Generation Curriculum: PPL-gated stage transitions
                 if cg_stage_manager is not None:
@@ -7274,8 +7286,10 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
-                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
+                       help="Model architecture type (standard = O(n²) baseline, "
+                            "gct = Gated Coherence Transformer [pre-softmax coherence routing], "
+                            "ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
                             "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State], "
                             "mistral_cg = Frozen Mistral backbone + trainable CG modules)")
@@ -7298,6 +7312,30 @@ def main():
                        help="Dropout rate")
     parser.add_argument("--attention_dropout", type=float, default=0.1,
                        help="Attention dropout rate")
+
+    # GCT (Gated Coherence Transformer) arguments
+    parser.add_argument("--gct_window_size", type=int, default=128,
+                       help="GCT local window size for coarse attention path")
+    parser.add_argument("--gct_coherence_gamma", type=float, default=5.0,
+                       help="GCT output delta sensitivity in coherence score")
+    parser.add_argument("--gct_coherence_delta", type=float, default=3.0,
+                       help="GCT residual delta sensitivity in coherence score")
+    parser.add_argument("--gct_ema_decay", type=float, default=0.9,
+                       help="GCT EMA smoothing decay for coherence scores")
+    parser.add_argument("--gct_num_bands", type=int, default=3,
+                       help="GCT number of frequency bands for head partitioning")
+    parser.add_argument("--gct_alpha_sharpness", type=float, default=10.0,
+                       help="GCT sigmoid sharpness for routing probability")
+    parser.add_argument("--gct_hard_route_threshold", type=float, default=0.5,
+                       help="GCT hard routing threshold for inference")
+    parser.add_argument("--gct_kappa", type=float, default=3.0,
+                       help="GCT lambda_ladder suppression strength")
+    parser.add_argument("--gct_tau_ladder", type=float, default=0.15,
+                       help="GCT collapse detection threshold for lambda_ladder")
+    parser.add_argument("--gct_warmup_steps", type=int, default=500,
+                       help="GCT Phase 1: full-attention-only warmup steps")
+    parser.add_argument("--gct_anneal_steps", type=int, default=2000,
+                       help="GCT Phase 2: anneal from full to gated attention over N steps")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
@@ -7401,6 +7439,9 @@ def main():
                        help="Gate ceiling penalty weight (default: 5.0, 0=disable ceiling)")
     parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
                        help="Free exploration zone above gate target before penalty (default: 0.05)")
+    # V16: Semantic coherence gate
+    parser.add_argument("--slot_coherence_floor", type=float, default=None,
+                       help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
     # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
     # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
@@ -8891,11 +8932,25 @@ def main():
         slot_gate_target=getattr(args, 'slot_gate_target', None),
         slot_gate_ceil_weight=getattr(args, 'slot_gate_ceil_weight', None),
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
+        # V16: Semantic coherence gate
+        slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
         # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
         slot_lr_eta=getattr(args, 'slot_lr_eta', 0.03),
         slot_lr_stabilize_after=getattr(args, 'slot_lr_stabilize_after', None),
+        # GCT (Gated Coherence Transformer)
+        gct_window_size=args.gct_window_size,
+        gct_coherence_gamma=args.gct_coherence_gamma,
+        gct_coherence_delta=args.gct_coherence_delta,
+        gct_ema_decay=args.gct_ema_decay,
+        gct_num_bands=args.gct_num_bands,
+        gct_alpha_sharpness=args.gct_alpha_sharpness,
+        gct_hard_route_threshold=args.gct_hard_route_threshold,
+        gct_kappa=args.gct_kappa,
+        gct_tau_ladder=args.gct_tau_ladder,
+        gct_warmup_steps=args.gct_warmup_steps,
+        gct_anneal_steps=args.gct_anneal_steps,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay

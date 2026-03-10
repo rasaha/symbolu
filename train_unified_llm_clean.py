@@ -8698,6 +8698,17 @@ class UnifiedTrainingConfig:
     gct_warmup_steps: int = 500         # Full-attention-only warmup (Phase 1)
     gct_anneal_steps: int = 2000        # Anneal from full to gated (Phase 2)
 
+    # SlotMemoryGCT provides addressable memory slots for long-range retrieval.
+    global_tokens_enabled: bool = False  # Enable GCT memory slots
+    num_global_tokens: int = 64  # Number of memory slots
+    global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
+    slots_write_lr: float = 0.1  # EMA learning rate for slot writes
+    slot_prediction_loss_weight: float = 0.1  # Weight for slot-only prediction loss
+    slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
+    global_read_interval: int = 1  # Read slots every N layers (1 = every layer)
+    global_write_start_layer: int = 0  # Only write to slots from this layer onward
+    slot_coherence_floor: Optional[float] = None  # V16: Semantic coherence gate floor override
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256
@@ -8739,6 +8750,10 @@ class UnifiedTrainingConfig:
     alpha_phase_ppl_low: float = 0.3    # alpha_phase when PPL <= ppl_low_threshold
     ppl_high_threshold: float = 1000.0  # PPL threshold for max phase weight
     ppl_low_threshold: float = 100.0    # PPL threshold for min phase weight
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    enable_adaptive_alpha: bool = False  # Adapt alpha_phase from slot ablation after curriculum settles
+    # Phase health diagnostics
+    phase_health_interval: int = 500  # Log phase health diagnostics every N steps
     # Adaptive window size (small early for fast phase, large later for local context)
     enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
     window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
@@ -12510,7 +12525,7 @@ def train(config: UnifiedTrainingConfig):
     # Optimizer
     # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
     # gradient variance explosions from cosine-similarity key matching
-    _slot_memory_lr_scale = 0.1
+    _slot_memory_lr_scale = config.slot_memory_lr_scale
     _slot_param_ids = set()
     _slot_params = []
     _slot_no_wd_params = []  # V10.27: Params that receive zero gradient (exclude from WD)
@@ -12530,6 +12545,10 @@ def train(config: UnifiedTrainingConfig):
                 _main_params.append(p)
         print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
               f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        # V16: Apply coherence floor override if specified
+        if getattr(config, 'slot_coherence_floor', None) is not None:
+            _sm._coherence_floor = config.slot_coherence_floor
+            print(f"  [V16] Semantic coherence floor: {config.slot_coherence_floor}")
     else:
         _main_params = list(model.parameters())
 
@@ -12978,6 +12997,11 @@ def train(config: UnifiedTrainingConfig):
     # V9.7.0: EvoFlow Fluency Gate - track engagement state
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
+
+    # v2.2.1: Kosha Gyroscope Graduation tracking
+    kosha_graduation_monitor = None  # Not yet implemented - placeholder
+    kosha_graduated = False
+    vritti_resonance = None  # v2.3.0: Vritti Resonance Loss - placeholder
 
     # PPL-Gated Curriculum Controller
     curriculum_controller = None
@@ -13495,6 +13519,9 @@ def train(config: UnifiedTrainingConfig):
                         metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
                     if hasattr(model.slot_memory, '_gate_target'):
                         metrics['slot_gate_ceil'] = model.slot_memory._gate_target
+                    # V16: Semantic coherence diagnostic
+                    if hasattr(model.slot_memory, '_diag_coherence_mean'):
+                        metrics['slot_coherence'] = model.slot_memory._diag_coherence_mean
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -14552,6 +14579,25 @@ def train(config: UnifiedTrainingConfig):
                     # Add ortho_loss if enabled (weight orthogonalization)
                     if 'ortho_loss' in metrics:
                         log_msg += f" | Ortho: {metrics['ortho_loss']:.4f}"
+
+                    # V10.28: Slot memory diagnostics on console
+                    if 'slot_write_gate' in metrics or 'slot_assignment_entropy' in metrics:
+                        slot_parts = ["[Slots]"]
+                        if 'slot_write_gate' in metrics:
+                            slot_parts.append(f"wg:{metrics['slot_write_gate']:.3f}")
+                        if 'slot_gate_ceil' in metrics:
+                            slot_parts.append(f"ceil:{metrics['slot_gate_ceil']:.3f}")
+                        if 'slot_assignment_entropy' in metrics:
+                            slot_parts.append(f"asgn_H:{metrics['slot_assignment_entropy']:.2f}")
+                        if 'slot_read_entropy' in metrics:
+                            slot_parts.append(f"read_H:{metrics['slot_read_entropy']:.2f}")
+                        if 'slot_marginal_entropy' in metrics:
+                            slot_parts.append(f"marg_H:{metrics['slot_marginal_entropy']:.2f}")
+                        if 'slot_coherence' in metrics:
+                            slot_parts.append(f"coh:{metrics['slot_coherence']:.3f}")
+                        if 'retrieval_loss' in metrics:
+                            slot_parts.append(f"retr:{metrics['retrieval_loss']:.4f}")
+                        log_msg += " | " + " ".join(slot_parts)
 
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
@@ -15980,6 +16026,28 @@ def main():
     parser.add_argument("--gct_anneal_steps", type=int, default=2000,
                        help="GCT Phase 2: anneal from full to gated attention over N steps")
 
+    # SlotMemoryGCT (addressable memory slots for long-range retrieval)
+    parser.add_argument("--global_tokens", action="store_true",
+                       help="Enable SlotMemoryGCT for long-range associative retrieval")
+    parser.add_argument("--num_global_tokens", type=int, default=64,
+                       help="Number of memory slots (default: 64)")
+    parser.add_argument("--global_update_mode", type=str, default="slots",
+                       choices=["pool", "attn-lite", "slots"],
+                       help="Global token update mode (default: slots)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.1,
+                       help="EMA learning rate for slot writes (default: 0.1)")
+    parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
+                       help="Weight for slot-only prediction loss (default: 0.1)")
+    parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
+                       help="Slot param LR multiplier vs main LR (default: 0.1)")
+    parser.add_argument("--global_read_interval", type=int, default=1,
+                       help="Read slots every N layers (1 = every layer)")
+    parser.add_argument("--global_write_start_layer", type=int, default=0,
+                       help="Only write to slots from this layer onward")
+    # V16: Semantic coherence gate
+    parser.add_argument("--slot_coherence_floor", type=float, default=None,
+                       help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
+
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size per GPU (reference batch for seq len curriculum)")
@@ -16104,6 +16172,12 @@ def main():
                        help="PPL threshold for max phase weight")
     parser.add_argument("--ppl_low_threshold", type=float, default=100.0,
                        help="PPL threshold for min phase weight")
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    parser.add_argument("--enable_adaptive_alpha", action="store_true",
+                       help="After PPL curriculum settles, adapt alpha_phase based on slot ablation delta")
+    # Phase health diagnostics
+    parser.add_argument("--phase_health_interval", type=int, default=500,
+                       help="Log phase health diagnostics every N steps (default: 500)")
     # Adaptive window size (small early for fast phase, large later for local context)
     parser.add_argument("--enable_adaptive_window", action="store_true",
                        help="Adapt window size based on PPL (small when high, large when low)")
@@ -16632,6 +16706,11 @@ def main():
                        help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
                        help="Disable evolutionary flow system")
+    # CSR / SGP disable flags (accepted for compatibility, no-op in clean trainer)
+    parser.add_argument("--disable_csr", action="store_true",
+                       help="Disable CSR phoneme grounding (no-op in clean trainer)")
+    parser.add_argument("--disable_sgp", action="store_true",
+                       help="Disable SGP (no-op in clean trainer)")
     parser.add_argument("--evo_lambda", type=float, default=0.1,
                        help="Overall evolutionary loss weight")
     parser.add_argument("--evo_micro_weight", type=float, default=0.3,
@@ -17082,6 +17161,16 @@ def main():
         phase_rotation_angles=args.phase_rotation_angles,
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
+        # SlotMemoryGCT
+        global_tokens_enabled=args.global_tokens,
+        num_global_tokens=args.num_global_tokens,
+        global_update_mode=args.global_update_mode,
+        slots_write_lr=args.slots_write_lr,
+        slot_prediction_loss_weight=args.slot_prediction_loss_weight,
+        slot_memory_lr_scale=args.slot_memory_lr_scale,
+        global_read_interval=args.global_read_interval,
+        global_write_start_layer=args.global_write_start_layer,
+        slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
         # V10.0: Binding Cache options
         binding_cache_top_k=args.binding_cache_top_k,
         no_binding_cache=args.no_binding_cache,
@@ -17174,6 +17263,9 @@ def main():
         alpha_phase_ppl_low=args.alpha_phase_ppl_low,
         ppl_high_threshold=args.ppl_high_threshold,
         ppl_low_threshold=args.ppl_low_threshold,
+        # Post-curriculum adaptive alpha
+        enable_adaptive_alpha=args.enable_adaptive_alpha,
+        phase_health_interval=args.phase_health_interval,
         # Adaptive window size
         enable_adaptive_window=args.enable_adaptive_window,
         window_size_high_ppl=args.window_size_high_ppl,
