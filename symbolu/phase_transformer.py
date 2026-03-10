@@ -8673,14 +8673,22 @@ class SlotMemoryGCT(nn.Module):
         # The model learns per-position when slot reads help.  Gate starts near
         # zero (bias=-2.0 → sigmoid≈0.12) so it's safe by default, then opens
         # where slots add value.  Full LM gradients flow through the gate.
-        # V13.1: Zero-init WEIGHT too. Default Kaiming init + hidden states with
-        # norm ~35 produces weight·x >> 2.0, overwhelming the -2.0 bias and
-        # pushing the gate to ~0.55 immediately. With zero weight, the gate
-        # output is purely sigmoid(bias)=0.12 regardless of input, and the
-        # weight then learns from scratch which directions should open it.
+        # V15: "Open Door" read gate — bias=0.0 (sigmoid=0.50) with small
+        # positive weight init (std=0.01). Previous V13.1 used zero weight +
+        # bias=-2.0 (sigmoid=0.12), which created a cold-start trap: the gate
+        # was so closed that LM loss received negligible gradient through slot
+        # reads, so the gate never learned to open. Slot ablation stayed at
+        # +0.0% through 200+ steps despite slot_pred_ppl improving 50K→3.4K.
+        #
+        # The fix: start the gate at 50% open. The model is forced to deal
+        # with slot content immediately. LM loss has a strong gradient signal
+        # to either improve slot content (if helpful) or close the gate (if
+        # harmful). Small positive weight (not zero) lets the gate learn
+        # position-dependent gating from the start. If slot reads hurt, the
+        # gate will learn to close — but it won't get stuck near-zero.
         self.read_gate_proj = nn.Linear(embed_dim, 1)
-        nn.init.zeros_(self.read_gate_proj.weight)
-        nn.init.constant_(self.read_gate_proj.bias, -2.0)
+        nn.init.normal_(self.read_gate_proj.weight, mean=0.0, std=0.01)
+        nn.init.constant_(self.read_gate_proj.bias, 0.0)
         # Diagnostic: average gate activation across positions
         self._diag_read_gate_mean: float = 0.0
         self.read_dropout = nn.Dropout(dropout)
