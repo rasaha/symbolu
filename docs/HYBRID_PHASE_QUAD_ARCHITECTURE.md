@@ -66,29 +66,35 @@ Each block: `x = LocalAttention(x) → FFN(x)` with pre-norm residuals.
 
 O(n) linear attention using complex-valued phasors. This is the core innovation — causal attention without quadratic cost.
 
-**Mathematical model**:
-```
-Q = a_q · e^(iφ_q)          # Query phasor: amplitude × phase angle
-K = a_k · e^(-iφ_k)         # Key phasor: conjugated
+#### 2.2.1 Core Mechanism
 
-State_t = Σ_{s≤t} (K_s · V_s)   # Cumulative state via parallel scan
-Output_t = Re(Q_t · State_t) / Normalizer_t
-```
+Each token produces a query and key, both represented as complex phasors — a learned amplitude multiplied by a complex exponential at a learned phase angle. The key's phase is conjugated so that when query and key phases align, their product is maximally positive.
 
-**Key details**:
-- Amplitudes: `a = 0.05 + 0.95 · sigmoid(raw)` (floor prevents gradient death)
-- Phase offsets: Per-head learnable offsets prevent all heads converging
-- Normalizer: `(a_q · cumsum(a_k)).clamp(min=0.1).detach()` — detached to prevent gradient explosion through division
-- Decay: Optional per-head learned decay `γ` via parallel EMA scan
-- Bounded phase mode: `φ = π · sin(φ_raw)` constrains to [-π, π]
-- Phase warm-start: `α = sigmoid((step - center) / τ)` dampens writes during early training
+The cumulative state at each position is the running sum of all prior key-value outer products, computed efficiently via parallel scan. The output at each position is the real part of the query phasor dotted into this cumulative state, divided by a normalizer.
 
-**Three cosine readout modes**:
-1. **Standard**: `cos(φ_q - φ_k)` range [-1, +1]
-2. **Shifted**: Adds amplitude-only term, range [0, 2], eliminates negative cancellation
-3. **Complex**: Uses both real and imaginary parts, projects through learned layer
+#### 2.2.2 Normalization
 
-**State for chunking**: Returns `final_state` (last cumulative state) for chunk-to-chunk persistence.
+The normalizer is the query amplitude times the cumulative sum of key amplitudes, clamped to a minimum value and detached from the computation graph to prevent gradient explosion through the division.
+
+#### 2.2.3 Amplitude & Phase Parameterization
+
+Amplitudes are parameterized through a sigmoid with a floor to prevent them from collapsing to zero and killing gradients. Each head has a learnable phase offset to break symmetry and encourage specialization. Phase angles can optionally be bounded to the canonical range through a sine nonlinearity.
+
+#### 2.2.4 Temporal Dynamics
+
+An optional per-head learned decay factor can be applied via parallel EMA scan to give the model a forgetting mechanism. A warm-start schedule using a sigmoid ramp dampens write magnitudes during early training steps, preventing noisy initial updates from corrupting the cumulative state.
+
+#### 2.2.5 Readout Modes
+
+The three cosine readout modes differ in how the query-key phase interaction is interpreted:
+
+1. **Standard**: Uses the raw cosine similarity over the full signed range, allowing the model to actively suppress irrelevant tokens
+2. **Shifted**: Adds an amplitude-only bias term to eliminate negative contributions, useful when all context is potentially relevant
+3. **Complex**: Retains both real and imaginary components and projects them through a learned linear layer, capturing more nuanced relationships
+
+#### 2.2.6 Chunked Sequence Support
+
+The cumulative state at the end of any segment can be passed forward as the starting state for the next segment, enabling the model to process arbitrarily long documents in manageable chunks without losing continuity.
 
 ### 2.3 Protected Phase Mode (How Local + Phase Combine)
 
