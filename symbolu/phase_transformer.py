@@ -8578,8 +8578,11 @@ class SlotMemoryGCT(nn.Module):
         self._L_ortho_weight_max = 1.0
 
         # (e) Read scale clamp max — mirrors write scale adaptive clamp
-        self._read_scale_max = 5.0          # Starts at current hardcoded max
-        self._read_scale_max_limit = 8.0    # Can widen to this
+        # V12.1: Raised from 5.0/8.0. Cosine sims in high-d cluster tightly
+        # (spread ~0.05), so scale=5 produces near-uniform softmax over 16 slots.
+        # Floor=18 ≈ num_slots. Ceiling=64 gives gyroscope room to widen.
+        self._read_scale_max = 64.0         # High ceiling so optimizer isn't clamped
+        self._read_scale_max_limit = 64.0   # Already at max — no gyroscope widening needed
 
         # (f) Router noise — tie decay to marginal_H instead of fixed schedule
         self._adaptive_router_noise = True  # Enable marginal_H-based noise
@@ -8656,13 +8659,12 @@ class SlotMemoryGCT(nn.Module):
         self._diag_slot_pred_loss: float = 0.0
         self._diag_slot_pred_acc: float = 0.0
 
-        # V10.21: Re-enable separate read temperature. Previously collapsed
-        # because LM loss suppressed reads (V10.14.3 comment). But read output
-        # is now detached from LM loss, so that suppression no longer applies.
-        # Init at log(2.0) — lower than write scale (3.0) to start slightly
-        # sharper. Clamped to [1.0, 5.0] in read() to prevent collapse/explosion.
+        # V12.1: Read temperature. With cosine similarity over 16 slots,
+        # scale must be high enough to break uniform softmax. Cosine sims
+        # cluster tightly in high-d (~0.05 spread), so scale=5 can't produce
+        # sharp attention. Init at log(18.0) = floor, learnable up to 64.
         self._read_log_scale = nn.Parameter(
-            torch.tensor(math.log(2.0))
+            torch.tensor(math.log(18.0))
         )
 
         # --- Router noise (MoE-style symmetry breaking) ---
@@ -8719,7 +8721,7 @@ class SlotMemoryGCT(nn.Module):
         '_adaptive_retr_loss_weight': 1.0,
         '_H_target': 1.0,
         '_L_ortho_weight': 0.5,
-        '_read_scale_max': 5.0,
+        '_read_scale_max': 64.0,
         '_soft_detach_leak': 0.1,
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
@@ -9025,12 +9027,12 @@ class SlotMemoryGCT(nn.Module):
         # from write queries, trained by retrieval loss only.
         queries = self.read_query_proj(x)  # [B, N, D_key]
 
-        # V12: Read scale floor raised to 4.0 (from 1.0). With cosine
-        # similarity, scale=2.0 can't amplify small sim differences enough
-        # to break uniform attention over 16 slots. Floor=4.0 ensures
-        # minimum sharpness while _read_log_scale can still learn higher.
+        # V12.1: Read scale floor raised to 18.0 (from 4.0). With cosine
+        # similarity in high-d, slot sims cluster within ~0.05 spread.
+        # Over 16 slots, scale=5 → near-uniform softmax. Floor=18 ≈ num_slots
+        # so a 0.05 sim gap → logit gap of 0.9 → sharp peak.
         _read_scale = torch.exp(
-            self._read_log_scale.clamp(min=math.log(4.0), max=math.log(self._read_scale_max))
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
         )
         _q_norm = F.normalize(queries, dim=-1)
         # V10.20: Detach slot_keys in read path (same rationale as write path).
@@ -9469,7 +9471,7 @@ class SlotMemoryGCT(nn.Module):
         _raw_wr_scale = torch.exp(self._write_log_scale).item()
         wr_scale = max(1.5, min(_raw_wr_scale, self._wr_scale_max))
         _raw_rd_scale = torch.exp(self._read_log_scale).item()
-        read_scale = max(1.0, min(_raw_rd_scale, self._read_scale_max))
+        read_scale = max(18.0, min(_raw_rd_scale, self._read_scale_max))
         per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
         # BUG 4 fix: Use window-averaged L_ortho
         avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
