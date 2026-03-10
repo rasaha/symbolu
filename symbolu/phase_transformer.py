@@ -8593,10 +8593,17 @@ class SlotMemoryGCT(nn.Module):
         # (f) Router noise — tie decay to marginal_H instead of fixed schedule
         self._adaptive_router_noise = True  # Enable marginal_H-based noise
 
-        # (g) Soft detach leak fraction — larger when gate collapsed
+        # (g) Soft detach leak fraction — ramps up when slots show signal
+        # V13/B1-fix: Trigger based on slot_pred_ppl (content quality), not
+        # gate health.  Gate at 0.4 (healthy) was suppressing the ramp even
+        # though slots weren't storing useful info (ppl=395).  Now: when
+        # slot_pred_ppl drops below threshold, ramp leak so LM gradients
+        # flow into writes and accelerate slot content improvement.
         self._soft_detach_leak = 0.1        # Default 10% gradient leak
         self._soft_detach_leak_min = 0.05   # Minimum leak
-        self._soft_detach_leak_max = 0.3    # Emergency boost
+        self._soft_detach_leak_max = 0.5    # V13: Raised from 0.3→0.5 to allow stronger signal
+        self._slot_pred_loss_window: List[float] = []  # Track slot_pred_loss for ppl-based ramp
+        self._leak_ramp_ppl_threshold = 300.0  # Ramp leak when slot_pred_ppl drops below this
 
         # (h) L_sharp weight — reduce once sharpness is in good range
         self._L_sharp_weight = 0.1
@@ -8639,6 +8646,15 @@ class SlotMemoryGCT(nn.Module):
         # Separate projection lets retrieval loss train read queries independently.
         self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
         self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        # V13/B2: Learned read gate — replaces blind residual addition
+        # `x = x + alpha * slot_out` with `x = x + alpha * sigma(gate) * slot_out`.
+        # The model learns per-position when slot reads help.  Gate starts near
+        # zero (bias=-2.0 → sigmoid≈0.12) so it's safe by default, then opens
+        # where slots add value.  Full LM gradients flow through the gate.
+        self.read_gate_proj = nn.Linear(embed_dim, 1)
+        nn.init.constant_(self.read_gate_proj.bias, -2.0)
+        # Diagnostic: average gate activation across positions
+        self._diag_read_gate_mean: float = 0.0
         self.read_dropout = nn.Dropout(dropout)
         # V10.14.6: Retrieval readout norm — raw slot values go through this
         # LayerNorm before lm_head in compute_retrieval_loss. The lm_head
@@ -8754,6 +8770,7 @@ class SlotMemoryGCT(nn.Module):
         self._lm_loss_history.clear()
         self._retr_loss_window.clear()
         self._gate_window.clear()
+        self._slot_pred_loss_window.clear()
         self._gate_adapt_counter = 0
 
     def state_dict(self, *args, **kwargs):
@@ -9123,11 +9140,25 @@ class SlotMemoryGCT(nn.Module):
         # Project to output space
         output = self.read_output_proj(retrieved)
 
+        # V13/B2: Learned per-position gating.  The gate decides how much
+        # slot-derived information to inject at each position.  Input is the
+        # query token's hidden state `x` (NOT retrieved content) — the model
+        # decides based on its OWN state whether it needs slot info, before
+        # seeing what the slot returned.  This prevents the gate from just
+        # learning "is this slot content zero/noisy" → actually forces the
+        # model to learn WHEN to use memory.
+        # NOTE: gate is applied here (inside read()) so compute_retrieval_loss
+        # and compute_slot_prediction_loss are NOT gated — those losses train
+        # the read/write projections directly, independent of LM usefulness.
+        _gate = torch.sigmoid(self.read_gate_proj(x))  # [B, N, 1]
+        output = output * _gate
+
         # Diagnostics
         with torch.no_grad():
             _w_log = torch.log(attn_weights.clamp(min=1e-8))
             self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
             self._diag_read_scale = _read_scale.item()
+            self._diag_read_gate_mean = _gate.mean().item()
 
         return output
 
@@ -9519,6 +9550,10 @@ class SlotMemoryGCT(nn.Module):
         self._retr_loss_history.append(retr_loss)
         if lm_loss > 0:
             self._lm_loss_history.append(lm_loss)
+        # V13/B1: Accumulate slot_pred_loss for ppl-based leak ramp
+        _cur_sp_loss = getattr(self, '_diag_slot_pred_loss', 0.0) or 0.0
+        if _cur_sp_loss > 0:
+            self._slot_pred_loss_window.append(_cur_sp_loss)
         # BUG 3 fix: Accumulate gate_mean per step (not stale single-batch)
         _cur_gate = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
         self._gate_mean_window.append(_cur_gate)
@@ -9540,7 +9575,7 @@ class SlotMemoryGCT(nn.Module):
         _max_len = self._constraint_relax_interval * 2
         for _lst in (self._constraint_relax_window, self._retr_loss_history,
                      self._lm_loss_history, self._gate_mean_window,
-                     self._L_ortho_window):
+                     self._L_ortho_window, self._slot_pred_loss_window):
             if len(_lst) > _max_len:
                 del _lst[:len(_lst) - _max_len]
 
@@ -9727,14 +9762,36 @@ class SlotMemoryGCT(nn.Module):
             changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
 
         # ── (9) Soft detach leak ──────────────────────────────────────────
-        if avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+        # V13/B1-fix: Ramp based on slot_pred_ppl (content quality signal),
+        # not gate health.  The gate being healthy (0.4) doesn't mean slots
+        # contain useful info — it just means tokens are writing.  The real
+        # question is: does slot content help predict next tokens?
+        # When slot_pred_ppl drops below threshold, ramp leak so LM loss
+        # gradients flow into the write path, accelerating content improvement.
+        # Secondary: still rescue on gate collapse as emergency fallback.
+        _avg_sp_loss = (sum(self._slot_pred_loss_window) / len(self._slot_pred_loss_window)
+                        if self._slot_pred_loss_window else 99.0)
+        _avg_sp_ppl = math.exp(min(_avg_sp_loss, 20.0))
+        if _avg_sp_ppl < self._leak_ramp_ppl_threshold and self._soft_detach_leak < self._soft_detach_leak_max:
+            # Slots show signal — ramp leak to let LM loss shape writes
+            # Ramp speed proportional to how far below threshold (faster when clearly useful)
+            _ppl_ratio = _avg_sp_ppl / self._leak_ramp_ppl_threshold  # 0→1, lower=better
+            _step_size = 0.02 + 0.03 * (1.0 - _ppl_ratio)  # 0.02 at threshold, 0.05 at ppl→0
+            old = self._soft_detach_leak
+            self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + _step_size)
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(slot_pred_ppl={_avg_sp_ppl:.0f} < {self._leak_ramp_ppl_threshold:.0f})")
+        elif avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+            # Emergency fallback: gate collapsed, need gradient to rescue writes
             old = self._soft_detach_leak
             self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + 0.03)
-            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed)")
-        elif avg_gate > 0.3 and self._soft_detach_leak > self._soft_detach_leak_min:
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed, emergency)")
+        elif _avg_sp_ppl > self._leak_ramp_ppl_threshold * 1.5 and self._soft_detach_leak > self._soft_detach_leak_min:
+            # Slots carry no useful info — don't waste gradient budget on writes
             old = self._soft_detach_leak
             self._soft_detach_leak = max(self._soft_detach_leak_min, self._soft_detach_leak - 0.01)
-            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate healthy)")
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(slot_pred_ppl={_avg_sp_ppl:.0f}, no signal)")
 
         # ── (10) L_sharp weight ───────────────────────────────────────────
         # Note: Uses per_token_H which is last-batch (acceptable since
@@ -9784,6 +9841,7 @@ class SlotMemoryGCT(nn.Module):
         self._lm_loss_history.clear()
         self._gate_mean_window.clear()
         self._L_ortho_window.clear()
+        self._slot_pred_loss_window.clear()
         self._constraint_relax_counter = 0
 
 
