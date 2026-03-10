@@ -4564,7 +4564,7 @@ def train(config: UnifiedTrainingConfig):
                               f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "
                               f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
-                              f"wr_scale={_wr_scale:.1f} "
+                              f"wr_scale={_wr_scale:.3f} "
                               f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f} "
                               f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f} "
                               f"retr_w={getattr(_sm, '_adaptive_retr_loss_weight', 1.0):.2f} "
