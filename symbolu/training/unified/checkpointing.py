@@ -261,8 +261,25 @@ def load_checkpoint(
             print(f"      Dropped: {old_key}")
         print(f"    \u2713 state_projector will initialize fresh with proper normalization")
 
+    # V12.7: Extract slot_memory._adaptive.* keys before load_state_dict.
+    # PyTorch's model.load_state_dict() uses _load_from_state_dict() internally
+    # and does NOT call child module load_state_dict() overrides. So the
+    # SlotMemoryGCT.load_state_dict() pre-processing (adaptive key extraction)
+    # and post-processing (scale overrides) never run. Handle them here.
+    _slot_adaptive_vals = {}
+    _slot_adaptive_keys = [k for k in filtered_state if '._adaptive.' in k]
+    for k in _slot_adaptive_keys:
+        # e.g. "slot_memory._adaptive._gate_ceiling" → "_gate_ceiling"
+        attr_name = k.split('._adaptive.', 1)[1]
+        _slot_adaptive_vals[attr_name] = filtered_state.pop(k)
+
     model.load_state_dict(filtered_state, strict=False)
     print(f"    \u2713 Model weights loaded")
+
+    # V12.7: Restore slot memory adaptive values and apply post-load overrides
+    if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+        model.slot_memory._restore_adaptive_values(_slot_adaptive_vals)
+        model.slot_memory.apply_checkpoint_overrides()
 
     result = {
         "step": checkpoint.get("step", 0),

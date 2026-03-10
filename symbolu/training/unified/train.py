@@ -4564,8 +4564,8 @@ def train(config: UnifiedTrainingConfig):
                               f"write_gate={getattr(_sm, '_diag_write_gate_mean', 0):.3f} "
                               f"marginal_H={getattr(_sm, '_diag_marginal_entropy', 0):.3f} "
                               f"read_H={getattr(_sm, '_diag_read_attn_entropy', 0):.3f} "
-                              f"wr_scale={_wr_scale:.1f} "
-                              f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.1f} "
+                              f"wr_scale={_wr_scale:.3f} "
+                              f"rd_scale={getattr(_sm, '_diag_read_scale', 0):.3f} "
                               f"gate_ceil={getattr(_sm, '_gate_target', 0.35):.2f} "
                               f"retr_w={getattr(_sm, '_adaptive_retr_loss_weight', 1.0):.2f} "
                               f"gate_floor={getattr(_sm, '_novelty_gate_floor', 0.15):.2f} "
@@ -5002,12 +5002,26 @@ def train(config: UnifiedTrainingConfig):
                     if p.grad is not None
                 ]
                 if _slot_params_with_grad:
-                    # First: per-element cap (prevents any single catastrophic update)
-                    torch.nn.utils.clip_grad_value_(_slot_params_with_grad, 0.01)
-                    # Second: norm clip as safety net
-                    torch.nn.utils.clip_grad_norm_(
-                        _slot_params_with_grad, config.max_grad_norm * 0.01
-                    )
+                    # V12.6: Scalar params (log-scales) need looser clip — 0.01 × slot_lr
+                    # ≈ 2.8e-7 per step makes them effectively frozen. Forward-pass
+                    # .clamp() on scales provides safety bounds regardless.
+                    _scalar_params = [p for p in _slot_params_with_grad if p.numel() == 1]
+                    _matrix_params = [p for p in _slot_params_with_grad if p.numel() > 1]
+                    # Per-element cap for high-dimensional matrices (stability)
+                    if _matrix_params:
+                        torch.nn.utils.clip_grad_value_(_matrix_params, 0.01)
+                    # Looser clip for scalars (wr/rd log-scale)
+                    if _scalar_params:
+                        torch.nn.utils.clip_grad_value_(_scalar_params, 1.0)
+                    # Second: norm clip as safety net — matrix params only.
+                    # V12.7: Including scalars in the group norm clip meant matrix
+                    # params (thousands of elements) dominated the norm budget,
+                    # leaving scalar params with ~0 effective gradient. Scalars
+                    # are already bounded by value clip (1.0) + forward-pass clamp.
+                    if _matrix_params:
+                        torch.nn.utils.clip_grad_norm_(
+                            _matrix_params, config.max_grad_norm * 0.01
+                        )
 
             # V10.17/V10.18: Clip phase attention OV circuit params separately.
             # The v_proj (741x spike) and W_k_fused (2183x spike at step 1270) are

@@ -8668,9 +8668,13 @@ class SlotMemoryGCT(nn.Module):
         # V12.1: Read temperature. With cosine similarity over 16 slots,
         # scale must be high enough to break uniform softmax. Cosine sims
         # cluster tightly in high-d (~0.05 spread), so scale=5 can't produce
-        # sharp attention. Init at log(18.0) = floor, learnable up to 64.
+        # sharp attention. Floor=18.0, ceiling=64.0, learnable.
+        # V12.7: Init at log(22.0) instead of log(18.0). Initializing AT
+        # the clamp floor meant gradients wanting to decrease scale were
+        # zeroed by the clamp, so the param could only move UP. Starting
+        # above floor gives room in both directions.
         self._read_log_scale = nn.Parameter(
-            torch.tensor(math.log(18.0))
+            torch.tensor(math.log(22.0))
         )
 
         # --- Router noise (MoE-style symmetry breaking) ---
@@ -8762,7 +8766,14 @@ class SlotMemoryGCT(nn.Module):
         return sd
 
     def load_state_dict(self, state_dict, *args, **kwargs):
-        """V10.27/29: Restore runtime state after loading."""
+        """V10.27/29: Restore runtime state after loading.
+
+        NOTE: This override is only called when slot_memory.load_state_dict()
+        is invoked directly. When loading via parent model.load_state_dict(),
+        PyTorch routes through _load_from_state_dict() instead — so the
+        post-load fixups live in apply_checkpoint_overrides() which must be
+        called separately from the training script.
+        """
         # V10.29: Extract adaptive keys before super() (which would reject them)
         adaptive_vals = {}
         keys_to_remove = []
@@ -8773,13 +8784,30 @@ class SlotMemoryGCT(nn.Module):
         for k in keys_to_remove:
             del state_dict[k]
         result = super().load_state_dict(state_dict, *args, **kwargs)
+        self._restore_adaptive_values(adaptive_vals)
+        self.apply_checkpoint_overrides()
+        return result
+
+    def _restore_adaptive_values(self, adaptive_vals: dict):
+        """Restore adaptive hyperparams from checkpoint."""
         self._router_step = int(self._router_step_buf.item())
-        # Restore adaptive values (with validation)
         for key, val in adaptive_vals.items():
             if hasattr(self, key):
                 setattr(self, key, val)
         if adaptive_vals:
             print(f"  [SLOTS] Restored {len(adaptive_vals)} adaptive params from checkpoint")
+
+    def apply_checkpoint_overrides(self):
+        """V12.7: Apply post-load fixups to checkpoint values.
+
+        Called after weights are loaded — either from load_state_dict() (direct)
+        or from train.py after model.load_state_dict() (via parent).
+
+        PyTorch's model.load_state_dict() uses _load_from_state_dict() internally
+        and does NOT call child module load_state_dict() overrides. All post-load
+        fixups must live here and be called explicitly.
+        """
+        self._router_step = int(self._router_step_buf.item())
         # V11.2b: Enforce current floor on loaded retr_weight
         if self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_min:
             old = self._adaptive_retr_loss_weight
@@ -8808,13 +8836,17 @@ class SlotMemoryGCT(nn.Module):
         # V12.1: If loaded _read_log_scale is below new floor, override it.
         # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
         # and the parameter can never learn upward.
+        # V12.7: Also override if AT the floor (within 0.01). Starting AT the
+        # clamp boundary means the param can only move UP — pull it above
+        # floor to give gradients room in both directions.
         _rd_floor = math.log(18.0)
-        if self._read_log_scale.item() < _rd_floor:
+        _rd_above_floor = math.log(22.0)  # V12.7: target when stuck at floor
+        if self._read_log_scale.item() < _rd_floor + 0.01:
             _old_scale = math.exp(self._read_log_scale.item())
             with torch.no_grad():
-                self._read_log_scale.fill_(_rd_floor)
-            print(f"  [SLOTS] V12.1: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
-                  f"→ {_rd_floor:.2f} (scale=18.0) (below new floor, overridden)")
+                self._read_log_scale.fill_(_rd_above_floor)
+            print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
+                  f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
@@ -8824,7 +8856,6 @@ class SlotMemoryGCT(nn.Module):
             self._read_warmstart_center = _step
             print(f"  [SLOTS] V12: read warmstart re-centered to step {_step} "
                   f"(read_query_proj now active, re-ramping)")
-        return result
 
     @property
     def read_warmstart_alpha(self) -> float:
