@@ -121,6 +121,23 @@ class UnifiedTrainingConfig:
     use_kosha_annotation: bool = True  # Kosha affects binding salience (consciousness sheaths)
     use_srk_annotation: bool = True  # SRK affects binding salience (Sovereign State)
 
+    # ==========================================================================
+    # GCT (Gated Coherence Transformer) parameters
+    # ==========================================================================
+    # Pre-softmax coherence gating with lambda_ladder band insulation.
+    # Routes heads between full O(n²) and local-window O(n*w) attention.
+    gct_window_size: int = 128           # Local window size for coarse path
+    gct_coherence_gamma: float = 5.0     # Output delta sensitivity in coherence score
+    gct_coherence_delta: float = 3.0     # Residual delta sensitivity in coherence score
+    gct_ema_decay: float = 0.9           # EMA smoothing for coherence scores
+    gct_num_bands: int = 3               # Frequency bands (global/mid/local head partition)
+    gct_alpha_sharpness: float = 10.0    # Sigmoid sharpness for routing probability
+    gct_hard_route_threshold: float = 0.5  # Hard routing threshold (inference)
+    gct_kappa: float = 3.0              # Lambda_ladder suppression strength
+    gct_tau_ladder: float = 0.15        # Collapse detection threshold
+    gct_warmup_steps: int = 500         # Full-attention-only warmup (Phase 1)
+    gct_anneal_steps: int = 2000        # Anneal from full to gated (Phase 2)
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256

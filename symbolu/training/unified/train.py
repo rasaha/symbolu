@@ -7285,8 +7285,10 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
-                       help="Model architecture type (standard = O(n²) baseline, ontological_hybrid = Two-Tier AGI, "
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
+                       help="Model architecture type (standard = O(n²) baseline, "
+                            "gct = Gated Coherence Transformer [pre-softmax coherence routing], "
+                            "ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
                             "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State], "
                             "mistral_cg = Frozen Mistral backbone + trainable CG modules)")
@@ -7309,6 +7311,30 @@ def main():
                        help="Dropout rate")
     parser.add_argument("--attention_dropout", type=float, default=0.1,
                        help="Attention dropout rate")
+
+    # GCT (Gated Coherence Transformer) arguments
+    parser.add_argument("--gct_window_size", type=int, default=128,
+                       help="GCT local window size for coarse attention path")
+    parser.add_argument("--gct_coherence_gamma", type=float, default=5.0,
+                       help="GCT output delta sensitivity in coherence score")
+    parser.add_argument("--gct_coherence_delta", type=float, default=3.0,
+                       help="GCT residual delta sensitivity in coherence score")
+    parser.add_argument("--gct_ema_decay", type=float, default=0.9,
+                       help="GCT EMA smoothing decay for coherence scores")
+    parser.add_argument("--gct_num_bands", type=int, default=3,
+                       help="GCT number of frequency bands for head partitioning")
+    parser.add_argument("--gct_alpha_sharpness", type=float, default=10.0,
+                       help="GCT sigmoid sharpness for routing probability")
+    parser.add_argument("--gct_hard_route_threshold", type=float, default=0.5,
+                       help="GCT hard routing threshold for inference")
+    parser.add_argument("--gct_kappa", type=float, default=3.0,
+                       help="GCT lambda_ladder suppression strength")
+    parser.add_argument("--gct_tau_ladder", type=float, default=0.15,
+                       help="GCT collapse detection threshold for lambda_ladder")
+    parser.add_argument("--gct_warmup_steps", type=int, default=500,
+                       help="GCT Phase 1: full-attention-only warmup steps")
+    parser.add_argument("--gct_anneal_steps", type=int, default=2000,
+                       help="GCT Phase 2: anneal from full to gated attention over N steps")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
@@ -8912,6 +8938,18 @@ def main():
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
         slot_lr_eta=getattr(args, 'slot_lr_eta', 0.03),
         slot_lr_stabilize_after=getattr(args, 'slot_lr_stabilize_after', None),
+        # GCT (Gated Coherence Transformer)
+        gct_window_size=args.gct_window_size,
+        gct_coherence_gamma=args.gct_coherence_gamma,
+        gct_coherence_delta=args.gct_coherence_delta,
+        gct_ema_decay=args.gct_ema_decay,
+        gct_num_bands=args.gct_num_bands,
+        gct_alpha_sharpness=args.gct_alpha_sharpness,
+        gct_hard_route_threshold=args.gct_hard_route_threshold,
+        gct_kappa=args.gct_kappa,
+        gct_tau_ladder=args.gct_tau_ladder,
+        gct_warmup_steps=args.gct_warmup_steps,
+        gct_anneal_steps=args.gct_anneal_steps,
         cosine_mode=args.cosine_mode,  # V9.6.12: Cosine interaction mode
         decay_gamma=args.decay_gamma,  # V9.6.13: State decay factor
         learned_decay=args.learned_decay,  # V9.9.7: Per-head learned decay

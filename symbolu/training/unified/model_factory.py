@@ -1,7 +1,7 @@
 """
 Model factory for creating different model architectures.
 
-Supports ontological, phase, hybrid, gen2, standard, ontological_hybrid,
+Supports ontological, phase, hybrid, gen2, standard, gct, ontological_hybrid,
 binding_cache, and ontological_binding_cache model types.
 
 Extracted from train_unified_llm.py
@@ -18,6 +18,7 @@ from symbolu.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,
+    GCTTransformer,
     OntologicalHybridTransformer,
     BindingCacheTransformer,
     OntologicalBindingCacheTransformer,
@@ -286,6 +287,42 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             tie_embeddings=tie_emb,
         )
         print(f"\n  [Standard] O(n²) baseline transformer for comparison")
+
+    elif config.model_type == "gct":
+        # Gated Coherence Transformer: pre-softmax coherence routing
+        # Routes heads between full O(n²) and local-window O(n*w) attention
+        # based on temporal stability signals (output + residual deltas).
+        # FlashAttention-compatible on the full path.
+        tie_emb = not config.untie_embeddings
+        model = GCTTransformer(
+            vocab_size=config.vocab_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            max_seq_len=config.max_seq_len,
+            dropout=config.dropout,
+            tie_embeddings=tie_emb,
+            gct_window_size=config.gct_window_size,
+            gct_coherence_gamma=config.gct_coherence_gamma,
+            gct_coherence_delta=config.gct_coherence_delta,
+            gct_ema_decay=config.gct_ema_decay,
+            gct_num_bands=config.gct_num_bands,
+            gct_alpha_sharpness=config.gct_alpha_sharpness,
+            gct_hard_route_threshold=config.gct_hard_route_threshold,
+            gct_use_hard_routing=False,  # Training uses soft blend
+            gct_kappa=config.gct_kappa,
+            gct_tau_ladder=config.gct_tau_ladder,
+            gct_warmup_steps=config.gct_warmup_steps,
+            gct_anneal_steps=config.gct_anneal_steps,
+        )
+        print(f"\n  [GCT] Gated Coherence Transformer")
+        print(f"    Attention: Full O(n^2) + Local-Window O(n*{config.gct_window_size})")
+        print(f"    Coherence: output_delta(gamma={config.gct_coherence_gamma}) * residual_delta(delta={config.gct_coherence_delta})")
+        print(f"    Bands: {config.gct_num_bands} (equal head partition)")
+        print(f"    Lambda_ladder: kappa={config.gct_kappa}, tau={config.gct_tau_ladder}")
+        print(f"    Schedule: warmup={config.gct_warmup_steps}, anneal={config.gct_anneal_steps}")
+        print(f"    Routing: soft blend (training), hard theta={config.gct_hard_route_threshold} (inference)")
 
     elif config.model_type == "ontological_hybrid":
         # V9.6.14: Two-Tier AGI Architecture (Ontological State Delta + Hybrid)
