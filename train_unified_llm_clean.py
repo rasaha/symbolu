@@ -14572,6 +14572,23 @@ def train(config: UnifiedTrainingConfig):
                     if 'ortho_loss' in metrics:
                         log_msg += f" | Ortho: {metrics['ortho_loss']:.4f}"
 
+                    # V10.28: Slot memory diagnostics on console
+                    if 'slot_write_gate' in metrics or 'slot_assignment_entropy' in metrics:
+                        slot_parts = ["[Slots]"]
+                        if 'slot_write_gate' in metrics:
+                            slot_parts.append(f"wg:{metrics['slot_write_gate']:.3f}")
+                        if 'slot_gate_ceil' in metrics:
+                            slot_parts.append(f"ceil:{metrics['slot_gate_ceil']:.3f}")
+                        if 'slot_assignment_entropy' in metrics:
+                            slot_parts.append(f"asgn_H:{metrics['slot_assignment_entropy']:.2f}")
+                        if 'slot_read_entropy' in metrics:
+                            slot_parts.append(f"read_H:{metrics['slot_read_entropy']:.2f}")
+                        if 'slot_marginal_entropy' in metrics:
+                            slot_parts.append(f"marg_H:{metrics['slot_marginal_entropy']:.2f}")
+                        if 'retrieval_loss' in metrics:
+                            slot_parts.append(f"retr:{metrics['retrieval_loss']:.4f}")
+                        log_msg += " | " + " ".join(slot_parts)
+
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
 
