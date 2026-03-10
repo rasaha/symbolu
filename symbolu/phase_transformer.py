@@ -8535,8 +8535,13 @@ class SlotMemoryGCT(nn.Module):
         # over-constrained (uniform usage, scale at clamp, gate at ceiling)
         # and progressively relax to allow specialization.
         self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
-        self._wr_scale_max = 2.0          # Write scale upper clamp (starts conservative)
-        self._wr_scale_max_limit = 4.0    # Maximum the clamp can relax to
+        # V12.5: Raised from 2.0→4.0. The gradient explosion concerns that
+        # motivated the 2.0 ceiling are now addressed by: detached slot_keys
+        # in assignment (V10.20), L2-normalized incoming_keys, write_pressure
+        # floor at 0.1, and detached-norm slot key renormalization. With those
+        # in place, scale=4 is safe and gives the parameter room to learn.
+        self._wr_scale_max = 4.0          # Write scale upper clamp
+        self._wr_scale_max_limit = 8.0    # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
         self._L_bal_weight_floor = 0.1    # Minimum balance weight
         # V11.1: Track L_bal relaxation reason for diagnostics
@@ -8716,7 +8721,7 @@ class SlotMemoryGCT(nn.Module):
         '_gate_target': 0.35,
         '_gate_ceil_weight': 5.0,
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
-        '_wr_scale_max': 2.0,
+        '_wr_scale_max': 4.0,
         '_L_bal_weight': 1.0,
         '_novelty_gate_floor': 0.15,
         '_adaptive_retr_loss_weight': 1.0,
@@ -8781,10 +8786,18 @@ class SlotMemoryGCT(nn.Module):
             self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
             print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
                   f"(clamped to new floor)")
+        # V12.5: Bump loaded _wr_scale_max if below current default (4.0).
+        # Old checkpoints saved _wr_scale_max=2.0 which creates the ceiling trap.
+        _wr_default = self._ADAPTIVE_DEFAULTS['_wr_scale_max']
+        if self._wr_scale_max < _wr_default:
+            _old_max = self._wr_scale_max
+            self._wr_scale_max = _wr_default
+            print(f"  [SLOTS] V12.5: _wr_scale_max {_old_max:.1f}→{_wr_default:.1f} "
+                  f"(raised to current default)")
         # V12.3: If loaded _write_log_scale is at or above _wr_scale_max,
         # pull it to 90% of max. Hard clamp kills gradient at the boundary
         # (value >= max → grad = 0), so we need to be strictly inside.
-        _wr_target = self._wr_scale_max * 0.9  # e.g. 2.0 * 0.9 = 1.8
+        _wr_target = self._wr_scale_max * 0.9
         _wr_target_log = math.log(_wr_target)
         if self._write_log_scale.item() >= math.log(self._wr_scale_max) - 0.01:
             _old_wr = math.exp(self._write_log_scale.item())
