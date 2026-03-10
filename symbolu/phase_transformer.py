@@ -8689,6 +8689,19 @@ class SlotMemoryGCT(nn.Module):
         self.read_gate_proj = nn.Linear(embed_dim, 1)
         nn.init.normal_(self.read_gate_proj.weight, mean=0.0, std=0.01)
         nn.init.constant_(self.read_gate_proj.bias, 0.0)
+        # V15.1: Frozen-gate curriculum — for the first N steps, the read gate
+        # is fixed at 0.5 (read_gate_proj.requires_grad=False). This prevents
+        # the model from taking the easy path of just closing the gate to avoid
+        # noisy slot reads. Instead, the backbone is forced to adapt to slot
+        # content, building a functional relationship with memory. After the
+        # freeze period, the gate unfreezes and can learn position-dependent
+        # gating on top of the already-established slot integration.
+        self._read_gate_freeze_steps = 2000  # Freeze gate for first 2K steps
+        self._read_gate_frozen = True  # Start frozen
+        self._read_gate_freeze_value = 0.5  # Fixed gate value during freeze
+        # Start with gate params frozen
+        self.read_gate_proj.weight.requires_grad = False
+        self.read_gate_proj.bias.requires_grad = False
         # Diagnostic: average gate activation across positions
         self._diag_read_gate_mean: float = 0.0
         self.read_dropout = nn.Dropout(dropout)
@@ -8770,6 +8783,7 @@ class SlotMemoryGCT(nn.Module):
         '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
         '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
         '_L_sharp_weight', 'write_lr',
+        '_read_gate_frozen',  # V15.1: Persisted so resume knows freeze state
     )
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
@@ -8900,18 +8914,25 @@ class SlotMemoryGCT(nn.Module):
                 self._read_log_scale.fill_(_rd_above_floor)
             print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
                   f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
-        # V13.1: Reset read_gate_proj to zero-init on resume. Checkpoints
-        # saved with Kaiming-init weights have random weight·x >> bias, pushing
-        # the gate to ~0.55 immediately instead of starting at sigmoid(-2)=0.12.
-        # Zero the weight so the gate starts content-independent and learns from scratch.
-        if hasattr(self, 'read_gate_proj'):
-            _gate_w_norm = self.read_gate_proj.weight.data.norm().item()
-            if _gate_w_norm > 0.01:  # Only reset if not already near-zero
-                with torch.no_grad():
-                    nn.init.zeros_(self.read_gate_proj.weight)
-                    nn.init.constant_(self.read_gate_proj.bias, -2.0)
-                print(f"  [SLOTS] V13.1: read_gate_proj reset to zero-init "
-                      f"(was norm={_gate_w_norm:.3f}, gate will start at ~0.12)")
+        # V15/V15.1: On resume, check if we're still in the freeze period.
+        # If _router_step < freeze_steps, keep gate frozen. Otherwise unfreeze.
+        # This replaces V13.1's zero-init reset (which was for the old -2.0 bias).
+        if hasattr(self, 'read_gate_proj') and hasattr(self, '_read_gate_freeze_steps'):
+            if self._router_step >= self._read_gate_freeze_steps:
+                # Past freeze period — unfreeze gate if still frozen
+                if self._read_gate_frozen:
+                    self._read_gate_frozen = False
+                    self.read_gate_proj.weight.requires_grad = True
+                    self.read_gate_proj.bias.requires_grad = True
+                    print(f"  [SLOTS] V15.1: Read gate unfrozen on resume "
+                          f"(step {self._router_step} >= {self._read_gate_freeze_steps})")
+            else:
+                # Still in freeze period — ensure gate stays frozen
+                self._read_gate_frozen = True
+                self.read_gate_proj.weight.requires_grad = False
+                self.read_gate_proj.bias.requires_grad = False
+                print(f"  [SLOTS] V15.1: Read gate stays frozen on resume "
+                      f"(step {self._router_step} < {self._read_gate_freeze_steps})")
         # V13.2: Enforce gate_target floor on resume. Old checkpoints may have
         # _gate_target tightened below the new floor (0.40), creating a feedback
         # loop where the ceiling caps the write gate before slots prove useful.
@@ -8953,6 +8974,22 @@ class SlotMemoryGCT(nn.Module):
             -(self._router_step - self._read_warmstart_center)
             / max(self._read_warmstart_tau, 1.0)
         ))
+
+    def maybe_unfreeze_read_gate(self):
+        """V15.1: Unfreeze read gate after the curriculum freeze period.
+
+        Called every step after _router_step increments. Once _router_step
+        reaches _read_gate_freeze_steps, the gate parameters are unfrozen
+        and the model can learn position-dependent gating on top of the
+        slot integration that the backbone learned during the freeze.
+        """
+        if self._read_gate_frozen and self._router_step >= self._read_gate_freeze_steps:
+            self._read_gate_frozen = False
+            self.read_gate_proj.weight.requires_grad = True
+            self.read_gate_proj.bias.requires_grad = True
+            print(f"  [SLOTS] V15.1: Read gate UNFROZEN at step {self._router_step} "
+                  f"(was fixed at {self._read_gate_freeze_value} for "
+                  f"{self._read_gate_freeze_steps} steps). Gate now learnable.")
 
     def init_state(self, batch_size: int, dtype: torch.dtype, device: torch.device):
         """Initialize slot state for a new batch.
@@ -9222,7 +9259,16 @@ class SlotMemoryGCT(nn.Module):
         # NOTE: gate is applied here (inside read()) so compute_retrieval_loss
         # and compute_slot_prediction_loss are NOT gated — those losses train
         # the read/write projections directly, independent of LM usefulness.
-        _gate = torch.sigmoid(self.read_gate_proj(x))  # [B, N, 1]
+        # V15.1: During frozen-gate phase, use fixed gate value instead of
+        # learned projection. This forces the backbone to adapt to slot reads.
+        if self._read_gate_frozen:
+            _gate = torch.full(
+                (x.shape[0], x.shape[1], 1),
+                self._read_gate_freeze_value,
+                device=x.device, dtype=x.dtype,
+            )
+        else:
+            _gate = torch.sigmoid(self.read_gate_proj(x))  # [B, N, 1]
         output = output * _gate
 
         # Diagnostics

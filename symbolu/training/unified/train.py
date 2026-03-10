@@ -2784,6 +2784,7 @@ def train(config: UnifiedTrainingConfig):
                                         query_mask=_qmask, target_ids=chunk_targets,
                                     )
                                 _sm._router_step += 1
+                                _sm.maybe_unfreeze_read_gate()
                                 return (_aux + _cfg.retrieval_loss_weight * _retr
                                         + _cfg.slot_prediction_loss_weight * _slot_pred)
 
@@ -4553,6 +4554,7 @@ def train(config: UnifiedTrainingConfig):
                         # to avoid interval counters firing grad_accum× too fast.
                     # Step the router noise counter
                     _sm._router_step += 1
+                    _sm.maybe_unfreeze_read_gate()
                     # Log slot diagnostics periodically (only on last accumulation step)
                     if global_step % config.log_every == 0 and (accumulation_step + 1) % config.gradient_accumulation == 0:
                         _wr_scale = math.exp(float(_sm._write_log_scale.data.clamp(min=math.log(1.5), max=math.log(getattr(_sm, '_wr_scale_max', 2.0)))))
