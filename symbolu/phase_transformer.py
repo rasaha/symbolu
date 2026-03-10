@@ -6878,6 +6878,7 @@ class HybridPhaseTransformer(nn.Module):
                     num_heads=num_heads,
                     write_lr=slots_write_lr,
                     dropout=dropout,
+                    vocab_size=vocab_size,
                 )
                 # No legacy GCT modules needed — slot_memory handles everything
                 self.global_tokens = None  # Slots init is inside SlotMemoryGCT
@@ -8461,16 +8462,16 @@ class SlotMemoryGCT(nn.Module):
         self,
         num_slots: int = 64,
         embed_dim: int = 768,
-        num_heads: int = 12,
+        num_heads: int = 12,  # Accepted for API compat, unused internally
         write_lr: float = 0.1,
         dropout: float = 0.1,
         write_key_dim: Optional[int] = None,
         write_top_k: int = 4,
+        vocab_size: int = 50257,
     ):
         super().__init__()
         self.num_slots = num_slots
         self.embed_dim = embed_dim
-        self.num_heads = num_heads
         self.write_lr = write_lr
         self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
@@ -8652,7 +8653,7 @@ class SlotMemoryGCT(nn.Module):
         self.slot_pred_head = nn.Sequential(
             nn.Linear(embed_dim, _bottleneck_dim, bias=False),
             nn.GELU(),
-            nn.Linear(_bottleneck_dim, 50257, bias=False),  # GPT-2 vocab
+            nn.Linear(_bottleneck_dim, vocab_size, bias=False),
         )
         self.slot_pred_norm = nn.LayerNorm(embed_dim)
         # Diagnostics for slot prediction
@@ -8714,7 +8715,7 @@ class SlotMemoryGCT(nn.Module):
     _ADAPTIVE_DEFAULTS = {
         '_gate_target': 0.35,
         '_gate_ceil_weight': 5.0,
-        '_gate_ceil_margin': 0.05,
+        # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
         '_wr_scale_max': 2.0,
         '_L_bal_weight': 1.0,
         '_novelty_gate_floor': 0.15,
@@ -9014,7 +9015,6 @@ class SlotMemoryGCT(nn.Module):
         # Store assignment for sharpness loss (WITH grad — this is the learning signal)
         self._last_assignment = assignment  # [B, N, K]
         self._last_novelty = novelty  # [B, N, 1]
-        self._last_gated_assignment = gated_assignment  # [B, N, K] — for gate gradient
         # V10.14.8: Store updated slot keys for orthogonality loss
         self._last_slot_keys = new_slot_keys  # [B, K, D_key]
 
@@ -9291,7 +9291,8 @@ class SlotMemoryGCT(nn.Module):
             router_loss: λ_sharp * L_sharp + λ_bal * L_bal + λ_gate * L_gate
         """
         if self._last_assignment is None:
-            return torch.tensor(0.0)
+            return torch.tensor(0.0, device=self.slot_keys_init.device,
+                                dtype=self.slot_keys_init.dtype)
 
         assignment = self._last_assignment  # [B, N, K]
         K = self.num_slots
@@ -9405,7 +9406,7 @@ class SlotMemoryGCT(nn.Module):
         if not self.enable_adaptive_constraints:
             return
 
-        gate_val = getattr(self, '_diag_write_gate_mean', 0.0)
+        gate_val = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
 
         self._retr_loss_window.append(retr_loss)
         self._gate_window.append(gate_val)
