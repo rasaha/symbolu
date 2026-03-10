@@ -8668,9 +8668,13 @@ class SlotMemoryGCT(nn.Module):
         # V12.1: Read temperature. With cosine similarity over 16 slots,
         # scale must be high enough to break uniform softmax. Cosine sims
         # cluster tightly in high-d (~0.05 spread), so scale=5 can't produce
-        # sharp attention. Init at log(18.0) = floor, learnable up to 64.
+        # sharp attention. Floor=18.0, ceiling=64.0, learnable.
+        # V12.7: Init at log(22.0) instead of log(18.0). Initializing AT
+        # the clamp floor meant gradients wanting to decrease scale were
+        # zeroed by the clamp, so the param could only move UP. Starting
+        # above floor gives room in both directions.
         self._read_log_scale = nn.Parameter(
-            torch.tensor(math.log(18.0))
+            torch.tensor(math.log(22.0))
         )
 
         # --- Router noise (MoE-style symmetry breaking) ---
@@ -8808,13 +8812,17 @@ class SlotMemoryGCT(nn.Module):
         # V12.1: If loaded _read_log_scale is below new floor, override it.
         # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
         # and the parameter can never learn upward.
+        # V12.7: Also override if AT the floor (within 0.01). Starting AT the
+        # clamp boundary means the param can only move UP — pull it above
+        # floor to give gradients room in both directions.
         _rd_floor = math.log(18.0)
-        if self._read_log_scale.item() < _rd_floor:
+        _rd_above_floor = math.log(22.0)  # V12.7: target when stuck at floor
+        if self._read_log_scale.item() < _rd_floor + 0.01:
             _old_scale = math.exp(self._read_log_scale.item())
             with torch.no_grad():
-                self._read_log_scale.fill_(_rd_floor)
-            print(f"  [SLOTS] V12.1: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
-                  f"→ {_rd_floor:.2f} (scale=18.0) (below new floor, overridden)")
+                self._read_log_scale.fill_(_rd_above_floor)
+            print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
+                  f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over

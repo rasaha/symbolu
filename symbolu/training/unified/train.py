@@ -5013,10 +5013,15 @@ def train(config: UnifiedTrainingConfig):
                     # Looser clip for scalars (wr/rd log-scale)
                     if _scalar_params:
                         torch.nn.utils.clip_grad_value_(_scalar_params, 1.0)
-                    # Second: norm clip as safety net
-                    torch.nn.utils.clip_grad_norm_(
-                        _slot_params_with_grad, config.max_grad_norm * 0.01
-                    )
+                    # Second: norm clip as safety net — matrix params only.
+                    # V12.7: Including scalars in the group norm clip meant matrix
+                    # params (thousands of elements) dominated the norm budget,
+                    # leaving scalar params with ~0 effective gradient. Scalars
+                    # are already bounded by value clip (1.0) + forward-pass clamp.
+                    if _matrix_params:
+                        torch.nn.utils.clip_grad_norm_(
+                            _matrix_params, config.max_grad_norm * 0.01
+                        )
 
             # V10.17/V10.18: Clip phase attention OV circuit params separately.
             # The v_proj (741x spike) and W_k_fused (2183x spike at step 1270) are
