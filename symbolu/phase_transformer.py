@@ -8780,6 +8780,16 @@ class SlotMemoryGCT(nn.Module):
             self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
             print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
                   f"(clamped to new floor)")
+        # V12.1: If loaded _read_log_scale is below new floor, override it.
+        # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
+        # and the parameter can never learn upward.
+        _rd_floor = math.log(18.0)
+        if self._read_log_scale.item() < _rd_floor:
+            _old_scale = math.exp(self._read_log_scale.item())
+            with torch.no_grad():
+                self._read_log_scale.fill_(_rd_floor)
+            print(f"  [SLOTS] V12.1: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
+                  f"→ {_rd_floor:.2f} (scale=18.0) (below new floor, overridden)")
         # V12: Re-ramp read warmstart on resume so fresh read_query_proj
         # doesn't immediately dump noisy reads into the residual stream.
         # Shift warmstart center to current step → sigmoid re-ramps over
