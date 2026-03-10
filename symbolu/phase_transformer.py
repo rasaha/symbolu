@@ -8555,13 +8555,16 @@ class SlotMemoryGCT(nn.Module):
         # over-constrained (uniform usage, scale at clamp, gate at ceiling)
         # and progressively relax to allow specialization.
         self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
-        # V12.5: Raised from 2.0→4.0. The gradient explosion concerns that
-        # motivated the 2.0 ceiling are now addressed by: detached slot_keys
-        # in assignment (V10.20), L2-normalized incoming_keys, write_pressure
-        # floor at 0.1, and detached-norm slot key renormalization. With those
-        # in place, scale=4 is safe and gives the parameter room to learn.
-        self._wr_scale_max = 4.0          # Write scale upper clamp
-        self._wr_scale_max_limit = 8.0    # Maximum the clamp can relax to
+        # V12.5→V19: Raised from 4.0→num_slots/4. The gradient explosion
+        # concerns that motivated the 2.0 ceiling are addressed by: detached
+        # slot_keys in assignment (V10.20), L2-normalized incoming_keys,
+        # write_pressure floor at 0.1, and detached-norm slot key renorm.
+        # V19: For 64 slots with 768-dim keys, cosine sim std ≈ 0.036.
+        # Scale must be >> 1/std ≈ 28 to differentiate slots. The read path
+        # already uses floor=18 for this reason (V12.1). Apply same logic
+        # to writes: ceiling = num_slots, limit = 2*num_slots.
+        self._wr_scale_max = max(16.0, num_slots / 4)  # Write scale upper clamp
+        self._wr_scale_max_limit = max(32.0, num_slots)  # Maximum the clamp can relax to
         self._L_bal_weight = 1.0          # Balance loss weight (starts full)
         self._L_bal_weight_floor = 0.1    # Minimum balance weight
         # V11.1: Track L_bal relaxation reason for diagnostics
@@ -8660,13 +8663,16 @@ class SlotMemoryGCT(nn.Module):
         # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
         # route to the same slot. Scale=5 gives enough sharpness to differentiate
         # while allowing more balanced slot utilization.
-        # V10.20→V12.3: Init at 1.8, safely below _wr_scale_max (2.0).
-        # Hard clamp kills gradient when value >= max, so init AT the boundary
-        # gives zero gradient and the parameter never moves. At 1.8 the param
-        # is inside the clamp's pass-through region → gradients flow → optimizer
-        # can push toward the ceiling → gyroscope detects pressure and relaxes.
+        # V19: Init write scale proportional to num_slots. For K slots with
+        # high-dim keys, cosine sims have std ≈ 1/sqrt(D). Need scale ≈ K/8
+        # to get ~1 nat of logit spread across K slots. Init at K/8, ceiling
+        # at K/4, so the param starts inside the clamp pass-through region
+        # with room to grow. Previous V10.25 init of 1.8 was catastrophically
+        # low for K>16 — softmax over 64 items with 0.13 logit spread is
+        # uniform, preventing any slot specialization.
+        _wr_scale_init = max(4.0, num_slots / 8)  # 8.0 for 64 slots
         self._write_log_scale = nn.Parameter(
-            torch.tensor(math.log(1.8))  # exp(log(1.8)) ≈ 1.8, below _wr_scale_max=2.0
+            torch.tensor(math.log(_wr_scale_init))
         )
 
         # --- READ path: query → slot attention ---
@@ -8814,7 +8820,7 @@ class SlotMemoryGCT(nn.Module):
         '_gate_target': 0.80,             # V18: Forced open for bootstrap
         '_gate_ceil_weight': 50.0,       # V14-hotfix: Linear+ReLU (was 5.0 quadratic)
         # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
-        '_wr_scale_max': 4.0,
+        '_wr_scale_max': 16.0,  # V19: Raised from 4.0 (see __init__ for num_slots scaling)
         '_L_bal_weight': 1.0,
         '_novelty_gate_floor': 0.50,     # V18: Forced open for bootstrap
         '_adaptive_retr_loss_weight': 1.0,
@@ -8905,14 +8911,15 @@ class SlotMemoryGCT(nn.Module):
             self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
             print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
                   f"(clamped to new floor)")
-        # V12.5: Bump loaded _wr_scale_max if below current default (4.0).
-        # Old checkpoints saved _wr_scale_max=2.0 which creates the ceiling trap.
-        _wr_default = self._ADAPTIVE_DEFAULTS['_wr_scale_max']
-        if self._wr_scale_max < _wr_default:
+        # V19: Bump loaded _wr_scale_max if below num_slots/4 (V12.5 used
+        # class default=4.0; V19 makes it instance-aware since 64 slots need
+        # much higher ceiling than 16 slots).
+        _wr_min = max(16.0, self.num_slots / 4)
+        if self._wr_scale_max < _wr_min:
             _old_max = self._wr_scale_max
-            self._wr_scale_max = _wr_default
-            print(f"  [SLOTS] V12.5: _wr_scale_max {_old_max:.1f}→{_wr_default:.1f} "
-                  f"(raised to current default)")
+            self._wr_scale_max = _wr_min
+            print(f"  [SLOTS] V19: _wr_scale_max {_old_max:.1f}→{_wr_min:.1f} "
+                  f"(raised for {self.num_slots} slots)")
         # V12.3: If loaded _write_log_scale is at or above _wr_scale_max,
         # pull it to 90% of max. Hard clamp kills gradient at the boundary
         # (value >= max → grad = 0), so we need to be strictly inside.
@@ -9077,20 +9084,15 @@ class SlotMemoryGCT(nn.Module):
         # direction only, not magnitude. This prevents winner-take-all collapse
         # where one slot's key norm grows larger and attracts all tokens.
         # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
-        # V10.14.8: Clamp temperature to [3, 15]. At scale=10+ all tokens
-        # pick the same top slot → winner-take-all collapse. Capping at 15
-        # prevents runaway; floor of 3 prevents assignments from going uniform.
-        # V10.20: Tightened max from 15→8. Logs showed scale learning to 5.9,
-        # concentrating writes on few slots and causing 1.2M× gradient spikes.
-        # V10.23: Lowered max from 8→4. At wr_scale=8.0 (hit max clamp for 400+
-        # steps), softmax assignment is ultra-peaky → gradients through assignment
-        # back to novelty_gate are negligible → write_gate stuck at floor (0.155).
-        # V10.25: Lowered further from [3,4]→[1.5,2.0]. Even at scale=4 the
-        # assignment softmax is ultra-peaky, producing near-zero gradients back
-        # through the softmax to write_novelty_gate. At scale≤2.0, assignments
-        # stay differentiated enough for meaningful gradient flow, letting the
-        # gate learn to open above the 0.15 floor via both retrieval loss and
-        # the 10% LM-loss leak (V10.24).
+        # V19: Write scale clamp [1.5, _wr_scale_max]. The ceiling is now
+        # num_slots/4 (e.g. 16.0 for 64 slots) instead of the old 2.0-4.0
+        # range. History: V10.20-V10.25 progressively lowered the ceiling to
+        # fix gradient explosions from F.normalize Jacobian on slot_keys, but
+        # V10.20 also detached slot_keys (line below) — fixing the root cause.
+        # The low ceiling remained as dead code that prevented slot
+        # specialization: with 64 slots and scale≤4, cosine sim spread
+        # ≈ 0.036*4 = 0.14 → softmax is uniform → marginal_H=1.0 → all
+        # slots store identical content → ablation shows 0% benefit.
         _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
         _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
         # V10.20: Detach slot_keys before F.normalize in assignment computation.
