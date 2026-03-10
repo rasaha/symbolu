@@ -8707,6 +8707,7 @@ class UnifiedTrainingConfig:
     slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
     global_read_interval: int = 1  # Read slots every N layers (1 = every layer)
     global_write_start_layer: int = 0  # Only write to slots from this layer onward
+    slot_coherence_floor: Optional[float] = None  # V16: Semantic coherence gate floor override
 
     # Hybrid-specific parameters
     local_layers: int = 4
@@ -12544,6 +12545,10 @@ def train(config: UnifiedTrainingConfig):
                 _main_params.append(p)
         print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
               f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        # V16: Apply coherence floor override if specified
+        if getattr(config, 'slot_coherence_floor', None) is not None:
+            _sm._coherence_floor = config.slot_coherence_floor
+            print(f"  [V16] Semantic coherence floor: {config.slot_coherence_floor}")
     else:
         _main_params = list(model.parameters())
 
@@ -13514,6 +13519,9 @@ def train(config: UnifiedTrainingConfig):
                         metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
                     if hasattr(model.slot_memory, '_gate_target'):
                         metrics['slot_gate_ceil'] = model.slot_memory._gate_target
+                    # V16: Semantic coherence diagnostic
+                    if hasattr(model.slot_memory, '_diag_coherence_mean'):
+                        metrics['slot_coherence'] = model.slot_memory._diag_coherence_mean
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -14585,6 +14593,8 @@ def train(config: UnifiedTrainingConfig):
                             slot_parts.append(f"read_H:{metrics['slot_read_entropy']:.2f}")
                         if 'slot_marginal_entropy' in metrics:
                             slot_parts.append(f"marg_H:{metrics['slot_marginal_entropy']:.2f}")
+                        if 'slot_coherence' in metrics:
+                            slot_parts.append(f"coh:{metrics['slot_coherence']:.3f}")
                         if 'retrieval_loss' in metrics:
                             slot_parts.append(f"retr:{metrics['retrieval_loss']:.4f}")
                         log_msg += " | " + " ".join(slot_parts)
@@ -16034,6 +16044,9 @@ def main():
                        help="Read slots every N layers (1 = every layer)")
     parser.add_argument("--global_write_start_layer", type=int, default=0,
                        help="Only write to slots from this layer onward")
+    # V16: Semantic coherence gate
+    parser.add_argument("--slot_coherence_floor", type=float, default=None,
+                       help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
@@ -17157,6 +17170,7 @@ def main():
         slot_memory_lr_scale=args.slot_memory_lr_scale,
         global_read_interval=args.global_read_interval,
         global_write_start_layer=args.global_write_start_layer,
+        slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
         # V10.0: Binding Cache options
         binding_cache_top_k=args.binding_cache_top_k,
         no_binding_cache=args.no_binding_cache,

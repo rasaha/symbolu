@@ -8768,6 +8768,18 @@ class SlotMemoryGCT(nn.Module):
         self._read_warmstart_center = 100
         self._read_warmstart_tau = 25
 
+        # --- V16: Semantic Coherence Gate ---
+        # Modulates write assignment by value-space coherence between token
+        # and slot content: S[i,j] = cosine_sim(write_val[i], slot_val[j]).
+        # Prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots, directly improving ablation delta.
+        # Floor decays from initial value to 0 over warmup steps, letting
+        # writes bootstrap before coherence filtering tightens.
+        self._coherence_floor = 0.3          # Initial floor (lets writes through early)
+        self._coherence_floor_min = 0.0      # Final floor after warmup
+        self._coherence_floor_decay_steps = 4000  # Steps to decay floor to min
+        self._diag_coherence_mean: float = 0.0  # Mean coherence score
+
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
         self._diag_assignment_entropy = None
@@ -8784,6 +8796,7 @@ class SlotMemoryGCT(nn.Module):
         '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
         '_L_sharp_weight', 'write_lr',
         '_read_gate_frozen',  # V15.1: Persisted so resume knows freeze state
+        '_coherence_floor',   # V16: Semantic coherence gate floor
     )
 
     # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
@@ -8801,6 +8814,7 @@ class SlotMemoryGCT(nn.Module):
         '_soft_detach_leak': 0.5,        # V14-hotfix: Start at 50% (was 0.1)
         '_L_sharp_weight': 0.1,
         'write_lr': 0.1,
+        '_coherence_floor': 0.3,          # V16: Semantic coherence gate floor
     }
 
     def reset_constraints(self):
@@ -9122,6 +9136,23 @@ class SlotMemoryGCT(nn.Module):
         # [B, N, K] * [B, N, 1] → [B, N, K]
         gated_assignment = assignment * novelty
 
+        # V16: Semantic Coherence Gate — modulate assignment by value-space
+        # similarity between the token's write content and slot's existing content.
+        # This prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots. Key insight: cosine key similarity (routing) can match
+        # tokens to "nearby" slots that store unrelated content; value coherence
+        # filters these out.  A decaying floor handles cold-start (slot_vals ≈ 0
+        # early → all coherences ≈ 0 → floor lets writes bootstrap).
+        _wv_norm = F.normalize(write_vals, dim=-1)                  # [B, N, D]
+        _sv_norm = F.normalize(slot_vals.detach(), dim=-1)          # [B, K, D]
+        coherence = torch.bmm(_wv_norm, _sv_norm.transpose(1, 2))  # [B, N, K]
+        # Floor decays linearly from _coherence_floor to _coherence_floor_min
+        # over _coherence_floor_decay_steps, then stays at min.
+        _coh_progress = min(1.0, self._router_step / max(1, self._coherence_floor_decay_steps))
+        _coh_floor = self._coherence_floor + (self._coherence_floor_min - self._coherence_floor) * _coh_progress
+        coherence = torch.clamp(coherence, min=_coh_floor)
+        gated_assignment = gated_assignment * coherence
+
         # Aggregate writes per slot: sum over tokens
         # effective_write[b, k] = sum_t(gated_assignment[b, t, k])
         # This is the total write pressure on each slot
@@ -9196,6 +9227,10 @@ class SlotMemoryGCT(nn.Module):
             self._diag_assignment_entropy = -(assignment * _a_log).sum(dim=-1).mean().item()
             self._diag_slot_key_norm = new_slot_keys.norm(dim=-1).mean().item()
             self._diag_slot_val_norm = new_slot_vals.norm(dim=-1).mean().item()
+            # V16: Mean semantic coherence (before floor clamp)
+            self._diag_coherence_mean = torch.bmm(
+                _wv_norm, _sv_norm.transpose(1, 2)
+            ).mean().item()
 
         return new_slot_keys, new_slot_vals
 

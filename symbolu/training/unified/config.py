@@ -164,6 +164,8 @@ class UnifiedTrainingConfig:
     slot_gate_target: Optional[float] = None  # Override gate ceiling target (default: 0.35)
     slot_gate_ceil_weight: Optional[float] = None  # Override gate ceiling penalty weight (default: 5.0)
     slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
+    # V16: Semantic coherence gate — modulates write assignment by value-space coherence
+    slot_coherence_floor: Optional[float] = None  # Initial coherence floor (default: 0.3, decays to 0)
 
     # V10.23: Three-phase proportional slot LR controller
     # Phase 1 (bootstrap): fixed LR until warmup_complete + sufficient signal history

@@ -549,6 +549,10 @@ def train(config: UnifiedTrainingConfig):
                 _gate_overrides.append(f"margin={config.slot_gate_ceil_margin}")
             if _gate_overrides:
                 print(f"  Gate Ceiling: {', '.join(_gate_overrides)}")
+            # V16: Semantic coherence gate floor override
+            if getattr(config, 'slot_coherence_floor', None) is not None:
+                _sm._coherence_floor = config.slot_coherence_floor
+                print(f"  Coherence Floor: {config.slot_coherence_floor}")
 
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
@@ -7408,6 +7412,9 @@ def main():
                        help="Gate ceiling penalty weight (default: 5.0, 0=disable ceiling)")
     parser.add_argument("--slot_gate_ceil_margin", type=float, default=None,
                        help="Free exploration zone above gate target before penalty (default: 0.05)")
+    # V16: Semantic coherence gate
+    parser.add_argument("--slot_coherence_floor", type=float, default=None,
+                       help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
     # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
     # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
@@ -8898,6 +8905,8 @@ def main():
         slot_gate_target=getattr(args, 'slot_gate_target', None),
         slot_gate_ceil_weight=getattr(args, 'slot_gate_ceil_weight', None),
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
+        # V16: Semantic coherence gate
+        slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
         # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
