@@ -6241,7 +6241,8 @@ def train(config: UnifiedTrainingConfig):
                 # Phase 1: CONSTRUCTION (PPL > 50) - Gyroscope OFF, freedom to learn
                 # Phase 2: REFINEMENT (30 < PPL < 50) - Gyroscope RELAXED, gentle guidance
                 # Phase 3: POLISHING (PPL < 30) - Gyroscope ACTIVE, firm homeostasis
-                if not config.enable_kosha_gyroscope and KOSHA_GYROSCOPE_AVAILABLE:
+                # Only activates when explicitly enabled via --enable_kosha_gyroscope
+                if config.enable_kosha_gyroscope and kosha_gyroscope is None and KOSHA_GYROSCOPE_AVAILABLE:
 
                     # Phase transition: CONSTRUCTION -> REFINEMENT
                     if (gyroscope_phase == "CONSTRUCTION" and
@@ -6402,9 +6403,11 @@ def train(config: UnifiedTrainingConfig):
                             tb_writer.add_scalar("gyro/graduation_step", global_step, global_step)
 
                     # TensorBoard logging for gyroscope during training
-                    if tb_writer is not None and not kosha_graduated:
-                        tb_writer.add_scalar("gyro/mean_ppl", kosha_graduation_monitor.mean_ppl, global_step)
-                        tb_writer.add_scalar("gyro/ppl_variance", kosha_graduation_monitor.variance, global_step)
+                    if tb_writer is not None and not kosha_graduated and kosha_graduation_monitor is not None:
+                        grad_status = kosha_graduation_monitor.get_status()
+                        if 'avg_ppl' in grad_status:
+                            tb_writer.add_scalar("gyro/mean_ppl", grad_status['avg_ppl'], global_step)
+                            tb_writer.add_scalar("gyro/ppl_variance", grad_status['std_ppl'], global_step)
 
                 # Conscious Generation Curriculum: PPL-gated stage transitions
                 if cg_stage_manager is not None:
