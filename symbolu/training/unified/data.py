@@ -204,7 +204,15 @@ def load_data(
                 try:
                     ds = load_dataset("wikitext", "wikitext-103-v1")
                 except Exception as e:
-                    if "No space left on device" in str(e) or "Errno 28" in str(e):
+                    # Check full exception chain for disk space errors
+                    _exc = e
+                    _is_disk_full = False
+                    while _exc is not None:
+                        if "No space left on device" in str(_exc) or (isinstance(_exc, OSError) and _exc.errno == 28):
+                            _is_disk_full = True
+                            break
+                        _exc = getattr(_exc, '__cause__', None) or getattr(_exc, '__context__', None)
+                    if _is_disk_full:
                         print(f"  ⚠️  WikiText-103 failed (disk full), falling back to WikiText-2...")
                         ds = load_dataset("wikitext", "wikitext-2-v1")
                     else:
