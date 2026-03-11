@@ -5156,6 +5156,9 @@ def train(config: UnifiedTrainingConfig):
 
             # V11.3: Slot adaptive calls — once per global step (not per micro-step).
             # Moved from accumulation loop so interval counters count global steps.
+            _sm = locals().get('_sm')
+            _retr_loss_val = locals().get('_retr_loss_val')
+            _lm_loss_val = locals().get('_lm_loss_val')
             if _sm is not None and _retr_loss_val is not None:
                 _sm.update_write_gate_target(_retr_loss_val)
                 _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
