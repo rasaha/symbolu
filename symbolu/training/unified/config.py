@@ -1027,6 +1027,8 @@ class UnifiedTrainingConfig:
     embedding_diag_interval: int = 200              # Steps between diagnostic snapshots
     embedding_diag_vocab_sample: int = 1000         # Vocab tokens to sample for drift metrics
     embedding_diag_neighbors: int = 20              # Nearest neighbors to track for stability
+    embedding_diag_no_samples: bool = False         # Disable vocab sampling (only grad norms + adapter gate)
+    embedding_diag_start_step: int = 0              # Delay diagnostics until this step
 
     # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)

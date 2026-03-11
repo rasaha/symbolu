@@ -38,11 +38,15 @@ class EmbeddingDiagnostics:
         vocab_sample_size: int = 1000,
         neighbor_k: int = 20,
         seed: int = 42,
+        no_samples: bool = False,
+        start_step: int = 0,
     ):
         self.interval = interval
         self.vocab_sample_size = vocab_sample_size
         self.neighbor_k = neighbor_k
         self.seed = seed
+        self.no_samples = no_samples
+        self.start_step = start_step
 
         # Snapshot storage
         self._prev_state_proj: Optional[torch.Tensor] = None      # [sample, 32]
@@ -88,16 +92,19 @@ class EmbeddingDiagnostics:
         """
         if global_step % self.interval != 0:
             return None
+        if global_step < self.start_step:
+            return None
 
         metrics: Dict[str, float] = {"step": global_step}
         device = next(model.parameters()).device
 
         # ── 1. State Projector Output Drift ──────────────────────────
         emb_layer = None
-        if hasattr(model, 'get_input_embeddings'):
-            emb_layer = model.get_input_embeddings()
-        elif hasattr(model, 'backbone'):
-            emb_layer = model.backbone.get_input_embeddings()
+        if not self.no_samples:
+            if hasattr(model, 'get_input_embeddings'):
+                emb_layer = model.get_input_embeddings()
+            elif hasattr(model, 'backbone'):
+                emb_layer = model.backbone.get_input_embeddings()
 
         if emb_layer is not None and hasattr(emb_layer, 'weight'):
             vocab_size = emb_layer.weight.shape[0]
@@ -156,7 +163,7 @@ class EmbeddingDiagnostics:
             metrics["phase_adapter_weight_norm"] = total_norm ** 0.5
 
         # ── 4. Per-Primitive Cache Drift ─────────────────────────────
-        if token_cache is not None:
+        if token_cache is not None and not self.no_samples:
             for buf_name, prev_attr in [
                 ('P_tok', '_prev_P_tok'),
                 ('R_tok', '_prev_R_tok'),

@@ -2370,11 +2370,18 @@ def train(config: UnifiedTrainingConfig):
                 interval=config.embedding_diag_interval,
                 vocab_sample_size=config.embedding_diag_vocab_sample,
                 neighbor_k=config.embedding_diag_neighbors,
+                no_samples=config.embedding_diag_no_samples,
+                start_step=config.embedding_diag_start_step,
             )
             print(f"\n  [Embedding Diagnostics] ENABLED")
             print(f"    Snapshot interval: every {config.embedding_diag_interval} steps")
-            print(f"    Vocab sample: {config.embedding_diag_vocab_sample} tokens")
-            print(f"    Neighbor tracking: top-{config.embedding_diag_neighbors}")
+            if config.embedding_diag_no_samples:
+                print(f"    Vocab sampling: DISABLED (grad norms + adapter gate only)")
+            else:
+                print(f"    Vocab sample: {config.embedding_diag_vocab_sample} tokens")
+                print(f"    Neighbor tracking: top-{config.embedding_diag_neighbors}")
+            if config.embedding_diag_start_step > 0:
+                print(f"    Start step: {config.embedding_diag_start_step} (dormant until then)")
         except ImportError as e:
             print(f"  [Embedding Diagnostics] Import failed: {e}")
 
@@ -8949,6 +8956,10 @@ def main():
                        help="Number of vocab tokens to sample for drift metrics")
     parser.add_argument("--embedding_diag_neighbors", type=int, default=20,
                        help="Nearest neighbors to track for embedding stability")
+    parser.add_argument("--embedding_diag_no_samples", action="store_true",
+                       help="Disable vocab sampling (only track grad norms + adapter gate)")
+    parser.add_argument("--embedding_diag_start_step", type=int, default=0,
+                       help="Delay embedding diagnostics until this training step")
 
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
