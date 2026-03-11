@@ -5988,7 +5988,10 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
                 # Runs at --phase_health_interval (default 500) to reduce log noise
+                # V20: Auto-scaling overrides phase_health_interval from _slot_scaling
                 _ph_interval = getattr(config, 'phase_health_interval', 500)
+                if hasattr(config, '_slot_scaling') and 'phase_health_interval' in config._slot_scaling:
+                    _ph_interval = config._slot_scaling['phase_health_interval']
                 if config.model_type in ('phase', 'hybrid', 'ontological_hybrid') and global_step % _ph_interval == 0:
                     try:
                         enable_health_diagnostics_capture(model, True)

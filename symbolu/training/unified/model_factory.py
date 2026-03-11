@@ -115,14 +115,21 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     slot_scaling = None
     if config.slot_auto_scale and config.global_tokens_enabled:
         slot_scaling = config.compute_slot_scaling()
-        print(f"  Slot Auto-Scale: ENABLED")
-        print(f"    num_slots={slot_scaling['num_slots']}, write_top_k={slot_scaling['write_top_k']}")
-        print(f"    plasticity_warmup={slot_scaling['plasticity_warmup_end']}, "
+        print(f"  Slot Auto-Scale: ENABLED (embed_dim={slot_scaling['embed_dim']}, "
+              f"num_layers={slot_scaling['num_layers']}, steps={slot_scaling['total_steps']})")
+        print(f"    Model-size derived:")
+        print(f"      num_slots={slot_scaling['num_slots']}, write_top_k={slot_scaling['write_top_k']}, "
+              f"local_layers={slot_scaling['local_layers']}")
+        print(f"      write_start_layer={slot_scaling['write_start_layer']}, "
+              f"read_interval={slot_scaling['read_interval']}, "
+              f"slot_lr_scale={slot_scaling['slot_lr_scale']}")
+        print(f"    Budget derived (from {slot_scaling['total_steps']} steps):")
+        print(f"      plasticity_warmup={slot_scaling['plasticity_warmup_end']}, "
               f"cooldown={slot_scaling['plasticity_cooldown_end']}")
-        print(f"    leak_curriculum={slot_scaling['leak_curriculum_steps']}, "
+        print(f"      leak_curriculum={slot_scaling['leak_curriculum_steps']}, "
               f"read_gate_freeze={slot_scaling['read_gate_freeze_steps']}")
-        print(f"    slot_lr_scale={slot_scaling['slot_lr_scale']}, "
-              f"write_start_layer={slot_scaling['write_start_layer']}")
+        print(f"      sample_every={slot_scaling['sample_every']}, "
+              f"phase_health={slot_scaling['phase_health_interval']}")
 
     # Validate embed_dim / num_heads divisibility
     if embed_dim % num_heads != 0:
