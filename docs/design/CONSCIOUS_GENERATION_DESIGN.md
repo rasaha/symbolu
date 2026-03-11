@@ -5275,3 +5275,212 @@ The build strategy follows five sequential phases:
 5. **Phase 5 — Curriculum + Validation**: Implement staged training, ablation experiments, and benchmarks to prove the architecture works.
 
 Each phase has explicit validation gates that must pass before the next phase begins. All modules live under `symbolu/training/conscious_generation/` and are activated via the `enable_conscious_generation` flag in `UnifiedTrainingConfig`. Existing modules are preserved without modification — the conscious generation system is purely additive to the current `ontological_hybrid` architecture.
+
+## Appendix E — CG Fine-Tuning Training Guide
+
+This appendix provides practical training commands, parameter reference, and operational notes for fine-tuning a Mistral backbone with the full Conscious Generation pipeline.
+
+### E.1 Prerequisites
+
+- A trained or pre-trained Mistral backbone (e.g., `mistralai/Mistral-7B-v0.3`)
+- GPU with sufficient VRAM (4-bit quantization fits in ~18GB peak; see training logs)
+- Dataset prepared in the unified training format
+
+### E.2 Training Modes
+
+There are two modes for CG training:
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **All-at-once** | `--enable_conscious_generation` (no curriculum) | All phases active from step 0. Simpler but less stable. |
+| **Staged curriculum** | `--enable_conscious_generation --enable_cg_curriculum` | Phases A→D activate progressively, gated by PPL stability. Recommended for production runs. |
+
+### E.3 Recommended Training Command (Staged Curriculum)
+
+```bash
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_conscious_generation \
+  --enable_cg_curriculum \
+  --use_field_integrated_softmax \
+  --max_steps 20000 \
+  --eval_every 100 \
+  --lambda_ont 0.1 \
+  --lambda_kosha_routing 0.05 \
+  --lambda_bliss_token 0.05 \
+  --lambda_jepa_token 0.02 \
+  --lambda_csr_token 0.02 \
+  --lambda_vritti_token 0.02 \
+  --lambda_guna_token 0.02
+```
+
+> **Note on `--max_steps`:** The number of training steps must be tuned per dataset. Smaller or simpler datasets may converge in 5,000–10,000 steps, while larger or more diverse datasets may require 20,000–50,000+ steps. The curriculum stage boundaries are computed as proportions of `max_steps`, so changing this value automatically adjusts how long the model spends in each stage. Monitor validation PPL to determine when the model has converged — the curriculum will not advance stages until PPL stabilizes regardless of the step budget.
+
+### E.4 Minimal Training Command (All-at-Once, No Curriculum)
+
+For quick experiments or small datasets where staged progression is unnecessary:
+
+```bash
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_conscious_generation \
+  --max_steps 5000 \
+  --lambda_ont 0.01 \
+  --lambda_kosha_routing 0.01 \
+  --lambda_bliss_token 0.01
+```
+
+This activates all CG modules simultaneously with small lambda values. The primitive token-level losses (JEPA, CSR, Vritti, Guna) default to 0 and can be added as needed.
+
+### E.5 Resuming from a Checkpoint
+
+To continue training from a saved checkpoint (the checkpoint includes all CG module weights):
+
+```bash
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_conscious_generation \
+  --enable_cg_curriculum \
+  --use_field_integrated_softmax \
+  --max_steps 20000 \
+  --resume checkpoints_unified/best.pt \
+  --lambda_ont 0.1 \
+  --lambda_kosha_routing 0.05 \
+  --lambda_bliss_token 0.05 \
+  --lambda_jepa_token 0.02 \
+  --lambda_csr_token 0.02 \
+  --lambda_vritti_token 0.02 \
+  --lambda_guna_token 0.02
+```
+
+Use `--resume_weights_only` to load model weights but reset the optimizer and step counter (useful when switching datasets or changing learning rate).
+
+### E.6 Curriculum Stage Reference
+
+When `--enable_cg_curriculum` is active, training progresses through four PPL-gated stages:
+
+| Stage | Name | Default % | What Activates | Lambda Behavior |
+|-------|------|-----------|----------------|-----------------|
+| **A** | Backbone Stabilization | 30% | LM loss dominant, ontology projector only | λ_ont=0.01, all others=0 |
+| **B** | Ontology Formation | 20% | Ontology ramps up, JEPA + CSR begin weakly | λ_ont→target, λ_jepa=0.01, λ_csr=0.01 |
+| **C** | Primitive Specialization | 25% | All 6 primitives ramp to target, Kosha routing begins | All λ_f→target, λ_kosha→0.05 |
+| **D** | Integrated Generation | 25% | Field-integrated softmax ON — Z* replaces base logits | All λ at target values |
+
+**Stage transition conditions** (both must be met):
+1. Minimum time in stage: 50% of stage's allocated steps
+2. PPL stability: variance of last `stability_window` validation PPLs < `ppl_var_threshold`
+
+The lambda values passed via CLI (`--lambda_ont`, `--lambda_kosha_routing`, etc.) are the **Stage D target values**. The curriculum manager ramps from zero (or from the previous stage's value) to these targets using cosine schedules within each stage.
+
+### E.7 Curriculum Tuning Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--cg_curriculum_stage_proportions` | `0.30,0.20,0.25,0.25` | Fraction of `max_steps` for stages A,B,C,D |
+| `--cg_curriculum_ramp_mode` | `cosine` | Lambda ramp shape: `linear`, `cosine`, or `step` |
+| `--cg_curriculum_ppl_var_threshold` | `0.5` | Max PPL variance for stage transition |
+| `--cg_curriculum_stability_window` | `5` | Number of eval steps to check PPL stability |
+
+### E.8 Full CG Parameter Reference
+
+**Core flags:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--enable_conscious_generation` | off | Master switch for all CG modules |
+| `--enable_cg_curriculum` | off | Enable staged A→D curriculum |
+| `--use_field_integrated_softmax` | off | Replace base logits with Z* for L_LM (Stage D) |
+| `--model_type mistral_cg` | — | Required model type for Mistral + CG |
+
+**Ontology (Phase 1):**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--token_ontology_dim` | 32 | Ontological code dimension (must match SOVEREIGN_STATE_DIM) |
+| `--ontology_cache_refresh_interval` | 100 | Steps between O_tok cache refresh |
+| `--lambda_ont` | 0.0 | Ontological structure loss weight |
+| `--ontology_loss_type` | `contrastive` | Loss type: `contrastive` or `prototype` |
+| `--ontology_loss_temperature` | 0.1 | Temperature for contrastive loss |
+| `--ontology_scorer_use_low_rank` | true | Use low-rank M_ont = A B^T factorization |
+| `--ontology_scorer_rank` | 8 | Rank for low-rank bilinear factorization |
+
+**Primitives (Phase 2):**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--primitive_shortlist_k` | 128 | Top-K base logits for primitive evaluation |
+| `--lambda_jepa_token` | 0.0 | JEPA token-level plausibility loss weight |
+| `--lambda_csr_token` | 0.0 | CSR token-level resonance loss weight |
+| `--lambda_vritti_token` | 0.0 | Vritti cognitive mode loss weight |
+| `--lambda_guna_token` | 0.0 | Guna energetic compatibility loss weight |
+
+**Governance (Phase 3):**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--lambda_kosha_routing` | 0.0 | Kosha routing loss weight |
+| `--lambda_bliss_token` | 0.0 | Bliss token-level coherence loss weight |
+| `--bliss_lambda_B` | 1.0 | Lambda_B temperature for Bliss gate exp(-λ_B·D) |
+| `--kosha_routing_init` | `uniform` | Kosha router initialization: `uniform` or `base_dominant` |
+
+### E.9 Checkpoint Contents
+
+CG modules are stored as part of the model via `nn.ModuleDict` (attached as `model.conscious_gen`). The checkpoint `best_model.pt` automatically includes:
+
+- `conscious_gen.token_projector.*` — 32D ontology projector weights
+- `conscious_gen.ontology_scorer.*` — bilinear compatibility matrix (low-rank A, B)
+- `conscious_gen.jepa_scorer.*` — JEPA scoring MLP + bilinear
+- `conscious_gen.csr_scorer.*` — CSR scoring MLP + bilinear
+- `conscious_gen.vritti_scorer.*` — Vritti 5-class classifier
+- `conscious_gen.guna_scorer.*` — Guna 3-class classifier + G matrix
+- `conscious_gen.kosha_router.*` — routing MLP weights
+- `conscious_gen.bliss_gate.*` — gate parameters
+- `conscious_gen.integrated_scorer.*` — scorer wrapper
+- `conscious_gen.token_eval_tensor.*` — orchestrator
+- Loss module parameters (kosha_routing_loss, bliss_coherence_loss, etc.)
+
+The token primitive cache (`O_tok`, `P_tok`, `R_tok`, etc.) is **not** saved — it is recomputed on the first cache refresh step after resume. This is by design since the cache is derived from the saved model weights.
+
+### E.10 Monitoring Training Progress
+
+Key metrics to watch in the training logs:
+
+| Log Field | Meaning | Healthy Range |
+|-----------|---------|---------------|
+| `Loss` / `PPL` | Language modeling loss and perplexity | Decreasing over time |
+| `Conf` | Sovereign state confidence | 0.4–0.8 (🟡→🟢) |
+| `Know` | Knowledge head accuracy | Increasing |
+| `L:A:S` | Lotus:Agni:Shadow guna balance | Near equal (0.33 each) at start |
+| `cg_ont_loss` | Ontological structure loss (TensorBoard) | Decreasing |
+| `cg_alpha_entropy` | Kosha routing entropy (TensorBoard) | Should not collapse to 0 |
+| `cg_bliss_mean` | Mean Bliss gate value (TensorBoard) | 0.5–0.9 when stable |
+| `cg_disagree_mean` | Mean inter-primitive disagreement | Decreasing |
+
+When using the curriculum, stage transitions are logged as:
+```
+[Conscious Gen Curriculum] Stage transition: A_BACKBONE -> B_ONTOLOGY at step 6000 (PPL=5.23)
+```
+
+### E.11 Dataset-Specific Step Recommendations
+
+The number of training steps should be adjusted based on dataset size and complexity. The curriculum proportions remain the same — only `--max_steps` changes:
+
+| Dataset Scale | Recommended `--max_steps` | Notes |
+|---------------|---------------------------|-------|
+| Small (<1M tokens) | 5,000–10,000 | May not need full curriculum; consider all-at-once mode |
+| Medium (1M–50M tokens) | 10,000–20,000 | Standard curriculum works well |
+| Large (50M–500M tokens) | 20,000–50,000 | Full curriculum recommended; increase `eval_every` proportionally |
+| Very large (>500M tokens) | 50,000–100,000+ | Consider increasing `stability_window` to 8–10 |
+
+**Key principle:** The curriculum is PPL-gated, not step-gated. Even if you set `--max_steps 50000`, the model will not advance from Stage A to Stage B until validation PPL stabilizes. This means:
+- Setting too few steps risks the model never reaching Stage D
+- Setting too many steps is safe — the model simply trains longer in Stage D once all modules are active
+- When in doubt, err on the side of more steps and use early stopping based on validation PPL
+
+When switching to a new dataset, use `--resume_weights_only` to keep the learned CG module weights but reset the optimizer state and curriculum position, allowing the curriculum to re-adapt to the new data distribution.
