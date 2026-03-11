@@ -2385,6 +2385,24 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Embedding Diagnostics] Import failed: {e}")
 
+    # Factual Eval — verify CG primitives distinguish facts from hallucinations
+    cg_factual_eval = None
+    if config.enable_conscious_generation and config.enable_factual_eval:
+        try:
+            from symbolu.training.conscious_generation.diagnostics.factual_eval import FactualEval
+            cg_factual_eval = FactualEval(
+                interval=config.factual_eval_interval,
+                num_probes=config.factual_eval_probes,
+                start_step=config.factual_eval_start_step,
+            )
+            print(f"\n  [Factual Eval] ENABLED")
+            print(f"    Eval interval: every {config.factual_eval_interval} steps")
+            print(f"    Probe pairs: {cg_factual_eval.num_probes} (fact vs hallucination)")
+            if config.factual_eval_start_step > 0:
+                print(f"    Start step: {config.factual_eval_start_step}")
+        except ImportError as e:
+            print(f"  [Factual Eval] Import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -7177,6 +7195,34 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+            # CG Factual Eval — verify JEPA/Vritti distinguish facts from hallucinations
+            if cg_factual_eval is not None and tokenizer is not None:
+                _fe_cache = None
+                if hasattr(model, 'conscious_gen'):
+                    _fe_cache = model.conscious_gen.get('token_cache', None)
+                _fe_metrics = cg_factual_eval.evaluate(
+                    model=model,
+                    tokenizer=tokenizer,
+                    global_step=global_step,
+                    token_cache=_fe_cache,
+                )
+                if _fe_metrics is not None:
+                    print(cg_factual_eval.format_console_log(_fe_metrics))
+                    for _fk, _fv in _fe_metrics.items():
+                        if isinstance(_fv, (int, float)) and _fk != 'step':
+                            metrics[f'factual_eval/{_fk}'] = _fv
+                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                        for _fk, _fv in _fe_metrics.items():
+                            if isinstance(_fv, (int, float)) and _fk != 'step':
+                                writer.add_scalar(f'factual_eval/{_fk}', _fv, global_step)
+                    # Trend summary every 5 evals
+                    if len(cg_factual_eval.history) % 5 == 0 and len(cg_factual_eval.history) >= 2:
+                        _fe_trend = cg_factual_eval.get_trend_summary()
+                        _fe_trend_parts = ["  [FACTUAL-TREND]"]
+                        for _tk, _tv in _fe_trend.items():
+                            _fe_trend_parts.append(f"    {_tk}: {_tv}")
+                        print("\n".join(_fe_trend_parts))
+
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0 and not config.no_save:
                 # V9.8.10: Ensure scheduled alpha is applied before saving
@@ -8960,6 +9006,16 @@ def main():
                        help="Disable vocab sampling (only track grad norms + adapter gate)")
     parser.add_argument("--embedding_diag_start_step", type=int, default=0,
                        help="Delay embedding diagnostics until this training step")
+
+    # Factual eval — verify CG primitives distinguish facts from hallucinations
+    parser.add_argument("--enable_factual_eval", action="store_true",
+                       help="Run CG-aware factual probes to verify JEPA/Vritti distinguish facts from hallucinations")
+    parser.add_argument("--factual_eval_interval", type=int, default=500,
+                       help="Steps between factual evaluation runs")
+    parser.add_argument("--factual_eval_probes", type=int, default=50,
+                       help="Number of fact/hallucination probe pairs per evaluation")
+    parser.add_argument("--factual_eval_start_step", type=int, default=0,
+                       help="Delay factual evaluation until this training step")
 
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",

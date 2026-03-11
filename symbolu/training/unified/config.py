@@ -1030,6 +1030,12 @@ class UnifiedTrainingConfig:
     embedding_diag_no_samples: bool = False         # Disable vocab sampling (only grad norms + adapter gate)
     embedding_diag_start_step: int = 0              # Delay diagnostics until this step
 
+    # Factual Eval — verify CG primitives distinguish facts from hallucinations
+    enable_factual_eval: bool = False               # Master toggle for CG factual evaluation
+    factual_eval_interval: int = 500                # Steps between eval runs
+    factual_eval_probes: int = 50                   # Number of fact/hallucination pairs per eval
+    factual_eval_start_step: int = 0                # Delay eval until this training step
+
     # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules
