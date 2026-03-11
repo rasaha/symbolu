@@ -1072,10 +1072,17 @@ class UnifiedTrainingConfig:
           sample_every         = max_steps * 0.025
           phase_health_interval= max_steps * 0.025
 
+        Parameters that scale with CONTEXT LENGTH (max_seq_len):
+          window_size              = min(512, max_seq_len // 4)
+          window_size_high_ppl     = window_size // 2
+          window_size_low_ppl      = window_size
+          ppl_high_threshold       = 500 * (max_seq_len / 1024)  (longer ctx → higher PPL)
+          ppl_low_threshold        = 50 * (max_seq_len / 1024)
+
         Parameters that DON'T scale (dimensionless ratios / thresholds):
           slots_write_lr, slot_prediction_loss_weight, slot_coherence_floor,
-          adaptive_max_lr_relative, alpha_phase_ppl_low, ppl_low_threshold,
-          window_size, learning_rate, adaptive_lr_min, batch_size,
+          adaptive_max_lr_relative, alpha_phase_ppl_low,
+          learning_rate, adaptive_lr_min, batch_size,
           gradient_accumulation, log_every
         """
         if not self.slot_auto_scale:
@@ -1171,6 +1178,36 @@ class UnifiedTrainingConfig:
         phase_health_interval = max(50, int(total_steps * 0.025))
 
         # =================================================================
+        # CONTEXT-LENGTH-DEPENDENT PARAMETERS
+        # =================================================================
+
+        ctx_len = self.max_seq_len
+
+        # --- Window size: ~25% of context length, capped at 512 ---
+        # Local attention window should cover enough context for syntactic
+        # patterns without blowing up memory. 256 is right for 1024-ctx,
+        # but undersized for 4096+. Cap at 512 for VRAM safety.
+        # Reference: optimize_training.py uses min(512, target_context // 4).
+        window_size = min(512, ctx_len // 4)
+        window_size = max(64, window_size)  # Floor at 64 for very short contexts
+        self.window_size = window_size
+
+        # --- Adaptive window endpoints scale with window_size ---
+        # High-PPL (early training): half the base window for fast phase learning.
+        # Low-PPL (converged): full base window for richer local context.
+        self.window_size_high_ppl = max(64, window_size // 2)
+        self.window_size_low_ppl = window_size
+
+        # --- PPL thresholds: scale with context length ---
+        # Longer sequences produce higher perplexity (more tokens to predict).
+        # Fixed thresholds (100/1000) are calibrated for ~1024 context.
+        # Scale linearly: 2048-ctx sees ~2x the PPL of 1024-ctx for the same
+        # model quality, so thresholds should shift proportionally.
+        ctx_ratio = ctx_len / 1024.0
+        self.ppl_high_threshold = round(500.0 * ctx_ratio, 1)
+        self.ppl_low_threshold = round(50.0 * ctx_ratio, 1)
+
+        # =================================================================
         # BUILD SCALING DICT
         # =================================================================
         scaling = {
@@ -1190,10 +1227,17 @@ class UnifiedTrainingConfig:
             "router_noise_warmup": router_noise_warmup,
             "sample_every": sample_every,
             "phase_health_interval": phase_health_interval,
+            # Context-length-dependent
+            "window_size": window_size,
+            "window_size_high_ppl": self.window_size_high_ppl,
+            "window_size_low_ppl": self.window_size_low_ppl,
+            "ppl_high_threshold": self.ppl_high_threshold,
+            "ppl_low_threshold": self.ppl_low_threshold,
             # Context (for diagnostics)
             "embed_dim": embed_dim,
             "num_layers": num_layers,
             "total_steps": total_steps,
+            "context_length": ctx_len,
         }
         # Attach to config so training loop and SlotMemoryGCT can access it
         self._slot_scaling = scaling
