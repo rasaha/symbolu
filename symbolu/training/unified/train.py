@@ -524,6 +524,16 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # For mistral_cg, use the backbone's own tokenizer so token IDs match
+    # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
+    if config.model_type == "mistral_cg" and hasattr(model, "tokenizer") and model.tokenizer is not None:
+        tokenizer = model.tokenizer
+        tokenizer.model_max_length = int(1e12)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        config.vocab_size = len(tokenizer)
+        print(f"  [Mistral CG] Using Mistral tokenizer (vocab_size={config.vocab_size})")
+
     # V11: Disable/reset adaptive constraint relaxation if requested
     if config.global_tokens_enabled:
         _sm = getattr(model, 'slot_memory', None)
