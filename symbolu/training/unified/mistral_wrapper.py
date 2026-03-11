@@ -156,10 +156,11 @@ class MistralCGWrapper(nn.Module):
         if quantize in ("4bit", "8bit"):
             try:
                 from transformers import BitsAndBytesConfig
+                import bitsandbytes as _bnb  # noqa: F401
             except ImportError:
                 raise ImportError(
                     "bitsandbytes required for quantization. "
-                    "Install with: pip install bitsandbytes"
+                    "Install with: pip install -U bitsandbytes>=0.46.1"
                 )
             if quantize == "4bit":
                 load_kwargs["quantization_config"] = BitsAndBytesConfig(
