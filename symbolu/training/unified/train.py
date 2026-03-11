@@ -553,6 +553,11 @@ def train(config: UnifiedTrainingConfig):
             if getattr(config, 'slot_coherence_floor', None) is not None:
                 _sm._coherence_floor = config.slot_coherence_floor
                 print(f"  Coherence Floor: {config.slot_coherence_floor}")
+            # V16.1: When tied mode is active, set decay steps to infinity so
+            # the step-based decay in forward() becomes a no-op — the controller
+            # will drive _coherence_floor directly at each eval point.
+            if getattr(config, 'slot_coherence_floor_tied', True) and config.slot_lr_eta > 0:
+                _sm._coherence_floor_decay_steps = float('inf')
 
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
@@ -1721,6 +1726,8 @@ def train(config: UnifiedTrainingConfig):
     # V10.23: Three-phase proportional Slot LR Controller (auto-enabled)
     adaptive_slot_lr = None
     if _slot_params and config.slot_lr_eta > 0:
+        # V16.1: Pass coherence floor initial so controller can derive floor from scale
+        _coh_floor_init = config.slot_coherence_floor if config.slot_coherence_floor is not None else 0.3
         adaptive_slot_lr = AdaptiveSlotLRController(
             optimizer=optimizer,
             initial_scale=config.slot_memory_lr_scale,
@@ -1728,10 +1735,13 @@ def train(config: UnifiedTrainingConfig):
             scale_max=config.slot_lr_scale_max,
             eta=config.slot_lr_eta,
             stabilize_after_steps=config.slot_lr_stabilize_after,
+            coherence_floor_initial=_coh_floor_init if config.slot_coherence_floor_tied else 0.0,
         )
         print(f"  [V10.23] Slot LR Controller: Phase 1 (until warmup_complete + signal) "
               f"→ Phase 2 (eta={config.slot_lr_eta}, scale=[{config.slot_lr_scale_min}, {config.slot_lr_scale_max}]) "
               f"→ Phase 3 (auto-stabilize)")
+        if config.slot_coherence_floor_tied:
+            print(f"  [V16.1] Coherence floor tied to slot LR scale (initial={_coh_floor_init})")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -6991,6 +7001,13 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  --> {adaptive_controller.get_status_string()}")
                 if adaptive_slot_lr is not None:
                     adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # V16.1: Propagate tied coherence floor to slot memory
+                    if config.slot_coherence_floor_tied and adaptive_slot_lr.coherence_floor_initial > 0:
+                        _sm_eval = getattr(model, 'slot_memory', None)
+                        if _sm_eval is None:
+                            _sm_eval = getattr(getattr(model, 'hybrid', model), 'slot_memory', None)
+                        if _sm_eval is not None:
+                            _sm_eval._coherence_floor = adaptive_slot_lr.get_coherence_floor()
                     print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
@@ -7072,6 +7089,9 @@ def train(config: UnifiedTrainingConfig):
                 if adaptive_slot_lr is not None:
                     adaptive_slot_lr.record_ablation_delta(_slot_delta)
                     _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # V16.1: Propagate tied coherence floor after ablation-triggered update
+                    if config.slot_coherence_floor_tied and adaptive_slot_lr.coherence_floor_initial > 0:
+                        _sm._coherence_floor = adaptive_slot_lr.get_coherence_floor()
                 # Post-curriculum adaptive alpha: feed ablation % to curriculum
                 if ppl_alpha_curriculum is not None:
                     ppl_alpha_curriculum.update_from_ablation(_slot_pct)
@@ -7496,6 +7516,11 @@ def main():
     # V16: Semantic coherence gate
     parser.add_argument("--slot_coherence_floor", type=float, default=None,
                        help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
+    parser.add_argument("--slot_coherence_floor_tied", action="store_true", default=True,
+                       help="V16.1: Tie coherence floor to slot LR scale schedule (default: on)")
+    parser.add_argument("--no_slot_coherence_floor_tied", dest="slot_coherence_floor_tied",
+                       action="store_false",
+                       help="V16.1: Disable tied coherence floor, use independent step-based decay")
     # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
     # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
@@ -8988,6 +9013,7 @@ def main():
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
         # V16: Semantic coherence gate
         slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
+        slot_coherence_floor_tied=getattr(args, 'slot_coherence_floor_tied', True),
         # V20: Auto-scaling
         slot_auto_scale=getattr(args, 'slot_auto_scale', False),
         # V10.23: Three-phase proportional slot LR

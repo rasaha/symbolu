@@ -183,6 +183,7 @@ class UnifiedTrainingConfig:
     slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
     # V16: Semantic coherence gate — modulates write assignment by value-space coherence
     slot_coherence_floor: Optional[float] = None  # Initial coherence floor (default: 0.3, decays to 0)
+    slot_coherence_floor_tied: bool = True  # V16.1: Tie coherence floor to slot LR scale (default: on)
 
     # V20: Auto-scaling slot memory — derives slot hyperparameters from model size
     # and training budget. When enabled, num_global_tokens and step-based schedules
