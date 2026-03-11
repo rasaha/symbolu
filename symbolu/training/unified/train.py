@@ -7472,6 +7472,8 @@ def main():
                        help="EMA learning rate for slot writes (default: 0.1)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+    parser.add_argument("--slot_auto_scale", action="store_true",
+                       help="V20: Auto-derive slot hyperparameters from model size, training budget, and context length")
     parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
                        help="V11.4: Weight for slot-only prediction loss (default: 0.1)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
@@ -8986,6 +8988,8 @@ def main():
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
         # V16: Semantic coherence gate
         slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
+        # V20: Auto-scaling
+        slot_auto_scale=getattr(args, 'slot_auto_scale', False),
         # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),
