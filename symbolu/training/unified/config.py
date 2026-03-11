@@ -1046,6 +1046,15 @@ class UnifiedTrainingConfig:
     mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
 
+    # ==========================================================================
+    # Knowledge Distillation from Mistral Teacher
+    # Use frozen Mistral as teacher for hybrid / ontological_hybrid students
+    # ==========================================================================
+    distill_from_mistral: bool = False                      # Enable distillation mode
+    distill_temperature: float = 2.0                        # Softmax temperature (higher = softer targets)
+    distill_alpha: float = 0.5                              # Weight for KD loss (1.0 = pure KD, 0.0 = pure CE)
+    distill_warmup_steps: int = 0                           # Steps before KD kicks in (CE-only warmup)
+
     # =========================================================================
     # V20: AUTO-SCALING SLOT MEMORY
     # =========================================================================

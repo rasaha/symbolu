@@ -534,6 +534,32 @@ def train(config: UnifiedTrainingConfig):
         config.vocab_size = len(tokenizer)
         print(f"  [Mistral CG] Using Mistral tokenizer (vocab_size={config.vocab_size})")
 
+    # Knowledge Distillation: Load frozen Mistral teacher
+    mistral_teacher = None
+    distill_tokenizer = None
+    if config.distill_from_mistral:
+        if config.model_type == "mistral_cg":
+            print("  [Distillation] WARNING: distill_from_mistral with model_type=mistral_cg "
+                  "is redundant — Mistral is already the backbone. Skipping teacher.")
+        else:
+            from symbolu.training.unified.mistral_teacher import MistralTeacher
+            quantize = config.mistral_quantize if config.mistral_quantize != "none" else None
+            mistral_teacher = MistralTeacher(
+                model_name=config.mistral_model_name,
+                quantize=quantize,
+                device_map=config.mistral_device_map,
+                trust_remote_code=config.mistral_trust_remote_code,
+            )
+            mistral_teacher.eval()
+            mistral_teacher.print_summary()
+            distill_tokenizer = mistral_teacher.tokenizer
+            if distill_tokenizer.pad_token is None:
+                distill_tokenizer.pad_token = distill_tokenizer.eos_token
+            print(f"    Temperature: {config.distill_temperature}")
+            print(f"    Alpha (KD weight): {config.distill_alpha}")
+            if config.distill_warmup_steps > 0:
+                print(f"    CE-only warmup: {config.distill_warmup_steps} steps")
+
     # V11: Disable/reset adaptive constraint relaxation if requested
     if config.global_tokens_enabled:
         _sm = getattr(model, 'slot_memory', None)
@@ -2939,6 +2965,39 @@ def train(config: UnifiedTrainingConfig):
 
                 if not tbptt_backward_done:
                     loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Knowledge Distillation from frozen Mistral teacher
+                if (mistral_teacher is not None
+                        and not tbptt_backward_done
+                        and logits is not None
+                        and global_step >= config.distill_warmup_steps):
+                    from symbolu.training.unified.mistral_teacher import compute_distillation_loss
+                    # Re-tokenize with Mistral's tokenizer if vocabs differ
+                    # For simplicity: use same input_ids if tokenizers match,
+                    # otherwise decode + re-encode (slow but correct)
+                    _kd_input_ids = x  # assume shared tokenizer by default
+                    if distill_tokenizer is not None and tokenizer is not None:
+                        # Check if vocabs match (fast path)
+                        if getattr(tokenizer, 'vocab_size', -1) != mistral_teacher.vocab_size:
+                            # Different tokenizers: decode student tokens, re-encode for teacher
+                            _kd_texts = tokenizer.batch_decode(x, skip_special_tokens=False)
+                            _kd_enc = distill_tokenizer(
+                                _kd_texts, return_tensors="pt",
+                                truncation=True, max_length=x.shape[1],
+                                padding="max_length", pad_to_multiple_of=None,
+                            )
+                            _kd_input_ids = _kd_enc["input_ids"].to(x.device)
+                    with torch.no_grad():
+                        _teacher_logits = mistral_teacher(_kd_input_ids)
+                    # Replace CE loss with combined KD + CE loss
+                    loss, _kd_metrics = compute_distillation_loss(
+                        student_logits=logits,
+                        teacher_logits=_teacher_logits,
+                        labels=y,
+                        temperature=config.distill_temperature,
+                        alpha=config.distill_alpha,
+                    )
+                    metrics.update(_kd_metrics)
 
                 # Entropy-Based Logit Scale Control (train-time)
                 if entropy_scale_module is not None and not tbptt_backward_done:
@@ -7932,6 +7991,16 @@ def main():
     parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
                        help="Hidden dimension for phase-conditioned adapter MLP")
 
+    # Knowledge Distillation from Mistral
+    parser.add_argument("--distill_from_mistral", action="store_true",
+                       help="Use frozen Mistral as teacher for knowledge distillation")
+    parser.add_argument("--distill_temperature", type=float, default=2.0,
+                       help="Softmax temperature for soft targets (higher = softer)")
+    parser.add_argument("--distill_alpha", type=float, default=0.5,
+                       help="Weight for KD loss vs CE loss (1.0 = pure KD)")
+    parser.add_argument("--distill_warmup_steps", type=int, default=0,
+                       help="Steps of CE-only training before KD kicks in")
+
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
                        help="Bhava relationship loss weight")
@@ -9772,6 +9841,16 @@ def main():
         mistral_device_map=args.mistral_device_map,
         mistral_trust_remote_code=args.mistral_trust_remote_code,
         mistral_phase_adapter_hidden=args.mistral_phase_adapter_hidden,
+        # Knowledge Distillation
+        distill_from_mistral=args.distill_from_mistral,
+        distill_temperature=args.distill_temperature,
+        distill_alpha=args.distill_alpha,
+        distill_warmup_steps=args.distill_warmup_steps,
+        # Factual Eval
+        enable_factual_eval=args.enable_factual_eval,
+        factual_eval_interval=args.factual_eval_interval,
+        factual_eval_probes=args.factual_eval_probes,
+        factual_eval_start_step=args.factual_eval_start_step,
     )
 
     # ==========================================================================
