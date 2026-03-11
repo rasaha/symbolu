@@ -174,6 +174,16 @@ class MistralCGWrapper(nn.Module):
                     load_in_8bit=True,
                 )
 
+        # PyTorch < 2.1 lacks set_submodule, required by transformers' bnb integration
+        if not hasattr(torch.nn.Module, "set_submodule"):
+            def _set_submodule(self, target, module):
+                atoms = target.split(".")
+                mod = self
+                for item in atoms[:-1]:
+                    mod = getattr(mod, item)
+                setattr(mod, atoms[-1], module)
+            torch.nn.Module.set_submodule = _set_submodule
+
         print(f"  Loading Mistral backbone: {model_name}")
         print(f"  Quantization: {quantize or 'none (bf16)'}")
         print(f"  Device map: {device_map}")
