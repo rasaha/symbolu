@@ -553,6 +553,11 @@ def train(config: UnifiedTrainingConfig):
             if getattr(config, 'slot_coherence_floor', None) is not None:
                 _sm._coherence_floor = config.slot_coherence_floor
                 print(f"  Coherence Floor: {config.slot_coherence_floor}")
+            # V16.1: When tied mode is active, set decay steps to infinity so
+            # the step-based decay in forward() becomes a no-op — the controller
+            # will drive _coherence_floor directly at each eval point.
+            if getattr(config, 'slot_coherence_floor_tied', True) and config.slot_lr_eta > 0:
+                _sm._coherence_floor_decay_steps = float('inf')
 
     # V10.6.3: Architecture Health Check (PASS/WARN/FAIL)
     if config.run_architecture_health_check:
@@ -843,8 +848,15 @@ def train(config: UnifiedTrainingConfig):
         print(f"  [Appendix G] 12D Health Monitor: ENABLED (every {config.health_monitor_interval} steps)")
 
     if config.enable_gradient_tracker:
-        gradient_variance_tracker = GradientVarianceTracker(window_size=100)
-        print(f"  [Appendix G] Gradient Variance Tracker: ENABLED (window=100)")
+        gradient_variance_tracker = GradientVarianceTracker(
+            window_size=100,
+            adaptive_dampen=config.enable_variance_dampen,
+            dampen_threshold_layers=config.variance_dampen_threshold,
+            dampen_min_factor=config.variance_dampen_min,
+            dampen_recovery_rate=config.variance_dampen_recovery,
+        )
+        dampen_str = f", adaptive_dampen={'ON' if config.enable_variance_dampen else 'OFF'}"
+        print(f"  [Appendix G] Gradient Variance Tracker: ENABLED (window=100{dampen_str})")
 
     # Initialize SGP (Stochastic Gradient Persistence) and Sattvic Controller
     sattvic_controller = None
@@ -1714,6 +1726,8 @@ def train(config: UnifiedTrainingConfig):
     # V10.23: Three-phase proportional Slot LR Controller (auto-enabled)
     adaptive_slot_lr = None
     if _slot_params and config.slot_lr_eta > 0:
+        # V16.1: Pass coherence floor initial so controller can derive floor from scale
+        _coh_floor_init = config.slot_coherence_floor if config.slot_coherence_floor is not None else 0.3
         adaptive_slot_lr = AdaptiveSlotLRController(
             optimizer=optimizer,
             initial_scale=config.slot_memory_lr_scale,
@@ -1721,10 +1735,13 @@ def train(config: UnifiedTrainingConfig):
             scale_max=config.slot_lr_scale_max,
             eta=config.slot_lr_eta,
             stabilize_after_steps=config.slot_lr_stabilize_after,
+            coherence_floor_initial=_coh_floor_init if config.slot_coherence_floor_tied else 0.0,
         )
         print(f"  [V10.23] Slot LR Controller: Phase 1 (until warmup_complete + signal) "
               f"→ Phase 2 (eta={config.slot_lr_eta}, scale=[{config.slot_lr_scale_min}, {config.slot_lr_scale_max}]) "
               f"→ Phase 3 (auto-stabilize)")
+        if config.slot_coherence_floor_tied:
+            print(f"  [V16.1] Coherence floor tied to slot LR scale (initial={_coh_floor_init})")
 
     # Restore HGS/DRC state from checkpoint if available
     if resumed_hgs_state is not None and gradient_scaler_hgs is not None:
@@ -4974,16 +4991,18 @@ def train(config: UnifiedTrainingConfig):
             if gradient_variance_tracker is not None:
                 grad_health = gradient_variance_tracker.record(model, global_step=global_step)
                 metrics['grad_total_norm'] = grad_health.get('total_grad_norm', 0.0)
-                if grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                if grad_health.get('alerts') and global_step % config.log_every == 0:
                     for alert in grad_health['alerts']:
                         print(f"  [GRAD ALERT] {alert}", flush=True)
 
                 # Phase 4: Track JEPA projector gradients separately
+                # update_dampen=False: JEPA projector is a tiny auxiliary model —
+                # its spike count must not corrupt the main model's dampening state.
                 if jepa_injection_projector is not None:
                     jepa_proj_grad_health = gradient_variance_tracker.record(
-                        jepa_injection_projector
+                        jepa_injection_projector, update_dampen=False,
                     )
-                    if jepa_proj_grad_health.get('alerts') and global_step % config.bliss_log_interval == 0:
+                    if jepa_proj_grad_health.get('alerts') and global_step % config.log_every == 0:
                         for alert in jepa_proj_grad_health['alerts']:
                             print(f"  [GRAD ALERT JEPA-Proj] {alert}", flush=True)
 
@@ -4997,6 +5016,26 @@ def train(config: UnifiedTrainingConfig):
                 )
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
+
+            # V10.24: Adaptive variance dampening — when the GradientVarianceTracker
+            # detects sustained oscillation across multiple layers (not just a one-off
+            # norm spike), scale down LR proportionally. The throttle catches acute
+            # spikes; this catches chronic instability that the throttle misses.
+            # Applied temporarily: LR is scaled down before optimizer.step(), then
+            # restored after, so the throttle's _unthrottled_lr tracking isn't corrupted.
+            variance_dampen = 1.0
+            _pre_dampen_lrs = None
+            if gradient_variance_tracker is not None and grad_health is not None:
+                variance_dampen = grad_health.get('variance_dampen_factor', 1.0)
+                if variance_dampen < 1.0:
+                    _pre_dampen_lrs = [pg['lr'] for pg in optimizer.param_groups]
+                    for pg in optimizer.param_groups:
+                        pg['lr'] *= variance_dampen
+                    metrics['variance_dampen'] = variance_dampen
+                    if global_step % config.log_every == 0:
+                        spiking = grad_health.get('spiking_layers', 0)
+                        tracked = grad_health.get('tracked_layers', 0)
+                        print(f"  [GRAD VARIANCE] {spiking}/{tracked} layers spiking | LR x{variance_dampen:.2f}")
 
             # V10.15/V10.17: Clip slot memory gradients with per-element capping.
             # Slot keys live on the unit hypersphere — even a single large gradient
@@ -5065,6 +5104,14 @@ def train(config: UnifiedTrainingConfig):
                 scaler.update()
             else:
                 optimizer.step()
+
+            # V10.24: Restore LR after variance dampening (temporary per-step reduction)
+            if _pre_dampen_lrs is not None:
+                for pg, orig_lr in zip(optimizer.param_groups, _pre_dampen_lrs):
+                    pg['lr'] = orig_lr
+                    # Also update throttle's tracking so it doesn't snapshot the dampened LR
+                    if '_throttle_applied_lr' in pg:
+                        pg['_throttle_applied_lr'] = orig_lr
 
             # Formula [1331] 9:3 Split: Update gradient scaler warmup schedule
             hgs_metrics = {}
@@ -5528,6 +5575,10 @@ def train(config: UnifiedTrainingConfig):
                         f"Tok/s: {tokens_per_sec:.0f}{mem_str}"
                     )
 
+                    # Gradient norm (tracked every step, logged every log_every)
+                    if 'grad_total_norm' in metrics:
+                        log_msg += f" | GradN: {metrics['grad_total_norm']:.2f}"
+
                     # Add decorr_loss if enabled
                     if 'decorr_loss' in metrics:
                         log_msg += f" | Decorr: {metrics['decorr_loss']:.4f}"
@@ -5893,6 +5944,14 @@ def train(config: UnifiedTrainingConfig):
                         if global_step % 100 == 0:
                             print(f"    ⚠️ [SOVEREIGN] Diagnostic error: {e}", flush=True)
 
+                # TensorBoard: Log gradient norm at log_every cadence for variance visibility
+                if tb_writer is not None and 'grad_total_norm' in metrics:
+                    tb_writer.add_scalar("grad/total_norm", metrics['grad_total_norm'], global_step)
+                    if 'raw_grad_norm' in dir() and raw_grad_norm is not None:
+                        tb_writer.add_scalar("grad/raw_norm_pre_clip", raw_grad_norm, global_step)
+                    if 'variance_dampen' in metrics:
+                        tb_writer.add_scalar("grad/variance_dampen", metrics['variance_dampen'], global_step)
+
                 step_start_time = time.time()
 
             # Evaluation
@@ -5939,7 +5998,10 @@ def train(config: UnifiedTrainingConfig):
 
                 # V9.9.12c: PhaseAttention Health Dashboard (diagnostic only)
                 # Runs at --phase_health_interval (default 500) to reduce log noise
+                # V20: Auto-scaling overrides phase_health_interval from _slot_scaling
                 _ph_interval = getattr(config, 'phase_health_interval', 500)
+                if hasattr(config, '_slot_scaling') and 'phase_health_interval' in config._slot_scaling:
+                    _ph_interval = config._slot_scaling['phase_health_interval']
                 if config.model_type in ('phase', 'hybrid', 'ontological_hybrid') and global_step % _ph_interval == 0:
                     try:
                         enable_health_diagnostics_capture(model, True)
@@ -6939,6 +7001,13 @@ def train(config: UnifiedTrainingConfig):
                     print(f"  --> {adaptive_controller.get_status_string()}")
                 if adaptive_slot_lr is not None:
                     adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # V16.1: Propagate tied coherence floor to slot memory
+                    if config.slot_coherence_floor_tied and adaptive_slot_lr.coherence_floor_initial > 0:
+                        _sm_eval = getattr(model, 'slot_memory', None)
+                        if _sm_eval is None:
+                            _sm_eval = getattr(getattr(model, 'hybrid', model), 'slot_memory', None)
+                        if _sm_eval is not None:
+                            _sm_eval._coherence_floor = adaptive_slot_lr.get_coherence_floor()
                     print(f"  --> {adaptive_slot_lr.get_status_string()}")
 
                 if val_loss < best_val_loss:
@@ -7020,6 +7089,9 @@ def train(config: UnifiedTrainingConfig):
                 if adaptive_slot_lr is not None:
                     adaptive_slot_lr.record_ablation_delta(_slot_delta)
                     _slot_lr_actions = adaptive_slot_lr.update(global_step, warmup_complete=warmup_complete)
+                    # V16.1: Propagate tied coherence floor after ablation-triggered update
+                    if config.slot_coherence_floor_tied and adaptive_slot_lr.coherence_floor_initial > 0:
+                        _sm._coherence_floor = adaptive_slot_lr.get_coherence_floor()
                 # Post-curriculum adaptive alpha: feed ablation % to curriculum
                 if ppl_alpha_curriculum is not None:
                     ppl_alpha_curriculum.update_from_ablation(_slot_pct)
@@ -7420,6 +7492,8 @@ def main():
                        help="EMA learning rate for slot writes (default: 0.1)")
     parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
                        help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+    parser.add_argument("--slot_auto_scale", action="store_true",
+                       help="V20: Auto-derive slot hyperparameters from model size, training budget, and context length")
     parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
                        help="V11.4: Weight for slot-only prediction loss (default: 0.1)")
     parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
@@ -7442,6 +7516,11 @@ def main():
     # V16: Semantic coherence gate
     parser.add_argument("--slot_coherence_floor", type=float, default=None,
                        help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
+    parser.add_argument("--slot_coherence_floor_tied", action="store_true", default=True,
+                       help="V16.1: Tie coherence floor to slot LR scale schedule (default: on)")
+    parser.add_argument("--no_slot_coherence_floor_tied", dest="slot_coherence_floor_tied",
+                       action="store_false",
+                       help="V16.1: Disable tied coherence floor, use independent step-based decay")
     # V10.23: Three-phase proportional slot LR controller (auto-enabled with slot memory)
     # Phase 1 ends automatically when warmup_complete + sufficient signal history
     parser.add_argument("--slot_lr_scale_min", type=float, default=0.1,
@@ -8220,7 +8299,7 @@ def main():
                        help="Alarm threshold for cognitive discontinuity")
 
     # Full Evolutionary Flow System (Phase 2-5)
-    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
+    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=False,
                        help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
                        help="Disable evolutionary flow system")
@@ -8300,7 +8379,7 @@ def main():
                        help="Only ramp when PPL < this (0 = step-based only)")
 
     # CSR Phoneme-Ontological Grounding
-    parser.add_argument("--enable_csr", action="store_true", default=True,
+    parser.add_argument("--enable_csr", action="store_true", default=False,
                        help="Enable CSR phoneme grounding")
     parser.add_argument("--disable_csr", action="store_true",
                        help="Disable CSR phoneme grounding")
@@ -8934,6 +9013,9 @@ def main():
         slot_gate_ceil_margin=getattr(args, 'slot_gate_ceil_margin', None),
         # V16: Semantic coherence gate
         slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
+        slot_coherence_floor_tied=getattr(args, 'slot_coherence_floor_tied', True),
+        # V20: Auto-scaling
+        slot_auto_scale=getattr(args, 'slot_auto_scale', False),
         # V10.23: Three-phase proportional slot LR
         slot_lr_scale_min=getattr(args, 'slot_lr_scale_min', 0.1),
         slot_lr_scale_max=getattr(args, 'slot_lr_scale_max', 0.8),

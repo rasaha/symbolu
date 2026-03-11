@@ -805,6 +805,8 @@ class AdaptiveSlotLRController:
         stabilize_scale_variance_threshold: float = 0.005,  # Auto-freeze when scale variance drops below this
         # History
         history_window: int = 5,
+        # V16.1: Tied coherence floor — derives coherence floor from scale
+        coherence_floor_initial: float = 0.3,
     ):
         self.optimizer = optimizer
         self.current_scale = initial_scale
@@ -819,6 +821,9 @@ class AdaptiveSlotLRController:
         self.stabilize_after_steps = stabilize_after_steps
         self.stabilize_scale_variance_threshold = stabilize_scale_variance_threshold
         self.history_window = history_window
+
+        # V16.1: Tied coherence floor
+        self.coherence_floor_initial = coherence_floor_initial
 
         # State
         self.retr_loss_history: List[float] = []
@@ -1036,6 +1041,27 @@ class AdaptiveSlotLRController:
         self.sync_slot_lr()
         return actions
 
+    def get_coherence_floor(self) -> float:
+        """V16.1: Derive coherence floor from current scale and phase.
+
+        Inversely tracks scale: when scale is low (slots struggling),
+        floor is high (permissive writes). When scale is high (slots
+        thriving), floor drops (strict coherence filtering). Phase 3
+        always returns 0 (fully locked down).
+        """
+        if self.coherence_floor_initial <= 0:
+            return 0.0
+        if self.phase == 3:
+            return 0.0
+        # Normalize scale position within [scale_min, scale_max]
+        scale_range = self.scale_max - self.scale_min
+        if scale_range <= 0:
+            return 0.0
+        scale_frac = (self.current_scale - self.scale_min) / scale_range
+        scale_frac = max(0.0, min(1.0, scale_frac))
+        # Invert: high scale → low floor, low scale → high floor
+        return self.coherence_floor_initial * (1.0 - scale_frac)
+
     def sync_slot_lr(self):
         """Ensure slot param group LR = main_lr * current_scale."""
         if len(self.optimizer.param_groups) < 2:
@@ -1047,8 +1073,9 @@ class AdaptiveSlotLRController:
         health = self._compute_health_score()
         h_str = f"{health:+.3f}" if health is not None else "N/A"
         phase_names = {1: "bootstrap", 2: "adaptive", 3: "stabilized"}
+        coh_floor = self.get_coherence_floor()
         return (f"SlotLR: phase={phase_names[self.phase]} scale={self.current_scale:.4f} "
-                f"health={h_str} updates={self.total_updates}")
+                f"health={h_str} coh_floor={coh_floor:.3f} updates={self.total_updates}")
 
     def state_dict(self) -> Dict[str, Any]:
         return {
@@ -1061,6 +1088,7 @@ class AdaptiveSlotLRController:
             "total_updates": self.total_updates,
             "cumulative_signal": self.cumulative_signal,
             "phase_transitions": self.phase_transitions,
+            "coherence_floor_initial": self.coherence_floor_initial,
         }
 
     def load_state_dict(self, state: Dict[str, Any]):
@@ -1073,3 +1101,4 @@ class AdaptiveSlotLRController:
         self.total_updates = state.get("total_updates", 0)
         self.cumulative_signal = state.get("cumulative_signal", 0.0)
         self.phase_transitions = state.get("phase_transitions", [])
+        self.coherence_floor_initial = state.get("coherence_floor_initial", self.coherence_floor_initial)

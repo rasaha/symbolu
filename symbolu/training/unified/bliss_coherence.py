@@ -414,7 +414,9 @@ class GradientVarianceTracker:
     to detect instability from dual injection paths and coherence feedback.
     """
 
-    def __init__(self, window_size: int = 100, variance_spike_factor: float = 10.0):
+    def __init__(self, window_size: int = 100, variance_spike_factor: float = 10.0,
+                 adaptive_dampen: bool = True, dampen_threshold_layers: int = 3,
+                 dampen_min_factor: float = 0.5, dampen_recovery_rate: float = 0.02):
         self.window_size = window_size
         self.variance_spike_factor = variance_spike_factor
 
@@ -431,6 +433,16 @@ class GradientVarianceTracker:
         # V10.15: Increased from 0.01 to 0.05 so baseline tracks LR warmup
         # faster, preventing false positive spike alerts during warmup phase
         self._baseline_ema_alpha = 0.05
+
+        # V10.24: Adaptive variance dampening — when multiple layers spike
+        # simultaneously, reduce LR to let gradients stabilize before they
+        # cascade into destructive weight updates.
+        self.adaptive_dampen = adaptive_dampen
+        self.dampen_threshold_layers = dampen_threshold_layers  # N layers spiking → engage
+        self.dampen_min_factor = dampen_min_factor  # Floor for LR multiplier
+        self.dampen_recovery_rate = dampen_recovery_rate  # How fast factor recovers per step
+        self._dampen_factor = 1.0  # Current LR multiplier (1.0 = no dampening)
+        self._spiking_layers_count = 0  # Layers spiking this step
 
     def notify_lr_change(self, factor: float):
         """Scale baselines when LR changes abruptly (e.g. LR boost).
@@ -456,7 +468,8 @@ class GradientVarianceTracker:
         return count
 
     @torch.no_grad()
-    def record(self, model: torch.nn.Module, global_step: int = None) -> Dict[str, any]:
+    def record(self, model: torch.nn.Module, global_step: int = None,
+               update_dampen: bool = True) -> Dict[str, any]:
         """
         Record gradient statistics for one training step.
 
@@ -467,16 +480,26 @@ class GradientVarianceTracker:
             global_step: If provided, used for spike timestamps (supports
                          resume where global_step != internal step count).
                          Falls back to internal counter if not provided.
+            update_dampen: If True (default), update adaptive dampening state
+                          based on this model's layers. Set False when recording
+                          auxiliary models (e.g. JEPA projector) so their small
+                          parameter sets don't corrupt the main dampening state.
 
         Returns:
             Dict with gradient health metrics and any spike alerts.
         """
-        self._step += 1
+        # Only increment step counter for primary (dampen-updating) calls
+        # to prevent double-counting when recording auxiliary models.
+        if update_dampen:
+            self._step += 1
         self._global_step = global_step if global_step is not None else self._step
         results = {'step': self._step, 'alerts': []}
 
         total_norm = 0.0
         param_count = 0
+        # V10.24: Track spike status per-layer inline to avoid a second pass
+        spiking_now = 0
+        tracked_with_baseline = 0
 
         for name, param in model.named_parameters():
             if param.grad is None:
@@ -509,6 +532,8 @@ class GradientVarianceTracker:
                 # Set baseline on first full window
                 if name not in self._baseline_variance:
                     self._baseline_variance[name] = max(variance, 1e-10)
+                    # Still count for tracked_with_baseline on next iteration
+                    # (not this one, since we have no baseline to compare against)
                     continue
 
                 baseline = self._baseline_variance[name]
@@ -521,7 +546,14 @@ class GradientVarianceTracker:
                     + self._baseline_ema_alpha * variance
                 )
 
-                if variance > self.variance_spike_factor * baseline:
+                # V10.24: Count spike status inline (replaces separate second pass)
+                is_spiking = variance > self.variance_spike_factor * baseline
+                if update_dampen:
+                    tracked_with_baseline += 1
+                    if is_spiking:
+                        spiking_now += 1
+
+                if is_spiking:
                     # V9.9.1: Rate-limit alerts — at most once per window_size steps per layer
                     # Use internal _step for rate-limiting (monotonic), but store
                     # _global_step in _last_alert_step for cross-domain queries
@@ -549,5 +581,27 @@ class GradientVarianceTracker:
 
         results['total_grad_norm'] = total_norm ** 0.5
         results['param_count'] = param_count
+
+        # V10.24: Adaptive variance dampening — only update for primary model
+        if update_dampen:
+            self._spiking_layers_count = spiking_now
+            results['spiking_layers'] = spiking_now
+            results['tracked_layers'] = tracked_with_baseline
+
+            if self.adaptive_dampen:
+                if spiking_now >= self.dampen_threshold_layers:
+                    # Proportional dampening: more spiking layers → stronger dampening
+                    # Scale: 3 layers → 0.85, 6 layers → 0.70, 10+ → dampen_min_factor
+                    spike_ratio = min(spiking_now / max(tracked_with_baseline, 1), 1.0)
+                    target = max(1.0 - spike_ratio, self.dampen_min_factor)
+                    # Snap down fast (one step), recover slowly
+                    self._dampen_factor = min(self._dampen_factor, target)
+                else:
+                    # Recover gradually toward 1.0
+                    self._dampen_factor = min(
+                        1.0, self._dampen_factor + self.dampen_recovery_rate
+                    )
+
+        results['variance_dampen_factor'] = self._dampen_factor
 
         return results

@@ -183,6 +183,13 @@ class UnifiedTrainingConfig:
     slot_gate_ceil_margin: Optional[float] = None  # Free zone above target before penalty (default: 0.05)
     # V16: Semantic coherence gate — modulates write assignment by value-space coherence
     slot_coherence_floor: Optional[float] = None  # Initial coherence floor (default: 0.3, decays to 0)
+    slot_coherence_floor_tied: bool = True  # V16.1: Tie coherence floor to slot LR scale (default: on)
+
+    # V20: Auto-scaling slot memory — derives slot hyperparameters from model size
+    # and training budget. When enabled, num_global_tokens and step-based schedules
+    # are computed from embed_dim, num_layers, and max_steps instead of using
+    # fixed defaults that only work well for small/medium models.
+    slot_auto_scale: bool = False  # Enable auto-scaling (overrides manual slot defaults)
 
     # V10.23: Three-phase proportional slot LR controller
     # Phase 1 (bootstrap): fixed LR until warmup_complete + sufficient signal history
@@ -599,7 +606,7 @@ class UnifiedTrainingConfig:
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
-    enable_evolutionary_flow: bool = True    # Master switch for evolutionary intelligence
+    enable_evolutionary_flow: bool = False   # Master switch for evolutionary intelligence (opt-in)
     evo_lambda: float = 0.1                  # Overall evolutionary loss weight
     evo_micro_weight: float = 0.3            # Weight for per-gate coherence loss
     evo_meso_weight: float = 0.3             # Weight for cluster coherence loss (Auth/Sens)
@@ -646,7 +653,7 @@ class UnifiedTrainingConfig:
     seq_len_ppl_gate: float = 0.0                 # If > 0, only ramp when PPL < this (0 = step-based only)
 
     # CSR Phoneme-Ontological Grounding
-    enable_csr: bool = True                  # Enable CSR phoneme grounding
+    enable_csr: bool = False                 # Enable CSR phoneme grounding (opt-in)
     csr_lambda: float = 0.1                  # CSR injection strength
     csr_tau: float = 0.07                    # InfoNCE temperature (lower = sharper gradients, 0.07 = 14x amplification)
     csr_use_phase_gating: bool = True        # Gate Phase Attention with CSR confidence
@@ -686,6 +693,10 @@ class UnifiedTrainingConfig:
     enable_12d_health_monitor: bool = True  # Track ontology projection health (SVD, variance, drift)
     health_monitor_interval: int = 100      # Steps between 12D health checks
     enable_gradient_tracker: bool = True    # Track gradient variance & direction stability
+    enable_variance_dampen: bool = True    # V10.24: Adaptive LR dampening on variance spikes
+    variance_dampen_threshold: int = 3     # Min spiking layers to engage dampening
+    variance_dampen_min: float = 0.5       # Floor for variance dampening factor
+    variance_dampen_recovery: float = 0.02 # Recovery rate per step toward 1.0
 
     # Phase 3: Bliss Gating (adaptive λ_eff for CSR injection)
     enable_bliss_gating: bool = False        # Phase 3: Bliss modulates csr_lambda via sigmoid gate
@@ -706,7 +717,7 @@ class UnifiedTrainingConfig:
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
-    enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
+    enable_sgp: bool = False                 # Enable SGP synchronized with Sattvic Controller (opt-in)
     sgp_base_rate: int = 200                 # Base SGP rate (Toroidal Refresh Rate) - every 200 steps
     sgp_stagnation_rate: int = 100           # Rate when stagnation detected - halved from base
     sgp_gamma: float = 0.5                   # Persistence coefficient - was 0.3 (stronger cement)
@@ -1021,6 +1032,218 @@ class UnifiedTrainingConfig:
     mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
 
+    # =========================================================================
+    # V20: AUTO-SCALING SLOT MEMORY
+    # =========================================================================
+    # When slot_auto_scale=True, call compute_slot_scaling() after parsing args
+    # to derive slot hyperparameters from model size and training budget.
+    #
+    # Scaling principles:
+    #   1. Slot count scales with model capacity: more parameters → more slots
+    #      to store distinct associative patterns.
+    #   2. Step-based schedules normalize to training budget: a 50K-step run
+    #      and a 200K-step run should spend the same *fraction* of training
+    #      in bootstrap vs refinement phases.
+    #   3. Write temperature scales with slot count (already in V19).
+    #   4. Gate targets and coherence floors are dimensionless — keep fixed.
+    # =========================================================================
+
+    def compute_slot_scaling(self) -> dict:
+        """
+        V20: Derive slot memory hyperparameters from model size and training budget.
+
+        Call this after config is fully initialized (model_size resolved, max_steps set).
+        Returns a dict of the computed values for logging. Mutates self in-place.
+
+        Parameters that scale with MODEL SIZE (embed_dim, num_layers):
+          num_global_tokens    = embed_dim // 8, rounded to power of 2
+          write_top_k          = max(4, num_slots // 16)
+          global_write_start_layer = int(num_layers * 0.67)  (late-layer writes)
+          global_read_interval = max(1, num_layers // 4)     (maintain ~4 reads)
+          local_layers         = max(2, num_layers // 6)     (early local-only)
+          slot_memory_lr_scale = 0.1 + embed_dim / 5120      (grows with model)
+
+        Parameters that scale with TRAINING BUDGET (max_steps):
+          plasticity_warmup    = max_steps * 0.10
+          plasticity_cooldown  = max_steps * 0.20
+          leak_curriculum      = max_steps * 0.08
+          read_gate_freeze     = max_steps * 0.01
+          coherence_decay      = max_steps * 0.08
+          router_noise_warmup  = max_steps * 0.20
+          sample_every         = max_steps * 0.025
+          phase_health_interval= max_steps * 0.025
+
+        Parameters that scale with CONTEXT LENGTH (max_seq_len):
+          window_size              = min(512, max_seq_len // 4)
+          window_size_high_ppl     = window_size // 2
+          window_size_low_ppl      = window_size
+          ppl_high_threshold       = 500 * (max_seq_len / 1024)  (longer ctx → higher PPL)
+          ppl_low_threshold        = 50 * (max_seq_len / 1024)
+
+        Parameters that DON'T scale (dimensionless ratios / thresholds):
+          slots_write_lr, slot_prediction_loss_weight, slot_coherence_floor,
+          adaptive_max_lr_relative, alpha_phase_ppl_low,
+          learning_rate, adaptive_lr_min, batch_size,
+          gradient_accumulation, log_every
+        """
+        if not self.slot_auto_scale:
+            return {}
+
+        preset = MODEL_PRESETS.get(self.model_size, MODEL_PRESETS["small"])
+        embed_dim = self.n_embd if self.n_embd is not None else preset["embed_dim"]
+        num_layers = self.n_layer if self.n_layer is not None else preset["num_layers"]
+        total_steps = self.max_steps
+
+        # =================================================================
+        # MODEL-SIZE-DEPENDENT PARAMETERS
+        # =================================================================
+
+        # --- Slot count: scales with embed_dim ---
+        # Each slot key lives in embed_dim space. More dimensions →
+        # easier to pack orthogonal keys → more slots without interference.
+        # embed_dim//8 gives: 32(tiny), 64(small), 96(medium), 128(large).
+        num_slots = embed_dim // 8
+        # Round to nearest power of 2 for hardware efficiency
+        num_slots = max(16, 2 ** round(math.log2(num_slots)))
+        self.num_global_tokens = num_slots
+
+        # --- Write top-k: scales with slot count ---
+        # Each token writes to top-k slots. More slots → slightly more writes
+        # per token to maintain coverage, but keep it sparse.
+        # 4 for 64 slots, 8 for 128, 16 for 256.
+        write_top_k = max(4, num_slots // 16)
+
+        # --- Write start layer: late-layer writes ---
+        # Slot memory works best with well-processed representations, not
+        # raw embeddings from early layers. Writing from ~67% through the
+        # network (e.g., layer 8/12 for medium) ensures slots receive
+        # semantically rich features.
+        # Reference: user validated 8/12 for medium = 0.67 ratio.
+        write_start_layer = max(1, int(num_layers * 0.67))
+        self.global_write_start_layer = write_start_layer
+
+        # --- Read interval: maintain ~4 reads across the network ---
+        # For 12 layers with interval=3, that's 4 read opportunities.
+        # Scaling to more layers should maintain similar read density.
+        # Reference: user validated interval=3 for 12 layers.
+        read_interval = max(1, num_layers // 4)
+        self.global_read_interval = read_interval
+
+        # --- Local layers: early local-only layers ---
+        # First N layers use local attention only for fast syntactic
+        # pattern learning before hybrid phase+local kicks in.
+        # ~17% of layers (2/12 for medium, 3/16 for large).
+        # Reference: user validated 2 for 12 layers.
+        local_layers = max(2, num_layers // 6)
+        self.local_layers = local_layers
+
+        # --- LR scale: larger models need higher slot LR ---
+        # Larger models have stronger backbone gradients that dominate the
+        # slot parameter group. Linear scale: 0.1 + embed_dim/7680.
+        # Gives: 0.13(tiny/256), 0.17(small/512), 0.20(medium/768), 0.23(large/1024).
+        # Anchored at 0.2 for medium/768 (validated by user).
+        slot_lr_scale = round(0.1 + embed_dim / 7680, 3)
+        slot_lr_scale = max(0.1, min(0.5, slot_lr_scale))  # Clamp [0.1, 0.5]
+        self.slot_memory_lr_scale = slot_lr_scale
+
+        # =================================================================
+        # TRAINING-BUDGET-DEPENDENT PARAMETERS (fractions of max_steps)
+        # =================================================================
+
+        # Plasticity schedule: bootstrap (high write_lr) for 10% of training,
+        # then cool down over the next 10% to refinement write_lr.
+        plasticity_warmup_end = max(500, int(total_steps * 0.10))
+        plasticity_cooldown_end = max(1000, int(total_steps * 0.20))
+
+        # Soft detach leak curriculum: reach full LM gradient by 8% of training.
+        # Shorter than plasticity because gradient flow is more urgent.
+        leak_curriculum_steps = max(500, int(total_steps * 0.08))
+
+        # Read gate freeze: force gate open for 1% of training.
+        # Just long enough to establish slot-backbone coupling.
+        read_gate_freeze_steps = max(100, int(total_steps * 0.01))
+
+        # Coherence floor decay: loosen bootstrap coherence over 8% of training.
+        coherence_floor_decay_steps = max(500, int(total_steps * 0.08))
+
+        # Router noise warmup: maintain diversity pressure for 20% of training.
+        router_noise_warmup = max(1000, int(total_steps * 0.20))
+
+        # Sample generation interval: ~2.5% of training → ~40 samples total.
+        # Reference: user uses 500 for 20K steps = 2.5%.
+        sample_every = max(50, int(total_steps * 0.025))
+        self.sample_every = sample_every
+
+        # Phase health diagnostics interval: same cadence as sampling.
+        # Reference: user uses 500 for 20K steps = 2.5%.
+        phase_health_interval = max(50, int(total_steps * 0.025))
+
+        # =================================================================
+        # CONTEXT-LENGTH-DEPENDENT PARAMETERS
+        # =================================================================
+
+        ctx_len = self.max_seq_len
+
+        # --- Window size: ~25% of context length, capped at 512 ---
+        # Local attention window should cover enough context for syntactic
+        # patterns without blowing up memory. 256 is right for 1024-ctx,
+        # but undersized for 4096+. Cap at 512 for VRAM safety.
+        # Reference: optimize_training.py uses min(512, target_context // 4).
+        window_size = min(512, ctx_len // 4)
+        window_size = max(64, window_size)  # Floor at 64 for very short contexts
+        self.window_size = window_size
+
+        # --- Adaptive window endpoints scale with window_size ---
+        # High-PPL (early training): half the base window for fast phase learning.
+        # Low-PPL (converged): full base window for richer local context.
+        self.window_size_high_ppl = max(64, window_size // 2)
+        self.window_size_low_ppl = window_size
+
+        # --- PPL thresholds: scale with context length ---
+        # Longer sequences produce higher perplexity (more tokens to predict).
+        # Fixed thresholds (100/1000) are calibrated for ~1024 context.
+        # Scale linearly: 2048-ctx sees ~2x the PPL of 1024-ctx for the same
+        # model quality, so thresholds should shift proportionally.
+        ctx_ratio = ctx_len / 1024.0
+        self.ppl_high_threshold = round(500.0 * ctx_ratio, 1)
+        self.ppl_low_threshold = round(50.0 * ctx_ratio, 1)
+
+        # =================================================================
+        # BUILD SCALING DICT
+        # =================================================================
+        scaling = {
+            # Model-size-dependent
+            "num_slots": num_slots,
+            "write_top_k": write_top_k,
+            "write_start_layer": write_start_layer,
+            "read_interval": read_interval,
+            "local_layers": local_layers,
+            "slot_lr_scale": slot_lr_scale,
+            # Training-budget-dependent
+            "plasticity_warmup_end": plasticity_warmup_end,
+            "plasticity_cooldown_end": plasticity_cooldown_end,
+            "leak_curriculum_steps": leak_curriculum_steps,
+            "read_gate_freeze_steps": read_gate_freeze_steps,
+            "coherence_floor_decay_steps": coherence_floor_decay_steps,
+            "router_noise_warmup": router_noise_warmup,
+            "sample_every": sample_every,
+            "phase_health_interval": phase_health_interval,
+            # Context-length-dependent
+            "window_size": window_size,
+            "window_size_high_ppl": self.window_size_high_ppl,
+            "window_size_low_ppl": self.window_size_low_ppl,
+            "ppl_high_threshold": self.ppl_high_threshold,
+            "ppl_low_threshold": self.ppl_low_threshold,
+            # Context (for diagnostics)
+            "embed_dim": embed_dim,
+            "num_layers": num_layers,
+            "total_steps": total_steps,
+            "context_length": ctx_len,
+        }
+        # Attach to config so training loop and SlotMemoryGCT can access it
+        self._slot_scaling = scaling
+        return scaling
+
 
 # Model size presets
 MODEL_PRESETS = {
@@ -1093,7 +1316,7 @@ def build_srk_config_from_legacy(args, config: 'UnifiedTrainingConfig') -> Tuple
     # Auto-detect if legacy flags should trigger SRK
     legacy_triggers = {
         'enable_onto_bridge': getattr(args, 'enable_onto_bridge', False),
-        'enable_csr': getattr(args, 'enable_csr', True) and not getattr(args, 'disable_csr', False),
+        'enable_csr': getattr(args, 'enable_csr', False) and not getattr(args, 'disable_csr', False),
         'enable_kosha_steering': getattr(args, 'enable_kosha_steering', False),
         'enable_toroidal_bridge': getattr(args, 'enable_toroidal_bridge', False),
         'enable_sovereign_loss': getattr(args, 'enable_sovereign_loss', False),
