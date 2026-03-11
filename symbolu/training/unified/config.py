@@ -605,7 +605,7 @@ class UnifiedTrainingConfig:
 
     # Full Evolutionary Flow System (Phase 2: All Layer Transitions)
     # Extends Toroidal Bridge to ALL layer transitions with Delayed Resonance
-    enable_evolutionary_flow: bool = True    # Master switch for evolutionary intelligence
+    enable_evolutionary_flow: bool = False   # Master switch for evolutionary intelligence (opt-in)
     evo_lambda: float = 0.1                  # Overall evolutionary loss weight
     evo_micro_weight: float = 0.3            # Weight for per-gate coherence loss
     evo_meso_weight: float = 0.3             # Weight for cluster coherence loss (Auth/Sens)
@@ -652,7 +652,7 @@ class UnifiedTrainingConfig:
     seq_len_ppl_gate: float = 0.0                 # If > 0, only ramp when PPL < this (0 = step-based only)
 
     # CSR Phoneme-Ontological Grounding
-    enable_csr: bool = True                  # Enable CSR phoneme grounding
+    enable_csr: bool = False                 # Enable CSR phoneme grounding (opt-in)
     csr_lambda: float = 0.1                  # CSR injection strength
     csr_tau: float = 0.07                    # InfoNCE temperature (lower = sharper gradients, 0.07 = 14x amplification)
     csr_use_phase_gating: bool = True        # Gate Phase Attention with CSR confidence
@@ -716,7 +716,7 @@ class UnifiedTrainingConfig:
 
     # SGP (Stochastic Gradient Persistence) - "Cement" for CSR structure
     # V9.6.8: Updated defaults per Gemini recommendation (stronger cement, less frequent)
-    enable_sgp: bool = True                  # Enable SGP synchronized with Sattvic Controller
+    enable_sgp: bool = False                 # Enable SGP synchronized with Sattvic Controller (opt-in)
     sgp_base_rate: int = 200                 # Base SGP rate (Toroidal Refresh Rate) - every 200 steps
     sgp_stagnation_rate: int = 100           # Rate when stagnation detected - halved from base
     sgp_gamma: float = 0.5                   # Persistence coefficient - was 0.3 (stronger cement)
@@ -1315,7 +1315,7 @@ def build_srk_config_from_legacy(args, config: 'UnifiedTrainingConfig') -> Tuple
     # Auto-detect if legacy flags should trigger SRK
     legacy_triggers = {
         'enable_onto_bridge': getattr(args, 'enable_onto_bridge', False),
-        'enable_csr': getattr(args, 'enable_csr', True) and not getattr(args, 'disable_csr', False),
+        'enable_csr': getattr(args, 'enable_csr', False) and not getattr(args, 'disable_csr', False),
         'enable_kosha_steering': getattr(args, 'enable_kosha_steering', False),
         'enable_toroidal_bridge': getattr(args, 'enable_toroidal_bridge', False),
         'enable_sovereign_loss': getattr(args, 'enable_sovereign_loss', False),

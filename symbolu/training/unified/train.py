@@ -8272,7 +8272,7 @@ def main():
                        help="Alarm threshold for cognitive discontinuity")
 
     # Full Evolutionary Flow System (Phase 2-5)
-    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
+    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=False,
                        help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
                        help="Disable evolutionary flow system")
@@ -8352,7 +8352,7 @@ def main():
                        help="Only ramp when PPL < this (0 = step-based only)")
 
     # CSR Phoneme-Ontological Grounding
-    parser.add_argument("--enable_csr", action="store_true", default=True,
+    parser.add_argument("--enable_csr", action="store_true", default=False,
                        help="Enable CSR phoneme grounding")
     parser.add_argument("--disable_csr", action="store_true",
                        help="Disable CSR phoneme grounding")
