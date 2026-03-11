@@ -201,7 +201,14 @@ def load_data(
 
             # Static WikiText datasets
             if config.dataset == "wikitext103":
-                ds = load_dataset("wikitext", "wikitext-103-v1")
+                try:
+                    ds = load_dataset("wikitext", "wikitext-103-v1")
+                except Exception as e:
+                    if "No space left on device" in str(e) or "Errno 28" in str(e):
+                        print(f"  ⚠️  WikiText-103 failed (disk full), falling back to WikiText-2...")
+                        ds = load_dataset("wikitext", "wikitext-2-v1")
+                    else:
+                        raise
             else:
                 ds = load_dataset("wikitext", "wikitext-2-v1")
 
