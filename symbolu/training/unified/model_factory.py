@@ -111,6 +111,19 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     ff_dim = int(embed_dim * 4)  # Standard 4x expansion for FFN
     n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else None  # None = use num_heads
 
+    # V20: Compute auto-scaling for slot memory if enabled
+    slot_scaling = None
+    if config.slot_auto_scale and config.global_tokens_enabled:
+        slot_scaling = config.compute_slot_scaling()
+        print(f"  Slot Auto-Scale: ENABLED")
+        print(f"    num_slots={slot_scaling['num_slots']}, write_top_k={slot_scaling['write_top_k']}")
+        print(f"    plasticity_warmup={slot_scaling['plasticity_warmup_end']}, "
+              f"cooldown={slot_scaling['plasticity_cooldown_end']}")
+        print(f"    leak_curriculum={slot_scaling['leak_curriculum_steps']}, "
+              f"read_gate_freeze={slot_scaling['read_gate_freeze_steps']}")
+        print(f"    slot_lr_scale={slot_scaling['slot_lr_scale']}, "
+              f"write_start_layer={slot_scaling['write_start_layer']}")
+
     # Validate embed_dim / num_heads divisibility
     if embed_dim % num_heads != 0:
         raise ValueError(
@@ -218,6 +231,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             retrieval_loss_weight=config.retrieval_loss_weight,
             global_read_interval=config.global_read_interval,
             global_write_start_layer=config.global_write_start_layer,
+            slot_scaling=slot_scaling,  # V20: Auto-scaling overrides
         )
         print(f"  Hybrid Cosine Mode: {config.cosine_mode}")  # V9.6.12: Log mode
         print(f"  Hybrid Decay Gamma: {config.decay_gamma}")  # V9.6.13: Log decay
@@ -361,6 +375,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             retrieval_loss_weight=config.retrieval_loss_weight,
             global_read_interval=config.global_read_interval,
             global_write_start_layer=config.global_write_start_layer,
+            slot_scaling=slot_scaling,  # V20: Auto-scaling overrides
         )
         print(f"\n  [Ontological Hybrid] Two-Tier AGI Architecture enabled (V11.0.0: Separated Planes)")
         print(f"    Full Sovereign State: {config.state_dim}D (diagnostics/control/learning)")

@@ -184,6 +184,12 @@ class UnifiedTrainingConfig:
     # V16: Semantic coherence gate — modulates write assignment by value-space coherence
     slot_coherence_floor: Optional[float] = None  # Initial coherence floor (default: 0.3, decays to 0)
 
+    # V20: Auto-scaling slot memory — derives slot hyperparameters from model size
+    # and training budget. When enabled, num_global_tokens and step-based schedules
+    # are computed from embed_dim, num_layers, and max_steps instead of using
+    # fixed defaults that only work well for small/medium models.
+    slot_auto_scale: bool = False  # Enable auto-scaling (overrides manual slot defaults)
+
     # V10.23: Three-phase proportional slot LR controller
     # Phase 1 (bootstrap): fixed LR until warmup_complete + sufficient signal history
     # Phase 2 (adaptive): continuous proportional control via LR *= e^(eta * health_score)
@@ -1024,6 +1030,124 @@ class UnifiedTrainingConfig:
     mistral_device_map: str = "auto"                        # Device placement strategy
     mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
+
+    # =========================================================================
+    # V20: AUTO-SCALING SLOT MEMORY
+    # =========================================================================
+    # When slot_auto_scale=True, call compute_slot_scaling() after parsing args
+    # to derive slot hyperparameters from model size and training budget.
+    #
+    # Scaling principles:
+    #   1. Slot count scales with model capacity: more parameters → more slots
+    #      to store distinct associative patterns.
+    #   2. Step-based schedules normalize to training budget: a 50K-step run
+    #      and a 200K-step run should spend the same *fraction* of training
+    #      in bootstrap vs refinement phases.
+    #   3. Write temperature scales with slot count (already in V19).
+    #   4. Gate targets and coherence floors are dimensionless — keep fixed.
+    # =========================================================================
+
+    def compute_slot_scaling(self) -> dict:
+        """
+        V20: Derive slot memory hyperparameters from model size and training budget.
+
+        Call this after config is fully initialized (model_size resolved, max_steps set).
+        Returns a dict of the computed values for logging. Mutates self in-place.
+
+        Scaling rules:
+          num_global_tokens  = embed_dim // 8   (32 for tiny, 64 for small, 96 for medium, 128 for large)
+          write_top_k        = max(4, num_slots // 16)
+          plasticity_warmup  = max_steps * 0.10  (10% of training)
+          plasticity_cooldown= max_steps * 0.20  (20% of training)
+          leak_curriculum    = max_steps * 0.08  (8% of training)
+          read_gate_freeze   = max_steps * 0.01  (1% of training)
+          coherence_decay    = max_steps * 0.08  (8% of training)
+          router_noise_warmup= max_steps * 0.20  (20% of training)
+          slot_memory_lr_scale = 0.1 for <=512D, 0.15 for 768D, 0.2 for >=1024D
+        """
+        if not self.slot_auto_scale:
+            return {}
+
+        preset = MODEL_PRESETS.get(self.model_size, MODEL_PRESETS["small"])
+        embed_dim = self.n_embd if self.n_embd is not None else preset["embed_dim"]
+        num_layers = self.n_layer if self.n_layer is not None else preset["num_layers"]
+        total_steps = self.max_steps
+
+        # --- Slot count: scales with embed_dim ---
+        # Rationale: each slot key lives in embed_dim space. More dimensions →
+        # easier to pack orthogonal keys → can support more slots without
+        # interference. embed_dim//8 gives: 32(tiny), 64(small), 96(medium), 128(large).
+        num_slots = embed_dim // 8
+        # Round to nearest power of 2 for hardware efficiency
+        num_slots = max(16, 2 ** round(math.log2(num_slots)))
+        self.num_global_tokens = num_slots
+
+        # --- Write top-k: scales with slot count ---
+        # Each token writes to top-k slots. With more slots, allow slightly
+        # more writes per token to maintain coverage, but keep it sparse.
+        # 4 for 64 slots, 8 for 128, 16 for 256.
+        write_top_k = max(4, num_slots // 16)
+
+        # --- Step-based schedules: normalize to training budget ---
+        # All expressed as fractions of max_steps so they work at any scale.
+
+        # Plasticity schedule: bootstrap (high write_lr) for 10% of training,
+        # then cool down over the next 10% to refinement write_lr.
+        plasticity_warmup_end = max(500, int(total_steps * 0.10))
+        plasticity_cooldown_end = max(1000, int(total_steps * 0.20))
+
+        # Soft detach leak curriculum: reach full LM gradient by 8% of training.
+        # Shorter than plasticity because gradient flow is more urgent.
+        leak_curriculum_steps = max(500, int(total_steps * 0.08))
+
+        # Read gate freeze: force gate open for 1% of training.
+        # Just long enough to establish slot-backbone coupling.
+        read_gate_freeze_steps = max(100, int(total_steps * 0.01))
+
+        # Coherence floor decay: loosen bootstrap coherence over 8% of training.
+        coherence_floor_decay_steps = max(500, int(total_steps * 0.08))
+
+        # Router noise warmup: maintain diversity pressure for 20% of training.
+        router_noise_warmup = max(1000, int(total_steps * 0.20))
+
+        # --- LR scale: larger models need slightly higher slot LR ---
+        # Larger models have stronger backbone gradients that dominate the slot
+        # parameter group. A higher multiplier compensates.
+        if embed_dim <= 512:
+            slot_lr_scale = 0.1
+        elif embed_dim <= 768:
+            slot_lr_scale = 0.15
+        else:
+            slot_lr_scale = 0.2
+        self.slot_memory_lr_scale = slot_lr_scale
+
+        # --- Write start layer: skip earliest layers (they do tokenization) ---
+        # Start writing from ~25% through the network so slot content
+        # reflects intermediate representations, not raw embeddings.
+        write_start_layer = max(0, num_layers // 4)
+        self.global_write_start_layer = write_start_layer
+
+        # Store computed values for SlotMemoryGCT to consume
+        # These are passed via a dict attached to config, since SlotMemoryGCT
+        # constructor doesn't take all these directly.
+        scaling = {
+            "num_slots": num_slots,
+            "write_top_k": write_top_k,
+            "plasticity_warmup_end": plasticity_warmup_end,
+            "plasticity_cooldown_end": plasticity_cooldown_end,
+            "leak_curriculum_steps": leak_curriculum_steps,
+            "read_gate_freeze_steps": read_gate_freeze_steps,
+            "coherence_floor_decay_steps": coherence_floor_decay_steps,
+            "router_noise_warmup": router_noise_warmup,
+            "slot_lr_scale": slot_lr_scale,
+            "write_start_layer": write_start_layer,
+            "embed_dim": embed_dim,
+            "num_layers": num_layers,
+            "total_steps": total_steps,
+        }
+        # Attach to config so training loop and SlotMemoryGCT can access it
+        self._slot_scaling = scaling
+        return scaling
 
 
 # Model size presets

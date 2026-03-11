@@ -6751,6 +6751,7 @@ class HybridPhaseTransformer(nn.Module):
         # V11: Slot memory experiment — read interval and late-layer writes
         global_read_interval: int = 1,  # Read slots every N layers (1 = every layer)
         global_write_start_layer: int = 0,  # Only write to slots from this layer onward
+        slot_scaling: Optional[dict] = None,  # V20: Auto-scaling overrides
     ):
         super().__init__()
 
@@ -6879,6 +6880,7 @@ class HybridPhaseTransformer(nn.Module):
                     write_lr=slots_write_lr,
                     dropout=dropout,
                     vocab_size=vocab_size,
+                    scaling=slot_scaling,  # V20: Auto-scaling overrides
                 )
                 # No legacy GCT modules needed — slot_memory handles everything
                 self.global_tokens = None  # Slots init is inside SlotMemoryGCT
@@ -7902,6 +7904,7 @@ class OntologicalHybridTransformer(nn.Module):
         # V11: Slot memory experiment
         global_read_interval: int = 1,
         global_write_start_layer: int = 0,
+        slot_scaling: Optional[dict] = None,  # V20: Auto-scaling overrides
     ):
         super().__init__()
 
@@ -7936,6 +7939,7 @@ class OntologicalHybridTransformer(nn.Module):
             retrieval_loss_weight=retrieval_loss_weight,
             global_read_interval=global_read_interval,
             global_write_start_layer=global_write_start_layer,
+            slot_scaling=slot_scaling,  # V20: Auto-scaling overrides
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
@@ -8485,6 +8489,7 @@ class SlotMemoryGCT(nn.Module):
         write_key_dim: Optional[int] = None,
         write_top_k: int = 4,
         vocab_size: int = 50257,
+        scaling: Optional[dict] = None,  # V20: Auto-scaling overrides from config.compute_slot_scaling()
     ):
         super().__init__()
         self.num_slots = num_slots
@@ -8493,6 +8498,9 @@ class SlotMemoryGCT(nn.Module):
         # Controller optimizer can adjust it via gradients, in addition to the
         # existing manual adaptive schedule.
         self.write_lr = nn.Parameter(torch.tensor(0.5))
+        # V20: Apply auto-scaling overrides if provided
+        if scaling is not None:
+            write_top_k = scaling.get("write_top_k", write_top_k)
         self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
         _key_dim = write_key_dim or embed_dim
 
@@ -8795,6 +8803,37 @@ class SlotMemoryGCT(nn.Module):
         self._coherence_floor_min = 0.0      # Final floor after warmup
         self._coherence_floor_decay_steps = 4000  # Steps to decay floor to min
         self._diag_coherence_mean: float = 0.0  # Mean coherence score
+
+        # --- V20: Auto-scaling overrides ---
+        # When scaling dict is provided (from config.compute_slot_scaling()),
+        # override all step-based schedules to be proportional to training budget.
+        # Dimensionless targets (gate_target, H_target, etc.) are NOT overridden
+        # because they don't depend on model size or training length.
+        if scaling is not None:
+            _total = scaling.get("total_steps", 10000)
+            # Plasticity schedule
+            self._plasticity_warmup_end = scaling.get(
+                "plasticity_warmup_end", max(500, int(_total * 0.10)))
+            self._plasticity_cooldown_end = scaling.get(
+                "plasticity_cooldown_end", max(1000, int(_total * 0.20)))
+            # Soft detach leak curriculum
+            self._leak_curriculum_steps = scaling.get(
+                "leak_curriculum_steps", max(500, int(_total * 0.08)))
+            # Read gate freeze
+            self._read_gate_freeze_steps = scaling.get(
+                "read_gate_freeze_steps", max(100, int(_total * 0.01)))
+            # Coherence floor decay
+            self._coherence_floor_decay_steps = scaling.get(
+                "coherence_floor_decay_steps", max(500, int(_total * 0.08)))
+            # Router noise warmup
+            self._router_noise_warmup = scaling.get(
+                "router_noise_warmup", max(1000, int(_total * 0.20)))
+            # Constraint relaxation interval scales too — check more often
+            # in short runs, less often in long runs
+            self._constraint_relax_interval = max(100, int(_total * 0.01))
+            self._gate_adapt_window = max(50, int(_total * 0.005))
+            # Store scaling dict for diagnostics
+            self._scaling_config = scaling
 
         # --- Diagnostics ---
         self._diag_write_gate_mean = None
