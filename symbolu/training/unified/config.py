@@ -1022,6 +1022,12 @@ class UnifiedTrainingConfig:
     cg_curriculum_stage_proportions: str = "0.30,0.20,0.25,0.25"  # Stage A,B,C,D proportions
     enable_cg_diagnostics: bool = False             # Enable governance diagnostics tracking
 
+    # Phase 5+: Embedding Diagnostics — verify CG auxiliaries change representations
+    enable_embedding_diagnostics: bool = False      # Master toggle for embedding drift tracking
+    embedding_diag_interval: int = 200              # Steps between diagnostic snapshots
+    embedding_diag_vocab_sample: int = 1000         # Vocab tokens to sample for drift metrics
+    embedding_diag_neighbors: int = 20              # Nearest neighbors to track for stability
+
     # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules

@@ -2361,6 +2361,23 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
 
+    # Embedding Diagnostics — verify CG auxiliaries are changing representations
+    cg_embedding_diag = None
+    if config.enable_conscious_generation and config.enable_embedding_diagnostics:
+        try:
+            from symbolu.training.conscious_generation.diagnostics.embedding_diagnostics import EmbeddingDiagnostics
+            cg_embedding_diag = EmbeddingDiagnostics(
+                interval=config.embedding_diag_interval,
+                vocab_sample_size=config.embedding_diag_vocab_sample,
+                neighbor_k=config.embedding_diag_neighbors,
+            )
+            print(f"\n  [Embedding Diagnostics] ENABLED")
+            print(f"    Snapshot interval: every {config.embedding_diag_interval} steps")
+            print(f"    Vocab sample: {config.embedding_diag_vocab_sample} tokens")
+            print(f"    Neighbor tracking: top-{config.embedding_diag_neighbors}")
+        except ImportError as e:
+            print(f"  [Embedding Diagnostics] Import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -4939,6 +4956,30 @@ def train(config: UnifiedTrainingConfig):
                                 for _sk, _sv in _cg_stage_diag.items():
                                     if isinstance(_sv, (int, float)):
                                         metrics[_sk] = _sv
+
+                            # Embedding diagnostics: snapshot and log drift metrics
+                            if cg_embedding_diag is not None:
+                                _ed_cache = model.conscious_gen.get('token_cache', None) if hasattr(model, 'conscious_gen') else None
+                                _ed_model = getattr(model, 'module', model)  # unwrap DDP if needed
+                                _ed_metrics = cg_embedding_diag.snapshot(
+                                    model=_ed_model,
+                                    global_step=global_step,
+                                    token_cache=_ed_cache,
+                                )
+                                if _ed_metrics is not None:
+                                    print(cg_embedding_diag.format_console_log(_ed_metrics))
+                                    # TensorBoard logging
+                                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                        for _ek, _ev in _ed_metrics.items():
+                                            if isinstance(_ev, (int, float)) and _ek != 'step':
+                                                writer.add_scalar(f'embedding_diag/{_ek}', _ev, global_step)
+                                    # Trend summary every 5 snapshots
+                                    if len(cg_embedding_diag.history) % 5 == 0 and len(cg_embedding_diag.history) >= 2:
+                                        _ed_trend = cg_embedding_diag.get_trend_summary()
+                                        _ed_trend_parts = [f"  [EMBED-TREND]"]
+                                        for _tk, _tv in _ed_trend.items():
+                                            _ed_trend_parts.append(f"    {_tk}: {_tv}")
+                                        print("\n".join(_ed_trend_parts))
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -8898,6 +8939,16 @@ def main():
                        help="Stage A,B,C,D proportions (comma-separated, must sum to 1.0)")
     parser.add_argument("--enable_cg_diagnostics", action="store_true",
                        help="Enable governance diagnostics tracking")
+
+    # Embedding diagnostics — verify CG auxiliaries are changing representations
+    parser.add_argument("--enable_embedding_diagnostics", action="store_true",
+                       help="Track embedding drift to verify CG auxiliaries change the model meaningfully")
+    parser.add_argument("--embedding_diag_interval", type=int, default=200,
+                       help="Steps between embedding diagnostic snapshots")
+    parser.add_argument("--embedding_diag_vocab_sample", type=int, default=1000,
+                       help="Number of vocab tokens to sample for drift metrics")
+    parser.add_argument("--embedding_diag_neighbors", type=int, default=20,
+                       help="Nearest neighbors to track for embedding stability")
 
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
