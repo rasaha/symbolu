@@ -1595,7 +1595,7 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.8.9: Initialize DWS window from resumed PPL if resuming
     if config.resume and best_val_loss < float('inf') and dynamic_window_scheduler is not None:
-        resumed_ppl = math.exp(best_val_loss)
+        resumed_ppl = math.exp(min(best_val_loss, 20))
         initial_window = dynamic_window_scheduler.set_initial_window_from_ppl(resumed_ppl)
         print(f"  ✓ DWS Window Initialized: {initial_window} (PPL={resumed_ppl:.1f})")
 
@@ -5387,7 +5387,7 @@ def train(config: UnifiedTrainingConfig):
                     'loss': avg_loss,
                     'coherence': metrics.get('coherence', 0.5),
                     'entropy': metrics.get('onto_entropy', metrics.get('entropy', 0.5)),
-                    'ppl': metrics.get('ppl', math.exp(avg_loss)),
+                    'ppl': metrics.get('ppl', math.exp(min(avg_loss, 20))),
                     'sa_deviation': abs(current_sa_ratio - 0.15) if current_sa_ratio > 0 else 0.0,
                     'sa_ratio': current_sa_ratio,
                 }
@@ -7346,7 +7346,7 @@ def train(config: UnifiedTrainingConfig):
     print(f"{'='*70}")
     print(f"  Total Steps: {global_step:,}")
     print(f"  Best Val Loss: {best_val_loss:.4f}")
-    print(f"  Best Val PPL: {math.exp(best_val_loss):.2f}")
+    print(f"  Best Val PPL: {math.exp(min(best_val_loss, 20)):.2f}")
     if authority_controller is not None:
         print(f"  Final Authority: {authority_controller.A:.3f}")
     if not config.no_save:
