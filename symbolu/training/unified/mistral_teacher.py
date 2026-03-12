@@ -49,30 +49,54 @@ class MistralTeacher(nn.Module):
 
     def _load_mistral(self, model_name, quantize, device_map, trust_remote_code):
         """Load Mistral with optional quantization."""
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+        except ImportError:
+            raise ImportError(
+                "transformers package required for distillation. "
+                "Install with: pip install transformers"
+            )
 
         load_kwargs = {
+            "device_map": device_map,
             "trust_remote_code": trust_remote_code,
-            "torch_dtype": torch.float16,
+            "torch_dtype": torch.bfloat16,
         }
 
-        if quantize == "4bit":
-            from transformers import BitsAndBytesConfig
-            load_kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-            )
-            load_kwargs["device_map"] = device_map
-        elif quantize == "8bit":
-            from transformers import BitsAndBytesConfig
-            load_kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_8bit=True,
-            )
-            load_kwargs["device_map"] = device_map
-        else:
-            load_kwargs["device_map"] = device_map
+        if quantize in ("4bit", "8bit"):
+            try:
+                from transformers import BitsAndBytesConfig
+                import bitsandbytes as _bnb  # noqa: F401
+            except ImportError:
+                raise ImportError(
+                    "bitsandbytes required for quantization. "
+                    "Install with: pip install -U bitsandbytes>=0.46.1"
+                )
+            if quantize == "4bit":
+                load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                )
+            else:
+                load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                )
+
+        # PyTorch < 2.1 lacks set_submodule, required by transformers' bnb integration
+        if not hasattr(torch.nn.Module, "set_submodule"):
+            def _set_submodule(self_mod, target, module):
+                atoms = target.split(".")
+                mod = self_mod
+                for item in atoms[:-1]:
+                    mod = getattr(mod, item)
+                setattr(mod, atoms[-1], module)
+            torch.nn.Module.set_submodule = _set_submodule
+
+        print(f"  Loading Mistral teacher: {model_name}")
+        print(f"  Quantization: {quantize or 'none (bf16)'}")
+        print(f"  Device map: {device_map}")
 
         backbone = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
         tokenizer = AutoTokenizer.from_pretrained(
