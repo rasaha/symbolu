@@ -524,6 +524,42 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # For mistral_cg, use the backbone's own tokenizer so token IDs match
+    # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
+    if config.model_type == "mistral_cg" and hasattr(model, "tokenizer") and model.tokenizer is not None:
+        tokenizer = model.tokenizer
+        tokenizer.model_max_length = int(1e12)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        config.vocab_size = len(tokenizer)
+        print(f"  [Mistral CG] Using Mistral tokenizer (vocab_size={config.vocab_size})")
+
+    # Knowledge Distillation: Load frozen Mistral teacher
+    mistral_teacher = None
+    distill_tokenizer = None
+    if config.distill_from_mistral:
+        if config.model_type == "mistral_cg":
+            print("  [Distillation] WARNING: distill_from_mistral with model_type=mistral_cg "
+                  "is redundant — Mistral is already the backbone. Skipping teacher.")
+        else:
+            from symbolu.training.unified.mistral_teacher import MistralTeacher
+            quantize = config.mistral_quantize if config.mistral_quantize != "none" else None
+            mistral_teacher = MistralTeacher(
+                model_name=config.mistral_model_name,
+                quantize=quantize,
+                device_map=config.mistral_device_map,
+                trust_remote_code=config.mistral_trust_remote_code,
+            )
+            mistral_teacher.eval()
+            mistral_teacher.print_summary()
+            distill_tokenizer = mistral_teacher.tokenizer
+            if distill_tokenizer.pad_token is None:
+                distill_tokenizer.pad_token = distill_tokenizer.eos_token
+            print(f"    Temperature: {config.distill_temperature}")
+            print(f"    Alpha (KD weight): {config.distill_alpha}")
+            if config.distill_warmup_steps > 0:
+                print(f"    CE-only warmup: {config.distill_warmup_steps} steps")
+
     # V11: Disable/reset adaptive constraint relaxation if requested
     if config.global_tokens_enabled:
         _sm = getattr(model, 'slot_memory', None)
@@ -1559,7 +1595,7 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.8.9: Initialize DWS window from resumed PPL if resuming
     if config.resume and best_val_loss < float('inf') and dynamic_window_scheduler is not None:
-        resumed_ppl = math.exp(best_val_loss)
+        resumed_ppl = math.exp(min(best_val_loss, 20))
         initial_window = dynamic_window_scheduler.set_initial_window_from_ppl(resumed_ppl)
         print(f"  ✓ DWS Window Initialized: {initial_window} (PPL={resumed_ppl:.1f})")
 
@@ -2351,6 +2387,48 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
 
+    # Embedding Diagnostics — verify CG auxiliaries are changing representations
+    cg_embedding_diag = None
+    if config.enable_conscious_generation and config.enable_embedding_diagnostics:
+        try:
+            from symbolu.training.conscious_generation.diagnostics.embedding_diagnostics import EmbeddingDiagnostics
+            cg_embedding_diag = EmbeddingDiagnostics(
+                interval=config.embedding_diag_interval,
+                vocab_sample_size=config.embedding_diag_vocab_sample,
+                neighbor_k=config.embedding_diag_neighbors,
+                no_samples=config.embedding_diag_no_samples,
+                start_step=config.embedding_diag_start_step,
+            )
+            print(f"\n  [Embedding Diagnostics] ENABLED")
+            print(f"    Snapshot interval: every {config.embedding_diag_interval} steps")
+            if config.embedding_diag_no_samples:
+                print(f"    Vocab sampling: DISABLED (grad norms + adapter gate only)")
+            else:
+                print(f"    Vocab sample: {config.embedding_diag_vocab_sample} tokens")
+                print(f"    Neighbor tracking: top-{config.embedding_diag_neighbors}")
+            if config.embedding_diag_start_step > 0:
+                print(f"    Start step: {config.embedding_diag_start_step} (dormant until then)")
+        except ImportError as e:
+            print(f"  [Embedding Diagnostics] Import failed: {e}")
+
+    # Factual Eval — verify CG primitives distinguish facts from hallucinations
+    cg_factual_eval = None
+    if config.enable_conscious_generation and config.enable_factual_eval:
+        try:
+            from symbolu.training.conscious_generation.diagnostics.factual_eval import FactualEval
+            cg_factual_eval = FactualEval(
+                interval=config.factual_eval_interval,
+                num_probes=config.factual_eval_probes,
+                start_step=config.factual_eval_start_step,
+            )
+            print(f"\n  [Factual Eval] ENABLED")
+            print(f"    Eval interval: every {config.factual_eval_interval} steps")
+            print(f"    Probe pairs: {cg_factual_eval.num_probes} (fact vs hallucination)")
+            if config.factual_eval_start_step > 0:
+                print(f"    Start step: {config.factual_eval_start_step}")
+        except ImportError as e:
+            print(f"  [Factual Eval] Import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -2887,6 +2965,39 @@ def train(config: UnifiedTrainingConfig):
 
                 if not tbptt_backward_done:
                     loss, metrics = compute_phase_loss(logits, y, config)
+
+                # Knowledge Distillation from frozen Mistral teacher
+                if (mistral_teacher is not None
+                        and not tbptt_backward_done
+                        and logits is not None
+                        and global_step >= config.distill_warmup_steps):
+                    from symbolu.training.unified.mistral_teacher import compute_distillation_loss
+                    # Re-tokenize with Mistral's tokenizer if vocabs differ
+                    # For simplicity: use same input_ids if tokenizers match,
+                    # otherwise decode + re-encode (slow but correct)
+                    _kd_input_ids = x  # assume shared tokenizer by default
+                    if distill_tokenizer is not None and tokenizer is not None:
+                        # Check if vocabs match (fast path)
+                        if getattr(tokenizer, 'vocab_size', -1) != mistral_teacher.vocab_size:
+                            # Different tokenizers: decode student tokens, re-encode for teacher
+                            _kd_texts = tokenizer.batch_decode(x, skip_special_tokens=False)
+                            _kd_enc = distill_tokenizer(
+                                _kd_texts, return_tensors="pt",
+                                truncation=True, max_length=x.shape[1],
+                                padding="max_length", pad_to_multiple_of=None,
+                            )
+                            _kd_input_ids = _kd_enc["input_ids"].to(x.device)
+                    with torch.no_grad():
+                        _teacher_logits = mistral_teacher(_kd_input_ids)
+                    # Replace CE loss with combined KD + CE loss
+                    loss, _kd_metrics = compute_distillation_loss(
+                        student_logits=logits,
+                        teacher_logits=_teacher_logits,
+                        labels=y,
+                        temperature=config.distill_temperature,
+                        alpha=config.distill_alpha,
+                    )
+                    metrics.update(_kd_metrics)
 
                 # Entropy-Based Logit Scale Control (train-time)
                 if entropy_scale_module is not None and not tbptt_backward_done:
@@ -4930,6 +5041,30 @@ def train(config: UnifiedTrainingConfig):
                                     if isinstance(_sv, (int, float)):
                                         metrics[_sk] = _sv
 
+                            # Embedding diagnostics: snapshot and log drift metrics
+                            if cg_embedding_diag is not None:
+                                _ed_cache = model.conscious_gen.get('token_cache', None) if hasattr(model, 'conscious_gen') else None
+                                _ed_model = getattr(model, 'module', model)  # unwrap DDP if needed
+                                _ed_metrics = cg_embedding_diag.snapshot(
+                                    model=_ed_model,
+                                    global_step=global_step,
+                                    token_cache=_ed_cache,
+                                )
+                                if _ed_metrics is not None:
+                                    print(cg_embedding_diag.format_console_log(_ed_metrics))
+                                    # TensorBoard logging
+                                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                        for _ek, _ev in _ed_metrics.items():
+                                            if isinstance(_ev, (int, float)) and _ek != 'step':
+                                                writer.add_scalar(f'embedding_diag/{_ek}', _ev, global_step)
+                                    # Trend summary every 5 snapshots
+                                    if len(cg_embedding_diag.history) % 5 == 0 and len(cg_embedding_diag.history) >= 2:
+                                        _ed_trend = cg_embedding_diag.get_trend_summary()
+                                        _ed_trend_parts = [f"  [EMBED-TREND]"]
+                                        for _tk, _tv in _ed_trend.items():
+                                            _ed_trend_parts.append(f"    {_tk}: {_tv}")
+                                        print("\n".join(_ed_trend_parts))
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [Conscious Gen] Error at step {global_step}: {e}")
@@ -5146,6 +5281,9 @@ def train(config: UnifiedTrainingConfig):
 
             # V11.3: Slot adaptive calls — once per global step (not per micro-step).
             # Moved from accumulation loop so interval counters count global steps.
+            _sm = locals().get('_sm')
+            _retr_loss_val = locals().get('_retr_loss_val')
+            _lm_loss_val = locals().get('_lm_loss_val')
             if _sm is not None and _retr_loss_val is not None:
                 _sm.update_write_gate_target(_retr_loss_val)
                 _sm.update_constraint_relaxation(_retr_loss_val, lm_loss=_lm_loss_val)
@@ -5249,7 +5387,7 @@ def train(config: UnifiedTrainingConfig):
                     'loss': avg_loss,
                     'coherence': metrics.get('coherence', 0.5),
                     'entropy': metrics.get('onto_entropy', metrics.get('entropy', 0.5)),
-                    'ppl': metrics.get('ppl', math.exp(avg_loss)),
+                    'ppl': metrics.get('ppl', math.exp(min(avg_loss, 20))),
                     'sa_deviation': abs(current_sa_ratio - 0.15) if current_sa_ratio > 0 else 0.0,
                     'sa_ratio': current_sa_ratio,
                 }
@@ -7116,6 +7254,34 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+            # CG Factual Eval — verify JEPA/Vritti distinguish facts from hallucinations
+            if cg_factual_eval is not None and tokenizer is not None:
+                _fe_cache = None
+                if hasattr(model, 'conscious_gen'):
+                    _fe_cache = model.conscious_gen.get('token_cache', None)
+                _fe_metrics = cg_factual_eval.evaluate(
+                    model=model,
+                    tokenizer=tokenizer,
+                    global_step=global_step,
+                    token_cache=_fe_cache,
+                )
+                if _fe_metrics is not None:
+                    print(cg_factual_eval.format_console_log(_fe_metrics))
+                    for _fk, _fv in _fe_metrics.items():
+                        if isinstance(_fv, (int, float)) and _fk != 'step':
+                            metrics[f'factual_eval/{_fk}'] = _fv
+                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                        for _fk, _fv in _fe_metrics.items():
+                            if isinstance(_fv, (int, float)) and _fk != 'step':
+                                writer.add_scalar(f'factual_eval/{_fk}', _fv, global_step)
+                    # Trend summary every 5 evals
+                    if len(cg_factual_eval.history) % 5 == 0 and len(cg_factual_eval.history) >= 2:
+                        _fe_trend = cg_factual_eval.get_trend_summary()
+                        _fe_trend_parts = ["  [FACTUAL-TREND]"]
+                        for _tk, _tv in _fe_trend.items():
+                            _fe_trend_parts.append(f"    {_tk}: {_tv}")
+                        print("\n".join(_fe_trend_parts))
+
             # Save checkpoint (overwrites last.pt each time)
             if global_step % config.save_every == 0 and not config.no_save:
                 # V9.8.10: Ensure scheduled alpha is applied before saving
@@ -7180,7 +7346,7 @@ def train(config: UnifiedTrainingConfig):
     print(f"{'='*70}")
     print(f"  Total Steps: {global_step:,}")
     print(f"  Best Val Loss: {best_val_loss:.4f}")
-    print(f"  Best Val PPL: {math.exp(best_val_loss):.2f}")
+    print(f"  Best Val PPL: {math.exp(min(best_val_loss, 20)):.2f}")
     if authority_controller is not None:
         print(f"  Final Authority: {authority_controller.A:.3f}")
     if not config.no_save:
@@ -7824,6 +7990,16 @@ def main():
                        help="Trust remote code when loading Mistral model")
     parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
                        help="Hidden dimension for phase-conditioned adapter MLP")
+
+    # Knowledge Distillation from Mistral
+    parser.add_argument("--distill_from_mistral", action="store_true",
+                       help="Use frozen Mistral as teacher for knowledge distillation")
+    parser.add_argument("--distill_temperature", type=float, default=2.0,
+                       help="Softmax temperature for soft targets (higher = softer)")
+    parser.add_argument("--distill_alpha", type=float, default=0.5,
+                       help="Weight for KD loss vs CE loss (1.0 = pure KD)")
+    parser.add_argument("--distill_warmup_steps", type=int, default=0,
+                       help="Steps of CE-only training before KD kicks in")
 
     # Ontological-specific
     parser.add_argument("--bhava_lambda", type=float, default=0.1,
@@ -8886,6 +9062,30 @@ def main():
     parser.add_argument("--enable_cg_diagnostics", action="store_true",
                        help="Enable governance diagnostics tracking")
 
+    # Embedding diagnostics — verify CG auxiliaries are changing representations
+    parser.add_argument("--enable_embedding_diagnostics", action="store_true",
+                       help="Track embedding drift to verify CG auxiliaries change the model meaningfully")
+    parser.add_argument("--embedding_diag_interval", type=int, default=200,
+                       help="Steps between embedding diagnostic snapshots")
+    parser.add_argument("--embedding_diag_vocab_sample", type=int, default=1000,
+                       help="Number of vocab tokens to sample for drift metrics")
+    parser.add_argument("--embedding_diag_neighbors", type=int, default=20,
+                       help="Nearest neighbors to track for embedding stability")
+    parser.add_argument("--embedding_diag_no_samples", action="store_true",
+                       help="Disable vocab sampling (only track grad norms + adapter gate)")
+    parser.add_argument("--embedding_diag_start_step", type=int, default=0,
+                       help="Delay embedding diagnostics until this training step")
+
+    # Factual eval — verify CG primitives distinguish facts from hallucinations
+    parser.add_argument("--enable_factual_eval", action="store_true",
+                       help="Run CG-aware factual probes to verify JEPA/Vritti distinguish facts from hallucinations")
+    parser.add_argument("--factual_eval_interval", type=int, default=500,
+                       help="Steps between factual evaluation runs")
+    parser.add_argument("--factual_eval_probes", type=int, default=50,
+                       help="Number of fact/hallucination probe pairs per evaluation")
+    parser.add_argument("--factual_eval_start_step", type=int, default=0,
+                       help="Delay factual evaluation until this training step")
+
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
                        help="Run conscious generation phase tests instead of training. "
@@ -9641,6 +9841,16 @@ def main():
         mistral_device_map=args.mistral_device_map,
         mistral_trust_remote_code=args.mistral_trust_remote_code,
         mistral_phase_adapter_hidden=args.mistral_phase_adapter_hidden,
+        # Knowledge Distillation
+        distill_from_mistral=args.distill_from_mistral,
+        distill_temperature=args.distill_temperature,
+        distill_alpha=args.distill_alpha,
+        distill_warmup_steps=args.distill_warmup_steps,
+        # Factual Eval
+        enable_factual_eval=args.enable_factual_eval,
+        factual_eval_interval=args.factual_eval_interval,
+        factual_eval_probes=args.factual_eval_probes,
+        factual_eval_start_step=args.factual_eval_start_step,
     )
 
     # ==========================================================================

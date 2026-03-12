@@ -1022,6 +1022,20 @@ class UnifiedTrainingConfig:
     cg_curriculum_stage_proportions: str = "0.30,0.20,0.25,0.25"  # Stage A,B,C,D proportions
     enable_cg_diagnostics: bool = False             # Enable governance diagnostics tracking
 
+    # Phase 5+: Embedding Diagnostics — verify CG auxiliaries change representations
+    enable_embedding_diagnostics: bool = False      # Master toggle for embedding drift tracking
+    embedding_diag_interval: int = 200              # Steps between diagnostic snapshots
+    embedding_diag_vocab_sample: int = 1000         # Vocab tokens to sample for drift metrics
+    embedding_diag_neighbors: int = 20              # Nearest neighbors to track for stability
+    embedding_diag_no_samples: bool = False         # Disable vocab sampling (only grad norms + adapter gate)
+    embedding_diag_start_step: int = 0              # Delay diagnostics until this step
+
+    # Factual Eval — verify CG primitives distinguish facts from hallucinations
+    enable_factual_eval: bool = False               # Master toggle for CG factual evaluation
+    factual_eval_interval: int = 500                # Steps between eval runs
+    factual_eval_probes: int = 50                   # Number of fact/hallucination pairs per eval
+    factual_eval_start_step: int = 0                # Delay eval until this training step
+
     # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules
@@ -1031,6 +1045,15 @@ class UnifiedTrainingConfig:
     mistral_device_map: str = "auto"                        # Device placement strategy
     mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
+
+    # ==========================================================================
+    # Knowledge Distillation from Mistral Teacher
+    # Use frozen Mistral as teacher for hybrid / ontological_hybrid students
+    # ==========================================================================
+    distill_from_mistral: bool = False                      # Enable distillation mode
+    distill_temperature: float = 2.0                        # Softmax temperature (higher = softer targets)
+    distill_alpha: float = 0.5                              # Weight for KD loss (1.0 = pure KD, 0.0 = pure CE)
+    distill_warmup_steps: int = 0                           # Steps before KD kicks in (CE-only warmup)
 
     # =========================================================================
     # V20: AUTO-SCALING SLOT MEMORY
