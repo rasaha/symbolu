@@ -4708,7 +4708,10 @@ def train(config: UnifiedTrainingConfig):
                               f"q_norm={getattr(_sm, '_diag_retr_query_norm', 0):.2f} "
                               f"retr_norm={getattr(_sm, '_diag_retr_retrieved_norm', 0):.2f} "
                               f"rd_gate={getattr(_sm, '_diag_read_gate_mean', 0):.3f} "
-                              f"coh={getattr(_sm, '_diag_coherence_mean', 0):.3f}")
+                              f"coh={getattr(_sm, '_diag_coherence_mean', 0):.3f} "
+                              f"rd_max_w={getattr(_sm, '_diag_read_max_weight', 0):.3f} "
+                              f"key_cos_var={getattr(_sm, '_diag_slot_key_cos_var', 0):.4f} "
+                              f"val_norm={getattr(_sm, '_diag_slot_val_mean_norm', 0):.2f}")
                         # V11.4: Log slot-only prediction diagnostics
                         if _slot_pred_loss_val > 0:
                             _sp_ppl = math.exp(min(_slot_pred_loss_val, 20.0))  # Cap to avoid overflow

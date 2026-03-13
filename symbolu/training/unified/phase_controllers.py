@@ -1016,8 +1016,14 @@ class AdaptiveSlotLRController:
         old_scale = self.current_scale
         # Exponential update: scale *= e^(eta * s)
         self.current_scale *= math.exp(self.eta * health_score)
+        # V11.2: Early-training warmup floor — prevent slot LR suppression
+        # during the first 5000 steps when health signals are noisy and
+        # unreliable. Without this, negative health scores from random
+        # initialization can push wr_scale to floor before slots have had
+        # a chance to specialize, creating a death spiral.
+        _warmup_floor = 0.5 if global_step < 5000 else self.scale_min
         # Clamp
-        self.current_scale = max(self.scale_min, min(self.scale_max, self.current_scale))
+        self.current_scale = max(_warmup_floor, min(self.scale_max, self.current_scale))
 
         self.scale_history.append(self.current_scale)
         if len(self.scale_history) > 50:
