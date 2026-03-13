@@ -267,6 +267,200 @@ class ReasoningHFStreamingDataset(IterableDataset):
                 yield {"input_ids": input_ids, "labels": labels}
 
 
+class InterleavedMixedDataset(IterableDataset):
+    """Interleaves multiple streaming datasets with weighted sampling.
+
+    Each batch is drawn from one dataset, selected by weighted probability.
+    This ensures the model sees both language modeling and reasoning data
+    throughout training rather than in separate phases.
+
+    Usage:
+        --dataset mixed --mix_datasets "wikitext103:0.7,reasoning_hf:0.3"
+
+    Supports mixing any combination of:
+        - wikitext103, wikitext2 (static, wrapped as iterators)
+        - fineweb (streaming)
+        - reasoning_hf (streaming, uses --dataset_name)
+        - reasoning (synthetic CoT)
+    """
+
+    def __init__(
+        self,
+        sources: List[Tuple[IterableDataset, float]],
+        seed: int = 42,
+    ):
+        """
+        Args:
+            sources: List of (dataset, weight) tuples. Weights are normalized.
+            seed: Random seed for reproducibility.
+        """
+        total_weight = sum(w for _, w in sources)
+        self.sources = [(ds, w / total_weight) for ds, w in sources]
+        self.seed = seed
+
+    def __iter__(self):
+        rng = random.Random(self.seed)
+        # Create iterators for all sources
+        iterators = []
+        weights = []
+        for ds, w in self.sources:
+            iterators.append(iter(ds))
+            weights.append(w)
+
+        active = list(range(len(iterators)))
+
+        while active:
+            # Weighted random selection among active sources
+            active_weights = [weights[i] for i in active]
+            total = sum(active_weights)
+            active_weights = [w / total for w in active_weights]
+
+            r = rng.random()
+            cumulative = 0.0
+            chosen_idx = active[0]
+            for i, w in zip(active, active_weights):
+                cumulative += w
+                if r <= cumulative:
+                    chosen_idx = i
+                    break
+
+            try:
+                item = next(iterators[chosen_idx])
+                # Normalize to dict format
+                if isinstance(item, (tuple, list)):
+                    yield {"input_ids": item[0], "labels": item[1]}
+                else:
+                    yield item
+            except StopIteration:
+                active.remove(chosen_idx)
+
+
+class _StaticToStreamingAdapter(IterableDataset):
+    """Wraps a static TextDataset as an IterableDataset with shuffling."""
+
+    def __init__(self, static_dataset: TextDataset):
+        self.static_dataset = static_dataset
+
+    def __iter__(self):
+        indices = list(range(len(self.static_dataset)))
+        random.shuffle(indices)
+        for idx in indices:
+            x, y = self.static_dataset[idx]
+            yield {"input_ids": x, "labels": y}
+
+
+def _build_source_dataset(
+    source_name: str,
+    config,
+    tokenizer,
+    effective_seq_len: int,
+    split: str = "train",
+    max_examples: int = 0,
+) -> IterableDataset:
+    """Build a single source dataset by name for use in mixed training."""
+
+    if source_name in ["wikitext103", "wikitext2"]:
+        cache_dir = Path("data_cache")
+        cache_dir.mkdir(exist_ok=True)
+        tokenizer_name = getattr(tokenizer, 'name_or_path', 'unknown').replace('/', '_')
+        cache_path = cache_dir / f"{source_name}_{tokenizer_name}.pt"
+
+        if cache_path.exists():
+            cached_data = torch.load(cache_path, weights_only=True)
+            tokens = cached_data['train' if split == 'train' else 'val']
+        else:
+            if source_name == "wikitext103":
+                ds = load_dataset("wikitext", "wikitext-103-v1")
+            else:
+                ds = load_dataset("wikitext", "wikitext-2-v1")
+
+            hf_split = "train" if split == "train" else "validation"
+            text = "\n".join(ds[hf_split]["text"])
+            if WIKITEXT_CLEANUP_AVAILABLE:
+                text = clean_wikitext_artifacts(text)
+            tokens = torch.tensor(tokenizer.encode(text), dtype=torch.long)
+
+            # Cache both splits
+            train_text = "\n".join(ds["train"]["text"])
+            val_text = "\n".join(ds["validation"]["text"])
+            if WIKITEXT_CLEANUP_AVAILABLE:
+                train_text = clean_wikitext_artifacts(train_text)
+                val_text = clean_wikitext_artifacts(val_text)
+            train_tokens = torch.tensor(tokenizer.encode(train_text), dtype=torch.long)
+            val_tokens = torch.tensor(tokenizer.encode(val_text), dtype=torch.long)
+            torch.save({"train": train_tokens, "val": val_tokens}, cache_path)
+
+        static_ds = TextDataset(tokens, effective_seq_len)
+        return _StaticToStreamingAdapter(static_ds)
+
+    elif source_name == "fineweb":
+        return FineWebStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=effective_seq_len,
+            dataset_name=config.dataset_name,
+            dataset_subset=config.dataset_subset,
+            split="train",
+            cache_dataset=config.cache_dataset,
+        )
+
+    elif source_name == "reasoning_hf":
+        ds_name = config.dataset_name
+        subset = config.dataset_subset if config.dataset_subset != "sample-10BT" else None
+        return ReasoningHFStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=effective_seq_len,
+            dataset_name=ds_name,
+            dataset_subset=subset,
+            split="train",
+            cache_dataset=config.cache_dataset,
+            max_examples=max_examples,
+        )
+
+    elif source_name == "reasoning":
+        tokenizer_name = getattr(tokenizer, 'name_or_path', 'unknown').replace('/', '_')
+        cache_path = Path("data_cache") / f"reasoning_{tokenizer_name}.pt"
+
+        if cache_path.exists():
+            cached_data = torch.load(cache_path, weights_only=True)
+            tokens = cached_data['train' if split == 'train' else 'val']
+        else:
+            from symbolu.training.scripts.generate_reasoning_dataset import generate_examples
+            examples = generate_examples(50000, seed=42)
+            split_idx = int(len(examples) * 0.95)
+            separator = "\n\n"
+            train_tokens = torch.tensor(
+                tokenizer.encode(separator.join(examples[:split_idx])), dtype=torch.long
+            )
+            val_tokens = torch.tensor(
+                tokenizer.encode(separator.join(examples[split_idx:])), dtype=torch.long
+            )
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save({"train": train_tokens, "val": val_tokens}, cache_path)
+            tokens = train_tokens if split == "train" else val_tokens
+
+        static_ds = TextDataset(tokens, effective_seq_len)
+        return _StaticToStreamingAdapter(static_ds)
+
+    else:
+        raise ValueError(f"Unknown source for mixed dataset: {source_name}")
+
+
+def parse_mix_datasets(mix_str: str) -> List[Tuple[str, float]]:
+    """Parse mix_datasets string like 'wikitext103:0.7,reasoning_hf:0.3'.
+
+    Returns list of (dataset_name, weight) tuples.
+    """
+    sources = []
+    for part in mix_str.split(","):
+        part = part.strip()
+        if ":" in part:
+            name, weight = part.rsplit(":", 1)
+            sources.append((name.strip(), float(weight)))
+        else:
+            sources.append((part.strip(), 1.0))
+    return sources
+
+
 def cache_validation_batches(dataloader, num_batches: int = 20) -> list:
     """Pre-cache validation batches to avoid re-resolving streaming dataset.
 
@@ -459,6 +653,53 @@ def load_data(
 
         return train_loader, val_loader
 
+    elif config.dataset == "mixed":
+        # Interleaved mixed training from multiple sources
+        mix_str = getattr(config, 'mix_datasets', '')
+        if not mix_str:
+            raise ValueError("--dataset mixed requires --mix_datasets, e.g. 'wikitext103:0.7,reasoning_hf:0.3'")
+
+        source_specs = parse_mix_datasets(mix_str)
+        print(f"  Mixed training with {len(source_specs)} sources:")
+
+        # Build train sources
+        train_sources = []
+        for name, weight in source_specs:
+            print(f"    - {name}: weight={weight:.2f}")
+            ds = _build_source_dataset(name, config, tokenizer, effective_seq_len, split="train")
+            train_sources.append((ds, weight))
+
+        # Build val sources (with limited examples for streaming ones)
+        val_sources = []
+        for name, weight in source_specs:
+            ds = _build_source_dataset(
+                name, config, tokenizer, effective_seq_len,
+                split="val", max_examples=2000,
+            )
+            val_sources.append((ds, weight))
+
+        train_dataset = InterleavedMixedDataset(train_sources, seed=42)
+        val_dataset = InterleavedMixedDataset(val_sources, seed=123)
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            num_workers=4,
+            pin_memory=True,
+            prefetch_factor=4,
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            num_workers=2,
+            pin_memory=True,
+            prefetch_factor=2,
+        )
+
+        print(f"  Interleaved dataloaders created (batch_size={config.batch_size})")
+        return train_loader, val_loader
+
     elif config.dataset == "reasoning_hf":
         # Production reasoning datasets from HuggingFace
         # Uses dataset_name to select: meta-math/MetaMathQA, nvidia/OpenMathInstruct-2, etc.
@@ -602,4 +843,4 @@ def load_data(
         return train_loader, val_loader
 
     else:
-        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', 'reasoning_hf', 'reasoning', or 'synthetic'")
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', 'mixed', 'reasoning_hf', 'reasoning', or 'synthetic'")
