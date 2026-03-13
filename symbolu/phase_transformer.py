@@ -9384,6 +9384,16 @@ class SlotMemoryGCT(nn.Module):
             self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
             self._diag_read_scale = _read_scale.item()
             self._diag_read_gate_mean = _gate.mean().item()
+            # V11.2: Slot specialization diagnostics
+            # max_weight: how peaked is the read attention? High = specialized.
+            self._diag_read_max_weight = attn_weights.max(dim=-1).values.mean().item()
+            # key_variance: how diverse are slot keys? Low = collapsed.
+            # Compute pairwise cosine sim variance across K slots.
+            _sk_for_diag = F.normalize(slot_keys, dim=-1)  # [B, K, D]
+            _key_cos = torch.bmm(_sk_for_diag, _sk_for_diag.transpose(1, 2))  # [B, K, K]
+            self._diag_slot_key_cos_var = _key_cos.var().item()
+            # value_norm: mean L2 norm of slot values — zero means empty slots.
+            self._diag_slot_val_mean_norm = slot_vals.norm(dim=-1).mean().item()
 
         return output
 
