@@ -7609,10 +7609,10 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2", "fineweb", "reasoning", "synthetic"],
-                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), reasoning (chain-of-thought), or synthetic (random tokens)")
+                       choices=["wikitext103", "wikitext2", "fineweb", "reasoning_hf", "reasoning", "synthetic"],
+                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), reasoning_hf (HF reasoning datasets), reasoning (synthetic CoT), or synthetic (random tokens)")
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
-                       help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
+                       help="HuggingFace dataset name for fineweb/reasoning_hf mode (e.g., meta-math/MetaMathQA, nvidia/OpenMathInstruct-2)")
     parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
                        help="Dataset subset/config for fineweb mode")
     parser.add_argument("--cache_val_batches", type=int, default=20,

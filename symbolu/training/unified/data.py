@@ -24,6 +24,53 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Field mappings for known HuggingFace reasoning datasets.
+# Each entry maps dataset_name -> (question_field, answer_field, optional_subset).
+REASONING_HF_REGISTRY = {
+    "meta-math/MetaMathQA": {
+        "question": "query",
+        "answer": "response",
+        "subset": None,
+        "split": "train",
+        "description": "395K math problems with diverse reasoning paths",
+    },
+    "nvidia/OpenMathInstruct-2": {
+        "question": "problem",
+        "answer": "generated_solution",
+        "subset": None,
+        "split": "train",
+        "description": "14M math reasoning examples from Llama",
+    },
+    "AI-MO/NuminaMath-CoT": {
+        "question": "problem",
+        "answer": "solution",
+        "subset": None,
+        "split": "train",
+        "description": "860K competition math with chain-of-thought",
+    },
+    "kaist-ai/CoT-Collection": {
+        "question": "source",
+        "answer": "rationale",
+        "subset": None,
+        "split": "train",
+        "description": "1.84M chain-of-thought across 1,060 tasks",
+    },
+    "TIGER-Lab/MathInstruct": {
+        "question": "instruction",
+        "answer": "output",
+        "subset": None,
+        "split": "train",
+        "description": "262K math with CoT + program-of-thought",
+    },
+    "microsoft/orca-math-word-problems-200k": {
+        "question": "question",
+        "answer": "answer",
+        "subset": None,
+        "split": "train",
+        "description": "200K word problems with multi-agent verification",
+    },
+}
+
 
 class TextDataset(Dataset):
     """Dataset for language modeling."""
@@ -116,6 +163,100 @@ class FineWebStreamingDataset(IterableDataset):
             buffer.extend(tokens)
 
             # Yield chunks of seq_length + 1 (for input/target)
+            while len(buffer) >= self.seq_length + 1:
+                chunk = buffer[:self.seq_length + 1]
+                buffer = buffer[self.seq_length:]
+
+                input_ids = torch.tensor(chunk[:-1], dtype=torch.long)
+                labels = torch.tensor(chunk[1:], dtype=torch.long)
+
+                yield {"input_ids": input_ids, "labels": labels}
+
+
+class ReasoningHFStreamingDataset(IterableDataset):
+    """Streaming dataset for HuggingFace reasoning datasets.
+
+    Formats Q&A pairs into text for next-token prediction:
+        Question: <question>
+        Solution: <answer>
+
+    Supports auto-detection of field names for known datasets
+    (MetaMathQA, OpenMathInstruct-2, NuminaMath-CoT, etc.)
+    and manual field specification for custom datasets.
+    """
+
+    def __init__(
+        self,
+        tokenizer,
+        seq_length: int = 1024,
+        dataset_name: str = "meta-math/MetaMathQA",
+        dataset_subset: str = None,
+        split: str = "train",
+        question_field: str = None,
+        answer_field: str = None,
+        cache_dataset: bool = False,
+        max_examples: int = 0,
+    ):
+        self.tokenizer = tokenizer
+        self.seq_length = seq_length
+        self.dataset_name = dataset_name
+        self.dataset_subset = dataset_subset
+        self.split = split
+        self.cache_dataset = cache_dataset
+        self.max_examples = max_examples
+        self._cached_dataset = None
+
+        # Auto-detect fields from registry, or use provided overrides
+        registry_entry = REASONING_HF_REGISTRY.get(dataset_name, {})
+        self.question_field = question_field or registry_entry.get("question", "question")
+        self.answer_field = answer_field or registry_entry.get("answer", "answer")
+
+        if dataset_subset is None and registry_entry.get("subset"):
+            self.dataset_subset = registry_entry["subset"]
+        if registry_entry.get("split"):
+            self.split = split or registry_entry["split"]
+
+    def _load_dataset(self):
+        from datasets import load_dataset
+
+        kwargs = {
+            "split": self.split,
+            "streaming": not self.cache_dataset,
+        }
+        if self.dataset_subset:
+            kwargs["name"] = self.dataset_subset
+
+        return load_dataset(self.dataset_name, **kwargs)
+
+    def _format_example(self, example: dict) -> str:
+        question = example.get(self.question_field, "")
+        answer = example.get(self.answer_field, "")
+        if not question and not answer:
+            return ""
+        return f"Question: {question}\nSolution: {answer}"
+
+    def __iter__(self):
+        if self.cache_dataset and self._cached_dataset is None:
+            print(f"  [ReasoningHF] Downloading and caching {self.dataset_name}...")
+            self._cached_dataset = self._load_dataset()
+            print(f"  [ReasoningHF] Cached. Size: {len(self._cached_dataset):,} examples")
+
+        dataset = self._cached_dataset if self.cache_dataset else self._load_dataset()
+        buffer = []
+        count = 0
+
+        for example in dataset:
+            if self.max_examples > 0 and count >= self.max_examples:
+                break
+
+            text = self._format_example(example)
+            if not text:
+                continue
+
+            tokens = self.tokenizer.encode(text)
+            buffer.extend(tokens)
+            count += 1
+
             while len(buffer) >= self.seq_length + 1:
                 chunk = buffer[:self.seq_length + 1]
                 buffer = buffer[self.seq_length:]
@@ -318,6 +459,65 @@ def load_data(
 
         return train_loader, val_loader
 
+    elif config.dataset == "reasoning_hf":
+        # Production reasoning datasets from HuggingFace
+        # Uses dataset_name to select: meta-math/MetaMathQA, nvidia/OpenMathInstruct-2, etc.
+        dataset_name = config.dataset_name
+        registry_entry = REASONING_HF_REGISTRY.get(dataset_name)
+
+        if registry_entry:
+            print(f"  Dataset: {dataset_name}")
+            print(f"  Description: {registry_entry['description']}")
+        else:
+            print(f"  Dataset: {dataset_name} (custom — using question_field/answer_field)")
+
+        print(f"  Sequence length: {effective_seq_len}")
+        print(f"  Mode: {'Cached (local)' if config.cache_dataset else 'Streaming'}")
+
+        train_dataset = ReasoningHFStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=effective_seq_len,
+            dataset_name=dataset_name,
+            dataset_subset=config.dataset_subset if config.dataset_subset != "sample-10BT" else None,
+            split="train",
+            cache_dataset=config.cache_dataset,
+        )
+
+        # Validation: stream a separate portion (most reasoning datasets have only train split)
+        val_dataset = ReasoningHFStreamingDataset(
+            tokenizer=tokenizer,
+            seq_length=effective_seq_len,
+            dataset_name=dataset_name,
+            dataset_subset=config.dataset_subset if config.dataset_subset != "sample-10BT" else None,
+            split="train",
+            cache_dataset=config.cache_dataset,
+            max_examples=2000,
+        )
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            num_workers=4,
+            pin_memory=True,
+            prefetch_factor=4,
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.batch_size,
+            num_workers=2,
+            pin_memory=True,
+            prefetch_factor=2,
+        )
+
+        print(f"  Streaming dataloaders created (batch_size={config.batch_size})")
+
+        # List available datasets if user might want to try others
+        if not registry_entry:
+            print(f"  Available presets: {', '.join(REASONING_HF_REGISTRY.keys())}")
+
+        return train_loader, val_loader
+
     elif config.dataset == "reasoning":
         # Synthetic reasoning dataset (chain-of-thought examples)
         # Generated by: python -m symbolu.training.scripts.generate_reasoning_dataset
@@ -402,4 +602,4 @@ def load_data(
         return train_loader, val_loader
 
     else:
-        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', 'reasoning', or 'synthetic'")
+        raise ValueError(f"Unknown dataset: {config.dataset}. Use 'wikitext103', 'wikitext2', 'fineweb', 'reasoning_hf', 'reasoning', or 'synthetic'")
