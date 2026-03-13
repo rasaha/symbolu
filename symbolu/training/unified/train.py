@@ -7609,12 +7609,14 @@ def main():
 
     # Dataset
     parser.add_argument("--dataset", type=str, default="wikitext103",
-                       choices=["wikitext103", "wikitext2", "fineweb", "synthetic"],
-                       help="Training dataset: wikitext103, wikitext2, fineweb (streaming), or synthetic (offline)")
+                       choices=["wikitext103", "wikitext2", "fineweb", "mixed", "reasoning_hf", "reasoning", "synthetic"],
+                       help="Training dataset: wikitext103, wikitext2, fineweb, mixed (interleaved), reasoning_hf, reasoning, or synthetic")
     parser.add_argument("--dataset_name", type=str, default="HuggingFaceFW/fineweb",
-                       help="HuggingFace dataset name for fineweb mode (e.g., HuggingFaceFW/fineweb-edu)")
+                       help="HuggingFace dataset name for fineweb/reasoning_hf mode (e.g., meta-math/MetaMathQA, nvidia/OpenMathInstruct-2)")
     parser.add_argument("--dataset_subset", type=str, default="sample-10BT",
                        help="Dataset subset/config for fineweb mode")
+    parser.add_argument("--mix_datasets", type=str, default="",
+                       help="For --dataset mixed: comma-separated sources with weights, e.g. 'wikitext103:0.7,reasoning_hf:0.3'")
     parser.add_argument("--cache_val_batches", type=int, default=20,
                        help="Pre-cache N validation batches for streaming datasets (0=disable)")
     parser.add_argument("--cache_dataset", action="store_true",
