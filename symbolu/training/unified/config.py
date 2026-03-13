@@ -436,7 +436,7 @@ class UnifiedTrainingConfig:
     onto_rampdown_steps: int = 500           # Steps to ramp to 0 after disengage
 
     # Dataset
-    dataset: str = "wikitext103"  # "wikitext103", "wikitext2", or "fineweb"
+    dataset: str = "wikitext103"  # "wikitext103", "wikitext2", "fineweb", "reasoning", or "synthetic"
     dataset_name: str = "HuggingFaceFW/fineweb"  # HuggingFace dataset name (for fineweb mode)
     dataset_subset: str = "sample-10BT"  # Dataset subset/config
     cache_val_batches: int = 20  # Pre-cache N validation batches (for streaming datasets)
