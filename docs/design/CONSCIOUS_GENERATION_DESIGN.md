@@ -7058,12 +7058,375 @@ When all modules work together (Stages 1–7), the model should demonstrate:
 12. **Phase-to-logit continuity** — phase coherence from attention directly influences token selection, closing the consciousness→expression path [Stage 7F]
 13. **Internal consistency monitoring** — token-latent convergence metric detects measurement system disagreement [Stage 7G]
 
-The model becomes a **closed-loop language generator**:
+---
+
+### F.12 Stage 8 — Interpretive Synthesis Architecture (Representation Conditioning)
+
+#### F.12.1 Motivation: From Logit Modulation to Representation Conditioning
+
+Stages 1–7 build auxiliary signals that modulate *after* the transformer has produced its output — either adjusting decoding policy (Stage 1) or nudging logits (Stage 2). This works but creates an architectural tension: the auxiliary systems interpret meaning on orthogonal semantic axes (resonance, cognition, experiential depth, ontological phase), yet their interpretations only affect generation through scalar additive terms on logits.
+
+The codebase already contains the correct pattern. `mistral_wrapper.py:311-333` implements **representation conditioning**: the phase adapter modifies the hidden state *before* `lm_head`, so the transformer's own vocabulary projection operates on an interpretively-enriched representation. This is fundamentally different from post-hoc logit nudging.
+
+Stage 8 generalizes this pattern: CSR, Vritti, Kosha, and Bhava produce a unified **InterpretiveState** that conditions the decoder through the hidden representation, not through logit arithmetic.
+
+#### F.12.2 Why This Is Architecturally Superior
+
+| Property | Logit Modulation (Stages 1–2) | Representation Conditioning (Stage 8) |
+|----------|-------------------------------|---------------------------------------|
+| Expressiveness | Additive scalar per token | Full-rank hidden state transformation |
+| Semantic scope | Token-level nudge | Contextual meaning shift |
+| Interaction with vocab | Fights lm_head's projection | Works *through* lm_head's projection |
+| Information capacity | O(V) scalars | O(D²) via adapter matrix |
+| Orthogonality | Modules compete on logit dimension | Modules operate on separate semantic axes |
+| Existing precedent | `AuxiliaryModulator` (Stage 2) | `phase_adapter` in `mistral_wrapper.py:318-324` |
+
+The key principle: **auxiliary systems interpret meaning, they don't compete for tokens.**
+
+#### F.12.3 Multi-Perspective Interpretation Pipeline
+
+Each auxiliary module interprets the same hidden state along a different semantic axis. These are parallel, non-competing interpretations:
 
 ```
-Transformer     = plant          (produces language)
-CSR latent state = observer       (measures experiential trajectory)
-Coherence controller = controller (adjusts expression dynamics)
+hidden_state x [B, T, D]
+    │
+    ├──→ CSR Interpreter                    (acoustic / resonance semantics)
+    │       energy words, phonemic structure
+    │       → A_csr: resonance pattern + emotional signal
+    │
+    ├──→ Vritti Interpreter                 (cognitive modification mode)
+    │       5-class distribution [Pramāṇa, Viparyaya, Vikalpa, Nidrā, Smṛti]
+    │       → A_vritti: dominant cognitive pattern + distribution
+    │
+    ├──→ Kosha Router                       (experiential layer routing)
+    │       6-primitive weights [base, ontology, jepa, csr, vritti, guna]
+    │       → A_kosha: primary/secondary experiential layer
+    │
+    ├──→ Bhava Analyzer                     (ontological phase / relation)
+    │       12D onto_state → 144D relational matrix
+    │       → A_bhava: phase relation + alignment state
+    │
+    └──→ Perspective Synthesizer
+            combines A_csr, A_vritti, A_kosha, A_bhava
+            → InterpretiveState U [B, T, D_interp]
+            → conditions decoder
 ```
 
-This is the conscious generation architecture: a reflective generation system where the model observes its own output through a different modality (phonemic/ontological) and adjusts its expression without altering its knowledge.
+**Worked Example — "I feel confused about what to do next."**
+
+| Module | Axis | Interpretation |
+|--------|------|----------------|
+| CSR | Resonance | energy words: *confused*, *do*, *next* → instability seeking orientation |
+| Vritti | Cognition | Vikalpa 0.41, Viparyaya 0.38 → conceptual uncertainty with possible misperception |
+| Kosha | Experience | Manomaya 0.58, Vijnanamaya 0.21 → mental-emotional turbulence, emerging intellectual reflection |
+| Bhava | Ontology | self ↔ future action → disconnected intentional trajectory |
+
+**Synthesized state:**
+
+```
+User is experiencing mental uncertainty about future direction.
+Cognitive pattern: conceptual confusion (vikalpa), not factual misunderstanding.
+Disturbance originates in Manomaya layer.
+Reflects misalignment between present identity and intended future action.
+```
+
+**Generation conditioning from synthesis:**
+
+```
+objective: clarify conceptual uncertainty, restore direction, reduce vikalpa
+approach: avoid prescriptive advice (wrong vritti), ground in present experience (kosha shift)
+```
+
+This produces a response shaped by interpretive understanding rather than token-level score competition.
+
+#### F.12.4 InterpretiveState Design
+
+New dataclass: `inference/interpretive_state.py`
+
+```python
+@dataclass
+class InterpretiveState:
+    """Unified interpretive state from all auxiliary modules.
+
+    Each field captures a different semantic axis of the input.
+    Combined into a single conditioning vector for the decoder.
+    """
+    csr_signal: torch.Tensor      # [B, T, D_csr] resonance pattern
+    vritti_distribution: torch.Tensor  # [B, T, 5] cognitive mode simplex
+    kosha_routing: torch.Tensor   # [B, T, 6] experiential layer weights
+    bhava_relation: torch.Tensor  # [B, T, 16] compressed ontological state
+
+    def to_conditioning_vector(self) -> torch.Tensor:
+        """Concatenate all interpretive signals into a single vector."""
+        return torch.cat([
+            self.csr_signal,
+            self.vritti_distribution,
+            self.kosha_routing,
+            self.bhava_relation,
+        ], dim=-1)  # [B, T, D_csr + 5 + 6 + 16]
+```
+
+#### F.12.5 Perspective Synthesizer Design
+
+New module: `inference/perspective_synthesizer.py`
+
+```python
+class PerspectiveSynthesizerConfig:
+    d_interp: int = 64              # Interpretive state dimension
+    d_csr: int = 16                 # CSR resonance dimension
+    d_bhava: int = 16               # Compressed Bhava dimension
+    n_vritti: int = 5               # Vritti classes
+    n_kosha: int = 6                # Kosha primitives
+    enable: bool = True
+    gate_init: float = 0.0          # Start with zero influence (safe cold start)
+
+
+class PerspectiveSynthesizer(nn.Module):
+    """
+    Synthesizes orthogonal interpretive signals into a unified
+    conditioning state for the decoder.
+
+    Design principle: Each module interprets meaning on its own axis.
+    The synthesizer combines these into a representation that conditions
+    generation through the hidden state, not through logit modulation.
+
+    Placement: Between SovereignStateProjector output and lm_head input.
+    This follows the pattern established in mistral_wrapper.py:318-324.
+    """
+
+    def __init__(self, config: PerspectiveSynthesizerConfig, hidden_dim: int):
+        super().__init__()
+        self.config = config
+
+        # Input: concatenated interpretive signals
+        input_dim = config.d_csr + config.n_vritti + config.n_kosha + config.d_bhava
+        # = 16 + 5 + 6 + 16 = 43
+
+        # Synthesis MLP: interpretive signals → hidden-dim-compatible conditioning
+        self.synthesis = nn.Sequential(
+            nn.Linear(input_dim, config.d_interp),
+            nn.GELU(),
+            nn.Linear(config.d_interp, hidden_dim),
+        )
+
+        # Gated residual (same pattern as mistral_wrapper.py:322-324)
+        self.gate = nn.Parameter(torch.tensor(config.gate_init))
+
+        # Zero-initialize final layer for safe cold start
+        nn.init.zeros_(self.synthesis[-1].weight)
+        nn.init.zeros_(self.synthesis[-1].bias)
+
+    def forward(
+        self,
+        hidden: torch.Tensor,           # [B, T, D] from transformer
+        interp_state: InterpretiveState, # Parallel interpretive outputs
+    ) -> torch.Tensor:
+        """
+        Condition the hidden state with interpretive synthesis.
+
+        At initialization (gate=0), returns hidden unchanged.
+        As gate trains up, interpretive signal increasingly conditions
+        the representation that lm_head projects to vocabulary logits.
+        """
+        if not self.config.enable:
+            return hidden
+
+        # Combine interpretive signals
+        conditioning = interp_state.to_conditioning_vector()  # [B, T, 43]
+
+        # Synthesize into hidden-compatible representation
+        synthesis_output = self.synthesis(conditioning)  # [B, T, D]
+
+        # Gated residual blend
+        g = torch.sigmoid(self.gate)
+        return hidden + g * synthesis_output  # [B, T, D]
+```
+
+#### F.12.6 Integration Point — Between State Projector and LM Head
+
+The synthesizer inserts at the exact point where `mistral_wrapper.py` already places its phase adapter:
+
+```
+Transformer Blocks (Phase Attention)
+    ↓
+Final Layer Norm
+    ↓
+hidden_state x [B, T, D]
+    ↓
+┌─────────────────────────────────────────────────┐
+│ Parallel Interpretation (no mutual dependencies) │
+│                                                  │
+│  SovereignStateProjector(x)  → 32D state S       │
+│    S[0:12]  → Bhava (softmax)                    │
+│    S[12:17] → Kosha (sigmoid)                    │
+│    S[17:22] → Vritti (softmax)                   │
+│    S[22:28] → Guna (sigmoid)                     │
+│                                                  │
+│  OntologicalProjection(x) → 12D onto_state       │
+│    ↓                                             │
+│  BhavaRelationshipLayer(onto) → 144D → 16D       │
+│                                                  │
+│  CSRTokenScorer context projection(x, S)          │
+│    → csr_signal [B, T, 16]                       │
+│                                                  │
+│  VrittiTokenScorer context projection(x, S)       │
+│    → vritti_dist [B, T, 5]                       │
+│                                                  │
+│  KoshaPrimitiveRouter(x, S)                       │
+│    → kosha_routing [B, T, 6]                     │
+└─────────────────────────────────────────────────┘
+    ↓
+InterpretiveState = {csr_signal, vritti_dist, kosha_routing, bhava_16d}
+    ↓
+PerspectiveSynthesizer(x, InterpretiveState)
+    ↓
+conditioned_hidden = x + gate · synthesis(InterpretiveState)
+    ↓
+lm_head(conditioned_hidden)
+    ↓
+logits → sampling → next_token
+```
+
+**Critical:** The `PerspectiveSynthesizer` replaces `AuxiliaryModulator` (Stage 2) as the primary integration mechanism. Stage 2's logit modulation becomes a fallback / ablation comparison, not the primary path.
+
+#### F.12.7 Relationship to Stage 2 (AuxiliaryModulator)
+
+Stage 2 is not deleted — it becomes an alternative integration strategy for ablation:
+
+| Mode | Integration Path | Use Case |
+|------|-----------------|----------|
+| `representation` (default) | PerspectiveSynthesizer → hidden → lm_head | Primary: full semantic conditioning |
+| `logit` (Stage 2) | lm_head → AuxiliaryModulator → logits | Ablation: bounded post-hoc nudge |
+| `both` | Synthesizer + Modulator | Research: measure interaction effects |
+| `none` | Pure transformer | Baseline: kill switch |
+
+Configuration:
+
+```python
+class IntegrationConfig:
+    mode: str = "representation"  # "representation" | "logit" | "both" | "none"
+    synthesizer: PerspectiveSynthesizerConfig = PerspectiveSynthesizerConfig()
+    modulator: AuxiliaryModulatorConfig = AuxiliaryModulatorConfig()
+```
+
+#### F.12.8 Interpretive Axis Orthogonality
+
+Each module operates on a different semantic axis. This is not an assertion — it's a structural property of the existing codebase:
+
+| Module | Semantic Axis | Codebase Evidence |
+|--------|--------------|-------------------|
+| CSR | Resonance / acoustic meaning | `csr_scorer.py` — bilinear phoneme affinity (`csr_affinity_dim=12`) |
+| Vritti | Cognitive mode | `vritti_scorer.py` — 5-class simplex [FACT, ERROR, IMAGINATION, VOID, MEMORY] |
+| Kosha | Experiential layer | `kosha_router.py` — 6-primitive routing (Annamaya→Anandamaya mapped to base→guna) |
+| Bhava | Ontological relation | `bhava_relationships.py` — 12×12 inter-layer aspect matrix with Vedic aspect strengths |
+
+These axes are mathematically independent:
+- CSR uses bilinear form on phoneme embeddings (acoustic space)
+- Vritti uses dot product on probability simplices (epistemic space)
+- Kosha uses MLP routing to weight primitive channels (depth space)
+- Bhava uses outer product on ontological projections (relational space)
+
+No two modules share a learned projection matrix or scoring function. Their outputs occupy disjoint semantic subspaces.
+
+#### F.12.9 Observable Improvements After Stage 8
+
+| Property | Before Stage 8 | After Stage 8 |
+|----------|---------------|---------------|
+| Generation alignment | Logit nudge, scalar influence | Full representation conditioning matches user state |
+| Interpretability | Individual module scores logged | Full `InterpretiveState` logged per token — CSR resonance, Vritti mode, Kosha layer, Bhava relation all visible |
+| Language quality | Preserved via modulation bound | Preserved via gate cold start + gradual training |
+| Semantic coherence | Modules compete on logit axis | Modules provide orthogonal interpretive signals |
+
+**Logged state per response:**
+
+```python
+{
+    "csr_state": {"resonance_pattern": "instability→orientation", "emotional_signal": "uncertainty"},
+    "vritti_state": {"dominant": "vikalpa", "secondary": "viparyaya", "distribution": [0.12, 0.38, 0.41, 0.02, 0.07]},
+    "kosha_state": {"primary": "Manomaya", "secondary": "Vijnanamaya", "distribution": [0.04, 0.10, 0.58, 0.21, 0.07]},
+    "bhava_state": {"relation": "self↔future", "phase": "misalignment"},
+    "synthesis_gate": 0.23,
+    "conditioning_norm": 0.045
+}
+```
+
+#### F.12.10 Why the Synthesizer Sits Between State Projector and LM Head
+
+This placement solves almost all integration gaps because:
+
+1. **Upstream of lm_head**: The transformer's vocabulary projection operates on enriched representations. No logit arithmetic needed.
+
+2. **Downstream of transformer blocks**: The full context-aware hidden state is available. Interpretive modules see the complete representation.
+
+3. **Parallel to SovereignStateProjector**: The 32D state (Bhava/Kosha/Vritti/Guna) feeds both the synthesizer *and* the phase attention system. No redundant computation.
+
+4. **Consistent with existing pattern**: `mistral_wrapper.py:318-324` already implements exactly this:
+   ```python
+   adapter_input = torch.cat([hidden, phase_expanded], dim=-1)
+   adapter_output = self.phase_adapter(adapter_input)
+   gate = torch.sigmoid(self.adapter_gate)
+   adapted_hidden = hidden + gate * adapter_output
+   logits = self.backbone.lm_head(adapted_hidden)
+   ```
+   Stage 8 generalizes this from phase-only to full interpretive state.
+
+5. **InterpretiveState becomes the central intelligence state**: Once implemented, every generation decision is traceable to a unified interpretive representation. This is the model's self-understanding.
+
+#### F.12.11 Success Criteria
+
+- [ ] `PerspectiveSynthesizer` produces identical output to baseline when gate = 0 (cold start verification)
+- [ ] Gate value increases during training (interpretive signal is useful to the objective)
+- [ ] Representation conditioning mode outperforms logit modulation mode on coherence metrics (ablation: `representation` vs `logit` vs `none`)
+- [ ] Vritti distribution varies meaningfully across prompts (not collapsed to uniform)
+- [ ] Kosha routing activates different primaries for different prompt types
+- [ ] CSR resonance pattern correlates with acoustic/emotional content
+- [ ] Bhava relational state reflects detected relationships in prompt
+- [ ] Full `InterpretiveState` log available for every generated response
+- [ ] No perplexity degradation vs. baseline (within ± 1%)
+- [ ] Language quality unchanged on standard benchmarks
+- [ ] Forward pass latency increase < 5% (synthesis MLP is lightweight)
+
+#### F.12.12 Stage 8 Dependencies
+
+```
+Stage 7C (Dual-Space / P_t)          ← experiential state feeds synthesis
+Stage 7D (Polarity Encoding)         ← polarity-gated CSR feeds CSR signal
+Stage 7F (Phase–Logit Bridge)        ← phase coherence available as additional signal
+Stage 7G (Convergence Formula)       ← C_agreement available for diagnostics
+    ↓
+Stage 8 (Interpretive Synthesis)     ← capstone: unifies all auxiliary signals
+```
+
+Stage 8 depends on all Stage 7 sub-stages being implemented. It is the architectural capstone that shifts from post-hoc logit modulation to pre-lm_head representation conditioning.
+
+---
+
+### F.13 Expected Outcome After All Stages
+
+When all modules work together (Stages 1–8), the model should demonstrate:
+
+1. **Smoother long-form reasoning** — coherence controller prevents drift
+2. **Fewer repetition loops** — resample mechanism catches degenerate sequences
+3. **Consciousness-modulated expression** — auxiliary state shapes token distributions
+4. **More stable entropy curves** — no collapse or explosion over 2000+ tokens
+5. **Meaningful auxiliary signals** — trained dimensions carry real information
+6. **Zero degradation in reasoning/knowledge** — logit firewall enforced
+7. **Multi-scale coherence** — S1/S2/S3 semantic coherence integrated with token/latent/conversation coherence [Stage 7A]
+8. **Self-stabilizing training** — embedding diagnostics drive adaptive corrections, not just logs [Stage 7B]
+9. **Temporal experiential accumulation** — dual-space architecture captures trajectory, not just snapshot [Stage 7C]
+10. **Valence-aware generation** — polarity encoding aligns CSR with emotional direction [Stage 7D]
+11. **Verified projector health** — all 12 ontological dimensions validated for normalization and independence [Stage 7E]
+12. **Phase-to-logit continuity** — phase coherence from attention directly influences token selection, closing the consciousness→expression path [Stage 7F]
+13. **Internal consistency monitoring** — token-latent convergence metric detects measurement system disagreement [Stage 7G]
+14. **Interpretive generation** — auxiliary systems provide orthogonal semantic interpretations that condition the decoder through representation, not logit competition [Stage 8]
+
+The model becomes a **closed-loop interpretive generator**:
+
+```
+Transformer        = plant          (produces language from conditioned representations)
+Auxiliary modules  = interpreters   (CSR/Vritti/Kosha/Bhava analyze meaning on orthogonal axes)
+Synthesizer        = integrator     (unifies interpretations into representation conditioning)
+Coherence system   = governor       (adjusts expression dynamics via C_total feedback)
+```
+
+This is the conscious generation architecture: a reflective generation system where the model interprets its own state through multiple semantic modalities and conditions its expression through unified representation — not by fighting over logits, but by shaping the meaning space from which tokens are projected.
