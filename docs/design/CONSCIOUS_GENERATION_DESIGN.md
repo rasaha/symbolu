@@ -6674,13 +6674,227 @@ Stage 4 (Unified Controller)          ← Requires Stages 1, 3; replaces simple 
 Stage 5 (Auxiliary Loss Training)     ← Independent training change; improves all stages
     ↓
 Stage 6 (Stability Verification)     ← Validates all stages; no rollback needed
+    ↓
+Stage 7A (SemanticCoherence)          ← Extends Stage 4; parallel with 7B, 7E
+Stage 7B (Adaptive Diagnostics)       ← Extends training; parallel with 7A, 7E
+Stage 7E (Projector Tests)            ← Test-only; parallel with 7A, 7B
+    ↓
+Stage 7C (Dual-Space / P_t)           ← Requires 7A
+    ↓
+Stage 7D (Polarity Encoding)          ← Requires 7C
 ```
 
 Each stage includes a kill switch (`enable: bool = True/False`) allowing individual stage rollback without affecting other stages.
 
+### F.10.6 Stage 7 — Remaining Gap Closures
+
+Stage 7 addresses five gaps not covered by Stages 1–6. These represent deeper architectural extensions that should only be attempted after Stages 1–6 are validated and stable.
+
+**Prerequisites:** All Stage 6 stability tests pass. Token change rate in healthy range (3–10%). No regressions in reasoning or knowledge benchmarks.
+
+---
+
+#### F.10.6.1 Gap A: SemanticCoherenceController Integration
+
+**Problem:** `semantic_coherence.py` provides `CoherenceLoss`, `LayerCoherenceModule`, and S1–S3 formulas (1,062 lines of code) — none of which are imported or used in `symbolu12_llm.py`. Stages 1–4 build new controllers (`CoherenceAwareDecoder`, `UnifiedCoherenceController`) rather than wiring the existing module.
+
+**Fix:**
+
+1. Import `LayerCoherenceModule` from `semantic_coherence.py` into `symbolu12_llm.py`
+2. Wire it as a per-layer coherence signal inside each `PhaseAttentionBlock`, computing S1 (token-level), S2 (sequence-level), and S3 (cross-layer) coherence
+3. Feed S1–S3 into `UnifiedCoherenceController` as additional inputs alongside C_token, C_latent, and C_conv
+4. Add `CoherenceLoss` to the auxiliary loss bundle from Stage 5
+
+**Integration point:**
+
+```python
+# In PhaseAttentionBlock.forward(), after attention computation:
+s1, s2, s3 = self.layer_coherence(hidden_state, attention_weights)
+
+# In UnifiedCoherenceController:
+C_total = (w1 * C_token + w2 * C_latent + w3 * C_conv
+           + w4 * S1 + w5 * S2 + w6 * S3)
+# where w4, w5, w6 are learned weights initialized to 0.0
+```
+
+**Bounded introduction:** Initialize S1–S3 weights to 0.0 so the system behaves identically to Stage 4 at start. Ramp weights over training steps with max bound of 0.15 each.
+
+**Success criteria:**
+- [ ] All three S-scores (S1, S2, S3) are non-trivial (variance > 0.01)
+- [ ] C_total with S-scores correlates more strongly with human coherence ratings than C_total without
+- [ ] No degradation in Stage 6 stability metrics
+- [ ] `CoherenceLoss` gradient magnitude < 0.1 × main LM loss gradient
+
+---
+
+#### F.10.6.2 Gap B: Embedding Diagnostics → Adaptive Feedback
+
+**Problem:** `embedding_diagnostics.py` tracks state projector drift, adapter gate magnitude, and per-primitive cache shifts — but results are printed to logs, never consumed by any adaptive mechanism.
+
+**Fix:**
+
+1. Refactor `embedding_diagnostics.py` to expose a `DiagnosticSignals` dataclass instead of printing
+2. Feed `DiagnosticSignals` into a new `AdaptiveDiagnosticController` that adjusts:
+   - State projector learning rate when drift exceeds threshold
+   - Adapter gate clipping when magnitude spikes
+   - Primitive cache refresh frequency when shift exceeds tolerance
+3. Wire `AdaptiveDiagnosticController` into the training loop alongside Stage 5 auxiliary losses
+
+**Diagnostic signals and their adaptive responses:**
+
+```
+┌──────────────────────┬───────────────┬──────────────────────────────┐
+│ Diagnostic Signal    │ Threshold     │ Adaptive Response            │
+├──────────────────────┼───────────────┼──────────────────────────────┤
+│ Projector drift      │ > 0.05/step   │ Reduce projector LR by 50%   │
+│ Adapter gate mag     │ > 2.0         │ Clip gate to [-1.5, 1.5]     │
+│ Primitive cache Δ    │ > 0.1/epoch   │ Trigger cache recomputation  │
+│ Component norm ratio │ > 3.0         │ Apply per-component norm     │
+└──────────────────────┴───────────────┴──────────────────────────────┘
+```
+
+**Success criteria:**
+- [ ] `DiagnosticSignals` dataclass replaces all print statements
+- [ ] Adaptive responses trigger correctly when thresholds are crossed (unit tested)
+- [ ] Projector drift stabilizes within 5% of initial norm over 1000 training steps
+- [ ] No regression in Stage 6 stability metrics
+
+---
+
+#### F.10.6.3 Gap C: Dual-Space Architecture (Representational + Experiential)
+
+**Problem:** The design document specifies a dual-space architecture with a representational subspace (standard hidden state) and an experiential subspace (P_t with latent recurrence). `symbolu12_llm.py` has only a single hidden state `x`. The central recurrence equation `P_t = g_t ⊙ (ρ P_{t-1}) + u_t + λ W_c c_t` is not implemented.
+
+**Fix:**
+
+1. Introduce a parallel experiential state `P_t` of dimension `d_exp` (default: 64) alongside the hidden state `x`
+2. Implement the recurrence at the end of each transformer block:
+   ```python
+   g_t = sigmoid(W_g @ x_t)                    # gating vector
+   u_t = W_u @ x_t                              # input projection
+   c_t = coherence_embedding(C_total)            # coherence context
+   P_t = g_t * (rho * P_{t-1}) + u_t + lam * W_c @ c_t
+   ```
+3. Feed `P_t` into the `AuxiliaryModulator` (Stage 2) as an additional signal source
+4. Enforce stability constraints: `ρ < 1.0` (init 0.95), `λ ≤ 0.1` (init 0.01), `spectral_norm(W_c) ≤ 1.0`
+
+**Architecture change:**
+
+```
+hidden_state x ──→ lm_head(x) ──→ base_logits
+      │
+      ├──→ experiential_gate(x) ──→ g_t
+      ├──→ experiential_input(x) ──→ u_t
+      │
+      └──→ P_t = g_t ⊙ (ρ P_{t-1}) + u_t + λ W_c c_t
+                  │
+                  └──→ AuxiliaryModulator (as additional signal)
+```
+
+**Bounded introduction:** Initialize `λ = 0.0` so `P_t` accumulates but does not influence logits. Ramp `λ` during fine-tuning with spectral norm monitoring.
+
+**Success criteria:**
+- [ ] `P_t` norm remains bounded (< 10.0) over 4096-token sequences
+- [ ] `ρ` remains < 1.0 throughout training (enforced by sigmoid parameterization)
+- [ ] `spectral_norm(W_c) ≤ 1.0` at all checkpoints
+- [ ] P_t signal provides information gain over x alone (measured by auxiliary probe accuracy)
+- [ ] No degradation in main LM loss when λ = 0.0 (null integration test)
+
+---
+
+#### F.10.6.4 Gap D: Polarity Encoding (Varna Polarity Gates)
+
+**Problem:** The design specifies polarity encoding `c = (1-φ)/2 · v_neg + (1+φ)/2 · v_pos` where φ is a learned polarity scalar. The current CSR implementation uses standard bilinear projections with no polarity gates.
+
+**Fix:**
+
+1. Extend `CSRTokenScorer` with a polarity gate:
+   ```python
+   phi = tanh(W_phi @ onto_state)               # polarity ∈ [-1, 1]
+   v_neg = W_neg @ hidden_state                  # negative pole embedding
+   v_pos = W_pos @ hidden_state                  # positive pole embedding
+   c_polar = (1 - phi) / 2 * v_neg + (1 + phi) / 2 * v_pos
+   S_csr_polar = bilinear(c_polar, reference)    # polarity-aware CSR
+   ```
+2. Replace the existing CSR score in `AuxiliaryModulator` with `S_csr_polar`
+3. Maintain backward compatibility: when `phi = 0`, the formula reduces to `(v_neg + v_pos) / 2`, which should approximate the original bilinear output
+
+**Success criteria:**
+- [ ] Polarity values φ show meaningful variation across ontological states (std > 0.1)
+- [ ] Polarity-aware CSR correlates more strongly with human valence ratings than standard CSR
+- [ ] When φ is clamped to 0, output matches Stage 2 baseline within tolerance (< 0.5% token change)
+- [ ] No increase in generation latency > 5%
+
+---
+
+#### F.10.6.5 Gap E: State Projector Component Normalization Tests
+
+**Problem:** The state projector maps 768D hidden states to 12D ontological space, but no test validates that the 12 components maintain proper normalization, orthogonality, or that individual components don't dominate.
+
+**Fix:**
+
+Add the following integration tests to the Stage 6 test suite:
+
+```python
+def test_state_projector_component_normalization():
+    """Each of the 12 ontological dimensions should contribute meaningfully."""
+    # 1. Component variance test
+    onto_states = collect_onto_states(model, test_corpus)  # [N, 12]
+    per_dim_var = onto_states.var(dim=0)                   # [12]
+    assert per_dim_var.min() > 0.01, "Dead ontological dimension detected"
+    assert per_dim_var.max() / per_dim_var.min() < 100, "Dimension dominance detected"
+
+    # 2. Component orthogonality test
+    W = model.state_projector.weight                       # [12, 768]
+    cosine_sim = (W @ W.T) / (W.norm(dim=1, keepdim=True) @ W.norm(dim=1, keepdim=True).T)
+    off_diagonal = cosine_sim - torch.eye(12)
+    assert off_diagonal.abs().max() < 0.5, "Projector components not sufficiently independent"
+
+    # 3. Gradient flow test
+    loss = model(test_input)["logits"].sum()
+    loss.backward()
+    grad_norms = model.state_projector.weight.grad.norm(dim=1)  # [12]
+    assert (grad_norms > 0).all(), "Dead gradient in state projector dimension"
+
+    # 4. Projection stability test
+    onto_1 = model.state_projector(hidden_states)
+    onto_2 = model.state_projector(hidden_states + 0.01 * torch.randn_like(hidden_states))
+    drift = (onto_1 - onto_2).norm(dim=1).mean()
+    assert drift < 0.5, f"State projector too sensitive to input perturbation: {drift}"
+```
+
+**Success criteria:**
+- [ ] All 12 dimensions have variance > 0.01 across test corpus
+- [ ] Max/min variance ratio < 100
+- [ ] Off-diagonal cosine similarity < 0.5
+- [ ] All dimensions receive gradient flow
+- [ ] Perturbation stability: drift < 0.5 for ε = 0.01
+
+---
+
+#### F.10.6.6 Stage 7 Dependencies and Ordering
+
+```
+Stage 6 (Stability Verification)     ← ALL Stage 6 tests must pass
+    ↓
+Stage 7A (SemanticCoherenceController)  ← Extends Stage 4; independent of 7B–7E
+Stage 7B (Embedding Diagnostics)        ← Extends training loop; independent of 7A,7C–7E
+Stage 7E (State Projector Tests)        ← Test-only; independent; can run in parallel
+    ↓
+Stage 7C (Dual-Space Architecture)      ← Requires 7A (uses extended C_total)
+    ↓
+Stage 7D (Polarity Encoding)            ← Requires 7C (uses experiential state for polarity context)
+```
+
+Stages 7A, 7B, and 7E can be implemented in parallel. Stage 7C depends on 7A. Stage 7D depends on 7C.
+
+Each sub-stage includes a kill switch (`enable: bool = True/False`) consistent with Stages 1–6.
+
+---
+
 ### F.11 Expected Outcome After All Stages
 
-When all modules work together, the model should demonstrate:
+When all modules work together (Stages 1–7), the model should demonstrate:
 
 1. **Smoother long-form reasoning** — coherence controller prevents drift
 2. **Stronger emotional alignment** — vritti/bliss modulation guides tone
@@ -6688,6 +6902,11 @@ When all modules work together, the model should demonstrate:
 4. **More stable entropy curves** — no collapse or explosion over 2000+ tokens
 5. **Meaningful auxiliary signals** — trained dimensions carry real information
 6. **Zero degradation in reasoning/knowledge** — logit firewall enforced
+7. **Multi-scale coherence** — S1/S2/S3 semantic coherence integrated with token/latent/conversation coherence [Stage 7A]
+8. **Self-stabilizing training** — embedding diagnostics drive adaptive corrections, not just logs [Stage 7B]
+9. **Temporal experiential accumulation** — dual-space architecture captures trajectory, not just snapshot [Stage 7C]
+10. **Valence-aware generation** — polarity encoding aligns CSR with emotional direction [Stage 7D]
+11. **Verified projector health** — all 12 ontological dimensions validated for normalization and independence [Stage 7E]
 
 The model becomes a **closed-loop language generator**:
 
