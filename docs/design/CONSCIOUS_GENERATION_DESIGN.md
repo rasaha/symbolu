@@ -5484,3 +5484,1217 @@ The number of training steps should be adjusted based on dataset size and comple
 - When in doubt, err on the side of more steps and use early stopping based on validation PPL
 
 When switching to a new dataset, use `--resume_weights_only` to keep the learned CG module weights but reset the optimizer state and curriculum position, allowing the curriculum to re-adapt to the new data distribution.
+
+---
+
+## Appendix F — Gaps Implementation: Conscious Generation Integration Roadmap
+
+### F.0 Purpose and Philosophy
+
+This appendix defines a structured implementation plan to close the gap between the auxiliary consciousness measurements (CSR, Vritti, Kosha, Bliss, Bhava, coherence metrics) and actual token generation. Currently, these systems exist as training-time modules and observation instruments but are **not wired into the generation loop** of `symbolu12_llm.py`.
+
+**Core Philosophy:**
+
+```
+Wire → Measure → Stabilize → Expand
+```
+
+Each stage must be validated before proceeding to the next. The goal is to improve generation quality (coherence, emotional alignment, narrative flow) without degrading reasoning capability or knowledge accuracy.
+
+**Anti-Pattern to Avoid:**
+
+```
+measurement → complexity
+```
+
+Every integration must demonstrate measurable improvement, not just architectural sophistication.
+
+**Completion Gate for Each Stage:**
+
+1. Design document section (this appendix)
+2. Implementation code
+3. Measurement instrumentation
+4. Ablation tests
+5. Success criteria met
+
+---
+
+### F.1 Architectural Gap Analysis
+
+#### F.1.1 Current Generation Path
+
+The current generation pipeline in `symbolu12_llm.py:584–636` is a standard autoregressive decoder:
+
+```python
+# symbolu12_llm.py:584-636 (current implementation)
+for _ in range(max_new_tokens):
+    output = self.forward(generated, return_ontological=return_ontological)
+    logits = output["logits"][:, -1, :] / temperature  # Line 587
+
+    # Top-k filtering (lines 590-592)
+    # Top-p filtering (lines 595-604)
+
+    probs = F.softmax(logits, dim=-1)                  # Line 607
+    next_token = torch.multinomial(probs, num_samples=1)  # Line 608
+
+    # Ontological data is recorded but NEVER consumed (lines 614-618)
+    if return_ontological:
+        onto_data.append({
+            "ontological": output["ontological"][:, -1, :].cpu(),
+            "coherence": output["coherence"][:, -1, :].cpu(),
+        })
+```
+
+**Key observation:** `logits = self.lm_head(x)` at line 496 uses only the 768D hidden state. The 12D ontological projection, 144D Bhava matrix, and coherence scalar are computed (`return_ontological=True`) but never influence token selection.
+
+#### F.1.2 Existing Modules NOT Wired into Generation
+
+| Module | Location | Status |
+|--------|----------|--------|
+| `CSRTokenScorer` | `training/conscious_generation/primitives/csr_scorer.py` | Training-only |
+| `VrittiTokenScorer` | `training/conscious_generation/primitives/vritti_scorer.py` | Training-only |
+| `KoshaPrimitiveRouter` | `training/conscious_generation/governance/kosha_router.py` | Training-only |
+| `BlissTokenGate` | `training/conscious_generation/governance/bliss_gate.py` | Training-only |
+| `IntegratedTokenScorer` | `training/conscious_generation/integration/token_scorer.py` | Training-only |
+| `FieldIntegratedSoftmax` | `training/conscious_generation/integration/field_softmax.py` | Training-only |
+| `LogitModulator` | `inference/logit_modulation.py` | Exists, not called |
+| `EntropySinkInference` | `inference/csr_inference.py` | Exists, not called |
+| `SynthesisGateInference` | `inference/csr_inference.py` | Exists, not called |
+| `SemanticCoherenceController` | `core/coherence/semantic_coherence.py` | Not imported by LLM |
+
+#### F.1.3 Three Disconnected Coherence Systems
+
+| Level | System | Scope | Integration |
+|-------|--------|-------|-------------|
+| Training | `BlissCoherenceFunctional` (`training/unified/bliss_coherence.py`) | Per-layer B scalar, gates λ_eff | Only during training |
+| Token | `PrimitiveAuxiliaryLosses` (`training/conscious_generation/losses/`) | L_jepa, L_csr, L_vritti, L_guna | Contrastive loss only |
+| Conversation | `CoherenceEngine` (`core/coherence/coherence_engine.py`) | 50+ fields, multi-turn | No model feedback |
+
+**No bridge layer** aggregates token-level primitive scores into conversation-level coherence, or propagates training-time bliss insights into inference decisions.
+
+#### F.1.4 Bhava Information Collapse
+
+The `BhavaRelationshipLayer` computes the full 12×12 outer product (144D relational structure) but `coherence_net` immediately collapses it to a single scalar. The rich relational structure between ontological layers is discarded before it can influence generation.
+
+---
+
+### F.2 Stage 0 — Baseline System Capture
+
+#### F.2.1 Objective
+
+Create a reproducible baseline before any integration. Instrument the generation loop to log auxiliary state per-token without modifying generation behavior.
+
+#### F.2.2 Current Generation Path (Documented)
+
+```
+hidden_state x
+    ↓
+lm_head(x)                    → logits           [symbolu12_llm.py:496]
+    ↓
+temperature scaling            → logits / T       [symbolu12_llm.py:587]
+    ↓
+top-k / top-p filtering                           [symbolu12_llm.py:590-604]
+    ↓
+softmax → multinomial                             [symbolu12_llm.py:607-608]
+    ↓
+token
+```
+
+Auxiliary computations exist but are observation-only:
+
+- CSR scoring (`csr_scorer.py`) — `S_csr(w) = r_t^T M_csr r_w`
+- Vritti scoring (`vritti_scorer.py`) — `S_vritti(w) = q_t^(v) · q_w^(v)` over 5-simplex
+- Kosha routing (`kosha_router.py`) — `α_t = softmax(W_k [h_t ; o_t]) ∈ Δ⁵`
+- Bliss gate (`bliss_gate.py`) — `B(w) = exp(-λ_B · D(w))`
+- Bhava state (`symbolu12_llm.py:503`) — 12D ontological + 144D relational → scalar coherence
+- Coherence metrics (`coherence_engine.py`) — 50+ fields per turn
+
+#### F.2.3 Implementation — Instrumentation Only
+
+Add a `GenerationTracer` class to `inference/generation_tracer.py`:
+
+```python
+class GenerationTracer:
+    """Per-token instrumentation for baseline capture. No generation modification."""
+
+    def __init__(self, model, csr_scorer=None, vritti_scorer=None,
+                 kosha_router=None, bliss_gate=None):
+        self.model = model
+        self.csr_scorer = csr_scorer
+        self.vritti_scorer = vritti_scorer
+        self.kosha_router = kosha_router
+        self.bliss_gate = bliss_gate
+        self.trace = []
+
+    def record_token(self, token_id, logits, hidden_state, onto_state=None):
+        """Record per-token auxiliary measurements without modifying generation."""
+        entry = {
+            "token_id": token_id,
+            "logit_entropy": -(F.softmax(logits, -1) * F.log_softmax(logits, -1)).sum().item(),
+            "token_prob": F.softmax(logits, -1)[0, token_id].item(),
+            "hidden_norm": hidden_state.norm().item(),
+        }
+        if onto_state is not None:
+            entry["bhava_coherence"] = onto_state.get("coherence", None)
+        if self.csr_scorer is not None:
+            entry["csr_score"] = self._compute_csr(token_id, hidden_state, onto_state)
+        if self.vritti_scorer is not None:
+            entry["vritti_vector"] = self._compute_vritti(hidden_state, onto_state)
+        if self.kosha_router is not None:
+            entry["kosha_alpha"] = self._compute_kosha(hidden_state, onto_state)
+        if self.bliss_gate is not None:
+            entry["bliss"] = self._compute_bliss(hidden_state, onto_state)
+        self.trace.append(entry)
+
+    def export(self, path="generation_trace.json"):
+        """Export trace to JSON for offline analysis."""
+        import json
+        with open(path, 'w') as f:
+            json.dump(self.trace, f, indent=2)
+```
+
+#### F.2.4 Output Artifact — `generation_trace.json`
+
+Per-token trace format:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `token_id` | int | Sampled token index |
+| `logit_entropy` | float | Shannon entropy of logit distribution H(softmax(z)) |
+| `token_prob` | float | Probability assigned to selected token |
+| `hidden_norm` | float | L2 norm of hidden state ‖h_t‖₂ |
+| `csr_score` | float | CSR bilinear score S_csr(w) |
+| `vritti_vector` | float[5] | Vritti distribution [FACT, ERROR, IMAGINATION, VOID, MEMORY] |
+| `kosha_alpha` | float[6] | Kosha routing weights [base, ontology, jepa, csr, vritti, guna] |
+| `bliss` | float | Bliss coherence gate B(w) ∈ [0.01, 1] |
+| `bhava_coherence` | float | Bhava scalar coherence |
+
+#### F.2.5 Baseline Statistics to Compute
+
+From the trace, compute:
+
+| Metric | Formula | Expected Range |
+|--------|---------|----------------|
+| Mean logit entropy | μ(H) across all tokens | 5.0 – 8.0 |
+| Coherence distribution | histogram of B(w) values | Should span [0.01, 1] |
+| Token repetition rate | # repeated n-grams / total n-grams | < 15% (healthy) |
+| Long-form drift rate | cosine(h_t, h_{t-50}) mean for t > 100 | > 0.3 (no collapse) |
+| CSR score distribution | μ(S_csr), σ(S_csr) | Should have meaningful variance |
+| Vritti entropy | H(vritti_vector) per token | > 0.5 bits (not collapsed) |
+| Kosha alpha entropy | H(α_t) per token | > 1.0 bits (not collapsed) |
+
+#### F.2.6 Success Criteria
+
+- [ ] Baseline `generation_trace.json` produced for ≥ 3 standard prompts
+- [ ] All metrics computed and recorded
+- [ ] No generation behavior modified (exact same output with/without tracer)
+- [ ] Statistics establish clear reference values for all subsequent stages
+
+---
+
+### F.3 Stage 1 — Generation Becomes Coherence-Aware
+
+#### F.3.1 Objective
+
+Allow generation to respond to coherence signals by modulating decoding policy (temperature, top_p), **without altering logits**. This is the safest possible control mechanism — the transformer's knowledge and reasoning remain untouched; only expression dynamics change.
+
+#### F.3.2 Architecture
+
+```
+logits
+    ↓
+coherence controller              [NEW — CoherenceAwareDecoder]
+    ↓
+decoding policy adjustment         temperature, top_p modified
+    ↓
+sampling
+```
+
+**Logit firewall enforced:** The coherence controller cannot modify logit values. It only adjusts sampling parameters.
+
+#### F.3.3 Design — CoherenceAwareDecoder
+
+New module: `inference/coherence_aware_decoder.py`
+
+```python
+@dataclass
+class CoherenceDecoderConfig:
+    """Configuration for coherence-aware decoding policy."""
+    coherence_threshold_low: float = 0.4      # Below this: reduce temperature
+    coherence_threshold_critical: float = 0.2  # Below this: resample
+    temperature_dampening: float = 0.8         # Multiplier when coherence low
+    top_p_cap: float = 0.85                    # Max top_p when coherence low
+    max_resample_attempts: int = 2             # Resamples before accepting
+    enable: bool = True                        # Master switch
+
+
+class CoherenceAwareDecoder:
+    """
+    Modulates sampling policy based on coherence signals.
+
+    Invariants:
+    - NEVER modifies logit values
+    - NEVER modifies model weights
+    - Only adjusts: temperature, top_p, resample decision
+    """
+
+    def __init__(self, config: CoherenceDecoderConfig = None):
+        self.config = config or CoherenceDecoderConfig()
+
+    def adjust_policy(self, coherence: float, base_temperature: float,
+                      base_top_p: float) -> dict:
+        """Compute adjusted decoding parameters from coherence score."""
+        if not self.config.enable:
+            return {"temperature": base_temperature, "top_p": base_top_p,
+                    "should_resample": False}
+
+        temperature = base_temperature
+        top_p = base_top_p
+        should_resample = False
+
+        if coherence < self.config.coherence_threshold_low:
+            temperature = base_temperature * self.config.temperature_dampening
+            top_p = min(base_top_p, self.config.top_p_cap)
+
+        if coherence < self.config.coherence_threshold_critical:
+            should_resample = True
+
+        return {
+            "temperature": temperature,
+            "top_p": top_p,
+            "should_resample": should_resample,
+        }
+```
+
+#### F.3.4 Integration into Generation Loop
+
+Modified `symbolu12_llm.py:generate_text()`:
+
+```python
+# BEFORE (current):
+logits = output["logits"][:, -1, :] / temperature
+# ... fixed top_k, top_p ...
+probs = F.softmax(logits, dim=-1)
+next_token = torch.multinomial(probs, num_samples=1)
+
+# AFTER (Stage 1):
+logits_raw = output["logits"][:, -1, :]
+
+# Compute coherence from auxiliary state
+coherence = output.get("coherence", None)
+if coherence is not None:
+    coherence_scalar = coherence[:, -1].mean().item()
+else:
+    coherence_scalar = 1.0  # No degradation if no signal
+
+# Adjust policy (logits untouched)
+policy = coherence_decoder.adjust_policy(
+    coherence_scalar, temperature, top_p
+)
+
+logits = logits_raw / policy["temperature"]
+# Apply top_k, top_p with policy-adjusted values
+# ... top_k filtering unchanged ...
+# ... top_p filtering uses policy["top_p"] ...
+
+probs = F.softmax(logits, dim=-1)
+next_token = torch.multinomial(probs, num_samples=1)
+
+# Resample if coherence critically low
+if policy["should_resample"]:
+    for attempt in range(coherence_decoder.config.max_resample_attempts):
+        candidate = torch.multinomial(probs, num_samples=1)
+        # Accept candidate with higher probability (more conservative)
+        if probs[0, candidate[0, 0]] > probs[0, next_token[0, 0]]:
+            next_token = candidate
+            break
+```
+
+#### F.3.5 Expected Behavioral Change
+
+**Baseline drift example:**
+
+```
+Explain why the sky is blue.
+
+The sky appears blue because sunlight scatters in the atmosphere.
+The scattering process involves molecules and particles interacting
+with light. In some philosophical contexts this can also be described
+metaphorically...  ← DRIFT: coherence dropped, model wandered
+```
+
+**Stage 1 output (coherence-aware):**
+
+```
+The sky appears blue because sunlight scatters in the atmosphere.
+Shorter wavelengths scatter more strongly than longer wavelengths.
+This effect, called Rayleigh scattering, causes blue light to
+dominate the sky's color.  ← STABLE: low coherence triggered
+                              conservative sampling
+```
+
+When coherence dropped after sentence 2:
+- Temperature lowered (0.7 → 0.56)
+- top_p capped (0.9 → 0.85)
+- Sampling became more conservative, selecting higher-probability tokens
+
+#### F.3.6 Measurements
+
+Per-token log additions:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coherence_before` | float | Coherence score before policy adjustment |
+| `coherence_after` | float | Coherence score after token is generated |
+| `temperature_used` | float | Actual temperature after adjustment |
+| `top_p_used` | float | Actual top_p after adjustment |
+| `resample_events` | int | Number of resamples triggered this token |
+
+#### F.3.7 Ablation Tests
+
+| Mode | Configuration | Expected Result |
+|------|--------------|-----------------|
+| `baseline` | Coherence-aware disabled (`enable=False`) | Current behavior |
+| `control` | Fixed temperature reduction (T×0.8 always) | Slightly more conservative |
+| `coherence_aware` | Full Stage 1 integration | Adaptive improvement |
+
+Compare across 50+ generation samples:
+
+| Metric | Baseline → Stage 1 |
+|--------|---------------------|
+| Semantic drift | Medium → Lower |
+| Repetition loops | Possible → Reduced |
+| Entropy spikes | Frequent → Smoothed |
+| Knowledge accuracy | Unchanged (firewall) |
+| Reasoning quality | Unchanged (firewall) |
+
+#### F.3.8 Success Criteria
+
+- [ ] Long-form coherence improves (measured by cosine similarity of hidden states across sentences)
+- [ ] Repetition rate decreases by ≥ 10% relative to baseline
+- [ ] Incoherent drift events (manual annotation) reduced by ≥ 25%
+- [ ] Perplexity on standard benchmarks unchanged (± 1%)
+- [ ] Knowledge accuracy unchanged
+- [ ] Resample events occur in < 5% of tokens (not over-triggering)
+
+---
+
+### F.4 Stage 2 — Auxiliary State Modulates Token Scoring
+
+#### F.4.1 Objective
+
+Allow auxiliary state (CSR, Bliss, Kosha) to influence token ranking while keeping transformer logits dominant. The modulation is **bounded** to prevent global distortion.
+
+#### F.4.2 Architecture
+
+```
+hidden_state
+    ↓
+lm_head                         → base_logits      [symbolu12_llm.py:496]
+    ↓
+auxiliary_state                  → modulation        [NEW — AuxiliaryModulator]
+    ↓
+final_logits = base_logits + modulation              [bounded: |mod| ≤ 0.1·σ(base)]
+    ↓
+coherence-aware decoding                             [Stage 1]
+    ↓
+sampling
+```
+
+#### F.4.3 Modulation Equation
+
+```
+modulation(w) = α₁ · S_csr(w) + α₂ · B(w) + α₃ · kosha_bias(w)
+```
+
+**Stability bound (critical):**
+
+```
+|modulation(w)| ≤ 0.1 × std(base_logits)
+```
+
+This ensures auxiliary signals can nudge token selection but never override the transformer's judgment.
+
+#### F.4.4 Design — AuxiliaryModulator
+
+New module: `inference/auxiliary_modulator.py`
+
+```python
+class AuxiliaryModulatorConfig:
+    alpha_csr: float = 0.03         # CSR resonance weight
+    alpha_bliss: float = 0.05       # Bliss coherence weight
+    alpha_kosha: float = 0.02       # Kosha routing bias weight
+    max_modulation_ratio: float = 0.1  # |mod| ≤ ratio × std(base_logits)
+    top_k_only: int = 50            # Only modulate top-k candidates
+    enable: bool = True
+
+
+class AuxiliaryModulator:
+    """
+    Applies bounded auxiliary modulation to base logits.
+
+    Invariant: |modulation| ≤ max_modulation_ratio × std(base_logits)
+    Applied only to top_k_only candidates to prevent global distortion.
+    """
+
+    def modulate(self, base_logits, csr_scores=None, bliss_scores=None,
+                 kosha_bias=None):
+        if not self.config.enable:
+            return base_logits
+
+        # Select top-k candidates
+        topk_vals, topk_ids = torch.topk(base_logits, self.config.top_k_only)
+
+        # Compute modulation for candidates only
+        mod = torch.zeros_like(topk_vals)
+        if csr_scores is not None:
+            mod += self.config.alpha_csr * csr_scores.gather(-1, topk_ids)
+        if bliss_scores is not None:
+            mod += self.config.alpha_bliss * bliss_scores.gather(-1, topk_ids)
+        if kosha_bias is not None:
+            mod += self.config.alpha_kosha * kosha_bias.gather(-1, topk_ids)
+
+        # Enforce stability bound
+        logit_std = base_logits.std(dim=-1, keepdim=True)
+        max_mod = self.config.max_modulation_ratio * logit_std
+        mod = torch.clamp(mod, -max_mod, max_mod)
+
+        # Apply modulation to top-k only
+        modulated = base_logits.clone()
+        modulated.scatter_(-1, topk_ids, topk_vals + mod)
+        return modulated
+```
+
+#### F.4.5 Integration with Existing Modules
+
+The modulation sources come from existing trained modules:
+
+| Signal | Source Module | Inference Adaptation |
+|--------|-------------|---------------------|
+| `S_csr(w)` | `CSRTokenScorer` (`csr_scorer.py`) | Use trained weights, forward-only |
+| `B(w)` | `BlissTokenGate` (`bliss_gate.py`) | Use trained λ_B and min_bliss |
+| `kosha_bias(w)` | `KoshaPrimitiveRouter` (`kosha_router.py`) | Use trained routing MLP |
+
+These modules are loaded from the CG checkpoint (`conscious_gen.*` state dict, see Appendix E.9) and used in inference-only mode (no gradients).
+
+#### F.4.6 Expected Behavioral Change
+
+**Prompt:** `Write a comforting message to someone feeling anxious.`
+
+**Baseline output:**
+
+```
+It is normal to feel anxious sometimes.
+You should try to relax and think positively.
+Everything will work out eventually.
+```
+
+**Stage 2 output (after vritti/bliss modulation):**
+
+```
+It's okay to feel anxious sometimes.
+Take a slow breath and give yourself a moment.
+You are allowed to move through this feeling at your own pace.
+```
+
+Token shifts caused by auxiliary modulation:
+
+| Baseline Token | Stage 2 Token | Reason |
+|---------------|---------------|--------|
+| should | can | Vritti: lower prescriptive mode |
+| try | take | CSR: higher resonance |
+| relax | breathe | Bliss: higher coherence agreement |
+
+#### F.4.7 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `base_token` | int | Token chosen by base logits alone |
+| `modulated_token` | int | Token chosen after modulation |
+| `delta_logit` | float | max |modulation| applied |
+| `token_change_flag` | bool | Whether modulation changed the selected token |
+| `modulation_ratio` | float | |mod| / std(base_logits) |
+
+#### F.4.8 Success Criteria — Token Change Rate
+
+```
+token_change_rate = #tokens_changed_by_modulation / total_tokens
+```
+
+**Healthy range: 3% – 10%**
+
+| Range | Interpretation |
+|-------|---------------|
+| < 1% | Modules doing nothing — weights too small or signals collapsed |
+| 1% – 3% | Marginal effect — consider increasing α weights |
+| **3% – 10%** | **Healthy modulation — auxiliary signals meaningfully engaged** |
+| 10% – 20% | Aggressive — monitor for quality degradation |
+| > 20% | **Generation unstable — reduce α weights immediately** |
+
+Additional criteria:
+
+- [ ] Emotional alignment score improves on affect-tagged benchmarks
+- [ ] Coherence variance decreases (smoother generation)
+- [ ] Perplexity unchanged (± 2%)
+- [ ] Knowledge accuracy unchanged
+- [ ] No new repetition patterns introduced
+
+---
+
+### F.5 Stage 3 — Bhava Relational Structure Preservation
+
+#### F.5.1 Objective
+
+Prevent the loss of ontological relational structure. Currently the 12×12 Bhava matrix (144D) is collapsed to a single scalar by `coherence_net`. Replace this with a vector compression that preserves relational information.
+
+#### F.5.2 Current Implementation
+
+```python
+# symbolu12_llm.py:BhavaRelationshipLayer
+bhava_matrix = torch.outer(onto_state, onto_state)   # 12×12 = 144D
+coherence = self.coherence_net(bhava_matrix.flatten()) # 144D → 1 scalar
+```
+
+**Problem:** The rich relational structure (which ontological axes are aligned, which are in tension) is discarded.
+
+#### F.5.3 Architecture — Vector Compression
+
+```
+Bhava 144D (12×12 matrix)
+    ↓
+BhavaVectorCompressor              [NEW]
+    ↓
+bhava_vector (16D)
+    ↓
+Used for: coherence computation, modulation signals, diagnostics
+```
+
+#### F.5.4 Design — BhavaVectorCompressor
+
+New module: `inference/bhava_compressor.py`
+
+```python
+class BhavaVectorCompressor(nn.Module):
+    """
+    Compresses 12×12 Bhava relationship matrix to 16D vector.
+    Preserves relational structure lost by scalar collapse.
+
+    Architecture: 144D → 64D (ReLU) → 16D
+    Also outputs scalar coherence for backward compatibility.
+    """
+
+    def __init__(self, bhava_dim: int = 12, output_dim: int = 16):
+        super().__init__()
+        input_dim = bhava_dim * bhava_dim  # 144
+        self.compressor = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim),
+        )
+        # Backward-compatible scalar coherence
+        self.coherence_head = nn.Linear(output_dim, 1)
+
+    def forward(self, bhava_matrix: torch.Tensor) -> dict:
+        flat = bhava_matrix.flatten(start_dim=-2)  # (..., 144)
+        bhava_vector = self.compressor(flat)        # (..., 16)
+        coherence = torch.sigmoid(self.coherence_head(bhava_vector))  # (..., 1)
+        return {
+            "bhava_vector": bhava_vector,
+            "coherence": coherence.squeeze(-1),
+        }
+```
+
+#### F.5.5 Integration Points
+
+The 16D `bhava_vector` feeds into:
+
+1. **Stage 1** (CoherenceAwareDecoder) — replaces scalar coherence with richer signal
+2. **Stage 2** (AuxiliaryModulator) — provides additional modulation signal
+3. **Stage 4** (UnifiedCoherenceController) — contributes to C_latent
+
+#### F.5.6 Expected Behavioral Change
+
+**Prompt:** `Describe the relationship between memory and identity.`
+
+**Baseline output (scalar coherence):**
+
+```
+Memory plays an important role in shaping identity.
+Our experiences help form who we are.
+```
+
+**Stage 3 output (vector coherence):**
+
+```
+Memory shapes identity because it carries the narrative of past experience.
+Without memory, the continuity of self begins to fragment.
+Identity emerges as the story the mind preserves across time.
+```
+
+**What changed:** Model maintains stronger conceptual consistency across sentences because the bhava_vector preserves *which* ontological relationships are active (e.g., MEMORY↔IDENTITY alignment), not just a scalar "how coherent."
+
+#### F.5.7 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bhava_vector` | float[16] | Compressed relational vector |
+| `bhava_vector_variance` | float | Variance across vector dimensions |
+| `bhava_vector_drift` | float | Cosine distance from previous token's bhava_vector |
+| `coherence_scalar` | float | Backward-compatible scalar (for comparison) |
+
+#### F.5.8 Success Criteria
+
+- [ ] bhava_vector shows meaningful variance across different semantic contexts (σ > 0.1 per dim)
+- [ ] Topic continuity improves (measured by sentence-level semantic similarity)
+- [ ] bhava_vector_drift correlates with topic transitions (r > 0.3)
+- [ ] Backward compatibility: scalar coherence output matches previous behavior (± 5%)
+
+---
+
+### F.6 Stage 4 — Unified Coherence Controller
+
+#### F.6.1 Objective
+
+Merge the three disconnected coherence systems into a single controller that produces one authoritative coherence signal for generation control.
+
+#### F.6.2 Current State — Three Independent Systems
+
+| System | Scope | Signal | Used By |
+|--------|-------|--------|---------|
+| `BlissTokenGate` | Token-level | B(w) = exp(-λ_B · D(w)) | Training only |
+| `PrimitiveAuxiliaryLosses` | Token-level | L_jepa, L_csr, L_vritti, L_guna | Training loss only |
+| `CoherenceEngine` | Conversation-level | 50+ metrics, quality_v3 | Pipeline only |
+
+**Problem:** No single coherence signal governs generation. Each system measures coherence independently and none feeds back into sampling.
+
+#### F.6.3 Architecture — UnifiedCoherenceController
+
+```
+┌─────────────────────────────────────────┐
+│         UnifiedCoherenceController       │
+│                                         │
+│   C_token ─────┐                        │
+│   (bliss gate)  │                       │
+│                 ├──→ C_total ──→ policy  │
+│   C_latent ────┘         │              │
+│   (bhava vector)         │              │
+│                          ↓              │
+│   C_conv ──────────→ diagnostics        │
+│   (conversation)                        │
+└─────────────────────────────────────────┘
+```
+
+#### F.6.4 Aggregation Formula
+
+```
+C_total = w_token · C_token + w_latent · C_latent + w_conv · C_conversation
+```
+
+Default weights:
+
+```
+w_token = 0.4    # Token-level Bliss agreement (most direct signal)
+w_latent = 0.3   # Bhava vector coherence (relational structure)
+w_conv = 0.3     # Conversation-level stability (long-range context)
+```
+
+Where:
+- `C_token` = mean B(w) from BlissTokenGate across recent K tokens
+- `C_latent` = sigmoid(coherence_head(bhava_vector)) from Stage 3
+- `C_conversation` = quality_v3 from CoherenceEngine (if available), else 0.7 default
+
+#### F.6.5 Design
+
+New module: `inference/unified_coherence_controller.py`
+
+```python
+@dataclass
+class UnifiedCoherenceConfig:
+    w_token: float = 0.4
+    w_latent: float = 0.3
+    w_conv: float = 0.3
+    ema_alpha: float = 0.1          # EMA smoothing for C_total
+    history_window: int = 20        # Tokens to average for C_token
+
+
+class UnifiedCoherenceController:
+    """
+    Single authoritative coherence signal for generation control.
+    Merges token-level, latent, and conversation-level coherence.
+    """
+
+    def __init__(self, config: UnifiedCoherenceConfig = None):
+        self.config = config or UnifiedCoherenceConfig()
+        self.c_total_ema = 0.7  # Initial optimistic value
+        self.bliss_history = []
+
+    def update(self, c_token=None, c_latent=None, c_conv=None):
+        """Compute unified coherence from available signals."""
+        # Use available signals, default to neutral for missing
+        ct = c_token if c_token is not None else 0.5
+        cl = c_latent if c_latent is not None else 0.5
+        cc = c_conv if c_conv is not None else 0.7
+
+        c_total = (self.config.w_token * ct
+                 + self.config.w_latent * cl
+                 + self.config.w_conv * cc)
+
+        # EMA smoothing to prevent jitter
+        self.c_total_ema = (self.config.ema_alpha * c_total
+                          + (1 - self.config.ema_alpha) * self.c_total_ema)
+
+        return {
+            "C_total": self.c_total_ema,
+            "C_token": ct,
+            "C_latent": cl,
+            "C_conversation": cc,
+        }
+```
+
+#### F.6.6 Integration — Replaces Stage 1 Coherence Source
+
+Stage 1's `CoherenceAwareDecoder` currently reads a single coherence scalar. After Stage 4, it reads `C_total` from the unified controller:
+
+```python
+# Stage 1 (before Stage 4):
+coherence_scalar = output["coherence"][:, -1].mean().item()
+
+# Stage 4 (unified):
+coherence_result = unified_controller.update(
+    c_token=bliss_mean,
+    c_latent=bhava_coherence,
+    c_conv=conversation_quality,
+)
+coherence_scalar = coherence_result["C_total"]
+```
+
+#### F.6.7 Expected Behavioral Change
+
+**Prompt:** `Explain quantum mechanics simply.`
+
+**Baseline (coherence signals disconnected):**
+
+```
+Quantum mechanics studies the behavior of particles.
+It involves wave functions and operators.
+The mathematics can be quite complicated...  ← COMPLEXITY SPIKE: no unified signal
+```
+
+**Stage 4 output (unified controller):**
+
+```
+Quantum mechanics describes how very small particles behave.
+Instead of having a fixed position, a particle is described
+by a probability wave. Measurements cause that wave to collapse
+into a specific outcome.  ← STABLE: controller suppressed complexity spike
+```
+
+#### F.6.8 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `C_token` | float | Token-level coherence (Bliss mean) |
+| `C_latent` | float | Latent coherence (Bhava vector) |
+| `C_conversation` | float | Conversation coherence (engine quality) |
+| `C_total` | float | Unified coherence (EMA-smoothed) |
+
+#### F.6.9 Success Criteria
+
+- [ ] C_total correlates with logit entropy (r > 0.3, negative)
+- [ ] C_total correlates inversely with repetition rate (r < -0.2)
+- [ ] C_total correlates inversely with semantic drift (r < -0.2)
+- [ ] Complexity spikes reduced by ≥ 30% vs Stage 1 alone
+- [ ] No increase in perplexity
+
+---
+
+### F.7 Stage 5 — Auxiliary Loss Supervision
+
+#### F.7.1 Objective
+
+Train auxiliary dimensions to remain meaningful representations, not noise. Currently the CG training pipeline has the loss functions but they are disabled by default (all `lambda_*` = 0.0 in config, see Appendix E.8).
+
+#### F.7.2 Loss Functions
+
+**CSR Alignment Loss:**
+
+```
+L_csr = cosine_distance(S_csr_predicted, S_csr_target)
+```
+
+Where `S_csr_target` is derived from phoneme-to-varna mapping of the correct next token.
+
+Source: `training/conscious_generation/losses/primitive_auxiliary.py` — InfoNCE or margin loss.
+
+**Vritti Classification Loss:**
+
+```
+L_vritti = cross_entropy(vritti_pred, vritti_label)
+```
+
+Where `vritti_label` ∈ {FACT, ERROR, IMAGINATION, VOID, MEMORY} is determined by context type.
+
+Source: `training/conscious_generation/losses/primitive_auxiliary.py` — per-primitive loss.
+
+**Kosha Distribution Regularization:**
+
+```
+L_kosha = KL(α_t || prior)
+```
+
+Where `prior` is either uniform or base-dominant depending on training stage.
+
+Source: `training/conscious_generation/losses/kosha_routing.py` — entropy regularization.
+
+**Bliss Coherence Loss:**
+
+```
+L_bliss = -log(B(w_correct)) + neg_weight · (-log(1 - B(w_negative)))
+```
+
+Source: `training/conscious_generation/losses/bliss_coherence.py` — contrastive Bliss loss.
+
+#### F.7.3 Total Training Loss
+
+```
+L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_bliss
+```
+
+**Recommended initial weights (conservative):**
+
+| Weight | Value | Rationale |
+|--------|-------|-----------|
+| λ₁ (CSR) | 0.01 | Start small — phoneme alignment is auxiliary |
+| λ₂ (Vritti) | 0.02 | Cognitive mode is more directly useful |
+| λ₃ (Kosha) | 0.005 | Regularization — prevent routing collapse |
+| λ₄ (Bliss) | 0.02 | Coherence gating is the primary governance signal |
+
+These map to existing CLI parameters (see Appendix E.8):
+
+```bash
+--lambda_csr_token 0.01
+--lambda_vritti_token 0.02
+--lambda_kosha_routing 0.005
+--lambda_bliss_token 0.02
+```
+
+#### F.7.4 Training Protocol
+
+Use the existing staged curriculum (Appendix E.6) with auxiliary losses enabled:
+
+1. **Stage A** (backbone stabilization): All λ = 0 (existing behavior)
+2. **Stage B** (ontology activation): Enable λ_kosha only
+3. **Stage C** (primitive activation): Enable λ_csr, λ_vritti
+4. **Stage D** (full integration): Enable λ_bliss, all losses active
+
+The PPL-gated curriculum ensures auxiliary losses only activate after the backbone has stabilized.
+
+#### F.7.5 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `loss_total` | float | Combined training loss |
+| `loss_token` | float | Standard next-token prediction loss |
+| `loss_csr` | float | CSR alignment auxiliary loss |
+| `loss_vritti` | float | Vritti classification auxiliary loss |
+| `loss_kosha` | float | Kosha routing regularization loss |
+| `loss_bliss` | float | Bliss coherence auxiliary loss |
+| `aux_gradient_norm` | float | L2 norm of gradients from auxiliary losses |
+| `backbone_gradient_norm` | float | L2 norm of gradients from L_token |
+
+#### F.7.6 Gradient Safety Monitoring
+
+```
+auxiliary_gradient_ratio = aux_gradient_norm / backbone_gradient_norm
+```
+
+**Safety bounds:**
+
+| Ratio | Action |
+|-------|--------|
+| < 0.01 | Auxiliary losses ineffective — increase λ weights |
+| **0.01 – 0.1** | **Healthy range — auxiliary signals training without dominating** |
+| 0.1 – 0.5 | Caution — monitor perplexity closely |
+| > 0.5 | **Danger — reduce λ weights immediately** |
+
+#### F.7.7 Success Criteria
+
+- [ ] Auxiliary losses converge (decreasing over training)
+- [ ] Perplexity does NOT increase (± 2% vs non-CG baseline)
+- [ ] Auxiliary gradient ratio stays in [0.01, 0.1] range
+- [ ] Token-change rate (Stage 2 metric) increases to 3–10% range
+- [ ] Vritti classification accuracy > 60% on held-out validation
+- [ ] Kosha entropy remains > 1.0 bits (no routing collapse)
+- [ ] Bliss distribution spans [0.1, 0.9] (not collapsed to 0 or 1)
+
+---
+
+### F.8 Stage 6 — Stability and Orthogonality Verification
+
+#### F.8.1 Objective
+
+Ensure control-plane signals do not destabilize generation. Verify architectural invariants under stress.
+
+#### F.8.2 Test 1 — Phase/Control Plane Orthogonality
+
+**Invariant (V11.0.0 contract):** Bhava (12D phase plane) must remain orthogonal to Control (16D Koshas/Vrittis/Gunas) in attention computation.
+
+**Test:**
+
+```python
+def test_phase_control_orthogonality(model, test_inputs):
+    """Verify control signals don't leak into phase rotation."""
+    for batch in test_inputs:
+        output = model(batch, return_ontological=True)
+        bhava_state = output["ontological"][:, :, :12]    # Phase plane
+        control_state = output["ontological"][:, :, 12:28]  # Control plane
+
+        # Correlation should be low
+        corr = pearson_correlation(
+            bhava_state.flatten(),
+            control_state.flatten()
+        )
+        assert abs(corr) < 0.3, f"Phase-control correlation {corr} exceeds threshold"
+```
+
+**Target:** `|corr(bhava, control)| < 0.3`
+
+#### F.8.3 Test 2 — Logit Stability Under Modulation
+
+**Invariant:** Modulation must remain bounded relative to base logits.
+
+**Test:**
+
+```python
+def test_modulation_stability(model, modulator, test_inputs):
+    """Verify auxiliary modulation stays within safety bounds."""
+    for batch in test_inputs:
+        base_logits = model(batch)["logits"]
+        modulated_logits = modulator.modulate(base_logits, ...)
+
+        delta = (modulated_logits - base_logits).abs()
+        logit_std = base_logits.std(dim=-1, keepdim=True)
+
+        # Modulation bounded by 10% of logit std
+        ratio = delta / (logit_std + 1e-8)
+        assert ratio.max() <= 0.1 + 1e-6, f"Modulation ratio {ratio.max()} exceeds 0.1"
+```
+
+**Target:** `max(|mod|) ≤ 0.1 × std(base_logits)` for all tokens
+
+#### F.8.4 Test 3 — Entropy Monitoring (Collapse Detection)
+
+**Invariant:** Generation entropy must not collapse to near-zero (deterministic repetition) or spike to near-maximum (random noise).
+
+**Test:**
+
+```python
+def test_entropy_stability(model, prompt, max_tokens=2000):
+    """Verify entropy remains in healthy range over long generation."""
+    trace = generate_with_trace(model, prompt, max_tokens)
+    entropies = [t["logit_entropy"] for t in trace]
+
+    # No collapse
+    assert min(entropies) > 1.0, f"Entropy collapsed to {min(entropies)}"
+    # No explosion
+    assert max(entropies) < 12.0, f"Entropy exploded to {max(entropies)}"
+    # Low variance (stable)
+    entropy_std = np.std(entropies)
+    assert entropy_std < 2.0, f"Entropy variance {entropy_std} too high"
+```
+
+**Target:** `1.0 < H(logits) < 12.0` for all tokens, `std(H) < 2.0`
+
+#### F.8.5 Test 4 — Long-Sequence Stability
+
+**Invariant:** Generation remains coherent and non-repetitive over >2000 tokens.
+
+**Test protocol:**
+
+1. Generate 2000+ tokens from 5 diverse prompts
+2. Measure:
+
+| Metric | Target |
+|--------|--------|
+| Entropy | Stable (no monotonic decrease) |
+| Repetition rate (4-gram) | < 5% |
+| Token oscillation (A-B-A-B patterns) | None detected |
+| Coherence (C_total) | > 0.3 at all points |
+| Hidden state norm | No unbounded growth |
+
+3. Generate under adversarial conditions:
+   - Contradictory prompt
+   - Prompt requesting infinite enumeration
+   - Prompt with embedded repetition seeds
+
+#### F.8.6 Test 5 — Auxiliary Module Kill Switch
+
+**Invariant:** Disabling all auxiliary modules must produce identical output to baseline.
+
+```python
+def test_kill_switch(model, prompt):
+    """Verify auxiliary modules can be cleanly disabled."""
+    # With auxiliary
+    output_aux = model.generate(prompt, enable_conscious_gen=True)
+
+    # Without auxiliary (kill switch)
+    output_base = model.generate(prompt, enable_conscious_gen=False)
+
+    # Base output should match pre-integration baseline exactly
+    # (when using same seed)
+    assert output_base == baseline_reference_output
+```
+
+#### F.8.7 Success Criteria
+
+- [ ] Phase/control correlation < 0.3 across all test inputs
+- [ ] Modulation ratio ≤ 0.1 enforced for all tokens
+- [ ] Entropy stable: 1.0 < H < 12.0, std < 2.0 over 2000 tokens
+- [ ] No repetition loops in any long-sequence test
+- [ ] No token oscillation patterns detected
+- [ ] Kill switch produces exact baseline output
+- [ ] No oscillations in C_total (monotonically smoothed by EMA)
+
+---
+
+### F.9 Final Integrated Architecture
+
+After all 6 stages, the generation pipeline becomes:
+
+```
+hidden_state x
+    │
+    ├──→ lm_head(x)                          → base_logits
+    │
+    ├──→ ontological(x)                      → 12D onto_state
+    │       ↓
+    │    bhava(onto)                          → 144D bhava_matrix
+    │       ↓
+    │    BhavaVectorCompressor               → 16D bhava_vector     [Stage 3]
+    │
+    ├──→ CSRTokenScorer(x, onto)             → S_csr(w)             [existing]
+    ├──→ VrittiTokenScorer(x, onto)          → S_vritti(w)          [existing]
+    ├──→ KoshaPrimitiveRouter(x, onto)       → α_t                  [existing]
+    ├──→ BlissTokenGate(T, α)                → B(w)                 [existing]
+    │
+    ├──→ AuxiliaryModulator                                         [Stage 2]
+    │       base_logits + bounded(α₁·csr + α₂·bliss + α₃·kosha)
+    │       → final_logits
+    │
+    ├──→ UnifiedCoherenceController                                 [Stage 4]
+    │       C_total = 0.4·C_token + 0.3·C_latent + 0.3·C_conv
+    │
+    ├──→ CoherenceAwareDecoder                                      [Stage 1]
+    │       C_total → temperature, top_p adjustment
+    │
+    └──→ sampling
+            → next_token
+```
+
+Auxiliary state summary:
+
+```
+┌───────────────────────────────────────────────────┐
+│              Auxiliary State Bundle                 │
+│                                                   │
+│   CSR score        S_csr(w)    bilinear resonance │
+│   Vritti vector    q_v(w)      5-class simplex    │
+│   Kosha routing    α_t         6-primitive Δ⁵     │
+│   Bhava vector     b_t         16D compressed     │
+│   Bliss gate       B(w)        coherence ∈[0,1]   │
+│   Unified C        C_total     smoothed aggregate │
+└───────────────────────────────────────────────────┘
+```
+
+### F.10 Key Design Principles
+
+#### F.10.1 Measurement → Control → Validation (Never Measurement → Complexity)
+
+Every integration must follow:
+
+1. **Measure** the auxiliary signal (is it meaningful? does it vary?)
+2. **Control** generation using the signal (bounded, reversible)
+3. **Validate** the control improves output (ablation, metrics)
+
+Never add architectural complexity without demonstrated measurement improvement.
+
+#### F.10.2 Logit Firewall
+
+The consciousness system **must not** directly modify knowledge or reasoning. It only influences expression dynamics:
+
+| Property | Effect |
+|----------|--------|
+| Coherence | Improves |
+| Emotional alignment | Improves |
+| Long text flow | Improves |
+| Empathy perception | Improves |
+| Reasoning | **Unchanged** |
+| Knowledge | **Unchanged** |
+
+#### F.10.3 Token Change Rate as Primary Health Metric
+
+```
+token_change_rate = #tokens_changed_by_modulation / total_tokens
+```
+
+| Range | Health |
+|-------|--------|
+| < 1% | Dead — modules doing nothing |
+| 1% – 3% | Marginal — increase weights |
+| **3% – 10%** | **Healthy** |
+| 10% – 20% | Aggressive — monitor quality |
+| > 20% | **Unstable — reduce weights immediately** |
+
+#### F.10.4 Stability Constraints
+
+The integrated system must enforce:
+
+| Constraint | Bound | Purpose |
+|-----------|-------|---------|
+| Modulation magnitude | \|mod\| ≤ 0.1 × std(base_logits) | Prevent logit distortion |
+| Coherence EMA | α = 0.1 | Prevent jitter |
+| Bliss floor | min_bliss = 0.01 | Prevent token zeroing |
+| Temperature dampening | ≥ 0.5 × base | Prevent over-conservative sampling |
+| Resample attempts | ≤ 3 | Prevent generation stalling |
+| Phase/control correlation | < 0.3 | Prevent plane leakage |
+
+#### F.10.5 Stage Dependencies and Rollback
+
+```
+Stage 0 (Baseline)
+    ↓
+Stage 1 (Coherence-Aware Decoding)    ← Can be disabled independently
+    ↓
+Stage 2 (Auxiliary Modulation)         ← Requires Stage 1; can be disabled
+    ↓
+Stage 3 (Bhava Compression)           ← Independent; feeds into Stages 1, 2, 4
+    ↓
+Stage 4 (Unified Controller)          ← Requires Stages 1, 3; replaces simple coherence
+    ↓
+Stage 5 (Auxiliary Loss Training)     ← Independent training change; improves all stages
+    ↓
+Stage 6 (Stability Verification)     ← Validates all stages; no rollback needed
+```
+
+Each stage includes a kill switch (`enable: bool = True/False`) allowing individual stage rollback without affecting other stages.
+
+### F.11 Expected Outcome After All Stages
+
+When all modules work together, the model should demonstrate:
+
+1. **Smoother long-form reasoning** — coherence controller prevents drift
+2. **Stronger emotional alignment** — vritti/bliss modulation guides tone
+3. **Fewer incoherent transitions** — unified coherence detects and suppresses
+4. **More stable entropy curves** — no collapse or explosion over 2000+ tokens
+5. **Meaningful auxiliary signals** — trained dimensions carry real information
+6. **Zero degradation in reasoning/knowledge** — logit firewall enforced
+
+The model becomes a **closed-loop language generator**:
+
+```
+Transformer     = plant          (produces language)
+CSR latent state = observer       (measures experiential trajectory)
+Coherence controller = controller (adjusts expression dynamics)
+```
+
+This is the conscious generation architecture: a reflective generation system where the model observes its own output through a different modality (phonemic/ontological) and adjusts its expression without altering its knowledge.
