@@ -7405,7 +7405,7 @@ Stage 8 depends on all Stage 7 sub-stages being implemented. It is the architect
 
 ### F.13 Expected Outcome After All Stages
 
-When all modules work together (Stages 1–8), the model should demonstrate:
+When all modules work together (Stages 1–9), the model should demonstrate:
 
 1. **Smoother long-form reasoning** — coherence controller prevents drift
 2. **Fewer repetition loops** — resample mechanism catches degenerate sequences
@@ -7421,6 +7421,7 @@ When all modules work together (Stages 1–8), the model should demonstrate:
 12. **Phase-to-logit continuity** — phase coherence from attention directly influences token selection, closing the consciousness→expression path [Stage 7F]
 13. **Internal consistency monitoring** — token-latent convergence metric detects measurement system disagreement [Stage 7G]
 14. **Interpretive generation** — auxiliary systems provide orthogonal semantic interpretations that condition the decoder through representation, not logit competition [Stage 8]
+15. **Validated attention mechanisms** — each intrinsic modulation (phase, Vṛtti, Guna) confirmed to contribute meaningful signal through post-training ablation audit [Stage 9]
 
 The model becomes a **closed-loop interpretive generator**:
 
@@ -7432,3 +7433,205 @@ Coherence system   = governor       (adjusts expression dynamics via C_total fee
 ```
 
 This is the conscious generation architecture: a reflective generation system where the model interprets its own state through multiple semantic modalities and conditions its expression through unified representation — not by fighting over logits, but by shaping the meaning space from which tokens are projected.
+
+### F.14 Stage 9 — Post-Training Attention Mechanism Ablation Audit
+
+#### F.14.1 Objective
+
+After the first stable training run reaches convergence, validate that each intrinsic attention modulation mechanism contributes meaningful signal. Remove or merge mechanisms that show negligible influence on trained behavior.
+
+**Prerequisite:** This stage runs only after:
+- First convergence plateau reached
+- Stable validation perplexity established
+- Generation quality is reasonable
+- Typically at 10–20% of planned training steps, or after the first LR decay
+
+**Rationale:** Before training, all mechanism parameters contain random weights, so ablation would measure initialization noise rather than learned contribution. Ablation is meaningful only when mechanisms have had the opportunity to learn useful representations.
+
+#### F.14.2 Mechanism Toggle Flags
+
+Each attention modulation mechanism must be independently disableable at runtime. Toggle flags should be added to model configuration during initial implementation (before training), so they are available when ablation is needed.
+
+```python
+class AttentionAblationConfig:
+    """Toggle flags for attention mechanism ablation testing."""
+    use_phase_sync: bool = True          # U3/U4 phase synchronization
+    use_vritti_modulation: bool = True    # Cognitive mode gating (temperature/magnitude)
+    use_guna_bias: bool = True           # Top-down directional embedding bias
+    use_dual_channel_intent: bool = False # Multiplicative intent alignment (disabled by default)
+```
+
+Each mechanism checks its flag and falls back to the unmodulated equivalent:
+
+**Phase synchronization** (`PhaseAttentionBlock`):
+```python
+if config.use_phase_sync:
+    attn_corr = torch.cos(phi_i - phi_j)  # Phase correlation
+else:
+    attn_corr = (Q @ K.T) / sqrt(d)       # Standard dot-product fallback
+```
+
+**Vṛtti modulation** (`unified_symbolu12.py`):
+```python
+if config.use_vritti_modulation:
+    temperature = base_temp * vritti_scale
+    scores = scores / temperature
+    scores = scores * (1 - nidra_damping)
+    scores = scores + smrti_position_bias
+else:
+    temperature = base_temp  # No cognitive gating
+```
+
+**Guna bias** (`BidirectionalGunaMapper`):
+```python
+if config.use_guna_bias:
+    topic_embedding = topic_embedding + guna_to_attention_bias(guna_state)
+else:
+    pass  # Topic embedding unmodified
+```
+
+**Dual-channel intent** (`PhaseAttentionLayer`):
+```python
+if config.use_dual_channel_intent:
+    score = s_content * (1 + alpha * s_align)
+else:
+    score = s_content  # No multiplicative alignment
+```
+
+#### F.14.3 Ablation Configurations
+
+Run the trained model in these configurations:
+
+| Configuration | Phase | Vṛtti | Guna | Intent | Purpose |
+|---------------|-------|-------|------|--------|---------|
+| Baseline | ON | ON | ON | OFF | Full system reference |
+| Phase OFF | OFF | ON | ON | OFF | Measure relational geometry contribution |
+| Vṛtti OFF | ON | OFF | ON | OFF | Measure cognitive gating contribution |
+| Guna OFF | ON | ON | OFF | OFF | Measure directional bias contribution |
+| Phase + Vṛtti only | ON | ON | OFF | OFF | Test Guna redundancy |
+| Phase + Guna only | ON | OFF | ON | OFF | Test Vṛtti redundancy |
+| Vṛtti + Guna only | OFF | ON | ON | OFF | Test Phase essentiality |
+| All OFF | OFF | OFF | OFF | OFF | Pure transformer baseline |
+
+#### F.14.4 Metrics
+
+**Metric 1 — Validation Perplexity (PPL)**
+
+$$PPL = e^{loss}$$
+
+| Configuration | PPL | ΔPPL (%) |
+|---------------|-----|----------|
+| Baseline | — | 0% |
+| Phase OFF | — | ? |
+| Vṛtti OFF | — | ? |
+| Guna OFF | — | ? |
+
+A useful mechanism typically shifts perplexity by ≥1–3%.
+
+**Metric 2 — Attention Entropy**
+
+$$H = -\sum p_i \log p_i$$
+
+Compute average entropy across all heads and layers.
+
+| Entropy change | Interpretation |
+|----------------|---------------|
+| No change | Mechanism has no attention routing effect |
+| Entropy ↑ | Mechanism was sharpening attention (its absence makes attention diffuse) |
+| Entropy ↓ | Mechanism was broadening attention (its absence makes attention narrow) |
+
+**Note:** For phase attention, entropy must be computed over the cosine correlation matrix, not standard softmax attention weights.
+
+**Metric 3 — Token Change Rate**
+
+Generate text with and without each mechanism using identical prompts and sampling seeds.
+
+$$\text{Change Rate} = \frac{\text{tokens different}}{\text{total tokens}}$$
+
+| Range | Interpretation |
+|-------|---------------|
+| 0–1% | Mechanism has negligible influence on generation |
+| 3–10% | Healthy influence range |
+| >15% | Mechanism dominates generation (verify stability) |
+
+**Metric 4 — Hidden State Perturbation**
+
+$$\Delta_h = \|h_{mod} - h_{base}\|_2 / \|h_{base}\|_2$$
+
+| Range | Interpretation |
+|-------|---------------|
+| < 0.01 | Negligible — mechanism is effectively dead |
+| 0.02–0.10 | Healthy contribution |
+| > 0.20 | Potentially destabilizing |
+
+#### F.14.5 Runtime Logging
+
+During training, log mechanism strength signals to detect dead mechanisms early:
+
+```python
+# Log per training step (sampled every N steps)
+log_dict = {
+    "phase/sync_lr": self.sync_lr.item(),
+    "phase/mean_coherence": phase_coherence.mean().item(),
+    "vritti/temperature_mean": vritti_temperature.mean().item(),
+    "vritti/nidra_damping_mean": nidra_weight.mean().item(),
+    "vritti/smrti_bias_mean": smrti_bias.abs().mean().item(),
+    "guna/bias_norm": guna_bias_vector.norm(dim=-1).mean().item(),
+    "guna/sattva_weight": guna_state[:, 0].mean().item(),
+    "guna/rajas_weight": guna_state[:, 1].mean().item(),
+    "guna/tamas_weight": guna_state[:, 2].mean().item(),
+}
+```
+
+If any mechanism's strength collapses toward zero during training (before the ablation audit), investigate whether it is receiving useful gradients.
+
+#### F.14.6 Long-Context Behavior Test
+
+Some mechanisms may contribute minimally to perplexity but significantly to long-range coherence. Test with prompts requiring:
+- Multi-paragraph summarization
+- Reference tracking across 1000+ tokens
+- Topic consistency over extended generation
+
+Disable each mechanism individually and evaluate:
+- Coherence (does the output maintain logical flow?)
+- Reference accuracy (are entities tracked correctly?)
+- Topic drift (does the model stay on subject?)
+
+#### F.14.7 Gradient Health Check
+
+During ablation runs, monitor gradient norms per mechanism:
+
+```python
+grad_norms = {
+    "phase_params": get_grad_norm(phase_parameters),
+    "vritti_params": get_grad_norm(vritti_parameters),
+    "guna_params": get_grad_norm(guna_parameters),
+}
+```
+
+If disabling a mechanism causes gradient norms in other mechanisms to spike or vanish, the disabled mechanism is structurally important for training stability even if its direct PPL contribution is small.
+
+#### F.14.8 Decision Rules
+
+| Mechanism | Keep if | Merge/remove if |
+|-----------|---------|-----------------|
+| Phase sync | ΔPPL ≥ 1% OR significant attention structure effect | — (core innovation, keep regardless) |
+| Vṛtti modulation | Token change rate ≥ 3% OR meaningful long-context improvement | Token change < 1% AND no long-context effect |
+| Guna bias | Improves long-context reasoning OR ΔPPL ≥ 1% | ΔPPL < 0.5% AND no coherence effect |
+| Dual-channel intent | Meaningful improvement when enabled | No measurable benefit (remains disabled) |
+
+**Interaction redundancy rule:** If pairwise combination tests show:
+
+$$PPL(\text{Phase + Vṛtti}) \approx PPL(\text{Phase + Vṛtti + Guna})$$
+
+then Guna is redundant with Phase + Vṛtti and should be removed or merged.
+
+#### F.14.9 Success Criteria
+
+- [ ] All four toggle flags implemented and tested (pre-training)
+- [ ] Runtime logging active during training (pre-training)
+- [ ] Full ablation matrix completed (post first convergence)
+- [ ] Each retained mechanism shows ≥1% PPL impact OR meaningful qualitative improvement
+- [ ] No more than 3 independent attention modulation axes remain active
+- [ ] Pairwise interaction tests confirm no redundancy between retained mechanisms
+- [ ] Results documented with quantitative evidence for each keep/remove decision
