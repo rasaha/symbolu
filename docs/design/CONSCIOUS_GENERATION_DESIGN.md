@@ -6572,17 +6572,26 @@ hidden_state x
     │       ↓
     │    BhavaVectorCompressor               → 16D bhava_vector     [Stage 3]
     │
+    ├──→ phase_coherence (from PhaseAttentionBlocks)                 [Stage 7F]
+    │       per-head phase angle std → aggregate → scalar
+    │
     ├──→ CSRTokenScorer(x, onto)             → S_csr(w)             [existing]
+    │       ↓ (optional: polarity gate)      → S_csr_polar(w)       [Stage 7D]
     ├──→ VrittiTokenScorer(x, onto)          → S_vritti(w)          [existing]
     ├──→ KoshaPrimitiveRouter(x, onto)       → α_t                  [existing]
     ├──→ BlissTokenGate(T, α)                → B(w)                 [existing]
     │
-    ├──→ AuxiliaryModulator                                         [Stage 2]
-    │       base_logits + bounded(α₁·csr + α₂·bliss + α₃·kosha)
+    ├──→ AuxiliaryModulator                                         [Stage 2 + 7F]
+    │       base_logits + bounded(α₁·csr + α₂·bliss + α₃·kosha + α₄·phase)
     │       → final_logits
     │
-    ├──→ UnifiedCoherenceController                                 [Stage 4]
-    │       C_total = 0.4·C_token + 0.3·C_latent + 0.3·C_conv
+    ├──→ UnifiedCoherenceController                                 [Stage 4 + 7G]
+    │       C_agreement = 1 - |C_token - C_latent|                  [Stage 7G]
+    │       C_total = 0.30·C_token + 0.25·C_latent
+    │              + 0.20·C_agreement + 0.25·C_conversation
+    │
+    ├──→ (optional) P_t experiential recurrence                     [Stage 7C]
+    │       P_t = g_t ⊙ (ρ P_{t-1}) + u_t + λ W_c c_t
     │
     ├──→ CoherenceAwareDecoder                                      [Stage 1]
     │       C_total → temperature, top_p adjustment
@@ -6594,16 +6603,20 @@ hidden_state x
 Auxiliary state summary:
 
 ```
-┌───────────────────────────────────────────────────┐
-│              Auxiliary State Bundle                 │
-│                                                   │
-│   CSR score        S_csr(w)    bilinear resonance │
-│   Vritti vector    q_v(w)      5-class simplex    │
-│   Kosha routing    α_t         6-primitive Δ⁵     │
-│   Bhava vector     b_t         16D compressed     │
-│   Bliss gate       B(w)        coherence ∈[0,1]   │
-│   Unified C        C_total     smoothed aggregate │
-└───────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│              Auxiliary State Bundle                     │
+│                                                       │
+│   CSR score        S_csr(w)    bilinear resonance     │
+│   Vritti vector    q_v(w)      5-class simplex        │
+│   Kosha routing    α_t         6-primitive Δ⁵         │
+│   Bhava vector     b_t         16D compressed         │
+│   Bliss gate       B(w)        coherence ∈[0,1]       │
+│   Phase coherence  φ_c         per-head aggregate     │  [Stage 7F]
+│   C_agreement      1-|Ct-Cl|   token-latent conv.    │  [Stage 7G]
+│   Experiential P   P_t         64D recurrent state    │  [Stage 7C]
+│   Polarity         φ           CSR valence gate       │  [Stage 7D]
+│   Unified C        C_total     4-term aggregate       │
+└───────────────────────────────────────────────────────┘
 ```
 
 ### F.10 Key Design Principles
@@ -6872,21 +6885,156 @@ def test_state_projector_component_normalization():
 
 ---
 
-#### F.10.6.6 Stage 7 Dependencies and Ordering
+#### F.10.6.6 Gap F: Phase Synchronization → Logit Path (Phase–Logit Bridge)
+
+**Problem:** `PhaseAttentionBlock` (lines 226–256) implements U3/U4 phase dynamics that correctly modulate attention weights, but phase coherence is lost before logit computation. The consciousness field constrains *how tokens attend to each other* but not *which tokens are generated*. Stage 2's `AuxiliaryModulator` re-introduces auxiliary signals post-attention, but this is a workaround — the phase signal itself (the φ rotation angles and their coherence) never reaches the logit layer.
+
+**Why Stage 2 is insufficient:** The `AuxiliaryModulator` uses CSR, Bliss, and Kosha scores, which are computed from the hidden state *after* phase attention. The phase coherence signal — how well the U3/U4 rotations maintained constructive interference across heads — is discarded after attention output projection. This means:
+- Two sequences with identical hidden states but different phase dynamics produce identical logits
+- The "consciousness field" influences representation but not expression
+
+**Fix:**
+
+1. Extract per-head phase coherence from `PhaseAttentionBlock` as a residual signal
+2. Aggregate across layers into a `phase_coherence_vector`
+3. Feed into `AuxiliaryModulator` as a fourth modulation source
+
+```python
+# In PhaseAttentionBlock.forward():
+# After phase rotation (lines 240-248)
+phase_angles = torch.atan2(q_rotated.imag, q_rotated.real)  # [B, H, T, D/2]
+phase_coherence_per_head = 1.0 - phase_angles.std(dim=-1).mean(dim=-1)  # [B, H]
+# High value = phases aligned (constructive); Low = phases scattered
+
+# New output added to block return:
+return hidden_state, phase_coherence_per_head
+
+# In SymboluLLM.forward(), aggregate across layers:
+phase_coherence_stack = torch.stack(phase_coherences, dim=1)  # [B, L, H]
+phase_coherence_vector = phase_coherence_stack.mean(dim=1)    # [B, H]
+phase_coherence_scalar = phase_coherence_vector.mean(dim=-1)  # [B]
+```
+
+4. Extend `AuxiliaryModulator` with phase term:
+
+```python
+# In AuxiliaryModulator.modulate():
+modulation(w) = α₁·S_csr(w) + α₂·B(w) + α₃·kosha_bias(w) + α₄·phase_coherence
+```
+
+Where `α₄` (init 0.0) controls phase influence on logits. The phase coherence scalar acts as a global modulation gain — when phases are coherent (constructive interference), auxiliary modulation is amplified; when phases are incoherent, modulation is damped.
+
+**Architecture change:**
+
+```
+PhaseAttentionBlock
+    ├──→ attention_output (into residual stream → hidden_state → lm_head)
+    │
+    └──→ phase_coherence_per_head ──→ aggregate across layers
+                                          ↓
+                                     phase_coherence_scalar
+                                          ↓
+                                     AuxiliaryModulator (α₄ term)
+                                          ↓
+                                     final_logits
+```
+
+**Bounded introduction:** Initialize `α₄ = 0.0`. Phase coherence is computed and logged (extending Stage 0 tracer) before activation. Ramp `α₄` after validating that phase coherence correlates with generation quality.
+
+**Success criteria:**
+- [ ] Phase coherence per-head values show meaningful variation (std > 0.05 across sequences)
+- [ ] Phase coherence correlates with downstream coherence metrics (Pearson r > 0.3)
+- [ ] With α₄ > 0, phase-coherent sequences show improved token selection (measured by human eval or perplexity on held-out continuation)
+- [ ] With α₄ = 0, output identical to Stage 2 baseline (null integration test)
+- [ ] No increase in forward pass latency > 3% (phase coherence is a lightweight computation)
+- [ ] Phase/control plane orthogonality (Stage 6 Test 1) still passes with |corr| < 0.3
+
+---
+
+#### F.10.6.7 Gap G: Convergence Metric Formula Alignment
+
+**Problem:** The design specification defines the convergence metric as `C_conv = 1 - |C_tok - C_lat|`, measuring the agreement between token-level and latent-level coherence. Stage 4's `UnifiedCoherenceController` uses `C_conversation` (from `CoherenceEngine.quality_v3`) as the third term in `C_total = w1·C_token + w2·C_latent + w3·C_conv`, which is a different formula with a different semantic meaning:
+
+| | Design Spec | Stage 4 Implementation |
+|---|---|---|
+| **Formula** | `C_conv = 1 - \|C_tok - C_lat\|` | `C_conv = CoherenceEngine.quality_v3` |
+| **Meaning** | Token–latent agreement | Conversation-level quality |
+| **Range** | [0, 1] where 1 = perfect agreement | [0, 1] where 1 = high quality |
+| **Signal** | Are the two coherence views converging? | Is the conversation coherent? |
+
+These measure different things. The design spec's formula detects *internal consistency* (do the two measurement systems agree?), while Stage 4 measures *external quality*.
+
+**Fix:**
+
+1. Implement the spec-defined convergence metric as `C_agreement`:
+
+```python
+# In UnifiedCoherenceController:
+C_agreement = 1.0 - abs(C_token - C_latent)
+```
+
+2. Retain `C_conversation` from the CoherenceEngine as a separate signal
+3. Extend `C_total` to include both:
+
+```python
+C_total = (w1 * C_token      +    # 0.30  token-level (Bliss gate)
+           w2 * C_latent      +    # 0.25  latent-level (Bhava)
+           w3 * C_agreement   +    # 0.20  token-latent convergence (spec formula)
+           w4 * C_conversation)    # 0.25  conversation quality (engine)
+```
+
+4. Log `C_agreement` alongside other coherence signals in the generation tracer
+
+**Diagnostic value of C_agreement:**
+
+```
+┌─────────────────────────────────┬───────────────────────────────────────┐
+│ C_agreement Value               │ Interpretation                        │
+├─────────────────────────────────┼───────────────────────────────────────┤
+│ > 0.9                          │ Token and latent coherence agree —     │
+│                                │ measurement systems consistent         │
+├─────────────────────────────────┼───────────────────────────────────────┤
+│ 0.5 – 0.9                     │ Partial disagreement — one system      │
+│                                │ sees degradation the other doesn't     │
+├─────────────────────────────────┼───────────────────────────────────────┤
+│ < 0.5                          │ Measurement systems diverged —         │
+│                                │ possible calibration issue or          │
+│                                │ fundamentally different signal         │
+└─────────────────────────────────┴───────────────────────────────────────┘
+```
+
+**Backward compatibility:** When `C_agreement` weight is 0.0, the formula reduces to the original Stage 4 three-term weighted sum (with renormalized weights).
+
+**Success criteria:**
+- [ ] `C_agreement` values distributed across [0, 1] with meaningful variance (not collapsed to 1.0)
+- [ ] `C_agreement` drops detectably (> 0.1 decrease) during known incoherent passages
+- [ ] Including `C_agreement` in `C_total` improves correlation with human coherence ratings vs. Stage 4 baseline
+- [ ] When `w3 = 0`, output matches Stage 4 exactly (null integration test)
+
+---
+
+#### F.10.6.8 Stage 7 Dependencies and Ordering
 
 ```
 Stage 6 (Stability Verification)     ← ALL Stage 6 tests must pass
     ↓
-Stage 7A (SemanticCoherenceController)  ← Extends Stage 4; independent of 7B–7E
-Stage 7B (Embedding Diagnostics)        ← Extends training loop; independent of 7A,7C–7E
-Stage 7E (State Projector Tests)        ← Test-only; independent; can run in parallel
+┌─────────────────────────────────────────────────────────────────────┐
+│ Parallel group (no interdependencies):                              │
+│                                                                     │
+│ Stage 7A (SemanticCoherenceController)  ← Extends Stage 4           │
+│ Stage 7B (Adaptive Diagnostics)         ← Extends training loop     │
+│ Stage 7E (State Projector Tests)        ← Test-only                 │
+│ Stage 7F (Phase–Logit Bridge)           ← Extends Stage 2           │
+│ Stage 7G (Convergence Formula)          ← Extends Stage 4           │
+└─────────────────────────────────────────────────────────────────────┘
     ↓
-Stage 7C (Dual-Space Architecture)      ← Requires 7A (uses extended C_total)
+Stage 7C (Dual-Space / P_t)             ← Requires 7A (extended C_total)
+                                            and 7G (C_agreement feeds into P_t)
     ↓
-Stage 7D (Polarity Encoding)            ← Requires 7C (uses experiential state for polarity context)
+Stage 7D (Polarity Encoding)            ← Requires 7C (experiential state)
 ```
 
-Stages 7A, 7B, and 7E can be implemented in parallel. Stage 7C depends on 7A. Stage 7D depends on 7C.
+Stages 7A, 7B, 7E, 7F, and 7G can be implemented in parallel. Stage 7C depends on 7A and 7G. Stage 7D depends on 7C.
 
 Each sub-stage includes a kill switch (`enable: bool = True/False`) consistent with Stages 1–6.
 
@@ -6907,6 +7055,8 @@ When all modules work together (Stages 1–7), the model should demonstrate:
 9. **Temporal experiential accumulation** — dual-space architecture captures trajectory, not just snapshot [Stage 7C]
 10. **Valence-aware generation** — polarity encoding aligns CSR with emotional direction [Stage 7D]
 11. **Verified projector health** — all 12 ontological dimensions validated for normalization and independence [Stage 7E]
+12. **Phase-to-logit continuity** — phase coherence from attention directly influences token selection, closing the consciousness→expression path [Stage 7F]
+13. **Internal consistency monitoring** — token-latent convergence metric detects measurement system disagreement [Stage 7G]
 
 The model becomes a **closed-loop language generator**:
 
