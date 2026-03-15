@@ -7773,3 +7773,451 @@ then Guna is redundant with Phase + Vṛtti and should be removed or merged.
 - [ ] No more than 3 independent attention modulation axes remain active
 - [ ] Pairwise interaction tests confirm no redundancy between retained mechanisms
 - [ ] Results documented with quantitative evidence for each keep/remove decision
+
+---
+
+### F.15 Stage 10 — Phase-VL-JEPA Multimodal Perception Integration
+
+#### F.15.1 Objective
+
+Integrate the Phase-VL-JEPA vision-language perception system (documented in `HYBRID_PHASE_JEPA_DESIGN.md`) into the conscious generation pipeline as a multimodal perception module. The Phase-VL-JEPA serves as the "Perception Body" — a predictive (not generative) system that observes visual input and produces 32D Sovereign State representations that feed the same interpretive conditioning pipeline (Stages 2, 4, 8) already built for text-only generation.
+
+**Why this stage exists:** Appendix F Stages 0–9 define the conscious generation pipeline for text-only language modeling. The Phase-VL-JEPA architecture is designed separately (`HYBRID_PHASE_JEPA_DESIGN.md`) but has no documented integration path into the CG pipeline. This stage closes that gap.
+
+#### F.15.2 Prerequisites
+
+- Stage 8 (PerspectiveSynthesizer) must be implemented and stable — multimodal perception feeds *into* the interpretive synthesis pathway
+- Stage 9 (ablation audit) should be complete for text-only — establishes a clean baseline before introducing a new modality
+- Existing JEPA modules (`symbolu/jepa/`) must be operational: `PhaseJEPAPredictor`, `TargetEncoder`, `SovereignStateProjector`, `VICRegLoss`
+
+#### F.15.3 Gap Analysis — What Is Missing
+
+The following components are specified in `HYBRID_PHASE_JEPA_DESIGN.md` Part II but are not implemented:
+
+| Component | Design Source | Status | Gap |
+|-----------|-------------|--------|-----|
+| `HybridPhaseBlock` | HPJD §11 | **Not implemented** | Local + global stream splitting for vision patches |
+| `WindowedQuadraticAttention` | HPJD §11 | **Not implemented** | O(W²) local texture attention for image patches |
+| `GeometricMaskCollator` | HPJD §11 | **Not implemented** | Quadrant / rotation / random masking strategies |
+| `PhaseSyncLoss` | HPJD §11 | **Not implemented** | Amplitude L2 + phase cosine distance for cross-modal alignment |
+| `SovereignPatentLoss` (BCVF, USE, SCC) | HPJD §13 | **Not implemented** | Patent-derived loss terms for phase coherence and entropy |
+| Vision encoder integration | HPJD §11 | **Not implemented** | Image patches → embeddings → HybridPhaseBlock |
+| Text-to-phase conditioning | HPJD §11 | **Not implemented** | `θ_geometric = tanh(W_phase @ text_emb) × π` rotation |
+| `SafeInference` / Mauna protocol | HPJD Ops | **Not implemented** | Silence output when phase entropy exceeds threshold |
+| VL-JEPA → CG pipeline bridge | — | **Not designed** | No specification for how VL-JEPA 32D output feeds InterpretiveConditioner / PerspectiveSynthesizer |
+| Multimodal Kosha routing | — | **Not designed** | How `α_t` adapts when visual perception is active |
+| Multimodal coherence (C_total) | — | **Not designed** | How UnifiedCoherenceController handles vision-conditioned states |
+| Multimodal training curriculum | — | **Not designed** | PPL-gated progression for vision-language joint training |
+
+#### F.15.4 Architecture — VL-JEPA Perception Module
+
+##### F.15.4.1 Vision Encoder
+
+```
+Image → PatchEmbedding → [B, N_patches, D]
+     → HybridPhaseBlock (local WindowedQuadratic + global PhaseAttention)
+     → h_vision [B, N_patches, 768]
+     → SovereignStateProjector → S_vision [B, N_patches, 32]
+```
+
+**HybridPhaseBlock** splits each layer into two streams:
+
+```python
+class HybridPhaseBlock(nn.Module):
+    """
+    Local stream:  WindowedQuadraticAttention — O(N × W²) for spatial texture
+    Global stream: PhaseAttention — O(N × D) for global structure via phase rotation
+    Merge:         h = gate · h_local + (1 - gate) · h_global
+    """
+
+    def __init__(self, hidden_dim: int = 768, window_size: int = 7, num_heads: int = 12):
+        super().__init__()
+        self.local_attn = WindowedQuadraticAttention(hidden_dim, window_size)
+        self.global_attn = PhaseAttention(hidden_dim, num_heads)  # existing module
+        self.gate = nn.Parameter(torch.tensor(0.5))               # learnable merge
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h_local = self.local_attn(x)
+        h_global = self.global_attn(x)
+        g = torch.sigmoid(self.gate)
+        return g * h_local + (1 - g) * h_global
+```
+
+**WindowedQuadraticAttention** provides local spatial processing:
+
+```python
+class WindowedQuadraticAttention(nn.Module):
+    """O(N × W²) attention over spatial windows for local texture features."""
+
+    def __init__(self, hidden_dim: int, window_size: int = 7):
+        super().__init__()
+        self.window_size = window_size
+        self.qkv = nn.Linear(hidden_dim, 3 * hidden_dim)
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Partition into non-overlapping windows, apply standard attention within each
+        # O(N × W²) where W = window_size
+        ...
+```
+
+##### F.15.4.2 Geometric Masking
+
+```python
+class GeometricMaskCollator:
+    """
+    Creates masking patterns for VL-JEPA self-supervised training.
+
+    Strategies:
+      - quadrant:  Mask one quadrant, predict from other three
+      - rotation:  Mask center region, condition on rotation angle text
+      - random:    Standard random patch masking (JEPA baseline)
+    """
+
+    def __init__(self, strategy: str = "quadrant", mask_ratio: float = 0.25):
+        self.strategy = strategy
+        self.mask_ratio = mask_ratio
+
+    def __call__(self, images: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        # Returns: (masked_patches, target_patches, conditioning_text)
+        ...
+```
+
+Rotation conditioning text maps angles to natural language:
+
+| Angle (rad) | Conditioning text |
+|-------------|-------------------|
+| 0.0 | "The image is upright with no rotation" |
+| π/2 | "The image is rotated ninety degrees clockwise" |
+| π | "The image is rotated one hundred eighty degrees" |
+| 3π/2 | "The image is rotated ninety degrees counter-clockwise" |
+
+##### F.15.4.3 Text-to-Phase Conditioning (Cross-Modal Bridge)
+
+The key innovation from `HYBRID_PHASE_JEPA_DESIGN.md`: text conditions visual prediction via phase rotation, not concatenation.
+
+```python
+class TextToPhaseConditioner(nn.Module):
+    """
+    Converts text embeddings to phase rotation angles that condition
+    the VL-JEPA predictor's attention pattern.
+
+    Standard VL-JEPA:  concat(text_emb, vision_emb) → predict
+    Phase-VL-JEPA:     vision_emb × e^{iθ(text)} → predict
+
+    Phase rotation is a NATIVE operation (addition of angles), not learned
+    matrix multiplication. Expected 2-3x faster convergence.
+    """
+
+    def __init__(self, text_dim: int, phase_dim: int):
+        super().__init__()
+        self.phase_proj = nn.Linear(text_dim, phase_dim)
+
+    def forward(self, text_emb: torch.Tensor) -> torch.Tensor:
+        # θ ∈ [-π, π] — phase rotation angles
+        return torch.tanh(self.phase_proj(text_emb)) * math.pi
+```
+
+In the predictor:
+
+```
+Query: Q = a_q × e^{i(φ_q + θ_text)}    ← text rotates query phase
+Key:   K = a_k × e^{-iφ_k}
+```
+
+#### F.15.5 Architecture — CG Pipeline Bridge
+
+This is the **new design** that connects VL-JEPA output to the conscious generation pipeline.
+
+##### F.15.5.1 Perception State Injection
+
+The VL-JEPA produces `S_vision ∈ ℝ^{B×N×32}` — a 32D Sovereign State per visual patch. This must be aggregated and injected into the text-side pipeline.
+
+```python
+class PerceptionBridge(nn.Module):
+    """
+    Bridges VL-JEPA perception output to the CG pipeline's InterpretiveConditioner.
+
+    VL-JEPA → 32D per patch → aggregate → perception_state
+    perception_state → InterpretiveConditioner (as additional interpretive axis)
+    """
+
+    def __init__(self, state_dim: int = 32, interp_dim: int = 64):
+        super().__init__()
+        # Aggregate patch-level states to sequence-level perception
+        self.temporal_pool = nn.MultiheadAttention(state_dim, num_heads=4, batch_first=True)
+        self.perception_query = nn.Parameter(torch.randn(1, 1, state_dim))
+        # Project to interpretive conditioning space
+        self.to_interp = nn.Linear(state_dim, interp_dim)
+        # Gate — cold start at 0.0
+        self.gate_param = nn.Parameter(torch.tensor(-5.0))
+
+    def forward(self, S_vision: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            S_vision: [B, N_patches, 32] from VL-JEPA encoder
+        Returns:
+            perception_signal: [B, 1, interp_dim] for InterpretiveConditioner
+        """
+        B = S_vision.shape[0]
+        query = self.perception_query.expand(B, -1, -1)
+        # Cross-attend over visual patches to produce single perception vector
+        pooled, _ = self.temporal_pool(query, S_vision, S_vision)  # [B, 1, 32]
+        gate = torch.sigmoid(self.gate_param)
+        return gate * self.to_interp(pooled)
+```
+
+##### F.15.5.2 InterpretiveConditioner Extension
+
+Stage 2's `InterpretiveConditioner` must be extended to accept an optional perception signal:
+
+```python
+# In InterpretiveConditioner.forward():
+def forward(self, h_t, interpretive_state, perception_signal=None):
+    # Existing: condition from CSR, Vritti, Kosha, Bhava
+    conditioning = self.synthesize(interpretive_state)
+
+    # NEW: blend perception if available
+    if perception_signal is not None:
+        conditioning = conditioning + perception_signal  # additive
+
+    # Existing: gated residual
+    gate = torch.sigmoid(self.gate_param)
+    return h_t + gate * self.conditioning_proj(conditioning)
+```
+
+**Null integration requirement:** When no image is provided (`perception_signal=None`), the output must be identical to Stage 8 text-only behavior. This is guaranteed by the additive design — no perception signal = no change.
+
+##### F.15.5.3 Multimodal Kosha Routing
+
+Kosha routing (`α_t`) must adapt when visual perception is active. The router's input is extended:
+
+```python
+# Current (text-only):
+α_t = softmax(W_k [h_t ; o_t])  # over {base, ont, JEPA, CSR, Vritti, Guna}
+
+# Extended (multimodal):
+α_t = softmax(W_k [h_t ; o_t ; p_t])  # p_t = perception_state (32D, or zeros if no image)
+```
+
+**Expected routing behavior with visual input:**
+- Physical scene descriptions → JEPA weight increases (visual grounding available)
+- Emotional/tonal content → CSR weight maintained (acoustic resonance still text-derived)
+- Factual QA about images → Ontology + JEPA weights increase
+- Creative/imaginative → Vritti weight maintained, JEPA weight may decrease
+
+##### F.15.5.4 Multimodal Coherence Extension
+
+`UnifiedCoherenceController` (Stage 4) gains a fourth coherence source:
+
+```
+C_total = w₁·C_token + w₂·C_latent + w₃·C_conversation + w₄·C_perception
+```
+
+Where:
+
+```
+C_perception = PAS(S_vision_pred, S_vision_target)
+             = mean(cos(φ_pred - φ_target))
+```
+
+PAS (Phase Alignment Score) from the VL-JEPA predictor measures how well the model's visual predictions align with targets. High PAS → high perceptual coherence → can generate more confidently about visual content.
+
+**Default weights:** `w₁=0.35, w₂=0.25, w₃=0.25, w₄=0.15` (vision coherence starts low, tuned during training).
+
+When no image is present: `C_perception = 1.0` (neutral — does not degrade text-only coherence).
+
+#### F.15.6 Training
+
+##### F.15.6.1 Sub-Stage A — VL-JEPA Standalone Training
+
+Train the vision encoder and predictor in isolation before connecting to the CG pipeline.
+
+**Objective:** Self-supervised visual representation learning via masked prediction in 32D Sovereign State space.
+
+**Training data:** Start with CIFAR-100 or Tiny-ImageNet for validation, scale to larger datasets.
+
+**Losses:**
+
+```
+L_vl = L_jepa_vision + λ_var·L_variance + λ_cov·L_covariance + λ_sync·L_phase_sync
+```
+
+| Loss | Definition | Weight |
+|------|-----------|--------|
+| `L_jepa_vision` | ‖S_pred - sg(S_target)‖² (stop-gradient) | 1.0 |
+| `L_variance` | VICReg hinge: penalize dim variance < 1.0 | 2.0 (Phase 1), 1.0 (Phase 2+) |
+| `L_covariance` | Off-diagonal covariance decorrelation | 0.5 |
+| `L_phase_sync` | `L_amp + L_phase = ‖a_pred - a_target‖² + (1 - cos(φ_pred - φ_target))` | 0.1 |
+
+**Phase-sync loss note:** Always use `1 - cos(φ_pred - φ_target)`, never `(φ_pred - φ_target)²`, to avoid phase wrapping discontinuities.
+
+**Curriculum (from HYBRID_PHASE_JEPA_DESIGN.md):**
+
+| Phase | Name | Duration | k-step | Description |
+|-------|------|----------|--------|-------------|
+| 1 | Dhyāna (Meditation) | ~20% | k=1 | State foundation — 1-step prediction only |
+| 2 | Saṃvāda (Dialogue) | ~50% | k=4 | Prediction expansion — enable intent phase rotation |
+| 3 | Kṛti (Action) | ~30% | k=4 | Full integration — enable text conditioning |
+
+**Target encoder update:** `θ_target ← α·θ_target + (1-α)·θ_context`, α = 0.996
+
+**Success criteria for Sub-Stage A:**
+
+- [ ] PAS (Phase Alignment Score) > 0.6 within 10 epochs on CIFAR-100
+- [ ] All 32 sovereign state dimensions show meaningful variance (> 0.01)
+- [ ] No VICReg collapse (variance loss near zero)
+- [ ] Geometric masking produces qualitatively sensible predictions (visual inspection)
+- [ ] Text conditioning (rotation angle → θ_geometric) affects prediction direction
+
+##### F.15.6.2 Sub-Stage B — Perception Bridge Training
+
+Connect the trained VL-JEPA to the CG pipeline via `PerceptionBridge`.
+
+**Objective:** Train the bridge to produce useful perception signals that improve multimodal generation quality without degrading text-only performance.
+
+**Method:** Freeze VL-JEPA weights. Train only `PerceptionBridge` and the extended `InterpretiveConditioner` gate on multimodal data (image-text pairs).
+
+**Loss:**
+
+```
+L_bridge = L_token + λ_bridge·L_perception_alignment
+```
+
+Where `L_perception_alignment` is a contrastive loss ensuring the perception signal is informative:
+
+```
+L_perception_alignment = -log(σ(sim(perception_signal, h_correct) - sim(perception_signal, h_negative)))
+```
+
+This trains the bridge to produce perception signals that are more similar to hidden states of correct (image-relevant) continuations than incorrect ones.
+
+**Gate monitoring:** The `PerceptionBridge.gate_param` starts at sigmoid(-5.0) ≈ 0.007 and must learn to open. If it remains < 0.01 after 1000 steps, the perception signal is not useful — investigate VL-JEPA quality or bridge architecture.
+
+**Success criteria for Sub-Stage B:**
+
+- [ ] PerceptionBridge gate opens (sigmoid > 0.05 within 2000 steps)
+- [ ] Text-only inputs produce identical output to Stage 8 baseline (null integration test)
+- [ ] Multimodal inputs produce measurably different output from text-only
+- [ ] Perplexity on text-only benchmarks unchanged (± 1%)
+- [ ] Image-captioning or VQA metrics improve over text-only baseline
+
+##### F.15.6.3 Sub-Stage C — End-to-End Multimodal Fine-Tuning
+
+Unfreeze VL-JEPA and train the full stack end-to-end.
+
+**Objective:** Joint optimization of perception and generation.
+
+**Loss:**
+
+```
+L_total = L_token + λ_vl·L_vl + λ_bridge·L_perception_alignment + [existing auxiliary losses from Stage 5]
+```
+
+**Curriculum:** Use the existing PPL-gated progression. Multimodal losses activate only after text-only perplexity stabilizes (same principle as Stage 5's curriculum A→D).
+
+**Gradient safety:** Monitor `perception_gradient_ratio = ‖∇_perception‖ / ‖∇_backbone‖`. Same bounds as Stage 5:
+
+| Ratio | Action |
+|-------|--------|
+| < 0.01 | Perception losses ineffective — increase λ_vl |
+| 0.01 – 0.1 | Healthy range |
+| 0.1 – 0.5 | Caution — monitor text PPL |
+| > 0.5 | Danger — reduce λ_vl immediately |
+
+**Success criteria for Sub-Stage C:**
+
+- [ ] Multimodal generation quality improves over Sub-Stage B (end-to-end > frozen)
+- [ ] Text-only perplexity does NOT increase (± 2%)
+- [ ] VL-JEPA PAS remains > 0.5 (doesn't degrade from joint training)
+- [ ] Kosha routing shows meaningful shift for visual vs. text-only inputs
+- [ ] C_perception contributes to C_total (non-trivial weight after training)
+
+#### F.15.7 Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| `HybridPhaseBlock` | `conscious_generation/perception/hybrid_phase_block.py` | Local + global stream splitting for vision patches |
+| `WindowedQuadraticAttention` | `conscious_generation/perception/windowed_attention.py` | O(N×W²) local spatial attention |
+| `GeometricMaskCollator` | `conscious_generation/perception/geometric_mask.py` | Quadrant / rotation / random masking for VL-JEPA training |
+| `TextToPhaseConditioner` | `conscious_generation/perception/text_phase_conditioner.py` | Text embedding → phase rotation angle θ_geometric |
+| `PhaseSyncLoss` | `conscious_generation/losses/phase_sync.py` | Amplitude L2 + phase cosine for cross-modal alignment |
+| `PerceptionBridge` | `conscious_generation/perception/perception_bridge.py` | VL-JEPA 32D output → InterpretiveConditioner input |
+| `VLJEPAEncoder` | `conscious_generation/perception/vl_jepa_encoder.py` | Full VL-JEPA vision encoder (patches → HybridPhaseBlock → 32D) |
+
+#### F.15.8 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pas` | float | Phase Alignment Score — mean(cos(φ_pred - φ_target)) |
+| `perception_gate` | float | PerceptionBridge gate value (sigmoid) |
+| `loss_jepa_vision` | float | VL-JEPA masked prediction loss |
+| `loss_phase_sync` | float | Phase synchronization loss |
+| `loss_perception_alignment` | float | Bridge contrastive alignment loss |
+| `perception_gradient_ratio` | float | ‖∇_perception‖ / ‖∇_backbone‖ |
+| `kosha_alpha_shift` | float[6] | Change in Kosha routing weights when perception active vs. absent |
+| `c_perception` | float | Perception coherence component of C_total |
+| `vl_jepa_variance_per_dim` | float[32] | Per-dimension variance of VL-JEPA 32D output |
+| `phase_entropy` | float | Entropy of phase distribution (hallucination indicator) |
+
+#### F.15.9 SafeInference and Mauna Protocol
+
+When phase entropy exceeds a threshold during inference, the VL-JEPA perception signal should be silenced rather than contributing noisy conditioning:
+
+```python
+class SafePerceptionInference:
+    """
+    Mauna (silence) protocol: if VL-JEPA is uncertain about visual content,
+    suppress perception signal rather than inject noise.
+
+    This prevents hallucinated visual grounding from corrupting text generation.
+    """
+
+    def __init__(self, entropy_threshold: float = 2.0):
+        self.entropy_threshold = entropy_threshold
+
+    def __call__(self, perception_signal: torch.Tensor, phase_entropy: float):
+        if phase_entropy > self.entropy_threshold:
+            return torch.zeros_like(perception_signal)  # silence
+        return perception_signal
+```
+
+**Rationale:** A generative model can hallucinate visual content. The predictive VL-JEPA is inherently more constrained (it predicts in latent space, not pixel space), but when its phase entropy is high, its predictions are unreliable. Better to fall back to text-only generation than inject noisy visual grounding.
+
+#### F.15.10 Relationship to Existing Stages
+
+```
+Stages 0–9 (text-only CG pipeline)
+    ↓ (all must be stable)
+Stage 10A — VL-JEPA standalone training (independent of CG pipeline)
+    ↓
+Stage 10B — PerceptionBridge training (connects to Stage 2/8 InterpretiveConditioner)
+    ↓
+Stage 10C — End-to-end multimodal fine-tuning (extends Stage 5 curriculum)
+```
+
+**What Stage 10 does NOT change:**
+- Text-only generation path (null integration guaranteed by gating)
+- Existing auxiliary losses (L_csr, L_vritti, L_kosha, L_bliss, L_ont)
+- Stage 6 stability properties (re-validated in Sub-Stage C success criteria)
+- Stage 9 ablation results (text-only mechanisms unchanged)
+
+**What Stage 10 extends:**
+- `InterpretiveConditioner` (Stage 2) — gains optional perception input
+- `UnifiedCoherenceController` (Stage 4) — gains C_perception source
+- `KoshaPrimitiveRouter` — gains perception state in routing input
+- `PerspectiveSynthesizer` (Stage 8) — perception signal flows through existing conditioning
+
+#### F.15.11 Success Criteria (Overall Stage 10)
+
+- [ ] VL-JEPA standalone achieves PAS > 0.6 on validation set
+- [ ] 32D Sovereign State from vision shows meaningful structure (clustering by visual category)
+- [ ] PerceptionBridge gate opens during multimodal training
+- [ ] Text-only generation quality is UNCHANGED when no image provided (null integration)
+- [ ] Multimodal generation shows measurable improvement on image-conditioned tasks
+- [ ] Kosha routing adapts: JEPA weight increases for visual scenes, decreases for abstract text
+- [ ] C_perception is non-degenerate (variance > 0.01, distributed across [0, 1])
+- [ ] Phase entropy Mauna protocol activates appropriately (silences on ambiguous images, passes on clear ones)
+- [ ] No Stage 6 stability regression (re-run orthogonality and entropy tests)
+- [ ] Perception gradient ratio stays in [0.01, 0.1] during end-to-end training
+- [ ] Body–Soul integration: VL-JEPA 32D state and SRK 32D state are compatible (same ontological schema, mergeable in OPB)
