@@ -3987,6 +3987,35 @@ Design target:
 
 The fundamental shift is from **hidden-state modification** (current: primitives inject into `h_t`) to **candidate-token evaluation** (design: primitives score each candidate `w` before final selection). The existing hidden-state injection mechanisms (CSR at Layer 7, JEPA weak prior, Kosha steering) can coexist as complementary enrichment during the transition, but the design's token-level multi-field consensus mechanism must become the primary generation pathway.
 
+#### A.5.1 Architectural Reconciliation — Representation Conditioning Supersedes Field-Integrated Softmax
+
+> **Note (added during Appendix F development):** The "design target" above — primitive scoring heads feeding `Z*(w)` through Kosha weighting and Bliss gating into a field-integrated softmax — has been **superseded** by the representation conditioning architecture defined in Appendix F, Stages 2 and 8.
+>
+> The field-integrated softmax approach requires per-candidate-token scoring (`Z*(w)` computed for each `w` in a shortlist), which creates an inference path fundamentally different from standard transformer generation. Appendix F instead adopted **representation conditioning**: auxiliary modules interpret the hidden state along orthogonal semantic axes (CSR, Vritti, Kosha, Bhava), and their interpretations condition the hidden state *before* `lm_head` via a gated residual. The transformer's own vocabulary projection then operates on an interpretively-enriched representation.
+>
+> **Key architectural differences:**
+>
+> | Property | Field-Integrated Softmax (this appendix) | Representation Conditioning (Appendix F) |
+> |----------|------------------------------------------|------------------------------------------|
+> | Where primitives act | On per-token scores after `lm_head` | On hidden state before `lm_head` |
+> | Vocabulary interaction | Replaces softmax with `Z*(w)` | Works *through* existing `lm_head` projection |
+> | Token ontology codes | Required (`o_w` for all candidates) | Not required for inference path |
+> | Token feature caches | Required (`O_tok`, `P_tok`, `R_tok`, `V_tok`, `G_tok`) | Not required for inference path |
+> | Performance | Requires shortlist (K=128) to be tractable | Operates once per step on hidden state |
+>
+> **Current status of components from this appendix:**
+>
+> | Component | Status under representation conditioning |
+> |-----------|----------------------------------------|
+> | Token ontology codes `o_w` | Retained as auxiliary training signal source (Appendix F, Stage 5 §F.7.8) — used for `L_ont` contrastive loss, not for inference |
+> | Token feature caches | Retained for optional diagnostic/research scoring; not part of primary inference path |
+> | Primitive scoring heads | Superseded by `InterpretiveConditioner` (F.4) and `PerspectiveSynthesizer` (F.12) |
+> | Kosha weighting `α_t` | Retained as routing signal within `InterpretiveConditioner` |
+> | Bliss gate `B(w)` | Redefined as coherence measure on conditioned hidden state (F.7.2.1) |
+> | Field-Integrated Softmax | Superseded by standard softmax over conditioned logits |
+>
+> The primitive scoring pipeline described in this appendix remains valid as a **research diagnostic tool** — it can be used to analyze per-token ontological compatibility during development. But it is no longer the primary generation pathway.
+
 ---
 
 ## Appendix B — Auxiliary Signal Weight Governance and Scenario-Specific Configurations
@@ -6337,18 +6366,62 @@ Where `prior` is either uniform or base-dominant depending on training stage.
 
 Source: `training/conscious_generation/losses/kosha_routing.py` — entropy regularization.
 
-**Bliss Coherence Loss:**
+**Ontological Compatibility Loss:**
 
 ```
-L_bliss = -log(B(w_correct)) + neg_weight · (-log(1 - B(w_negative)))
+L_ont = -log(σ(S_ont(w_correct) - S_ont(w_negative)))
 ```
 
-Source: `training/conscious_generation/losses/bliss_coherence.py` — contrastive Bliss loss.
+Where `S_ont(w) = o_t⊤ M_ont o_w` is the compatibility score between context ontological state `o_t` and token ontological code `o_w`.
+
+This loss requires **token ontology codes** — see §F.7.8 below for the token-side projection that feeds this loss.
+
+Source: `training/conscious_generation/losses/primitive_auxiliary.py` — contrastive ontological loss (Section 6.4).
+
+**Bliss Coherence Loss (redefined for representation conditioning):**
+
+```
+L_bliss = -log(σ(C(x_conditioned, w_correct) - C(x_conditioned, w_negative)))
+```
+
+Where `C(x, w)` is a coherence measure between the conditioned hidden state and a token, defined as:
+
+```
+C(x, w) = cos(f_coh(x_conditioned), e_w)
+```
+
+Here `f_coh` is a learned projection from the conditioned hidden state to a coherence embedding space, and `e_w` is the token embedding. This replaces the original per-token bliss gate `B(w)` (see §F.7.2.1 below for rationale).
+
+Source: `training/conscious_generation/losses/bliss_coherence.py` — contrastive coherence loss.
+
+#### F.7.2.1 Bliss Coherence Redefinition for Representation Conditioning
+
+The original Bliss coherence gate `B(w)` was designed for the field-integrated softmax architecture (Appendix A), where it gated per-candidate-token scores: `Z*(w) = B(w) · Σ α_f S_f(w)`. Under representation conditioning (Stages 2 and 8), there is no per-token scoring step — the auxiliary modules condition the hidden state, and `lm_head` projects to vocabulary.
+
+**Problem:** The original `B(w)` requires evaluating a gate function for each candidate token, which assumes the primitive scoring pipeline. This pipeline is no longer the primary generation path.
+
+**Solution:** Redefine bliss coherence as a property of the *conditioned representation*, not of per-token scores:
+
+```
+Original:   B(w) = gate function on per-token primitive scores
+Redefined:  C(x, w) = cos(f_coh(x_conditioned), e_w)
+```
+
+Where:
+- `x_conditioned` is the hidden state after `InterpretiveConditioner` / `PerspectiveSynthesizer` has applied
+- `f_coh: ℝ^D → ℝ^d_coh` is a learned coherence projection (small MLP, d_coh = 64)
+- `e_w` is the token embedding (projected to d_coh)
+
+**Intuition:** The coherence measure asks: "does the conditioned representation point toward the correct token in a coherence-aware embedding space?" This trains the conditioning to be *semantically aligned* with the tokens it should produce, without requiring per-candidate scoring at inference time.
+
+**Training signal:** Contrastive — the correct next token should have higher coherence with the conditioned representation than negative samples (random tokens from the batch).
+
+**Relationship to UnifiedCoherenceController (Stage 4):** The `C_total` signal from Stage 4 measures *sequence-level* coherence for decoding policy. The `L_bliss` loss measures *token-level* coherence for training the conditioning pathway. These are complementary: `C_total` governs how aggressively to sample, while `L_bliss` ensures the conditioned representation is well-aligned with correct tokens.
 
 #### F.7.3 Total Training Loss
 
 ```
-L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_bliss
+L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_bliss + λ₅·L_ont
 ```
 
 **Recommended initial weights (conservative):**
@@ -6359,6 +6432,7 @@ L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_b
 | λ₂ (Vritti) | 0.02 | Cognitive mode is more directly useful |
 | λ₃ (Kosha) | 0.005 | Regularization — prevent routing collapse |
 | λ₄ (Bliss) | 0.02 | Coherence gating is the primary governance signal |
+| λ₅ (Ont) | 0.01 | Ontological compatibility — contrastive, start conservative |
 
 These map to existing CLI parameters (see Appendix E.8):
 
@@ -6367,6 +6441,7 @@ These map to existing CLI parameters (see Appendix E.8):
 --lambda_vritti_token 0.02
 --lambda_kosha_routing 0.005
 --lambda_bliss_token 0.02
+--lambda_ont_token 0.01
 ```
 
 #### F.7.4 Training Protocol
@@ -6375,7 +6450,7 @@ Use the existing staged curriculum (Appendix E.6) with auxiliary losses enabled:
 
 1. **Stage A** (backbone stabilization): All λ = 0 (existing behavior)
 2. **Stage B** (ontology activation): Enable λ_kosha only
-3. **Stage C** (primitive activation): Enable λ_csr, λ_vritti
+3. **Stage C** (primitive activation): Enable λ_csr, λ_vritti, λ_ont
 4. **Stage D** (full integration): Enable λ_bliss, all losses active
 
 The PPL-gated curriculum ensures auxiliary losses only activate after the backbone has stabilized.
@@ -6390,6 +6465,7 @@ The PPL-gated curriculum ensures auxiliary losses only activate after the backbo
 | `loss_vritti` | float | Vritti classification auxiliary loss |
 | `loss_kosha` | float | Kosha routing regularization loss |
 | `loss_bliss` | float | Bliss coherence auxiliary loss |
+| `loss_ont` | float | Ontological compatibility auxiliary loss |
 | `aux_gradient_norm` | float | L2 norm of gradients from auxiliary losses |
 | `backbone_gradient_norm` | float | L2 norm of gradients from L_token |
 
@@ -6408,6 +6484,66 @@ auxiliary_gradient_ratio = aux_gradient_norm / backbone_gradient_norm
 | 0.1 – 0.5 | Caution — monitor perplexity closely |
 | > 0.5 | **Danger — reduce λ weights immediately** |
 
+#### F.7.8 Token Ontology Codes — Auxiliary Training Signal
+
+**Context:** Appendix A (Section A.1.5, A.1.12) identifies token ontology codes `o_w = U_o e_w ∈ ℝ³²` and token feature caches (`O_tok`, `P_tok`, etc.) as not implemented. Under the representation conditioning architecture (Stages 2 and 8), these are **not required for inference** — the `InterpretiveConditioner` and `PerspectiveSynthesizer` condition the hidden state directly, and `lm_head` handles vocabulary projection.
+
+However, token ontology codes remain valuable as an **auxiliary training signal source** for `L_ont`. They provide a contrastive learning target that trains the ontological projection to be meaningful.
+
+**Implementation:**
+
+```python
+class TokenOntologyProjection(nn.Module):
+    """Projects token embeddings to ontological codes for L_ont training."""
+
+    def __init__(self, embed_dim: int, onto_dim: int = 32):
+        super().__init__()
+        self.projection = nn.Linear(embed_dim, onto_dim, bias=False)
+
+    def forward(self, token_embeddings: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            token_embeddings: [V, D] or [B, K, D] for shortlist
+        Returns:
+            o_w: [V, 32] or [B, K, 32] ontological codes
+        """
+        return self.projection(token_embeddings)
+```
+
+**Integration with `L_ont`:**
+
+```python
+# Context-side: from SovereignStateProjector
+o_t = sovereign_state_projector(h_t)          # [B, T, 32]
+
+# Token-side: project correct and negative token embeddings
+o_w_correct = token_onto_proj(embed(w_correct))  # [B, T, 32]
+o_w_negative = token_onto_proj(embed(w_negative)) # [B, T, 32]
+
+# Compatibility scores
+M_ont = learnable_bilinear  # [32, 32]
+s_correct = (o_t @ M_ont @ o_w_correct.transpose(-1, -2)).diagonal(dim1=-2, dim2=-1)
+s_negative = (o_t @ M_ont @ o_w_negative.transpose(-1, -2)).diagonal(dim1=-2, dim2=-1)
+
+# Contrastive loss
+L_ont = -log(sigmoid(s_correct - s_negative)).mean()
+```
+
+**Caching (optional, for efficiency):**
+
+During training, `O_tok ∈ ℝ^{V×32}` can be precomputed from the full embedding matrix and refreshed every N steps (e.g., every 1000 steps), since token embeddings change slowly during training. This avoids recomputing `o_w` for negative samples at every step.
+
+```python
+# Refresh cache periodically
+if step % cache_refresh_interval == 0:
+    with torch.no_grad():
+        O_tok = token_onto_proj(model.get_input_embeddings().weight)  # [V, 32]
+```
+
+**Training curriculum placement:** `L_ont` activates in **Stage C** (primitive activation) alongside `L_csr` and `L_vritti`, after the backbone has stabilized in Stages A–B.
+
+**What this does NOT do:** Token ontology codes do not participate in the inference path. They exist purely to provide a training signal that makes the 32D ontological projection meaningful. At inference time, the ontological state feeds the `InterpretiveConditioner` / `PerspectiveSynthesizer`, which conditions the hidden state — no per-token ontological scoring occurs.
+
 #### F.7.7 Success Criteria
 
 - [ ] Auxiliary losses converge (decreasing over training)
@@ -6417,6 +6553,8 @@ auxiliary_gradient_ratio = aux_gradient_norm / backbone_gradient_norm
 - [ ] Vritti classification accuracy > 60% on held-out validation
 - [ ] Kosha entropy remains > 1.0 bits (no routing collapse)
 - [ ] Bliss distribution spans [0.1, 0.9] (not collapsed to 0 or 1)
+- [ ] Ontological compatibility loss converges (L_ont decreasing)
+- [ ] Token ontology codes `o_w` show meaningful clustering by semantic category
 
 ---
 
