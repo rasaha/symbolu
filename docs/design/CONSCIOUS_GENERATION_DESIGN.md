@@ -6258,37 +6258,57 @@ Mistral LM Head (frozen) → logits  (UNCHANGED)
 
 **Key constraint:** The Binding Cache modifies *what the model remembers* (KV cache), not *what it predicts* (logits). This is analogous to a human focusing attention on relevant context rather than changing their vocabulary.
 
-#### F.3.5+.3 Architecture — Active CTM+ Offloading
+#### F.3.5+.3 Architecture — Active CTM+ Offloading via CTMTransformerSetup
+
+CTM+ is integrated into the Mistral CG pipeline through `CTM_plus.transformer_setup.CTMTransformerSetup`, a unified entry point that wires together the appropriate backends (DeepSpeed for weight offloading, vLLM for KV cache management, CUDA for kernel-level scoring) based on workload type and available hardware.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  CTM+ Offload Manager  (ACTIVE)                                  │
+│  CTMTransformerSetup  (unified entry point)                      │
 │                                                                  │
-│  PhaseIntegrator                                                 │
-│    • Learns per-layer access patterns from Stage 0 traces        │
-│    • Computes phase/amplitude for each Mistral layer             │
+│  Factory methods:                                                │
+│    .for_training(model, gpu_memory_gb, zero_stage, ...)          │
+│    .for_inference(model, num_gpu_blocks, streaming, ...)         │
+│    .for_large_model_inference(model, tp_size, ...)               │
+│    .for_checkpoint_cache(cache_size_mb, ...)                     │
 │                                                                  │
-│  SmartVictimSelector                                             │
-│    • Selects layers to offload based on:                         │
-│      - Access frequency (LFU signal)                             │
-│      - Recency (LRU signal)                                      │
-│      - Phase coherence (CTM+ signal)                             │
-│    • ARC-style adaptive p balances recency vs frequency          │
-│                                                                  │
-│  PredictivePrefetcher                                            │
-│    • Prefetches layers predicted to be needed next step          │
-│    • Uses Markov model trained on Stage 0 access sequences       │
-│                                                                  │
-│  TierPlacement                                                   │
-│    Tier 0 (GPU): High-access layers (≤ gpu_budget)              │
-│    Tier 1 (CPU): Low-access layers (prefetched on demand)        │
-│    Tier 2 (NVMe): Optional for very large models                │
+│  Backends (auto-selected per workload):                          │
+│  ┌────────────────────┐  ┌────────────────────────────┐         │
+│  │ DeepSpeed Backend   │  │ vLLM Backend                │         │
+│  │ (CTMZeROOffload)    │  │ (CTMBlockSpaceManager)      │         │
+│  │                     │  │                              │         │
+│  │ • ZeRO-2/3 offload  │  │ • KV cache block allocation  │         │
+│  │ • CTM+ smart victim │  │ • CTM+ eviction policy       │         │
+│  │ • Async prefetch    │  │ • ARC-style adaptive p       │         │
+│  │ • Pinned memory     │  │ • Shadow cache tracking      │         │
+│  │ • Phase lifecycle:  │  │ • Streaming/batch configs    │         │
+│  │   begin_forward()   │  │                              │         │
+│  │   end_forward()     │  │ Victim selection:            │         │
+│  │   begin_backward()  │  │ • k-candidate sampling       │         │
+│  │   end_backward()    │  │ • 5-signal scoring:          │         │
+│  │   step()            │  │   recency + frequency +      │         │
+│  └────────────────────┘  │   reuse + coherence +         │         │
+│                           │   neighbor_hotness            │         │
+│  ┌────────────────────┐  └────────────────────────────┘         │
+│  │ CUDA Backend        │                                         │
+│  │ • kernel_record_    │  CTMTransformerConfig:                  │
+│  │   access()          │  • victim_sample_size: 48               │
+│  │ • kernel_select_    │  • promotion_threshold: 0.3             │
+│  │   victims()         │  • enable_smart_victim: true            │
+│  │ • O(1) hash table   │  • shadow_size: 2048                    │
+│  └────────────────────┘  • prefetch_ahead: 2-4                  │
 └──────────────────────────────────────────────────────────────────┘
     ↓
 Mistral-7B layers [0..31]
+    Training: DeepSpeed ZeRO offloads optimizer states / gradients
+    Inference: vLLM manages KV cache blocks, DeepSpeed offloads cold layers
     Hot layers: resident on GPU (fast path)
     Cold layers: on CPU, prefetched when predicted (warm path)
 ```
+
+**Auto-detection:** `CTMTransformerSetup` probes the model's `config` object (or falls back to scanning `named_modules()` for `layers`/`blocks`/`h` patterns) to auto-detect `num_layers`, `hidden_dim`, `num_heads`, and `vocab_size`. This makes it compatible with HuggingFace Mistral models out of the box.
+
+**Training lifecycle hooks:** The setup exposes `begin_forward()` / `end_forward()` / `begin_backward()` / `end_backward()` / `step()` that the training loop calls at each phase boundary. These drive CTM+ offload decisions — the offload manager observes which parameters are hot in each phase and schedules asynchronous prefetches for the next phase.
 
 #### F.3.5+.4 Integration with Stage 1 CoherenceAwareDecoder
 
@@ -6398,86 +6418,114 @@ class BindingCacheActiveWrapper:
         return confidence.clamp(0.0, 1.0)
 ```
 
-#### F.3.5+.6 Implementation — CTM+ Activation
+#### F.3.5+.6 Implementation — CTM+ Activation via CTMTransformerSetup
+
+The placeholder `CTMPlusActiveOffloader` from the original design has been superseded by `CTM_plus.transformer_setup.CTMTransformerSetup`, which provides the full production implementation with proper backend wiring. The code below shows how the Mistral CG training loop integrates CTM+ at Stage 1.5 — transitioning from Stage 0 observation-only to active offloading.
+
+**Training integration (in `train.py` training loop):**
 
 ```python
-class CTMPlusActiveOffloader:
-    """
-    Active layer offloading for Mistral backbone using CTM+ policy.
+from CTM_plus.transformer_setup import CTMTransformerSetup
 
-    Moves cold Mistral layers to CPU and prefetches predicted layers.
-    """
+# --- Setup (after model creation) ---
+# Auto-detects Mistral architecture (num_layers, hidden_dim, etc.)
+ctm_setup = CTMTransformerSetup.for_training(
+    model=model.backbone,          # Frozen Mistral-7B backbone
+    gpu_memory_gb=80,
+    cpu_memory_gb=256,
+    zero_stage=2,                  # ZeRO-2 for optimizer state offload
+)
 
-    def __init__(self, model, config, access_traces=None):
-        self.model = model
-        self.config = config
-        self.gpu_budget = config.gpu_budget
-        self.active = True
+# Register all trainable + frozen parameters for CTM+ tracking
+ctm_setup.register_model(model)
+ctm_setup.register_optimizer(optimizer)
 
-        # Initialize from Stage 0 traces if available
-        if access_traces is not None:
-            self._init_from_traces(access_traces)
-        else:
-            # Default: keep first and last layers on GPU (attention sinks)
-            self._gpu_layers = set(range(min(self.gpu_budget, config.num_layers)))
-            self._cpu_layers = set(range(self.gpu_budget, config.num_layers))
+# Generate DeepSpeed config with CTM+ offload settings baked in
+ds_config = ctm_setup.get_deepspeed_config(base_config=existing_ds_config)
 
-    def _init_from_traces(self, traces):
-        """Initialize tier placement from Stage 0 access traces."""
-        # Aggregate access counts across all traced tokens
-        total_access = [0] * self.config.num_layers
-        for entry in traces:
-            access = entry.get("ctm_layer_access", [])
-            for i, count in enumerate(access):
-                if i < len(total_access):
-                    total_access[i] += count
+# --- Training loop ---
+for batch in dataloader:
+    ctm_setup.begin_forward()
+    outputs = model(batch)        # MistralCGWrapper.forward()
+    ctm_setup.end_forward()
 
-        # Sort by access frequency, keep top gpu_budget on GPU
-        sorted_layers = sorted(
-            range(self.config.num_layers),
-            key=lambda i: total_access[i],
-            reverse=True,
-        )
-        self._gpu_layers = set(sorted_layers[:self.gpu_budget])
-        self._cpu_layers = set(sorted_layers[self.gpu_budget:])
+    ctm_setup.begin_backward()
+    outputs["loss"].backward()
+    ctm_setup.end_backward()
 
-    def place_layers(self):
-        """Move layers to their assigned devices."""
-        if not self.active:
-            return
+    optimizer.step()
+    ctm_setup.step()              # CTM+ offload decisions happen here
 
-        backbone = self.model.backbone
-        for i, layer in enumerate(backbone.model.layers):
-            if i in self._gpu_layers:
-                layer.cuda()
-            elif i in self._cpu_layers:
-                layer.cpu()
-
-    def prefetch(self, predicted_layers):
-        """Prefetch predicted layers from CPU to GPU."""
-        backbone = self.model.backbone
-        for layer_idx in predicted_layers:
-            if layer_idx in self._cpu_layers:
-                backbone.model.layers[layer_idx].cuda()
-                self._cpu_layers.discard(layer_idx)
-                # Evict least-recently-used GPU layer if over budget
-                if len(self._gpu_layers) >= self.gpu_budget:
-                    victim = self._select_victim()
-                    backbone.model.layers[victim].cpu()
-                    self._cpu_layers.add(victim)
-                    self._gpu_layers.discard(victim)
-                self._gpu_layers.add(layer_idx)
-
-    def _select_victim(self):
-        """Select GPU layer to evict (lowest access frequency)."""
-        # Simple LRU — in production, use full CTM+ scoring
-        return min(self._gpu_layers)
+    # Log CTM+ stats periodically
+    if step % log_interval == 0:
+        print(ctm_setup.log_stats(step=step))
 ```
+
+**Inference integration (for generation with KV cache management):**
+
+```python
+# Inference uses both vLLM (KV cache) and DeepSpeed (weight offload)
+ctm_setup = CTMTransformerSetup.for_inference(
+    model=model.backbone,
+    num_gpu_blocks=2000,
+    num_cpu_blocks=20000,
+    block_size=16,
+    streaming=True,               # Streaming inference mode
+)
+
+# Register layers for weight offloading
+ctm_setup.register_inference_model(model.backbone)
+
+# Get block manager for KV cache allocation
+block_manager = ctm_setup.get_block_manager()
+
+# --- Generation loop ---
+ctm_setup.begin_generation()
+for step in generation_steps:
+    # Allocate KV cache blocks for new sequences
+    block_ids = ctm_setup.allocate_kv_blocks(sequence_id=seq_id, num_blocks=1)
+
+    # Forward pass with layer-level offload tracking
+    for layer_idx in range(num_layers):
+        prefetch_ids = ctm_setup.on_layer_forward(layer_idx)
+        # prefetch_ids: tensors that need fetching from CPU → GPU
+        hidden = model.backbone.layers[layer_idx](hidden)
+
+    # Record KV block access (triggers CTM+ promotion/eviction)
+    promoted = ctm_setup.access_kv_blocks(seq_id, block_ids)
+
+ctm_setup.end_generation()
+
+# Free completed sequence
+ctm_setup.free_kv_blocks(seq_id)
+```
+
+**Key differences from original placeholder design:**
+- **No manual `.cuda()` / `.cpu()` calls** — offloading is handled internally by CTMZeROOffload and CTMInferenceManager via the lifecycle hooks
+- **Smart victim selection** uses the full 5-signal CTM+ scorer (recency, frequency, reuse probability, coherence, neighbor hotness) with k-candidate sampling, not simple `min()`
+- **ARC-style adaptive p** automatically balances recency vs frequency based on shadow cache hit patterns
+- **Async prefetch** with configurable `prefetch_ahead` (2-4 steps) overlaps CPU→GPU transfers with computation
+- **Auto-detection** of transformer architecture from HuggingFace model config eliminates manual `num_layers` specification
 
 #### F.3.5+.7 CLI Integration
 
+The Mistral CG training script (`train_unified_llm.py`) already has CLI arguments for Stage 0 observation. Stage 1.5 reuses the same flags and adds `--enable_active_ctm_offload` to transition from observation to active offloading:
+
 ```bash
-# Training with Stage 1.5 active (after Stage 0 baseline is captured)
+# Stage 0 (observation-only, already implemented):
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --ctm_plus_gpu_budget 24 \
+  --ctm_plus_num_layers 32 \
+  --binding_cache_top_k 64 \
+  --generation_trace_output stage0_trace.json \
+  --generation_trace_interval 500
+
+# Stage 1.5 (active offloading — uses CTMTransformerSetup internally):
 python train_unified_llm.py \
   --model_type mistral_cg \
   --mistral_model_name mistralai/Mistral-7B-v0.3 \
@@ -6485,9 +6533,10 @@ python train_unified_llm.py \
   --enable_binding_cache_tracer \
   --enable_ctm_plus_tracer \
   --enable_active_binding_cache \
-  --binding_cache_top_k 64 \
   --enable_active_ctm_offload \
   --ctm_plus_gpu_budget 24 \
+  --ctm_plus_num_layers 32 \
+  --binding_cache_top_k 64 \
   --generation_trace_output stage1_5_trace.json \
   --lambda_ont_token 0.01 \
   --lambda_csr_token 0.01 \
@@ -6496,19 +6545,36 @@ python train_unified_llm.py \
   --lambda_bliss_token 0.02
 ```
 
+When `--enable_active_ctm_offload` is set, the training loop instantiates `CTMTransformerSetup.for_training()` instead of the Stage 0 `MistralCGGenerationTracer`, and calls the lifecycle hooks (`begin_forward`, `end_forward`, `begin_backward`, `end_backward`, `step`) at each training phase boundary. The `CTMTransformerSetup` auto-detects the Mistral architecture from the model's HuggingFace config and configures the DeepSpeed ZeRO offload manager with CTM+ smart victim selection.
+
+**Stat logging** is available via `ctm_setup.log_stats(step=step)`, which outputs:
+```
+CTM+ Stats (step=1000)
+  DeepSpeed: GPU hit=94.2%, offloads=127, phase=forward
+  vLLM: free GPU=1823/2000, evictions=34, sequences=8
+```
+
 #### F.3.5+.8 Measurements
 
 Per-token log additions (beyond Stage 0 + Stage 1):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `bc_pruned` | bool | Whether KV cache was actively pruned this step |
-| `bc_kept_positions` | int | Positions retained after pruning |
-| `bc_prune_ratio` | float | Fraction of positions evicted |
-| `bc_proposal_confidence` | float | Combined confidence for CoherenceAwareDecoder |
-| `ctm_actual_gpu_layers` | int | Layers currently on GPU |
-| `ctm_prefetch_accuracy` | float | Fraction of prefetched layers that were actually used |
-| `ctm_offload_latency_us` | float | P99 latency for layer offload/prefetch |
+| Field | Type | Source | Description |
+|-------|------|--------|-------------|
+| `bc_pruned` | bool | BindingCache | Whether KV cache was actively pruned this step |
+| `bc_kept_positions` | int | BindingCache | Positions retained after pruning |
+| `bc_prune_ratio` | float | BindingCache | Fraction of positions evicted |
+| `bc_proposal_confidence` | float | BindingCache | Combined confidence for CoherenceAwareDecoder |
+| `ctm_actual_gpu_layers` | int | `ctm_setup.get_stats()["deepspeed_inference"]["gpu_layers"]` | Layers currently on GPU |
+| `ctm_gpu_hit_rate` | float | `ctm_setup.get_stats()["deepspeed_*"]["gpu_hit_rate"]` | Fraction of accesses served from GPU |
+| `ctm_offloads` | int | `ctm_setup.get_stats()["deepspeed_*"]["offloads"]` | Total GPU→CPU offload events |
+| `ctm_current_phase` | str | `ctm_setup.get_stats()["deepspeed_training"]["current_phase"]` | Current lifecycle phase (forward/backward/step/idle) |
+| `ctm_free_gpu_blocks` | int | `ctm_setup.get_stats()["vllm"]["free_gpu_blocks"]` | Free KV cache blocks on GPU |
+| `ctm_num_evictions` | int | `ctm_setup.get_stats()["vllm"]["num_evictions"]` | CTM+ eviction events in KV cache |
+| `ctm_active_sequences` | int | `ctm_setup.get_stats()["vllm"]["active_sequences"]` | Sequences with allocated KV blocks |
+| `ctm_prefetch_accuracy` | float | Derived | Fraction of prefetched layers that were actually used |
+| `ctm_offload_latency_us` | float | Derived | P99 latency for layer offload/prefetch |
+
+These metrics are obtained via `ctm_setup.get_stats()` and `ctm_setup.log_stats(step)`, which aggregate across all active backends (DeepSpeed training/inference + vLLM + Database). Stats can be reset between phases with `ctm_setup.reset_stats()`.
 
 #### F.3.5+.9 Ablation Tests
 
@@ -6533,13 +6599,25 @@ Compare across 50+ generation samples:
 
 #### F.3.5+.10 Success Criteria
 
+**Infrastructure (completed):**
+- [x] `CTMTransformerSetup` provides unified entry point with factory methods for training, inference, large-model inference, and checkpoint caching
+- [x] Auto-detection of transformer architecture from HuggingFace model config
+- [x] DeepSpeed ZeRO-2/3 integration with CTM+ smart victim selection (5-signal scoring)
+- [x] vLLM KV cache block management with ARC-style adaptive eviction
+- [x] Training lifecycle hooks (`begin_forward` → `end_forward` → `begin_backward` → `end_backward` → `step`)
+- [x] Inference layer-level offload tracking with `on_layer_forward()`
+- [x] Stage 0 generation tracer (`MistralCGGenerationTracer`) integrated in `train.py`
+- [x] Stats aggregation via `get_stats()` / `log_stats()` / `reset_stats()`
+
+**Performance targets (to be validated at Stage 1.5 activation):**
 - [ ] KV cache memory reduced by ≥ 30% with top_k=64
 - [ ] Long-form coherence improves over Stage 1 alone (cosine drift metric)
 - [ ] Perplexity unchanged (± 1%) compared to Stage 1
-- [ ] CTM+ offloading reduces peak GPU memory by ≥ 20%
+- [ ] CTM+ offloading reduces peak GPU memory by ≥ 20% (`ctm_gpu_hit_rate` > 0.80)
 - [ ] Prefetch accuracy > 70% (Markov model predicts layer access correctly)
 - [ ] Combined binding confidence + coherence signal reduces incoherent drift events by ≥ 35% vs baseline
 - [ ] No increase in hallucination rate (Vritti ERROR mode detection unchanged)
+- [ ] P99 eviction decision latency ≤ 100 µs (validated by CTM+ production benchmarks)
 
 ---
 
