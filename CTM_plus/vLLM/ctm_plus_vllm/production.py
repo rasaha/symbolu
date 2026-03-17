@@ -13,7 +13,6 @@ Latency Budget Target: p99 eviction decision ≤ 50-100 µs
 """
 
 import time
-import math
 import random
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Set, Tuple

@@ -289,10 +289,10 @@ class CTMBufferPool:
     """
 
     # Production configuration defaults
-    EVICTION_BATCH_SIZE = 64
-    EVICTION_THRESHOLD = 0.95
-    SLOW_PATH_INTERVAL = 1000
-    K_CANDIDATES = 32
+    EVICTION_BATCH_SIZE = 64      # Evict M pages at once when threshold hit
+    EVICTION_THRESHOLD = 0.95     # Trigger batch eviction at 95% capacity
+    SLOW_PATH_INTERVAL = 1000     # Run slow path maintenance every N accesses
+    K_CANDIDATES = 32             # Sample size for victim selection
 
     def __init__(
         self,

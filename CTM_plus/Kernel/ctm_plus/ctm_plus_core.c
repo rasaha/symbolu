@@ -239,8 +239,8 @@ static unsigned int ctm_get_reuse_score(struct ctm_controller *ctrl,
     if (!page)
         return 0;
 
-    /* Higher access count = higher reuse probability */
-    return min(page->access_count * 10, 100u);
+    /* Higher access count = higher reuse probability, capped at 100 */
+    return min(min(page->access_count, 10u) * 10, 100u);
 }
 
 /* ========== Victim Selection ========== */
@@ -278,10 +278,17 @@ static struct ctm_page_state *ctm_select_victim_smart(struct ctm_controller *ctr
 
         sample_count++;
 
-        /* Calculate scores (all in fixed-point * 100) */
-        recency_rank = div64_u64((page->last_access_time - min_time) * FP_SCALE,
-                                 time_range);
-        frequency = min(page->access_count * 10, 100u);
+        /* Calculate scores (all in fixed-point * 100).
+         * Use mul_u64_u32_div() pattern to avoid u64 overflow on large timestamps.
+         */
+        {
+            u64 delta = page->last_access_time - min_time;
+            if (delta > div64_u64(ULLONG_MAX, FP_SCALE))
+                recency_rank = (unsigned int)div64_u64(delta, time_range) * FP_SCALE;
+            else
+                recency_rank = (unsigned int)div64_u64(delta * FP_SCALE, time_range);
+        }
+        frequency = min(min(page->access_count, 10u) * 10, 100u);
         reuse = ctm_get_reuse_score(ctrl, page->pfn);
         coherence = page->coherence;
         neighbor_hot = ctm_get_neighbor_hotness(ctrl, page->pfn);

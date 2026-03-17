@@ -6,7 +6,6 @@ Demonstrates how to use CTM+ for intelligent memory offloading
 in DeepSpeed training and inference scenarios.
 """
 
-import random
 import time
 from typing import List, Dict
 

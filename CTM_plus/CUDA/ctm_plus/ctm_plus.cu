@@ -170,9 +170,10 @@ __global__ void kernel_select_victims(
 
     curandState local_state = rng_states[idx];
 
-    // Find time range
+    // Find time range by sampling up to sample_size entries (bounded scan)
     uint64_t min_time = UINT64_MAX, max_time = 0;
-    for (uint32_t i = 0; i < tier0_size && i < 100; i++) {
+    uint32_t scan_limit = min(tier0_size, sample_size);
+    for (uint32_t i = 0; i < scan_limit; i++) {
         uint64_t pid = tier0_lru[i];
         uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
         const PageState& p = pages[hash];
