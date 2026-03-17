@@ -3987,6 +3987,35 @@ Design target:
 
 The fundamental shift is from **hidden-state modification** (current: primitives inject into `h_t`) to **candidate-token evaluation** (design: primitives score each candidate `w` before final selection). The existing hidden-state injection mechanisms (CSR at Layer 7, JEPA weak prior, Kosha steering) can coexist as complementary enrichment during the transition, but the design's token-level multi-field consensus mechanism must become the primary generation pathway.
 
+#### A.5.1 Architectural Reconciliation — Representation Conditioning Supersedes Field-Integrated Softmax
+
+> **Note (added during Appendix F development):** The "design target" above — primitive scoring heads feeding `Z*(w)` through Kosha weighting and Bliss gating into a field-integrated softmax — has been **superseded** by the representation conditioning architecture defined in Appendix F, Stages 2 and 8.
+>
+> The field-integrated softmax approach requires per-candidate-token scoring (`Z*(w)` computed for each `w` in a shortlist), which creates an inference path fundamentally different from standard transformer generation. Appendix F instead adopted **representation conditioning**: auxiliary modules interpret the hidden state along orthogonal semantic axes (CSR, Vritti, Kosha, Bhava), and their interpretations condition the hidden state *before* `lm_head` via a gated residual. The transformer's own vocabulary projection then operates on an interpretively-enriched representation.
+>
+> **Key architectural differences:**
+>
+> | Property | Field-Integrated Softmax (this appendix) | Representation Conditioning (Appendix F) |
+> |----------|------------------------------------------|------------------------------------------|
+> | Where primitives act | On per-token scores after `lm_head` | On hidden state before `lm_head` |
+> | Vocabulary interaction | Replaces softmax with `Z*(w)` | Works *through* existing `lm_head` projection |
+> | Token ontology codes | Required (`o_w` for all candidates) | Not required for inference path |
+> | Token feature caches | Required (`O_tok`, `P_tok`, `R_tok`, `V_tok`, `G_tok`) | Not required for inference path |
+> | Performance | Requires shortlist (K=128) to be tractable | Operates once per step on hidden state |
+>
+> **Current status of components from this appendix:**
+>
+> | Component | Status under representation conditioning |
+> |-----------|----------------------------------------|
+> | Token ontology codes `o_w` | Retained as auxiliary training signal source (Appendix F, Stage 5 §F.7.8) — used for `L_ont` contrastive loss, not for inference |
+> | Token feature caches | Retained for optional diagnostic/research scoring; not part of primary inference path |
+> | Primitive scoring heads | Superseded by `InterpretiveConditioner` (F.4) and `PerspectiveSynthesizer` (F.12) |
+> | Kosha weighting `α_t` | Retained as routing signal within `InterpretiveConditioner` |
+> | Bliss gate `B(w)` | Redefined as coherence measure on conditioned hidden state (F.7.2.1) |
+> | Field-Integrated Softmax | Superseded by standard softmax over conditioned logits |
+>
+> The primitive scoring pipeline described in this appendix remains valid as a **research diagnostic tool** — it can be used to analyze per-token ontological compatibility during development. But it is no longer the primary generation pathway.
+
 ---
 
 ## Appendix B — Auxiliary Signal Weight Governance and Scenario-Specific Configurations
@@ -5689,6 +5718,312 @@ From the trace, compute:
 - [ ] All metrics computed and recorded
 - [ ] No generation behavior modified (exact same output with/without tracer)
 - [ ] Statistics establish clear reference values for all subsequent stages
+- [ ] Binding Cache baseline metrics captured (salience entropy, intent phase drift, proposal confidence)
+- [ ] CTM+ offload tier metrics captured (hit rates, tier distribution, eviction counts)
+
+#### F.2.6a Training Command — Stage 0 Baseline Capture
+
+```bash
+# Stage 0: Observation-only — captures baseline metrics without modifying generation
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --generation_trace_output generation_trace.json \
+  --generation_trace_interval 500 \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
+#### F.2.6b Training Command — Stage 0 Minimal (No Trace Export Args)
+
+```bash
+# Stage 0: Minimal form — uses default trace output path and interval
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
+#### F.2.7 Binding Cache Integration — Inference-Time KV Cache Wrapping
+
+**Rationale:** The `BindingCacheInferenceEngine` (V10.0) and `OntologicalBindingCacheInferenceEngine` (V11.0.0) already implement intent-phase injection, salience-based Top-K KV pruning, and proposal-mode confidence gating — all at inference time, without modifying model weights. When running `mistral_cg`, these modules wrap around Mistral's standard KV cache to provide coherence-aware memory management during generation.
+
+**Architecture (Mistral CG + Binding Cache):**
+
+```
+Mistral-7B (frozen, 4-bit)
+    ↓ hidden_states [B, T, 4096]
+State Projector → 32D Sovereign State          (trainable, existing)
+    ↓
+Bhava Delta [12D] → Intent Phase [H heads]     (trainable, existing)
+    ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  BindingCacheInferenceEngine  (NEW at Stage 0 — observation)    │
+│                                                                  │
+│  IntentPhaseInferenceModule                                      │
+│    • Receives intent_phase from MistralCGWrapper.forward()       │
+│    • Logs intent evolution per token (no modification)           │
+│                                                                  │
+│  BindingSalienceController                                       │
+│    • Computes salience scores from hidden states                 │
+│    • Logs salience distribution (no KV pruning yet)              │
+│                                                                  │
+│  ProposalModeMetrics                                             │
+│    • Tracks confidence of each generated token                   │
+│    • Logs proposal acceptance/rejection ratios                   │
+└──────────────────────────────────────────────────────────────────┘
+    ↓
+Phase Adapter → adapted_hidden                  (trainable, existing)
+    ↓
+Mistral LM Head (frozen) → logits              (existing)
+```
+
+**Stage 0 behavior:** Observation-only. The Binding Cache modules compute and log metrics but do NOT modify the KV cache or generation. This extends the `GenerationTracer` with binding-specific fields.
+
+**Additional trace fields for `generation_trace.json`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `intent_phase` | float[H] | Per-head intent phase angles from MistralCGWrapper |
+| `intent_drift` | float | L2 distance between consecutive intent phases |
+| `salience_entropy` | float | H(salience distribution) — cache diversity |
+| `salience_top_k_ratio` | float | Fraction of positions with salience > 1.0 |
+| `proposal_confidence` | float | Confidence score of the proposed token |
+| `binding_cache_hit_rate` | float | Simulated hit rate under Top-K salience pruning |
+
+**Implementation — `BindingCacheTracerMixin`:**
+
+```python
+class BindingCacheTracerMixin:
+    """Extends GenerationTracer with Binding Cache observation metrics."""
+
+    def __init__(self, intent_module, salience_controller, config):
+        self.intent_module = intent_module
+        self.salience_controller = salience_controller
+        self.config = config
+        self._prev_intent = None
+
+    def record_binding_cache(self, token_id, hidden_state, intent_phase,
+                              input_ids):
+        """Record per-token Binding Cache metrics without modifying generation."""
+        entry = {}
+
+        # Intent phase tracking
+        if intent_phase is not None:
+            entry["intent_phase"] = intent_phase.detach().cpu().tolist()
+            if self._prev_intent is not None:
+                entry["intent_drift"] = (
+                    (intent_phase - self._prev_intent).norm().item()
+                )
+            else:
+                entry["intent_drift"] = 0.0
+            self._prev_intent = intent_phase.detach().clone()
+
+        # Salience distribution analysis
+        salience = self.salience_controller.compute_salience(
+            input_ids, hidden_state
+        )
+        sal_probs = F.softmax(salience, dim=-1)
+        entry["salience_entropy"] = (
+            -(sal_probs * (sal_probs + 1e-8).log()).sum(-1).mean().item()
+        )
+        entry["salience_top_k_ratio"] = (
+            (salience > 1.0).float().mean().item()
+        )
+
+        # Simulated cache hit rate under Top-K pruning
+        top_k = self.config.top_k
+        T = salience.shape[-1]
+        if T > top_k:
+            _, top_indices = salience.topk(top_k, dim=-1)
+            entry["binding_cache_hit_rate"] = top_k / T
+        else:
+            entry["binding_cache_hit_rate"] = 1.0
+
+        return entry
+```
+
+#### F.2.8 CTM+ Offload Integration — Coherence-Tier Memory for Layer Placement
+
+**Rationale:** CTM+ (`CTM_plus/DeepSpeed/ctm_plus_deepspeed/offload_manager.py`) implements coherence-tier memory management that decides which model layers (or activations) reside on GPU vs CPU based on access patterns, phase correlation, and ARC-style shadow tracking. For `mistral_cg` with 4-bit quantization, the frozen backbone layers are candidates for tier-aware placement — frequently accessed layers stay on GPU, rarely accessed layers offload to CPU, with prefetching for predicted access.
+
+**Architecture (Mistral CG + CTM+ Offloading):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CTM+ Offload Manager  (NEW at Stage 0 — observation)          │
+│                                                                  │
+│  PhaseIntegrator                                                 │
+│    • Embeds per-layer access events (which Mistral layer, R/W)  │
+│    • Computes phase coherence between layer access patterns     │
+│    • Logs phase/amplitude per layer (no actual offloading)      │
+│                                                                  │
+│  WorkloadClassifier                                              │
+│    • Classifies generation workload (temporal/scan/mixed)       │
+│    • Logs workload mode transitions                              │
+│                                                                  │
+│  Shadow Tier Tracker                                             │
+│    • Simulates ARC-style B1/B2 ghost hits                       │
+│    • Tracks adaptive p (recency vs frequency balance)            │
+│    • Logs simulated tier placement decisions                     │
+└─────────────────────────────────────────────────────────────────┘
+    ↓ (observation only)
+Mistral-7B backbone layers [0..31]
+    ↓
+hidden_states → CG adapter → logits
+```
+
+**Stage 0 behavior:** Shadow-mode observation only. The CTM+ controller simulates tier placement decisions and logs them, but does NOT actually move layers between devices. This captures baseline access patterns needed for Stage 1+ activation.
+
+**Additional trace fields for `generation_trace.json`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ctm_layer_access` | int[32] | Per-layer access count this generation step |
+| `ctm_phase_coherence` | float | USE coherence across layer access phases |
+| `ctm_workload_mode` | str | Classified workload: "temporal", "scan", "mixed" |
+| `ctm_adaptive_p` | float | ARC adaptive p value (recency/frequency balance) |
+| `ctm_simulated_gpu_layers` | int | Layers that would stay on GPU under CTM+ policy |
+| `ctm_simulated_cpu_layers` | int | Layers that would be offloaded under CTM+ policy |
+| `ctm_prefetch_hits` | int | Correct prefetch predictions (simulated) |
+
+**Implementation — `CTMPlusTracerMixin`:**
+
+```python
+class CTMPlusTracerMixin:
+    """Extends GenerationTracer with CTM+ offload observation metrics."""
+
+    def __init__(self, num_layers=32, gpu_budget=24):
+        self.num_layers = num_layers
+        self.gpu_budget = gpu_budget
+        self._access_counts = [0] * num_layers
+        self._phase_integrator = None  # Initialized from CTM+ config
+        self._shadow_hits = {"b1": 0, "b2": 0}
+        self._adaptive_p = 0.5
+        self._total_steps = 0
+
+    def record_layer_access(self, layer_idx):
+        """Record that a layer was accessed during forward pass."""
+        self._access_counts[layer_idx] += 1
+
+    def record_ctm_metrics(self):
+        """Compute CTM+ metrics for the current generation step."""
+        self._total_steps += 1
+        entry = {}
+
+        entry["ctm_layer_access"] = list(self._access_counts)
+
+        # Phase coherence: cosine similarity of access frequency vectors
+        # between consecutive windows (simplified from full CTM+ USE formula)
+        access_tensor = torch.tensor(self._access_counts, dtype=torch.float32)
+        if access_tensor.sum() > 0:
+            access_probs = access_tensor / access_tensor.sum()
+            entry["ctm_phase_coherence"] = (
+                -(access_probs * (access_probs + 1e-8).log()).sum().item()
+            )
+        else:
+            entry["ctm_phase_coherence"] = 0.0
+
+        # Workload classification (simplified)
+        access_var = access_tensor.var().item()
+        if access_var < 0.1:
+            entry["ctm_workload_mode"] = "temporal"  # Uniform access
+        elif access_tensor.max().item() > 3 * access_tensor.mean().item():
+            entry["ctm_workload_mode"] = "scan"  # Skewed access
+        else:
+            entry["ctm_workload_mode"] = "mixed"
+
+        # Simulated tier placement
+        sorted_layers = sorted(
+            range(self.num_layers),
+            key=lambda i: self._access_counts[i],
+            reverse=True,
+        )
+        gpu_layers = sorted_layers[:self.gpu_budget]
+        cpu_layers = sorted_layers[self.gpu_budget:]
+        entry["ctm_adaptive_p"] = self._adaptive_p
+        entry["ctm_simulated_gpu_layers"] = len(gpu_layers)
+        entry["ctm_simulated_cpu_layers"] = len(cpu_layers)
+        entry["ctm_prefetch_hits"] = 0  # Populated after multi-step tracking
+
+        return entry
+```
+
+#### F.2.9 Combined Baseline: Binding Cache + CTM+ Observation
+
+When running `mistral_cg` training with Stage 0 instrumentation, both mixins are composed into the `GenerationTracer`:
+
+```python
+class MistralCGGenerationTracer(GenerationTracer, BindingCacheTracerMixin,
+                                 CTMPlusTracerMixin):
+    """
+    Full Stage 0 tracer for Mistral CG with Binding Cache + CTM+ observation.
+
+    Composes:
+    - GenerationTracer: logit entropy, token probs, CG primitive scores
+    - BindingCacheTracerMixin: intent phase, salience, proposal confidence
+    - CTMPlusTracerMixin: layer access patterns, tier placement simulation
+    """
+
+    def __init__(self, model, csr_scorer=None, vritti_scorer=None,
+                 kosha_router=None, bliss_gate=None,
+                 binding_config=None, ctm_num_layers=32):
+        GenerationTracer.__init__(self, model, csr_scorer, vritti_scorer,
+                                   kosha_router, bliss_gate)
+        # Binding Cache observation
+        intent_module = IntentPhaseInferenceModule(
+            num_heads=model.num_heads,
+            head_dim=model.mistral_hidden_dim // model.num_heads,
+        )
+        salience_controller = BindingSalienceController()
+        bc_config = binding_config or BindingCacheInferenceConfig()
+        BindingCacheTracerMixin.__init__(
+            self, intent_module, salience_controller, bc_config,
+        )
+        # CTM+ observation
+        CTMPlusTracerMixin.__init__(self, num_layers=ctm_num_layers)
+
+    def record_token(self, token_id, logits, hidden_state, onto_state=None,
+                      intent_phase=None, input_ids=None):
+        """Record all metrics: base CG + Binding Cache + CTM+."""
+        # Base CG metrics
+        super().record_token(token_id, logits, hidden_state, onto_state)
+
+        # Binding Cache metrics
+        if intent_phase is not None and input_ids is not None:
+            bc_entry = self.record_binding_cache(
+                token_id, hidden_state, intent_phase, input_ids,
+            )
+            self.trace[-1].update(bc_entry)
+
+        # CTM+ metrics (layer access recorded separately via hooks)
+        ctm_entry = self.record_ctm_metrics()
+        self.trace[-1].update(ctm_entry)
+```
+
+**Baseline statistics to add (Binding Cache + CTM+ specific):**
+
+| Metric | Formula | Expected Range |
+|--------|---------|----------------|
+| Mean intent drift | μ(‖θ_t - θ_{t-1}‖₂) across tokens | 0.01 – 0.5 (stable intent) |
+| Salience concentration | Gini coefficient of salience scores | 0.2 – 0.6 (not collapsed) |
+| Simulated cache efficiency | Avg binding_cache_hit_rate | > 0.8 at top_k=64 |
+| CTM+ layer access entropy | H(access distribution) | > 3.0 bits (diverse layer use) |
+| CTM+ optimal GPU budget | Min layers for 95% access coverage | < 24 (fits on single GPU) |
+| Workload mode stability | Mode transitions / total steps | < 0.05 (stable classification) |
 
 ---
 
@@ -5876,6 +6211,335 @@ Compare across 50+ generation samples:
 - [ ] Perplexity on standard benchmarks unchanged (± 1%)
 - [ ] Knowledge accuracy unchanged
 - [ ] Resample events occur in < 5% of tokens (not over-triggering)
+
+---
+
+### F.3.5+ Stage 1.5 — Active Binding Cache + CTM+ Integration
+
+#### F.3.5+.1 Objective
+
+Activate the Binding Cache and CTM+ modules that were instrumented in Stage 0. This stage transitions from observation-only to active intervention: the Binding Cache performs real salience-based KV pruning during generation, and CTM+ performs actual layer offloading between GPU and CPU. **Logits remain untouched** — these modules operate on the attention cache and memory tier, not on the generation distribution.
+
+**Prerequisite:** Stage 0 baseline metrics must demonstrate:
+- Intent drift is meaningful (not collapsed to 0 or oscillating wildly)
+- Salience distribution has entropy > 2.0 bits (not uniform or collapsed)
+- CTM+ workload classification is stable (< 5% mode transitions)
+
+#### F.3.5+.2 Architecture — Active Binding Cache
+
+```
+Mistral-7B (frozen, 4-bit) forward pass
+    ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  BindingCacheInferenceEngine  (ACTIVE)                           │
+│                                                                  │
+│  IntentPhaseInferenceModule                                      │
+│    • Receives intent_phase from MistralCGWrapper.forward()       │
+│    • Rotates key phases in KV cache based on intent              │
+│    • Intent-aligned keys get higher retrieval probability        │
+│                                                                  │
+│  BindingSalienceController                                       │
+│    • Computes salience from hidden states + ontological state    │
+│    • Top-K selection: only K highest-salience positions retained │
+│    • Low-salience positions evicted from KV cache                │
+│                                                                  │
+│  ProposalModeController                                          │
+│    • Confidence gating: if P(token) < threshold → flag for       │
+│      CoherenceAwareDecoder (Stage 1) to adjust sampling          │
+│    • Connects Binding Cache confidence → Stage 1 coherence input │
+└──────────────────────────────────────────────────────────────────┘
+    ↓ (pruned KV cache — fewer positions, higher quality)
+attention(Q, K_pruned, V_pruned)
+    ↓
+Phase Adapter → adapted_hidden
+    ↓
+Mistral LM Head (frozen) → logits  (UNCHANGED)
+```
+
+**Key constraint:** The Binding Cache modifies *what the model remembers* (KV cache), not *what it predicts* (logits). This is analogous to a human focusing attention on relevant context rather than changing their vocabulary.
+
+#### F.3.5+.3 Architecture — Active CTM+ Offloading
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CTM+ Offload Manager  (ACTIVE)                                  │
+│                                                                  │
+│  PhaseIntegrator                                                 │
+│    • Learns per-layer access patterns from Stage 0 traces        │
+│    • Computes phase/amplitude for each Mistral layer             │
+│                                                                  │
+│  SmartVictimSelector                                             │
+│    • Selects layers to offload based on:                         │
+│      - Access frequency (LFU signal)                             │
+│      - Recency (LRU signal)                                      │
+│      - Phase coherence (CTM+ signal)                             │
+│    • ARC-style adaptive p balances recency vs frequency          │
+│                                                                  │
+│  PredictivePrefetcher                                            │
+│    • Prefetches layers predicted to be needed next step          │
+│    • Uses Markov model trained on Stage 0 access sequences       │
+│                                                                  │
+│  TierPlacement                                                   │
+│    Tier 0 (GPU): High-access layers (≤ gpu_budget)              │
+│    Tier 1 (CPU): Low-access layers (prefetched on demand)        │
+│    Tier 2 (NVMe): Optional for very large models                │
+└──────────────────────────────────────────────────────────────────┘
+    ↓
+Mistral-7B layers [0..31]
+    Hot layers: resident on GPU (fast path)
+    Cold layers: on CPU, prefetched when predicted (warm path)
+```
+
+#### F.3.5+.4 Integration with Stage 1 CoherenceAwareDecoder
+
+Stage 1.5 does not replace Stage 1 — it feeds into it:
+
+```
+Binding Cache proposal_confidence
+    ↓
+    ├─ confidence > threshold → normal sampling (Stage 1 coherence)
+    └─ confidence < threshold → flag "uncertain"
+                                    ↓
+                              CoherenceAwareDecoder receives TWO signals:
+                                1. Bhava coherence (Stage 1, existing)
+                                2. Binding confidence (Stage 1.5, new)
+                                    ↓
+                              Combined coherence = min(bhava, confidence)
+                                    ↓
+                              Policy adjustment (temperature, top_p)
+```
+
+#### F.3.5+.5 Implementation — Binding Cache Activation
+
+New module: `inference/binding_cache_stage1_5.py`
+
+```python
+class BindingCacheActiveWrapper:
+    """
+    Wraps MistralCGWrapper to perform active KV cache pruning.
+
+    Stage 1.5: Salience-based Top-K KV pruning during generation.
+    Logits are NEVER modified. Only the KV cache is pruned.
+    """
+
+    def __init__(self, inference_engine, config):
+        self.engine = inference_engine  # BindingCacheInferenceEngine
+        self.config = config
+        self.active = True  # Can be disabled for ablation
+
+    def prune_kv_cache(self, kv_cache, hidden_states, input_ids,
+                        intent_phase):
+        """
+        Prune KV cache to top-K most salient positions.
+
+        Args:
+            kv_cache: Tuple of (keys, values) per layer
+            hidden_states: [B, T, D] current hidden states
+            input_ids: [B, T] input token IDs
+            intent_phase: [B, H] intent phase from CG adapter
+
+        Returns:
+            pruned_kv_cache: KV cache with only top-K positions
+            prune_metrics: Dict of pruning statistics
+        """
+        if not self.active:
+            return kv_cache, {"pruned": False}
+
+        # Inject intent phase to bias salience scoring
+        if intent_phase is not None:
+            self.engine.intent_module.inject_external_intent(intent_phase)
+
+        # Compute salience for each position
+        salience = self.engine.salience_controller.compute_salience(
+            input_ids, hidden_states
+        )
+
+        # Select top-K positions
+        top_k = self.config.top_k
+        B, T = salience.shape
+        if T <= top_k:
+            return kv_cache, {"pruned": False, "kept": T, "total": T}
+
+        _, keep_indices = salience.topk(top_k, dim=-1)  # [B, K]
+        keep_indices = keep_indices.sort(dim=-1).values  # maintain order
+
+        # Prune each layer's KV cache
+        pruned_cache = []
+        for layer_keys, layer_values in kv_cache:
+            # layer_keys: [B, H, T, D_h]
+            # Select only keep_indices positions along T dimension
+            idx = keep_indices.unsqueeze(1).unsqueeze(-1)
+            idx_k = idx.expand(-1, layer_keys.shape[1], -1, layer_keys.shape[-1])
+            idx_v = idx.expand(-1, layer_values.shape[1], -1, layer_values.shape[-1])
+            pruned_k = layer_keys.gather(2, idx_k)
+            pruned_v = layer_values.gather(2, idx_v)
+            pruned_cache.append((pruned_k, pruned_v))
+
+        metrics = {
+            "pruned": True,
+            "kept": top_k,
+            "total": T,
+            "prune_ratio": 1.0 - (top_k / T),
+            "salience_mean": salience.mean().item(),
+            "salience_std": salience.std().item(),
+        }
+
+        return pruned_cache, metrics
+
+    def compute_confidence(self, logits, salience):
+        """Compute proposal confidence for CoherenceAwareDecoder integration."""
+        # Higher salience mean + lower logit entropy = higher confidence
+        logit_probs = F.softmax(logits, dim=-1)
+        logit_entropy = -(logit_probs * (logit_probs + 1e-8).log()).sum(-1)
+        max_entropy = math.log(logits.shape[-1])
+        normalized_entropy = logit_entropy / max_entropy  # [0, 1]
+
+        confidence = salience.mean(-1) * (1.0 - normalized_entropy)
+        return confidence.clamp(0.0, 1.0)
+```
+
+#### F.3.5+.6 Implementation — CTM+ Activation
+
+```python
+class CTMPlusActiveOffloader:
+    """
+    Active layer offloading for Mistral backbone using CTM+ policy.
+
+    Moves cold Mistral layers to CPU and prefetches predicted layers.
+    """
+
+    def __init__(self, model, config, access_traces=None):
+        self.model = model
+        self.config = config
+        self.gpu_budget = config.gpu_budget
+        self.active = True
+
+        # Initialize from Stage 0 traces if available
+        if access_traces is not None:
+            self._init_from_traces(access_traces)
+        else:
+            # Default: keep first and last layers on GPU (attention sinks)
+            self._gpu_layers = set(range(min(self.gpu_budget, config.num_layers)))
+            self._cpu_layers = set(range(self.gpu_budget, config.num_layers))
+
+    def _init_from_traces(self, traces):
+        """Initialize tier placement from Stage 0 access traces."""
+        # Aggregate access counts across all traced tokens
+        total_access = [0] * self.config.num_layers
+        for entry in traces:
+            access = entry.get("ctm_layer_access", [])
+            for i, count in enumerate(access):
+                if i < len(total_access):
+                    total_access[i] += count
+
+        # Sort by access frequency, keep top gpu_budget on GPU
+        sorted_layers = sorted(
+            range(self.config.num_layers),
+            key=lambda i: total_access[i],
+            reverse=True,
+        )
+        self._gpu_layers = set(sorted_layers[:self.gpu_budget])
+        self._cpu_layers = set(sorted_layers[self.gpu_budget:])
+
+    def place_layers(self):
+        """Move layers to their assigned devices."""
+        if not self.active:
+            return
+
+        backbone = self.model.backbone
+        for i, layer in enumerate(backbone.model.layers):
+            if i in self._gpu_layers:
+                layer.cuda()
+            elif i in self._cpu_layers:
+                layer.cpu()
+
+    def prefetch(self, predicted_layers):
+        """Prefetch predicted layers from CPU to GPU."""
+        backbone = self.model.backbone
+        for layer_idx in predicted_layers:
+            if layer_idx in self._cpu_layers:
+                backbone.model.layers[layer_idx].cuda()
+                self._cpu_layers.discard(layer_idx)
+                # Evict least-recently-used GPU layer if over budget
+                if len(self._gpu_layers) >= self.gpu_budget:
+                    victim = self._select_victim()
+                    backbone.model.layers[victim].cpu()
+                    self._cpu_layers.add(victim)
+                    self._gpu_layers.discard(victim)
+                self._gpu_layers.add(layer_idx)
+
+    def _select_victim(self):
+        """Select GPU layer to evict (lowest access frequency)."""
+        # Simple LRU — in production, use full CTM+ scoring
+        return min(self._gpu_layers)
+```
+
+#### F.3.5+.7 CLI Integration
+
+```bash
+# Training with Stage 1.5 active (after Stage 0 baseline is captured)
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --enable_active_binding_cache \
+  --binding_cache_top_k 64 \
+  --enable_active_ctm_offload \
+  --ctm_plus_gpu_budget 24 \
+  --generation_trace_output stage1_5_trace.json \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
+#### F.3.5+.8 Measurements
+
+Per-token log additions (beyond Stage 0 + Stage 1):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bc_pruned` | bool | Whether KV cache was actively pruned this step |
+| `bc_kept_positions` | int | Positions retained after pruning |
+| `bc_prune_ratio` | float | Fraction of positions evicted |
+| `bc_proposal_confidence` | float | Combined confidence for CoherenceAwareDecoder |
+| `ctm_actual_gpu_layers` | int | Layers currently on GPU |
+| `ctm_prefetch_accuracy` | float | Fraction of prefetched layers that were actually used |
+| `ctm_offload_latency_us` | float | P99 latency for layer offload/prefetch |
+
+#### F.3.5+.9 Ablation Tests
+
+| Mode | Configuration | Expected Result |
+|------|--------------|-----------------|
+| `baseline` | Stage 0 only (no active pruning/offloading) | Reference quality |
+| `bc_only` | Active Binding Cache, no CTM+ | Better long-context coherence |
+| `ctm_only` | Active CTM+, no Binding Cache | Lower VRAM, same quality |
+| `bc_ctm` | Both active | Best coherence + lowest VRAM |
+| `bc_aggressive` | top_k=32 (aggressive pruning) | Test quality degradation threshold |
+
+Compare across 50+ generation samples:
+
+| Metric | Baseline → Stage 1.5 |
+|--------|----------------------|
+| KV cache VRAM usage | 100% → ~40% (top_k=64) |
+| Long-form coherence | Baseline → Improved (intent-aligned cache) |
+| Generation latency | Baseline → ~Same (pruning cost offset by smaller attention) |
+| Backbone VRAM usage | 100% → ~75% (CTM+ offload) |
+| Perplexity | Unchanged (± 1%) |
+| Knowledge accuracy | Unchanged (logit firewall) |
+
+#### F.3.5+.10 Success Criteria
+
+- [ ] KV cache memory reduced by ≥ 30% with top_k=64
+- [ ] Long-form coherence improves over Stage 1 alone (cosine drift metric)
+- [ ] Perplexity unchanged (± 1%) compared to Stage 1
+- [ ] CTM+ offloading reduces peak GPU memory by ≥ 20%
+- [ ] Prefetch accuracy > 70% (Markov model predicts layer access correctly)
+- [ ] Combined binding confidence + coherence signal reduces incoherent drift events by ≥ 35% vs baseline
+- [ ] No increase in hallucination rate (Vritti ERROR mode detection unchanged)
 
 ---
 
@@ -6337,18 +7001,62 @@ Where `prior` is either uniform or base-dominant depending on training stage.
 
 Source: `training/conscious_generation/losses/kosha_routing.py` — entropy regularization.
 
-**Bliss Coherence Loss:**
+**Ontological Compatibility Loss:**
 
 ```
-L_bliss = -log(B(w_correct)) + neg_weight · (-log(1 - B(w_negative)))
+L_ont = -log(σ(S_ont(w_correct) - S_ont(w_negative)))
 ```
 
-Source: `training/conscious_generation/losses/bliss_coherence.py` — contrastive Bliss loss.
+Where `S_ont(w) = o_t⊤ M_ont o_w` is the compatibility score between context ontological state `o_t` and token ontological code `o_w`.
+
+This loss requires **token ontology codes** — see §F.7.8 below for the token-side projection that feeds this loss.
+
+Source: `training/conscious_generation/losses/primitive_auxiliary.py` — contrastive ontological loss (Section 6.4).
+
+**Bliss Coherence Loss (redefined for representation conditioning):**
+
+```
+L_bliss = -log(σ(C(x_conditioned, w_correct) - C(x_conditioned, w_negative)))
+```
+
+Where `C(x, w)` is a coherence measure between the conditioned hidden state and a token, defined as:
+
+```
+C(x, w) = cos(f_coh(x_conditioned), e_w)
+```
+
+Here `f_coh` is a learned projection from the conditioned hidden state to a coherence embedding space, and `e_w` is the token embedding. This replaces the original per-token bliss gate `B(w)` (see §F.7.2.1 below for rationale).
+
+Source: `training/conscious_generation/losses/bliss_coherence.py` — contrastive coherence loss.
+
+#### F.7.2.1 Bliss Coherence Redefinition for Representation Conditioning
+
+The original Bliss coherence gate `B(w)` was designed for the field-integrated softmax architecture (Appendix A), where it gated per-candidate-token scores: `Z*(w) = B(w) · Σ α_f S_f(w)`. Under representation conditioning (Stages 2 and 8), there is no per-token scoring step — the auxiliary modules condition the hidden state, and `lm_head` projects to vocabulary.
+
+**Problem:** The original `B(w)` requires evaluating a gate function for each candidate token, which assumes the primitive scoring pipeline. This pipeline is no longer the primary generation path.
+
+**Solution:** Redefine bliss coherence as a property of the *conditioned representation*, not of per-token scores:
+
+```
+Original:   B(w) = gate function on per-token primitive scores
+Redefined:  C(x, w) = cos(f_coh(x_conditioned), e_w)
+```
+
+Where:
+- `x_conditioned` is the hidden state after `InterpretiveConditioner` / `PerspectiveSynthesizer` has applied
+- `f_coh: ℝ^D → ℝ^d_coh` is a learned coherence projection (small MLP, d_coh = 64)
+- `e_w` is the token embedding (projected to d_coh)
+
+**Intuition:** The coherence measure asks: "does the conditioned representation point toward the correct token in a coherence-aware embedding space?" This trains the conditioning to be *semantically aligned* with the tokens it should produce, without requiring per-candidate scoring at inference time.
+
+**Training signal:** Contrastive — the correct next token should have higher coherence with the conditioned representation than negative samples (random tokens from the batch).
+
+**Relationship to UnifiedCoherenceController (Stage 4):** The `C_total` signal from Stage 4 measures *sequence-level* coherence for decoding policy. The `L_bliss` loss measures *token-level* coherence for training the conditioning pathway. These are complementary: `C_total` governs how aggressively to sample, while `L_bliss` ensures the conditioned representation is well-aligned with correct tokens.
 
 #### F.7.3 Total Training Loss
 
 ```
-L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_bliss
+L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_bliss + λ₅·L_ont
 ```
 
 **Recommended initial weights (conservative):**
@@ -6359,6 +7067,7 @@ L_total = L_token + λ₁·L_csr + λ₂·L_vritti + λ₃·L_kosha + λ₄·L_b
 | λ₂ (Vritti) | 0.02 | Cognitive mode is more directly useful |
 | λ₃ (Kosha) | 0.005 | Regularization — prevent routing collapse |
 | λ₄ (Bliss) | 0.02 | Coherence gating is the primary governance signal |
+| λ₅ (Ont) | 0.01 | Ontological compatibility — contrastive, start conservative |
 
 These map to existing CLI parameters (see Appendix E.8):
 
@@ -6367,6 +7076,7 @@ These map to existing CLI parameters (see Appendix E.8):
 --lambda_vritti_token 0.02
 --lambda_kosha_routing 0.005
 --lambda_bliss_token 0.02
+--lambda_ont_token 0.01
 ```
 
 #### F.7.4 Training Protocol
@@ -6375,7 +7085,7 @@ Use the existing staged curriculum (Appendix E.6) with auxiliary losses enabled:
 
 1. **Stage A** (backbone stabilization): All λ = 0 (existing behavior)
 2. **Stage B** (ontology activation): Enable λ_kosha only
-3. **Stage C** (primitive activation): Enable λ_csr, λ_vritti
+3. **Stage C** (primitive activation): Enable λ_csr, λ_vritti, λ_ont
 4. **Stage D** (full integration): Enable λ_bliss, all losses active
 
 The PPL-gated curriculum ensures auxiliary losses only activate after the backbone has stabilized.
@@ -6390,6 +7100,7 @@ The PPL-gated curriculum ensures auxiliary losses only activate after the backbo
 | `loss_vritti` | float | Vritti classification auxiliary loss |
 | `loss_kosha` | float | Kosha routing regularization loss |
 | `loss_bliss` | float | Bliss coherence auxiliary loss |
+| `loss_ont` | float | Ontological compatibility auxiliary loss |
 | `aux_gradient_norm` | float | L2 norm of gradients from auxiliary losses |
 | `backbone_gradient_norm` | float | L2 norm of gradients from L_token |
 
@@ -6408,6 +7119,66 @@ auxiliary_gradient_ratio = aux_gradient_norm / backbone_gradient_norm
 | 0.1 – 0.5 | Caution — monitor perplexity closely |
 | > 0.5 | **Danger — reduce λ weights immediately** |
 
+#### F.7.8 Token Ontology Codes — Auxiliary Training Signal
+
+**Context:** Appendix A (Section A.1.5, A.1.12) identifies token ontology codes `o_w = U_o e_w ∈ ℝ³²` and token feature caches (`O_tok`, `P_tok`, etc.) as not implemented. Under the representation conditioning architecture (Stages 2 and 8), these are **not required for inference** — the `InterpretiveConditioner` and `PerspectiveSynthesizer` condition the hidden state directly, and `lm_head` handles vocabulary projection.
+
+However, token ontology codes remain valuable as an **auxiliary training signal source** for `L_ont`. They provide a contrastive learning target that trains the ontological projection to be meaningful.
+
+**Implementation:**
+
+```python
+class TokenOntologyProjection(nn.Module):
+    """Projects token embeddings to ontological codes for L_ont training."""
+
+    def __init__(self, embed_dim: int, onto_dim: int = 32):
+        super().__init__()
+        self.projection = nn.Linear(embed_dim, onto_dim, bias=False)
+
+    def forward(self, token_embeddings: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            token_embeddings: [V, D] or [B, K, D] for shortlist
+        Returns:
+            o_w: [V, 32] or [B, K, 32] ontological codes
+        """
+        return self.projection(token_embeddings)
+```
+
+**Integration with `L_ont`:**
+
+```python
+# Context-side: from SovereignStateProjector
+o_t = sovereign_state_projector(h_t)          # [B, T, 32]
+
+# Token-side: project correct and negative token embeddings
+o_w_correct = token_onto_proj(embed(w_correct))  # [B, T, 32]
+o_w_negative = token_onto_proj(embed(w_negative)) # [B, T, 32]
+
+# Compatibility scores
+M_ont = learnable_bilinear  # [32, 32]
+s_correct = (o_t @ M_ont @ o_w_correct.transpose(-1, -2)).diagonal(dim1=-2, dim2=-1)
+s_negative = (o_t @ M_ont @ o_w_negative.transpose(-1, -2)).diagonal(dim1=-2, dim2=-1)
+
+# Contrastive loss
+L_ont = -log(sigmoid(s_correct - s_negative)).mean()
+```
+
+**Caching (optional, for efficiency):**
+
+During training, `O_tok ∈ ℝ^{V×32}` can be precomputed from the full embedding matrix and refreshed every N steps (e.g., every 1000 steps), since token embeddings change slowly during training. This avoids recomputing `o_w` for negative samples at every step.
+
+```python
+# Refresh cache periodically
+if step % cache_refresh_interval == 0:
+    with torch.no_grad():
+        O_tok = token_onto_proj(model.get_input_embeddings().weight)  # [V, 32]
+```
+
+**Training curriculum placement:** `L_ont` activates in **Stage C** (primitive activation) alongside `L_csr` and `L_vritti`, after the backbone has stabilized in Stages A–B.
+
+**What this does NOT do:** Token ontology codes do not participate in the inference path. They exist purely to provide a training signal that makes the 32D ontological projection meaningful. At inference time, the ontological state feeds the `InterpretiveConditioner` / `PerspectiveSynthesizer`, which conditions the hidden state — no per-token ontological scoring occurs.
+
 #### F.7.7 Success Criteria
 
 - [ ] Auxiliary losses converge (decreasing over training)
@@ -6417,6 +7188,8 @@ auxiliary_gradient_ratio = aux_gradient_norm / backbone_gradient_norm
 - [ ] Vritti classification accuracy > 60% on held-out validation
 - [ ] Kosha entropy remains > 1.0 bits (no routing collapse)
 - [ ] Bliss distribution spans [0.1, 0.9] (not collapsed to 0 or 1)
+- [ ] Ontological compatibility loss converges (L_ont decreasing)
+- [ ] Token ontology codes `o_w` show meaningful clustering by semantic category
 
 ---
 
@@ -7635,3 +8408,451 @@ then Guna is redundant with Phase + Vṛtti and should be removed or merged.
 - [ ] No more than 3 independent attention modulation axes remain active
 - [ ] Pairwise interaction tests confirm no redundancy between retained mechanisms
 - [ ] Results documented with quantitative evidence for each keep/remove decision
+
+---
+
+### F.15 Stage 10 — Phase-VL-JEPA Multimodal Perception Integration
+
+#### F.15.1 Objective
+
+Integrate the Phase-VL-JEPA vision-language perception system (documented in `HYBRID_PHASE_JEPA_DESIGN.md`) into the conscious generation pipeline as a multimodal perception module. The Phase-VL-JEPA serves as the "Perception Body" — a predictive (not generative) system that observes visual input and produces 32D Sovereign State representations that feed the same interpretive conditioning pipeline (Stages 2, 4, 8) already built for text-only generation.
+
+**Why this stage exists:** Appendix F Stages 0–9 define the conscious generation pipeline for text-only language modeling. The Phase-VL-JEPA architecture is designed separately (`HYBRID_PHASE_JEPA_DESIGN.md`) but has no documented integration path into the CG pipeline. This stage closes that gap.
+
+#### F.15.2 Prerequisites
+
+- Stage 8 (PerspectiveSynthesizer) must be implemented and stable — multimodal perception feeds *into* the interpretive synthesis pathway
+- Stage 9 (ablation audit) should be complete for text-only — establishes a clean baseline before introducing a new modality
+- Existing JEPA modules (`symbolu/jepa/`) must be operational: `PhaseJEPAPredictor`, `TargetEncoder`, `SovereignStateProjector`, `VICRegLoss`
+
+#### F.15.3 Gap Analysis — What Is Missing
+
+The following components are specified in `HYBRID_PHASE_JEPA_DESIGN.md` Part II but are not implemented:
+
+| Component | Design Source | Status | Gap |
+|-----------|-------------|--------|-----|
+| `HybridPhaseBlock` | HPJD §11 | **Not implemented** | Local + global stream splitting for vision patches |
+| `WindowedQuadraticAttention` | HPJD §11 | **Not implemented** | O(W²) local texture attention for image patches |
+| `GeometricMaskCollator` | HPJD §11 | **Not implemented** | Quadrant / rotation / random masking strategies |
+| `PhaseSyncLoss` | HPJD §11 | **Not implemented** | Amplitude L2 + phase cosine distance for cross-modal alignment |
+| `SovereignPatentLoss` (BCVF, USE, SCC) | HPJD §13 | **Not implemented** | Patent-derived loss terms for phase coherence and entropy |
+| Vision encoder integration | HPJD §11 | **Not implemented** | Image patches → embeddings → HybridPhaseBlock |
+| Text-to-phase conditioning | HPJD §11 | **Not implemented** | `θ_geometric = tanh(W_phase @ text_emb) × π` rotation |
+| `SafeInference` / Mauna protocol | HPJD Ops | **Not implemented** | Silence output when phase entropy exceeds threshold |
+| VL-JEPA → CG pipeline bridge | — | **Not designed** | No specification for how VL-JEPA 32D output feeds InterpretiveConditioner / PerspectiveSynthesizer |
+| Multimodal Kosha routing | — | **Not designed** | How `α_t` adapts when visual perception is active |
+| Multimodal coherence (C_total) | — | **Not designed** | How UnifiedCoherenceController handles vision-conditioned states |
+| Multimodal training curriculum | — | **Not designed** | PPL-gated progression for vision-language joint training |
+
+#### F.15.4 Architecture — VL-JEPA Perception Module
+
+##### F.15.4.1 Vision Encoder
+
+```
+Image → PatchEmbedding → [B, N_patches, D]
+     → HybridPhaseBlock (local WindowedQuadratic + global PhaseAttention)
+     → h_vision [B, N_patches, 768]
+     → SovereignStateProjector → S_vision [B, N_patches, 32]
+```
+
+**HybridPhaseBlock** splits each layer into two streams:
+
+```python
+class HybridPhaseBlock(nn.Module):
+    """
+    Local stream:  WindowedQuadraticAttention — O(N × W²) for spatial texture
+    Global stream: PhaseAttention — O(N × D) for global structure via phase rotation
+    Merge:         h = gate · h_local + (1 - gate) · h_global
+    """
+
+    def __init__(self, hidden_dim: int = 768, window_size: int = 7, num_heads: int = 12):
+        super().__init__()
+        self.local_attn = WindowedQuadraticAttention(hidden_dim, window_size)
+        self.global_attn = PhaseAttention(hidden_dim, num_heads)  # existing module
+        self.gate = nn.Parameter(torch.tensor(0.5))               # learnable merge
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h_local = self.local_attn(x)
+        h_global = self.global_attn(x)
+        g = torch.sigmoid(self.gate)
+        return g * h_local + (1 - g) * h_global
+```
+
+**WindowedQuadraticAttention** provides local spatial processing:
+
+```python
+class WindowedQuadraticAttention(nn.Module):
+    """O(N × W²) attention over spatial windows for local texture features."""
+
+    def __init__(self, hidden_dim: int, window_size: int = 7):
+        super().__init__()
+        self.window_size = window_size
+        self.qkv = nn.Linear(hidden_dim, 3 * hidden_dim)
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Partition into non-overlapping windows, apply standard attention within each
+        # O(N × W²) where W = window_size
+        ...
+```
+
+##### F.15.4.2 Geometric Masking
+
+```python
+class GeometricMaskCollator:
+    """
+    Creates masking patterns for VL-JEPA self-supervised training.
+
+    Strategies:
+      - quadrant:  Mask one quadrant, predict from other three
+      - rotation:  Mask center region, condition on rotation angle text
+      - random:    Standard random patch masking (JEPA baseline)
+    """
+
+    def __init__(self, strategy: str = "quadrant", mask_ratio: float = 0.25):
+        self.strategy = strategy
+        self.mask_ratio = mask_ratio
+
+    def __call__(self, images: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        # Returns: (masked_patches, target_patches, conditioning_text)
+        ...
+```
+
+Rotation conditioning text maps angles to natural language:
+
+| Angle (rad) | Conditioning text |
+|-------------|-------------------|
+| 0.0 | "The image is upright with no rotation" |
+| π/2 | "The image is rotated ninety degrees clockwise" |
+| π | "The image is rotated one hundred eighty degrees" |
+| 3π/2 | "The image is rotated ninety degrees counter-clockwise" |
+
+##### F.15.4.3 Text-to-Phase Conditioning (Cross-Modal Bridge)
+
+The key innovation from `HYBRID_PHASE_JEPA_DESIGN.md`: text conditions visual prediction via phase rotation, not concatenation.
+
+```python
+class TextToPhaseConditioner(nn.Module):
+    """
+    Converts text embeddings to phase rotation angles that condition
+    the VL-JEPA predictor's attention pattern.
+
+    Standard VL-JEPA:  concat(text_emb, vision_emb) → predict
+    Phase-VL-JEPA:     vision_emb × e^{iθ(text)} → predict
+
+    Phase rotation is a NATIVE operation (addition of angles), not learned
+    matrix multiplication. Expected 2-3x faster convergence.
+    """
+
+    def __init__(self, text_dim: int, phase_dim: int):
+        super().__init__()
+        self.phase_proj = nn.Linear(text_dim, phase_dim)
+
+    def forward(self, text_emb: torch.Tensor) -> torch.Tensor:
+        # θ ∈ [-π, π] — phase rotation angles
+        return torch.tanh(self.phase_proj(text_emb)) * math.pi
+```
+
+In the predictor:
+
+```
+Query: Q = a_q × e^{i(φ_q + θ_text)}    ← text rotates query phase
+Key:   K = a_k × e^{-iφ_k}
+```
+
+#### F.15.5 Architecture — CG Pipeline Bridge
+
+This is the **new design** that connects VL-JEPA output to the conscious generation pipeline.
+
+##### F.15.5.1 Perception State Injection
+
+The VL-JEPA produces `S_vision ∈ ℝ^{B×N×32}` — a 32D Sovereign State per visual patch. This must be aggregated and injected into the text-side pipeline.
+
+```python
+class PerceptionBridge(nn.Module):
+    """
+    Bridges VL-JEPA perception output to the CG pipeline's InterpretiveConditioner.
+
+    VL-JEPA → 32D per patch → aggregate → perception_state
+    perception_state → InterpretiveConditioner (as additional interpretive axis)
+    """
+
+    def __init__(self, state_dim: int = 32, interp_dim: int = 64):
+        super().__init__()
+        # Aggregate patch-level states to sequence-level perception
+        self.temporal_pool = nn.MultiheadAttention(state_dim, num_heads=4, batch_first=True)
+        self.perception_query = nn.Parameter(torch.randn(1, 1, state_dim))
+        # Project to interpretive conditioning space
+        self.to_interp = nn.Linear(state_dim, interp_dim)
+        # Gate — cold start at 0.0
+        self.gate_param = nn.Parameter(torch.tensor(-5.0))
+
+    def forward(self, S_vision: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            S_vision: [B, N_patches, 32] from VL-JEPA encoder
+        Returns:
+            perception_signal: [B, 1, interp_dim] for InterpretiveConditioner
+        """
+        B = S_vision.shape[0]
+        query = self.perception_query.expand(B, -1, -1)
+        # Cross-attend over visual patches to produce single perception vector
+        pooled, _ = self.temporal_pool(query, S_vision, S_vision)  # [B, 1, 32]
+        gate = torch.sigmoid(self.gate_param)
+        return gate * self.to_interp(pooled)
+```
+
+##### F.15.5.2 InterpretiveConditioner Extension
+
+Stage 2's `InterpretiveConditioner` must be extended to accept an optional perception signal:
+
+```python
+# In InterpretiveConditioner.forward():
+def forward(self, h_t, interpretive_state, perception_signal=None):
+    # Existing: condition from CSR, Vritti, Kosha, Bhava
+    conditioning = self.synthesize(interpretive_state)
+
+    # NEW: blend perception if available
+    if perception_signal is not None:
+        conditioning = conditioning + perception_signal  # additive
+
+    # Existing: gated residual
+    gate = torch.sigmoid(self.gate_param)
+    return h_t + gate * self.conditioning_proj(conditioning)
+```
+
+**Null integration requirement:** When no image is provided (`perception_signal=None`), the output must be identical to Stage 8 text-only behavior. This is guaranteed by the additive design — no perception signal = no change.
+
+##### F.15.5.3 Multimodal Kosha Routing
+
+Kosha routing (`α_t`) must adapt when visual perception is active. The router's input is extended:
+
+```python
+# Current (text-only):
+α_t = softmax(W_k [h_t ; o_t])  # over {base, ont, JEPA, CSR, Vritti, Guna}
+
+# Extended (multimodal):
+α_t = softmax(W_k [h_t ; o_t ; p_t])  # p_t = perception_state (32D, or zeros if no image)
+```
+
+**Expected routing behavior with visual input:**
+- Physical scene descriptions → JEPA weight increases (visual grounding available)
+- Emotional/tonal content → CSR weight maintained (acoustic resonance still text-derived)
+- Factual QA about images → Ontology + JEPA weights increase
+- Creative/imaginative → Vritti weight maintained, JEPA weight may decrease
+
+##### F.15.5.4 Multimodal Coherence Extension
+
+`UnifiedCoherenceController` (Stage 4) gains a fourth coherence source:
+
+```
+C_total = w₁·C_token + w₂·C_latent + w₃·C_conversation + w₄·C_perception
+```
+
+Where:
+
+```
+C_perception = PAS(S_vision_pred, S_vision_target)
+             = mean(cos(φ_pred - φ_target))
+```
+
+PAS (Phase Alignment Score) from the VL-JEPA predictor measures how well the model's visual predictions align with targets. High PAS → high perceptual coherence → can generate more confidently about visual content.
+
+**Default weights:** `w₁=0.35, w₂=0.25, w₃=0.25, w₄=0.15` (vision coherence starts low, tuned during training).
+
+When no image is present: `C_perception = 1.0` (neutral — does not degrade text-only coherence).
+
+#### F.15.6 Training
+
+##### F.15.6.1 Sub-Stage A — VL-JEPA Standalone Training
+
+Train the vision encoder and predictor in isolation before connecting to the CG pipeline.
+
+**Objective:** Self-supervised visual representation learning via masked prediction in 32D Sovereign State space.
+
+**Training data:** Start with CIFAR-100 or Tiny-ImageNet for validation, scale to larger datasets.
+
+**Losses:**
+
+```
+L_vl = L_jepa_vision + λ_var·L_variance + λ_cov·L_covariance + λ_sync·L_phase_sync
+```
+
+| Loss | Definition | Weight |
+|------|-----------|--------|
+| `L_jepa_vision` | ‖S_pred - sg(S_target)‖² (stop-gradient) | 1.0 |
+| `L_variance` | VICReg hinge: penalize dim variance < 1.0 | 2.0 (Phase 1), 1.0 (Phase 2+) |
+| `L_covariance` | Off-diagonal covariance decorrelation | 0.5 |
+| `L_phase_sync` | `L_amp + L_phase = ‖a_pred - a_target‖² + (1 - cos(φ_pred - φ_target))` | 0.1 |
+
+**Phase-sync loss note:** Always use `1 - cos(φ_pred - φ_target)`, never `(φ_pred - φ_target)²`, to avoid phase wrapping discontinuities.
+
+**Curriculum (from HYBRID_PHASE_JEPA_DESIGN.md):**
+
+| Phase | Name | Duration | k-step | Description |
+|-------|------|----------|--------|-------------|
+| 1 | Dhyāna (Meditation) | ~20% | k=1 | State foundation — 1-step prediction only |
+| 2 | Saṃvāda (Dialogue) | ~50% | k=4 | Prediction expansion — enable intent phase rotation |
+| 3 | Kṛti (Action) | ~30% | k=4 | Full integration — enable text conditioning |
+
+**Target encoder update:** `θ_target ← α·θ_target + (1-α)·θ_context`, α = 0.996
+
+**Success criteria for Sub-Stage A:**
+
+- [ ] PAS (Phase Alignment Score) > 0.6 within 10 epochs on CIFAR-100
+- [ ] All 32 sovereign state dimensions show meaningful variance (> 0.01)
+- [ ] No VICReg collapse (variance loss near zero)
+- [ ] Geometric masking produces qualitatively sensible predictions (visual inspection)
+- [ ] Text conditioning (rotation angle → θ_geometric) affects prediction direction
+
+##### F.15.6.2 Sub-Stage B — Perception Bridge Training
+
+Connect the trained VL-JEPA to the CG pipeline via `PerceptionBridge`.
+
+**Objective:** Train the bridge to produce useful perception signals that improve multimodal generation quality without degrading text-only performance.
+
+**Method:** Freeze VL-JEPA weights. Train only `PerceptionBridge` and the extended `InterpretiveConditioner` gate on multimodal data (image-text pairs).
+
+**Loss:**
+
+```
+L_bridge = L_token + λ_bridge·L_perception_alignment
+```
+
+Where `L_perception_alignment` is a contrastive loss ensuring the perception signal is informative:
+
+```
+L_perception_alignment = -log(σ(sim(perception_signal, h_correct) - sim(perception_signal, h_negative)))
+```
+
+This trains the bridge to produce perception signals that are more similar to hidden states of correct (image-relevant) continuations than incorrect ones.
+
+**Gate monitoring:** The `PerceptionBridge.gate_param` starts at sigmoid(-5.0) ≈ 0.007 and must learn to open. If it remains < 0.01 after 1000 steps, the perception signal is not useful — investigate VL-JEPA quality or bridge architecture.
+
+**Success criteria for Sub-Stage B:**
+
+- [ ] PerceptionBridge gate opens (sigmoid > 0.05 within 2000 steps)
+- [ ] Text-only inputs produce identical output to Stage 8 baseline (null integration test)
+- [ ] Multimodal inputs produce measurably different output from text-only
+- [ ] Perplexity on text-only benchmarks unchanged (± 1%)
+- [ ] Image-captioning or VQA metrics improve over text-only baseline
+
+##### F.15.6.3 Sub-Stage C — End-to-End Multimodal Fine-Tuning
+
+Unfreeze VL-JEPA and train the full stack end-to-end.
+
+**Objective:** Joint optimization of perception and generation.
+
+**Loss:**
+
+```
+L_total = L_token + λ_vl·L_vl + λ_bridge·L_perception_alignment + [existing auxiliary losses from Stage 5]
+```
+
+**Curriculum:** Use the existing PPL-gated progression. Multimodal losses activate only after text-only perplexity stabilizes (same principle as Stage 5's curriculum A→D).
+
+**Gradient safety:** Monitor `perception_gradient_ratio = ‖∇_perception‖ / ‖∇_backbone‖`. Same bounds as Stage 5:
+
+| Ratio | Action |
+|-------|--------|
+| < 0.01 | Perception losses ineffective — increase λ_vl |
+| 0.01 – 0.1 | Healthy range |
+| 0.1 – 0.5 | Caution — monitor text PPL |
+| > 0.5 | Danger — reduce λ_vl immediately |
+
+**Success criteria for Sub-Stage C:**
+
+- [ ] Multimodal generation quality improves over Sub-Stage B (end-to-end > frozen)
+- [ ] Text-only perplexity does NOT increase (± 2%)
+- [ ] VL-JEPA PAS remains > 0.5 (doesn't degrade from joint training)
+- [ ] Kosha routing shows meaningful shift for visual vs. text-only inputs
+- [ ] C_perception contributes to C_total (non-trivial weight after training)
+
+#### F.15.7 Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| `HybridPhaseBlock` | `conscious_generation/perception/hybrid_phase_block.py` | Local + global stream splitting for vision patches |
+| `WindowedQuadraticAttention` | `conscious_generation/perception/windowed_attention.py` | O(N×W²) local spatial attention |
+| `GeometricMaskCollator` | `conscious_generation/perception/geometric_mask.py` | Quadrant / rotation / random masking for VL-JEPA training |
+| `TextToPhaseConditioner` | `conscious_generation/perception/text_phase_conditioner.py` | Text embedding → phase rotation angle θ_geometric |
+| `PhaseSyncLoss` | `conscious_generation/losses/phase_sync.py` | Amplitude L2 + phase cosine for cross-modal alignment |
+| `PerceptionBridge` | `conscious_generation/perception/perception_bridge.py` | VL-JEPA 32D output → InterpretiveConditioner input |
+| `VLJEPAEncoder` | `conscious_generation/perception/vl_jepa_encoder.py` | Full VL-JEPA vision encoder (patches → HybridPhaseBlock → 32D) |
+
+#### F.15.8 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pas` | float | Phase Alignment Score — mean(cos(φ_pred - φ_target)) |
+| `perception_gate` | float | PerceptionBridge gate value (sigmoid) |
+| `loss_jepa_vision` | float | VL-JEPA masked prediction loss |
+| `loss_phase_sync` | float | Phase synchronization loss |
+| `loss_perception_alignment` | float | Bridge contrastive alignment loss |
+| `perception_gradient_ratio` | float | ‖∇_perception‖ / ‖∇_backbone‖ |
+| `kosha_alpha_shift` | float[6] | Change in Kosha routing weights when perception active vs. absent |
+| `c_perception` | float | Perception coherence component of C_total |
+| `vl_jepa_variance_per_dim` | float[32] | Per-dimension variance of VL-JEPA 32D output |
+| `phase_entropy` | float | Entropy of phase distribution (hallucination indicator) |
+
+#### F.15.9 SafeInference and Mauna Protocol
+
+When phase entropy exceeds a threshold during inference, the VL-JEPA perception signal should be silenced rather than contributing noisy conditioning:
+
+```python
+class SafePerceptionInference:
+    """
+    Mauna (silence) protocol: if VL-JEPA is uncertain about visual content,
+    suppress perception signal rather than inject noise.
+
+    This prevents hallucinated visual grounding from corrupting text generation.
+    """
+
+    def __init__(self, entropy_threshold: float = 2.0):
+        self.entropy_threshold = entropy_threshold
+
+    def __call__(self, perception_signal: torch.Tensor, phase_entropy: float):
+        if phase_entropy > self.entropy_threshold:
+            return torch.zeros_like(perception_signal)  # silence
+        return perception_signal
+```
+
+**Rationale:** A generative model can hallucinate visual content. The predictive VL-JEPA is inherently more constrained (it predicts in latent space, not pixel space), but when its phase entropy is high, its predictions are unreliable. Better to fall back to text-only generation than inject noisy visual grounding.
+
+#### F.15.10 Relationship to Existing Stages
+
+```
+Stages 0–9 (text-only CG pipeline)
+    ↓ (all must be stable)
+Stage 10A — VL-JEPA standalone training (independent of CG pipeline)
+    ↓
+Stage 10B — PerceptionBridge training (connects to Stage 2/8 InterpretiveConditioner)
+    ↓
+Stage 10C — End-to-end multimodal fine-tuning (extends Stage 5 curriculum)
+```
+
+**What Stage 10 does NOT change:**
+- Text-only generation path (null integration guaranteed by gating)
+- Existing auxiliary losses (L_csr, L_vritti, L_kosha, L_bliss, L_ont)
+- Stage 6 stability properties (re-validated in Sub-Stage C success criteria)
+- Stage 9 ablation results (text-only mechanisms unchanged)
+
+**What Stage 10 extends:**
+- `InterpretiveConditioner` (Stage 2) — gains optional perception input
+- `UnifiedCoherenceController` (Stage 4) — gains C_perception source
+- `KoshaPrimitiveRouter` — gains perception state in routing input
+- `PerspectiveSynthesizer` (Stage 8) — perception signal flows through existing conditioning
+
+#### F.15.11 Success Criteria (Overall Stage 10)
+
+- [ ] VL-JEPA standalone achieves PAS > 0.6 on validation set
+- [ ] 32D Sovereign State from vision shows meaningful structure (clustering by visual category)
+- [ ] PerceptionBridge gate opens during multimodal training
+- [ ] Text-only generation quality is UNCHANGED when no image provided (null integration)
+- [ ] Multimodal generation shows measurable improvement on image-conditioned tasks
+- [ ] Kosha routing adapts: JEPA weight increases for visual scenes, decreases for abstract text
+- [ ] C_perception is non-degenerate (variance > 0.01, distributed across [0, 1])
+- [ ] Phase entropy Mauna protocol activates appropriately (silences on ambiguous images, passes on clear ones)
+- [ ] No Stage 6 stability regression (re-run orthogonality and entropy tests)
+- [ ] Perception gradient ratio stays in [0.01, 0.1] during end-to-end training
+- [ ] Body–Soul integration: VL-JEPA 32D state and SRK 32D state are compatible (same ontological schema, mergeable in OPB)

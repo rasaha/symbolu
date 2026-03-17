@@ -1038,6 +1038,19 @@ class UnifiedTrainingConfig:
     factual_eval_start_step: int = 0                # Delay eval until this training step
 
     # ==========================================================================
+    # Appendix F Stage 0: Binding Cache + CTM+ Observation Tracers
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, F.2.7–F.2.9
+    # ==========================================================================
+    enable_binding_cache_tracer: bool = False       # Enable Binding Cache observation (Stage 0)
+    binding_cache_top_k: int = 64                   # Simulated Top-K for cache hit rate estimation
+    binding_cache_confidence_threshold: float = 0.7 # Proposal confidence threshold for logging
+    enable_ctm_plus_tracer: bool = False            # Enable CTM+ offload observation (Stage 0)
+    ctm_plus_gpu_budget: int = 24                   # Simulated GPU layer budget for tier placement
+    ctm_plus_num_layers: int = 32                   # Number of backbone layers to track
+    generation_trace_output: str = "generation_trace.json"  # Path for Stage 0 trace output
+    generation_trace_interval: int = 500            # Steps between trace snapshots
+
+    # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules
     # ==========================================================================

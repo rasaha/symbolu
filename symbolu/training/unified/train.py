@@ -2429,6 +2429,30 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Factual Eval] Import failed: {e}")
 
+    # Appendix F Stage 0: Binding Cache + CTM+ Generation Tracer
+    generation_tracer = None
+    if config.model_type == "mistral_cg" and (
+        config.enable_binding_cache_tracer or config.enable_ctm_plus_tracer
+    ):
+        try:
+            from symbolu.inference.generation_tracer import MistralCGGenerationTracer
+            generation_tracer = MistralCGGenerationTracer(
+                model=model,
+                binding_cache_top_k=config.binding_cache_top_k,
+                ctm_num_layers=config.ctm_plus_num_layers,
+                ctm_gpu_budget=config.ctm_plus_gpu_budget,
+            )
+            print(f"\n  [Stage 0 Tracer] ENABLED — Observation only, no generation modification")
+            if config.enable_binding_cache_tracer:
+                print(f"    Binding Cache: top_k={config.binding_cache_top_k}, "
+                      f"confidence_threshold={config.binding_cache_confidence_threshold}")
+            if config.enable_ctm_plus_tracer:
+                print(f"    CTM+: gpu_budget={config.ctm_plus_gpu_budget}/{config.ctm_plus_num_layers} layers")
+            print(f"    Trace output: {config.generation_trace_output}")
+            print(f"    Snapshot interval: every {config.generation_trace_interval} steps")
+        except ImportError as e:
+            print(f"  [Stage 0 Tracer] Import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -2925,9 +2949,11 @@ def train(config: UnifiedTrainingConfig):
                         _mem_baseline = torch.cuda.memory_allocated() / (1024**3)
                         torch.cuda.reset_peak_memory_stats()
                     # Phase 3/4 governance needs hidden states for primitive scoring + routing
+                    # Stage 0 tracer also needs hidden states for binding cache metrics
                     _need_hidden = (config.enable_conscious_generation
                                     and hasattr(model, 'conscious_gen')
                                     and 'integrated_scorer' in model.conscious_gen)
+                    _need_hidden = _need_hidden or (generation_tracer is not None)
                     if enable_decorr or _need_hidden:
                         outputs = model(x, return_decorr_loss=enable_decorr,
                                         return_last_hidden=_need_hidden)
@@ -5071,6 +5097,46 @@ def train(config: UnifiedTrainingConfig):
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+
+            # Stage 0: Binding Cache + CTM+ generation tracer (observation only)
+            if generation_tracer is not None and logits is not None:
+                try:
+                    _gt_intent = outputs.get('intent_phase', None) if isinstance(outputs, dict) else None
+                    _gt_hidden = outputs.get('last_hidden_state', None) if isinstance(outputs, dict) else None
+
+                    # Record layer accesses for CTM+ (all backbone layers used in forward)
+                    if config.enable_ctm_plus_tracer:
+                        for _layer_idx in range(config.ctm_plus_num_layers):
+                            generation_tracer.record_layer_access(_layer_idx)
+
+                    # Record token-level metrics (using last token in sequence)
+                    _gt_logits = logits[:, -1, :] if logits.dim() == 3 else logits
+                    _gt_token_id = _gt_logits.argmax(dim=-1)[0].item()
+                    _gt_hidden_last = _gt_hidden[:, -1, :] if _gt_hidden is not None and _gt_hidden.dim() == 3 else _gt_hidden
+                    generation_tracer.record_token(
+                        token_id=_gt_token_id,
+                        logits=_gt_logits[0] if _gt_logits.dim() == 2 else _gt_logits,
+                        hidden_state=_gt_hidden_last[0] if _gt_hidden_last is not None else torch.zeros(1),
+                        intent_phase=_gt_intent,
+                        input_ids=x,
+                    )
+
+                    # Periodic trace export
+                    if global_step > 0 and global_step % config.generation_trace_interval == 0:
+                        generation_tracer.export(config.generation_trace_output)
+                        _gt_summary = generation_tracer.summary()
+                        print(f"  [Stage 0 Trace] Step {global_step} | "
+                              f"tokens={_gt_summary.get('num_tokens', 0)} | "
+                              f"H={_gt_summary.get('mean_logit_entropy', 0):.3f} | "
+                              f"intent_drift={_gt_summary.get('mean_intent_drift', 0):.4f} | "
+                              f"cache_hit={_gt_summary.get('mean_cache_hit_rate', 0):.3f}")
+                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                            for _gk, _gv in _gt_summary.items():
+                                if isinstance(_gv, (int, float)):
+                                    writer.add_scalar(f'stage0_tracer/{_gk}', _gv, global_step)
+                except Exception as _gt_err:
+                    if global_step % 1000 == 0:
+                        print(f"  [Stage 0 Tracer] Error at step {global_step}: {_gt_err}")
 
             # Scale for gradient accumulation
             loss = loss / config.gradient_accumulation
@@ -7340,6 +7406,20 @@ def train(config: UnifiedTrainingConfig):
         if training_state_tracker is not None and training_state_tracker.enabled:
             training_state_tracker.save_state()
 
+    # Export final Stage 0 trace
+    if generation_tracer is not None:
+        generation_tracer.export(config.generation_trace_output)
+        _final_summary = generation_tracer.summary()
+        print(f"\n  [Stage 0 Tracer] Final export: {config.generation_trace_output}")
+        print(f"    Total tokens traced: {_final_summary.get('num_tokens', 0)}")
+        if 'mean_intent_drift' in _final_summary:
+            print(f"    Mean intent drift: {_final_summary['mean_intent_drift']:.4f}")
+        if 'mean_cache_hit_rate' in _final_summary:
+            print(f"    Mean cache hit rate: {_final_summary['mean_cache_hit_rate']:.3f}")
+        if 'ctm_dominant_workload' in _final_summary:
+            print(f"    CTM+ dominant workload: {_final_summary['ctm_dominant_workload']}")
+            print(f"    CTM+ mode stability: {_final_summary.get('ctm_mode_stability', 0):.3f}")
+
     # Close TensorBoard
     if tb_writer is not None:
         tb_writer.close()
@@ -9090,6 +9170,22 @@ def main():
                        help="Number of fact/hallucination probe pairs per evaluation")
     parser.add_argument("--factual_eval_start_step", type=int, default=0,
                        help="Delay factual evaluation until this training step")
+
+    # Appendix F Stage 0: Binding Cache + CTM+ Observation Tracers
+    parser.add_argument("--enable_binding_cache_tracer", action="store_true",
+                       help="Enable Binding Cache observation tracer (Stage 0, no generation modification)")
+    parser.add_argument("--binding_cache_top_k", type=int, default=64,
+                       help="Simulated Top-K for Binding Cache hit rate estimation")
+    parser.add_argument("--enable_ctm_plus_tracer", action="store_true",
+                       help="Enable CTM+ offload observation tracer (Stage 0, no actual offloading)")
+    parser.add_argument("--ctm_plus_gpu_budget", type=int, default=24,
+                       help="Simulated GPU layer budget for CTM+ tier placement")
+    parser.add_argument("--ctm_plus_num_layers", type=int, default=32,
+                       help="Number of backbone layers to track for CTM+ simulation")
+    parser.add_argument("--generation_trace_output", type=str, default="generation_trace.json",
+                       help="Output path for Stage 0 generation trace JSON")
+    parser.add_argument("--generation_trace_interval", type=int, default=500,
+                       help="Steps between generation trace snapshots")
 
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
