@@ -317,7 +317,10 @@ class CTMPartitionedParameterCoordinator:
         ahead = self.offload_manager.config.prefetch_ahead
 
         for i in range(current_layer + 1, min(current_layer + ahead + 1, total_layers)):
-            # This would need layer->param mapping from the model
-            pass
+            # Prefetch params owned by this rank for upcoming layers
+            for param_id, (start, end) in self.owned_params.items():
+                if param_id.startswith(f"layer_{i}.") or param_id.startswith(f"layers.{i}."):
+                    if not self.full_params.get(param_id, False):
+                        prefetch_list.append(param_id)
 
         return prefetch_list

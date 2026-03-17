@@ -85,9 +85,22 @@ __global__ void kernel_on_access(
 
     uint64_t page_id = access_page_ids[idx];
     uint32_t hash_idx = hash_page_id(page_id, CTM_HASH_BITS);
+    uint32_t hash_mask = (1u << CTM_HASH_BITS) - 1;
 
-    // Find or create page state (simplified - real impl needs proper hash table)
-    PageState* page = &pages[hash_idx];
+    // Linear probing to find existing slot or empty slot
+    PageState* page = nullptr;
+    for (uint32_t probe = 0; probe < 16; probe++) {
+        uint32_t slot = (hash_idx + probe) & hash_mask;
+        PageState* candidate = &pages[slot];
+        if (candidate->page_id == page_id || candidate->page_id == 0) {
+            page = candidate;
+            break;
+        }
+    }
+    if (!page) {
+        // Hash table full in local neighborhood, fall back to base slot
+        page = &pages[hash_idx];
+    }
 
     // Initialize if new page
     if (page->page_id != page_id) {
@@ -179,7 +192,7 @@ __global__ void kernel_select_victims(
         uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
         const PageState& page = pages[hash];
 
-        float score = compute_victim_score(page, min_time, time_range, adaptive_p, 0.3f);
+        float score = compute_victim_score(page, min_time, time_range, adaptive_p, page.coherence);
 
         if (score < best_score) {
             best_score = score;

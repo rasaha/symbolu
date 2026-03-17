@@ -47,6 +47,14 @@ class CTMvLLMConfig:
     weight_coherence: float = 0.10
     weight_neighbor: float = 0.10
 
+    def __post_init__(self):
+        total = (self.weight_recency + self.weight_frequency +
+                 self.weight_reuse + self.weight_coherence + self.weight_neighbor)
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"Scoring weights must sum to 1.0, got {total:.3f}"
+            )
+
     @classmethod
     def for_llm_inference(cls) -> "CTMvLLMConfig":
         """Optimized for LLM inference (temporal patterns, long sequences)."""

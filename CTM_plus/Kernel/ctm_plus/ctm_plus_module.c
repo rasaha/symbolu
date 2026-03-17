@@ -204,7 +204,12 @@ EXPORT_SYMBOL_GPL(ctm_attr_group);
  */
 static int ctm_damon_callback(struct damon_ctx *ctx)
 {
-    /* TODO: Integrate with DAMON for access monitoring */
+    /*
+     * Placeholder for DAMON integration. When connected, this callback
+     * would feed DAMON-detected access patterns into ctm_on_access()
+     * for each monitored region's pages.
+     */
+    pr_debug("CTM+: DAMON callback invoked (integration pending)\n");
     return 0;
 }
 #endif

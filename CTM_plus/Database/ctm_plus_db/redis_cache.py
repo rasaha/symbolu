@@ -7,7 +7,6 @@ Can be used as a local cache or as a Redis module reference.
 
 import time
 import threading
-import hashlib
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
 from dataclasses import dataclass
 from enum import Enum
