@@ -5721,6 +5721,42 @@ From the trace, compute:
 - [ ] Binding Cache baseline metrics captured (salience entropy, intent phase drift, proposal confidence)
 - [ ] CTM+ offload tier metrics captured (hit rates, tier distribution, eviction counts)
 
+#### F.2.6a Training Command — Stage 0 Baseline Capture
+
+```bash
+# Stage 0: Observation-only — captures baseline metrics without modifying generation
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --generation_trace_output generation_trace.json \
+  --generation_trace_interval 500 \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
+#### F.2.6b Training Command — Stage 0 Minimal (No Trace Export Args)
+
+```bash
+# Stage 0: Minimal form — uses default trace output path and interval
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
 #### F.2.7 Binding Cache Integration — Inference-Time KV Cache Wrapping
 
 **Rationale:** The `BindingCacheInferenceEngine` (V10.0) and `OntologicalBindingCacheInferenceEngine` (V11.0.0) already implement intent-phase injection, salience-based Top-K KV pruning, and proposal-mode confidence gating — all at inference time, without modifying model weights. When running `mistral_cg`, these modules wrap around Mistral's standard KV cache to provide coherence-aware memory management during generation.
