@@ -48,9 +48,20 @@ static ssize_t stats_show(struct kobject *kobj, struct kobj_attribute *attr,
                           char *buf)
 {
     struct ctm_stats stats;
+    unsigned int tier0_size, tier0_cap, tier1_size, tier1_cap, adaptive_p;
+    unsigned long flags;
     u64 total_accesses, hit_rate;
 
     ctm_get_stats(ctm_ctrl, &stats);
+
+    /* Read tier sizes under lock for consistency */
+    spin_lock_irqsave(&ctm_ctrl->lock, flags);
+    tier0_size = ctm_ctrl->tier0_size;
+    tier0_cap = ctm_ctrl->tier0_capacity;
+    tier1_size = ctm_ctrl->tier1_size;
+    tier1_cap = ctm_ctrl->tier1_capacity;
+    adaptive_p = ctm_ctrl->adaptive_p;
+    spin_unlock_irqrestore(&ctm_ctrl->lock, flags);
 
     total_accesses = stats.tier0_hits + stats.tier1_hits + stats.misses;
     hit_rate = total_accesses ?
@@ -77,9 +88,9 @@ static ssize_t stats_show(struct kobject *kobj, struct kobj_attribute *attr,
         stats.promotions,
         stats.demotions,
         stats.smart_victim_selections,
-        ctm_ctrl->tier0_size, ctm_ctrl->tier0_capacity,
-        ctm_ctrl->tier1_size, ctm_ctrl->tier1_capacity,
-        ctm_ctrl->adaptive_p);
+        tier0_size, tier0_cap,
+        tier1_size, tier1_cap,
+        adaptive_p);
 }
 
 static ssize_t stats_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -93,7 +104,9 @@ static ssize_t stats_store(struct kobject *kobj, struct kobj_attribute *attr,
 static ssize_t victim_sample_size_show(struct kobject *kobj,
                                        struct kobj_attribute *attr, char *buf)
 {
-    return sysfs_emit(buf, "%u\n", ctm_ctrl->config.victim_sample_size);
+    struct ctm_config config;
+    ctm_get_config(ctm_ctrl, &config);
+    return sysfs_emit(buf, "%u\n", config.victim_sample_size);
 }
 
 static ssize_t victim_sample_size_store(struct kobject *kobj,
@@ -101,18 +114,23 @@ static ssize_t victim_sample_size_store(struct kobject *kobj,
                                         const char *buf, size_t count)
 {
     unsigned int val;
+    struct ctm_config config;
     if (kstrtouint(buf, 10, &val) < 0)
         return -EINVAL;
     if (val < 8 || val > 256)
         return -EINVAL;
-    ctm_ctrl->config.victim_sample_size = val;
+    ctm_get_config(ctm_ctrl, &config);
+    config.victim_sample_size = val;
+    ctm_set_config(ctm_ctrl, &config);
     return count;
 }
 
 static ssize_t promotion_threshold_show(struct kobject *kobj,
                                         struct kobj_attribute *attr, char *buf)
 {
-    return sysfs_emit(buf, "%u\n", ctm_ctrl->config.promotion_threshold);
+    struct ctm_config config;
+    ctm_get_config(ctm_ctrl, &config);
+    return sysfs_emit(buf, "%u\n", config.promotion_threshold);
 }
 
 static ssize_t promotion_threshold_store(struct kobject *kobj,
@@ -120,18 +138,23 @@ static ssize_t promotion_threshold_store(struct kobject *kobj,
                                          const char *buf, size_t count)
 {
     unsigned int val;
+    struct ctm_config config;
     if (kstrtouint(buf, 10, &val) < 0)
         return -EINVAL;
     if (val > 100)
         return -EINVAL;
-    ctm_ctrl->config.promotion_threshold = val;
+    ctm_get_config(ctm_ctrl, &config);
+    config.promotion_threshold = val;
+    ctm_set_config(ctm_ctrl, &config);
     return count;
 }
 
 static ssize_t smart_victim_show(struct kobject *kobj,
                                  struct kobj_attribute *attr, char *buf)
 {
-    return sysfs_emit(buf, "%d\n", ctm_ctrl->config.enable_smart_victim);
+    struct ctm_config config;
+    ctm_get_config(ctm_ctrl, &config);
+    return sysfs_emit(buf, "%d\n", config.enable_smart_victim);
 }
 
 static ssize_t smart_victim_store(struct kobject *kobj,
@@ -139,9 +162,12 @@ static ssize_t smart_victim_store(struct kobject *kobj,
                                   const char *buf, size_t count)
 {
     bool val;
+    struct ctm_config config;
     if (kstrtobool(buf, &val) < 0)
         return -EINVAL;
-    ctm_ctrl->config.enable_smart_victim = val;
+    ctm_get_config(ctm_ctrl, &config);
+    config.enable_smart_victim = val;
+    ctm_set_config(ctm_ctrl, &config);
     return count;
 }
 

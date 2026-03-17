@@ -4,7 +4,7 @@ CTM+ ZeRO-Offload Integration for DeepSpeed.
 Provides intelligent offloading for ZeRO optimizer states and gradients.
 """
 
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Tuple
 import threading
 
 from .offload_manager import CTMOffloadManager, TensorLocation

@@ -40,8 +40,8 @@ class CTMvLLMConfig:
     adaptive_p_learning_rate: float = 0.1
     initial_p: float = 0.5
 
-    # Scoring weights
-    weight_recency: float = 0.40
+    # Scoring weights (must sum to 1.0)
+    weight_recency: float = 0.35
     weight_frequency: float = 0.30
     weight_reuse: float = 0.15
     weight_coherence: float = 0.10

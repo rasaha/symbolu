@@ -807,4 +807,3 @@ class CTMBufferPool:
             # PRODUCTION: Reset latency and pools
             self.latency_stats.clear()
             self.candidate_pool.clear()
-            self._slow_path_counter = 0
