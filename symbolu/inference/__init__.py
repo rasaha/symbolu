@@ -79,6 +79,14 @@ from .logit_modulation_benchmark import (
     SweepResult,
 )
 
+# Appendix F Stage 0: Generation Tracer
+from .generation_tracer import (
+    GenerationTracer,
+    BindingCacheTracerMixin,
+    CTMPlusTracerMixin,
+    MistralCGGenerationTracer,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -132,6 +140,12 @@ __all__ = [
     "LogitModulationBenchmark",
     "BenchmarkMetrics",
     "SweepResult",
+
+    # Appendix F Stage 0: Generation Tracer
+    "GenerationTracer",
+    "BindingCacheTracerMixin",
+    "CTMPlusTracerMixin",
+    "MistralCGGenerationTracer",
 ]
 
 __version__ = "2.0.0"

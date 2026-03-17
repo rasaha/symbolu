@@ -5718,6 +5718,276 @@ From the trace, compute:
 - [ ] All metrics computed and recorded
 - [ ] No generation behavior modified (exact same output with/without tracer)
 - [ ] Statistics establish clear reference values for all subsequent stages
+- [ ] Binding Cache baseline metrics captured (salience entropy, intent phase drift, proposal confidence)
+- [ ] CTM+ offload tier metrics captured (hit rates, tier distribution, eviction counts)
+
+#### F.2.7 Binding Cache Integration — Inference-Time KV Cache Wrapping
+
+**Rationale:** The `BindingCacheInferenceEngine` (V10.0) and `OntologicalBindingCacheInferenceEngine` (V11.0.0) already implement intent-phase injection, salience-based Top-K KV pruning, and proposal-mode confidence gating — all at inference time, without modifying model weights. When running `mistral_cg`, these modules wrap around Mistral's standard KV cache to provide coherence-aware memory management during generation.
+
+**Architecture (Mistral CG + Binding Cache):**
+
+```
+Mistral-7B (frozen, 4-bit)
+    ↓ hidden_states [B, T, 4096]
+State Projector → 32D Sovereign State          (trainable, existing)
+    ↓
+Bhava Delta [12D] → Intent Phase [H heads]     (trainable, existing)
+    ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  BindingCacheInferenceEngine  (NEW at Stage 0 — observation)    │
+│                                                                  │
+│  IntentPhaseInferenceModule                                      │
+│    • Receives intent_phase from MistralCGWrapper.forward()       │
+│    • Logs intent evolution per token (no modification)           │
+│                                                                  │
+│  BindingSalienceController                                       │
+│    • Computes salience scores from hidden states                 │
+│    • Logs salience distribution (no KV pruning yet)              │
+│                                                                  │
+│  ProposalModeMetrics                                             │
+│    • Tracks confidence of each generated token                   │
+│    • Logs proposal acceptance/rejection ratios                   │
+└──────────────────────────────────────────────────────────────────┘
+    ↓
+Phase Adapter → adapted_hidden                  (trainable, existing)
+    ↓
+Mistral LM Head (frozen) → logits              (existing)
+```
+
+**Stage 0 behavior:** Observation-only. The Binding Cache modules compute and log metrics but do NOT modify the KV cache or generation. This extends the `GenerationTracer` with binding-specific fields.
+
+**Additional trace fields for `generation_trace.json`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `intent_phase` | float[H] | Per-head intent phase angles from MistralCGWrapper |
+| `intent_drift` | float | L2 distance between consecutive intent phases |
+| `salience_entropy` | float | H(salience distribution) — cache diversity |
+| `salience_top_k_ratio` | float | Fraction of positions with salience > 1.0 |
+| `proposal_confidence` | float | Confidence score of the proposed token |
+| `binding_cache_hit_rate` | float | Simulated hit rate under Top-K salience pruning |
+
+**Implementation — `BindingCacheTracerMixin`:**
+
+```python
+class BindingCacheTracerMixin:
+    """Extends GenerationTracer with Binding Cache observation metrics."""
+
+    def __init__(self, intent_module, salience_controller, config):
+        self.intent_module = intent_module
+        self.salience_controller = salience_controller
+        self.config = config
+        self._prev_intent = None
+
+    def record_binding_cache(self, token_id, hidden_state, intent_phase,
+                              input_ids):
+        """Record per-token Binding Cache metrics without modifying generation."""
+        entry = {}
+
+        # Intent phase tracking
+        if intent_phase is not None:
+            entry["intent_phase"] = intent_phase.detach().cpu().tolist()
+            if self._prev_intent is not None:
+                entry["intent_drift"] = (
+                    (intent_phase - self._prev_intent).norm().item()
+                )
+            else:
+                entry["intent_drift"] = 0.0
+            self._prev_intent = intent_phase.detach().clone()
+
+        # Salience distribution analysis
+        salience = self.salience_controller.compute_salience(
+            input_ids, hidden_state
+        )
+        sal_probs = F.softmax(salience, dim=-1)
+        entry["salience_entropy"] = (
+            -(sal_probs * (sal_probs + 1e-8).log()).sum(-1).mean().item()
+        )
+        entry["salience_top_k_ratio"] = (
+            (salience > 1.0).float().mean().item()
+        )
+
+        # Simulated cache hit rate under Top-K pruning
+        top_k = self.config.top_k
+        T = salience.shape[-1]
+        if T > top_k:
+            _, top_indices = salience.topk(top_k, dim=-1)
+            entry["binding_cache_hit_rate"] = top_k / T
+        else:
+            entry["binding_cache_hit_rate"] = 1.0
+
+        return entry
+```
+
+#### F.2.8 CTM+ Offload Integration — Coherence-Tier Memory for Layer Placement
+
+**Rationale:** CTM+ (`CTM_plus/DeepSpeed/ctm_plus_deepspeed/offload_manager.py`) implements coherence-tier memory management that decides which model layers (or activations) reside on GPU vs CPU based on access patterns, phase correlation, and ARC-style shadow tracking. For `mistral_cg` with 4-bit quantization, the frozen backbone layers are candidates for tier-aware placement — frequently accessed layers stay on GPU, rarely accessed layers offload to CPU, with prefetching for predicted access.
+
+**Architecture (Mistral CG + CTM+ Offloading):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CTM+ Offload Manager  (NEW at Stage 0 — observation)          │
+│                                                                  │
+│  PhaseIntegrator                                                 │
+│    • Embeds per-layer access events (which Mistral layer, R/W)  │
+│    • Computes phase coherence between layer access patterns     │
+│    • Logs phase/amplitude per layer (no actual offloading)      │
+│                                                                  │
+│  WorkloadClassifier                                              │
+│    • Classifies generation workload (temporal/scan/mixed)       │
+│    • Logs workload mode transitions                              │
+│                                                                  │
+│  Shadow Tier Tracker                                             │
+│    • Simulates ARC-style B1/B2 ghost hits                       │
+│    • Tracks adaptive p (recency vs frequency balance)            │
+│    • Logs simulated tier placement decisions                     │
+└─────────────────────────────────────────────────────────────────┘
+    ↓ (observation only)
+Mistral-7B backbone layers [0..31]
+    ↓
+hidden_states → CG adapter → logits
+```
+
+**Stage 0 behavior:** Shadow-mode observation only. The CTM+ controller simulates tier placement decisions and logs them, but does NOT actually move layers between devices. This captures baseline access patterns needed for Stage 1+ activation.
+
+**Additional trace fields for `generation_trace.json`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ctm_layer_access` | int[32] | Per-layer access count this generation step |
+| `ctm_phase_coherence` | float | USE coherence across layer access phases |
+| `ctm_workload_mode` | str | Classified workload: "temporal", "scan", "mixed" |
+| `ctm_adaptive_p` | float | ARC adaptive p value (recency/frequency balance) |
+| `ctm_simulated_gpu_layers` | int | Layers that would stay on GPU under CTM+ policy |
+| `ctm_simulated_cpu_layers` | int | Layers that would be offloaded under CTM+ policy |
+| `ctm_prefetch_hits` | int | Correct prefetch predictions (simulated) |
+
+**Implementation — `CTMPlusTracerMixin`:**
+
+```python
+class CTMPlusTracerMixin:
+    """Extends GenerationTracer with CTM+ offload observation metrics."""
+
+    def __init__(self, num_layers=32, gpu_budget=24):
+        self.num_layers = num_layers
+        self.gpu_budget = gpu_budget
+        self._access_counts = [0] * num_layers
+        self._phase_integrator = None  # Initialized from CTM+ config
+        self._shadow_hits = {"b1": 0, "b2": 0}
+        self._adaptive_p = 0.5
+        self._total_steps = 0
+
+    def record_layer_access(self, layer_idx):
+        """Record that a layer was accessed during forward pass."""
+        self._access_counts[layer_idx] += 1
+
+    def record_ctm_metrics(self):
+        """Compute CTM+ metrics for the current generation step."""
+        self._total_steps += 1
+        entry = {}
+
+        entry["ctm_layer_access"] = list(self._access_counts)
+
+        # Phase coherence: cosine similarity of access frequency vectors
+        # between consecutive windows (simplified from full CTM+ USE formula)
+        access_tensor = torch.tensor(self._access_counts, dtype=torch.float32)
+        if access_tensor.sum() > 0:
+            access_probs = access_tensor / access_tensor.sum()
+            entry["ctm_phase_coherence"] = (
+                -(access_probs * (access_probs + 1e-8).log()).sum().item()
+            )
+        else:
+            entry["ctm_phase_coherence"] = 0.0
+
+        # Workload classification (simplified)
+        access_var = access_tensor.var().item()
+        if access_var < 0.1:
+            entry["ctm_workload_mode"] = "temporal"  # Uniform access
+        elif access_tensor.max().item() > 3 * access_tensor.mean().item():
+            entry["ctm_workload_mode"] = "scan"  # Skewed access
+        else:
+            entry["ctm_workload_mode"] = "mixed"
+
+        # Simulated tier placement
+        sorted_layers = sorted(
+            range(self.num_layers),
+            key=lambda i: self._access_counts[i],
+            reverse=True,
+        )
+        gpu_layers = sorted_layers[:self.gpu_budget]
+        cpu_layers = sorted_layers[self.gpu_budget:]
+        entry["ctm_adaptive_p"] = self._adaptive_p
+        entry["ctm_simulated_gpu_layers"] = len(gpu_layers)
+        entry["ctm_simulated_cpu_layers"] = len(cpu_layers)
+        entry["ctm_prefetch_hits"] = 0  # Populated after multi-step tracking
+
+        return entry
+```
+
+#### F.2.9 Combined Baseline: Binding Cache + CTM+ Observation
+
+When running `mistral_cg` training with Stage 0 instrumentation, both mixins are composed into the `GenerationTracer`:
+
+```python
+class MistralCGGenerationTracer(GenerationTracer, BindingCacheTracerMixin,
+                                 CTMPlusTracerMixin):
+    """
+    Full Stage 0 tracer for Mistral CG with Binding Cache + CTM+ observation.
+
+    Composes:
+    - GenerationTracer: logit entropy, token probs, CG primitive scores
+    - BindingCacheTracerMixin: intent phase, salience, proposal confidence
+    - CTMPlusTracerMixin: layer access patterns, tier placement simulation
+    """
+
+    def __init__(self, model, csr_scorer=None, vritti_scorer=None,
+                 kosha_router=None, bliss_gate=None,
+                 binding_config=None, ctm_num_layers=32):
+        GenerationTracer.__init__(self, model, csr_scorer, vritti_scorer,
+                                   kosha_router, bliss_gate)
+        # Binding Cache observation
+        intent_module = IntentPhaseInferenceModule(
+            num_heads=model.num_heads,
+            head_dim=model.mistral_hidden_dim // model.num_heads,
+        )
+        salience_controller = BindingSalienceController()
+        bc_config = binding_config or BindingCacheInferenceConfig()
+        BindingCacheTracerMixin.__init__(
+            self, intent_module, salience_controller, bc_config,
+        )
+        # CTM+ observation
+        CTMPlusTracerMixin.__init__(self, num_layers=ctm_num_layers)
+
+    def record_token(self, token_id, logits, hidden_state, onto_state=None,
+                      intent_phase=None, input_ids=None):
+        """Record all metrics: base CG + Binding Cache + CTM+."""
+        # Base CG metrics
+        super().record_token(token_id, logits, hidden_state, onto_state)
+
+        # Binding Cache metrics
+        if intent_phase is not None and input_ids is not None:
+            bc_entry = self.record_binding_cache(
+                token_id, hidden_state, intent_phase, input_ids,
+            )
+            self.trace[-1].update(bc_entry)
+
+        # CTM+ metrics (layer access recorded separately via hooks)
+        ctm_entry = self.record_ctm_metrics()
+        self.trace[-1].update(ctm_entry)
+```
+
+**Baseline statistics to add (Binding Cache + CTM+ specific):**
+
+| Metric | Formula | Expected Range |
+|--------|---------|----------------|
+| Mean intent drift | μ(‖θ_t - θ_{t-1}‖₂) across tokens | 0.01 – 0.5 (stable intent) |
+| Salience concentration | Gini coefficient of salience scores | 0.2 – 0.6 (not collapsed) |
+| Simulated cache efficiency | Avg binding_cache_hit_rate | > 0.8 at top_k=64 |
+| CTM+ layer access entropy | H(access distribution) | > 3.0 bits (diverse layer use) |
+| CTM+ optimal GPU budget | Min layers for 95% access coverage | < 24 (fits on single GPU) |
+| Workload mode stability | Mode transitions / total steps | < 0.05 (stable classification) |
 
 ---
 
@@ -5905,6 +6175,335 @@ Compare across 50+ generation samples:
 - [ ] Perplexity on standard benchmarks unchanged (± 1%)
 - [ ] Knowledge accuracy unchanged
 - [ ] Resample events occur in < 5% of tokens (not over-triggering)
+
+---
+
+### F.3.5+ Stage 1.5 — Active Binding Cache + CTM+ Integration
+
+#### F.3.5+.1 Objective
+
+Activate the Binding Cache and CTM+ modules that were instrumented in Stage 0. This stage transitions from observation-only to active intervention: the Binding Cache performs real salience-based KV pruning during generation, and CTM+ performs actual layer offloading between GPU and CPU. **Logits remain untouched** — these modules operate on the attention cache and memory tier, not on the generation distribution.
+
+**Prerequisite:** Stage 0 baseline metrics must demonstrate:
+- Intent drift is meaningful (not collapsed to 0 or oscillating wildly)
+- Salience distribution has entropy > 2.0 bits (not uniform or collapsed)
+- CTM+ workload classification is stable (< 5% mode transitions)
+
+#### F.3.5+.2 Architecture — Active Binding Cache
+
+```
+Mistral-7B (frozen, 4-bit) forward pass
+    ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  BindingCacheInferenceEngine  (ACTIVE)                           │
+│                                                                  │
+│  IntentPhaseInferenceModule                                      │
+│    • Receives intent_phase from MistralCGWrapper.forward()       │
+│    • Rotates key phases in KV cache based on intent              │
+│    • Intent-aligned keys get higher retrieval probability        │
+│                                                                  │
+│  BindingSalienceController                                       │
+│    • Computes salience from hidden states + ontological state    │
+│    • Top-K selection: only K highest-salience positions retained │
+│    • Low-salience positions evicted from KV cache                │
+│                                                                  │
+│  ProposalModeController                                          │
+│    • Confidence gating: if P(token) < threshold → flag for       │
+│      CoherenceAwareDecoder (Stage 1) to adjust sampling          │
+│    • Connects Binding Cache confidence → Stage 1 coherence input │
+└──────────────────────────────────────────────────────────────────┘
+    ↓ (pruned KV cache — fewer positions, higher quality)
+attention(Q, K_pruned, V_pruned)
+    ↓
+Phase Adapter → adapted_hidden
+    ↓
+Mistral LM Head (frozen) → logits  (UNCHANGED)
+```
+
+**Key constraint:** The Binding Cache modifies *what the model remembers* (KV cache), not *what it predicts* (logits). This is analogous to a human focusing attention on relevant context rather than changing their vocabulary.
+
+#### F.3.5+.3 Architecture — Active CTM+ Offloading
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CTM+ Offload Manager  (ACTIVE)                                  │
+│                                                                  │
+│  PhaseIntegrator                                                 │
+│    • Learns per-layer access patterns from Stage 0 traces        │
+│    • Computes phase/amplitude for each Mistral layer             │
+│                                                                  │
+│  SmartVictimSelector                                             │
+│    • Selects layers to offload based on:                         │
+│      - Access frequency (LFU signal)                             │
+│      - Recency (LRU signal)                                      │
+│      - Phase coherence (CTM+ signal)                             │
+│    • ARC-style adaptive p balances recency vs frequency          │
+│                                                                  │
+│  PredictivePrefetcher                                            │
+│    • Prefetches layers predicted to be needed next step          │
+│    • Uses Markov model trained on Stage 0 access sequences       │
+│                                                                  │
+│  TierPlacement                                                   │
+│    Tier 0 (GPU): High-access layers (≤ gpu_budget)              │
+│    Tier 1 (CPU): Low-access layers (prefetched on demand)        │
+│    Tier 2 (NVMe): Optional for very large models                │
+└──────────────────────────────────────────────────────────────────┘
+    ↓
+Mistral-7B layers [0..31]
+    Hot layers: resident on GPU (fast path)
+    Cold layers: on CPU, prefetched when predicted (warm path)
+```
+
+#### F.3.5+.4 Integration with Stage 1 CoherenceAwareDecoder
+
+Stage 1.5 does not replace Stage 1 — it feeds into it:
+
+```
+Binding Cache proposal_confidence
+    ↓
+    ├─ confidence > threshold → normal sampling (Stage 1 coherence)
+    └─ confidence < threshold → flag "uncertain"
+                                    ↓
+                              CoherenceAwareDecoder receives TWO signals:
+                                1. Bhava coherence (Stage 1, existing)
+                                2. Binding confidence (Stage 1.5, new)
+                                    ↓
+                              Combined coherence = min(bhava, confidence)
+                                    ↓
+                              Policy adjustment (temperature, top_p)
+```
+
+#### F.3.5+.5 Implementation — Binding Cache Activation
+
+New module: `inference/binding_cache_stage1_5.py`
+
+```python
+class BindingCacheActiveWrapper:
+    """
+    Wraps MistralCGWrapper to perform active KV cache pruning.
+
+    Stage 1.5: Salience-based Top-K KV pruning during generation.
+    Logits are NEVER modified. Only the KV cache is pruned.
+    """
+
+    def __init__(self, inference_engine, config):
+        self.engine = inference_engine  # BindingCacheInferenceEngine
+        self.config = config
+        self.active = True  # Can be disabled for ablation
+
+    def prune_kv_cache(self, kv_cache, hidden_states, input_ids,
+                        intent_phase):
+        """
+        Prune KV cache to top-K most salient positions.
+
+        Args:
+            kv_cache: Tuple of (keys, values) per layer
+            hidden_states: [B, T, D] current hidden states
+            input_ids: [B, T] input token IDs
+            intent_phase: [B, H] intent phase from CG adapter
+
+        Returns:
+            pruned_kv_cache: KV cache with only top-K positions
+            prune_metrics: Dict of pruning statistics
+        """
+        if not self.active:
+            return kv_cache, {"pruned": False}
+
+        # Inject intent phase to bias salience scoring
+        if intent_phase is not None:
+            self.engine.intent_module.inject_external_intent(intent_phase)
+
+        # Compute salience for each position
+        salience = self.engine.salience_controller.compute_salience(
+            input_ids, hidden_states
+        )
+
+        # Select top-K positions
+        top_k = self.config.top_k
+        B, T = salience.shape
+        if T <= top_k:
+            return kv_cache, {"pruned": False, "kept": T, "total": T}
+
+        _, keep_indices = salience.topk(top_k, dim=-1)  # [B, K]
+        keep_indices = keep_indices.sort(dim=-1).values  # maintain order
+
+        # Prune each layer's KV cache
+        pruned_cache = []
+        for layer_keys, layer_values in kv_cache:
+            # layer_keys: [B, H, T, D_h]
+            # Select only keep_indices positions along T dimension
+            idx = keep_indices.unsqueeze(1).unsqueeze(-1)
+            idx_k = idx.expand(-1, layer_keys.shape[1], -1, layer_keys.shape[-1])
+            idx_v = idx.expand(-1, layer_values.shape[1], -1, layer_values.shape[-1])
+            pruned_k = layer_keys.gather(2, idx_k)
+            pruned_v = layer_values.gather(2, idx_v)
+            pruned_cache.append((pruned_k, pruned_v))
+
+        metrics = {
+            "pruned": True,
+            "kept": top_k,
+            "total": T,
+            "prune_ratio": 1.0 - (top_k / T),
+            "salience_mean": salience.mean().item(),
+            "salience_std": salience.std().item(),
+        }
+
+        return pruned_cache, metrics
+
+    def compute_confidence(self, logits, salience):
+        """Compute proposal confidence for CoherenceAwareDecoder integration."""
+        # Higher salience mean + lower logit entropy = higher confidence
+        logit_probs = F.softmax(logits, dim=-1)
+        logit_entropy = -(logit_probs * (logit_probs + 1e-8).log()).sum(-1)
+        max_entropy = math.log(logits.shape[-1])
+        normalized_entropy = logit_entropy / max_entropy  # [0, 1]
+
+        confidence = salience.mean(-1) * (1.0 - normalized_entropy)
+        return confidence.clamp(0.0, 1.0)
+```
+
+#### F.3.5+.6 Implementation — CTM+ Activation
+
+```python
+class CTMPlusActiveOffloader:
+    """
+    Active layer offloading for Mistral backbone using CTM+ policy.
+
+    Moves cold Mistral layers to CPU and prefetches predicted layers.
+    """
+
+    def __init__(self, model, config, access_traces=None):
+        self.model = model
+        self.config = config
+        self.gpu_budget = config.gpu_budget
+        self.active = True
+
+        # Initialize from Stage 0 traces if available
+        if access_traces is not None:
+            self._init_from_traces(access_traces)
+        else:
+            # Default: keep first and last layers on GPU (attention sinks)
+            self._gpu_layers = set(range(min(self.gpu_budget, config.num_layers)))
+            self._cpu_layers = set(range(self.gpu_budget, config.num_layers))
+
+    def _init_from_traces(self, traces):
+        """Initialize tier placement from Stage 0 access traces."""
+        # Aggregate access counts across all traced tokens
+        total_access = [0] * self.config.num_layers
+        for entry in traces:
+            access = entry.get("ctm_layer_access", [])
+            for i, count in enumerate(access):
+                if i < len(total_access):
+                    total_access[i] += count
+
+        # Sort by access frequency, keep top gpu_budget on GPU
+        sorted_layers = sorted(
+            range(self.config.num_layers),
+            key=lambda i: total_access[i],
+            reverse=True,
+        )
+        self._gpu_layers = set(sorted_layers[:self.gpu_budget])
+        self._cpu_layers = set(sorted_layers[self.gpu_budget:])
+
+    def place_layers(self):
+        """Move layers to their assigned devices."""
+        if not self.active:
+            return
+
+        backbone = self.model.backbone
+        for i, layer in enumerate(backbone.model.layers):
+            if i in self._gpu_layers:
+                layer.cuda()
+            elif i in self._cpu_layers:
+                layer.cpu()
+
+    def prefetch(self, predicted_layers):
+        """Prefetch predicted layers from CPU to GPU."""
+        backbone = self.model.backbone
+        for layer_idx in predicted_layers:
+            if layer_idx in self._cpu_layers:
+                backbone.model.layers[layer_idx].cuda()
+                self._cpu_layers.discard(layer_idx)
+                # Evict least-recently-used GPU layer if over budget
+                if len(self._gpu_layers) >= self.gpu_budget:
+                    victim = self._select_victim()
+                    backbone.model.layers[victim].cpu()
+                    self._cpu_layers.add(victim)
+                    self._gpu_layers.discard(victim)
+                self._gpu_layers.add(layer_idx)
+
+    def _select_victim(self):
+        """Select GPU layer to evict (lowest access frequency)."""
+        # Simple LRU — in production, use full CTM+ scoring
+        return min(self._gpu_layers)
+```
+
+#### F.3.5+.7 CLI Integration
+
+```bash
+# Training with Stage 1.5 active (after Stage 0 baseline is captured)
+python train_unified_llm.py \
+  --model_type mistral_cg \
+  --mistral_model_name mistralai/Mistral-7B-v0.3 \
+  --mistral_quantize 4bit \
+  --enable_binding_cache_tracer \
+  --enable_ctm_plus_tracer \
+  --enable_active_binding_cache \
+  --binding_cache_top_k 64 \
+  --enable_active_ctm_offload \
+  --ctm_plus_gpu_budget 24 \
+  --generation_trace_output stage1_5_trace.json \
+  --lambda_ont_token 0.01 \
+  --lambda_csr_token 0.01 \
+  --lambda_vritti_token 0.02 \
+  --lambda_kosha_routing 0.005 \
+  --lambda_bliss_token 0.02
+```
+
+#### F.3.5+.8 Measurements
+
+Per-token log additions (beyond Stage 0 + Stage 1):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bc_pruned` | bool | Whether KV cache was actively pruned this step |
+| `bc_kept_positions` | int | Positions retained after pruning |
+| `bc_prune_ratio` | float | Fraction of positions evicted |
+| `bc_proposal_confidence` | float | Combined confidence for CoherenceAwareDecoder |
+| `ctm_actual_gpu_layers` | int | Layers currently on GPU |
+| `ctm_prefetch_accuracy` | float | Fraction of prefetched layers that were actually used |
+| `ctm_offload_latency_us` | float | P99 latency for layer offload/prefetch |
+
+#### F.3.5+.9 Ablation Tests
+
+| Mode | Configuration | Expected Result |
+|------|--------------|-----------------|
+| `baseline` | Stage 0 only (no active pruning/offloading) | Reference quality |
+| `bc_only` | Active Binding Cache, no CTM+ | Better long-context coherence |
+| `ctm_only` | Active CTM+, no Binding Cache | Lower VRAM, same quality |
+| `bc_ctm` | Both active | Best coherence + lowest VRAM |
+| `bc_aggressive` | top_k=32 (aggressive pruning) | Test quality degradation threshold |
+
+Compare across 50+ generation samples:
+
+| Metric | Baseline → Stage 1.5 |
+|--------|----------------------|
+| KV cache VRAM usage | 100% → ~40% (top_k=64) |
+| Long-form coherence | Baseline → Improved (intent-aligned cache) |
+| Generation latency | Baseline → ~Same (pruning cost offset by smaller attention) |
+| Backbone VRAM usage | 100% → ~75% (CTM+ offload) |
+| Perplexity | Unchanged (± 1%) |
+| Knowledge accuracy | Unchanged (logit firewall) |
+
+#### F.3.5+.10 Success Criteria
+
+- [ ] KV cache memory reduced by ≥ 30% with top_k=64
+- [ ] Long-form coherence improves over Stage 1 alone (cosine drift metric)
+- [ ] Perplexity unchanged (± 1%) compared to Stage 1
+- [ ] CTM+ offloading reduces peak GPU memory by ≥ 20%
+- [ ] Prefetch accuracy > 70% (Markov model predicts layer access correctly)
+- [ ] Combined binding confidence + coherence signal reduces incoherent drift events by ≥ 35% vs baseline
+- [ ] No increase in hallucination rate (Vritti ERROR mode detection unchanged)
 
 ---
 
