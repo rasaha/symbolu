@@ -15,6 +15,7 @@ Production Optimizations (p99 < 100µs):
 """
 
 import bisect
+import logging
 import random
 import threading
 import time
@@ -23,6 +24,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Any
 
 from .config import CTMvLLMConfig
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -480,6 +483,7 @@ class CTMEvictionPolicy:
         """
         with self._lock:
             if not self.gpu_blocks:
+                logger.debug("select_victim: no GPU blocks to evict")
                 return None
 
             if not self.config.enable_smart_victim:
@@ -511,6 +515,7 @@ class CTMEvictionPolicy:
         n = len(candidates)
 
         if n == 0:
+            logger.debug("_select_smart_victim: all %d blocks are pinned", len(self.gpu_blocks))
             return None
 
         # Sample k candidates

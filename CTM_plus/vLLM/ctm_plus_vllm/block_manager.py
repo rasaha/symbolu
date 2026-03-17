@@ -100,6 +100,7 @@ class CTMBlockSpaceManager:
 
         # CTM+ eviction policy
         self.ctm = CTMEvictionPolicy(ctm_config)
+        self.ctm.set_capacity(num_gpu_blocks)
 
         # Physical blocks
         self.gpu_blocks: Dict[int, PhysicalBlock] = {

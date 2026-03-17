@@ -847,10 +847,10 @@ class CTMOffloadManager:
             return {
                 "gpu_used_bytes": self.gpu_used_bytes,
                 "gpu_total_bytes": self.gpu_memory_bytes,
-                "gpu_utilization": self.gpu_used_bytes / self.gpu_memory_bytes,
+                "gpu_utilization": self.gpu_used_bytes / self.gpu_memory_bytes if self.gpu_memory_bytes > 0 else 0.0,
                 "cpu_used_bytes": self.cpu_used_bytes,
                 "cpu_total_bytes": self.cpu_memory_bytes,
-                "cpu_utilization": self.cpu_used_bytes / self.cpu_memory_bytes,
+                "cpu_utilization": self.cpu_used_bytes / self.cpu_memory_bytes if self.cpu_memory_bytes > 0 else 0.0,
                 "gpu_tensor_count": len(self.gpu_tensors),
                 "cpu_tensor_count": len(self.cpu_tensors),
             }

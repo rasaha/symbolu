@@ -7,7 +7,6 @@ Can be used as a local cache or as a Redis module reference.
 
 import time
 import threading
-import hashlib
 from typing import Dict, List, Optional, Any, Tuple, Set, Union
 from dataclasses import dataclass
 from enum import Enum
@@ -317,7 +316,7 @@ class RedisCTMCache:
             if entry.data_type != RedisDataType.LIST:
                 raise TypeError("WRONGTYPE")
 
-            for v in reversed(values):
+            for v in values:
                 entry.value.insert(0, v)
 
             key_id = self._get_key_id(key)

@@ -85,9 +85,22 @@ __global__ void kernel_on_access(
 
     uint64_t page_id = access_page_ids[idx];
     uint32_t hash_idx = hash_page_id(page_id, CTM_HASH_BITS);
+    uint32_t hash_mask = (1u << CTM_HASH_BITS) - 1;
 
-    // Find or create page state (simplified - real impl needs proper hash table)
-    PageState* page = &pages[hash_idx];
+    // Linear probing to find existing slot or empty slot
+    PageState* page = nullptr;
+    for (uint32_t probe = 0; probe < 16; probe++) {
+        uint32_t slot = (hash_idx + probe) & hash_mask;
+        PageState* candidate = &pages[slot];
+        if (candidate->page_id == page_id || candidate->page_id == 0) {
+            page = candidate;
+            break;
+        }
+    }
+    if (!page) {
+        // Hash table full in local neighborhood, fall back to base slot
+        page = &pages[hash_idx];
+    }
 
     // Initialize if new page
     if (page->page_id != page_id) {
@@ -116,7 +129,8 @@ __global__ void kernel_on_access(
         atomicAdd((unsigned long long*)&stats->tier1_hits, 1);
 
         float reuse = page->reuse_score;
-        float neighbor_hot = 0.3f; // Simplified
+        // Compute neighbor hotness from page coherence as proxy
+        float neighbor_hot = page->coherence;
 
         bool should_promote = false;
         if (reuse > config.loop_pin_reuse_thresh &&
@@ -156,9 +170,10 @@ __global__ void kernel_select_victims(
 
     curandState local_state = rng_states[idx];
 
-    // Find time range
+    // Find time range by sampling up to sample_size entries (bounded scan)
     uint64_t min_time = UINT64_MAX, max_time = 0;
-    for (uint32_t i = 0; i < tier0_size && i < 100; i++) {
+    uint32_t scan_limit = min(tier0_size, sample_size);
+    for (uint32_t i = 0; i < scan_limit; i++) {
         uint64_t pid = tier0_lru[i];
         uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
         const PageState& p = pages[hash];
@@ -178,7 +193,7 @@ __global__ void kernel_select_victims(
         uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
         const PageState& page = pages[hash];
 
-        float score = compute_victim_score(page, min_time, time_range, adaptive_p, 0.3f);
+        float score = compute_victim_score(page, min_time, time_range, adaptive_p, page.coherence);
 
         if (score < best_score) {
             best_score = score;
@@ -225,19 +240,19 @@ __global__ void kernel_update_shadow(
     bool from_tier0,
     uint64_t current_time
 ) {
-    // Single thread updates shadow tier
+    // Single thread updates shadow tier — this kernel must be launched
+    // with <<<1, 1>>> to avoid concurrent writes to shadow arrays.
     if (threadIdx.x != 0 || blockIdx.x != 0) return;
 
     ShadowEntry* shadow = from_tier0 ? shadow_b1 : shadow_b2;
     uint32_t* size = from_tier0 ? &shadow_sizes[0] : &shadow_sizes[1];
 
     if (*size < CTM_SHADOW_MAX_SIZE) {
-        uint32_t idx = atomicAdd(size, 1);
-        if (idx < CTM_SHADOW_MAX_SIZE) {
-            shadow[idx].page_id = evicted_page_id;
-            shadow[idx].evict_time = current_time;
-            shadow[idx].from_tier0 = from_tier0;
-        }
+        uint32_t idx = *size;
+        *size = idx + 1;
+        shadow[idx].page_id = evicted_page_id;
+        shadow[idx].evict_time = current_time;
+        shadow[idx].from_tier0 = from_tier0;
     }
 }
 
@@ -266,43 +281,83 @@ struct Controller::Impl {
     cudaStream_t stream;
 
     Impl(uint32_t t0_cap, uint32_t t1_cap, cudaStream_t s)
-        : tier0_capacity(t0_cap), tier1_capacity(t1_cap), stream(s),
+        : d_pages(nullptr), d_tier0_lru(nullptr), d_tier1_lru(nullptr),
+          d_shadow_b1(nullptr), d_shadow_b2(nullptr), d_shadow_sizes(nullptr),
+          d_stats(nullptr), d_rng_states(nullptr),
+          tier0_capacity(t0_cap), tier1_capacity(t1_cap), stream(s),
           tier0_size(0), tier1_size(0), adaptive_p(0.5f), access_counter(0)
     {
         memset(&h_stats, 0, sizeof(h_stats));
 
-        // Allocate device memory
+        // Allocate device memory with error checking
+        cudaError_t err;
         size_t hash_size = 1 << CTM_HASH_BITS;
-        cudaMalloc(&d_pages, hash_size * sizeof(PageState));
+
+        err = cudaMalloc(&d_pages, hash_size * sizeof(PageState));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate pages: %s\n", cudaGetErrorString(err));
+            return;
+        }
         cudaMemset(d_pages, 0, hash_size * sizeof(PageState));
 
-        cudaMalloc(&d_tier0_lru, tier0_capacity * sizeof(uint64_t));
-        cudaMalloc(&d_tier1_lru, tier1_capacity * sizeof(uint64_t));
+        err = cudaMalloc(&d_tier0_lru, tier0_capacity * sizeof(uint64_t));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate tier0_lru: %s\n", cudaGetErrorString(err));
+            return;
+        }
 
-        cudaMalloc(&d_shadow_b1, CTM_SHADOW_MAX_SIZE * sizeof(ShadowEntry));
-        cudaMalloc(&d_shadow_b2, CTM_SHADOW_MAX_SIZE * sizeof(ShadowEntry));
-        cudaMalloc(&d_shadow_sizes, 2 * sizeof(uint32_t));
+        err = cudaMalloc(&d_tier1_lru, tier1_capacity * sizeof(uint64_t));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate tier1_lru: %s\n", cudaGetErrorString(err));
+            return;
+        }
+
+        err = cudaMalloc(&d_shadow_b1, CTM_SHADOW_MAX_SIZE * sizeof(ShadowEntry));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate shadow_b1: %s\n", cudaGetErrorString(err));
+            return;
+        }
+
+        err = cudaMalloc(&d_shadow_b2, CTM_SHADOW_MAX_SIZE * sizeof(ShadowEntry));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate shadow_b2: %s\n", cudaGetErrorString(err));
+            return;
+        }
+
+        err = cudaMalloc(&d_shadow_sizes, 2 * sizeof(uint32_t));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate shadow_sizes: %s\n", cudaGetErrorString(err));
+            return;
+        }
         cudaMemset(d_shadow_sizes, 0, 2 * sizeof(uint32_t));
 
-        cudaMalloc(&d_stats, sizeof(Stats));
+        err = cudaMalloc(&d_stats, sizeof(Stats));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate stats: %s\n", cudaGetErrorString(err));
+            return;
+        }
         cudaMemset(d_stats, 0, sizeof(Stats));
 
         // Initialize RNG
         uint32_t rng_count = 256;
-        cudaMalloc(&d_rng_states, rng_count * sizeof(curandState));
+        err = cudaMalloc(&d_rng_states, rng_count * sizeof(curandState));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "CTM+ CUDA: Failed to allocate rng_states: %s\n", cudaGetErrorString(err));
+            return;
+        }
         kernel_init_rng<<<(rng_count + 255) / 256, 256, 0, stream>>>(
             d_rng_states, time(nullptr), rng_count);
     }
 
     ~Impl() {
-        cudaFree(d_pages);
-        cudaFree(d_tier0_lru);
-        cudaFree(d_tier1_lru);
-        cudaFree(d_shadow_b1);
-        cudaFree(d_shadow_b2);
-        cudaFree(d_shadow_sizes);
-        cudaFree(d_stats);
-        cudaFree(d_rng_states);
+        if (d_pages) cudaFree(d_pages);
+        if (d_tier0_lru) cudaFree(d_tier0_lru);
+        if (d_tier1_lru) cudaFree(d_tier1_lru);
+        if (d_shadow_b1) cudaFree(d_shadow_b1);
+        if (d_shadow_b2) cudaFree(d_shadow_b2);
+        if (d_shadow_sizes) cudaFree(d_shadow_sizes);
+        if (d_stats) cudaFree(d_stats);
+        if (d_rng_states) cudaFree(d_rng_states);
     }
 };
 

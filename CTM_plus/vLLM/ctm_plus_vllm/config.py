@@ -40,12 +40,20 @@ class CTMvLLMConfig:
     adaptive_p_learning_rate: float = 0.1
     initial_p: float = 0.5
 
-    # Scoring weights
-    weight_recency: float = 0.40
+    # Scoring weights (must sum to 1.0)
+    weight_recency: float = 0.35
     weight_frequency: float = 0.30
     weight_reuse: float = 0.15
     weight_coherence: float = 0.10
     weight_neighbor: float = 0.10
+
+    def __post_init__(self):
+        total = (self.weight_recency + self.weight_frequency +
+                 self.weight_reuse + self.weight_coherence + self.weight_neighbor)
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"Scoring weights must sum to 1.0, got {total:.3f}"
+            )
 
     @classmethod
     def for_llm_inference(cls) -> "CTMvLLMConfig":
