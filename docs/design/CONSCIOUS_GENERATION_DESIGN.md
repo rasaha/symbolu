@@ -8934,3 +8934,463 @@ Stage 10C — End-to-end multimodal fine-tuning (extends Stage 5 curriculum)
 - [ ] No Stage 6 stability regression (re-run orthogonality and entropy tests)
 - [ ] Perception gradient ratio stays in [0.01, 0.1] during end-to-end training
 - [ ] Body–Soul integration: VL-JEPA 32D state and SRK 32D state are compatible (same ontological schema, mergeable in OPB)
+
+---
+
+### F.16 Stage 11 — Unified Recursive-Governance State: v2.7 Ontology × Dynamic VRITTI Integration
+
+#### F.16.1 Motivation
+
+Stages 1–10 build individual components — coherence controllers, VRITTI scoring, P_t recurrence, ontological projection, multimodal perception — but do not specify how these components compose into a single unified state equation with a defined computation ordering. The components interact but the interaction is implicit: VRITTI scores independently of ontological position, diffusion control depends on VRITTI alone, and there is no switching mechanism that bridges cognitive mode to architectural mode selection.
+
+This stage defines the **stacked control system** — the explicit integration of v2.7 recursive ontology, dynamic VRITTI, P_t latent state, coherence/entropy governance, and multimodal execution control into a single formally-specified computation chain.
+
+**The core insight:** VRITTI should depend not only on latent state and coherence signals, but also on *where in the recursive ontology the system currently operates*. A prompt operating in the Soul/Witness band should produce different cognitive mode distributions than one in the Body/Action band. This is the missing integration piece.
+
+#### F.16.2 Architectural Principle: Stacked Control
+
+The integration is **not** a merge of all variables into one. It is a stacked control system where each layer has a fixed role:
+
+| Layer | Component | Role | Decides |
+|-------|-----------|------|---------|
+| 1 | v2.7 Ontology | Structural recursion | Which ontology layer is active; whether recursion goes deeper; symbolic vs. experiential mode |
+| 2 | P_t Latent State | Temporal carrier | Accumulated trajectory; reflection history; experiential consequence |
+| 3 | Coherence / Entropy | Governance signals | Whether trajectory is stable; whether correction is needed |
+| 4 | Dynamic VRITTI | Live cognitive mode | Whether generation is grounded, distorted, imaginative, inert, or memory-dominant |
+| 5 | Execution Control | Generation parameters | Diffusion/sampling parameters for text or multimodal output |
+
+#### F.16.3 Unified State Equation
+
+The full state at time t is:
+
+```
+s_t = (a_t, ã_t, P_t, C_t, H_t, v_t, e_t)
+```
+
+where:
+
+| Symbol | Dimension | Source | Description |
+|--------|-----------|--------|-------------|
+| `a_t` | ∈ ℝ¹² | `state_projector(x_t)` | Active ontological position (12D projection from hidden state) |
+| `ã_t` | ∈ {1..10} | `argmax(p_w[a])` | Dominant sub-layer within the ontological hierarchy |
+| `P_t` | ∈ ℝ⁶⁴ | Gap C recurrence (F.10.6.3) | Latent temporal state |
+| `C_t` | ∈ ℝ³ | `UnifiedCoherenceController` | Coherence signals: (C_token, C_latent, C_conversation) |
+| `H_t` | ∈ ℝ³ | Entropy module | Entropy signals: (H_dimensional, H_guna, H_kosha) |
+| `v_t` | ∈ Δ⁴ | `VrittiState(...)` | 5-class cognitive mode distribution (simplex) |
+| `e_t` | ∈ {symbolic, anchor} | `HybridSwitch(...)` | Experience-anchor mode state |
+
+**Mapping to existing architecture:**
+
+- `a_t` maps to the existing 12D ontological state from `OntologicalHybridTransformer.state_projector`
+- `ã_t` maps to `argmax` over the 10-aspect distribution `p_w[a]` from the Chitta-Vṛtti coupling formula
+- `P_t` maps to Gap C's experiential recurrence (F.10.6.3)
+- `C_t` maps to Stage 4's `UnifiedCoherenceController` outputs
+- `H_t` maps to v2.6 Guna entropy + kosha entropy from existing modules
+- `v_t` maps to `VrittiTokenScorer` output (5-class simplex)
+- `e_t` is **new** — the hybrid switching output (see F.16.5)
+
+#### F.16.4 Computation Ordering
+
+The system evolves in strict sequential order. Each step depends on outputs from prior steps.
+
+##### Step 1 — Ontology / Sub-Layer Update
+
+Using the existing state projector and aspect distribution:
+
+```
+a_t = state_projector(x_t)                           # 12D ontological position
+(ã_t, p_w[a]) = AspectDistribution(a_t, P_{t-1}, H_{t-1})  # dominant sub-layer
+```
+
+This determines where in the ontology the generation is operating. The `RecursionState` function is implemented by the hierarchical traversal inherent in the 10-aspect hierarchy (Action → Body → Mind → Ego → Intellect → Soul → Witness → Atman → Brahman → Absolute).
+
+**Implementation mapping:**
+
+```python
+# a_t comes from existing state_projector
+a_t = self.state_projector(x_t)  # [B, T, 12]
+
+# ã_t comes from the Chitta-Vṛtti coupling formula (Part 1 of CHITTA_VRITTI_EVOLUTION)
+p_w_a = normalize(E(w,c) * Phi(a) * sum_v(p_v[v] * R[v,a]) + B_c)
+a_tilde_t = p_w_a.argmax(dim=-1)  # dominant aspect index
+```
+
+##### Step 2 — Latent State Update
+
+Update P_t from token/input dynamics (identical to Gap C specification):
+
+```
+g_t = σ(W_g · x_t)                    # gating vector
+u_t = W_u · x_t                        # input projection
+c_t = coherence_embedding(C_{t-1})     # coherence context (includes varna-vritti acoustic signal)
+P_t = g_t ⊙ (ρ · P_{t-1}) + u_t + λ · W_c · c_t
+```
+
+Stability constraints: `ρ < 1.0` (init 0.95), `λ ≤ 0.1` (init 0.01), `spectral_norm(W_c) ≤ 1.0`.
+
+##### Step 3 — Coherence and Entropy Update
+
+Compute governance signals from current state:
+
+```
+C_t = (C_token, C_latent, C_conversation)
+    = UnifiedCoherenceController(x_t, P_t, session_state)
+
+H_t = (H_dimensional, H_guna, H_kosha)
+    = (entropy(a_t), guna_entropy(g_t), kosha_entropy(α_t))
+```
+
+Where:
+- `C_token` = Bliss gate output (token-level coherence)
+- `C_latent` = Bhava-derived latent coherence
+- `C_conversation` = session-level coherence from `CoherenceEngine.quality_v3`
+- `H_dimensional` = entropy of the 12D ontological projection
+- `H_guna` = normalized Guna entropy from v2.6
+- `H_kosha` = entropy of Kosha routing weights `α_t`
+
+##### Step 4 — Dynamic VRITTI Inference (Corrected Form)
+
+**This is the key integration.** The previous specification was:
+
+```
+v_t = VrittiState(P_t, C_t, H_t)
+```
+
+The corrected integrated form includes ontological position:
+
+```
+v_t = softmax(W_v · [P_t; C_t; H_t; a_t; ã_t] + b_v)
+```
+
+Or equivalently:
+
+```
+v_t = VrittiState(P_t, C_t, H_t, a_t, ã_t)
+```
+
+**Why this matters:** VRITTI should depend on where in the recursive ontology the system currently is. A prompt operating in the high-abstraction Soul/Witness band (e.g., "What is the nature of consciousness?") should naturally produce higher Vikalpa (conceptual branching) and lower Pramāṇa (direct valid cognition) than a prompt in the Body/Action band (e.g., "How do I tie a knot?").
+
+**Implementation mapping to existing `VrittiTokenScorer`:**
+
+```python
+class IntegratedVrittiScorer(nn.Module):
+    """Extended VrittiTokenScorer that incorporates ontological position."""
+
+    def __init__(self, p_dim: int = 64, c_dim: int = 3, h_dim: int = 3,
+                 a_dim: int = 12, num_aspects: int = 10):
+        super().__init__()
+        input_dim = p_dim + c_dim + h_dim + a_dim + num_aspects
+        self.vritti_proj = nn.Linear(input_dim, 5)  # 5 cognitive modes
+        self.bias = nn.Parameter(torch.zeros(5))
+
+    def forward(self, P_t, C_t, H_t, a_t, a_tilde_onehot):
+        combined = torch.cat([P_t, C_t, H_t, a_t, a_tilde_onehot], dim=-1)
+        return F.softmax(self.vritti_proj(combined) + self.bias, dim=-1)
+```
+
+**Effect on R[v,a] coupling:** The existing coupling matrix `R[v,a]` (5×10) from the Chitta-Vṛtti doc remains valid. It couples the *output* of VRITTI to aspects. What changes is the *input* — VRITTI now receives ontological position, creating a feedback loop: ontology → vritti → R[v,a] → aspect weighting → generation.
+
+##### Step 5 — Hybrid Switching
+
+The hybrid switching function bridges dynamic VRITTI and v2.7 mode selection:
+
+```
+m_t = HybridSwitch(C_t, H_t, v_t)
+
+       ⎧ symbolic_recursion,     if Γ(C_t, H_t, v_t) < τ
+m_t = ⎨
+       ⎩ experience_anchor,      if Γ(C_t, H_t, v_t) ≥ τ
+```
+
+where `Γ` is a stability function:
+
+```
+Γ = α_H · H_dimensional + β_H · H_guna
+  + α_V · v_t(Viparyaya) + β_V · v_t(Nidrā)
+  - γ_V · v_t(Pramāṇa)
+```
+
+**Interpretation:**
+- High entropy → instability → push toward anchor mode
+- High distortion (Viparyaya) → misperception → push toward anchor mode
+- High inertness (Nidrā) → dormancy → push toward anchor mode
+- High clarity (Pramāṇa) → valid cognition → remain in symbolic mode
+
+**Default coefficients:**
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| `α_H` | 0.25 | Dimensional entropy contribution |
+| `β_H` | 0.20 | Guna entropy contribution |
+| `α_V` | 0.25 | Viparyaya (distortion) contribution |
+| `β_V` | 0.15 | Nidrā (inertness) contribution |
+| `γ_V` | 0.30 | Pramāṇa (clarity) stabilizing effect |
+| `τ` | 0.5 | Switching threshold |
+
+**Experience-anchor mode:** When `m_t = experience_anchor`, the system tightens generation controls — higher CFG/guidance, lower diversity, stronger negative-prompt weighting. This is the architectural bridge between cognitive assessment and generation policy.
+
+**Implementation:**
+
+```python
+class HybridSwitch(nn.Module):
+    """Bridges VRITTI cognitive state to architectural mode selection."""
+
+    def __init__(self, alpha_H=0.25, beta_H=0.20, alpha_V=0.25,
+                 beta_V=0.15, gamma_V=0.30, tau=0.5):
+        super().__init__()
+        self.alpha_H = alpha_H
+        self.beta_H = beta_H
+        self.alpha_V = alpha_V
+        self.beta_V = beta_V
+        self.gamma_V = gamma_V
+        self.tau = tau
+
+    def forward(self, C_t, H_t, v_t):
+        """
+        Args:
+            C_t: [B, 3] coherence signals
+            H_t: [B, 3] entropy signals (dimensional, guna, kosha)
+            v_t: [B, 5] vritti distribution (pramana, viparyaya, vikalpa, smrti, nidra)
+        Returns:
+            gamma: [B] stability score
+            mode: [B] binary mode (0=symbolic, 1=anchor)
+        """
+        gamma = (self.alpha_H * H_t[:, 0] + self.beta_H * H_t[:, 1]
+                 + self.alpha_V * v_t[:, 1]   # viparyaya
+                 + self.beta_V * v_t[:, 4]    # nidra
+                 - self.gamma_V * v_t[:, 0])  # pramana
+        mode = (gamma >= self.tau).long()
+        return gamma, mode
+```
+
+#### F.16.5 Multimodal Execution Control (Diffusion Integration)
+
+When the system produces multimodal output (e.g., image generation via diffusion), the generation parameters are no longer based on VRITTI alone. They are based on the full recursive-governance state:
+
+```
+θ_t^img = θ_0^img + f(v_t, a_t, ã_t, C_t, H_t, m_t)
+```
+
+where `θ_t^img` is the parameter vector:
+
+```
+θ_t^img = (cfg_t, σ_t^noise, w_t^cond, w_t^neg, r_t^refine)
+```
+
+**Parameter mappings:**
+
+| Parameter | Formula | Effect |
+|-----------|---------|--------|
+| **CFG guidance** | `cfg_t = cfg_0 + α_p·v_t(Pramāṇa) - α_k·v_t(Vikalpa) - α_n·v_t(Nidrā) + α_c·C_conversation` | Clarity raises guidance; imagination and inertness lower it |
+| **Diversity noise** | `σ_t = σ_0 + β_k·v_t(Vikalpa) + β_h·H_dimensional - β_p·v_t(Pramāṇa)` | Imagination and entropy increase exploration |
+| **Negative prompt weight** | `w_t^neg = w_0^neg + γ_v·v_t(Viparyaya) + γ_n·v_t(Nidrā)` | Distortion and inertia increase negative suppression |
+| **Refinement strength** | `r_t = r_0 + δ_v·v_t(Viparyaya) + δ_n·v_t(Nidrā) - δ_s·v_t(Smṛti)` | Distortion triggers refinement; memory stability reduces it |
+
+**Default coefficient values:**
+
+```python
+DIFFUSION_COEFFICIENTS = {
+    # CFG
+    "alpha_p": 1.5,   # pramana → raise guidance
+    "alpha_k": 1.0,   # vikalpa → lower guidance
+    "alpha_n": 0.8,   # nidra → lower guidance
+    "alpha_c": 0.5,   # conversation coherence → raise guidance
+    # Diversity noise
+    "beta_k": 0.3,    # vikalpa → more diversity
+    "beta_h": 0.2,    # dimensional entropy → more diversity
+    "beta_p": 0.25,   # pramana → less diversity
+    # Negative prompt
+    "gamma_v": 0.4,   # viparyaya → stronger negative
+    "gamma_n": 0.3,   # nidra → stronger negative
+    # Refinement
+    "delta_v": 0.3,   # viparyaya → more refinement
+    "delta_n": 0.2,   # nidra → more refinement
+    "delta_s": 0.15,  # smrti → less refinement (stable memory)
+}
+```
+
+**Why this is superior to VRITTI-only diffusion control:** The corrected form includes:
+- `v_t` → cognitive mode (how is the system thinking?)
+- `a_t, ã_t` → semantic region (what is the system thinking about?)
+- `C_t, H_t` → stability signals (is the trajectory reliable?)
+- `m_t` → architectural mode (is the system in symbolic or experiential mode?)
+
+This gives diffusion control access to the full recursive-governance state, not just the cognitive mode.
+
+#### F.16.6 Collapse Detection and Recovery
+
+When a generation (text or multimodal) produces unstable output, the system detects collapse through the governance signals and responds:
+
+```
+Collapse detected when:
+  v_t(Viparyaya) ↑  AND  v_t(Nidrā) ↑  AND  C_conversation ↓
+
+Response:
+  Γ(C_t, H_t, v_t) ≥ τ  →  switch to experience-anchor mode
+
+Anchor mode effects:
+  - cfg_t ↑ (tighter guidance)
+  - σ_t^noise ↓ (less diversity)
+  - w_t^neg ↑ (stronger negative suppression)
+  - r_t^refine ↑ (more refinement passes)
+```
+
+This creates a closed feedback loop: generation quality → coherence measurement → VRITTI update → mode switch → tighter controls → improved generation quality.
+
+#### F.16.7 Worked Example: "A futuristic city floating in the sky"
+
+##### Without integrated governance (baseline diffusion)
+
+- Prompt embedding is underdetermined
+- Imagination unconstrained; composition may drift
+- Outputs vary widely with no semantic steering
+
+##### With integrated v2.7 + dynamic VRITTI
+
+**Step A — Ontology recursion:**
+
+```
+a_t = state_projector("A futuristic city floating in the sky")
+```
+
+The prompt activates higher abstraction / possibility region. Suppose the 12D projection concentrates in the Intellect/Soul/Mind band — high imaginative symbolic region emphasizing possibility and conceptual expansion.
+
+**Step B — Latent update:**
+
+Prompt features and prior context update `P_t` via the Gap C recurrence.
+
+**Step C — VRITTI inference (integrated form):**
+
+The system sees: high abstraction (a_t in upper ontological band), low direct realism cue, moderate novelty. The integrated scorer produces:
+
+```
+v_t ≈ [Pramāṇa=0.18, Viparyaya=0.08, Vikalpa=0.52, Nidrā=0.07, Smṛti=0.15]
+```
+
+Vikalpa dominant — the system recognizes this as conceptual/imaginative territory.
+
+**Step D — Diffusion control:**
+
+```
+cfg_t = 7.5 + 1.5(0.18) - 1.0(0.52) - 0.8(0.07) + 0.5(0.8)
+      = 7.5 + 0.27 - 0.52 - 0.056 + 0.4 = 7.59  (slightly above baseline)
+
+σ_t = 0.5 + 0.3(0.52) + 0.2(0.4) - 0.25(0.18)
+    = 0.5 + 0.156 + 0.08 - 0.045 = 0.691  (higher diversity — encourages imagination)
+```
+
+Effects: slightly relaxed guidance, higher diversity noise, allowing compositional imagination.
+
+**Step E — Collapse detection:**
+
+If the first generation is visually unstable:
+- Coherence drops: `C_conversation ↓`
+- Distortion rises: `v_t(Viparyaya) ↑`
+- Entropy rises: `H_dimensional ↑`
+
+Then `Γ ≥ τ`, triggering experience-anchor mode:
+- CFG increases (tighter guidance)
+- Diversity noise decreases
+- Negative-prompt weighting increases
+- Composition recenters
+
+The system self-corrects without manual intervention.
+
+#### F.16.8 Full Computation Chain (Summary)
+
+```
+(a_t, ã_t) = OntologyState(x_t, P_{t-1}, H_{t-1})
+
+P_t = g_t ⊙ (ρ · P_{t-1}) + u_t + λ · W_c · c_t
+
+C_t = Coherence(x_t, P_t)
+H_t = Entropy(x_t, P_t)
+
+v_t = VrittiState(P_t, C_t, H_t, a_t, ã_t)
+
+(Γ_t, m_t) = HybridSwitch(C_t, H_t, v_t)
+
+θ_t^img = θ_0^img + f(v_t, a_t, ã_t, C_t, H_t, m_t)
+
+y_t = Generate(x_t, θ_t)
+```
+
+**One-line interpretation:** v2.7 determines the recursive semantic location, dynamic VRITTI determines the live cognitive mode, and together they modulate generation controls through coherence- and entropy-governed execution.
+
+#### F.16.9 Prerequisites
+
+- Stage 7C (Dual-Space / P_t) must be implemented — provides the P_t recurrence
+- Stage 7A (SemanticCoherence) must be stable — provides extended C_total
+- Stage 7G (Convergence Formula) must be stable — provides C_agreement
+- Stage 10 (Phase-VL-JEPA) should be available for multimodal execution control testing
+- Chitta-Vṛtti module (from `CHITTA_VRITTI_EVOLUTION_v2.7_to_v2.8.md`) must have R[v,a] coupling matrix implemented
+
+#### F.16.10 Implementation Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| `IntegratedVrittiScorer` | `conscious_generation/primitives/integrated_vritti_scorer.py` | Extended VrittiTokenScorer with ontological position inputs |
+| `HybridSwitch` | `conscious_generation/governance/hybrid_switch.py` | Bridges VRITTI cognitive state to architectural mode selection |
+| `DiffusionControlAdapter` | `conscious_generation/multimodal/diffusion_control.py` | Maps full governance state to diffusion parameters |
+| `UnifiedStateTracker` | `conscious_generation/governance/unified_state.py` | Tracks s_t = (a_t, ã_t, P_t, C_t, H_t, v_t, e_t) |
+
+#### F.16.11 Measurements
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ontology_band` | int | Dominant ontological band index (ã_t) |
+| `ontology_entropy` | float | H_dimensional — entropy of 12D ontological projection |
+| `vritti_distribution` | float[5] | v_t — 5-mode cognitive distribution |
+| `vritti_dominant` | str | Name of dominant VRITTI mode |
+| `gamma_stability` | float | Γ — stability function output |
+| `hybrid_mode` | str | m_t — "symbolic" or "anchor" |
+| `diffusion_cfg` | float | cfg_t — computed CFG guidance |
+| `diffusion_noise` | float | σ_t — computed diversity noise |
+| `diffusion_neg_weight` | float | w_t^neg — negative prompt weight |
+| `diffusion_refine` | float | r_t — refinement strength |
+| `collapse_detected` | bool | Whether Γ ≥ τ triggered mode switch |
+| `ontology_vritti_correlation` | float | Pearson correlation between a_t and v_t over session |
+
+#### F.16.12 Success Criteria
+
+- [ ] `IntegratedVrittiScorer` produces different v_t distributions for same text at different ontological positions (variance test: Δv > 0.05 between Body-band and Soul-band inputs)
+- [ ] `HybridSwitch` triggers experience-anchor mode when Viparyaya + Nidrā spike (unit tested with synthetic inputs)
+- [ ] Collapse detection fires within 2 generation steps of simulated instability (latency test)
+- [ ] Recovery from anchor mode restores coherence within 3 steps (recovery test)
+- [ ] Diffusion parameters vary meaningfully across cognitive modes (not collapsed to baseline)
+- [ ] Text-only generation quality is UNCHANGED when diffusion control is disabled (null integration test)
+- [ ] No regression in Stage 6 stability metrics
+- [ ] Full computation chain completes in < 500μs per step (excluding diffusion generation itself)
+- [ ] The feedback loop (ontology → vritti → switching → controls → generation → coherence → vritti) converges rather than oscillates (stability test over 20+ steps)
+- [ ] R[v,a] coupling matrix from Chitta-Vṛtti doc remains valid with ontology-aware VRITTI inputs (invariant preservation test)
+
+#### F.16.13 Relationship to Existing Stages
+
+```
+Stages 0–6 (baseline CG pipeline)
+    ↓
+Stage 7 (gap closures: P_t, coherence, diagnostics)
+    ↓
+Stage 8 (representation conditioning)
+    ↓
+Stage 9 (ablation audit)
+    ↓
+Stage 10 (VL-JEPA multimodal perception)
+    ↓
+Stage 11 (THIS) — Unified Recursive-Governance State
+    Integrates: ontology (Stage 8) + P_t (7C) + coherence (4+7A+7G) + VRITTI + diffusion (10)
+    into a single stacked control system with defined computation ordering
+```
+
+**What Stage 11 does NOT change:**
+- Text-only generation path (unless diffusion control is active)
+- Existing auxiliary losses
+- R[v,a] coupling matrix values
+- Stage 6 stability properties
+
+**What Stage 11 adds:**
+- Ontological position as input to VRITTI inference (the missing integration piece)
+- HybridSwitch bridging cognitive state to architectural mode
+- Full-state diffusion control (replacing VRITTI-only control)
+- Collapse detection and self-recovery loop
+- Unified state tracking for diagnostics and explainability
