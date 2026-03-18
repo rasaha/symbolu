@@ -8959,6 +8959,20 @@ The integration is **not** a merge of all variables into one. It is a stacked co
 | 4 | Dynamic VRITTI | Live cognitive mode | Whether generation is grounded, distorted, imaginative, inert, or memory-dominant |
 | 5 | Execution Control | Generation parameters | Diffusion/sampling parameters for text or multimodal output |
 
+##### F.16.2.1 Dual-Channel Governance Principle
+
+Governance operates through two bounded channels:
+
+1. **Upstream representation conditioning** (pre-logit influence)
+2. **Downstream decode-policy modulation** (post-logit influence)
+
+These channels are complementary and composable:
+
+- **Stage 8** shapes internal representations (hidden state conditioning before `lm_head`)
+- **Stage 11** shapes sampling behavior (decode policy parameters after logits exist)
+
+Governance modules must not directly overwrite or inject values into logits. Upstream conditioning changes *how the transformer reasons*; downstream modulation changes *how decisions are expressed*. Neither bypasses the transformer's role as sole generator of token logits.
+
 #### F.16.3 Unified State Equation
 
 The full state at time t is:
@@ -9102,6 +9116,8 @@ class IntegratedVrittiScorer(nn.Module):
         combined = torch.cat([P_t, C_t, H_t, a_t, a_tilde_onehot], dim=-1)
         return F.softmax(self.vritti_proj(combined) + self.bias, dim=-1)
 ```
+
+The `IntegratedVrittiScorer` extends existing token-level VRITTI scoring by incorporating latent trajectory P_t, recursive ontology position (a_t, ã_t), and stability signals (C_t, H_t), enabling governance-time cognitive state inference.
 
 **Effect on R[v,a] coupling:** The existing coupling matrix `R[v,a]` (5×10) from the Chitta-Vṛtti doc remains valid. It couples the *output* of VRITTI to aspects. What changes is the *input* — governance-level VRITTI now receives ontological position, P_t trajectory, and coherence signals, creating a feedback loop: ontology → vritti → R[v,a] → aspect weighting → generation.
 
@@ -9481,7 +9497,8 @@ The stacked control system decomposes into eight modules with clean interfaces. 
 │ Extends: CoherenceAwareDecoder (Stage 1) + IntentPhaseProjector     │
 │ Maps full governance state → decoding policy θ_dec_t                │
 │ Write channel: phase rotation, temperature, top-p, hedge, etc.      │
-│ NEVER touches logits directly                                       │
+│ Governance modules must not directly overwrite or inject values     │
+│ into logits                                                         │
 └─────────────┬───────────────────────────────────────────────────────┘
               │ θ_dec_t
               ▼
@@ -9574,11 +9591,12 @@ class GovernanceAwareDecoder:
     to full governance-state-driven decoding policy.
 
     Invariants:
-    - NEVER directly modifies logit values (post-lm_head logit firewall).
-      Note: Stage 8 InterpretiveConditioner may have already shaped
-      the hidden state *before* lm_head — that is representation
-      conditioning, not decode-policy governance. This class operates
-      strictly on sampling parameters applied to finished logits.
+    - Governance modules must not directly overwrite or inject values
+      into logits (post-lm_head logit firewall). Note: Stage 8
+      InterpretiveConditioner may have already shaped the hidden state
+      *before* lm_head — that is representation conditioning, not
+      decode-policy governance. This class operates strictly on
+      sampling parameters applied to finished logits.
     - NEVER modifies model weights
     - Only adjusts: temperature, top_p, repetition_penalty,
                     hedge_factor, phase_strength, recursion_depth
