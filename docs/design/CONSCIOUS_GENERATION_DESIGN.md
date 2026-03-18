@@ -8945,7 +8945,7 @@ Stages 1–10 build individual components — coherence controllers, VRITTI scor
 
 This stage defines the **stacked control system** — the explicit integration of v2.7 recursive ontology, dynamic VRITTI, P_t latent state, coherence/entropy governance, and multimodal execution control into a single formally-specified computation chain.
 
-**The core insight:** VRITTI should depend not only on latent state and coherence signals, but also on *where in the recursive ontology the system currently operates*. A prompt operating in the Soul/Witness band should produce different cognitive mode distributions than one in the Body/Action band. This is the missing integration piece.
+**The core insight:** VRITTI should depend not only on latent state and coherence signals, but also on *where in the recursive ontology the system currently operates*. A prompt operating in the Soul/Witness band should produce different cognitive mode distributions than one in the Body/Action band. Per-token VRITTI scoring already incorporates ontological state (via `VrittiTokenScorer.compute_context_repr`); what is missing is a **governance-level** VRITTI that combines ontological position with P_t trajectory and coherence signals to drive decode policy across the full generation step.
 
 #### F.16.2 Architectural Principle: Stacked Control
 
@@ -9072,9 +9072,24 @@ v_t = VrittiState(P_t, C_t, H_t, a_t, ã_t)
 
 **Implementation mapping to existing `VrittiTokenScorer`:**
 
+**Dual-inference clarification:** The existing `VrittiTokenScorer` (in `vritti_scorer.py`) already accepts ontological state (`o_ctx`, 32D sovereign state vector) and operates at **token evaluation time** — it scores individual candidate tokens during `TwoStageGenerator` re-ranking. The `IntegratedVrittiScorer` below operates at **governance time** — it computes the sequence-level cognitive mode distribution `v_t` that drives `GovernanceAwareDecoder` sampling policy. These are complementary:
+
+| Scorer | Operates at | Input includes ontology? | Output | Consumer |
+|--------|-------------|--------------------------|--------|----------|
+| `VrittiTokenScorer` | Token evaluation (per-candidate) | Yes (`o_ctx`, 32D) | Per-token vritti score | `TwoStageGenerator` re-ranking |
+| `IntegratedVrittiScorer` | Governance (per-step) | Yes (`a_t` + `ã_t`) | Sequence-level `v_t` (5D) | `GovernanceAwareDecoder`, `HybridSwitch` |
+
+What Stage 11 adds is NOT ontological input to VRITTI (that already exists in `VrittiTokenScorer`), but rather: (a) the full governance-level VRITTI that incorporates `P_t` latent trajectory and coherence/entropy signals alongside ontological position, and (b) the stacked control system that routes `v_t` to decode policy.
+
 ```python
 class IntegratedVrittiScorer(nn.Module):
-    """Extended VrittiTokenScorer that incorporates ontological position."""
+    """
+    Governance-level VRITTI scorer that computes sequence-level cognitive
+    mode distribution v_t from full governance state.
+
+    Distinct from VrittiTokenScorer which operates per-candidate-token
+    during TwoStageGenerator re-ranking. Both may be active simultaneously.
+    """
 
     def __init__(self, p_dim: int = 64, c_dim: int = 3, h_dim: int = 3,
                  a_dim: int = 12, num_aspects: int = 10):
@@ -9088,7 +9103,7 @@ class IntegratedVrittiScorer(nn.Module):
         return F.softmax(self.vritti_proj(combined) + self.bias, dim=-1)
 ```
 
-**Effect on R[v,a] coupling:** The existing coupling matrix `R[v,a]` (5×10) from the Chitta-Vṛtti doc remains valid. It couples the *output* of VRITTI to aspects. What changes is the *input* — VRITTI now receives ontological position, creating a feedback loop: ontology → vritti → R[v,a] → aspect weighting → generation.
+**Effect on R[v,a] coupling:** The existing coupling matrix `R[v,a]` (5×10) from the Chitta-Vṛtti doc remains valid. It couples the *output* of VRITTI to aspects. What changes is the *input* — governance-level VRITTI now receives ontological position, P_t trajectory, and coherence signals, creating a feedback loop: ontology → vritti → R[v,a] → aspect weighting → generation.
 
 ##### Step 5 — Hybrid Switching
 
@@ -9383,14 +9398,14 @@ Stage 11 (THIS) — Unified Recursive-Governance State
 ```
 
 **What Stage 11 does NOT change:**
-- Logit values (logit firewall preserved — governance modulates decoding policy only)
+- Logit values *directly* (logit firewall preserved — governance modulates decoding policy only). **Clarification:** Stage 8's `InterpretiveConditioner` modifies the hidden state *before* `lm_head`, which changes the logits produced. That is representation conditioning and is orthogonal to Stage 11. Stage 11 operates *after* logits exist — it adjusts sampling parameters (temperature, top_p, repetition_penalty, etc.) but never adds to, subtracts from, or reweights logit values. The two mechanisms compose: Stage 8 shapes *what* logits emerge; Stage 11 shapes *how* those logits are sampled. See also: interaction with BCVF decoding below.
 - Existing auxiliary losses
 - R[v,a] coupling matrix values
 - Stage 6 stability properties
 - Model weights, knowledge, or reasoning capability
 
 **What Stage 11 adds:**
-- Ontological position as input to VRITTI inference (the missing integration piece)
+- Governance-level VRITTI inference incorporating ontological position, P_t trajectory, and coherence signals (extending the per-token ontological input already present in `VrittiTokenScorer`)
 - HybridSwitch bridging cognitive state to architectural mode
 - Full-state decode policy control for text generation (extending Stage 1's CoherenceAwareDecoder)
 - Full-state diffusion control for multimodal generation (replacing VRITTI-only control)
@@ -9559,10 +9574,23 @@ class GovernanceAwareDecoder:
     to full governance-state-driven decoding policy.
 
     Invariants:
-    - NEVER modifies logit values
+    - NEVER directly modifies logit values (post-lm_head logit firewall).
+      Note: Stage 8 InterpretiveConditioner may have already shaped
+      the hidden state *before* lm_head — that is representation
+      conditioning, not decode-policy governance. This class operates
+      strictly on sampling parameters applied to finished logits.
     - NEVER modifies model weights
     - Only adjusts: temperature, top_p, repetition_penalty,
                     hedge_factor, phase_strength, recursion_depth
+
+    Interaction with BCVF decoding (bcvf_decoding.py):
+    - BCVF Options A/C *do* modify logits (additive modulation, reranking).
+      These run BEFORE GovernanceAwareDecoder in the pipeline.
+    - GovernanceAwareDecoder then adjusts sampling parameters on the
+      BCVF-modified logit distribution. The two are complementary:
+      BCVF shapes the distribution, GAD shapes the sampling strategy.
+    - When BCVF is disabled, GAD operates on raw lm_head logits
+      (or Stage 8-conditioned logits if InterpretiveConditioner is active).
     """
 
     def __init__(self, config: GovernanceDecoderConfig):
@@ -9638,7 +9666,27 @@ class GovernanceAwareDecoder:
 | Recursion depth | v2.7 Evaluation Layer recursion cap | `SPEC_V27.md` |
 | Hedge/softening | DHA delivery modulation | `p21_delivery_resolver.py` |
 
-**Firewall verification:** `GovernanceAwareDecoder` extends but does not replace `CoherenceAwareDecoder`. It operates on the same principle: logits are produced by Module A, then sampling parameters are adjusted by Module H. The two never share a pathway. When Module H is disabled, the system falls back to Stage 1 coherence-only decoding.
+**Firewall verification:** `GovernanceAwareDecoder` extends but does not replace `CoherenceAwareDecoder`. It operates on the same principle: logits are produced by Module A (potentially conditioned by Stage 8's `InterpretiveConditioner`), optionally modulated by BCVF (Options A/C), then sampling parameters are adjusted by Module H. Module H never shares a pathway with logit production. When Module H is disabled, the system falls back to Stage 1 coherence-only decoding.
+
+**Pipeline ordering:**
+
+```
+hidden_state
+    ↓
+[Stage 8] InterpretiveConditioner (representation conditioning — modifies hidden state)
+    ↓
+lm_head → logits
+    ↓
+[BCVF] Options A/C (logit modulation / reranking — optional, modifies logit values)
+    ↓
+[Stage 11] GovernanceAwareDecoder (sampling policy — adjusts temperature, top_p, etc.)
+    ↓
+[TwoStageGenerator] top-K candidate re-ranking via CG primitives (optional)
+    ↓
+sampled token
+```
+
+Each stage is independently disableable. The "logit firewall" in Stage 11 means specifically that `GovernanceAwareDecoder` never writes to the logit tensor — it reads governance state and outputs sampling parameters only. Upstream stages (Stage 8, BCVF) may modify what logits are produced, and that is by design.
 
 #### F.16.17 The Reflection-Feedback Architecture
 
