@@ -85,6 +85,7 @@ from .generation_tracer import (
     BindingCacheTracerMixin,
     CTMPlusTracerMixin,
     MistralCGGenerationTracer,
+    BaselineStatisticsAnalyzer,
 )
 
 __all__ = [
@@ -146,6 +147,7 @@ __all__ = [
     "BindingCacheTracerMixin",
     "CTMPlusTracerMixin",
     "MistralCGGenerationTracer",
+    "BaselineStatisticsAnalyzer",
 ]
 
 __version__ = "2.0.0"

@@ -556,6 +556,7 @@ class SymbolU12LLM(nn.Module):
         top_k: int = 50,
         top_p: float = 0.9,
         return_ontological: bool = False,
+        generation_tracer=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -567,12 +568,18 @@ class SymbolU12LLM(nn.Module):
             top_k: Top-k sampling (0 = disabled)
             top_p: Nucleus sampling threshold
             return_ontological: Whether to return ontological analysis
+            generation_tracer: Optional GenerationTracer (Appendix F Stage 0)
+                for per-token baseline capture. Observation only — does not
+                modify generation behavior.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
         """
         self.eval()
         device = next(self.parameters()).device
+
+        # If tracer is provided, force ontological computation for metrics
+        need_ontological = return_ontological or (generation_tracer is not None)
 
         # Encode prompt
         input_ids = self.encode(prompt).to(device)
@@ -583,8 +590,12 @@ class SymbolU12LLM(nn.Module):
 
         for _ in range(max_new_tokens):
             # Forward pass
-            output = self.forward(generated, return_ontological=return_ontological)
-            logits = output["logits"][:, -1, :] / temperature
+            output = self.forward(generated, return_ontological=need_ontological)
+
+            # Pre-filtering logits (used by tracer before temperature/filtering)
+            raw_logits = output["logits"][:, -1, :]
+
+            logits = raw_logits / temperature
 
             # Top-k filtering
             if top_k > 0:
@@ -609,6 +620,22 @@ class SymbolU12LLM(nn.Module):
 
             # Append token
             generated = torch.cat([generated, next_token], dim=1)
+
+            # Stage 0 tracer: record per-token metrics (observation only)
+            if generation_tracer is not None:
+                _onto_state = None
+                if need_ontological and "coherence" in output:
+                    _onto_state = {
+                        "coherence": output["coherence"][:, -1, :].mean().item()
+                            if output["coherence"].dim() == 3
+                            else output["coherence"].mean().item(),
+                    }
+                generation_tracer.record_token(
+                    token_id=next_token[0, 0].item(),
+                    logits=raw_logits[0],
+                    hidden_state=output["logits"][:, -1, :],
+                    onto_state=_onto_state,
+                )
 
             # Track ontological for last token
             if return_ontological:
