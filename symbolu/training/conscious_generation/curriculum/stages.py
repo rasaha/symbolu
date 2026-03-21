@@ -231,3 +231,26 @@ class CurriculumStageManager:
         }
         result.update(self.scheduler.get_diagnostics())
         return result
+
+    def get_state(self) -> Dict[str, object]:
+        """Serialize curriculum state for checkpoint saving."""
+        return {
+            "current_stage": self.current_stage,
+            "current_stage_idx": self.current_stage_idx,
+            "stage_entry_step": self.stage_entry_step,
+            "field_integrated_active": self._field_integrated_active,
+            "ppl_history": list(self.ppl_history),
+            "stage_history": list(self.stage_history),
+            "scheduler_values": dict(self.scheduler._values),
+        }
+
+    def load_state(self, state: Dict[str, object]):
+        """Restore curriculum state from checkpoint."""
+        self.current_stage = state["current_stage"]
+        self.current_stage_idx = state["current_stage_idx"]
+        self.stage_entry_step = state["stage_entry_step"]
+        self._field_integrated_active = state["field_integrated_active"]
+        self.ppl_history = list(state.get("ppl_history", []))
+        self.stage_history = list(state.get("stage_history", []))
+        if "scheduler_values" in state:
+            self.scheduler._values.update(state["scheduler_values"])

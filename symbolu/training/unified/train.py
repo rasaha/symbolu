@@ -824,6 +824,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_pidv2_curriculum_state = None
     resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
     resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+    resumed_cg_stage_manager_state = None  # CG Curriculum Stage Manager (Stages A-D)
     resumed_kv_supervisor_state = None  # KV Supervision (Kosha-Vritti Structured Supervision)
     resumed_jepa_injection_projector_state = None  # Phase 4: JEPA injection projector
 
@@ -1577,6 +1578,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_evoflow_state = resume_result.get("evoflow_state")
                 resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
                 resumed_jepa_injection_projector_state = resume_result.get("jepa_injection_projector_state")
+                resumed_cg_stage_manager_state = resume_result.get("cg_stage_manager_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -2380,6 +2382,12 @@ def train(config: UnifiedTrainingConfig):
             print(f"    Proportions: {_cg_stage_proportions}")
             print(f"    Ramp mode: {config.cg_curriculum_ramp_mode}")
             print(f"    PPL var threshold: {config.cg_curriculum_ppl_var_threshold}")
+
+            # Restore CG Stage Manager state from checkpoint
+            if resumed_cg_stage_manager_state is not None:
+                cg_stage_manager.load_state(resumed_cg_stage_manager_state)
+                print(f"  ✓ CG Stage Manager Restored: Stage={cg_stage_manager.current_stage}, "
+                      f"FieldIntegrated={cg_stage_manager._field_integrated_active}")
 
             if config.enable_cg_diagnostics:
                 cg_governance_diag = GovernanceDiagnostics(window_size=100)
@@ -7287,6 +7295,7 @@ def train(config: UnifiedTrainingConfig):
                             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+                            cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
                         )
                         print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
@@ -7419,6 +7428,7 @@ def train(config: UnifiedTrainingConfig):
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+                    cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
                 )
                 print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -7447,6 +7457,7 @@ def train(config: UnifiedTrainingConfig):
             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+            cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
         )
         # v2.7 Training State Tracker: Save final state
         if training_state_tracker is not None and training_state_tracker.enabled:
