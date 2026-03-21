@@ -108,6 +108,32 @@ from .unified_coherence_controller import (
     UnifiedCoherenceConfig,
 )
 
+# Appendix F Stage 7A: Semantic Coherence Integration
+from .semantic_coherence_integration import (
+    SemanticCoherenceIntegration,
+    SemanticCoherenceConfig,
+)
+
+# Appendix F Stage 7C: Experiential State (Dual-Space Architecture)
+from .experiential_state import (
+    ExperientialStateModule,
+    ExperientialStateConfig,
+)
+
+# Appendix F Stage 7D: Polarity Encoding (Varna Polarity Gates)
+from .polarity_encoding import (
+    PolarityGate,
+    PolarityEncodingConfig,
+)
+
+# Appendix F Stage 7F: Phase Coherence Signal
+from .phase_coherence_signal import (
+    PhaseCoherenceExtractor,
+    PhaseCoherenceAggregator,
+    PhaseCoherenceProjection,
+    PhaseCoherenceConfig,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -182,6 +208,24 @@ __all__ = [
     # Appendix F Stage 4: Unified Coherence Controller
     "UnifiedCoherenceController",
     "UnifiedCoherenceConfig",
+
+    # Appendix F Stage 7A: Semantic Coherence Integration
+    "SemanticCoherenceIntegration",
+    "SemanticCoherenceConfig",
+
+    # Appendix F Stage 7C: Experiential State
+    "ExperientialStateModule",
+    "ExperientialStateConfig",
+
+    # Appendix F Stage 7D: Polarity Encoding
+    "PolarityGate",
+    "PolarityEncodingConfig",
+
+    # Appendix F Stage 7F: Phase Coherence Signal
+    "PhaseCoherenceExtractor",
+    "PhaseCoherenceAggregator",
+    "PhaseCoherenceProjection",
+    "PhaseCoherenceConfig",
 ]
 
 __version__ = "2.0.0"

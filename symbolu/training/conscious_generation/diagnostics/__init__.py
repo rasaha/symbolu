@@ -11,6 +11,14 @@ from symbolu.training.conscious_generation.diagnostics.stability_verifier import
     StabilityVerifier,
 )
 
+# Appendix F Stage 7B: Adaptive Diagnostic Controller
+from symbolu.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
+    AdaptiveDiagnosticController,
+    AdaptiveDiagnosticConfig,
+    DiagnosticSignals,
+    AdaptiveResponse,
+)
+
 __all__ = [
     # Stage 6
     "StabilityConfig",
@@ -20,4 +28,10 @@ __all__ = [
     "LongSequenceAnalyzer",
     "KillSwitchVerifier",
     "StabilityVerifier",
+
+    # Stage 7B
+    "AdaptiveDiagnosticController",
+    "AdaptiveDiagnosticConfig",
+    "DiagnosticSignals",
+    "AdaptiveResponse",
 ]
