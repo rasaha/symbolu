@@ -5121,6 +5121,25 @@ def train(config: UnifiedTrainingConfig):
                                             _ed_trend_parts.append(f"    {_tk}: {_tv}")
                                         print("\n".join(_ed_trend_parts))
 
+                            # Stage 8: Perspective Synthesizer metrics
+                            if (isinstance(outputs, dict) and 'synth_result' in outputs
+                                    and outputs['synth_result'] is not None):
+                                _sr = outputs['synth_result']
+                                metrics['stage8_gate'] = _sr.get('gate_value', 0.0)
+                                metrics['stage8_cond_norm'] = _sr.get('conditioning_norm', 0.0)
+                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                    writer.add_scalar('stage8/synthesis_gate', _sr.get('gate_value', 0.0), global_step)
+                                    writer.add_scalar('stage8/conditioning_norm', _sr.get('conditioning_norm', 0.0), global_step)
+                                    _s8_log = _sr.get('log_dict', {})
+                                    if 'vritti_dominant' in _s8_log:
+                                        _vritti_idx = ['pramana', 'viparyaya', 'vikalpa', 'nidra', 'smrti'].index(
+                                            _s8_log['vritti_dominant']
+                                        ) if _s8_log['vritti_dominant'] in ['pramana', 'viparyaya', 'vikalpa', 'nidra', 'smrti'] else -1
+                                        if _vritti_idx >= 0:
+                                            writer.add_scalar('stage8/vritti_dominant_idx', _vritti_idx, global_step)
+                                    if 'csr_signal_norm' in _s8_log:
+                                        writer.add_scalar('stage8/csr_signal_norm', _s8_log['csr_signal_norm'], global_step)
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [Conscious Gen] Error at step {global_step}: {e}")
@@ -9198,21 +9217,15 @@ def main():
     parser.add_argument("--factual_eval_start_step", type=int, default=0,
                        help="Delay factual evaluation until this training step")
 
-    # Appendix F Stage 0: Binding Cache + CTM+ Observation Tracers
-    parser.add_argument("--enable_binding_cache_tracer", action="store_true",
-                       help="Enable Binding Cache observation tracer (Stage 0, no generation modification)")
-    parser.add_argument("--binding_cache_top_k", type=int, default=64,
-                       help="Simulated Top-K for Binding Cache hit rate estimation")
-    parser.add_argument("--enable_ctm_plus_tracer", action="store_true",
-                       help="Enable CTM+ offload observation tracer (Stage 0, no actual offloading)")
-    parser.add_argument("--ctm_plus_gpu_budget", type=int, default=24,
-                       help="Simulated GPU layer budget for CTM+ tier placement")
-    parser.add_argument("--ctm_plus_num_layers", type=int, default=32,
-                       help="Number of backbone layers to track for CTM+ simulation")
-    parser.add_argument("--generation_trace_output", type=str, default="generation_trace.json",
-                       help="Output path for Stage 0 generation trace JSON")
-    parser.add_argument("--generation_trace_interval", type=int, default=500,
-                       help="Steps between generation trace snapshots")
+    # Stage 8: Perspective Synthesizer (representation conditioning)
+    parser.add_argument("--enable_perspective_synthesizer", action="store_true",
+                       help="Enable Stage 8 Perspective Synthesizer (representation conditioning before lm_head)")
+    parser.add_argument("--perspective_d_synthesis", type=int, default=64,
+                       help="Synthesis MLP hidden dimension for Stage 8")
+    parser.add_argument("--perspective_gate_init", type=float, default=0.0,
+                       help="Initial gate value (0.0 for safe cold start)")
+    parser.add_argument("--perspective_log_interpretive", action="store_true", default=True,
+                       help="Log full InterpretiveState per token to TensorBoard")
 
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
@@ -9979,6 +9992,18 @@ def main():
         factual_eval_interval=args.factual_eval_interval,
         factual_eval_probes=args.factual_eval_probes,
         factual_eval_start_step=args.factual_eval_start_step,
+        # Embedding Diagnostics
+        enable_embedding_diagnostics=args.enable_embedding_diagnostics,
+        embedding_diag_interval=args.embedding_diag_interval,
+        embedding_diag_vocab_sample=args.embedding_diag_vocab_sample,
+        embedding_diag_neighbors=args.embedding_diag_neighbors,
+        embedding_diag_no_samples=args.embedding_diag_no_samples,
+        embedding_diag_start_step=args.embedding_diag_start_step,
+        # Stage 8: Perspective Synthesizer
+        enable_perspective_synthesizer=args.enable_perspective_synthesizer,
+        perspective_d_synthesis=args.perspective_d_synthesis,
+        perspective_gate_init=args.perspective_gate_init,
+        perspective_log_interpretive=args.perspective_log_interpretive,
     )
 
     # ==========================================================================
