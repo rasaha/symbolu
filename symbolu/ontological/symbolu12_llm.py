@@ -485,6 +485,10 @@ class SymbolU12LLM(nn.Module):
         self._interpretive_state_builder = None
         self._interpretive_conditioner = None
 
+        # Stage 8: Perspective Synthesizer (optional, set via attach_perspective_synthesizer)
+        # When set, replaces Stage 2's separate builder + conditioner with unified pipeline.
+        self._perspective_synthesizer = None
+
         # Initialize weights
         self.apply(self._init_weights)
 
@@ -517,6 +521,19 @@ class SymbolU12LLM(nn.Module):
         """
         self._interpretive_state_builder = state_builder
         self._interpretive_conditioner = conditioner
+
+    def attach_perspective_synthesizer(self, synthesizer):
+        """Attach Stage 8 PerspectiveSynthesizer.
+
+        When attached, replaces Stage 2's separate builder + conditioner
+        with the unified synthesis pipeline. The PerspectiveSynthesizer
+        produces an InterpretiveState dataclass and applies gated residual
+        conditioning before lm_head.
+
+        Args:
+            synthesizer: PerspectiveSynthesizer instance.
+        """
+        self._perspective_synthesizer = synthesizer
 
     def forward(
         self,
@@ -561,21 +578,34 @@ class SymbolU12LLM(nn.Module):
         # Final norm
         x = self.final_norm(x)
 
-        # Ontological analysis (computed before lm_head for Stage 2 conditioning)
+        # Ontological analysis (computed before lm_head for Stage 2/8 conditioning)
         onto = None
         bhava_output = None
+        has_stage8 = self._perspective_synthesizer is not None
         has_conditioner = (
             self._interpretive_state_builder is not None
             and self._interpretive_conditioner is not None
         )
+        need_onto = return_ontological or has_stage8 or has_conditioner
 
-        if return_ontological or has_conditioner:
+        if need_onto:
             onto = self.ontological(x)
             bhava_output = self.bhava(onto)
 
-        # --- Stage 2: Interpretive conditioning before vocabulary projection ---
-        interp_components = None
-        if has_conditioner:
+        # --- Stage 8: Perspective Synthesizer (takes precedence over Stage 2) ---
+        synth_result = None
+        if has_stage8:
+            synth_result = self._perspective_synthesizer(
+                hidden=x,
+                onto_state=onto,
+                bhava_matrix=bhava_output["relationship_matrix"],
+                phase_coherence_vector=phase_coherence_vector,
+                experiential_vector=experiential_vector,
+            )
+            x = synth_result["conditioned_hidden"]
+
+        # --- Stage 2 fallback: Interpretive conditioning (if Stage 8 not active) ---
+        elif has_conditioner:
             builder_out = self._interpretive_state_builder(
                 hidden=x,
                 onto_state=onto,
@@ -587,7 +617,13 @@ class SymbolU12LLM(nn.Module):
                 hidden=x,
                 interpretive_state=builder_out["interpretive_state"],
             )
-            interp_components = builder_out["components"]
+            synth_result = {
+                "interpretive_state": None,
+                "gate_value": self._interpretive_conditioner.gate_value,
+                "conditioning_norm": 0.0,
+                "log_dict": {},
+                "interp_components": builder_out["components"],
+            }
 
         # Language model logits
         logits = self.lm_head(x)
@@ -602,10 +638,13 @@ class SymbolU12LLM(nn.Module):
             output["relationship_matrix"] = bhava_output["relationship_matrix"]
             output["bhava_vector"] = bhava_output["bhava_vector"]
 
-        # Stage 2 conditioning metadata
-        if interp_components is not None:
-            output["interp_components"] = interp_components
-            output["gate_value"] = self._interpretive_conditioner.gate_value
+        # Stage 8/2 conditioning metadata
+        if synth_result is not None:
+            output["synth_result"] = synth_result
+            output["gate_value"] = synth_result.get("gate_value", 0.0)
+            output["conditioning_norm"] = synth_result.get("conditioning_norm", 0.0)
+            if "interp_components" in synth_result:
+                output["interp_components"] = synth_result["interp_components"]
 
         return output
 
@@ -664,6 +703,7 @@ class SymbolU12LLM(nn.Module):
         phase_coherence_aggregator=None,
         phase_coherence_projection=None,
         experiential_state_module=None,
+        perspective_synthesizer=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -699,12 +739,21 @@ class SymbolU12LLM(nn.Module):
             experiential_state_module: Optional ExperientialStateModule
                 (Appendix F Stage 7C). Maintains parallel experiential state
                 P_t with latent recurrence.
+            perspective_synthesizer: Optional PerspectiveSynthesizer
+                (Appendix F Stage 8). Unifies all interpretive axes into
+                representation conditioning before lm_head. When provided,
+                temporarily attaches to the model for the generation call.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
         """
         self.eval()
         device = next(self.parameters()).device
+
+        # Stage 8: Temporarily attach synthesizer for this generation call
+        _prev_synth = self._perspective_synthesizer
+        if perspective_synthesizer is not None:
+            self._perspective_synthesizer = perspective_synthesizer
 
         # If tracer, coherence decoder, or unified controller is provided,
         # force ontological computation so coherence signals are available
@@ -715,6 +764,7 @@ class SymbolU12LLM(nn.Module):
             or (unified_coherence_controller is not None)
             or (semantic_coherence_integration is not None)
             or (experiential_state_module is not None)
+            or (perspective_synthesizer is not None)
         )
 
         # Encode prompt
@@ -875,20 +925,17 @@ class SymbolU12LLM(nn.Module):
                     "resample_events": resample_count,
                 })
 
-            # --- Stage 2: Record interpretive conditioning metrics in tracer ---
-            if generation_tracer is not None and "gate_value" in output:
-                stage2_entry = {
-                    "gate_value": output["gate_value"],
+            # --- Stage 8/2: Record interpretive conditioning metrics in tracer ---
+            if generation_tracer is not None and "synth_result" in output:
+                sr = output["synth_result"]
+                stage8_entry = {
+                    "gate_value": sr.get("gate_value", 0.0),
+                    "conditioning_norm": sr.get("conditioning_norm", 0.0),
                 }
-                if "interp_components" in output:
-                    comps = output["interp_components"]
-                    stage2_entry["conditioning_norm"] = (
-                        comps["r_ctx"][:, -1, :].norm().item()
-                        + comps["v_ctx"][:, -1, :].norm().item()
-                        + comps["alpha_t"][:, -1, :].norm().item()
-                        + comps["b_t"][:, -1, :].norm().item()
-                    )
-                generation_tracer.trace[-1].update(stage2_entry)
+                # Stage 8: Full InterpretiveState logging
+                if sr.get("log_dict"):
+                    stage8_entry.update(sr["log_dict"])
+                generation_tracer.trace[-1].update(stage8_entry)
 
             # --- Stage 3: Record bhava vector metrics in tracer ---
             if generation_tracer is not None and "bhava_vector" in output:
@@ -954,6 +1001,9 @@ class SymbolU12LLM(nn.Module):
             # Stop if max length reached
             if generated.shape[1] >= self.config.max_seq_len:
                 break
+
+        # Stage 8: Restore previous synthesizer state
+        self._perspective_synthesizer = _prev_synth
 
         # Decode output
         generated_text = self.decode(generated)

@@ -1051,6 +1051,15 @@ class UnifiedTrainingConfig:
     generation_trace_interval: int = 500            # Steps between trace snapshots
 
     # ==========================================================================
+    # Appendix F Stage 8: Perspective Synthesizer (Representation Conditioning)
+    # Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12
+    # ==========================================================================
+    enable_perspective_synthesizer: bool = False  # Master toggle for Stage 8
+    perspective_d_synthesis: int = 64             # Synthesis MLP hidden dimension
+    perspective_gate_init: float = 0.0            # Gate init (0.0 for safe cold start)
+    perspective_log_interpretive: bool = True     # Log full InterpretiveState per token
+
+    # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules
     # ==========================================================================
