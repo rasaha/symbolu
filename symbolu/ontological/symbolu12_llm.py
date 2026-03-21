@@ -396,10 +396,23 @@ class SymbolU12Block(nn.Module):
         self.norm1 = nn.LayerNorm(config.embed_dim)
         self.norm2 = nn.LayerNorm(config.embed_dim)
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        x = x + self.attention(self.norm1(x), causal_mask=causal_mask)
-        x = x + self.ffn(self.norm2(x))
-        return x
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+        return_phase_angles: bool = False,
+    ) -> Union[torch.Tensor, tuple]:
+        if return_phase_angles:
+            attn_out, phase_angles = self.attention(
+                self.norm1(x), causal_mask=causal_mask, return_phase_angles=True,
+            )
+            x = x + attn_out
+            x = x + self.ffn(self.norm2(x))
+            return x, phase_angles
+        else:
+            x = x + self.attention(self.norm1(x), causal_mask=causal_mask)
+            x = x + self.ffn(self.norm2(x))
+            return x
 
 
 # =============================================================================
@@ -530,7 +543,8 @@ class SymbolU12LLM(nn.Module):
         # Transformer blocks (O(n) attention)
         for layer_idx, block in enumerate(self.blocks):
             if need_phase:
-                x, phase_angles = block(x, causal_mask=True, return_phase_angles=True)
+                block_out = block(x, causal_mask=True, return_phase_angles=True)
+                x, phase_angles = block_out
                 # Stage 7F: Extract per-head phase coherence
                 per_head_coherence = phase_coherence_extractor.compute_per_head(phase_angles)
                 phase_coherence_aggregator.record_layer(layer_idx, per_head_coherence)
