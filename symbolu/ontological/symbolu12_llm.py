@@ -211,7 +211,8 @@ class PhaseAttentionBlock(nn.Module):
         self,
         x: torch.Tensor,
         causal_mask: bool = True,
-    ) -> torch.Tensor:
+        return_phase_angles: bool = False,
+    ) -> Union[torch.Tensor, tuple]:
         B, N, D = x.shape
 
         # Project to Q, K, V
@@ -259,6 +260,9 @@ class PhaseAttentionBlock(nn.Module):
         output = self.out_proj(output)
         output = self.dropout(output)
 
+        # Stage 7F: Optionally return phase angles for phase coherence extraction
+        if return_phase_angles:
+            return output, phases  # phases: [B, H, N, phase_dim]
         return output
 
 
@@ -505,6 +509,11 @@ class SymbolU12LLM(nn.Module):
         self,
         input_ids: torch.Tensor,
         return_ontological: bool = True,
+        semantic_coherence_integration=None,
+        phase_coherence_extractor=None,
+        phase_coherence_aggregator=None,
+        phase_coherence_vector=None,
+        experiential_vector=None,
     ) -> Dict[str, torch.Tensor]:
         B, N = input_ids.shape
         device = input_ids.device
@@ -514,9 +523,26 @@ class SymbolU12LLM(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # Stage 7A/7F: Check if we need per-layer phase/coherence data
+        need_phase = (phase_coherence_extractor is not None
+                      and phase_coherence_aggregator is not None)
+
         # Transformer blocks (O(n) attention)
-        for block in self.blocks:
-            x = block(x, causal_mask=True)
+        for layer_idx, block in enumerate(self.blocks):
+            if need_phase:
+                x, phase_angles = block(x, causal_mask=True, return_phase_angles=True)
+                # Stage 7F: Extract per-head phase coherence
+                per_head_coherence = phase_coherence_extractor.compute_per_head(phase_angles)
+                phase_coherence_aggregator.record_layer(layer_idx, per_head_coherence)
+            else:
+                x = block(x, causal_mask=True)
+
+            # Stage 7A: Record per-layer semantic coherence (approximated from hidden norms)
+            if semantic_coherence_integration is not None:
+                # Use hidden state norm stability as S1 proxy
+                layer_norm = x.norm(dim=-1).mean().item()
+                s1_approx = min(1.0, max(0.0, 1.0 - abs(layer_norm - 1.0) * 0.1))
+                semantic_coherence_integration.record_layer(layer_idx, s1_approx)
 
         # Final norm
         x = self.final_norm(x)
@@ -540,6 +566,8 @@ class SymbolU12LLM(nn.Module):
                 hidden=x,
                 onto_state=onto,
                 bhava_matrix=bhava_output["relationship_matrix"],
+                phase_coherence_vector=phase_coherence_vector,
+                experiential_vector=experiential_vector,
             )
             x = self._interpretive_conditioner(
                 hidden=x,
@@ -617,6 +645,11 @@ class SymbolU12LLM(nn.Module):
         generation_tracer=None,
         coherence_decoder=None,
         unified_coherence_controller=None,
+        semantic_coherence_integration=None,
+        phase_coherence_extractor=None,
+        phase_coherence_aggregator=None,
+        phase_coherence_projection=None,
+        experiential_state_module=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -639,6 +672,19 @@ class SymbolU12LLM(nn.Module):
                 coherence signal from token, latent, and conversation sources.
                 When provided, replaces the simple coherence scalar for
                 Stage 1 policy adjustment.
+            semantic_coherence_integration: Optional SemanticCoherenceIntegration
+                (Appendix F Stage 7A). Collects per-layer S1 scores and feeds
+                aggregated S1/S2/S3 signals into the unified controller.
+            phase_coherence_extractor: Optional PhaseCoherenceExtractor
+                (Appendix F Stage 7F). Extracts per-head phase coherence.
+            phase_coherence_aggregator: Optional PhaseCoherenceAggregator
+                (Appendix F Stage 7F). Aggregates phase coherence across layers.
+            phase_coherence_projection: Optional PhaseCoherenceProjection
+                (Appendix F Stage 7F). Projects phase coherence into
+                interpretive state dimension.
+            experiential_state_module: Optional ExperientialStateModule
+                (Appendix F Stage 7C). Maintains parallel experiential state
+                P_t with latent recurrence.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
@@ -653,6 +699,8 @@ class SymbolU12LLM(nn.Module):
             or (generation_tracer is not None)
             or (coherence_decoder is not None)
             or (unified_coherence_controller is not None)
+            or (semantic_coherence_integration is not None)
+            or (experiential_state_module is not None)
         )
 
         # Encode prompt
@@ -662,9 +710,37 @@ class SymbolU12LLM(nn.Module):
         # Track ontological data if requested
         onto_data = [] if return_ontological else None
 
+        # Stage 7C: Reset experiential state for new generation
+        if experiential_state_module is not None:
+            experiential_state_module.reset(batch_size=1)
+
         for _ in range(max_new_tokens):
-            # Forward pass
-            output = self.forward(generated, return_ontological=need_ontological)
+            # Stage 7A/7F: Reset per-token layer accumulators
+            if semantic_coherence_integration is not None:
+                semantic_coherence_integration.reset()
+            if phase_coherence_aggregator is not None:
+                phase_coherence_aggregator.reset()
+
+            # Stage 7F: Get aggregated phase vector from previous token's layers
+            _phase_vec = None
+            if phase_coherence_aggregator is not None:
+                _phase_vec = phase_coherence_aggregator.get_phase_coherence_vector()
+
+            # Stage 7C: Get experiential vector from previous step
+            _exp_vec = None
+            if experiential_state_module is not None:
+                _exp_vec = experiential_state_module.get_experiential_vector()
+
+            # Forward pass (with optional per-layer phase/coherence extraction)
+            output = self.forward(
+                generated,
+                return_ontological=need_ontological,
+                semantic_coherence_integration=semantic_coherence_integration,
+                phase_coherence_extractor=phase_coherence_extractor,
+                phase_coherence_aggregator=phase_coherence_aggregator,
+                phase_coherence_vector=_phase_vec,
+                experiential_vector=_exp_vec,
+            )
 
             # Pre-filtering logits (used by tracer before temperature/filtering)
             raw_logits = output["logits"][:, -1, :]
@@ -681,14 +757,34 @@ class SymbolU12LLM(nn.Module):
                     coherence_scalar = output["coherence"].mean().item()
                 c_latent = coherence_scalar
 
+            # --- Stage 7A: Feed S1/S2/S3 into unified controller ---
+            s1, s2, s3 = None, None, None
+            if semantic_coherence_integration is not None:
+                s_signals = semantic_coherence_integration.compute_signals()
+                s1 = s_signals["s1"]
+                s2 = s_signals["s2"]
+                s3 = s_signals["s3"]
+
             # --- Stage 4: Unified coherence replaces simple scalar ---
             if unified_coherence_controller is not None:
                 unified_result = unified_coherence_controller.update(
                     c_token=None,   # Uses bliss_history if available
                     c_latent=c_latent,
                     c_conv=None,    # CoherenceEngine integration (future)
+                    s1=s1,          # Stage 7A semantic signals
+                    s2=s2,
+                    s3=s3,
                 )
                 coherence_scalar = unified_result["C_total"]
+
+            # --- Stage 7C: Advance experiential state ---
+            if experiential_state_module is not None:
+                # Use last-token hidden state for experiential recurrence
+                last_hidden = output["logits"][:, -1, :]  # [B, D] proxy
+                if "interp_components" in output:
+                    # Prefer pre-lm_head hidden (approximated from interp components)
+                    last_hidden = output["logits"][:, -1, :]
+                experiential_state_module.step(last_hidden, c_total=coherence_scalar)
 
             # --- Stage 1: Adjust decoding policy via coherence ---
             effective_temperature = temperature
@@ -810,6 +906,29 @@ class SymbolU12LLM(nn.Module):
                     "C_conversation": unified_result["C_conversation"],
                     "C_raw": unified_result["C_raw"],
                 })
+
+            # --- Stage 7A: Record semantic coherence signals in tracer ---
+            if generation_tracer is not None and s1 is not None:
+                generation_tracer.trace[-1].update({
+                    "S1": s1,
+                    "S2": s2,
+                    "S3": s3,
+                })
+
+            # --- Stage 7C: Record experiential state norm in tracer ---
+            if generation_tracer is not None and experiential_state_module is not None:
+                p_vec = experiential_state_module.get_experiential_vector()
+                generation_tracer.trace[-1].update({
+                    "P_t_norm": p_vec.norm().item(),
+                })
+
+            # --- Stage 7F: Record phase coherence in tracer ---
+            if generation_tracer is not None and phase_coherence_aggregator is not None:
+                phase_vec = phase_coherence_aggregator.get_phase_coherence_vector()
+                if phase_vec is not None:
+                    generation_tracer.trace[-1].update({
+                        "phase_coherence_mean": phase_vec.mean().item(),
+                    })
 
             # Track ontological for last token
             if return_ontological:

@@ -76,6 +76,12 @@ class InterpretiveConditionerConfig:
     bhava_output_dim: int = 16
     bhava_input_dim: int = 144
     onto_dim: int = 12
+    # Stage 7D: Polarity encoding (replaces standard CSR projection)
+    enable_polarity: bool = False
+    # Stage 7F: Phase coherence signal dimension (added to interpretive state)
+    phase_out_dim: int = 0
+    # Stage 7C: Experiential state dimension (added to interpretive state)
+    d_exp: int = 0
 
 
 # =============================================================================
@@ -153,9 +159,23 @@ class InterpretiveStateBuilder(nn.Module):
     def __init__(self, hidden_dim: int, config: InterpretiveConditionerConfig):
         super().__init__()
         self.config = config
+        self.hidden_dim = hidden_dim
         input_dim = hidden_dim + config.onto_dim
 
-        # CSR context projection: [h_t; o_t] → csr_dim
+        # Stage 7D: Use PolarityGate if enabled, otherwise standard CSR projection
+        self._polarity_gate = None
+        if config.enable_polarity:
+            try:
+                from symbolu.inference.polarity_encoding import PolarityGate, PolarityEncodingConfig
+                self._polarity_gate = PolarityGate(PolarityEncodingConfig(
+                    hidden_dim=hidden_dim,
+                    onto_dim=config.onto_dim,
+                    csr_dim=config.csr_dim,
+                ))
+            except ImportError:
+                pass
+
+        # CSR context projection (fallback if polarity not enabled/available)
         self.csr_proj = nn.Sequential(
             nn.Linear(input_dim, hidden_dim // 4),
             nn.GELU(),
@@ -178,6 +198,25 @@ class InterpretiveStateBuilder(nn.Module):
             output_dim=config.bhava_output_dim,
         )
 
+        # Stage 7F: Phase coherence projection (zero-init for bounded intro)
+        self._phase_projection = None
+        if config.phase_out_dim > 0:
+            try:
+                from symbolu.inference.phase_coherence_signal import PhaseCoherenceProjection
+                self._phase_projection = PhaseCoherenceProjection(
+                    num_heads=8,  # Default; overridden by caller if needed
+                    phase_out_dim=config.phase_out_dim,
+                )
+            except ImportError:
+                pass
+
+        # Stage 7C: Experiential state projection (zero-init for bounded intro)
+        self._exp_projection = None
+        if config.d_exp > 0:
+            self._exp_projection = nn.Linear(config.d_exp, config.d_exp)
+            nn.init.zeros_(self._exp_projection.weight)
+            nn.init.zeros_(self._exp_projection.bias)
+
         self._init_weights()
 
     def _init_weights(self):
@@ -192,18 +231,27 @@ class InterpretiveStateBuilder(nn.Module):
     @property
     def interp_dim(self) -> int:
         """Total dimension of the concatenated interpretive state."""
-        return (
+        base = (
             self.config.csr_dim
             + self.config.vritti_classes
             + self.config.kosha_primitives
             + self.config.bhava_output_dim
         )
+        # Stage 7F: Phase coherence adds phase_out_dim
+        if self._phase_projection is not None:
+            base += self.config.phase_out_dim
+        # Stage 7C: Experiential state adds d_exp
+        if self._exp_projection is not None:
+            base += self.config.d_exp
+        return base
 
     def forward(
         self,
         hidden: torch.Tensor,
         onto_state: torch.Tensor,
         bhava_matrix: torch.Tensor,
+        phase_coherence_vector: Optional[torch.Tensor] = None,
+        experiential_vector: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """Build interpretive state from hidden + auxiliary signals.
 
@@ -211,6 +259,8 @@ class InterpretiveStateBuilder(nn.Module):
             hidden: Transformer hidden states (..., hidden_dim).
             onto_state: Ontological projection (..., onto_dim).
             bhava_matrix: Bhava relationship matrix (..., 12, 12) or (..., 144).
+            phase_coherence_vector: Optional [B, H] from Stage 7F aggregator.
+            experiential_vector: Optional [B, d_exp] from Stage 7C module.
 
         Returns:
             Dict with:
@@ -219,8 +269,13 @@ class InterpretiveStateBuilder(nn.Module):
         """
         combined = torch.cat([hidden, onto_state], dim=-1)
 
-        # CSR context interpretation
-        r_ctx = self.csr_proj(combined)
+        # Stage 7D: Use PolarityGate for CSR if available, else standard projection
+        polarity_result = None
+        if self._polarity_gate is not None:
+            polarity_result = self._polarity_gate(hidden, onto_state)
+            r_ctx = polarity_result["c_polar"]
+        else:
+            r_ctx = self.csr_proj(combined)
 
         # Vritti cognitive mode distribution
         v_ctx = torch.softmax(self.vritti_proj(combined), dim=-1)
@@ -234,21 +289,44 @@ class InterpretiveStateBuilder(nn.Module):
 
         # Broadcast b_t to match hidden sequence dimensions if needed
         if b_t.dim() < r_ctx.dim():
-            # bhava_matrix was per-batch, expand to sequence length
             expand_shape = list(r_ctx.shape[:-1]) + [b_t.shape[-1]]
             b_t = b_t.unsqueeze(-2).expand(expand_shape)
 
-        interpretive_state = torch.cat([r_ctx, v_ctx, alpha_t, b_t], dim=-1)
+        parts = [r_ctx, v_ctx, alpha_t, b_t]
+        components = {
+            "r_ctx": r_ctx,
+            "v_ctx": v_ctx,
+            "alpha_t": alpha_t,
+            "b_t": b_t,
+            "bhava_coherence": bhava_out["coherence"],
+        }
+
+        # Stage 7F: Append phase coherence projection
+        if self._phase_projection is not None and phase_coherence_vector is not None:
+            seq_len = hidden.shape[-2] if hidden.dim() >= 2 else 1
+            phase_signal = self._phase_projection(phase_coherence_vector, seq_len=seq_len)
+            parts.append(phase_signal)
+            components["phase_signal"] = phase_signal
+
+        # Stage 7C: Append experiential state projection
+        if self._exp_projection is not None and experiential_vector is not None:
+            exp_proj = self._exp_projection(experiential_vector)
+            # Broadcast to sequence length if needed
+            if exp_proj.dim() < r_ctx.dim():
+                expand_shape = list(r_ctx.shape[:-1]) + [exp_proj.shape[-1]]
+                exp_proj = exp_proj.unsqueeze(-2).expand(expand_shape)
+            parts.append(exp_proj)
+            components["experiential"] = exp_proj
+
+        # Stage 7D: Record polarity metrics
+        if polarity_result is not None:
+            components["phi"] = polarity_result["phi"]
+
+        interpretive_state = torch.cat(parts, dim=-1)
 
         return {
             "interpretive_state": interpretive_state,
-            "components": {
-                "r_ctx": r_ctx,
-                "v_ctx": v_ctx,
-                "alpha_t": alpha_t,
-                "b_t": b_t,
-                "bhava_coherence": bhava_out["coherence"],
-            },
+            "components": components,
         }
 
 

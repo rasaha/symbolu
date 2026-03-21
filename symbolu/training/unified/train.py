@@ -2411,6 +2411,18 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Embedding Diagnostics] Import failed: {e}")
 
+    # Stage 7B: Adaptive Diagnostic Controller — threshold-based responses
+    cg_adaptive_diag_controller = None
+    if cg_embedding_diag is not None:
+        try:
+            from symbolu.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
+                AdaptiveDiagnosticController,
+            )
+            cg_adaptive_diag_controller = AdaptiveDiagnosticController()
+            print(f"  [Adaptive Diagnostics] ENABLED (Stage 7B)")
+        except ImportError as e:
+            print(f"  [Adaptive Diagnostics] Import failed: {e}")
+
     # Factual Eval — verify CG primitives distinguish facts from hallucinations
     cg_factual_eval = None
     if config.enable_conscious_generation and config.enable_factual_eval:
@@ -5086,6 +5098,21 @@ def train(config: UnifiedTrainingConfig):
                                         for _ek, _ev in _ed_metrics.items():
                                             if isinstance(_ev, (int, float)) and _ek != 'step':
                                                 writer.add_scalar(f'embedding_diag/{_ek}', _ev, global_step)
+                                    # Stage 7B: Feed metrics into adaptive controller
+                                    if cg_adaptive_diag_controller is not None:
+                                        _diag_signals = cg_embedding_diag.to_diagnostic_signals(
+                                            _ed_metrics, global_step=global_step,
+                                        )
+                                        if _diag_signals is not None:
+                                            _adaptive_responses = cg_adaptive_diag_controller.check(_diag_signals)
+                                            for _ar in _adaptive_responses:
+                                                print(f"  [ADAPTIVE-7B] {_ar.severity}: {_ar.action} "
+                                                      f"(signal={_ar.signal_name}, value={_ar.signal_value:.4f})")
+                                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                                    writer.add_scalar(
+                                                        f'adaptive_diag/{_ar.action}', _ar.signal_value, global_step,
+                                                    )
+
                                     # Trend summary every 5 snapshots
                                     if len(cg_embedding_diag.history) % 5 == 0 and len(cg_embedding_diag.history) >= 2:
                                         _ed_trend = cg_embedding_diag.get_trend_summary()

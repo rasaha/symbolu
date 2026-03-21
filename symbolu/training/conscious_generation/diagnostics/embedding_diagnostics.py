@@ -145,12 +145,20 @@ class EmbeddingDiagnostics:
                 metrics["state_proj_dim_std_max"] = dim_std.max().item()
                 metrics["state_proj_dead_dims"] = (dim_std < 1e-4).sum().item()
 
+                # Stage 7B: Component norm ratio (max/min per-dim norm)
+                dim_norms = state_proj.norm(dim=0)  # [32]
+                min_norm = dim_norms.min().item()
+                max_norm = dim_norms.max().item()
+                metrics["component_norm_ratio"] = max_norm / (min_norm + 1e-8)
+
                 self._prev_state_proj = state_proj.cpu()
 
         # ── 2. Adapter Gate Magnitude ────────────────────────────────
         if hasattr(model, 'adapter_gate'):
             gate_val = torch.sigmoid(model.adapter_gate).item()
             metrics["adapter_gate"] = gate_val
+            # Stage 7B: Expose raw magnitude for AdaptiveDiagnosticController
+            metrics["adapter_gate_magnitude"] = torch.abs(model.adapter_gate).item()
             if self._prev_adapter_gate is not None:
                 metrics["adapter_gate_delta"] = gate_val - self._prev_adapter_gate
             self._prev_adapter_gate = gate_val
@@ -352,3 +360,44 @@ class EmbeddingDiagnostics:
             parts.append(f"nn_jaccard={metrics['neighbor_jaccard_mean']:.4f}")
 
         return " | ".join(parts)
+
+    def to_diagnostic_signals(
+        self, metrics: Dict[str, float], global_step: int = 0,
+    ) -> Optional["DiagnosticSignals"]:
+        """Convert embedding metrics into DiagnosticSignals for AdaptiveDiagnosticController.
+
+        Stage 7B bridge: translates raw embedding diagnostic output into the
+        structured signals expected by AdaptiveDiagnosticController.
+
+        Args:
+            metrics: Output from snapshot().
+            global_step: Current training step.
+
+        Returns:
+            DiagnosticSignals instance, or None if metrics is None.
+        """
+        if metrics is None:
+            return None
+
+        try:
+            from symbolu.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
+                DiagnosticSignals,
+            )
+        except ImportError:
+            return None
+
+        # Aggregate primitive cache drifts (max across P/R/V/G)
+        cache_drifts = []
+        for buf in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+            drift = metrics.get(f"{buf}_drift")
+            if drift is not None:
+                cache_drifts.append(drift)
+        primitive_cache_shift = max(cache_drifts) if cache_drifts else 0.0
+
+        return DiagnosticSignals(
+            projector_drift=metrics.get("state_proj_drift", 0.0),
+            adapter_gate_magnitude=metrics.get("adapter_gate_magnitude", 0.0),
+            primitive_cache_shift=primitive_cache_shift,
+            component_norm_ratio=metrics.get("component_norm_ratio", 1.0),
+            step=global_step,
+        )
