@@ -310,19 +310,31 @@ class OntologicalProjection(nn.Module):
 
 class BhavaRelationshipLayer(nn.Module):
     """
-    Computes 144D inter-layer Bhava relationships.
+    Computes 144D inter-layer Bhava relationships with vector compression.
 
     Based on Vedic Drishti (aspect) patterns:
     - Each layer can "see" (relate to) every other layer
     - Creates a 12×12 relationship matrix
     - Flattened to 144D Bhava vector
+
+    Stage 3 (F.5): Replaces scalar collapse with BhavaVectorCompressor
+    that preserves relational structure as a 16D vector while maintaining
+    backward-compatible scalar coherence.
     """
 
-    def __init__(self, num_layers: int = 12, hidden_dim: int = 64):
+    def __init__(self, num_layers: int = 12, hidden_dim: int = 64,
+                 bhava_output_dim: int = 16):
         super().__init__()
         self.num_layers = num_layers
 
-        # Coherence computation
+        # Stage 3: Vector compression preserving relational structure
+        from symbolu.inference.interpretive_conditioner import BhavaVectorCompressor
+        self.bhava_compressor = BhavaVectorCompressor(
+            bhava_dim=num_layers,
+            output_dim=bhava_output_dim,
+        )
+
+        # Legacy coherence_net kept for checkpoint backward compatibility
         self.coherence_net = nn.Sequential(
             nn.Linear(num_layers * num_layers, hidden_dim),
             nn.GELU(),
@@ -339,13 +351,14 @@ class BhavaRelationshipLayer(nn.Module):
         # Bhava vector (flattened relationship matrix)
         bhava = rel_matrix.view(B, N, L * L)
 
-        # Global coherence
-        coherence = self.coherence_net(bhava)
+        # Stage 3: Compress to 16D vector + backward-compatible coherence
+        compressor_out = self.bhava_compressor(bhava)
 
         return {
             "bhava": bhava,
             "relationship_matrix": rel_matrix,
-            "coherence": coherence,
+            "bhava_vector": compressor_out["bhava_vector"],
+            "coherence": compressor_out["coherence"].unsqueeze(-1),
         }
 
 
@@ -545,6 +558,7 @@ class SymbolU12LLM(nn.Module):
             output["bhava"] = bhava_output["bhava"]
             output["coherence"] = bhava_output["coherence"]
             output["relationship_matrix"] = bhava_output["relationship_matrix"]
+            output["bhava_vector"] = bhava_output["bhava_vector"]
 
         # Stage 2 conditioning metadata
         if interp_components is not None:
@@ -745,6 +759,27 @@ class SymbolU12LLM(nn.Module):
                         + comps["b_t"][:, -1, :].norm().item()
                     )
                 generation_tracer.trace[-1].update(stage2_entry)
+
+            # --- Stage 3: Record bhava vector metrics in tracer ---
+            if generation_tracer is not None and "bhava_vector" in output:
+                bv = output["bhava_vector"][:, -1, :]  # [B, 16]
+                stage3_entry = {
+                    "bhava_vector": bv[0].detach().cpu().tolist(),
+                    "bhava_vector_variance": bv[0].var().item(),
+                    "coherence_scalar": coherence_scalar,
+                }
+                # Compute drift from previous token's bhava_vector
+                prev_trace = generation_tracer.trace
+                if len(prev_trace) >= 2 and "bhava_vector" in prev_trace[-2]:
+                    prev_bv = torch.tensor(prev_trace[-2]["bhava_vector"])
+                    curr_bv = bv[0].detach().cpu()
+                    cos_sim = torch.nn.functional.cosine_similarity(
+                        prev_bv.unsqueeze(0), curr_bv.unsqueeze(0),
+                    ).item()
+                    stage3_entry["bhava_vector_drift"] = 1.0 - cos_sim
+                else:
+                    stage3_entry["bhava_vector_drift"] = 0.0
+                generation_tracer.trace[-1].update(stage3_entry)
 
             # Track ontological for last token
             if return_ontological:
