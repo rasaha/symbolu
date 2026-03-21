@@ -451,6 +451,10 @@ class SymbolU12LLM(nn.Module):
         # Weight tying
         self.lm_head.weight = self.token_embed.weight
 
+        # Stage 2: Interpretive conditioning (optional, set via attach_interpretive_conditioner)
+        self._interpretive_state_builder = None
+        self._interpretive_conditioner = None
+
         # Initialize weights
         self.apply(self._init_weights)
 
@@ -472,6 +476,18 @@ class SymbolU12LLM(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
+    def attach_interpretive_conditioner(self, state_builder, conditioner):
+        """Attach Stage 2 interpretive conditioning modules.
+
+        Args:
+            state_builder: InterpretiveStateBuilder that builds interpretive
+                state from hidden + onto + bhava signals.
+            conditioner: InterpretiveConditioner that applies gated conditioning
+                to hidden state before lm_head.
+        """
+        self._interpretive_state_builder = state_builder
+        self._interpretive_conditioner = conditioner
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -492,20 +508,48 @@ class SymbolU12LLM(nn.Module):
         # Final norm
         x = self.final_norm(x)
 
+        # Ontological analysis (computed before lm_head for Stage 2 conditioning)
+        onto = None
+        bhava_output = None
+        has_conditioner = (
+            self._interpretive_state_builder is not None
+            and self._interpretive_conditioner is not None
+        )
+
+        if return_ontological or has_conditioner:
+            onto = self.ontological(x)
+            bhava_output = self.bhava(onto)
+
+        # --- Stage 2: Interpretive conditioning before vocabulary projection ---
+        interp_components = None
+        if has_conditioner:
+            builder_out = self._interpretive_state_builder(
+                hidden=x,
+                onto_state=onto,
+                bhava_matrix=bhava_output["relationship_matrix"],
+            )
+            x = self._interpretive_conditioner(
+                hidden=x,
+                interpretive_state=builder_out["interpretive_state"],
+            )
+            interp_components = builder_out["components"]
+
         # Language model logits
         logits = self.lm_head(x)
 
         output = {"logits": logits}
 
-        # Ontological analysis
-        if return_ontological:
-            onto = self.ontological(x)
-            bhava_output = self.bhava(onto)
-
+        # Ontological outputs
+        if return_ontological and onto is not None:
             output["ontological"] = onto
             output["bhava"] = bhava_output["bhava"]
             output["coherence"] = bhava_output["coherence"]
             output["relationship_matrix"] = bhava_output["relationship_matrix"]
+
+        # Stage 2 conditioning metadata
+        if interp_components is not None:
+            output["interp_components"] = interp_components
+            output["gate_value"] = self._interpretive_conditioner.gate_value
 
         return output
 
@@ -686,6 +730,21 @@ class SymbolU12LLM(nn.Module):
                     "top_p_used": effective_top_p,
                     "resample_events": resample_count,
                 })
+
+            # --- Stage 2: Record interpretive conditioning metrics in tracer ---
+            if generation_tracer is not None and "gate_value" in output:
+                stage2_entry = {
+                    "gate_value": output["gate_value"],
+                }
+                if "interp_components" in output:
+                    comps = output["interp_components"]
+                    stage2_entry["conditioning_norm"] = (
+                        comps["r_ctx"][:, -1, :].norm().item()
+                        + comps["v_ctx"][:, -1, :].norm().item()
+                        + comps["alpha_t"][:, -1, :].norm().item()
+                        + comps["b_t"][:, -1, :].norm().item()
+                    )
+                generation_tracer.trace[-1].update(stage2_entry)
 
             # Track ontological for last token
             if return_ontological:

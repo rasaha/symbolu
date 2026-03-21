@@ -94,6 +94,14 @@ from .coherence_aware_decoder import (
     CoherenceDecoderConfig,
 )
 
+# Appendix F Stage 2: Interpretive Conditioner
+from .interpretive_conditioner import (
+    InterpretiveConditioner,
+    InterpretiveConditionerConfig,
+    InterpretiveStateBuilder,
+    BhavaVectorCompressor,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -158,6 +166,12 @@ __all__ = [
     # Appendix F Stage 1: Coherence-Aware Decoder
     "CoherenceAwareDecoder",
     "CoherenceDecoderConfig",
+
+    # Appendix F Stage 2: Interpretive Conditioner
+    "InterpretiveConditioner",
+    "InterpretiveConditionerConfig",
+    "InterpretiveStateBuilder",
+    "BhavaVectorCompressor",
 ]
 
 __version__ = "2.0.0"
