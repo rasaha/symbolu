@@ -137,6 +137,14 @@ if [ "$SMOKE_TEST" -eq 1 ]; then
     echo "╔══════════════════════════════════════════════════════════╗"
     echo "║  SMOKE TEST MODE — 10 steps, synthetic data, no save   ║"
     echo "╚══════════════════════════════════════════════════════════╝"
+    # Check if transformers is installed; fall back to ontological model
+    if python -c "import transformers" 2>/dev/null; then
+        echo "  Using: mistral_cg (transformers available)"
+    else
+        echo "  Using: ontological (transformers not installed)"
+        echo "  Install transformers + bitsandbytes for Mistral training."
+        MODEL_TYPE_OVERRIDE="ontological"
+    fi
     DATASET="synthetic"
     MAX_STEPS=10
     BATCH_SIZE=2
@@ -147,8 +155,10 @@ if [ "$SMOKE_TEST" -eq 1 ]; then
     LOG_EVERY=5
     MIXED_PRECISION="none"
     CHECKPOINT_DIR=""
-    # Use tiny vocab for synthetic
     EXTRA_ARGS="--no_save --quiet"
+    if [ -n "${MODEL_TYPE_OVERRIDE:-}" ]; then
+        EXTRA_ARGS="$EXTRA_ARGS --model_size tiny"
+    fi
 else
     EXTRA_ARGS=""
 fi
@@ -191,10 +201,16 @@ echo "  Stage 8:      $([ -z "${NO_STAGE8+x}" ] && echo 'ENABLED' || echo 'DISAB
 echo "  Checkpoints:  $CHECKPOINT_DIR"
 echo "======================================================================"
 
-python symbolu/training/unified/train.py \
-    --model_type mistral_cg \
-    --mistral_model_name "$MISTRAL_MODEL" \
-    --mistral_quantize "$QUANTIZE" \
+MODEL_TYPE="${MODEL_TYPE_OVERRIDE:-mistral_cg}"
+
+MISTRAL_ARGS=""
+if [ "$MODEL_TYPE" = "mistral_cg" ]; then
+    MISTRAL_ARGS="--mistral_model_name $MISTRAL_MODEL --mistral_quantize $QUANTIZE"
+fi
+
+python train_unified_llm.py \
+    --model_type "$MODEL_TYPE" \
+    $MISTRAL_ARGS \
     --dataset "$DATASET" \
     --max_steps "$MAX_STEPS" \
     --batch_size "$BATCH_SIZE" \
@@ -219,5 +235,4 @@ python symbolu/training/unified/train.py \
     $STAGE8_FLAGS \
     $RESUME_FLAG \
     $EXTRA_ARGS \
-    ${CHECKPOINT_DIR:+--checkpoint_dir "$CHECKPOINT_DIR"} \
-    ${LOG_DIR:+--log_dir "$LOG_DIR"}
+    ${CHECKPOINT_DIR:+--checkpoint_dir "$CHECKPOINT_DIR"}
