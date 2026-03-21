@@ -769,6 +769,41 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
                   f"agreement_energy={config.use_agreement_energy}")
             print(f"    TwoStageGenerator: K={config.primitive_shortlist_k}")
 
+    # =========================================================================
+    # Conscious Generation: Stage 8 — Perspective Synthesizer
+    # Representation conditioning before lm_head via gated residual.
+    # =========================================================================
+    if config.enable_conscious_generation and config.enable_perspective_synthesizer:
+        from symbolu.inference.perspective_synthesizer import (
+            PerspectiveSynthesizer, PerspectiveSynthesizerConfig,
+        )
+        ps_config = PerspectiveSynthesizerConfig(
+            enable=True,
+            d_synthesis=config.perspective_d_synthesis,
+            gate_init=config.perspective_gate_init,
+            log_interpretive_state=config.perspective_log_interpretive,
+            onto_dim=12,
+        )
+        perspective_synth = PerspectiveSynthesizer(ps_config, hidden_dim=embed_dim)
+        if not hasattr(model, 'conscious_gen'):
+            model.conscious_gen = nn.ModuleDict()
+        model.conscious_gen["perspective_synthesizer"] = perspective_synth
+
+        # For SymbolU12LLM: attach via the model's method
+        if hasattr(model, 'attach_perspective_synthesizer'):
+            model.attach_perspective_synthesizer(perspective_synth)
+
+        # For MistralCGWrapper: store reference for forward pass
+        if hasattr(model, 'backbone'):
+            model._perspective_synthesizer = perspective_synth
+
+        ps_params = sum(p.numel() for p in perspective_synth.parameters())
+        print(f"  [Conscious Gen Stage 8] Perspective Synthesizer")
+        print(f"    d_synthesis={config.perspective_d_synthesis}, "
+              f"gate_init={config.perspective_gate_init:.1f}, "
+              f"interp_dim={perspective_synth.interp_dim}, "
+              f"params={ps_params/1e3:.1f}K")
+
     # For mistral_cg with device_map="auto", backbone handles its own placement;
     # only move trainable adapter layers. For all other models, move to device.
     if config.model_type == "mistral_cg":

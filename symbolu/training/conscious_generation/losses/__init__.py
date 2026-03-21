@@ -13,9 +13,25 @@ from symbolu.training.conscious_generation.losses.bliss_coherence import (
     BlissCoherenceLoss,
 )
 
+# Appendix F Stage 5: Auxiliary Loss Supervision
+from symbolu.training.conscious_generation.losses.auxiliary_loss_supervisor import (
+    AuxiliaryLossSupervisor,
+    AuxiliaryLossConfig,
+    TokenOntologyProjection,
+    BlissCoherenceProjection,
+    GradientSafetyMonitor,
+)
+
 __all__ = [
     "OntologicalStructureLoss",
     "KoshaRoutingLoss",
     "PrimitiveAuxiliaryLosses",
     "BlissCoherenceLoss",
+
+    # Appendix F Stage 5
+    "AuxiliaryLossSupervisor",
+    "AuxiliaryLossConfig",
+    "TokenOntologyProjection",
+    "BlissCoherenceProjection",
+    "GradientSafetyMonitor",
 ]

@@ -323,6 +323,25 @@ class MistralCGWrapper(nn.Module):
         gate = torch.sigmoid(self.adapter_gate)
         adapted_hidden = hidden + gate * adapter_output  # [B, T, D]
 
+        # ── Stage 8: Perspective Synthesizer (representation conditioning) ─
+        synth_result = None
+        if hasattr(self, '_perspective_synthesizer') and self._perspective_synthesizer is not None:
+            # Build approximate ontological state from Sovereign State
+            # Expand state [B, 32] to sequence-level [B, T, 12] via Bhava slice
+            bhava_seq = state[:, BHAVA_SLICE].unsqueeze(1).expand(B, T, -1)  # [B, T, 12]
+            # Build approximate Bhava matrix from outer product of Bhava state
+            bhava_12d = state[:, BHAVA_SLICE]  # [B, 12]
+            bhava_matrix = torch.bmm(
+                bhava_12d.unsqueeze(-1), bhava_12d.unsqueeze(-2)
+            )  # [B, 12, 12]
+
+            synth_result = self._perspective_synthesizer(
+                hidden=adapted_hidden,
+                onto_state=bhava_seq,
+                bhava_matrix=bhava_matrix,
+            )
+            adapted_hidden = synth_result["conditioned_hidden"]
+
         # ── Compute logits through Mistral's LM head (frozen) ────────
         # The LM head is part of the CausalLM model, extract it
         if hasattr(self.backbone, 'lm_head'):
@@ -339,6 +358,12 @@ class MistralCGWrapper(nn.Module):
             'delta_bhava': delta_bhava,
             'intent_phase': intent_phase,
         }
+
+        # Stage 8 conditioning metadata
+        if synth_result is not None:
+            result['synth_result'] = synth_result
+            result['synthesis_gate'] = synth_result.get('gate_value', 0.0)
+            result['conditioning_norm'] = synth_result.get('conditioning_norm', 0.0)
 
         if return_last_hidden:
             result['last_hidden_state'] = adapted_hidden
@@ -384,3 +409,8 @@ class MistralCGWrapper(nn.Module):
                 p.numel() for p in self.conscious_gen.parameters()
             )
             print(f"      conscious_gen: {cg_params/1e3:.1f}K params")
+            if 'perspective_synthesizer' in self.conscious_gen:
+                ps_params = sum(
+                    p.numel() for p in self.conscious_gen['perspective_synthesizer'].parameters()
+                )
+                print(f"        └─ perspective_synthesizer: {ps_params/1e3:.1f}K params")
