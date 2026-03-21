@@ -88,6 +88,12 @@ from .generation_tracer import (
     BaselineStatisticsAnalyzer,
 )
 
+# Appendix F Stage 1: Coherence-Aware Decoder
+from .coherence_aware_decoder import (
+    CoherenceAwareDecoder,
+    CoherenceDecoderConfig,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -148,6 +154,10 @@ __all__ = [
     "CTMPlusTracerMixin",
     "MistralCGGenerationTracer",
     "BaselineStatisticsAnalyzer",
+
+    # Appendix F Stage 1: Coherence-Aware Decoder
+    "CoherenceAwareDecoder",
+    "CoherenceDecoderConfig",
 ]
 
 __version__ = "2.0.0"

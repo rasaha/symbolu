@@ -557,6 +557,7 @@ class SymbolU12LLM(nn.Module):
         top_p: float = 0.9,
         return_ontological: bool = False,
         generation_tracer=None,
+        coherence_decoder=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -571,6 +572,9 @@ class SymbolU12LLM(nn.Module):
             generation_tracer: Optional GenerationTracer (Appendix F Stage 0)
                 for per-token baseline capture. Observation only — does not
                 modify generation behavior.
+            coherence_decoder: Optional CoherenceAwareDecoder (Appendix F
+                Stage 1). Adjusts temperature and top_p based on coherence
+                signals. Never modifies logit values — only decoding policy.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
@@ -578,8 +582,13 @@ class SymbolU12LLM(nn.Module):
         self.eval()
         device = next(self.parameters()).device
 
-        # If tracer is provided, force ontological computation for metrics
-        need_ontological = return_ontological or (generation_tracer is not None)
+        # If tracer or coherence decoder is provided, force ontological
+        # computation so coherence signals are available
+        need_ontological = (
+            return_ontological
+            or (generation_tracer is not None)
+            or (coherence_decoder is not None)
+        )
 
         # Encode prompt
         input_ids = self.encode(prompt).to(device)
@@ -595,18 +604,42 @@ class SymbolU12LLM(nn.Module):
             # Pre-filtering logits (used by tracer before temperature/filtering)
             raw_logits = output["logits"][:, -1, :]
 
-            logits = raw_logits / temperature
+            # --- Stage 1: Extract coherence scalar for policy adjustment ---
+            coherence_scalar = 1.0  # Default: no degradation if no signal
+            if "coherence" in output:
+                if output["coherence"].dim() == 3:
+                    coherence_scalar = output["coherence"][:, -1, :].mean().item()
+                else:
+                    coherence_scalar = output["coherence"].mean().item()
+
+            # --- Stage 1: Adjust decoding policy via coherence ---
+            effective_temperature = temperature
+            effective_top_p = top_p
+            should_resample = False
+
+            if coherence_decoder is not None:
+                policy = coherence_decoder.adjust_policy(
+                    coherence=coherence_scalar,
+                    base_temperature=temperature,
+                    base_top_p=top_p,
+                )
+                effective_temperature = policy["temperature"]
+                effective_top_p = policy["top_p"]
+                should_resample = policy["should_resample"]
+
+            # Apply (possibly adjusted) temperature to raw logits
+            logits = raw_logits / effective_temperature
 
             # Top-k filtering
             if top_k > 0:
                 indices_to_remove = logits < torch.topk(logits, top_k)[0][:, -1, None]
                 logits[indices_to_remove] = float('-inf')
 
-            # Top-p (nucleus) filtering
-            if top_p < 1.0:
+            # Top-p (nucleus) filtering using effective top_p
+            if effective_top_p < 1.0:
                 sorted_logits, sorted_indices = torch.sort(logits, descending=True)
                 cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-                sorted_indices_to_remove = cumulative_probs > top_p
+                sorted_indices_to_remove = cumulative_probs > effective_top_p
                 sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
                 sorted_indices_to_remove[:, 0] = 0
                 indices_to_remove = sorted_indices_to_remove.scatter(
@@ -618,6 +651,16 @@ class SymbolU12LLM(nn.Module):
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
+            # --- Stage 1: Resample if coherence critically low ---
+            resample_count = 0
+            if should_resample and coherence_decoder is not None:
+                for _attempt in range(coherence_decoder.config.max_resample_attempts):
+                    candidate = torch.multinomial(probs, num_samples=1)
+                    if probs[0, candidate[0, 0]] > probs[0, next_token[0, 0]]:
+                        next_token = candidate
+                        resample_count += 1
+                        break
+
             # Append token
             generated = torch.cat([generated, next_token], dim=1)
 
@@ -626,9 +669,7 @@ class SymbolU12LLM(nn.Module):
                 _onto_state = None
                 if need_ontological and "coherence" in output:
                     _onto_state = {
-                        "coherence": output["coherence"][:, -1, :].mean().item()
-                            if output["coherence"].dim() == 3
-                            else output["coherence"].mean().item(),
+                        "coherence": coherence_scalar,
                     }
                 generation_tracer.record_token(
                     token_id=next_token[0, 0].item(),
@@ -636,6 +677,15 @@ class SymbolU12LLM(nn.Module):
                     hidden_state=output["logits"][:, -1, :],
                     onto_state=_onto_state,
                 )
+
+            # --- Stage 1: Record coherence-aware policy metrics in tracer ---
+            if generation_tracer is not None and coherence_decoder is not None:
+                generation_tracer.trace[-1].update({
+                    "coherence_before": coherence_scalar,
+                    "temperature_used": effective_temperature,
+                    "top_p_used": effective_top_p,
+                    "resample_events": resample_count,
+                })
 
             # Track ontological for last token
             if return_ontological:
