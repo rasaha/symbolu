@@ -102,6 +102,12 @@ from .interpretive_conditioner import (
     BhavaVectorCompressor,
 )
 
+# Appendix F Stage 4: Unified Coherence Controller
+from .unified_coherence_controller import (
+    UnifiedCoherenceController,
+    UnifiedCoherenceConfig,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -172,6 +178,10 @@ __all__ = [
     "InterpretiveConditionerConfig",
     "InterpretiveStateBuilder",
     "BhavaVectorCompressor",
+
+    # Appendix F Stage 4: Unified Coherence Controller
+    "UnifiedCoherenceController",
+    "UnifiedCoherenceConfig",
 ]
 
 __version__ = "2.0.0"

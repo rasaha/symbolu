@@ -616,6 +616,7 @@ class SymbolU12LLM(nn.Module):
         return_ontological: bool = False,
         generation_tracer=None,
         coherence_decoder=None,
+        unified_coherence_controller=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -633,6 +634,11 @@ class SymbolU12LLM(nn.Module):
             coherence_decoder: Optional CoherenceAwareDecoder (Appendix F
                 Stage 1). Adjusts temperature and top_p based on coherence
                 signals. Never modifies logit values — only decoding policy.
+            unified_coherence_controller: Optional UnifiedCoherenceController
+                (Appendix F Stage 4). Produces a single authoritative
+                coherence signal from token, latent, and conversation sources.
+                When provided, replaces the simple coherence scalar for
+                Stage 1 policy adjustment.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
@@ -640,12 +646,13 @@ class SymbolU12LLM(nn.Module):
         self.eval()
         device = next(self.parameters()).device
 
-        # If tracer or coherence decoder is provided, force ontological
-        # computation so coherence signals are available
+        # If tracer, coherence decoder, or unified controller is provided,
+        # force ontological computation so coherence signals are available
         need_ontological = (
             return_ontological
             or (generation_tracer is not None)
             or (coherence_decoder is not None)
+            or (unified_coherence_controller is not None)
         )
 
         # Encode prompt
@@ -662,13 +669,26 @@ class SymbolU12LLM(nn.Module):
             # Pre-filtering logits (used by tracer before temperature/filtering)
             raw_logits = output["logits"][:, -1, :]
 
-            # --- Stage 1: Extract coherence scalar for policy adjustment ---
+            # --- Extract coherence signals ---
             coherence_scalar = 1.0  # Default: no degradation if no signal
+            c_latent = None
+            unified_result = None
+
             if "coherence" in output:
                 if output["coherence"].dim() == 3:
                     coherence_scalar = output["coherence"][:, -1, :].mean().item()
                 else:
                     coherence_scalar = output["coherence"].mean().item()
+                c_latent = coherence_scalar
+
+            # --- Stage 4: Unified coherence replaces simple scalar ---
+            if unified_coherence_controller is not None:
+                unified_result = unified_coherence_controller.update(
+                    c_token=None,   # Uses bliss_history if available
+                    c_latent=c_latent,
+                    c_conv=None,    # CoherenceEngine integration (future)
+                )
+                coherence_scalar = unified_result["C_total"]
 
             # --- Stage 1: Adjust decoding policy via coherence ---
             effective_temperature = temperature
@@ -780,6 +800,16 @@ class SymbolU12LLM(nn.Module):
                 else:
                     stage3_entry["bhava_vector_drift"] = 0.0
                 generation_tracer.trace[-1].update(stage3_entry)
+
+            # --- Stage 4: Record unified coherence metrics in tracer ---
+            if generation_tracer is not None and unified_result is not None:
+                generation_tracer.trace[-1].update({
+                    "C_total": unified_result["C_total"],
+                    "C_token": unified_result["C_token"],
+                    "C_latent": unified_result["C_latent"],
+                    "C_conversation": unified_result["C_conversation"],
+                    "C_raw": unified_result["C_raw"],
+                })
 
             # Track ontological for last token
             if return_ontological:
