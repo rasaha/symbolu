@@ -22,9 +22,17 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
+
+# Auto-detect project root and add to sys.path so 'import symbolu' works
+# regardless of where the script is invoked from.
+_script_dir = Path(__file__).resolve().parent
+_project_root = _script_dir.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 import torch
 import torch.nn as nn
