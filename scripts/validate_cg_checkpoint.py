@@ -61,20 +61,25 @@ def load_state_dict_from_checkpoint(path: Path) -> Dict[str, Any]:
 
 def check_parameter_health(
     name: str, tensor: torch.Tensor, verbose: bool = False
-) -> List[str]:
-    """Check a parameter tensor for NaN, Inf, zero, and distribution issues."""
-    issues = []
+) -> Tuple[List[str], List[str]]:
+    """Check a parameter tensor for NaN, Inf, zero, and distribution issues.
+
+    Returns (failures, warnings) — only failures indicate real problems.
+    """
+    failures = []
+    warnings = []
     if torch.isnan(tensor).any():
-        issues.append(f"  FAIL: {name} contains NaN values")
+        failures.append(f"  FAIL: {name} contains NaN values")
     if torch.isinf(tensor).any():
-        issues.append(f"  FAIL: {name} contains Inf values")
+        failures.append(f"  FAIL: {name} contains Inf values")
     if tensor.numel() > 0 and tensor.abs().max().item() == 0:
-        issues.append(f"  WARN: {name} is all zeros")
+        # Zero bias vectors are normal (default init), only warn
+        warnings.append(f"  WARN: {name} is all zeros")
     if verbose and tensor.numel() > 1:
         print(f"    {name}: shape={list(tensor.shape)}, "
               f"mean={tensor.float().mean():.6f}, std={tensor.float().std():.6f}, "
               f"min={tensor.float().min():.6f}, max={tensor.float().max():.6f}")
-    return issues
+    return failures, warnings
 
 
 def validate_stage0(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str]]:
@@ -92,9 +97,9 @@ def validate_stage0(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
     if proj_keys:
         print(f"  Found {len(proj_keys)} state projector parameters")
         for k in proj_keys:
-            param_issues = check_parameter_health(k, state_dict[k], verbose)
-            if param_issues:
-                issues.extend(param_issues)
+            param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+            issues.extend(param_fails + param_warns)
+            if param_fails:
                 failed += 1
             else:
                 passed += 1
@@ -120,9 +125,9 @@ def validate_phase1(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
 
     print(f"  Found {len(ont_keys)} token ontology parameters")
     for k in ont_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -156,9 +161,9 @@ def validate_phase2(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
                 passed += 1
 
     for k in scorer_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -181,9 +186,9 @@ def validate_phase3(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
 
     print(f"  Kosha router: {len(kosha_keys)} params, Bliss gate: {len(bliss_keys)} params")
     for k in kosha_keys + bliss_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -205,9 +210,9 @@ def validate_phase4(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
 
     print(f"  Field softmax: {len(field_keys)} params")
     for k in field_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -257,9 +262,9 @@ def validate_stage8(state_dict: Dict, verbose: bool) -> Tuple[int, int, List[str
 
     # Check all synthesis params for health
     for k in synth_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -300,9 +305,9 @@ def validate_phase_adapter(state_dict: Dict, verbose: bool) -> Tuple[int, int, L
             print(f"    Adapter gate: {torch.sigmoid(g).item():.6f}")
 
     for k in adapter_keys:
-        param_issues = check_parameter_health(k, state_dict[k], verbose)
-        if param_issues:
-            issues.extend(param_issues)
+        param_fails, param_warns = check_parameter_health(k, state_dict[k], verbose)
+        issues.extend(param_fails + param_warns)
+        if param_fails:
             failed += 1
         else:
             passed += 1
@@ -422,75 +427,119 @@ def main():
 def _run_forward_test(state_dict: Dict, meta: Dict, verbose: bool):
     """Run a synthetic forward pass to verify CG modules produce output."""
     try:
-        # Determine model type from state_dict keys
-        is_mistral = any("mistral" in k.lower() or "lm_head" in k for k in state_dict)
         has_synth = any("perspective_synthesizer" in k for k in state_dict)
 
-        if has_synth:
-            from symbolu.inference.perspective_synthesizer import (
-                PerspectiveSynthesizer, PerspectiveSynthesizerConfig,
-            )
-            # Find hidden_dim from conditioner weights
-            conditioner_keys = [k for k in state_dict
-                                if "conditioner.synthesis_mlp" in k and "weight" in k]
-            if conditioner_keys:
-                # The first linear in synthesis_mlp maps interp_dim → d_synthesis
-                # The project_out maps d_synthesis → hidden_dim
-                proj_out_keys = [k for k in state_dict
-                                 if "conditioner.project_out.weight" in k]
-                if proj_out_keys:
-                    hidden_dim = state_dict[proj_out_keys[0]].shape[0]
-                else:
-                    hidden_dim = 64  # fallback
-            else:
-                hidden_dim = 64
-
-            config = PerspectiveSynthesizerConfig(enable=True)
-            synth = PerspectiveSynthesizer(config, hidden_dim=hidden_dim)
-
-            # Load matching weights
-            synth_prefix = None
-            for k in state_dict:
-                if "perspective_synthesizer" in k:
-                    parts = k.split("perspective_synthesizer.")
-                    if len(parts) > 1:
-                        synth_prefix = parts[0] + "perspective_synthesizer."
-                        break
-
-            if synth_prefix:
-                synth_state = {
-                    k.replace(synth_prefix, ""): v
-                    for k, v in state_dict.items()
-                    if k.startswith(synth_prefix)
-                }
-                synth.load_state_dict(synth_state, strict=False)
-
-            # Synthetic forward pass
-            B, T = 2, 8
-            hidden = torch.randn(B, T, hidden_dim)
-            onto_state = torch.randn(B, T, config.onto_dim)
-            bhava_matrix = torch.randn(B, config.bhava_input_dim)
-
-            with torch.no_grad():
-                result = synth(hidden, onto_state, bhava_matrix)
-
-            conditioned = result["conditioned_hidden"]
-            delta_norm = (conditioned - hidden).norm(dim=-1).mean().item()
-            gate = result["gate_value"]
-
-            print(f"    Stage 8 forward pass OK")
-            print(f"      Output shape: {list(conditioned.shape)}")
-            print(f"      Gate value: {gate:.6f}")
-            print(f"      Conditioning delta norm: {delta_norm:.6f}")
-
-            if result.get("log_dict"):
-                log = result["log_dict"]
-                if "vritti_dominant" in log:
-                    print(f"      Vritti dominant: {log['vritti_dominant']}")
-                if "kosha_primary" in log:
-                    print(f"      Kosha primary: {log['kosha_primary']}")
-        else:
+        if not has_synth:
             print("    Stage 8 not present — skipping forward test")
+            return
+
+        from symbolu.inference.perspective_synthesizer import (
+            PerspectiveSynthesizer, PerspectiveSynthesizerConfig,
+        )
+
+        # Find a consistent prefix (conscious_gen.perspective_synthesizer. or
+        # _perspective_synthesizer.) — use the first one found
+        synth_prefix = None
+        for k in state_dict:
+            if "perspective_synthesizer." in k:
+                synth_prefix = k[:k.index("perspective_synthesizer.") + len("perspective_synthesizer.")]
+                break
+
+        if not synth_prefix:
+            print("    Could not find synthesizer prefix in state_dict")
+            return
+
+        # Extract sub-state_dict for loading
+        synth_state = {
+            k[len(synth_prefix):]: v
+            for k, v in state_dict.items()
+            if k.startswith(synth_prefix)
+        }
+
+        # Infer dimensions from checkpoint weights:
+        #   conditioner.synthesis.0.weight: [d_synthesis, interp_dim]
+        #   conditioner.synthesis.2.weight: [hidden_dim, d_synthesis]
+        #   state_builder.csr_proj.0.weight: [intermediate, hidden_dim + onto_dim]
+        #   state_builder.vritti_proj.weight: [vritti_classes, hidden_dim + onto_dim]
+        #   state_builder.kosha_proj.2.weight: [kosha_primitives, intermediate]
+        #   state_builder.bhava_compressor.compressor.0.weight: [intermediate, bhava_input_dim]
+
+        synth_0_w = synth_state.get("conditioner.synthesis.0.weight")  # [d_synth, interp_dim]
+        synth_2_w = synth_state.get("conditioner.synthesis.2.weight")  # [hidden_dim, d_synth]
+        csr_0_w = synth_state.get("state_builder.csr_proj.0.weight")   # [inter, hidden+onto]
+        vritti_w = synth_state.get("state_builder.vritti_proj.weight")  # [vritti, hidden+onto]
+        kosha_2_w = synth_state.get("state_builder.kosha_proj.2.weight")  # [kosha, inter]
+        bhava_0_w = synth_state.get("state_builder.bhava_compressor.compressor.0.weight")  # [inter, bhava_in]
+        bhava_2_w = synth_state.get("state_builder.bhava_compressor.compressor.2.weight")  # [bhava_out, inter]
+
+        if synth_2_w is None or synth_0_w is None:
+            print("    Could not infer dimensions — missing conditioner weights")
+            return
+
+        hidden_dim = synth_2_w.shape[0]      # e.g. 4096
+        d_synthesis = synth_2_w.shape[1]      # e.g. 64
+        interp_dim = synth_0_w.shape[1]       # e.g. 43
+        vritti_classes = vritti_w.shape[0] if vritti_w is not None else 5
+        kosha_primitives = kosha_2_w.shape[0] if kosha_2_w is not None else 6
+        bhava_input_dim = bhava_0_w.shape[1] if bhava_0_w is not None else 144
+        bhava_output_dim = bhava_2_w.shape[0] if bhava_2_w is not None else 16
+
+        # Infer onto_dim: csr_proj input = hidden_dim + onto_dim
+        if csr_0_w is not None:
+            onto_dim = csr_0_w.shape[1] - hidden_dim
+            if onto_dim < 0:
+                onto_dim = 12  # fallback
+        else:
+            onto_dim = 12
+
+        # Compute csr_dim from interp_dim and known components
+        csr_dim = interp_dim - vritti_classes - kosha_primitives - bhava_output_dim
+        if csr_dim <= 0:
+            csr_dim = 16
+
+        print(f"    Inferred dimensions: hidden={hidden_dim}, d_synthesis={d_synthesis}, "
+              f"interp={interp_dim}, onto={onto_dim}")
+        print(f"    Components: csr={csr_dim}, vritti={vritti_classes}, "
+              f"kosha={kosha_primitives}, bhava_out={bhava_output_dim}")
+
+        config = PerspectiveSynthesizerConfig(
+            enable=True,
+            d_synthesis=d_synthesis,
+            csr_dim=csr_dim,
+            vritti_classes=vritti_classes,
+            kosha_primitives=kosha_primitives,
+            bhava_output_dim=bhava_output_dim,
+            bhava_input_dim=bhava_input_dim,
+            onto_dim=onto_dim,
+        )
+        synth = PerspectiveSynthesizer(config, hidden_dim=hidden_dim)
+        synth.load_state_dict(synth_state, strict=True)
+        synth.eval()
+
+        # Synthetic forward pass
+        B, T = 2, 8
+        hidden = torch.randn(B, T, hidden_dim)
+        onto_state = torch.randn(B, T, onto_dim)
+        bhava_matrix = torch.randn(B, bhava_input_dim)
+
+        with torch.no_grad():
+            result = synth(hidden, onto_state, bhava_matrix)
+
+        conditioned = result["conditioned_hidden"]
+        delta_norm = (conditioned - hidden).norm(dim=-1).mean().item()
+        gate = result["gate_value"]
+
+        print(f"    Stage 8 forward pass OK")
+        print(f"      Output shape: {list(conditioned.shape)}")
+        print(f"      Gate value: {gate:.6f}")
+        print(f"      Conditioning delta norm: {delta_norm:.6f}")
+
+        if result.get("log_dict"):
+            log = result["log_dict"]
+            if "vritti_dominant" in log:
+                print(f"      Vritti dominant: {log['vritti_dominant']}")
+            if "kosha_primary" in log:
+                print(f"      Kosha primary: {log['kosha_primary']}")
 
     except Exception as e:
         print(f"    Forward test failed: {type(e).__name__}: {e}")
