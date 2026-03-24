@@ -9681,26 +9681,18 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
 
     # Print architecture configuration
     print(f"\n{'='*80}")
-    if config.model_type == "mistral_cg":
-        # For mistral_cg, the preset dims are irrelevant — show backbone info instead
-        backbone_name = getattr(config, 'mistral_model_name', 'mistralai/Mistral-7B-v0.3')
-        print(f"Model Architecture: {config.model_type} (frozen backbone: {backbone_name})")
-        print(f"{'='*80}")
-        print(f"  NOTE: Architecture determined by backbone, not preset ({config.model_size})")
-        print(f"  See backbone load output below for actual dimensions")
-    else:
-        print(f"Model Architecture: {config.model_type} ({config.model_size} preset)")
-        print(f"{'='*80}")
-        if config.n_embd is not None or config.n_layer is not None or config.n_head is not None:
-            print(f"  ⚙️  Architecture Overrides Active:")
-        print(f"  Embedding Dimension:  {embed_dim}" + (" (override)" if config.n_embd is not None else ""))
-        print(f"  Number of Layers:     {num_layers}" + (" (override)" if config.n_layer is not None else ""))
-        print(f"  Number of Heads:      {num_heads}" + (" (override)" if config.n_head is not None else ""))
-        print(f"  FFN Dimension:        {ff_dim}")
-        if n_kv_heads is not None:
-            print(f"  KV Heads (GQA):       {n_kv_heads} (override)")
-        print(f"  Dropout:              {config.dropout}")
-        print(f"  Attention Dropout:    {config.attention_dropout}")
+    print(f"Model Architecture: {config.model_type} ({config.model_size} preset)")
+    print(f"{'='*80}")
+    if config.n_embd is not None or config.n_layer is not None or config.n_head is not None:
+        print(f"  ⚙️  Architecture Overrides Active:")
+    print(f"  Embedding Dimension:  {embed_dim}" + (" (override)" if config.n_embd is not None else ""))
+    print(f"  Number of Layers:     {num_layers}" + (" (override)" if config.n_layer is not None else ""))
+    print(f"  Number of Heads:      {num_heads}" + (" (override)" if config.n_head is not None else ""))
+    print(f"  FFN Dimension:        {ff_dim}")
+    if n_kv_heads is not None:
+        print(f"  KV Heads (GQA):       {n_kv_heads} (override)")
+    print(f"  Dropout:              {config.dropout}")
+    print(f"  Attention Dropout:    {config.attention_dropout}")
     print(f"{'='*80}\n")
 
     if config.model_type == "ontological":
