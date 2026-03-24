@@ -251,6 +251,21 @@ def load_checkpoint(
         removed = [k for k in model_state if k in runtime_buffers]
         print(f"    \u2192 Filtered runtime buffers: {removed}")
 
+    # For mistral_cg (and similar frozen-backbone wrappers): skip backbone weights.
+    # The backbone is loaded from HuggingFace and may use different quantization
+    # (e.g., checkpoint saved 4-bit but model loaded bf16). Only CG adapter
+    # weights need restoring from the checkpoint.
+    _backbone_keys = [k for k in filtered_state if k.startswith("backbone.")]
+    if _backbone_keys and hasattr(model, 'backbone'):
+        _backbone_frozen = all(
+            not p.requires_grad for p in model.backbone.parameters()
+        )
+        if _backbone_frozen:
+            for k in _backbone_keys:
+                del filtered_state[k]
+            print(f"    \u2192 Skipped {len(_backbone_keys)} frozen backbone keys "
+                  f"(loaded from HuggingFace, not checkpoint)")
+
     # V9.6.8: Handle old state_projector (nn.Sequential) -> new SovereignStateProjector
     # Old unconstrained weights produce extreme values that saturate softmax.
     # Drop them entirely so SovereignStateProjector initializes with small weights.

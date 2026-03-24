@@ -103,6 +103,12 @@ def main():
                        help="Subset of configs to run (by name). Default: all 8.")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device (auto, cpu, cuda, cuda:0, etc.)")
+    # Mistral CG options (must match training config)
+    parser.add_argument("--mistral_model_name", type=str, default="mistralai/Mistral-7B-v0.3",
+                       help="HuggingFace model ID for Mistral backbone")
+    parser.add_argument("--mistral_quantize", type=str, default="none",
+                       choices=["none", "4bit", "8bit"],
+                       help="Quantization for Mistral backbone (match training)")
 
     args = parser.parse_args()
 
@@ -128,6 +134,8 @@ def main():
         model_type=args.model_type,
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
+        mistral_model_name=args.mistral_model_name,
+        mistral_quantize=args.mistral_quantize,
     )
 
     model = create_model(config, device)
@@ -158,16 +166,22 @@ def main():
     model.to(device)
     model.eval()
 
-    # Build dataloader
-    from symbolu.training.unified.train import load_dataset
+    # Build dataloader — reuse the training pipeline's data loading
+    from symbolu.training.unified.data import load_data
     tokenizer = None
     if hasattr(model, "tokenizer") and model.tokenizer is not None:
         tokenizer = model.tokenizer
-    train_ds, val_ds, tokenizer = load_dataset(config, tokenizer)
+        tokenizer.model_max_length = int(1e12)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        config.vocab_size = len(tokenizer)
+    if tokenizer is None:
+        # Fallback: use tiktoken GPT-2 tokenizer
+        import tiktoken
+        tokenizer = tiktoken.get_encoding("gpt2")
 
-    val_loader = torch.utils.data.DataLoader(
-        val_ds, batch_size=args.batch_size, shuffle=False, drop_last=True,
-    )
+    config.dataset = args.dataset
+    train_loader, val_loader = load_data(config, tokenizer)
 
     # Optionally limit eval batches
     if args.max_eval_batches > 0:
