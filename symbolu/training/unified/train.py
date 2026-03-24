@@ -5128,7 +5128,7 @@ def train(config: UnifiedTrainingConfig):
 
                             # Embedding diagnostics: snapshot and log drift metrics
                             if cg_embedding_diag is not None:
-                                _ed_cache = model.conscious_gen.get('token_cache', None) if hasattr(model, 'conscious_gen') else None
+                                _ed_cache = model.conscious_gen['token_cache'] if (hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen) else None
                                 _ed_model = getattr(model, 'module', model)  # unwrap DDP if needed
                                 _ed_metrics = cg_embedding_diag.snapshot(
                                     model=_ed_model,
@@ -7461,7 +7461,7 @@ def train(config: UnifiedTrainingConfig):
             if cg_factual_eval is not None and tokenizer is not None:
                 _fe_cache = None
                 if hasattr(model, 'conscious_gen'):
-                    _fe_cache = model.conscious_gen.get('token_cache', None)
+                    _fe_cache = model.conscious_gen['token_cache'] if 'token_cache' in model.conscious_gen else None
                 _fe_metrics = cg_factual_eval.evaluate(
                     model=model,
                     tokenizer=tokenizer,
