@@ -50,13 +50,18 @@ def build_eval_fn(config, tokenizer, dataset):
         total_tokens = 0
         with torch.no_grad():
             for batch in dataloader:
-                if isinstance(batch, dict):
+                # TextDataset returns (inputs, targets) tuple
+                if isinstance(batch, (list, tuple)) and len(batch) == 2:
+                    inputs = batch[0].to(device)
+                    targets = batch[1].to(device)
+                elif isinstance(batch, dict):
                     input_ids = batch["input_ids"].to(device)
+                    targets = input_ids[:, 1:].contiguous()
+                    inputs = input_ids[:, :-1].contiguous()
                 else:
                     input_ids = batch.to(device)
-
-                targets = input_ids[:, 1:].contiguous()
-                inputs = input_ids[:, :-1].contiguous()
+                    targets = input_ids[:, 1:].contiguous()
+                    inputs = input_ids[:, :-1].contiguous()
 
                 outputs = model(inputs)
                 if isinstance(outputs, dict):
