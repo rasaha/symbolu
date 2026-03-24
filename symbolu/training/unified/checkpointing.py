@@ -46,6 +46,8 @@ def save_checkpoint(
     dataloader_position: Optional[dict] = None,
     # CG Curriculum Stage Manager state (Stages A-D)
     cg_stage_manager_state: Optional[dict] = None,
+    # Training config snapshot (for ablation audit / reproducibility)
+    training_config: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
@@ -110,6 +112,8 @@ def save_checkpoint(
         meta["dataloader_position"] = dataloader_position
     if cg_stage_manager_state is not None:
         meta["cg_stage_manager_state"] = cg_stage_manager_state
+    if training_config is not None:
+        meta["training_config"] = training_config
 
     # V9.9.1: Build HEAVY auxiliary module weights dict (saved separately)
     # These contain nn.Module state_dicts that were bloating meta to ~959MB
@@ -303,6 +307,7 @@ def load_checkpoint(
     result = {
         "step": checkpoint.get("step", 0),
         "best_val_loss": checkpoint.get("best_val_loss", float('inf')),
+        "training_config": checkpoint.get("training_config", None),
     }
 
     if weights_only:

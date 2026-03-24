@@ -469,6 +469,19 @@ from symbolu.training.unified.bliss_coherence import (
 # TRAINING LOOP
 # =============================================================================
 
+def _build_training_config_snapshot(config: UnifiedTrainingConfig) -> dict:
+    """Build a lightweight config snapshot for checkpoint metadata."""
+    return {
+        "model_type": config.model_type,
+        "model_size": config.model_size,
+        "max_seq_len": config.max_seq_len,
+        "batch_size": config.batch_size,
+        "vocab_size": config.vocab_size,
+        "dataset": config.dataset,
+        "learning_rate": config.learning_rate,
+    }
+
+
 def train(config: UnifiedTrainingConfig):
     """Main training loop with optional PIDv2 Governor."""
 
@@ -7358,6 +7371,7 @@ def train(config: UnifiedTrainingConfig):
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                             cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                            training_config=_build_training_config_snapshot(config),
                         )
                         print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
@@ -7491,6 +7505,7 @@ def train(config: UnifiedTrainingConfig):
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                     cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                    training_config=_build_training_config_snapshot(config),
                 )
                 print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -7520,6 +7535,7 @@ def train(config: UnifiedTrainingConfig):
             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
             cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+            training_config=_build_training_config_snapshot(config),
         )
         # v2.7 Training State Tracker: Save final state
         if training_state_tracker is not None and training_state_tracker.enabled:

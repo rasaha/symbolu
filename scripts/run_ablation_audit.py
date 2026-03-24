@@ -98,8 +98,8 @@ def main():
                        help="Evaluation dataset")
     parser.add_argument("--batch_size", type=int, default=4,
                        help="Evaluation batch size")
-    parser.add_argument("--max_seq_len", type=int, default=2048,
-                       help="Max sequence length for evaluation (default: 2048, must match training)")
+    parser.add_argument("--max_seq_len", type=int, default=None,
+                       help="Max sequence length (auto-detected from checkpoint, or 2048 fallback)")
     parser.add_argument("--max_eval_batches", type=int, default=50,
                        help="Max number of eval batches (0=all)")
     parser.add_argument("--output", type=str, default="ablation_report.json",
@@ -124,22 +124,49 @@ def main():
         device = torch.device(args.device)
     print(f"  Device: {device}")
 
-    # Load model and checkpoint
-    print(f"\n{'='*60}")
-    print(f"  Stage 9 Ablation Audit")
-    print(f"  Checkpoint: {args.checkpoint}")
-    print(f"  Sequence length: {args.max_seq_len}")
-    print(f"  Eval batches: {args.max_eval_batches} x {args.batch_size}")
-    print(f"{'='*60}")
-
     # Import model creation from training module
     from symbolu.training.unified.train import create_model
     from symbolu.training.unified.config import UnifiedTrainingConfig
     from symbolu.training.unified.checkpointing import load_checkpoint
+    from pathlib import Path
+
+    # ── Auto-detect training config from checkpoint ───────────────────
+    # Peek at checkpoint metadata to extract seq_len, model_type, etc.
+    # so the ablation audit uses the same settings as training.
+    ckpt_path = Path(args.checkpoint)
+    ckpt_stem = ckpt_path.parent / ckpt_path.stem
+    meta_path = Path(f"{ckpt_stem}_meta.pt")
+    ckpt_training_config = None
+    if meta_path.exists():
+        _meta = torch.load(meta_path, map_location="cpu", weights_only=False)
+        ckpt_training_config = _meta.get("training_config", None)
+        del _meta
+
+    # Resolve sequence length: CLI explicit > checkpoint > fallback 2048
+    user_explicit = args.max_seq_len is not None
+    if user_explicit:
+        effective_seq_len = args.max_seq_len
+        seq_source = "CLI"
+    elif ckpt_training_config is not None and ckpt_training_config.get("max_seq_len"):
+        effective_seq_len = ckpt_training_config["max_seq_len"]
+        seq_source = "checkpoint"
+        print(f"  Auto-detected max_seq_len={effective_seq_len} from checkpoint")
+    else:
+        effective_seq_len = 2048
+        seq_source = "default"
+        print(f"  No training_config in checkpoint — using fallback max_seq_len=2048")
+
+    # Print header
+    print(f"\n{'='*60}")
+    print(f"  Stage 9 Ablation Audit")
+    print(f"  Checkpoint: {args.checkpoint}")
+    print(f"  Sequence length: {effective_seq_len} (from {seq_source})")
+    print(f"  Eval batches: {args.max_eval_batches} x {args.batch_size}")
+    print(f"{'='*60}")
 
     config = UnifiedTrainingConfig(
         model_type=args.model_type,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=effective_seq_len,
         batch_size=args.batch_size,
         mistral_model_name=args.mistral_model_name,
         mistral_quantize=args.mistral_quantize,
@@ -148,9 +175,8 @@ def main():
     model = create_model(config, device)
 
     # Load checkpoint weights
-    from pathlib import Path
     load_result = load_checkpoint(
-        path=Path(args.checkpoint),
+        path=ckpt_path,
         model=model,
         optimizer=None,
         scheduler=None,
