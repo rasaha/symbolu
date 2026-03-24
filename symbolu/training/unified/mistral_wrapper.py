@@ -112,10 +112,13 @@ class MistralCGWrapper(nn.Module):
             project_per_head_dim=project_per_head_dim,
         )
 
-        # Phase-conditioned adapter: mixes phase signal into hidden states
-        # before the frozen LM head, so CG can influence token prediction
+        # Phase-only adapter: maps CG phase signal to hidden-space correction.
+        # CRITICAL: input is phase-only (num_heads D), NOT concatenated with
+        # hidden states (4096D). If hidden is included, the adapter learns to
+        # exploit Mistral features and ignores the tiny phase signal entirely
+        # (4096D vs 32D → phase contributes <1% of adapter input).
         self.phase_adapter = nn.Sequential(
-            nn.Linear(self.mistral_hidden_dim + self.num_heads, phase_adapter_hidden),
+            nn.Linear(self.num_heads, phase_adapter_hidden),
             nn.GELU(),
             nn.Linear(phase_adapter_hidden, self.mistral_hidden_dim),
         )
@@ -361,13 +364,14 @@ class MistralCGWrapper(nn.Module):
             # Ablation: zero phase → adapter sees no CG signal
             intent_phase = torch.zeros(B, self.num_heads, device=hidden.device, dtype=hidden.dtype)
 
-        # ── Phase-conditioned adapter ────────────────────────────────
-        # Expand intent_phase to match sequence length for concatenation
+        # ── Phase-only adapter ────────────────────────────────────────
+        # Expand intent_phase to match sequence length
         phase_expanded = intent_phase.unsqueeze(1).expand(B, T, -1)  # [B, T, H]
 
-        # Mix phase signal into hidden states
-        adapter_input = torch.cat([hidden, phase_expanded], dim=-1)  # [B, T, D+H]
-        adapter_output = self.phase_adapter(adapter_input)  # [B, T, D]
+        # Adapter takes ONLY phase signal — no raw hidden states.
+        # This forces the adapter to produce corrections driven by CG
+        # phase information, not by learning Mistral feature shortcuts.
+        adapter_output = self.phase_adapter(phase_expanded)  # [B, T, D]
 
         # Gated residual
         if _use_gate:

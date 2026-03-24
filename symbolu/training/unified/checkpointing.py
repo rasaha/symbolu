@@ -274,6 +274,25 @@ def load_checkpoint(
     # Old unconstrained weights produce extreme values that saturate softmax.
     # Drop them entirely so SovereignStateProjector initializes with small weights.
     migrated = False
+
+    # V12.8: Handle old phase_adapter (hidden+phase concat input) -> new phase-only input
+    # Old: Linear(4096+num_heads, hidden) → new: Linear(num_heads, hidden)
+    # Old adapter learned from raw hidden states, not phase — must reinitialize.
+    _pa_first_key = "phase_adapter.0.weight"
+    if _pa_first_key in filtered_state:
+        _pa_shape = filtered_state[_pa_first_key].shape
+        if hasattr(model, 'phase_adapter'):
+            _expected_shape = model.phase_adapter[0].weight.shape
+            if _pa_shape != _expected_shape:
+                migrated = True
+                print(f"    → Detected old phase_adapter format (input_dim={_pa_shape[1]}, "
+                      f"expected={_expected_shape[1]})")
+                print(f"    → Dropping old phase_adapter weights (learned hidden shortcuts, not phase)")
+                for k in list(filtered_state.keys()):
+                    if k.startswith("phase_adapter."):
+                        del filtered_state[k]
+                        print(f"      Dropped: {k}")
+                print(f"    ✓ phase_adapter will initialize fresh (phase-only architecture)")
     old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
     if old_projector_keys:
         migrated = True
