@@ -524,6 +524,26 @@ def train(config: UnifiedTrainingConfig):
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
 
+    # Stage 9: Wire ablation config into all compatible modules
+    _ablation_cfg = None
+    if (config.ablation_disable_phase_sync or config.ablation_disable_vritti
+            or config.ablation_disable_guna_bias or config.ablation_enable_dual_channel_intent
+            or config.ablation_log_mechanism_strength_every > 0):
+        from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+        _ablation_cfg = AttentionAblationConfig(
+            use_phase_sync=not config.ablation_disable_phase_sync,
+            use_vritti_modulation=not config.ablation_disable_vritti,
+            use_guna_bias=not config.ablation_disable_guna_bias,
+            use_dual_channel_intent=config.ablation_enable_dual_channel_intent,
+            log_mechanism_strength_every=config.ablation_log_mechanism_strength_every,
+        )
+        _ablation_count = 0
+        for module in model.modules():
+            if hasattr(module, 'ablation_config'):
+                module.ablation_config = _ablation_cfg
+                _ablation_count += 1
+        print(f"  [Stage 9] Ablation config applied to {_ablation_count} module(s): {_ablation_cfg.label()}")
+
     # For mistral_cg, use the backbone's own tokenizer so token IDs match
     # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
     if config.model_type == "mistral_cg" and hasattr(model, "tokenizer") and model.tokenizer is not None:
@@ -5148,6 +5168,23 @@ def train(config: UnifiedTrainingConfig):
                                     if 'csr_signal_norm' in _s8_log:
                                         writer.add_scalar('stage8/csr_signal_norm', _s8_log['csr_signal_norm'], global_step)
 
+                            # Stage 9: Mechanism strength logging (F.14.5)
+                            if (_ablation_cfg is not None
+                                    and _ablation_cfg.log_mechanism_strength_every > 0
+                                    and global_step % _ablation_cfg.log_mechanism_strength_every == 0
+                                    and global_step > 0):
+                                from symbolu.training.conscious_generation.ablation.metrics import (
+                                    collect_mechanism_strength_log, collect_gradient_norms,
+                                )
+                                _mech_log = collect_mechanism_strength_log(model)
+                                if _mech_log:
+                                    _mech_parts = [f"  [Stage 9 MechStrength Step {global_step}]"]
+                                    for _mk, _mv in _mech_log.items():
+                                        _mech_parts.append(f" {_mk}={_mv:.4f}")
+                                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                            writer.add_scalar(f'stage9/{_mk}', _mv, global_step)
+                                    print("".join(_mech_parts))
+
                 except Exception as e:
                     if global_step % 500 == 0:
                         print(f"  [Conscious Gen] Error at step {global_step}: {e}")
@@ -9238,6 +9275,21 @@ def main():
     parser.add_argument("--perspective_log_interpretive", action="store_true", default=True,
                        help="Log full InterpretiveState per token to TensorBoard")
 
+    # Stage 9: Attention Mechanism Ablation Audit (F.14)
+    parser.add_argument("--ablation_disable_phase_sync", action="store_true",
+                       help="Stage 9: Disable phase synchronization (fall back to dot-product attention)")
+    parser.add_argument("--ablation_disable_vritti", action="store_true",
+                       help="Stage 9: Disable Vritti modulation (no cognitive gating)")
+    parser.add_argument("--ablation_disable_guna_bias", action="store_true",
+                       help="Stage 9: Disable Guna top-down bias")
+    parser.add_argument("--ablation_enable_dual_channel_intent", action="store_true",
+                       help="Stage 9: Enable dual-channel intent alignment (experimental)")
+    parser.add_argument("--ablation_log_mechanism_strength_every", type=int, default=0,
+                       help="Stage 9: Log mechanism strength signals every N steps (0=disabled)")
+    parser.add_argument("--run_ablation_audit", action="store_true",
+                       help="Stage 9: Run full ablation matrix after training/on checkpoint "
+                            "(requires --resume)")
+
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
                        help="Run conscious generation phase tests instead of training. "
@@ -10015,6 +10067,13 @@ def main():
         perspective_d_synthesis=args.perspective_d_synthesis,
         perspective_gate_init=args.perspective_gate_init,
         perspective_log_interpretive=args.perspective_log_interpretive,
+        # Stage 9: Attention Mechanism Ablation Audit
+        ablation_disable_phase_sync=args.ablation_disable_phase_sync,
+        ablation_disable_vritti=args.ablation_disable_vritti,
+        ablation_disable_guna_bias=args.ablation_disable_guna_bias,
+        ablation_enable_dual_channel_intent=args.ablation_enable_dual_channel_intent,
+        ablation_log_mechanism_strength_every=args.ablation_log_mechanism_strength_every,
+        run_ablation_audit=args.run_ablation_audit,
     )
 
     # ==========================================================================

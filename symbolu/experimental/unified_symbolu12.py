@@ -345,6 +345,9 @@ class BidirectionalGunaMapper(nn.Module):
             nn.Linear(64, config.hidden_dim),
         )
 
+        # Stage 9: ablation config (None = mechanism active)
+        self.ablation_config = None
+
     def ontology_to_guna(self, ontology: torch.Tensor) -> torch.Tensor:
         """
         Bottom-up: Convert ontology distribution to Guna.
@@ -371,12 +374,18 @@ class BidirectionalGunaMapper(nn.Module):
         """
         Top-down: Convert Guna state to attention bias.
 
+        Stage 9 ablation: returns zeros when use_guna_bias is False.
+
         Args:
             guna: [B, T, 3] or [B, 3] Guna distribution
 
         Returns:
             bias: [B, T, hidden_dim] or [B, hidden_dim] attention bias
         """
+        # Stage 9 ablation: skip top-down bias when disabled
+        if self.ablation_config is not None and not self.ablation_config.use_guna_bias:
+            shape = list(guna.shape[:-1]) + [self.config.hidden_dim]
+            return torch.zeros(shape, device=guna.device, dtype=guna.dtype)
         return self.guna_to_bias(guna)
 
     def compute_entropy(self, guna: torch.Tensor) -> torch.Tensor:
@@ -401,6 +410,9 @@ class VrittiModulatedAttention(nn.Module):
     - Vikalpa (imagination): Broaden attention (higher temperature)
     - Smṛti (memory): Extend context window bias
     - Nidrā (dormancy): Reduce attention magnitude
+
+    Stage 9 ablation: When ablation_config.use_vritti_modulation is False,
+    returns attention_scores unmodified (base temperature, no cognitive gating).
     """
 
     VRITTI_NAMES = ['pramana', 'viparyaya', 'vikalpa', 'smrti', 'nidra']
@@ -418,6 +430,9 @@ class VrittiModulatedAttention(nn.Module):
         # Vṛtti → attention magnitude (for nidrā reducing)
         self.magnitude_mod = nn.Linear(config.num_vritti, 1)
 
+        # Stage 9: ablation config (None = mechanism active)
+        self.ablation_config = None
+
     def forward(
         self,
         attention_scores: torch.Tensor,  # [B, H, T, T] pre-softmax scores
@@ -429,6 +444,10 @@ class VrittiModulatedAttention(nn.Module):
         Returns:
             modulated_scores: [B, H, T, T]
         """
+        # Stage 9 ablation: bypass when disabled
+        if self.ablation_config is not None and not self.ablation_config.use_vritti_modulation:
+            return attention_scores
+
         B, H, T, _ = attention_scores.shape
 
         # Aggregate vṛtti across positions for global modulation
