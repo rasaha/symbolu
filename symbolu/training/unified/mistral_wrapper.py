@@ -41,6 +41,10 @@ from symbolu.phase_transformer import (
     SOVEREIGN_STATE_DIM,
     PHASE_STATE_DIM,
     BHAVA_SLICE,
+    KOSHA_SLICE,
+    VRITTI_SLICE,
+    GUNA_SLICE,
+    RESERVED_SLICE,
 )
 
 
@@ -119,8 +123,11 @@ class MistralCGWrapper(nn.Module):
         nn.init.zeros_(self.phase_adapter[-1].weight)
         nn.init.zeros_(self.phase_adapter[-1].bias)
 
-        # Adapter gate (learnable scalar, starts at 0 = pure Mistral)
-        self.adapter_gate = nn.Parameter(torch.zeros(1))
+        # Adapter gate (learnable scalar)
+        # sigmoid(-2) ≈ 0.12: adapter starts with minimal influence,
+        # ramps up as CG losses teach meaningful phase/state signals.
+        # Previous: zeros(1) → sigmoid(0)=0.5 → 50% noise before CG learns.
+        self.adapter_gate = nn.Parameter(torch.tensor([-2.0]))
 
         # Store config
         self.state_dim = state_dim
@@ -245,7 +252,17 @@ class MistralCGWrapper(nn.Module):
         pooled = hidden.mean(dim=1)  # [B, D_mistral]
 
         # Project to 32D Sovereign State
-        state = self.state_projector(pooled)  # [B, state_dim]
+        raw_state = self.state_projector(pooled)  # [B, state_dim]
+
+        # Apply ontological constraints (differentiable)
+        # Matches SovereignStateProjector semantics from jepa/state_projector.py
+        state = torch.cat([
+            torch.softmax(raw_state[..., BHAVA_SLICE], dim=-1),   # Bhavas: probability distribution
+            torch.sigmoid(raw_state[..., KOSHA_SLICE]),           # Koshas: independent [0,1]
+            torch.softmax(raw_state[..., VRITTI_SLICE], dim=-1),  # Vrittis: probability distribution
+            torch.sigmoid(raw_state[..., GUNA_SLICE]),            # Gunas: independent [0,1]
+            torch.tanh(raw_state[..., RESERVED_SLICE]),           # Reserved: bounded [-1,1]
+        ], dim=-1)
 
         # Extract Bhava slice
         bhava = state[:, BHAVA_SLICE]  # [B, 12]

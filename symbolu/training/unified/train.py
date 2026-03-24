@@ -4828,6 +4828,9 @@ def train(config: UnifiedTrainingConfig):
                         _cg_tok_emb = getattr(_cg_inner, 'embed_tokens', None)
                     if _cg_tok_emb is None:
                         _cg_tok_emb = getattr(_cg_inner, 'wte', None)
+                    # Fallback: use get_input_embeddings() (supports MistralCGWrapper)
+                    if _cg_tok_emb is None and hasattr(model, 'get_input_embeddings'):
+                        _cg_tok_emb = model.get_input_embeddings()
                     if _cg_tok_emb is not None and hasattr(_cg_tok_emb, 'weight'):
                         _cg_emb_weight = _cg_tok_emb.weight
 
