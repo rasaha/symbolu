@@ -162,14 +162,14 @@ def main():
     else:
         print("  WARNING: Could not load checkpoint. Running with random weights.")
 
-    # Match trainable module dtype to backbone (bf16 backbone + float32 adapter = crash)
+    # Match ALL non-backbone params to backbone dtype (bf16)
+    # This covers nn.Parameters like adapter_gate that aren't inside child modules
     if hasattr(model, 'backbone'):
         backbone_dtype = next(model.backbone.parameters()).dtype
-        for name, module in model.named_children():
-            if name == 'backbone':
-                continue
-            module.to(dtype=backbone_dtype)
-        print(f"  Trainable modules cast to {backbone_dtype}")
+        for name, param in model.named_parameters():
+            if not name.startswith('backbone.') and param.dtype != backbone_dtype:
+                param.data = param.data.to(dtype=backbone_dtype)
+        print(f"  Trainable parameters cast to {backbone_dtype}")
 
     # Ensure all modules have ablation_config attribute
     from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig as AAC
