@@ -133,8 +133,9 @@ def main():
     model = create_model(config, device)
 
     # Load checkpoint weights
+    from pathlib import Path
     load_result = load_checkpoint(
-        path=args.checkpoint,
+        path=Path(args.checkpoint),
         model=model,
         optimizer=None,
         scheduler=None,
