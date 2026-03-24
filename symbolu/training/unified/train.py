@@ -5912,6 +5912,31 @@ def train(config: UnifiedTrainingConfig):
                     if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
 
+                    # Mistral CG adapter diagnostics: gate value, adapter output norm, state norm
+                    if config.model_type == "mistral_cg":
+                        _cg_model = getattr(model, 'module', model)  # unwrap DDP
+                        if hasattr(_cg_model, 'adapter_gate'):
+                            _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
+                            metrics['adapter_gate'] = _gate_val
+                            log_msg += f" | Gate:{_gate_val:.4f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/gate', _gate_val, global_step)
+                        if hasattr(_cg_model, 'phase_adapter') and is_verbose_step:
+                            _adapter_norm = sum(
+                                p.data.norm().item() ** 2 for p in _cg_model.phase_adapter.parameters()
+                            ) ** 0.5
+                            metrics['adapter_weight_norm'] = _adapter_norm
+                            log_msg += f" | AdpN:{_adapter_norm:.1f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/weight_norm', _adapter_norm, global_step)
+                        if isinstance(outputs, dict) and 'state' in outputs and outputs['state'] is not None:
+                            _state_norm = outputs['state'].detach().norm(dim=-1).mean().item()
+                            metrics['state_norm'] = _state_norm
+                            if is_verbose_step:
+                                log_msg += f" | StN:{_state_norm:.2f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
+
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
                     if friction_alignment != 0.0 or friction_dominance != 1.0:
                         # Color-code alignment

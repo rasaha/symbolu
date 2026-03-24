@@ -358,6 +358,8 @@ class MistralCGWrapper(nn.Module):
             'delta_S': delta_S,
             'delta_bhava': delta_bhava,
             'intent_phase': intent_phase,
+            'adapter_gate': torch.sigmoid(self.adapter_gate).item(),
+            'adapter_output_norm': adapter_output.detach().norm(dim=-1).mean().item(),
         }
 
         # Stage 8 conditioning metadata
