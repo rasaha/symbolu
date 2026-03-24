@@ -41,7 +41,12 @@ from symbolu.phase_transformer import (
     SOVEREIGN_STATE_DIM,
     PHASE_STATE_DIM,
     BHAVA_SLICE,
+    KOSHA_SLICE,
+    VRITTI_SLICE,
+    GUNA_SLICE,
+    RESERVED_SLICE,
 )
+from symbolu.jepa.state_projector import SovereignStateProjector
 
 
 class MistralCGWrapper(nn.Module):
@@ -92,12 +97,17 @@ class MistralCGWrapper(nn.Module):
         # ── Trainable CG adapter layers ──────────────────────────────
 
         # State projector: Mistral hidden → 32D Sovereign State
-        self.state_projector = nn.Sequential(
-            nn.Linear(self.mistral_hidden_dim, self.mistral_hidden_dim // 4),
-            nn.GELU(),
-            nn.Linear(self.mistral_hidden_dim // 4, state_dim),
+        # Uses SovereignStateProjector with component-wise normalization
+        # (Bhava softmax, Kosha sigmoid, Vritti softmax, Guna sigmoid, Reserved tanh)
+        # intermediate_dim matches legacy hidden_dim//4 for checkpoint compatibility
+        self.state_projector = SovereignStateProjector(
+            hidden_dim=self.mistral_hidden_dim,
+            state_dim=state_dim,
+            intermediate_dim=self.mistral_hidden_dim // 4,
+            dropout=0.1,
+            use_layer_norm=True,
+            kosha_mode='sigmoid',
         )
-        self._init_absolute_potential_bias()
 
         # Intent phase projector: 12D Bhava delta → per-head phase offsets
         head_dim = self.mistral_hidden_dim // self.num_heads
@@ -108,10 +118,13 @@ class MistralCGWrapper(nn.Module):
             project_per_head_dim=project_per_head_dim,
         )
 
-        # Phase-conditioned adapter: mixes phase signal into hidden states
-        # before the frozen LM head, so CG can influence token prediction
+        # Phase-only adapter: maps CG phase signal to hidden-space correction.
+        # CRITICAL: input is phase-only (num_heads D), NOT concatenated with
+        # hidden states (4096D). If hidden is included, the adapter learns to
+        # exploit Mistral features and ignores the tiny phase signal entirely
+        # (4096D vs 32D → phase contributes <1% of adapter input).
         self.phase_adapter = nn.Sequential(
-            nn.Linear(self.mistral_hidden_dim + self.num_heads, phase_adapter_hidden),
+            nn.Linear(self.num_heads, phase_adapter_hidden),
             nn.GELU(),
             nn.Linear(phase_adapter_hidden, self.mistral_hidden_dim),
         )
@@ -119,16 +132,34 @@ class MistralCGWrapper(nn.Module):
         nn.init.zeros_(self.phase_adapter[-1].weight)
         nn.init.zeros_(self.phase_adapter[-1].bias)
 
-        # Adapter gate (learnable scalar, starts at 0 = pure Mistral)
-        self.adapter_gate = nn.Parameter(torch.zeros(1))
+        # Adapter gate (learnable scalar)
+        # sigmoid(-2) ≈ 0.12: adapter starts with minimal influence,
+        # ramps up as CG losses teach meaningful phase/state signals.
+        # Previous: zeros(1) → sigmoid(0)=0.5 → 50% noise before CG learns.
+        self.adapter_gate = nn.Parameter(torch.tensor([-2.0]))
 
         # Store config
         self.state_dim = state_dim
         self.embed_dim = self.mistral_hidden_dim  # alias for CG module compatibility
 
+        # Ablation support — compatible with Stage 9 ablation runner
+        self.ablation_config = None
+
         # Previous state for delta computation
         self.register_buffer('prev_state', None, persistent=False)
         self.register_buffer('prev_bhava', None, persistent=False)
+
+    def set_ablation_config(self, config) -> None:
+        """
+        Set ablation config for Stage 9 ablation audit.
+
+        MistralCG ablation mapping:
+            use_phase_sync=False    → zero intent_phase (adapter sees no CG phase signal)
+            use_vritti_modulation=F → bypass state_projector (zero state dynamics)
+            use_guna_bias=False     → force gate=0 (adapter output fully suppressed)
+            All OFF                 → pure Mistral logits, no CG influence
+        """
+        self.ablation_config = config
 
     @staticmethod
     def _load_mistral(
@@ -151,6 +182,7 @@ class MistralCGWrapper(nn.Module):
             "trust_remote_code": trust_remote_code,
             "torch_dtype": torch.bfloat16,
             "output_hidden_states": True,
+            "attn_implementation": "flash_attention_2",
         }
 
         if quantize in ("4bit", "8bit"):
@@ -228,7 +260,7 @@ class MistralCGWrapper(nn.Module):
         # Pool hidden states (mean over sequence)
         pooled = hidden.mean(dim=1)  # [B, D_mistral]
 
-        # Project to 32D Sovereign State
+        # Project to 32D Sovereign State (with component-wise constraints)
         state = self.state_projector(pooled)  # [B, state_dim]
 
         # Extract Bhava slice
@@ -304,23 +336,45 @@ class MistralCGWrapper(nn.Module):
         # Extract hidden states (last layer)
         hidden = backbone_out.hidden_states[-1]  # [B, T, D_mistral]
 
+        # ── Ablation flags ─────────────────────────────────────────────
+        _abl = self.ablation_config
+        _use_phase = _abl is None or _abl.use_phase_sync
+        _use_state = _abl is None or _abl.use_vritti_modulation
+        _use_gate = _abl is None or _abl.use_guna_bias
+
         # ── Compute CG state delta (trainable) ───────────────────────
-        state, delta_S, delta_bhava = self.compute_state_delta(hidden, reset_state)
+        B, T, D = hidden.shape
+
+        if _use_state:
+            state, delta_S, delta_bhava = self.compute_state_delta(hidden, reset_state)
+        else:
+            # Ablation: bypass state projector → zero state dynamics
+            state = torch.zeros(B, self.state_dim, device=hidden.device, dtype=hidden.dtype)
+            delta_S = torch.zeros_like(state)
+            delta_bhava = torch.zeros(B, PHASE_STATE_DIM, device=hidden.device, dtype=hidden.dtype)
 
         # Convert Bhava delta to phase rotation
-        intent_phase = self.intent_projector(delta_bhava)  # [B, H]
+        if _use_phase:
+            intent_phase = self.intent_projector(delta_bhava)  # [B, H]
+        else:
+            # Ablation: zero phase → adapter sees no CG signal
+            intent_phase = torch.zeros(B, self.num_heads, device=hidden.device, dtype=hidden.dtype)
 
-        # ── Phase-conditioned adapter ────────────────────────────────
-        # Expand intent_phase to match sequence length for concatenation
-        B, T, D = hidden.shape
+        # ── Phase-only adapter ────────────────────────────────────────
+        # Expand intent_phase to match sequence length
         phase_expanded = intent_phase.unsqueeze(1).expand(B, T, -1)  # [B, T, H]
 
-        # Mix phase signal into hidden states
-        adapter_input = torch.cat([hidden, phase_expanded], dim=-1)  # [B, T, D+H]
-        adapter_output = self.phase_adapter(adapter_input)  # [B, T, D]
+        # Adapter takes ONLY phase signal — no raw hidden states.
+        # This forces the adapter to produce corrections driven by CG
+        # phase information, not by learning Mistral feature shortcuts.
+        adapter_output = self.phase_adapter(phase_expanded)  # [B, T, D]
 
-        # Gated residual: at init gate=0, so output = pure Mistral logits
-        gate = torch.sigmoid(self.adapter_gate)
+        # Gated residual
+        if _use_gate:
+            gate = torch.sigmoid(self.adapter_gate)
+        else:
+            # Ablation: force gate to 0 → adapter output fully suppressed
+            gate = torch.zeros(1, device=hidden.device, dtype=hidden.dtype)
         adapted_hidden = hidden + gate * adapter_output  # [B, T, D]
 
         # ── Stage 8: Perspective Synthesizer (representation conditioning) ─
@@ -357,6 +411,8 @@ class MistralCGWrapper(nn.Module):
             'delta_S': delta_S,
             'delta_bhava': delta_bhava,
             'intent_phase': intent_phase,
+            'adapter_gate': gate.item() if isinstance(gate, torch.Tensor) else gate,
+            'adapter_output_norm': adapter_output.detach().norm(dim=-1).mean().item(),
         }
 
         # Stage 8 conditioning metadata

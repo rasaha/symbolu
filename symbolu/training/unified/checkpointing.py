@@ -44,6 +44,10 @@ def save_checkpoint(
     jepa_injection_projector_state: Optional[dict] = None,
     # Dataloader position
     dataloader_position: Optional[dict] = None,
+    # CG Curriculum Stage Manager state (Stages A-D)
+    cg_stage_manager_state: Optional[dict] = None,
+    # Training config snapshot (for ablation audit / reproducibility)
+    training_config: Optional[dict] = None,
 ):
     """Save training checkpoint with optional HGS/DRC/SGP/Sattvic/SRK/AMP scaler state.
 
@@ -106,6 +110,10 @@ def save_checkpoint(
         meta["kosha_gyroscope_state"] = kosha_gyroscope_state
     if dataloader_position is not None:
         meta["dataloader_position"] = dataloader_position
+    if cg_stage_manager_state is not None:
+        meta["cg_stage_manager_state"] = cg_stage_manager_state
+    if training_config is not None:
+        meta["training_config"] = training_config
 
     # V9.9.1: Build HEAVY auxiliary module weights dict (saved separately)
     # These contain nn.Module state_dicts that were bloating meta to ~959MB
@@ -247,19 +255,83 @@ def load_checkpoint(
         removed = [k for k in model_state if k in runtime_buffers]
         print(f"    \u2192 Filtered runtime buffers: {removed}")
 
+    # For mistral_cg (and similar frozen-backbone wrappers): skip backbone weights.
+    # The backbone is loaded from HuggingFace and may use different quantization
+    # (e.g., checkpoint saved 4-bit but model loaded bf16). Only CG adapter
+    # weights need restoring from the checkpoint.
+    _backbone_keys = [k for k in filtered_state if k.startswith("backbone.")]
+    if _backbone_keys and hasattr(model, 'backbone'):
+        _backbone_frozen = all(
+            not p.requires_grad for p in model.backbone.parameters()
+        )
+        if _backbone_frozen:
+            for k in _backbone_keys:
+                del filtered_state[k]
+            print(f"    \u2192 Skipped {len(_backbone_keys)} frozen backbone keys "
+                  f"(loaded from HuggingFace, not checkpoint)")
+
     # V9.6.8: Handle old state_projector (nn.Sequential) -> new SovereignStateProjector
     # Old unconstrained weights produce extreme values that saturate softmax.
     # Drop them entirely so SovereignStateProjector initializes with small weights.
     migrated = False
+
+    # V12.8: Handle old phase_adapter (hidden+phase concat input) -> new phase-only input
+    # Old: Linear(4096+num_heads, hidden) → new: Linear(num_heads, hidden)
+    # Old adapter learned from raw hidden states, not phase — must reinitialize.
+    _pa_first_key = "phase_adapter.0.weight"
+    if _pa_first_key in filtered_state:
+        _pa_shape = filtered_state[_pa_first_key].shape
+        if hasattr(model, 'phase_adapter'):
+            _expected_shape = model.phase_adapter[0].weight.shape
+            if _pa_shape != _expected_shape:
+                migrated = True
+                print(f"    → Detected old phase_adapter format (input_dim={_pa_shape[1]}, "
+                      f"expected={_expected_shape[1]})")
+                print(f"    → Dropping old phase_adapter weights (learned hidden shortcuts, not phase)")
+                for k in list(filtered_state.keys()):
+                    if k.startswith("phase_adapter."):
+                        del filtered_state[k]
+                        print(f"      Dropped: {k}")
+                print(f"    ✓ phase_adapter will initialize fresh (phase-only architecture)")
+    # Detect old nn.Sequential state_projector keys and remap to SovereignStateProjector
+    # Old: state_projector.{0,2}.{weight,bias} (Sequential: Linear, GELU, Linear)
+    # New: state_projector.projector.{0,3}.{weight,bias} (Sequential: Linear, GELU, Dropout, Linear)
+    # Index 2->3 because Dropout is inserted at position 2 in the new format.
+    _old_sp_key_map = {
+        "state_projector.0.weight": "state_projector.projector.0.weight",
+        "state_projector.0.bias": "state_projector.projector.0.bias",
+        "state_projector.2.weight": "state_projector.projector.3.weight",
+        "state_projector.2.bias": "state_projector.projector.3.bias",
+    }
     old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
     if old_projector_keys:
-        migrated = True
-        print(f"    \u2192 Detected old state_projector format (unconstrained nn.Sequential)")
-        print(f"    \u2192 Dropping old weights to allow fresh SovereignStateProjector init")
-        for old_key in old_projector_keys:
-            del filtered_state[old_key]
-            print(f"      Dropped: {old_key}")
-        print(f"    \u2713 state_projector will initialize fresh with proper normalization")
+        # Check if dimensions are compatible before remapping
+        _can_remap = True
+        if hasattr(model, 'state_projector') and hasattr(model.state_projector, 'projector'):
+            _expected_shape = model.state_projector.projector[0].weight.shape
+            _old_in_key = "state_projector.0.weight"
+            if _old_in_key in filtered_state and filtered_state[_old_in_key].shape != _expected_shape:
+                _can_remap = False
+                print(f"    \u2192 Old state_projector dim={filtered_state[_old_in_key].shape} "
+                      f"!= new {_expected_shape}, cannot remap \u2014 reinitializing fresh")
+
+        if _can_remap:
+            print(f"    \u2192 Migrating old state_projector keys to SovereignStateProjector format")
+            for old_key in old_projector_keys:
+                new_key = _old_sp_key_map.get(old_key)
+                if new_key:
+                    filtered_state[new_key] = filtered_state.pop(old_key)
+                    print(f"      Remapped: {old_key} \u2192 {new_key}")
+                else:
+                    del filtered_state[old_key]
+                    print(f"      Dropped unknown: {old_key}")
+            print(f"    \u2713 state_projector weights migrated (layer_norm will init fresh)")
+        else:
+            migrated = True
+            for old_key in old_projector_keys:
+                del filtered_state[old_key]
+                print(f"      Dropped: {old_key}")
+            print(f"    \u2713 state_projector will initialize fresh with proper normalization")
 
     # V12.7: Extract slot_memory._adaptive.* keys before load_state_dict.
     # PyTorch's model.load_state_dict() uses _load_from_state_dict() internally
@@ -284,6 +356,7 @@ def load_checkpoint(
     result = {
         "step": checkpoint.get("step", 0),
         "best_val_loss": checkpoint.get("best_val_loss", float('inf')),
+        "training_config": checkpoint.get("training_config", None),
     }
 
     if weights_only:

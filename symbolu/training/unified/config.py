@@ -1060,6 +1060,19 @@ class UnifiedTrainingConfig:
     perspective_log_interpretive: bool = True     # Log full InterpretiveState per token
 
     # ==========================================================================
+    # Stage 9: Post-Training Attention Mechanism Ablation Audit (F.14)
+    # Toggle flags for independently disabling attention modulation mechanisms.
+    # These flags should be set BEFORE training so they are available at ablation
+    # time, but only activated post-convergence for the actual ablation audit.
+    # ==========================================================================
+    ablation_disable_phase_sync: bool = False       # Disable U3/U4 phase synchronization
+    ablation_disable_vritti: bool = False            # Disable Vritti cognitive gating
+    ablation_disable_guna_bias: bool = False         # Disable Guna top-down bias
+    ablation_enable_dual_channel_intent: bool = False  # Enable dual-channel intent (off by default)
+    ablation_log_mechanism_strength_every: int = 0  # Log mechanism strength every N steps (0=off)
+    run_ablation_audit: bool = False                 # Run full ablation matrix (requires --resume)
+
+    # ==========================================================================
     # Mistral CG Wrapper (--model_type mistral_cg)
     # Pre-trained Mistral backbone + trainable CG modules
     # ==========================================================================

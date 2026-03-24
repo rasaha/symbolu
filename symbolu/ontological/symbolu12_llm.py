@@ -177,6 +177,9 @@ class PhaseAttentionBlock(nn.Module):
     - U2: Total correlation C_total = (1/N²) × Σᵢ,ⱼ C[i,j]
     - U3: Mean-field approximation: Σⱼ sin(φᵢ-φⱼ) ≈ N × sin(φᵢ - φ_mean)
     - U4: Phase update: Δφᵢ = α × ∂C_total/∂φᵢ
+
+    Stage 9 ablation: When ablation_config.use_phase_sync is False, falls back
+    to standard scaled dot-product attention (no phase computation).
     """
 
     def __init__(
@@ -207,6 +210,15 @@ class PhaseAttentionBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
+        # Stage 9: ablation config (None = all mechanisms active)
+        self.ablation_config = None
+
+    @property
+    def _use_phase_sync(self) -> bool:
+        if self.ablation_config is not None:
+            return self.ablation_config.use_phase_sync
+        return True
+
     def forward(
         self,
         x: torch.Tensor,
@@ -219,6 +231,24 @@ class PhaseAttentionBlock(nn.Module):
         Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # ── Stage 9 ablation: standard dot-product fallback ──
+        if not self._use_phase_sync:
+            scale = math.sqrt(self.head_dim)
+            attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / scale  # [B, H, N, N]
+            if causal_mask:
+                mask = torch.triu(torch.ones(N, N, device=x.device, dtype=torch.bool), diagonal=1)
+                attn_scores = attn_scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+            attn_weights = F.softmax(attn_scores, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+            output = torch.matmul(attn_weights, V)
+            output = output.transpose(1, 2).contiguous().view(B, N, D)
+            output = self.out_proj(output)
+            if return_phase_angles:
+                return output, None
+            return output
+
+        # ── Phase attention (original O(n) path) ──
 
         # Compute phases from queries
         phases = self.phase_proj(x).view(B, N, self.num_heads, self.phase_dim)

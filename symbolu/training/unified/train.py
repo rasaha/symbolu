@@ -469,6 +469,19 @@ from symbolu.training.unified.bliss_coherence import (
 # TRAINING LOOP
 # =============================================================================
 
+def _build_training_config_snapshot(config: UnifiedTrainingConfig) -> dict:
+    """Build a lightweight config snapshot for checkpoint metadata."""
+    return {
+        "model_type": config.model_type,
+        "model_size": config.model_size,
+        "max_seq_len": config.max_seq_len,
+        "batch_size": config.batch_size,
+        "vocab_size": config.vocab_size,
+        "dataset": config.dataset,
+        "learning_rate": config.learning_rate,
+    }
+
+
 def train(config: UnifiedTrainingConfig):
     """Main training loop with optional PIDv2 Governor."""
 
@@ -523,6 +536,26 @@ def train(config: UnifiedTrainingConfig):
     model = create_model(config, device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"\n  Model Parameters: {num_params:,} ({num_params/1e6:.1f}M)")
+
+    # Stage 9: Wire ablation config into all compatible modules
+    _ablation_cfg = None
+    if (config.ablation_disable_phase_sync or config.ablation_disable_vritti
+            or config.ablation_disable_guna_bias or config.ablation_enable_dual_channel_intent
+            or config.ablation_log_mechanism_strength_every > 0):
+        from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+        _ablation_cfg = AttentionAblationConfig(
+            use_phase_sync=not config.ablation_disable_phase_sync,
+            use_vritti_modulation=not config.ablation_disable_vritti,
+            use_guna_bias=not config.ablation_disable_guna_bias,
+            use_dual_channel_intent=config.ablation_enable_dual_channel_intent,
+            log_mechanism_strength_every=config.ablation_log_mechanism_strength_every,
+        )
+        _ablation_count = 0
+        for module in model.modules():
+            if hasattr(module, 'ablation_config'):
+                module.ablation_config = _ablation_cfg
+                _ablation_count += 1
+        print(f"  [Stage 9] Ablation config applied to {_ablation_count} module(s): {_ablation_cfg.label()}")
 
     # For mistral_cg, use the backbone's own tokenizer so token IDs match
     # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
@@ -824,6 +857,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_pidv2_curriculum_state = None
     resumed_kosha_gyroscope_state = None  # V9.8.6: Kosha Gyroscope (InvertedCurriculumController)
     resumed_evoflow_state = None  # V9.8.6: EvoFlow (EvolutionaryIntelligenceEngine)
+    resumed_cg_stage_manager_state = None  # CG Curriculum Stage Manager (Stages A-D)
     resumed_kv_supervisor_state = None  # KV Supervision (Kosha-Vritti Structured Supervision)
     resumed_jepa_injection_projector_state = None  # Phase 4: JEPA injection projector
 
@@ -1577,6 +1611,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_evoflow_state = resume_result.get("evoflow_state")
                 resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
                 resumed_jepa_injection_projector_state = resume_result.get("jepa_injection_projector_state")
+                resumed_cg_stage_manager_state = resume_result.get("cg_stage_manager_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -2380,6 +2415,12 @@ def train(config: UnifiedTrainingConfig):
             print(f"    Proportions: {_cg_stage_proportions}")
             print(f"    Ramp mode: {config.cg_curriculum_ramp_mode}")
             print(f"    PPL var threshold: {config.cg_curriculum_ppl_var_threshold}")
+
+            # Restore CG Stage Manager state from checkpoint
+            if resumed_cg_stage_manager_state is not None:
+                cg_stage_manager.load_state(resumed_cg_stage_manager_state)
+                print(f"  ✓ CG Stage Manager Restored: Stage={cg_stage_manager.current_stage}, "
+                      f"FieldIntegrated={cg_stage_manager._field_integrated_active}")
 
             if config.enable_cg_diagnostics:
                 cg_governance_diag = GovernanceDiagnostics(window_size=100)
@@ -4787,6 +4828,9 @@ def train(config: UnifiedTrainingConfig):
                         _cg_tok_emb = getattr(_cg_inner, 'embed_tokens', None)
                     if _cg_tok_emb is None:
                         _cg_tok_emb = getattr(_cg_inner, 'wte', None)
+                    # Fallback: use get_input_embeddings() (supports MistralCGWrapper)
+                    if _cg_tok_emb is None and hasattr(model, 'get_input_embeddings'):
+                        _cg_tok_emb = model.get_input_embeddings()
                     if _cg_tok_emb is not None and hasattr(_cg_tok_emb, 'weight'):
                         _cg_emb_weight = _cg_tok_emb.weight
 
@@ -5084,7 +5128,7 @@ def train(config: UnifiedTrainingConfig):
 
                             # Embedding diagnostics: snapshot and log drift metrics
                             if cg_embedding_diag is not None:
-                                _ed_cache = model.conscious_gen.get('token_cache', None) if hasattr(model, 'conscious_gen') else None
+                                _ed_cache = model.conscious_gen['token_cache'] if (hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen) else None
                                 _ed_model = getattr(model, 'module', model)  # unwrap DDP if needed
                                 _ed_metrics = cg_embedding_diag.snapshot(
                                     model=_ed_model,
@@ -5139,6 +5183,23 @@ def train(config: UnifiedTrainingConfig):
                                             writer.add_scalar('stage8/vritti_dominant_idx', _vritti_idx, global_step)
                                     if 'csr_signal_norm' in _s8_log:
                                         writer.add_scalar('stage8/csr_signal_norm', _s8_log['csr_signal_norm'], global_step)
+
+                            # Stage 9: Mechanism strength logging (F.14.5)
+                            if (_ablation_cfg is not None
+                                    and _ablation_cfg.log_mechanism_strength_every > 0
+                                    and global_step % _ablation_cfg.log_mechanism_strength_every == 0
+                                    and global_step > 0):
+                                from symbolu.training.conscious_generation.ablation.metrics import (
+                                    collect_mechanism_strength_log, collect_gradient_norms,
+                                )
+                                _mech_log = collect_mechanism_strength_log(model)
+                                if _mech_log:
+                                    _mech_parts = [f"  [Stage 9 MechStrength Step {global_step}]"]
+                                    for _mk, _mv in _mech_log.items():
+                                        _mech_parts.append(f" {_mk}={_mv:.4f}")
+                                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                            writer.add_scalar(f'stage9/{_mk}', _mv, global_step)
+                                    print("".join(_mech_parts))
 
                 except Exception as e:
                     if global_step % 500 == 0:
@@ -5866,6 +5927,31 @@ def train(config: UnifiedTrainingConfig):
                     # V9.8.10: Check if model type contains "phase" or "hybrid"
                     if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
+
+                    # Mistral CG adapter diagnostics: gate value, adapter output norm, state norm
+                    if config.model_type == "mistral_cg":
+                        _cg_model = getattr(model, 'module', model)  # unwrap DDP
+                        if hasattr(_cg_model, 'adapter_gate'):
+                            _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
+                            metrics['adapter_gate'] = _gate_val
+                            log_msg += f" | Gate:{_gate_val:.4f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/gate', _gate_val, global_step)
+                        if hasattr(_cg_model, 'phase_adapter') and is_verbose_step:
+                            _adapter_norm = sum(
+                                p.data.norm().item() ** 2 for p in _cg_model.phase_adapter.parameters()
+                            ) ** 0.5
+                            metrics['adapter_weight_norm'] = _adapter_norm
+                            log_msg += f" | AdpN:{_adapter_norm:.1f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/weight_norm', _adapter_norm, global_step)
+                        if isinstance(outputs, dict) and 'state' in outputs and outputs['state'] is not None:
+                            _state_norm = outputs['state'].detach().norm(dim=-1).mean().item()
+                            metrics['state_norm'] = _state_norm
+                            if is_verbose_step:
+                                log_msg += f" | StN:{_state_norm:.2f}"
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
 
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
                     if friction_alignment != 0.0 or friction_dominance != 1.0:
@@ -7287,6 +7373,8 @@ def train(config: UnifiedTrainingConfig):
                             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+                            cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                            training_config=_build_training_config_snapshot(config),
                         )
                         print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
 
@@ -7373,7 +7461,7 @@ def train(config: UnifiedTrainingConfig):
             if cg_factual_eval is not None and tokenizer is not None:
                 _fe_cache = None
                 if hasattr(model, 'conscious_gen'):
-                    _fe_cache = model.conscious_gen.get('token_cache', None)
+                    _fe_cache = model.conscious_gen['token_cache'] if 'token_cache' in model.conscious_gen else None
                 _fe_metrics = cg_factual_eval.evaluate(
                     model=model,
                     tokenizer=tokenizer,
@@ -7419,6 +7507,8 @@ def train(config: UnifiedTrainingConfig):
                     evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+                    cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                    training_config=_build_training_config_snapshot(config),
                 )
                 print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
                 # v2.7 Training State Tracker: Save state on checkpoint
@@ -7447,6 +7537,8 @@ def train(config: UnifiedTrainingConfig):
             evoflow_state=evolutionary_engine.get_state() if evolutionary_engine else None,
             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
+            cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+            training_config=_build_training_config_snapshot(config),
         )
         # v2.7 Training State Tracker: Save final state
         if training_state_tracker is not None and training_state_tracker.enabled:
@@ -9227,6 +9319,21 @@ def main():
     parser.add_argument("--perspective_log_interpretive", action="store_true", default=True,
                        help="Log full InterpretiveState per token to TensorBoard")
 
+    # Stage 9: Attention Mechanism Ablation Audit (F.14)
+    parser.add_argument("--ablation_disable_phase_sync", action="store_true",
+                       help="Stage 9: Disable phase synchronization (fall back to dot-product attention)")
+    parser.add_argument("--ablation_disable_vritti", action="store_true",
+                       help="Stage 9: Disable Vritti modulation (no cognitive gating)")
+    parser.add_argument("--ablation_disable_guna_bias", action="store_true",
+                       help="Stage 9: Disable Guna top-down bias")
+    parser.add_argument("--ablation_enable_dual_channel_intent", action="store_true",
+                       help="Stage 9: Enable dual-channel intent alignment (experimental)")
+    parser.add_argument("--ablation_log_mechanism_strength_every", type=int, default=0,
+                       help="Stage 9: Log mechanism strength signals every N steps (0=disabled)")
+    parser.add_argument("--run_ablation_audit", action="store_true",
+                       help="Stage 9: Run full ablation matrix after training/on checkpoint "
+                            "(requires --resume)")
+
     # Conscious Generation Phase Test
     parser.add_argument("--test_cg_phases", action="store_true",
                        help="Run conscious generation phase tests instead of training. "
@@ -10004,6 +10111,13 @@ def main():
         perspective_d_synthesis=args.perspective_d_synthesis,
         perspective_gate_init=args.perspective_gate_init,
         perspective_log_interpretive=args.perspective_log_interpretive,
+        # Stage 9: Attention Mechanism Ablation Audit
+        ablation_disable_phase_sync=args.ablation_disable_phase_sync,
+        ablation_disable_vritti=args.ablation_disable_vritti,
+        ablation_disable_guna_bias=args.ablation_disable_guna_bias,
+        ablation_enable_dual_channel_intent=args.ablation_enable_dual_channel_intent,
+        ablation_log_mechanism_strength_every=args.ablation_log_mechanism_strength_every,
+        run_ablation_audit=args.run_ablation_audit,
     )
 
     # ==========================================================================

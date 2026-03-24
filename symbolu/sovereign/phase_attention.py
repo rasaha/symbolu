@@ -118,6 +118,9 @@ class SovereignPhaseAttention(nn.Module):
         # Dropout
         self.dropout = nn.Dropout(dropout)
 
+        # Stage 9: ablation config (None = all mechanisms active)
+        self.ablation_config = None
+
         # Initialize
         self._init_weights()
 
@@ -177,6 +180,32 @@ class SovereignPhaseAttention(nn.Module):
         H = self.n_heads
         head_dim = self.head_dim
 
+        # ── Stage 9 ablation: check toggle flags ──
+        _use_phase = True
+        _use_vritti = self.use_vritti_phase
+        if self.ablation_config is not None:
+            _use_phase = self.ablation_config.use_phase_sync
+            if not self.ablation_config.use_vritti_modulation:
+                _use_vritti = False
+
+        # Stage 9 ablation: standard dot-product fallback (no phase)
+        if not _use_phase:
+            Q = self.q_proj(x).view(B, T, H, head_dim).permute(0, 2, 1, 3)
+            K = self.k_proj(x).view(B, T, H, head_dim).permute(0, 2, 1, 3)
+            V = self.v_proj(x).view(B, T, H, head_dim).permute(0, 2, 1, 3)
+            scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(head_dim)
+            if attention_mask is not None:
+                mask = attention_mask.unsqueeze(1).unsqueeze(2)
+                scores = scores.masked_fill(mask == 0, float('-inf'))
+            causal = torch.triu(torch.ones(T, T, device=x.device), diagonal=1).bool()
+            scores = scores.masked_fill(causal.unsqueeze(0).unsqueeze(0), float('-inf'))
+            attn_weights = F.softmax(scores, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+            context = torch.matmul(attn_weights, V)
+            context = context.permute(0, 2, 1, 3).contiguous().view(B, T, D)
+            output = self.out_proj(context)
+            return output, attn_weights
+
         # 1. Generate Phase Angles from R-Signal
         # Instead of random initialization, use Sovereign Intent
         phi_base = self.r_to_phi(r_signals)  # [B, T, H]
@@ -187,7 +216,7 @@ class SovereignPhaseAttention(nn.Module):
         # 3. Get Phase Stiffness from V-Signal (Vritti)
         # High stiffness = phase locked to R-Signal seed
         # Low stiffness = phase can drift (creative mode)
-        if v_signals is not None and self.use_vritti_phase:
+        if v_signals is not None and _use_vritti:
             stiffness = self.v_to_stiffness(v_signals)  # [B, T, H]
         else:
             # Default to medium stiffness

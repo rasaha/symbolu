@@ -169,10 +169,10 @@ class FactualEval:
                 return metrics
 
             _tet = raw_model.conscious_gen['token_eval_tensor']
-            _cache = raw_model.conscious_gen.get('token_cache', token_cache)
-            _bliss = raw_model.conscious_gen.get('bliss_gate', None)
-            _kosha = raw_model.conscious_gen.get('kosha_router', None)
-            _integ = raw_model.conscious_gen.get('integrated_scorer', None)
+            _cache = raw_model.conscious_gen['token_cache'] if 'token_cache' in raw_model.conscious_gen else token_cache
+            _bliss = raw_model.conscious_gen['bliss_gate'] if 'bliss_gate' in raw_model.conscious_gen else None
+            _kosha = raw_model.conscious_gen['kosha_router'] if 'kosha_router' in raw_model.conscious_gen else None
+            _integ = raw_model.conscious_gen['integrated_scorer'] if 'integrated_scorer' in raw_model.conscious_gen else None
 
             for context, fact_cont, hallu_cont in self._probes:
                 fact_text = context + fact_cont
@@ -256,7 +256,7 @@ class FactualEval:
 
                     # Vritti scores (column 4) — but we need the distribution, not the scalar
                     # Use the vritti scorer directly for richer info
-                    vritti_scorer = raw_model.conscious_gen.get('vritti_scorer', None)
+                    vritti_scorer = raw_model.conscious_gen['vritti_scorer'] if 'vritti_scorer' in raw_model.conscious_gen else None
                     if vritti_scorer is not None:
                         # Get context Vritti distribution for continuation tokens
                         fact_v_ctx = vritti_scorer.compute_context_repr(
