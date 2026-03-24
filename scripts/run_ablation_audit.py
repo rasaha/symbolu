@@ -42,12 +42,29 @@ from symbolu.training.conscious_generation.ablation import (
 
 
 def build_eval_fn(config, tokenizer, dataset):
-    """Build an evaluation function compatible with AblationRunner."""
+    """Build an evaluation function compatible with AblationRunner.
+
+    Returns (avg_loss, cg_diagnostics_dict) where cg_diagnostics contains:
+      - hidden_states: list of [B, T, D] tensors from each batch
+      - adapter_gate: mean gate value across batches
+      - adapter_output_norm: mean adapter output norm
+      - state_norm: mean sovereign state L2 norm
+      - delta_S_norm: mean state delta norm
+    """
 
     def eval_fn(model, dataloader, device):
         model.eval()
         total_loss = 0.0
         total_tokens = 0
+        # CG diagnostics accumulators
+        gate_sum = 0.0
+        adapter_norm_sum = 0.0
+        state_norm_sum = 0.0
+        delta_s_norm_sum = 0.0
+        n_batches = 0
+        hidden_states_sample = []  # Keep a few for hidden state delta
+        MAX_HIDDEN_SAMPLES = 5  # Don't OOM — keep only a few batches
+
         with torch.no_grad():
             for batch in dataloader:
                 # TextDataset returns (inputs, targets) tuple
@@ -63,9 +80,29 @@ def build_eval_fn(config, tokenizer, dataset):
                     targets = input_ids[:, 1:].contiguous()
                     inputs = input_ids[:, :-1].contiguous()
 
-                outputs = model(inputs)
+                try:
+                    outputs = model(inputs, return_last_hidden=True)
+                except TypeError:
+                    outputs = model(inputs)
                 if isinstance(outputs, dict):
                     logits = outputs.get("logits", outputs.get("output"))
+                    # Capture CG diagnostics from model output
+                    if "adapter_gate" in outputs:
+                        gate_val = outputs["adapter_gate"]
+                        gate_sum += gate_val if isinstance(gate_val, (int, float)) else gate_val.item()
+                    if "adapter_output_norm" in outputs:
+                        norm_val = outputs["adapter_output_norm"]
+                        adapter_norm_sum += norm_val if isinstance(norm_val, (int, float)) else norm_val.item()
+                    if "state" in outputs and outputs["state"] is not None:
+                        state_norm_sum += outputs["state"].detach().norm(dim=-1).mean().item()
+                    if "delta_S" in outputs and outputs["delta_S"] is not None:
+                        delta_s_norm_sum += outputs["delta_S"].detach().norm(dim=-1).mean().item()
+                    # Capture hidden states for HiddenΔ comparison
+                    if "last_hidden_state" in outputs and len(hidden_states_sample) < MAX_HIDDEN_SAMPLES:
+                        hidden_states_sample.append(outputs["last_hidden_state"].detach().cpu())
+                    elif len(hidden_states_sample) < MAX_HIDDEN_SAMPLES:
+                        # If model doesn't return last_hidden_state, compute from logits shape
+                        pass
                 else:
                     logits = outputs
 
@@ -79,9 +116,23 @@ def build_eval_fn(config, tokenizer, dataset):
                 )
                 total_loss += loss.item()
                 total_tokens += targets.numel()
+                n_batches += 1
 
         avg_loss = total_loss / max(total_tokens, 1)
-        return avg_loss, None  # No attention weights captured for now
+
+        # Build CG diagnostics dict
+        cg_diag = None
+        if n_batches > 0:
+            cg_diag = {
+                "adapter_gate": gate_sum / n_batches,
+                "adapter_output_norm": adapter_norm_sum / n_batches,
+                "state_norm": state_norm_sum / n_batches,
+                "delta_S_norm": delta_s_norm_sum / n_batches,
+            }
+            if hidden_states_sample:
+                cg_diag["hidden_states"] = torch.cat(hidden_states_sample, dim=0)
+
+        return avg_loss, cg_diag
 
     return eval_fn
 
@@ -137,9 +188,11 @@ def main():
     ckpt_stem = ckpt_path.parent / ckpt_path.stem
     meta_path = Path(f"{ckpt_stem}_meta.pt")
     ckpt_training_config = None
+    ckpt_step = None
     if meta_path.exists():
         _meta = torch.load(meta_path, map_location="cpu", weights_only=False)
         ckpt_training_config = _meta.get("training_config", None)
+        ckpt_step = _meta.get("step", None)
         del _meta
 
     # Resolve sequence length: CLI explicit > checkpoint > fallback 2048
@@ -160,6 +213,9 @@ def main():
     print(f"\n{'='*60}")
     print(f"  Stage 9 Ablation Audit")
     print(f"  Checkpoint: {args.checkpoint}")
+    if ckpt_step is not None:
+        print(f"  Checkpoint step: {ckpt_step}"
+              f"{'  !! WARNING: step 0 — CG adapter may not be trained' if ckpt_step == 0 else ''}")
     print(f"  Sequence length: {effective_seq_len} (from {seq_source})")
     print(f"  Eval batches: {args.max_eval_batches} x {args.batch_size}")
     print(f"{'='*60}")
