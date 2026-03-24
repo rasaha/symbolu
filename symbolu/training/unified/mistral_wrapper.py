@@ -151,6 +151,7 @@ class MistralCGWrapper(nn.Module):
             "trust_remote_code": trust_remote_code,
             "torch_dtype": torch.bfloat16,
             "output_hidden_states": True,
+            "attn_implementation": "flash_attention_2",
         }
 
         if quantize in ("4bit", "8bit"):
