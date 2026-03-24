@@ -13,7 +13,7 @@ Usage:
         --model_type mistral_cg \
         --dataset wikitext103 \
         --batch_size 4 \
-        --max_seq_len 512 \
+        --max_seq_len 2048 \
         --output ablation_report.json
 
 Prerequisites (per F.14.1):
@@ -98,8 +98,8 @@ def main():
                        help="Evaluation dataset")
     parser.add_argument("--batch_size", type=int, default=4,
                        help="Evaluation batch size")
-    parser.add_argument("--max_seq_len", type=int, default=512,
-                       help="Max sequence length for evaluation")
+    parser.add_argument("--max_seq_len", type=int, default=2048,
+                       help="Max sequence length for evaluation (default: 2048, must match training)")
     parser.add_argument("--max_eval_batches", type=int, default=50,
                        help="Max number of eval batches (0=all)")
     parser.add_argument("--output", type=str, default="ablation_report.json",
@@ -128,6 +128,8 @@ def main():
     print(f"\n{'='*60}")
     print(f"  Stage 9 Ablation Audit")
     print(f"  Checkpoint: {args.checkpoint}")
+    print(f"  Sequence length: {args.max_seq_len}")
+    print(f"  Eval batches: {args.max_eval_batches} x {args.batch_size}")
     print(f"{'='*60}")
 
     # Import model creation from training module
