@@ -293,15 +293,45 @@ def load_checkpoint(
                         del filtered_state[k]
                         print(f"      Dropped: {k}")
                 print(f"    ✓ phase_adapter will initialize fresh (phase-only architecture)")
+    # Detect old nn.Sequential state_projector keys and remap to SovereignStateProjector
+    # Old: state_projector.{0,2}.{weight,bias} (Sequential: Linear, GELU, Linear)
+    # New: state_projector.projector.{0,3}.{weight,bias} (Sequential: Linear, GELU, Dropout, Linear)
+    # Index 2->3 because Dropout is inserted at position 2 in the new format.
+    _old_sp_key_map = {
+        "state_projector.0.weight": "state_projector.projector.0.weight",
+        "state_projector.0.bias": "state_projector.projector.0.bias",
+        "state_projector.2.weight": "state_projector.projector.3.weight",
+        "state_projector.2.bias": "state_projector.projector.3.bias",
+    }
     old_projector_keys = [k for k in filtered_state if k.startswith("state_projector.") and ".projector." not in k and "layer_norm" not in k]
     if old_projector_keys:
-        migrated = True
-        print(f"    \u2192 Detected old state_projector format (unconstrained nn.Sequential)")
-        print(f"    \u2192 Dropping old weights to allow fresh SovereignStateProjector init")
-        for old_key in old_projector_keys:
-            del filtered_state[old_key]
-            print(f"      Dropped: {old_key}")
-        print(f"    \u2713 state_projector will initialize fresh with proper normalization")
+        # Check if dimensions are compatible before remapping
+        _can_remap = True
+        if hasattr(model, 'state_projector') and hasattr(model.state_projector, 'projector'):
+            _expected_shape = model.state_projector.projector[0].weight.shape
+            _old_in_key = "state_projector.0.weight"
+            if _old_in_key in filtered_state and filtered_state[_old_in_key].shape != _expected_shape:
+                _can_remap = False
+                print(f"    \u2192 Old state_projector dim={filtered_state[_old_in_key].shape} "
+                      f"!= new {_expected_shape}, cannot remap \u2014 reinitializing fresh")
+
+        if _can_remap:
+            print(f"    \u2192 Migrating old state_projector keys to SovereignStateProjector format")
+            for old_key in old_projector_keys:
+                new_key = _old_sp_key_map.get(old_key)
+                if new_key:
+                    filtered_state[new_key] = filtered_state.pop(old_key)
+                    print(f"      Remapped: {old_key} \u2192 {new_key}")
+                else:
+                    del filtered_state[old_key]
+                    print(f"      Dropped unknown: {old_key}")
+            print(f"    \u2713 state_projector weights migrated (layer_norm will init fresh)")
+        else:
+            migrated = True
+            for old_key in old_projector_keys:
+                del filtered_state[old_key]
+                print(f"      Dropped: {old_key}")
+            print(f"    \u2713 state_projector will initialize fresh with proper normalization")
 
     # V12.7: Extract slot_memory._adaptive.* keys before load_state_dict.
     # PyTorch's model.load_state_dict() uses _load_from_state_dict() internally

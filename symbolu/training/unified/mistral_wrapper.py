@@ -46,6 +46,7 @@ from symbolu.phase_transformer import (
     GUNA_SLICE,
     RESERVED_SLICE,
 )
+from symbolu.jepa.state_projector import SovereignStateProjector
 
 
 class MistralCGWrapper(nn.Module):
@@ -96,12 +97,17 @@ class MistralCGWrapper(nn.Module):
         # ── Trainable CG adapter layers ──────────────────────────────
 
         # State projector: Mistral hidden → 32D Sovereign State
-        self.state_projector = nn.Sequential(
-            nn.Linear(self.mistral_hidden_dim, self.mistral_hidden_dim // 4),
-            nn.GELU(),
-            nn.Linear(self.mistral_hidden_dim // 4, state_dim),
+        # Uses SovereignStateProjector with component-wise normalization
+        # (Bhava softmax, Kosha sigmoid, Vritti softmax, Guna sigmoid, Reserved tanh)
+        # intermediate_dim matches legacy hidden_dim//4 for checkpoint compatibility
+        self.state_projector = SovereignStateProjector(
+            hidden_dim=self.mistral_hidden_dim,
+            state_dim=state_dim,
+            intermediate_dim=self.mistral_hidden_dim // 4,
+            dropout=0.1,
+            use_layer_norm=True,
+            kosha_mode='sigmoid',
         )
-        self._init_absolute_potential_bias()
 
         # Intent phase projector: 12D Bhava delta → per-head phase offsets
         head_dim = self.mistral_hidden_dim // self.num_heads
@@ -254,18 +260,8 @@ class MistralCGWrapper(nn.Module):
         # Pool hidden states (mean over sequence)
         pooled = hidden.mean(dim=1)  # [B, D_mistral]
 
-        # Project to 32D Sovereign State
-        raw_state = self.state_projector(pooled)  # [B, state_dim]
-
-        # Apply ontological constraints (differentiable)
-        # Matches SovereignStateProjector semantics from jepa/state_projector.py
-        state = torch.cat([
-            torch.softmax(raw_state[..., BHAVA_SLICE], dim=-1),   # Bhavas: probability distribution
-            torch.sigmoid(raw_state[..., KOSHA_SLICE]),           # Koshas: independent [0,1]
-            torch.softmax(raw_state[..., VRITTI_SLICE], dim=-1),  # Vrittis: probability distribution
-            torch.sigmoid(raw_state[..., GUNA_SLICE]),            # Gunas: independent [0,1]
-            torch.tanh(raw_state[..., RESERVED_SLICE]),           # Reserved: bounded [-1,1]
-        ], dim=-1)
+        # Project to 32D Sovereign State (with component-wise constraints)
+        state = self.state_projector(pooled)  # [B, state_dim]
 
         # Extract Bhava slice
         bhava = state[:, BHAVA_SLICE]  # [B, 12]
