@@ -162,6 +162,15 @@ def main():
     else:
         print("  WARNING: Could not load checkpoint. Running with random weights.")
 
+    # Match trainable module dtype to backbone (bf16 backbone + float32 adapter = crash)
+    if hasattr(model, 'backbone'):
+        backbone_dtype = next(model.backbone.parameters()).dtype
+        for name, module in model.named_children():
+            if name == 'backbone':
+                continue
+            module.to(dtype=backbone_dtype)
+        print(f"  Trainable modules cast to {backbone_dtype}")
+
     # Ensure all modules have ablation_config attribute
     from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig as AAC
     for module in model.modules():
