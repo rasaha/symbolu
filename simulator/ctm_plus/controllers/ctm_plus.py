@@ -2399,10 +2399,17 @@ class CTMPlusController(BaseController):
                 if evicted is not None:
                     demoted = self._handle_eviction(state, evicted)
 
-            # Compressed tier access latency (decompression cost)
-            latency = self._config_compression_latency()
-            latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
-            return (Tier.COMPRESSED, latency, promoted, demoted)
+            if promoted:
+                # Promoted: decompression + promotion cost, served from compressed tier
+                latency = self._config_compression_latency()
+                latency += self.config.promotion_latency_ns
+                latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
+                return (Tier.COMPRESSED, latency, True, demoted)
+            else:
+                # Not promoted: just decompression access (page stays compressed)
+                latency = self._config_compression_latency()
+                latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
+                return (Tier.COMPRESSED, latency, False, False)
 
         # Case 2: Tier 1 Hit (Slow Path - consider promotion)
         if state.tier1.contains(page_id):
@@ -2584,9 +2591,17 @@ class CTMPlusController(BaseController):
             if page is None:
                 continue
 
-            if state.tier1.contains(next_page):
+            # Check tier0c first (cheaper to decompress than fetch from tier1)
+            in_tier0c = state.tier0c is not None and state.tier0c.contains(next_page)
+            if in_tier0c:
+                state.tier0c.remove(next_page)
+                self._compression_manager.decompress_page(page)
+            elif state.tier1.contains(next_page):
                 state.tier1.remove(next_page)
+            else:
+                continue  # Already in tier0 or not in any tier
 
+            if True:
                 # EXPLICIT VICTIM SELECTION for prefetch too
                 evicted = None
                 if state.tier0.is_full:
@@ -2659,10 +2674,18 @@ class CTMPlusController(BaseController):
     def _do_hint_prefetch(self, state: GlobalState, page_id: int, accessor_node: int = 0) -> None:
         """Gap 6: Prefetch a page due to WILLNEED hint."""
         page = state.all_pages.get(page_id)
-        if page is None or not state.tier1.contains(page_id):
+        if page is None:
             return
 
-        state.tier1.remove(page_id)
+        # Check tier0c first (decompress is cheaper than tier1 fetch)
+        in_tier0c = state.tier0c is not None and state.tier0c.contains(page_id)
+        if in_tier0c:
+            state.tier0c.remove(page_id)
+            self._compression_manager.decompress_page(page)
+        elif state.tier1.contains(page_id):
+            state.tier1.remove(page_id)
+        else:
+            return  # Already in tier0 or not placed
         evicted = None
         if state.tier0.is_full:
             victim = self._select_victim(state)

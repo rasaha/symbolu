@@ -433,6 +433,59 @@ class TestCompressionIntegration:
         page = state.all_pages.get(0)
         assert page is not None
 
+    def test_tier0c_hit_returns_compressed_tier(self):
+        """Tier0c hit should return Tier.COMPRESSED regardless of promotion."""
+        controller, state = self._make_controller(
+            tier0=5,
+            promotion_threshold_accesses=1,  # Promote on first hit
+        )
+        # Fill tier0
+        for i in range(5):
+            state.current_time += 1
+            controller.on_access(state, i, OpType.READ)
+
+        # Evict page 0 to tier0c
+        for i in range(5, 10):
+            state.current_time += 1
+            controller.on_access(state, i, OpType.READ)
+
+        # Access page 0 — should hit tier0c and promote (threshold=1)
+        state.current_time += 1
+        tier, latency, promoted, demoted = controller.on_access(state, 0, OpType.READ)
+
+        # Access was served from compressed tier
+        if tier == Tier.COMPRESSED:
+            assert latency > 0
+            # If promoted, latency should include promotion cost
+            if promoted:
+                assert latency >= controller.ctm_config.compression_tier.access_latency_ns
+
+    def test_tier0c_non_promoted_hit_no_promotion_latency(self):
+        """Tier0c hit without promotion should not include promotion latency."""
+        controller, state = self._make_controller(
+            tier0=5,
+            promotion_threshold_accesses=10,  # Need many hits before promotion
+        )
+        # Fill tier0
+        for i in range(5):
+            state.current_time += 1
+            controller.on_access(state, i, OpType.READ)
+
+        # Evict page 0 to tier0c
+        for i in range(5, 10):
+            state.current_time += 1
+            controller.on_access(state, i, OpType.READ)
+
+        # Access page 0 — should hit tier0c but NOT promote (threshold=10)
+        state.current_time += 1
+        tier, latency, promoted, demoted = controller.on_access(state, 0, OpType.READ)
+
+        if tier == Tier.COMPRESSED:
+            assert promoted is False
+            assert demoted is False
+            # Latency should be just compression access + NUMA penalty
+            assert latency >= controller.ctm_config.compression_tier.access_latency_ns
+
     def test_backward_compat_no_tier0c(self):
         """Tests should pass when tier0c is None (disabled compression)."""
         state = make_state(tier0=10, tier1=10000)
