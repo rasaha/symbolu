@@ -211,6 +211,7 @@ def run_benchmarks(
     trace_dir: Optional[str] = None,
     verbose: bool = True,
     seed: int = 42,
+    warmup_fraction: float = 0.0,
 ) -> BenchmarkSuite:
     """
     Run standard trace benchmarks.
@@ -222,6 +223,10 @@ def run_benchmarks(
         trace_dir: Directory with real trace files (None = synthetic only)
         verbose: Print progress
         seed: Random seed
+        warmup_fraction: Fraction of events to use as warmup (0.0-0.5).
+            During warmup, cache and controller state are built up normally
+            but metrics are reset so only steady-state performance is
+            measured. Default 0.0 = no warmup (legacy behavior).
 
     Returns:
         BenchmarkSuite with all results
@@ -246,6 +251,8 @@ def run_benchmarks(
         print(f"  Traces: {len(selected)}")
         if num_events:
             print(f"  Events/trace: {num_events:,}")
+        if warmup_fraction > 0:
+            print(f"  Warmup: {warmup_fraction:.0%} of events")
         print()
 
     start_time = time.time()
@@ -270,6 +277,9 @@ def run_benchmarks(
                   f"Tier0: {t0:,} ({profile.recommended_tier0_ratio:.0%} of WSS)")
             print()
 
+        # Compute warmup events for this trace
+        warmup_events = int(len(trace) * warmup_fraction)
+
         # Create controllers
         controllers = [
             ("LRU", LRUController(config)),
@@ -285,6 +295,7 @@ def run_benchmarks(
                 controller=controller,
                 trace_name=profile.name,
                 verbose=verbose,
+                warmup_events=warmup_events,
             )
             results[ctrl_name] = result
 
@@ -373,6 +384,16 @@ Examples:
         help="Quick run: 50k events per trace",
     )
     parser.add_argument(
+        "--warmup",
+        type=float,
+        default=0.0,
+        metavar="FRACTION",
+        help="Fraction of events to use as warmup (0.0-0.5). "
+             "Cache state is built during warmup but metrics are reset "
+             "so only steady-state performance is measured. "
+             "Example: --warmup 0.1 uses first 10%% as warmup.",
+    )
+    parser.add_argument(
         "--trace-dir",
         type=str,
         default=None,
@@ -419,6 +440,7 @@ Examples:
         trace_dir=args.trace_dir,
         verbose=not args.quiet,
         seed=args.seed,
+        warmup_fraction=args.warmup,
     )
 
     if args.json:

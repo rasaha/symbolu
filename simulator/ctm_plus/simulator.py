@@ -70,6 +70,7 @@ class Simulator:
         trace_name: str = "unknown",
         progress_interval: int = 10000,
         verbose: bool = True,
+        warmup_events: int = 0,
     ) -> SimulationResult:
         """
         Run simulation with given trace and controller.
@@ -80,6 +81,10 @@ class Simulator:
             trace_name: Name of trace (for reporting)
             progress_interval: Print progress every N events
             verbose: Whether to print progress
+            warmup_events: Number of initial events to use as warmup.
+                During warmup the cache and controller state are populated
+                normally, but metrics are reset afterwards so that only
+                steady-state performance is measured.
 
         Returns:
             SimulationResult with metrics and timing
@@ -152,6 +157,16 @@ class Simulator:
                 metrics.record_promotion()
             if demoted:
                 metrics.record_demotion()
+
+            # Warmup phase: reset metrics once warmup is complete
+            if warmup_events > 0 and i + 1 == warmup_events:
+                metrics.reset_stats()
+                start_time = time.time()  # restart timing for steady-state
+                if verbose:
+                    print(
+                        f"  [{controller.name}] Warmup complete: "
+                        f"{warmup_events:,} events, metrics reset"
+                    )
 
             # End of epoch processing
             if (i + 1) % epoch_size == 0:

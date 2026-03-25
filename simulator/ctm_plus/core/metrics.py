@@ -283,6 +283,27 @@ class MetricsCollector:
         """Record a BCVF rejection."""
         self.bcvf_rejections += 1
 
+    def reset_stats(self) -> None:
+        """Reset all counters/samples, keeping collector identity.
+
+        Used after a warmup phase: the controller and cache state are
+        preserved, but metrics start fresh so that only steady-state
+        performance is measured.
+        """
+        self.total_accesses = 0
+        self.tier0_hits = 0
+        self.tier1_hits = 0
+        self.total_misses = 0
+        self.promotions = 0
+        self.demotions = 0
+        self.bcvf_rejections = 0
+        self.total_latency_ns = 0
+        self.latencies.clear()
+        self.coherence_samples.clear()
+        self.phase_samples.clear()
+        self.hit_rate_over_time.clear()
+        self._hits_window.clear()
+
     def finalize(self) -> SimulationMetrics:
         """Convert to immutable SimulationMetrics."""
         return SimulationMetrics(
