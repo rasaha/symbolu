@@ -1780,7 +1780,7 @@ class CTMPlusController(BaseController):
                 self._numa_manager.migrate_page(page, target_node, state.current_time)
                 state.tier0.numa_occupancy[target_node] = state.tier0.numa_occupancy.get(target_node, 0) + 1
 
-            self._do_predictive_prefetch(state, page_id, policy)
+            self._do_predictive_prefetch(state, page_id, policy, accessor_node=accessor_node)
             latency = self._compute_latency(Tier.TIER0, False, False)
             # === NUMA: Add cross-node latency penalty ===
             latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
@@ -1848,7 +1848,7 @@ class CTMPlusController(BaseController):
                 if evicted is not None:
                     demoted = self._handle_eviction(state, evicted)
 
-                self._do_predictive_prefetch(state, page_id, policy)
+                self._do_predictive_prefetch(state, page_id, policy, accessor_node=accessor_node)
 
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             # === NUMA: Add cross-node latency penalty ===
@@ -1907,13 +1907,16 @@ class CTMPlusController(BaseController):
         willneed_pages = self._hint_manager.pop_willneed_pages()
         for wn_page_id in willneed_pages:
             if wn_page_id != page_id and state.tier1.contains(wn_page_id):
-                self._do_hint_prefetch(state, wn_page_id)
+                self._do_hint_prefetch(state, wn_page_id, accessor_node=accessor_node)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         # === NUMA: No extra penalty on miss (already at tier1 latency) ===
         return (Tier.NONE, latency, promoted, demoted)
 
-    def _do_predictive_prefetch(self, state: GlobalState, current_page: int, policy: ModePolicy = None) -> None:
+    def _do_predictive_prefetch(
+        self, state: GlobalState, current_page: int,
+        policy: ModePolicy = None, accessor_node: int = 0,
+    ) -> None:
         """
         FIX: Burst prefetch with gating based on probability mass.
         Mode-adaptive: respects policy.prefetch_enabled, budget_scale, min_prob, burst_size.
@@ -1961,6 +1964,8 @@ class CTMPlusController(BaseController):
                         state.tier0.remove(victim.page_id)
                         evicted = victim
 
+                # NUMA: Place prefetched page on accessor's node
+                self._numa_manager.assign_node(page, accessor_node)
                 state.tier0.add(page)
                 self._prefetch_promotions += 1
                 self._prefetch_engine.record_prefetch(next_page)
@@ -2010,7 +2015,7 @@ class CTMPlusController(BaseController):
         self._epoch_demotions += 1
         return True
 
-    def _do_hint_prefetch(self, state: GlobalState, page_id: int) -> None:
+    def _do_hint_prefetch(self, state: GlobalState, page_id: int, accessor_node: int = 0) -> None:
         """Gap 6: Prefetch a page due to WILLNEED hint."""
         page = state.all_pages.get(page_id)
         if page is None or not state.tier1.contains(page_id):
@@ -2024,6 +2029,8 @@ class CTMPlusController(BaseController):
                 state.tier0.remove(victim.page_id)
                 evicted = victim
 
+        # NUMA: Place prefetched page on accessor's node
+        self._numa_manager.assign_node(page, accessor_node)
         state.tier0.add(page)
         self._prefetch_promotions += 1
         self._prefetch_engine.record_prefetch(page_id)

@@ -43,6 +43,7 @@ class BaseController(ABC):
         state: GlobalState,
         page_id: int,
         op_type: OpType,
+        **kwargs,
     ) -> Tuple[Tier, int, bool, bool]:
         """
         Handle a memory access.
@@ -57,6 +58,8 @@ class BaseController(ABC):
             state: Global simulator state with all tiers and pages
             page_id: ID of the page being accessed
             op_type: Type of access (READ, WRITE, PREFETCH)
+            **kwargs: Extended parameters (e.g., tenant_id, numa_node)
+                consumed by advanced controllers, ignored by baselines.
 
         Returns:
             Tuple of:
@@ -153,6 +156,7 @@ class PassthroughController(BaseController):
         state: GlobalState,
         page_id: int,
         op_type: OpType,
+        **kwargs,
     ) -> Tuple[Tier, int, bool, bool]:
         # Get or create page
         page = state.get_or_create_page(page_id)

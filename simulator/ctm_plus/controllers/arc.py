@@ -74,6 +74,7 @@ class ARCController(BaseController):
         state: GlobalState,
         page_id: int,
         op_type: OpType,
+        **kwargs,
     ) -> Tuple[Tier, int, bool, bool]:
         page = state.get_or_create_page(page_id)
         page.update_on_access(state.current_time, op_type)
