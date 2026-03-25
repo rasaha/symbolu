@@ -31,7 +31,7 @@ from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
-    NUMAConfig, CostTieringConfig,
+    NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
 )
 
 
@@ -1319,6 +1319,188 @@ class CostModel:
         }
 
 
+class WritebackScheduler:
+    """
+    Writeback scheduling manager (Linux pdflush / CXL CMM-H inspired).
+
+    Proactively flushes dirty tier0 pages to tier1 in the background,
+    converting expensive synchronous eviction-time writebacks into cheap
+    asynchronous epoch-driven flushes.
+
+    Key behaviors:
+    - Tracks dirty pages in tier0 and their age (time since first dirtied)
+    - Drains oldest dirty pages each epoch (background writeback)
+    - Adjusts drain rate based on dirty ratio (watermark-driven)
+    - Provides victim score adjustments (dirty pages expensive to evict)
+    - Supports write coalescing (defers writeback for recently-dirtied pages)
+
+    Zero overhead when disabled (all methods short-circuit).
+    """
+
+    def __init__(self, config: WritebackSchedulingConfig, tier0_capacity: int):
+        self._config = config
+        self._tier0_capacity = max(1, tier0_capacity)
+
+        # Dirty page tracking: page_id → dirty_since timestamp
+        self._dirty_pages: Dict[int, int] = {}
+
+        # Stats
+        self._total_writebacks = 0
+        self._epoch_writebacks = 0
+        self._coalesced_writes = 0
+        self._dirty_evictions = 0    # Evictions requiring sync writeback
+        self._clean_evictions = 0    # Evictions with no writeback needed
+        self._watermark_triggers = 0  # Times high watermark was exceeded
+
+    @property
+    def enabled(self) -> bool:
+        return self._config.enabled
+
+    @property
+    def dirty_count(self) -> int:
+        """Number of currently dirty pages in tier0."""
+        return len(self._dirty_pages)
+
+    @property
+    def dirty_ratio(self) -> float:
+        """Fraction of tier0 that is dirty."""
+        return self.dirty_count / self._tier0_capacity
+
+    def mark_dirty(self, page_id: int, current_time: int) -> None:
+        """
+        Mark a page as dirty (written to in tier0).
+
+        If the page is already dirty and within the coalesce window,
+        the write is coalesced (dirty_since not reset).
+        """
+        if not self._config.enabled:
+            return
+
+        if page_id in self._dirty_pages:
+            # Already dirty — coalesce (don't reset dirty_since)
+            self._coalesced_writes += 1
+        else:
+            self._dirty_pages[page_id] = current_time
+
+    def mark_clean(self, page_id: int) -> None:
+        """Mark a page as clean after writeback."""
+        self._dirty_pages.pop(page_id, None)
+
+    def on_eviction(self, page_id: int) -> bool:
+        """
+        Record whether an evicted page was dirty (needed sync writeback).
+
+        Returns True if the page was dirty (expensive eviction).
+        """
+        if not self._config.enabled:
+            return False
+
+        was_dirty = page_id in self._dirty_pages
+        if was_dirty:
+            self._dirty_evictions += 1
+            self._dirty_pages.pop(page_id, None)
+        else:
+            self._clean_evictions += 1
+        return was_dirty
+
+    def get_victim_score_adjustment(self, page_id: int) -> float:
+        """
+        Victim score adjustment based on dirty status.
+
+        Dirty pages get a positive adjustment (harder to evict) because
+        evicting them requires an expensive synchronous writeback.
+        Clean pages get no adjustment (free to evict).
+
+        Returns positive = protect (dirty), 0.0 = neutral (clean).
+        """
+        if not self._config.enabled:
+            return 0.0
+
+        if page_id in self._dirty_pages:
+            return self._config.dirty_eviction_penalty
+        return 0.0
+
+    def drain_writebacks(self, state: 'GlobalState', current_time: int) -> int:
+        """
+        Epoch-driven background writeback: flush oldest dirty pages.
+
+        Called from on_epoch(). Selects dirty pages ordered by age
+        (oldest first) and marks them clean, simulating background
+        flush to tier1.
+
+        Returns number of pages written back this epoch.
+
+        Drain rate adapts to dirty ratio:
+        - Above high_watermark: drain at 2x rate (aggressive flush)
+        - Between watermarks: drain at normal rate
+        - Below low_watermark: no drain (no urgency)
+        """
+        if not self._config.enabled or not self._dirty_pages:
+            return 0
+
+        ratio = self.dirty_ratio
+
+        # Below low watermark: no urgency, skip drain
+        if ratio <= self._config.low_watermark:
+            self._epoch_writebacks = 0
+            return 0
+
+        # Determine drain budget
+        budget = self._config.max_writebacks_per_epoch
+        if ratio >= self._config.high_watermark:
+            budget *= 2  # Aggressive mode
+            self._watermark_triggers += 1
+
+        # Sort dirty pages by age (oldest first = lowest dirty_since)
+        sorted_dirty = sorted(self._dirty_pages.items(), key=lambda x: x[1])
+
+        flushed = 0
+        for page_id, dirty_since in sorted_dirty:
+            if flushed >= budget:
+                break
+
+            # Write coalescing: skip pages dirtied too recently
+            age = current_time - dirty_since
+            if age < self._config.coalesce_window:
+                continue
+
+            # Flush: mark page clean in both our tracking and page state
+            page = state.tier0.pages.get(page_id)
+            if page is not None:
+                page.dirty = False
+                page.dirty_since = 0
+                self._dirty_pages.pop(page_id, None)
+                flushed += 1
+
+        self._total_writebacks += flushed
+        self._epoch_writebacks = flushed
+        return flushed
+
+    def get_dirty_page_age(self, page_id: int, current_time: int) -> int:
+        """Get age (time since dirtied) of a dirty page. Returns 0 if clean."""
+        dirty_since = self._dirty_pages.get(page_id)
+        if dirty_since is None:
+            return 0
+        return max(0, current_time - dirty_since)
+
+    def get_stats(self) -> Dict:
+        """Get writeback scheduler metrics."""
+        total_evictions = self._dirty_evictions + self._clean_evictions
+        return {
+            "total_writebacks": self._total_writebacks,
+            "last_epoch_writebacks": self._epoch_writebacks,
+            "dirty_pages": self.dirty_count,
+            "dirty_ratio": round(self.dirty_ratio, 4),
+            "coalesced_writes": self._coalesced_writes,
+            "dirty_evictions": self._dirty_evictions,
+            "clean_evictions": self._clean_evictions,
+            "dirty_eviction_rate": (
+                self._dirty_evictions / total_evictions if total_evictions > 0 else 0.0
+            ),
+            "watermark_triggers": self._watermark_triggers,
+        }
+
+
 class NUMAManager:
     """
     NUMA-aware memory placement manager (Linux DAMON / CXL-inspired).
@@ -1498,6 +1680,7 @@ class CTMPlusController(BaseController):
     - External Hint API (CXL CMM-H): Application-provided page hints
     - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
     - NUMA-Aware Placement: Locality-aware latency, victim scoring, and migration
+    - Writeback Scheduling: Proactive dirty page flushing, write coalescing, eviction cost reduction
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
@@ -1531,6 +1714,9 @@ class CTMPlusController(BaseController):
         self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
         self._numa_manager = NUMAManager(self.ctm_config.numa)
         self._cost_model = CostModel(self.ctm_config.cost_tiering, config)
+        self._writeback_scheduler = WritebackScheduler(
+            self.ctm_config.writeback_scheduling, config.tier0_size
+        )
 
         # Stats
         self._promotions = 0
@@ -1548,6 +1734,7 @@ class CTMPlusController(BaseController):
         self._refault_promotions = 0
         self._numa_influenced = 0
         self._cost_influenced = 0
+        self._writeback_influenced = 0
         self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
@@ -1724,6 +1911,12 @@ class CTMPlusController(BaseController):
                 score += cost_adj
                 self._cost_influenced += 1
 
+            # === Writeback: Dirty pages are expensive to evict ===
+            wb_adj = self._writeback_scheduler.get_victim_score_adjustment(page.page_id)
+            if wb_adj != 0.0:
+                score += wb_adj
+                self._writeback_influenced += 1
+
             # Partition penalty based on adaptive p
             if p_val > 0.5 and frequency < 0.3:
                 score -= 0.10 * (p_val - 0.5) * 2
@@ -1824,6 +2017,11 @@ class CTMPlusController(BaseController):
         """External API: Get NUMA-related metrics."""
         return self._numa_manager.get_stats()
 
+    # === Writeback scheduling public API ===
+    def get_writeback_stats(self) -> Dict:
+        """External API: Get writeback scheduler metrics."""
+        return self._writeback_scheduler.get_stats()
+
     def on_access(
         self,
         state: GlobalState,
@@ -1920,6 +2118,10 @@ class CTMPlusController(BaseController):
             state.tier0.record_hit()
             self._tenant_manager.record_access(page.tenant_id, is_hit=True)
 
+            # === Writeback: Track dirty pages on write ===
+            if op_type == OpType.WRITE:
+                self._writeback_scheduler.mark_dirty(page_id, state.current_time)
+
             # === NUMA: Migrate page closer to accessor if beneficial ===
             if self._numa_manager.should_migrate(page, state.current_time):
                 old_node = page.numa_node
@@ -1995,6 +2197,10 @@ class CTMPlusController(BaseController):
                 self._tenant_manager.record_promotion(page.tenant_id)
                 page.last_promotion_time = state.current_time
 
+                # === Writeback: Track dirty pages promoted via write ===
+                if op_type == OpType.WRITE:
+                    self._writeback_scheduler.mark_dirty(page_id, state.current_time)
+
                 if evicted is not None:
                     demoted = self._handle_eviction(state, evicted)
 
@@ -2047,6 +2253,10 @@ class CTMPlusController(BaseController):
             promoted = True
             self._promotions += 1
             self._tenant_manager.record_promotion(page.tenant_id)
+
+            # === Writeback: Track dirty pages admitted via write ===
+            if op_type == OpType.WRITE:
+                self._writeback_scheduler.mark_dirty(page_id, state.current_time)
 
             if evicted is not None:
                 demoted = self._handle_eviction(state, evicted)
@@ -2143,6 +2353,11 @@ class CTMPlusController(BaseController):
         evicted.last_demotion_time = state.current_time
         evicted.visited = False  # Gap 5: Reset visited bit
 
+        # === Writeback: Track dirty eviction and clear dirty state ===
+        self._writeback_scheduler.on_eviction(evicted.page_id)
+        evicted.dirty = False
+        evicted.dirty_since = 0
+
         # Multi-tenancy: record tenant eviction
         self._tenant_manager.record_demotion(evicted.tenant_id)
         self._tenant_manager.record_eviction(evicted.tenant_id)
@@ -2207,6 +2422,9 @@ class CTMPlusController(BaseController):
 
         # === Gap 4: Flush old pending evictions and check for weight update ===
         self._weight_learner.maybe_update()
+
+        # === Writeback: Drain dirty pages in background ===
+        self._writeback_scheduler.drain_writebacks(state, state.current_time)
 
     def get_stats(self) -> dict:
         mode_stats = self._mode_switcher.get_stats()
@@ -2274,5 +2492,9 @@ class CTMPlusController(BaseController):
             "cost_tiering_enabled": self.ctm_config.cost_tiering.enabled,
             "cost_influenced_decisions": self._cost_influenced,
             "cost_stats": self._cost_model.get_stats() if self.ctm_config.cost_tiering.enabled else {},
+            # Writeback scheduling
+            "writeback_scheduling_enabled": self.ctm_config.writeback_scheduling.enabled,
+            "writeback_influenced_decisions": self._writeback_influenced,
+            "writeback_stats": self._writeback_scheduler.get_stats() if self.ctm_config.writeback_scheduling.enabled else {},
         }
         return stats

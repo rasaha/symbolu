@@ -402,6 +402,77 @@ class CostTieringConfig:
 
 
 @dataclass(frozen=True)
+class WritebackSchedulingConfig:
+    """
+    Writeback scheduling configuration (Linux pdflush / CXL CMM-H inspired).
+
+    Controls proactive flushing of dirty tier0 pages back to tier1 before
+    eviction. Without writeback scheduling, dirty pages require synchronous
+    writeback at eviction time, causing latency spikes and write bursts.
+
+    Key insight: By proactively writing back dirty pages during epochs, the
+    controller turns expensive synchronous eviction-time writebacks into
+    cheap asynchronous background flushes. This:
+    - Reduces tail latency (no sync writeback stall on eviction)
+    - Enables write coalescing (multiple writes → single flush)
+    - Improves victim selection (clean pages are cheaper to evict)
+
+    Dirty page lifecycle:
+        WRITE → mark dirty (dirty_since = current_time)
+        → background writeback (dirty_since reset, page stays in tier0)
+        → eviction (no writeback needed if already clean)
+
+    Victim scoring integration:
+        dirty_penalty: dirty pages cost more to evict → protect them OR
+        prefer evicting clean pages first (they're free to demote).
+    """
+
+    enabled: bool = False
+
+    # Maximum number of dirty pages to flush per epoch (background drain rate).
+    # Higher = more aggressive writeback, lower eviction-time stalls.
+    # Lower = less background I/O, but more synchronous writebacks.
+    max_writebacks_per_epoch: int = 50
+
+    # Age threshold (in time units) before a dirty page becomes urgent.
+    # Pages dirty longer than this are prioritized for writeback.
+    dirty_age_threshold: int = 500
+
+    # Maximum fraction of tier0 that can be dirty before triggering
+    # aggressive writeback. Prevents dirty page accumulation.
+    # When dirty_ratio exceeds this, drain rate doubles.
+    high_watermark: float = 0.7
+
+    # Below this dirty ratio, background writeback pauses (no urgency).
+    low_watermark: float = 0.2
+
+    # Victim scoring: penalty for dirty pages in eviction decisions.
+    # Positive = protect dirty pages (they're expensive to evict).
+    # Evicting a dirty page requires sync writeback → higher latency.
+    dirty_eviction_penalty: float = 0.15
+
+    # Write coalescing: minimum time between writeback of same page.
+    # If a page is written again within this window after being marked
+    # dirty, the writeback is deferred (coalescing multiple writes).
+    coalesce_window: int = 50
+
+    # Simulated writeback latency (ns). Background writebacks are cheaper
+    # than synchronous eviction writebacks because they can be batched.
+    writeback_latency_ns: int = 80000  # 80% of full demotion cost
+
+    def __post_init__(self) -> None:
+        if self.max_writebacks_per_epoch < 1:
+            raise ValueError("max_writebacks_per_epoch must be >= 1")
+        if not (0.0 <= self.low_watermark <= self.high_watermark <= 1.0):
+            raise ValueError(
+                f"Watermarks must satisfy 0 <= low ({self.low_watermark}) "
+                f"<= high ({self.high_watermark}) <= 1"
+            )
+        if self.dirty_age_threshold < 1:
+            raise ValueError("dirty_age_threshold must be >= 1")
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -439,6 +510,7 @@ class CTMPlusConfig:
     multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
     numa: NUMAConfig = field(default_factory=NUMAConfig)
     cost_tiering: CostTieringConfig = field(default_factory=CostTieringConfig)
+    writeback_scheduling: WritebackSchedulingConfig = field(default_factory=WritebackSchedulingConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

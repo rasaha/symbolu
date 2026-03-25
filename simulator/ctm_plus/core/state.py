@@ -99,6 +99,10 @@ class PageState:
     # === Multi-tenancy: QoS isolation ===
     tenant_id: str = "default"  # Owning tenant for QoS-aware eviction
 
+    # === Writeback scheduling ===
+    dirty: bool = False          # Page has unflushed writes in tier0
+    dirty_since: int = 0         # Time when page was first dirtied (0 = clean)
+
     # === NUMA-aware placement ===
     numa_node: int = 0           # Current NUMA node where page is placed
     preferred_node: int = 0      # NUMA node of most frequent accessor
@@ -135,6 +139,10 @@ class PageState:
         if op_type == OpType.WRITE:
             self.write_count += 1
             self.heat = min(1.0, self.heat + 0.2)  # Writes increase heat
+            # Writeback scheduling: mark page dirty on write
+            if not self.dirty:
+                self.dirty = True
+                self.dirty_since = time
         else:
             self.heat *= heat_decay  # Heat decays over time
 

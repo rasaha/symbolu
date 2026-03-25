@@ -5,7 +5,7 @@ from .config import (
     AdmissionConfig, IRRConfig, SizeAwareConfig, RefaultConfig,
     AdaptiveWeightConfig, LazyPromotionConfig, ExternalHintConfig,
     TenantPriority, TenantConfig, MultiTenancyConfig,
-    NUMAConfig, CostTieringConfig,
+    NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
 )
 from .state import PageState, TierState, PageHint
 from .metrics import SimulationMetrics, MetricsCollector
@@ -25,6 +25,7 @@ __all__ = [
     "MultiTenancyConfig",
     "NUMAConfig",
     "CostTieringConfig",
+    "WritebackSchedulingConfig",
     "PageState",
     "TierState",
     "PageHint",
