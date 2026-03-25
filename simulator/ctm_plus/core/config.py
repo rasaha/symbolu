@@ -6,7 +6,7 @@ derived from the CTM+ specification.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 from enum import IntEnum
 
 
@@ -267,6 +267,80 @@ class MultiTenancyConfig:
 
 
 @dataclass(frozen=True)
+class NUMAConfig:
+    """
+    NUMA-aware memory placement configuration (Linux DAMON / CXL-inspired).
+
+    Models a multi-socket system where memory access latency depends on the
+    physical distance between the requesting CPU and the memory node.
+
+    Topology:
+        num_nodes NUMA nodes, each with a slice of tier0 and tier1 capacity.
+        Access latency = base_latency + remote_penalty * distance(src, dst).
+
+    Design:
+        - Distance matrix: NxN symmetric matrix of inter-node distances [0.0, 1.0]
+          where 0.0 = local and 1.0 = maximum remote distance.
+        - Each page tracks its preferred_node (the NUMA node of its most
+          frequent accessor). Promotions target the requester's node.
+        - Victim selection penalizes pages on the "wrong" node (remote to
+          their preferred accessor) → they get evicted first.
+        - Migration: When a page is accessed from a different node than its
+          current placement, the controller may migrate it closer.
+    """
+
+    enabled: bool = False
+
+    # Topology
+    num_nodes: int = 2  # Number of NUMA nodes (sockets)
+
+    # Distance matrix as flat list (row-major): distances[i * num_nodes + j]
+    # If empty, auto-generated as uniform remote distance.
+    # Values in [0.0, 1.0] where 0.0 = local, 1.0 = max remote.
+    distances: Tuple[float, ...] = ()
+
+    # Latency model
+    remote_penalty_ns: int = 150  # Extra latency per unit of distance (ns)
+    # e.g., local DRAM = 100ns, 1-hop remote = 100 + 150*0.5 = 175ns
+
+    # Placement policy
+    local_preference_weight: float = 0.15  # Score boost for local pages in victim selection
+    remote_eviction_penalty: float = 0.15  # Score penalty for remote pages (easier to evict)
+    migration_threshold: float = 0.6  # Affinity score threshold to trigger migration
+    migration_cooldown: int = 50  # Min accesses between migrations for same page
+
+    def get_distance(self, src_node: int, dst_node: int) -> float:
+        """Get distance between two NUMA nodes."""
+        if src_node == dst_node:
+            return 0.0
+        if self.distances:
+            idx = src_node * self.num_nodes + dst_node
+            if idx < len(self.distances):
+                return self.distances[idx]
+        # Default: uniform remote distance of 1.0
+        return 1.0
+
+    def get_distance_matrix(self) -> List[List[float]]:
+        """Get full NxN distance matrix."""
+        n = self.num_nodes
+        if self.distances and len(self.distances) == n * n:
+            return [[self.distances[i * n + j] for j in range(n)] for i in range(n)]
+        # Auto-generate: 0 on diagonal, 1.0 everywhere else
+        return [[0.0 if i == j else 1.0 for j in range(n)] for i in range(n)]
+
+    def __post_init__(self) -> None:
+        if self.num_nodes < 1:
+            raise ValueError("num_nodes must be >= 1")
+        if self.distances:
+            expected = self.num_nodes * self.num_nodes
+            if len(self.distances) != expected:
+                raise ValueError(
+                    f"distances must have {expected} entries for {self.num_nodes} nodes, "
+                    f"got {len(self.distances)}"
+                )
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -302,6 +376,7 @@ class CTMPlusConfig:
     lazy_promotion: LazyPromotionConfig = field(default_factory=LazyPromotionConfig)
     external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
     multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
+    numa: NUMAConfig = field(default_factory=NUMAConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

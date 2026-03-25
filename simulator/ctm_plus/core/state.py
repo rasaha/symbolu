@@ -99,6 +99,13 @@ class PageState:
     # === Multi-tenancy: QoS isolation ===
     tenant_id: str = "default"  # Owning tenant for QoS-aware eviction
 
+    # === NUMA-aware placement ===
+    numa_node: int = 0           # Current NUMA node where page is placed
+    preferred_node: int = 0      # NUMA node of most frequent accessor
+    last_accessor_node: int = 0  # NUMA node of most recent accessor
+    node_access_counts: Dict[int, int] = field(default_factory=dict)  # per-node access counts
+    last_migration_time: int = 0  # Last time page was migrated between nodes
+
     def update_on_access(
         self,
         time: int,
@@ -216,6 +223,9 @@ class TierState:
     # Per-tenant occupancy tracking: tenant_id -> page count in this tier
     tenant_occupancy: Dict[str, int] = field(default_factory=dict)
 
+    # Per-NUMA-node occupancy tracking: node_id -> page count in this tier
+    numa_occupancy: Dict[int, int] = field(default_factory=dict)
+
     @property
     def size(self) -> int:
         """Current number of pages in tier."""
@@ -274,21 +284,27 @@ class TierState:
         if self.is_full and page.page_id not in self.pages:
             evicted = self._evict_lru()
 
-        # Track tenant occupancy change for evicted page
+        # Track tenant/NUMA occupancy change for evicted page
         if evicted is not None:
             tid = evicted.tenant_id
             self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+            nid = evicted.numa_node
+            self.numa_occupancy[nid] = max(0, self.numa_occupancy.get(nid, 0) - 1)
 
         # Add page (if replacing existing, adjust occupancy)
         if page.page_id in self.pages:
-            old_tid = self.pages[page.page_id].tenant_id
+            old_page = self.pages[page.page_id]
+            old_tid = old_page.tenant_id
             self.tenant_occupancy[old_tid] = max(0, self.tenant_occupancy.get(old_tid, 0) - 1)
+            old_nid = old_page.numa_node
+            self.numa_occupancy[old_nid] = max(0, self.numa_occupancy.get(old_nid, 0) - 1)
 
         self.pages[page.page_id] = page
         page.tier = self.tier_id
 
-        # Track tenant occupancy for new page
+        # Track tenant/NUMA occupancy for new page
         self.tenant_occupancy[page.tenant_id] = self.tenant_occupancy.get(page.tenant_id, 0) + 1
+        self.numa_occupancy[page.numa_node] = self.numa_occupancy.get(page.numa_node, 0) + 1
 
         # Update access order
         if page.page_id in self.access_order:
@@ -316,6 +332,9 @@ class TierState:
         # Track tenant occupancy
         tid = page.tenant_id
         self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+        # Track NUMA occupancy
+        nid = page.numa_node
+        self.numa_occupancy[nid] = max(0, self.numa_occupancy.get(nid, 0) - 1)
 
         if page_id in self.access_order:
             self.access_order.remove(page_id)
@@ -344,6 +363,10 @@ class TierState:
     def get_tenant_page_count(self, tenant_id: str) -> int:
         """Get number of pages owned by a tenant in this tier."""
         return self.tenant_occupancy.get(tenant_id, 0)
+
+    def get_numa_node_page_count(self, node_id: int) -> int:
+        """Get number of pages placed on a NUMA node in this tier."""
+        return self.numa_occupancy.get(node_id, 0)
 
     def get_lru_candidates(self, n: int) -> list:
         """Get N least recently used pages as eviction candidates."""

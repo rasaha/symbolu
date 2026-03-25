@@ -31,6 +31,7 @@ from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
+    NUMAConfig,
 )
 
 
@@ -1183,6 +1184,172 @@ class TenantManager:
         return tenant_stats
 
 
+class NUMAManager:
+    """
+    NUMA-aware memory placement manager (Linux DAMON / CXL-inspired).
+
+    Models a multi-socket system where cross-node memory accesses incur
+    additional latency. Provides:
+
+    - Node affinity tracking: Each page tracks which NUMA node accesses it
+      most frequently and sets a preferred_node accordingly.
+    - Locality-aware latency: Access latency includes a distance penalty
+      when the requester's node differs from the page's placement node.
+    - NUMA-aware victim scoring: Pages placed on a remote node (relative to
+      their preferred accessor) are penalized → evicted first.
+    - Migration decisions: When a page's accessor node doesn't match its
+      current placement node, it may be migrated closer.
+
+    Zero overhead when disabled (all methods short-circuit).
+    """
+
+    def __init__(self, config: NUMAConfig):
+        self._config = config
+        self._distance_matrix = config.get_distance_matrix()
+
+        # Per-node metrics
+        self._node_accesses: Dict[int, int] = {}
+        self._node_local_hits: Dict[int, int] = {}
+        self._node_remote_hits: Dict[int, int] = {}
+        self._migrations: int = 0
+
+    @property
+    def enabled(self) -> bool:
+        return self._config.enabled
+
+    def get_distance(self, src_node: int, dst_node: int) -> float:
+        """Get distance between two NUMA nodes. 0.0 = local, 1.0 = max remote."""
+        if not self._config.enabled or src_node == dst_node:
+            return 0.0
+        n = self._config.num_nodes
+        if 0 <= src_node < n and 0 <= dst_node < n:
+            return self._distance_matrix[src_node][dst_node]
+        return 1.0
+
+    def compute_latency_penalty(self, accessor_node: int, page_node: int) -> int:
+        """
+        Compute extra latency (ns) for cross-node access.
+
+        Returns 0 for local access, remote_penalty_ns * distance for remote.
+        """
+        if not self._config.enabled:
+            return 0
+        dist = self.get_distance(accessor_node, page_node)
+        return int(self._config.remote_penalty_ns * dist)
+
+    def record_access(self, page: PageState, accessor_node: int) -> None:
+        """
+        Record an access to a page from a specific NUMA node.
+
+        Updates the page's per-node access counts and preferred_node.
+        """
+        if not self._config.enabled:
+            return
+
+        page.last_accessor_node = accessor_node
+
+        # Update per-node access count
+        page.node_access_counts[accessor_node] = page.node_access_counts.get(accessor_node, 0) + 1
+
+        # Update preferred node (node with most accesses)
+        if page.node_access_counts.get(accessor_node, 0) >= page.node_access_counts.get(page.preferred_node, 0):
+            page.preferred_node = accessor_node
+
+        # Per-node metrics
+        self._node_accesses[accessor_node] = self._node_accesses.get(accessor_node, 0) + 1
+        if accessor_node == page.numa_node:
+            self._node_local_hits[accessor_node] = self._node_local_hits.get(accessor_node, 0) + 1
+        else:
+            self._node_remote_hits[accessor_node] = self._node_remote_hits.get(accessor_node, 0) + 1
+
+    def assign_node(self, page: PageState, accessor_node: int) -> None:
+        """Assign a new page to the accessor's NUMA node (initial placement)."""
+        if not self._config.enabled:
+            return
+        page.numa_node = accessor_node
+        page.preferred_node = accessor_node
+        page.last_accessor_node = accessor_node
+
+    def should_migrate(self, page: PageState, current_time: int) -> bool:
+        """
+        Decide whether a page should be migrated to its preferred node.
+
+        Conditions:
+        1. Page's current node != preferred node
+        2. Affinity is strong enough (preferred node has > threshold of accesses)
+        3. Cooldown has elapsed since last migration
+        """
+        if not self._config.enabled:
+            return False
+
+        if page.numa_node == page.preferred_node:
+            return False
+
+        if current_time - page.last_migration_time < self._config.migration_cooldown:
+            return False
+
+        # Compute affinity score: fraction of accesses from preferred node
+        total = sum(page.node_access_counts.values())
+        if total == 0:
+            return False
+        preferred_count = page.node_access_counts.get(page.preferred_node, 0)
+        affinity = preferred_count / total
+
+        return affinity >= self._config.migration_threshold
+
+    def migrate_page(self, page: PageState, target_node: int, current_time: int) -> None:
+        """
+        Migrate a page to a different NUMA node.
+
+        Updates the page's numa_node and records the migration time.
+        Note: The caller is responsible for updating TierState.numa_occupancy.
+        """
+        if not self._config.enabled:
+            return
+        page.numa_node = target_node
+        page.last_migration_time = current_time
+        self._migrations += 1
+
+    def get_victim_score_adjustment(self, page: PageState, accessor_node: int) -> float:
+        """
+        Compute NUMA-based victim score adjustment.
+
+        - Pages local to their preferred accessor get a boost (harder to evict)
+        - Pages remote from their preferred accessor get a penalty (easier to evict)
+
+        Returns positive = protect, negative = easier to evict.
+        """
+        if not self._config.enabled:
+            return 0.0
+
+        dist_from_preferred = self.get_distance(page.numa_node, page.preferred_node)
+
+        if dist_from_preferred == 0.0:
+            # Page is on its preferred node → protect it
+            return self._config.local_preference_weight
+        else:
+            # Page is remote from its preferred accessor → easier to evict
+            return -self._config.remote_eviction_penalty * dist_from_preferred
+
+    def get_stats(self) -> Dict:
+        """Get NUMA-related metrics."""
+        per_node = {}
+        for nid in range(self._config.num_nodes):
+            accesses = self._node_accesses.get(nid, 0)
+            local = self._node_local_hits.get(nid, 0)
+            remote = self._node_remote_hits.get(nid, 0)
+            per_node[nid] = {
+                "accesses": accesses,
+                "local_hits": local,
+                "remote_hits": remote,
+                "local_rate": local / accesses if accesses > 0 else 0.0,
+            }
+        return {
+            "migrations": self._migrations,
+            "per_node": per_node,
+        }
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller with all state-of-the-art gap closures implemented.
@@ -1195,6 +1362,7 @@ class CTMPlusController(BaseController):
     - Lazy Promotion (SIEVE): Visited-bit deferred scoring
     - External Hint API (CXL CMM-H): Application-provided page hints
     - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
+    - NUMA-Aware Placement: Locality-aware latency, victim scoring, and migration
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
@@ -1226,6 +1394,7 @@ class CTMPlusController(BaseController):
         self._weight_learner = AdaptiveWeightLearner(self.ctm_config)
         self._hint_manager = ExternalHintManager(self.ctm_config)
         self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
+        self._numa_manager = NUMAManager(self.ctm_config.numa)
 
         # Stats
         self._promotions = 0
@@ -1241,6 +1410,7 @@ class CTMPlusController(BaseController):
         self._irr_influenced = 0
         self._hint_influenced = 0
         self._refault_promotions = 0
+        self._numa_influenced = 0
         self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
@@ -1404,6 +1574,13 @@ class CTMPlusController(BaseController):
             if tenant_adj != 0.0:
                 score += tenant_adj
 
+            # === NUMA: Locality-based victim score adjustment ===
+            # Pages remote from their preferred accessor are easier to evict
+            numa_adj = self._numa_manager.get_victim_score_adjustment(page, page.preferred_node)
+            if numa_adj != 0.0:
+                score += numa_adj
+                self._numa_influenced += 1
+
             # Partition penalty based on adaptive p
             if p_val > 0.5 and frequency < 0.3:
                 score -= 0.10 * (p_val - 0.5) * 2
@@ -1494,14 +1671,23 @@ class CTMPlusController(BaseController):
         """External API: Get per-tenant metrics."""
         return self._tenant_manager.get_stats()
 
+    # === NUMA public API ===
+    def get_numa_stats(self) -> Dict:
+        """External API: Get NUMA-related metrics."""
+        return self._numa_manager.get_stats()
+
     def on_access(
         self,
         state: GlobalState,
         page_id: int,
         op_type: OpType,
         tenant_id: Optional[str] = None,
+        numa_node: Optional[int] = None,
     ) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
+
+        # Resolve NUMA node: use provided value or default to 0
+        accessor_node = numa_node if numa_node is not None else 0
 
         # Predictive updates
         self._transition_tracker.record_access(page_id)
@@ -1524,6 +1710,9 @@ class CTMPlusController(BaseController):
         # === Multi-tenancy: Assign tenant to page ===
         if tenant_id is not None:
             self._tenant_manager.assign_page_tenant(page, tenant_id)
+
+        # === NUMA: Record access and track node affinity ===
+        self._numa_manager.record_access(page, accessor_node)
         page.update_on_access(state.current_time, op_type)
 
         # === Gap 1: IRR tracking ===
@@ -1582,8 +1771,19 @@ class CTMPlusController(BaseController):
             state.tier0.touch(page_id)
             state.tier0.record_hit()
             self._tenant_manager.record_access(page.tenant_id, is_hit=True)
+
+            # === NUMA: Migrate page closer to accessor if beneficial ===
+            if self._numa_manager.should_migrate(page, state.current_time):
+                old_node = page.numa_node
+                target_node = page.preferred_node
+                state.tier0.numa_occupancy[old_node] = max(0, state.tier0.numa_occupancy.get(old_node, 0) - 1)
+                self._numa_manager.migrate_page(page, target_node, state.current_time)
+                state.tier0.numa_occupancy[target_node] = state.tier0.numa_occupancy.get(target_node, 0) + 1
+
             self._do_predictive_prefetch(state, page_id, policy)
             latency = self._compute_latency(Tier.TIER0, False, False)
+            # === NUMA: Add cross-node latency penalty ===
+            latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
             return (Tier.TIER0, latency, False, False)
 
         # Case 2: Tier 1 Hit (Slow Path - consider promotion)
@@ -1626,6 +1826,9 @@ class CTMPlusController(BaseController):
             if should_promote:
                 state.tier1.remove(page_id)
 
+                # === NUMA: Place promoted page on accessor's node ===
+                self._numa_manager.assign_node(page, accessor_node)
+
                 # EXPLICIT VICTIM SELECTION (the key change)
                 # Select victim BEFORE eviction, not after
                 evicted = None
@@ -1648,6 +1851,8 @@ class CTMPlusController(BaseController):
                 self._do_predictive_prefetch(state, page_id, policy)
 
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
+            # === NUMA: Add cross-node latency penalty ===
+            latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
             return (Tier.TIER1, latency, promoted, demoted)
 
         # Case 3: Miss
@@ -1676,6 +1881,9 @@ class CTMPlusController(BaseController):
                 admit = False
 
         if admit:
+            # === NUMA: Place new page on accessor's node ===
+            self._numa_manager.assign_node(page, accessor_node)
+
             evicted = None
             if victim and state.tier0.is_full:
                 state.tier0.remove(victim.page_id)
@@ -1691,6 +1899,7 @@ class CTMPlusController(BaseController):
                 demoted = self._handle_eviction(state, evicted)
         else:
             # Admission rejected: page goes to tier1 only (bypass tier0)
+            self._numa_manager.assign_node(page, accessor_node)
             state.tier1.add(page)
             promoted = False
 
@@ -1701,6 +1910,7 @@ class CTMPlusController(BaseController):
                 self._do_hint_prefetch(state, wn_page_id)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
+        # === NUMA: No extra penalty on miss (already at tier1 latency) ===
         return (Tier.NONE, latency, promoted, demoted)
 
     def _do_predictive_prefetch(self, state: GlobalState, current_page: int, policy: ModePolicy = None) -> None:
@@ -1896,5 +2106,9 @@ class CTMPlusController(BaseController):
             # Multi-tenancy & QoS isolation
             "multi_tenancy_enabled": self.ctm_config.multi_tenancy.enabled,
             "tenant_stats": self._tenant_manager.get_stats() if self.ctm_config.multi_tenancy.enabled else {},
+            # NUMA-aware placement
+            "numa_enabled": self.ctm_config.numa.enabled,
+            "numa_influenced_decisions": self._numa_influenced,
+            "numa_stats": self._numa_manager.get_stats() if self.ctm_config.numa.enabled else {},
         }
         return stats
