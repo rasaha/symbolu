@@ -23,6 +23,13 @@ from collections import deque, OrderedDict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple, Any
 
+from .concurrent import (
+    AtomicCounter,
+    AtomicStats,
+    ConcurrentBlockMap,
+    ConcurrentSet,
+    MPSCQueue,
+)
 from .config import CTMvLLMConfig
 
 logger = logging.getLogger(__name__)
@@ -332,43 +339,67 @@ class CTMEvictionPolicy:
     Provides intelligent victim selection that outperforms LRU
     on temporal and mixed workloads typical in LLM inference.
 
-    Thread-safe: All public methods are protected by RLock.
+    Thread-safety architecture (lock-free where possible):
+      - Hot path (GPU hit): AtomicCounter + ConcurrentBlockMap stripe lock.
+        No coarse lock acquired for the common case.
+      - Block sets (gpu/cpu/pinned): ConcurrentSet with striped locks.
+      - Stats: AtomicStats with per-counter locks (no contention between
+        different stat names).
+      - Cold path (eviction, slow-path): Acquires _write_lock for
+        multi-step mutations that must be atomic.
+      - Trackers (neighbor, transition, shadow): Protected by _write_lock
+        since they maintain cross-block state.
+
+    The coarse RLock is kept as ``_write_lock`` for cold-path operations
+    that touch multiple data structures atomically (eviction, batch-evict,
+    slow-path maintenance).  The hot path avoids it entirely for GPU hits.
     """
 
     def __init__(self, config: Optional[CTMvLLMConfig] = None):
         self.config = config or CTMvLLMConfig()
-        self.blocks: Dict[int, BlockState] = {}
-        self.gpu_blocks: Set[int] = set()
-        self.cpu_blocks: Set[int] = set()
 
-        # PRODUCTION: Cached pinned set for O(1) lookup
-        self.pinned_blocks: Set[int] = set()
+        # CONCURRENT: Striped block map – hot-path reads/writes per-block
+        self.blocks: ConcurrentBlockMap[BlockState] = ConcurrentBlockMap(num_shards=64)
+
+        # CONCURRENT: Striped sets for membership tests
+        self.gpu_blocks: ConcurrentSet = ConcurrentSet(num_shards=16)
+        self.cpu_blocks: ConcurrentSet = ConcurrentSet(num_shards=16)
+        self.pinned_blocks: ConcurrentSet = ConcurrentSet(num_shards=16)
 
         self.neighbor_tracker = NeighborTracker(self.config.neighbor_window)
         self.transition_tracker = TransitionTracker()
         self.shadow_tier = DualShadowTier(self.config.shadow_size)
         self.shadow_tier.p = self.config.initial_p
 
-        self.access_counter = 0
-        self.stats = {
-            "gpu_hits": 0,
-            "cpu_hits": 0,
-            "misses": 0,
-            "promotions": 0,
-            "evictions": 0,
-            "smart_selections": 0,
-            "batch_evictions": 0,
-            "slow_path_runs": 0,
-        }
+        # CONCURRENT: Lock-free counters
+        self.access_counter = AtomicCounter()
+        self._slow_path_counter = AtomicCounter()
+
+        # CONCURRENT: Per-stat atomic counters (no contention across stats)
+        self.stats = AtomicStats(
+            "gpu_hits", "cpu_hits", "misses", "promotions",
+            "evictions", "smart_selections", "batch_evictions",
+            "slow_path_runs",
+        )
 
         # PRODUCTION: Latency tracking and candidate pools
         self.latency_stats = LatencyStats()
         self.candidate_pool = StratifiedCandidatePool(pool_size=64)
-        self._slow_path_counter = 0
         self.max_blocks: int = 0  # Set when capacity is known
 
-        # PRODUCTION: Thread safety
-        self._lock = threading.RLock()
+        # CONCURRENT: Cold-path write lock for multi-step mutations
+        # (eviction, batch-evict, slow-path, tracker updates).
+        # Hot-path GPU hits do NOT acquire this lock.
+        self._write_lock = threading.RLock()
+
+        # CONCURRENT: MPSC queue for deferred tracker updates.
+        # Hot-path pushes access events; slow-path drains and processes.
+        self._deferred_tracker_queue: MPSCQueue[Tuple[int, Optional[int]]] = (
+            MPSCQueue(capacity=8192)
+        )
+
+        # Legacy alias so external code using ``with policy._lock:`` still works.
+        self._lock = self._write_lock
 
     def on_block_access(
         self,
@@ -378,20 +409,48 @@ class CTMEvictionPolicy:
         """
         Handle block access.
 
-        PRODUCTION: Fast path with O(1) state updates and latency tracking.
+        CONCURRENT: The common case (GPU hit) is nearly lock-free:
+        only acquires the per-block stripe lock in ConcurrentBlockMap
+        and bumps atomic counters.  The coarse _write_lock is only
+        taken for CPU hits, misses, batch eviction, and slow-path.
 
         Returns:
             (is_promotion, is_eviction_needed): Whether block was promoted
             and whether eviction is needed to make space.
         """
         start_time = time.perf_counter()
+        current_time = time.monotonic()
+        count = self.access_counter.increment()
+        slow_count = self._slow_path_counter.increment()
 
-        with self._lock:
-            current_time = time.monotonic()
-            self.access_counter += 1
-            self._slow_path_counter += 1
+        # === FAST PATH: GPU hit (no coarse lock) ===
+        if block_id in self.gpu_blocks:
+            self.stats.increment("gpu_hits")
+            # Update block state under per-block stripe lock only
+            self.blocks.update_in_place(
+                block_id, lambda b: b.update_access(current_time)
+            )
 
-            # Track for patterns
+            # Defer tracker updates to slow-path drain (lock-free push)
+            self._deferred_tracker_queue.push((block_id, sequence_id))
+
+            # Check thresholds (reads are lock-free)
+            self._maybe_batch_evict()
+            self._maybe_slow_path(slow_count)
+
+            elapsed_us = (time.perf_counter() - start_time) * 1_000_000
+            self.latency_stats.record(elapsed_us)
+            return False, False
+
+        # === SLOW PATH: CPU hit or miss (acquire write lock) ===
+        with self._write_lock:
+            is_promotion = False
+            needs_eviction = False
+
+            # Drain deferred tracker updates while we hold the lock
+            self._drain_deferred_tracker_events()
+
+            # Track for patterns (under write lock)
             self.neighbor_tracker.record_access(block_id)
             self.transition_tracker.record_access(block_id)
 
@@ -400,55 +459,69 @@ class CTMEvictionPolicy:
                 block_id, self.config.adaptive_p_learning_rate
             )
 
-            is_promotion = False
-            needs_eviction = False
-
-            if block_id in self.gpu_blocks:
-                # GPU hit
-                self.stats["gpu_hits"] += 1
-                block = self.blocks[block_id]
-                block.update_access(current_time)
-
-            elif block_id in self.cpu_blocks:
+            if block_id in self.cpu_blocks:
                 # CPU hit - consider promotion
-                self.stats["cpu_hits"] += 1
-                block = self.blocks[block_id]
-                block.update_access(current_time)
+                self.stats.increment("cpu_hits")
+                self.blocks.update_in_place(
+                    block_id, lambda b: b.update_access(current_time)
+                )
+                block = self.blocks.get(block_id)
 
-                if self._should_promote(block):
+                if block and self._should_promote(block):
                     is_promotion = True
-                    needs_eviction = True  # May need to evict from GPU
-                    self.stats["promotions"] += 1
+                    needs_eviction = True
+                    self.stats.increment("promotions")
 
             else:
                 # Miss - new block
-                self.stats["misses"] += 1
+                self.stats.increment("misses")
                 block = BlockState(
                     block_id=block_id,
                     sequence_id=sequence_id,
                     last_access_time=current_time,
                     access_count=1,
                 )
-                self.blocks[block_id] = block
+                self.blocks.put(block_id, block)
                 self.gpu_blocks.add(block_id)
                 is_promotion = True
 
-            # PRODUCTION: Check if batch eviction needed
-            if self.max_blocks > 0:
-                utilization = len(self.gpu_blocks) / self.max_blocks
-                if utilization >= EVICTION_THRESHOLD:
-                    self._batch_evict()
+            # Check if batch eviction needed
+            self._maybe_batch_evict()
+            self._maybe_slow_path(slow_count)
 
-            # PRODUCTION: Run slow path maintenance periodically
-            if self._slow_path_counter >= SLOW_PATH_INTERVAL:
-                self._slow_path_maintenance()
-                self._slow_path_counter = 0
-
-            # PRODUCTION: Record latency
             elapsed_us = (time.perf_counter() - start_time) * 1_000_000
             self.latency_stats.record(elapsed_us)
-
             return is_promotion, needs_eviction
+
+    def _drain_deferred_tracker_events(self) -> None:
+        """Drain deferred tracker updates (called under _write_lock)."""
+        events = self._deferred_tracker_queue.drain()
+        for block_id, _seq_id in events:
+            self.neighbor_tracker.record_access(block_id)
+            self.transition_tracker.record_access(block_id)
+            self.shadow_tier.check_and_adapt(
+                block_id, self.config.adaptive_p_learning_rate
+            )
+
+    def _maybe_batch_evict(self) -> None:
+        """Trigger batch eviction if utilization exceeds threshold."""
+        if self.max_blocks > 0:
+            utilization = len(self.gpu_blocks) / self.max_blocks
+            if utilization >= EVICTION_THRESHOLD:
+                with self._write_lock:
+                    # Re-check under lock (double-checked locking)
+                    utilization = len(self.gpu_blocks) / self.max_blocks
+                    if utilization >= EVICTION_THRESHOLD:
+                        self._drain_deferred_tracker_events()
+                        self._batch_evict()
+
+    def _maybe_slow_path(self, slow_count: int) -> None:
+        """Run slow-path maintenance if interval reached."""
+        if slow_count >= SLOW_PATH_INTERVAL:
+            if self._slow_path_counter.compare_and_swap(slow_count, 0):
+                with self._write_lock:
+                    self._drain_deferred_tracker_events()
+                    self._slow_path_maintenance()
 
     def _should_promote(self, block: BlockState) -> bool:
         """Determine if block should be promoted to GPU."""
@@ -456,8 +529,9 @@ class CTMEvictionPolicy:
             return True  # Always promote if smart victim disabled
 
         reuse = self.transition_tracker.get_reuse_score(block.block_id)
+        gpu_snap = self.gpu_blocks.snapshot()
         neighbor_hot = self.neighbor_tracker.get_hotness(
-            block.block_id, self.gpu_blocks
+            block.block_id, gpu_snap
         )
 
         # Loop pinning fast-track
@@ -481,37 +555,42 @@ class CTMEvictionPolicy:
         Returns:
             Block ID to evict, or None if GPU is empty.
         """
-        with self._lock:
-            if not self.gpu_blocks:
+        with self._write_lock:
+            if len(self.gpu_blocks) == 0:
                 logger.debug("select_victim: no GPU blocks to evict")
                 return None
 
+            self._drain_deferred_tracker_events()
+
             if not self.config.enable_smart_victim:
-                # Simple LRU fallback
                 return self._select_lru_victim()
 
-            self.stats["smart_selections"] += 1
+            self.stats.increment("smart_selections")
             return self._select_smart_victim()
 
     def _select_lru_victim(self) -> Optional[int]:
-        """Select victim using simple LRU. Uses cached pinned_blocks."""
+        """Select victim using simple LRU. Snapshot-based for concurrency."""
         oldest_time = float('inf')
         victim = None
 
-        for block_id in self.gpu_blocks:
-            if block_id in self.pinned_blocks:
+        gpu_snap = self.gpu_blocks.snapshot()
+        pinned_snap = self.pinned_blocks.snapshot()
+
+        for block_id in gpu_snap:
+            if block_id in pinned_snap:
                 continue
             block = self.blocks.get(block_id)
             if block and block.last_access_time < oldest_time:
                 oldest_time = block.last_access_time
                 victim = block_id
 
-        return victim  # Returns None if all blocks are pinned
+        return victim
 
     def _select_smart_victim(self) -> Optional[int]:
-        """Select victim using CTM+ scoring. Uses cached pinned_blocks."""
-        # Filter out pinned blocks upfront
-        candidates = [bid for bid in self.gpu_blocks if bid not in self.pinned_blocks]
+        """Select victim using CTM+ scoring. Snapshot-based for concurrency."""
+        gpu_snap = self.gpu_blocks.snapshot()
+        pinned_snap = self.pinned_blocks.snapshot()
+        candidates = [bid for bid in gpu_snap if bid not in pinned_snap]
         n = len(candidates)
 
         if n == 0:
@@ -534,7 +613,11 @@ class CTMEvictionPolicy:
             return None
 
         # Compute time range for normalization
-        times = [self.blocks[bid].last_access_time for bid in sampled if bid in self.blocks]
+        times = []
+        for bid in sampled:
+            block = self.blocks.get(bid)
+            if block:
+                times.append(block.last_access_time)
         if not times:
             return None
         min_time = min(times)
@@ -578,9 +661,10 @@ class CTMEvictionPolicy:
         # Reuse score
         reuse = self.transition_tracker.get_reuse_score(block.block_id)
 
-        # Neighbor hotness
+        # Neighbor hotness (use snapshot for concurrent safety)
+        gpu_snap = self.gpu_blocks.snapshot()
         neighbor_hot = self.neighbor_tracker.get_hotness(
-            block.block_id, self.gpu_blocks
+            block.block_id, gpu_snap
         )
 
         # Weighted score
@@ -602,18 +686,19 @@ class CTMEvictionPolicy:
 
     def evict_block(self, block_id: int) -> None:
         """Mark block as evicted from GPU to CPU."""
-        with self._lock:
+        with self._write_lock:
             if block_id in self.gpu_blocks:
-                self.gpu_blocks.remove(block_id)
+                self.gpu_blocks.discard(block_id)
                 self.cpu_blocks.add(block_id)
-                if block_id in self.blocks:
-                    self.blocks[block_id].in_gpu = False
+                self.blocks.update_in_place(
+                    block_id, lambda b: setattr(b, "in_gpu", False)
+                )
 
                 # Record in shadow tier
                 self.shadow_tier.record_eviction(
                     block_id, from_gpu=True, current_time=time.monotonic()
                 )
-                self.stats["evictions"] += 1
+                self.stats.increment("evictions")
 
     # =========================================================================
     # PRODUCTION: Batch Eviction and Slow Path Maintenance
@@ -623,27 +708,23 @@ class CTMEvictionPolicy:
         """
         PRODUCTION: Batch eviction - evict M blocks at once.
 
-        Instead of evicting one block at a time, we evict a batch
-        to amortize the overhead of victim selection.
-
-        Uses cached pinned_blocks for O(1) lookup.
+        Called under _write_lock. Uses snapshots of concurrent sets.
 
         Returns:
             List of evicted block IDs.
         """
         evicted = []
-
-        # Use cached pinned_blocks for O(1) lookup
-        pinned = self.pinned_blocks
+        pinned_snap = self.pinned_blocks.snapshot()
 
         # Get candidates from stratified pools
         candidates = self.candidate_pool.get_candidates(
-            K_CANDIDATES * 2, exclude_pinned=pinned
+            K_CANDIDATES * 2, exclude_pinned=pinned_snap
         )
 
         # Fall back to random sampling if pools are empty
         if len(candidates) < EVICTION_BATCH_SIZE:
-            available = [bid for bid in self.gpu_blocks if bid not in pinned]
+            gpu_snap = self.gpu_blocks.snapshot()
+            available = [bid for bid in gpu_snap if bid not in pinned_snap]
             if available:
                 sample_size = min(K_CANDIDATES * 2, len(available))
                 candidates = random.sample(available, sample_size)
@@ -653,7 +734,11 @@ class CTMEvictionPolicy:
 
         # Score candidates (O(k) operation)
         scored = []
-        times = [self.blocks[bid].last_access_time for bid in candidates if bid in self.blocks]
+        times = []
+        for bid in candidates:
+            block = self.blocks.get(bid)
+            if block:
+                times.append(block.last_access_time)
         if not times:
             return evicted
 
@@ -663,9 +748,9 @@ class CTMEvictionPolicy:
         adaptive_p = self.shadow_tier.p
 
         for block_id in candidates:
-            if block_id not in self.blocks:
+            block = self.blocks.get(block_id)
+            if not block:
                 continue
-            block = self.blocks[block_id]
             score = self._compute_victim_score(block, min_time, time_range, adaptive_p)
             scored.append((block_id, score))
 
@@ -673,21 +758,22 @@ class CTMEvictionPolicy:
         scored.sort(key=lambda x: x[1])
         victims = [bid for bid, _ in scored[:EVICTION_BATCH_SIZE]]
 
-        # Evict victims (inline to avoid lock re-acquisition)
+        # Evict victims
         for victim_id in victims:
             if victim_id in self.gpu_blocks:
-                self.gpu_blocks.remove(victim_id)
+                self.gpu_blocks.discard(victim_id)
                 self.cpu_blocks.add(victim_id)
-                if victim_id in self.blocks:
-                    self.blocks[victim_id].in_gpu = False
+                self.blocks.update_in_place(
+                    victim_id, lambda b: setattr(b, "in_gpu", False)
+                )
                 self.shadow_tier.record_eviction(
                     victim_id, from_gpu=True, current_time=time.monotonic()
                 )
-                self.stats["evictions"] += 1
+                self.stats.increment("evictions")
                 evicted.append(victim_id)
 
         if evicted:
-            self.stats["batch_evictions"] += 1
+            self.stats.increment("batch_evictions")
 
         return evicted
 
@@ -695,19 +781,22 @@ class CTMEvictionPolicy:
         """
         PRODUCTION: Slow path maintenance - runs every N accesses.
 
-        O(n) operations that are too expensive for the hot path:
-        - Rebuild stratified candidate pools
+        Called under _write_lock.  Uses snapshots of concurrent structures.
         """
-        self.stats["slow_path_runs"] += 1
+        self.stats.increment("slow_path_runs")
 
         # Clear and rebuild candidate pools
         self.candidate_pool.clear()
 
+        # Snapshot concurrent structures for sorting
+        gpu_snap = self.gpu_blocks.snapshot()
+        blocks_snap = self.blocks.snapshot()
+
         # Get unpinned GPU blocks
         available = [
-            (bid, self.blocks[bid])
-            for bid in self.gpu_blocks
-            if bid in self.blocks and not self.blocks[bid].pinned
+            (bid, blocks_snap[bid])
+            for bid in gpu_snap
+            if bid in blocks_snap and not blocks_snap[bid].pinned
         ]
 
         if not available:
@@ -738,71 +827,66 @@ class CTMEvictionPolicy:
 
     def promote_block(self, block_id: int) -> None:
         """Mark block as promoted from CPU to GPU."""
-        with self._lock:
+        with self._write_lock:
             if block_id in self.cpu_blocks:
-                self.cpu_blocks.remove(block_id)
+                self.cpu_blocks.discard(block_id)
                 self.gpu_blocks.add(block_id)
-                if block_id in self.blocks:
-                    self.blocks[block_id].in_gpu = True
+                self.blocks.update_in_place(
+                    block_id, lambda b: setattr(b, "in_gpu", True)
+                )
 
     def free_block(self, block_id: int) -> None:
         """Free block entirely (sequence completed). Cleans up from trackers."""
-        with self._lock:
+        with self._write_lock:
             self.gpu_blocks.discard(block_id)
             self.cpu_blocks.discard(block_id)
             self.pinned_blocks.discard(block_id)
-            if block_id in self.blocks:
-                del self.blocks[block_id]
+            self.blocks.remove(block_id)
             # Clean up from trackers to prevent memory leaks
             self.neighbor_tracker.remove_block(block_id)
             self.transition_tracker.remove_block(block_id)
 
     def pin_block(self, block_id: int) -> None:
-        """Pin block to prevent eviction. Updates cached pinned_blocks."""
-        with self._lock:
-            if block_id in self.blocks:
-                self.blocks[block_id].pinned = True
-                self.pinned_blocks.add(block_id)
+        """Pin block to prevent eviction."""
+        self.blocks.update_in_place(
+            block_id, lambda b: setattr(b, "pinned", True)
+        )
+        self.pinned_blocks.add(block_id)
 
     def unpin_block(self, block_id: int) -> None:
-        """Unpin block to allow eviction. Updates cached pinned_blocks."""
-        with self._lock:
-            if block_id in self.blocks:
-                self.blocks[block_id].pinned = False
-                self.pinned_blocks.discard(block_id)
+        """Unpin block to allow eviction."""
+        self.blocks.update_in_place(
+            block_id, lambda b: setattr(b, "pinned", False)
+        )
+        self.pinned_blocks.discard(block_id)
 
     def set_capacity(self, max_blocks: int) -> None:
         """Set the maximum block capacity for batch eviction threshold."""
-        with self._lock:
-            self.max_blocks = max_blocks
+        self.max_blocks = max_blocks  # int assignment is GIL-atomic
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get eviction statistics including production latency metrics."""
-        with self._lock:
-            total = self.stats["gpu_hits"] + self.stats["cpu_hits"] + self.stats["misses"]
-            return {
-                **self.stats,
-                "total_accesses": total,
-                "gpu_hit_rate": self.stats["gpu_hits"] / total if total > 0 else 0.0,
-                "adaptive_p": self.shadow_tier.p,
-                "gpu_blocks": len(self.gpu_blocks),
-                "cpu_blocks": len(self.cpu_blocks),
-                "pinned_blocks": len(self.pinned_blocks),
-                # PRODUCTION: Latency metrics
-                "latency": self.latency_stats.summary(),
-                "candidate_pool_sizes": {
-                    "lru": len(self.candidate_pool.lru_pool),
-                    "lfu": len(self.candidate_pool.lfu_pool),
-                    "low_reuse": len(self.candidate_pool.low_reuse_pool),
-                },
-            }
+        """Get eviction statistics (lock-free snapshot reads)."""
+        snap = self.stats.snapshot()
+        total = snap["gpu_hits"] + snap["cpu_hits"] + snap["misses"]
+        return {
+            **snap,
+            "total_accesses": total,
+            "gpu_hit_rate": snap["gpu_hits"] / total if total > 0 else 0.0,
+            "adaptive_p": self.shadow_tier.p,
+            "gpu_blocks": len(self.gpu_blocks),
+            "cpu_blocks": len(self.cpu_blocks),
+            "pinned_blocks": len(self.pinned_blocks),
+            "latency": self.latency_stats.summary(),
+            "candidate_pool_sizes": {
+                "lru": len(self.candidate_pool.lru_pool),
+                "lfu": len(self.candidate_pool.lfu_pool),
+                "low_reuse": len(self.candidate_pool.low_reuse_pool),
+            },
+        }
 
     def reset_stats(self) -> None:
         """Reset statistics including production latency tracking."""
-        with self._lock:
-            for key in self.stats:
-                self.stats[key] = 0
-            # PRODUCTION: Reset latency and pools
-            self.latency_stats.clear()
-            self.candidate_pool.clear()
-            self._slow_path_counter = 0
+        self.stats.reset_all()
+        self.latency_stats.clear()
+        self.candidate_pool.clear()
+        self._slow_path_counter.reset()
