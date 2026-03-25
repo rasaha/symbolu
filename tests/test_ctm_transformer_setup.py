@@ -14,7 +14,10 @@ import types
 import pytest
 
 # ---------------------------------------------------------------------------
-# Mock torch so tests run without PyTorch installed
+# Mock torch so tests run without PyTorch installed.
+# The mock is installed only during the import of transformer_setup, then
+# removed from sys.modules so it does not leak into other test modules
+# that legitimately require real PyTorch.
 # ---------------------------------------------------------------------------
 _torch_mock = types.ModuleType("torch")
 _torch_nn = types.ModuleType("torch.nn")
@@ -37,6 +40,10 @@ class _FakeModule:
 
 _torch_nn.Module = _FakeModule
 _torch_mock.nn = _torch_nn
+
+_TORCH_KEYS = ["torch", "torch.nn", "torch.nn.functional", "torch.utils.checkpoint"]
+_had_torch = {k: k in sys.modules for k in _TORCH_KEYS}
+
 sys.modules.setdefault("torch", _torch_mock)
 sys.modules.setdefault("torch.nn", _torch_nn)
 sys.modules.setdefault("torch.nn.functional", types.ModuleType("torch.nn.functional"))
@@ -50,6 +57,13 @@ from CTM_plus.transformer_setup import (
     _detect_model_arch,
     _is_transformer_layer,
 )
+
+# Clean up: remove mock torch entries we added so they don't leak into
+# other test modules that need real PyTorch (or a proper ImportError).
+for _k in _TORCH_KEYS:
+    if not _had_torch[_k] and _k in sys.modules:
+        del sys.modules[_k]
+del _had_torch, _TORCH_KEYS, _k
 
 
 # =========================================================================
