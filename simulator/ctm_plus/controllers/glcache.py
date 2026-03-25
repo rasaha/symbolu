@@ -285,8 +285,11 @@ class GBStumpEnsemble:
         self.stumps = []
 
         for _round in range(self.num_rounds):
-            # Compute sigmoid probabilities
-            probs = [1.0 / (1.0 + math.exp(-p)) for p in preds]
+            # Compute sigmoid probabilities (clamp to prevent overflow)
+            probs = []
+            for p in preds:
+                p_clamped = max(-500.0, min(500.0, p))
+                probs.append(1.0 / (1.0 + math.exp(-p_clamped)))
 
             # Residuals (negative gradient of log-loss)
             residuals = [y[i] - probs[i] for i in range(n)]
@@ -407,8 +410,23 @@ class GLCacheLearner:
     # --- Recording ---
 
     def record_eviction(self, page_id: int, features: List[float], group: int) -> None:
-        """Record a page eviction with its feature vector."""
+        """Record a page eviction with its feature vector.
+
+        If the page already has a pending eviction record (re-evicted
+        before the first eviction's outcome was observed), flush the
+        old record as a good eviction (outcome=0) before recording the
+        new one.  This prevents silent data loss.
+        """
         self.total_evictions += 1
+
+        # Flush stale pending record for this page if it exists
+        if page_id in self._pending:
+            old = self._pending.pop(page_id)
+            old.outcome = 0.0  # Assume the earlier eviction was fine
+            self._completed.append(old)
+            self._group_counts[old.group] = self._group_counts.get(old.group, 0) + 1
+            self._since_last_train += 1
+
         self._pending[page_id] = EvictionRecord(
             page_id=page_id,
             features=features,

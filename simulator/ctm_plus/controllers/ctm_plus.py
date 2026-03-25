@@ -2034,6 +2034,38 @@ class CTMPlusController(BaseController):
             sieve_victim = self._sieve_scan(state)
             if sieve_victim is not None:
                 self._sieve_evictions += 1
+
+                # Record SIEVE eviction for GL-Cache learning.
+                # Without this, SIEVE-evicted pages are invisible to the
+                # model and their refault outcomes are never learned from.
+                if self._glcache is not None:
+                    max_t = max(p.last_access_time for p in pages)
+                    min_t = min(p.last_access_time for p in pages)
+                    irr_v = 0.0
+                    if self.ctm_config.irr.enabled:
+                        irr_v = self._irr_tracker.get_normalized_irr(
+                            sieve_victim, state.tier0.capacity
+                        )
+                    gl_feats = extract_features(
+                        sieve_victim,
+                        current_time=state.current_time,
+                        max_time=max_t,
+                        min_time=min_t,
+                        tier0_capacity=state.tier0.capacity,
+                        reuse_score=self._transition_tracker.get_reuse_score(
+                            sieve_victim.page_id
+                        ),
+                        neighbor_hotness=self._neighbor_tracker.get_neighbor_hotness(
+                            sieve_victim.page_id, state
+                        ),
+                        irr_normalized=irr_v,
+                    )
+                    self._glcache.record_eviction(
+                        sieve_victim.page_id,
+                        gl_feats,
+                        frequency_group(sieve_victim.access_count),
+                    )
+
                 return sieve_victim
 
         # For small caches, just use LRU (fast path)
