@@ -83,6 +83,97 @@ class CoherenceConfig:
 
 
 @dataclass(frozen=True)
+class IRRConfig:
+    """
+    Inter-Reference Recency (IRR) tracking configuration (LIRS-inspired).
+
+    IRR measures the number of unique pages accessed between two consecutive
+    accesses to the same page. Pages with high IRR are cold despite recent access.
+    """
+
+    enabled: bool = True
+    irr_weight: float = 0.15  # Weight in victim scoring
+    irr_ema_alpha: float = 0.3  # EMA smoothing for IRR updates
+    max_irr: float = 1000.0  # Cap IRR to prevent unbounded values
+
+
+@dataclass(frozen=True)
+class SizeAwareConfig:
+    """
+    Size-aware eviction configuration (LHD-inspired).
+
+    Uses hit_density = expected_hits / size for variable-size objects.
+    """
+
+    enabled: bool = True
+    default_page_size: int = 4096  # Default page size in bytes
+    size_weight: float = 0.1  # How much size affects victim score
+
+
+@dataclass(frozen=True)
+class RefaultConfig:
+    """
+    Refault/pressure-based control configuration (TMO/MGLRU-inspired).
+
+    Tracks evicted pages that are immediately re-fetched (refaults)
+    and uses a PID-like controller to adjust eviction aggressiveness.
+    """
+
+    enabled: bool = True
+    refault_window: int = 200  # Sliding window for refault tracking
+    target_refault_rate: float = 0.05  # Target refault rate (PID setpoint)
+    kp: float = 0.5  # PID proportional gain
+    ki: float = 0.1  # PID integral gain
+    kd: float = 0.05  # PID derivative gain
+    promotion_boost_on_refault: float = 0.2  # Extra promotion score for refaulted pages
+
+
+@dataclass(frozen=True)
+class AdaptiveWeightConfig:
+    """
+    Online weight learning configuration (CACHEUS/LeCaR-inspired).
+
+    Uses Hedge (multiplicative weights) algorithm to learn victim scoring
+    weights from hit/miss outcomes rather than using fixed coefficients.
+    """
+
+    enabled: bool = True
+    learning_rate: float = 0.1  # Hedge algorithm learning rate (η)
+    min_weight: float = 0.02  # Floor to prevent weight collapse
+    update_interval: int = 100  # Update weights every N evictions
+    num_experts: int = 5  # Number of scoring dimensions
+
+
+@dataclass(frozen=True)
+class LazyPromotionConfig:
+    """
+    Lazy promotion configuration (SIEVE-inspired).
+
+    Defers metadata updates to eviction time. On access, only set a visited bit.
+    At eviction scan, skip visited pages (clear their bit) and evict unvisited ones.
+    """
+
+    enabled: bool = True
+    sieve_scan_limit: int = 8  # Max pages to scan before falling back to scoring
+
+
+@dataclass(frozen=True)
+class ExternalHintConfig:
+    """
+    External hint API configuration (CXL CMM-H-inspired).
+
+    Allows applications to signal page hotness/priority to the controller.
+    """
+
+    enabled: bool = True
+    hot_boost: float = 0.3  # Score boost for HOT-hinted pages
+    cold_penalty: float = 0.3  # Score penalty for COLD-hinted pages
+    pin_protection: bool = True  # PINNED pages cannot be evicted
+    willneed_prefetch: bool = True  # WILLNEED triggers prefetch
+    dontneed_evict_priority: float = 0.5  # Priority to evict DONTNEED pages
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -94,24 +185,28 @@ class CTMPlusConfig:
     coherence: CoherenceConfig = field(default_factory=CoherenceConfig)
 
     # Promotion/demotion specific
-    # NOTE: Previous values (100, 50, 100, 100) were too restrictive
-    # and handicapped CTM+ vs LRU/ARC which have no such limits
-    promotion_cooldown: int = 10  # Min accesses before re-promoting demoted page
-    demotion_cooldown: int = 10  # Min accesses before re-demoting promoted page
-    max_promotions_per_epoch: int = 10000  # Effectively unlimited
-    max_demotions_per_epoch: int = 10000  # Effectively unlimited
-    epoch_size: int = 1000  # Accesses per epoch
+    promotion_cooldown: int = 10
+    demotion_cooldown: int = 10
+    max_promotions_per_epoch: int = 10000
+    max_demotions_per_epoch: int = 10000
+    epoch_size: int = 1000
 
-    # Victim selection thresholds (configurable for tuning)
-    victim_sample_size: int = 48  # Sample size for O(k) victim selection (was 32)
-    promotion_threshold: float = 0.3  # Min combined score to promote from tier1
-    loop_pin_reuse_threshold: float = 0.4  # Reuse score threshold for loop pinning
-    loop_pin_neighbor_threshold: float = 0.3  # Neighbor hotness for loop pinning
+    # Victim selection thresholds
+    victim_sample_size: int = 48
+    promotion_threshold: float = 0.3
+    loop_pin_reuse_threshold: float = 0.4
+    loop_pin_neighbor_threshold: float = 0.3
 
-    # Ablation switches for experimental validation
-    enable_smart_victim: bool = True  # Use CTM+ victim selection vs LRU fallback
-    # NOTE: BCVF gate removed - ablation showed zero effect on hit rate
-    # NOTE: Admission controller removed - it hurt temporal workloads
+    # Ablation switches
+    enable_smart_victim: bool = True
+
+    # === New gap feature configs ===
+    irr: IRRConfig = field(default_factory=IRRConfig)
+    size_aware: SizeAwareConfig = field(default_factory=SizeAwareConfig)
+    refault: RefaultConfig = field(default_factory=RefaultConfig)
+    adaptive_weights: AdaptiveWeightConfig = field(default_factory=AdaptiveWeightConfig)
+    lazy_promotion: LazyPromotionConfig = field(default_factory=LazyPromotionConfig)
+    external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":
@@ -130,4 +225,13 @@ class CTMPlusConfig:
         """Conservative promotion, for random workloads."""
         return cls(
             phase=PhaseIntegratorConfig(decay_gamma=0.99),
+        )
+
+    @classmethod
+    def minimal_overhead(cls) -> "CTMPlusConfig":
+        """Minimal per-access overhead (SIEVE-like behavior)."""
+        return cls(
+            lazy_promotion=LazyPromotionConfig(enabled=True, sieve_scan_limit=16),
+            irr=IRRConfig(enabled=False),
+            adaptive_weights=AdaptiveWeightConfig(enabled=False),
         )

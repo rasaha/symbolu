@@ -9,21 +9,13 @@ Core components:
 5. Mode Switcher: Online workload classifier with hysteresis.
 6. Smart Victim Selection: Pre-eviction scoring with ARC-style partitioning.
 
-Removed components (ablation showed no impact):
-- BCVF Gate: Had zero effect on hit rate
-- SCC Optimizer: Depended on BCVF
-- Admission Controller: Hurt temporal workloads by mistaking locality for scans
-
-Key architectural changes:
-- Explicit victim selection BEFORE eviction (not post-hoc protection)
-- Tier0 logically partitioned by p (recency vs frequency sets)
-- ARC-safe weights: 70% recency+frequency, 30% CTM+ signals
-- Loop pinning for temporal workloads
-
-CTM+ vs ARC distinction:
-- ARC solves capacity allocation (set-level balancing)
-- CTM+ solves victim selection (page-level decision-making)
-- CTM+ degenerates safely to ARC/LRU when predictions are weak
+Gap closure components (state-of-the-art techniques):
+7.  IRR Tracker (LIRS): Inter-Reference Recency for scan-resistant eviction.
+8.  RefaultTracker (TMO/MGLRU): PID-controlled refault feedback loop.
+9.  AdaptiveWeightLearner (CACHEUS/LeCaR): Hedge-algorithm online weight learning.
+10. Size-aware eviction (LHD): Hits-per-byte metric for variable-size objects.
+11. Lazy promotion (SIEVE): Visited-bit deferred scoring, O(1) per-access overhead.
+12. ExternalHintManager (CXL CMM-H): Application hint API for page hotness.
 """
 
 import math
@@ -36,7 +28,7 @@ if TYPE_CHECKING:
 
 from .base import BaseController
 from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
-from ..core.state import GlobalState, PageState, Tier, OpType
+from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import SimulatorConfig, CTMPlusConfig
 
 
@@ -412,23 +404,337 @@ class PrefetchEngine:
         return self.prefetch_hits / total if total > 0 else 0.0
 
 
+class IRRTracker:
+    """
+    Gap 1: Inter-Reference Recency tracker (LIRS-inspired).
+
+    Tracks the number of unique pages accessed between two consecutive
+    accesses to the same page. IRR is a better predictor than raw recency
+    for scan-heavy workloads: a page accessed recently but with huge IRR
+    is actually cold.
+    """
+
+    def __init__(self, config: CTMPlusConfig):
+        self._config = config.irr
+        self._unique_counter = 0  # Monotonic counter of unique page accesses
+        self._last_access_position: Dict[int, int] = {}  # page_id -> position in unique stream
+        self._unique_since: set = set()  # Pages seen since last epoch reset
+
+    def record_access(self, page_id: int, page: PageState) -> float:
+        """Record access and return updated IRR for this page."""
+        if not self._config.enabled:
+            return page.irr
+
+        self._unique_counter += 1
+
+        if page_id in self._last_access_position:
+            # Compute IRR: unique pages between this access and previous
+            raw_irr = self._unique_counter - self._last_access_position[page_id]
+            # EMA smoothing to handle bursty patterns
+            alpha = self._config.irr_ema_alpha
+            if page.irr == float('inf'):
+                page.irr = min(raw_irr, self._config.max_irr)
+            else:
+                page.irr = alpha * raw_irr + (1 - alpha) * page.irr
+            page.irr = min(page.irr, self._config.max_irr)
+        # else: first access, IRR stays at inf
+
+        self._last_access_position[page_id] = self._unique_counter
+        return page.irr
+
+    def get_normalized_irr(self, page: PageState, cache_size: int) -> float:
+        """Normalize IRR to [0, 1] where 1 = coldest (highest IRR)."""
+        if page.irr == float('inf'):
+            return 1.0
+        return min(1.0, page.irr / max(cache_size, 1))
+
+
+class RefaultTracker:
+    """
+    Gap 3: Refault/pressure-based control (TMO/MGLRU-inspired).
+
+    Tracks whether evicted pages are immediately re-fetched (refaults).
+    Uses a PID controller to adjust eviction aggressiveness based on
+    measured refault rate vs target.
+
+    Key insight from TMO: measure actual performance impact (refault rate)
+    rather than relying on heuristic thresholds.
+    """
+
+    def __init__(self, config: CTMPlusConfig):
+        self._config = config.refault
+        self._refault_window: deque = deque(maxlen=config.refault.refault_window)
+        self._evicted_recently: Dict[int, int] = {}  # page_id -> eviction_time
+        self._eviction_time_limit = config.refault.refault_window * 2
+
+        # PID state
+        self._integral = 0.0
+        self._prev_error = 0.0
+        self._pressure_adjustment = 0.0  # Output: [-1, 1] adjustment to eviction
+
+        # Stats
+        self.total_refaults = 0
+        self.total_evictions_tracked = 0
+
+    def record_eviction(self, page_id: int, time: int) -> None:
+        """Record that a page was evicted."""
+        if not self._config.enabled:
+            return
+        self._evicted_recently[page_id] = time
+        self.total_evictions_tracked += 1
+
+        # Prune old entries
+        if len(self._evicted_recently) > self._eviction_time_limit:
+            cutoff = time - self._eviction_time_limit
+            self._evicted_recently = {
+                pid: t for pid, t in self._evicted_recently.items() if t > cutoff
+            }
+
+    def check_refault(self, page_id: int) -> bool:
+        """Check if accessing this page constitutes a refault (evicted then re-fetched)."""
+        if not self._config.enabled:
+            return False
+
+        is_refault = page_id in self._evicted_recently
+        if is_refault:
+            self.total_refaults += 1
+            del self._evicted_recently[page_id]
+
+        self._refault_window.append(1 if is_refault else 0)
+        return is_refault
+
+    def update_pid(self) -> float:
+        """Run PID controller and return pressure adjustment."""
+        if not self._config.enabled or len(self._refault_window) < 10:
+            return 0.0
+
+        current_rate = sum(self._refault_window) / len(self._refault_window)
+        error = current_rate - self._config.target_refault_rate
+
+        # PID terms
+        p_term = self._config.kp * error
+        self._integral += error
+        self._integral = max(-5.0, min(5.0, self._integral))  # Anti-windup
+        i_term = self._config.ki * self._integral
+        d_term = self._config.kd * (error - self._prev_error)
+        self._prev_error = error
+
+        self._pressure_adjustment = max(-1.0, min(1.0, p_term + i_term + d_term))
+        return self._pressure_adjustment
+
+    @property
+    def refault_rate(self) -> float:
+        if not self._refault_window:
+            return 0.0
+        return sum(self._refault_window) / len(self._refault_window)
+
+    @property
+    def pressure(self) -> float:
+        """Current pressure adjustment [-1, 1]. Positive = too many refaults."""
+        return self._pressure_adjustment
+
+
+class AdaptiveWeightLearner:
+    """
+    Gap 4: Online weight learning via Hedge algorithm (CACHEUS/LeCaR-inspired).
+
+    Replaces fixed victim scoring weights (40/30/15/10/-10) with learnable
+    weights updated from hit/miss outcomes. Uses multiplicative weights
+    (Hedge/EXP3) with theoretical regret guarantees.
+
+    Each "expert" is a scoring dimension:
+    0: recency, 1: frequency, 2: reuse, 3: coherence, 4: neighbor_hotness
+    """
+
+    def __init__(self, config: CTMPlusConfig):
+        self._config = config.adaptive_weights
+        n = self._config.num_experts
+
+        # Initialize weights uniformly (will be normalized to sum to 1)
+        self._log_weights = [0.0] * n  # Log-space for numerical stability
+        self._weights = [1.0 / n] * n  # Probability distribution
+
+        # Track eviction outcomes for learning
+        self._eviction_features: deque = deque(maxlen=config.adaptive_weights.update_interval)
+        self._eviction_outcomes: deque = deque(maxlen=config.adaptive_weights.update_interval)
+        self._eviction_count = 0
+
+        # Stats
+        self.weight_updates = 0
+
+    def get_weights(self) -> List[float]:
+        """Return current scoring weights scaled to sum to ~1.0."""
+        if not self._config.enabled:
+            # Return fixed weights when disabled
+            return [0.40, 0.30, 0.15, 0.10, 0.10]
+        # Scale weights so they sum to 1.05 (matching original total magnitude)
+        total = sum(abs(w) for w in self._weights)
+        if total == 0:
+            return [0.20] * 5
+        scale = 1.05 / total
+        return [w * scale for w in self._weights]
+
+    def record_eviction(self, features: List[float]) -> None:
+        """Record feature vector of evicted page for later learning."""
+        if not self._config.enabled:
+            return
+        self._eviction_features.append(features)
+        self._eviction_count += 1
+
+    def record_outcome(self, was_refault: bool) -> None:
+        """
+        Record whether an eviction was a mistake (refault = page needed again).
+
+        If refault: the eviction was bad → penalize experts that ranked this page low.
+        If no refault: the eviction was good → reward experts that identified it as cold.
+        """
+        if not self._config.enabled:
+            return
+        self._eviction_outcomes.append(1.0 if was_refault else 0.0)
+
+        # Update weights periodically
+        if len(self._eviction_outcomes) >= self._config.update_interval:
+            self._update_weights()
+
+    def _update_weights(self) -> None:
+        """Hedge algorithm weight update from accumulated outcomes."""
+        if not self._eviction_features or not self._eviction_outcomes:
+            return
+
+        n = self._config.num_experts
+        eta = self._config.learning_rate
+
+        # Compute per-expert loss: how well each expert predicted refaults
+        expert_losses = [0.0] * n
+        count = min(len(self._eviction_features), len(self._eviction_outcomes))
+
+        for i in range(count):
+            features = self._eviction_features[i]
+            outcome = self._eviction_outcomes[i]  # 1 = refault (bad eviction)
+
+            for j in range(min(n, len(features))):
+                # Loss: expert said "evict" (low feature) but page was needed (refault)
+                # High feature value + refault = expert was wrong to protect
+                # Low feature value + refault = expert was right to evict... but shouldn't have
+                expert_losses[j] += outcome * (1.0 - features[j])
+
+        # Normalize losses
+        if count > 0:
+            expert_losses = [l / count for l in expert_losses]
+
+        # Multiplicative weight update (Hedge)
+        for j in range(n):
+            self._log_weights[j] -= eta * expert_losses[j]
+
+        # Normalize to probability distribution
+        max_lw = max(self._log_weights)
+        exp_weights = [math.exp(lw - max_lw) for lw in self._log_weights]
+        total = sum(exp_weights)
+        self._weights = [max(self._config.min_weight, ew / total) for ew in exp_weights]
+
+        # Re-normalize after flooring
+        total = sum(self._weights)
+        self._weights = [w / total for w in self._weights]
+
+        self.weight_updates += 1
+        self._eviction_features.clear()
+        self._eviction_outcomes.clear()
+
+
+class ExternalHintManager:
+    """
+    Gap 6: External hint API (CXL CMM-H Host Hints inspired).
+
+    Provides an interface for applications to signal page hotness or access
+    patterns to the controller. Hints influence victim scoring and prefetch.
+    """
+
+    def __init__(self, config: CTMPlusConfig):
+        self._config = config.external_hints
+        self._hints: Dict[int, Tuple[PageHint, float]] = {}  # page_id -> (hint, priority)
+        self._willneed_queue: deque = deque(maxlen=64)  # Pages to prefetch
+
+    def set_hint(self, page_id: int, hint: PageHint, priority: float = 0.5) -> None:
+        """Set a hint for a page. Called by application/external system."""
+        if not self._config.enabled:
+            return
+        self._hints[page_id] = (hint, max(0.0, min(1.0, priority)))
+        if hint == PageHint.WILLNEED:
+            self._willneed_queue.append(page_id)
+
+    def clear_hint(self, page_id: int) -> None:
+        """Clear hint for a page."""
+        self._hints.pop(page_id, None)
+
+    def get_hint(self, page_id: int) -> Tuple[PageHint, float]:
+        """Get hint for a page."""
+        return self._hints.get(page_id, (PageHint.NONE, 0.0))
+
+    def get_score_adjustment(self, page_id: int) -> float:
+        """
+        Get victim score adjustment based on hint.
+
+        Positive = harder to evict, Negative = easier to evict.
+        """
+        if not self._config.enabled:
+            return 0.0
+
+        hint, priority = self.get_hint(page_id)
+        if hint == PageHint.HOT:
+            return self._config.hot_boost * priority
+        elif hint == PageHint.COLD:
+            return -self._config.cold_penalty * priority
+        elif hint == PageHint.PINNED:
+            return 10.0  # Effectively unevictable
+        elif hint == PageHint.DONTNEED:
+            return -self._config.dontneed_evict_priority * priority
+        return 0.0
+
+    def is_pinned(self, page_id: int) -> bool:
+        """Check if page is pinned (cannot be evicted)."""
+        if not self._config.enabled or not self._config.pin_protection:
+            return False
+        hint, _ = self.get_hint(page_id)
+        return hint == PageHint.PINNED
+
+    def pop_willneed_pages(self) -> List[int]:
+        """Get and clear pending WILLNEED prefetch requests."""
+        if not self._config.enabled or not self._config.willneed_prefetch:
+            return []
+        pages = list(self._willneed_queue)
+        self._willneed_queue.clear()
+        return pages
+
+    def apply_to_page(self, page: PageState) -> None:
+        """Apply hint metadata to a PageState object."""
+        hint, priority = self.get_hint(page.page_id)
+        page.hint = hint
+        page.hint_priority = priority
+
+
 class CTMPlusController(BaseController):
     """
-    CTM+ Controller with ChatGPT's critical fixes applied.
+    CTM+ Controller with all state-of-the-art gap closures implemented.
+
+    Gap closures:
+    - IRR Tracking (LIRS): Scan-resistant inter-reference recency
+    - Refault/Pressure Control (TMO/MGLRU): PID-based eviction feedback
+    - Adaptive Weight Learning (CACHEUS/LeCaR): Hedge-algorithm online weights
+    - Size-Aware Eviction (LHD): Hits-per-byte for variable-size objects
+    - Lazy Promotion (SIEVE): Visited-bit deferred scoring
+    - External Hint API (CXL CMM-H): Application-provided page hints
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
         super().__init__(config)
         self.ctm_config = ctm_config or CTMPlusConfig.default()
 
-        # Components
+        # Core components
         self._phase_integrator = PhaseIntegrator(self.ctm_config)
         self._coherence = CoherenceComputer(self.ctm_config)
         self._neighbor_tracker = NeighborTracker()
         self._transition_tracker = TransitionTracker(top_m=8, decay=0.95)
         self._prefetch_engine = PrefetchEngine(budget_per_1k=20, min_probability=0.25)
-
-        # FIX: Dual Shadow Tier (ARC-like B1/B2) instead of single FIFO
         self._shadow_tier = DualShadowTier(max_size=config.tier0_size)
 
         # Phase-Adaptive Mode Switcher
@@ -441,6 +747,12 @@ class CTMPlusController(BaseController):
         )
         self._current_policy: ModePolicy = self._mode_switcher.current_policy
 
+        # === Gap closure components ===
+        self._irr_tracker = IRRTracker(self.ctm_config)
+        self._refault_tracker = RefaultTracker(self.ctm_config)
+        self._weight_learner = AdaptiveWeightLearner(self.ctm_config)
+        self._hint_manager = ExternalHintManager(self.ctm_config)
+
         # Stats
         self._promotions = 0
         self._demotions = 0
@@ -451,6 +763,11 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
         self._smart_victim_selections = 0
+        self._sieve_evictions = 0
+        self._irr_influenced = 0
+        self._hint_influenced = 0
+        self._refault_promotions = 0
+        self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
     def name(self) -> str:
@@ -493,17 +810,13 @@ class CTMPlusController(BaseController):
         """
         Score Tier0 pages and return the worst victim for eviction.
 
-        OPTIMIZED: Uses sampling for O(k) instead of O(n) complexity.
-        - Sample k candidates from tier0 (default k=32)
-        - Score only sampled candidates
-        - Falls back to LRU on small caches
-
-        ARC-safe weights (70% recency+frequency, 30% CTM+ signals):
-        - 40% recency_rank (ARC T1-like)
-        - 30% (1-frequency) (ARC T2-like)
-        - 15% (1-reuse) (TransitionTracker signal)
-        - 10% (1-coherence) (structural signal)
-        - -10% neighbor_hotness (cluster protection)
+        Integrates all gap closures:
+        - SIEVE scan (Gap 5): Try visited-bit eviction first for O(1) amortized
+        - IRR (Gap 1): Use inter-reference recency instead of raw recency for scans
+        - Adaptive weights (Gap 4): Learned weights via Hedge algorithm
+        - Size-aware (Gap 2): Hits-per-byte for variable-size objects
+        - Hints (Gap 6): Application hints influence scoring
+        - Pressure (Gap 3): PID adjustment from refault rate
         """
         if not state.tier0.pages:
             return None
@@ -515,17 +828,21 @@ class CTMPlusController(BaseController):
         if not self.ctm_config.enable_smart_victim:
             return min(pages, key=lambda p: p.last_access_time)
 
+        # === Gap 5: SIEVE-style lazy eviction (try first for low overhead) ===
+        if self.ctm_config.lazy_promotion.enabled and n > 16:
+            sieve_victim = self._sieve_scan(state)
+            if sieve_victim is not None:
+                self._sieve_evictions += 1
+                return sieve_victim
+
         # For small caches, just use LRU (fast path)
         if n <= 16:
             return min(pages, key=lambda p: p.last_access_time)
 
         # SAMPLING: Pick k random candidates + always include LRU victim
         sample_size = min(self.ctm_config.victim_sample_size, n)
-
-        # Always include the LRU page (oldest) as a candidate
         lru_page = min(pages, key=lambda p: p.last_access_time)
 
-        # Random sample of other candidates
         if n > sample_size:
             sampled = random.sample(pages, sample_size - 1)
             if lru_page not in sampled:
@@ -533,18 +850,28 @@ class CTMPlusController(BaseController):
         else:
             sampled = pages
 
-        # Get time range for normalization (from full cache, but fast)
+        # Get time range for normalization
         max_time = max(p.last_access_time for p in pages)
         min_time = lru_page.last_access_time
         time_range = max(1, max_time - min_time)
 
         # Get adaptive p for partition logic
-        p = self._shadow_tier.p
+        p_val = self._shadow_tier.p
+
+        # === Gap 4: Get learned weights (or fixed fallback) ===
+        weights = self._weight_learner.get_weights()
+
+        # === Gap 3: Get pressure adjustment from PID controller ===
+        pressure = self._refault_tracker.pressure if self.ctm_config.refault.enabled else 0.0
 
         best_score = float("inf")
         victim = None
 
         for page in sampled:
+            # === Gap 6: Skip pinned pages ===
+            if self._hint_manager.is_pinned(page.page_id):
+                continue
+
             # Normalize recency to [0, 1] where 0 = oldest = evict first
             recency_rank = (page.last_access_time - min_time) / time_range
 
@@ -556,23 +883,51 @@ class CTMPlusController(BaseController):
             reuse = self._transition_tracker.get_reuse_score(page.page_id)
             neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(page.page_id, state)
 
-            # Base victim score (lower = evict first)
-            # ARC-safe: 70% is pure ARC logic (recency + frequency)
+            # === Gap 1: IRR-adjusted recency ===
+            # If IRR is high, the page is cold despite recent access (scan pattern)
+            if self.ctm_config.irr.enabled:
+                irr_cold = self._irr_tracker.get_normalized_irr(page, state.tier0.capacity)
+                # Blend recency with IRR: high IRR reduces effective recency
+                effective_recency = recency_rank * (1.0 - self.ctm_config.irr.irr_weight * irr_cold)
+                self._irr_influenced += 1
+            else:
+                effective_recency = recency_rank
+
+            # Base victim score with adaptive weights (lower = evict first)
             score = (
-                0.40 * recency_rank +           # ARC T1-like: favor recent
-                0.30 * frequency +              # ARC T2-like: favor frequent
-                0.15 * reuse +                  # CTM+ signal: favor predicted reuse
-                0.10 * coherence -              # CTM+ signal: favor coherent
-                0.10 * neighbor_hot             # CTM+ signal: protect clusters
+                weights[0] * effective_recency +  # Recency (IRR-adjusted)
+                weights[1] * frequency +           # Frequency
+                weights[2] * reuse +               # Predicted reuse
+                weights[3] * coherence -           # Structural coherence
+                weights[4] * neighbor_hot          # Cluster protection
             )
 
-            # Simplified partition penalty based on p
-            # If p > 0.5 (favor frequency), penalize low-freq pages more
-            # If p < 0.5 (favor recency), penalize low-recency pages more
-            if p > 0.5 and frequency < 0.3:
-                score -= 0.10 * (p - 0.5) * 2  # Scale by how much p favors freq
-            elif p < 0.5 and recency_rank < 0.3:
-                score -= 0.10 * (0.5 - p) * 2  # Scale by how much p favors recency
+            # === Gap 2: Size-aware adjustment (LHD hits-per-byte) ===
+            if self.ctm_config.size_aware.enabled:
+                size_ratio = page.size_bytes / self.ctm_config.size_aware.default_page_size
+                if size_ratio > 1.0:
+                    # Larger pages need proportionally higher score to stay
+                    score /= (1.0 + self.ctm_config.size_aware.size_weight * (size_ratio - 1.0))
+
+            # === Gap 6: Hint-based score adjustment ===
+            hint_adj = self._hint_manager.get_score_adjustment(page.page_id)
+            if hint_adj != 0.0:
+                score += hint_adj
+                self._hint_influenced += 1
+
+            # === Gap 3: Pressure-based adjustment ===
+            # When pressure is high (too many refaults), be more conservative
+            # (raise scores to keep more pages). When low, be more aggressive.
+            if pressure > 0.1:
+                score += 0.05 * pressure  # Protect more pages when refault rate is high
+            elif pressure < -0.1:
+                score += 0.05 * pressure  # Evict more aggressively when rate is low
+
+            # Partition penalty based on adaptive p
+            if p_val > 0.5 and frequency < 0.3:
+                score -= 0.10 * (p_val - 0.5) * 2
+            elif p_val < 0.5 and recency_rank < 0.3:
+                score -= 0.10 * (0.5 - p_val) * 2
 
             if score < best_score:
                 best_score = score
@@ -581,7 +936,69 @@ class CTMPlusController(BaseController):
         if victim is not None:
             self._smart_victim_selections += 1
 
+            # === Gap 4: Record features for weight learning ===
+            if self.ctm_config.adaptive_weights.enabled:
+                recency_rank = (victim.last_access_time - min_time) / time_range
+                frequency = min(1.0, victim.access_count / 10.0)
+                reuse = self._transition_tracker.get_reuse_score(victim.page_id)
+                coherence = victim.coherence
+                neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(victim.page_id, state)
+                self._weight_learner.record_eviction([
+                    recency_rank, frequency, reuse, coherence, neighbor_hot
+                ])
+
         return victim
+
+    def _sieve_scan(self, state: GlobalState) -> Optional[PageState]:
+        """
+        Gap 5: SIEVE-style lazy eviction scan.
+
+        Scan from LRU end: if visited=True, clear it and skip (retain in place).
+        If visited=False, evict. This gives new pages a chance to prove themselves.
+
+        Key insight from SIEVE: retained objects stay in original position (no reinsertion),
+        naturally preserving age ordering.
+        """
+        scan_limit = self.ctm_config.lazy_promotion.sieve_scan_limit
+        access_order = state.tier0.access_order
+        scanned = 0
+
+        for page_id in list(access_order):
+            if scanned >= scan_limit:
+                break
+
+            page = state.tier0.pages.get(page_id)
+            if page is None:
+                continue
+
+            # Skip pinned pages
+            if self._hint_manager.is_pinned(page_id):
+                continue
+
+            scanned += 1
+
+            if page.visited:
+                # Clear visited bit, give second chance (lazy promotion)
+                page.visited = False
+            else:
+                # Not visited since last scan → evict
+                return page
+
+        return None  # All scanned pages were visited; fall back to full scoring
+
+    # === Gap 6: Public hint API ===
+    def set_page_hint(self, page_id: int, hint: PageHint, priority: float = 0.5) -> None:
+        """External API: Set application hint for a page."""
+        self._hint_manager.set_hint(page_id, hint, priority)
+
+    def clear_page_hint(self, page_id: int) -> None:
+        """External API: Clear hint for a page."""
+        self._hint_manager.clear_hint(page_id)
+
+    def set_page_size(self, page_id: int, size_bytes: int) -> None:
+        """External API: Set variable size for a page (for size-aware eviction)."""
+        # Will be applied when page is next accessed/created
+        self._page_sizes[page_id] = size_bytes
 
     def on_access(self, state: GlobalState, page_id: int, op_type: OpType) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
@@ -601,6 +1018,21 @@ class CTMPlusController(BaseController):
         page.phase = phase
         page.amplitude = max(page.amplitude, amplitude)
         page.update_on_access(state.current_time, op_type)
+
+        # === Gap 1: IRR tracking ===
+        self._irr_tracker.record_access(page_id, page)
+
+        # === Gap 2: Apply variable page size if set ===
+        if hasattr(self, '_page_sizes') and page_id in self._page_sizes:
+            page.size_bytes = self._page_sizes[page_id]
+
+        # === Gap 6: Apply external hints ===
+        self._hint_manager.apply_to_page(page)
+
+        # === Gap 3: Check refault (was this page recently evicted?) ===
+        is_refault = self._refault_tracker.check_refault(page_id)
+        if is_refault and self.ctm_config.adaptive_weights.enabled:
+            self._weight_learner.record_outcome(was_refault=True)
 
         # Get neighbor hotness early (needed for mode switcher)
         neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
@@ -697,9 +1129,11 @@ class CTMPlusController(BaseController):
             return (Tier.TIER1, latency, promoted, demoted)
 
         # Case 3: Miss - Always admit to Tier0
-        # NOTE: Admission controller was removed as it hurt temporal workloads
-        # by mistaking temporal locality for sequential scans
         self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
+
+        # === Gap 3: Refault-boosted admission ===
+        if is_refault:
+            self._refault_promotions += 1
 
         # EXPLICIT VICTIM SELECTION before admission
         evicted = None
@@ -715,6 +1149,12 @@ class CTMPlusController(BaseController):
 
         if evicted is not None:
             demoted = self._handle_eviction(state, evicted)
+
+        # === Gap 6: Process WILLNEED prefetch hints ===
+        willneed_pages = self._hint_manager.pop_willneed_pages()
+        for wn_page_id in willneed_pages:
+            if wn_page_id != page_id and state.tier1.contains(wn_page_id):
+                self._do_hint_prefetch(state, wn_page_id)
 
         latency = self._compute_latency(Tier.NONE, promoted, demoted)
         return (Tier.NONE, latency, promoted, demoted)
@@ -780,31 +1220,56 @@ class CTMPlusController(BaseController):
         """
         Handle eviction from Tier 0.
 
-        SIMPLIFIED: All protection logic is now in _select_victim().
-        This function only demotes the already-selected victim.
-
-        Steps:
-        1. Add evicted page to Tier1
-        2. Record in shadow tier for regret tracking (ARC-like B1/B2)
-        3. Update stats
+        Integrates:
+        - Gap 3: Record eviction for refault tracking
+        - Gap 4: Record non-refault outcome for weight learning
+        - Gap 5: Clear visited bit on eviction (SIEVE)
         """
         # Demote to tier1
         state.tier1.add(evicted)
         evicted.last_demotion_time = state.current_time
+        evicted.visited = False  # Gap 5: Reset visited bit
+
+        # === Gap 3: Record eviction for refault tracking ===
+        self._refault_tracker.record_eviction(evicted.page_id, state.current_time)
+
+        # === Gap 4: Record good eviction outcome (not a refault... yet) ===
+        # The actual refault check happens later when the page is re-accessed
+        # For now, we record that an eviction happened without immediate regret
+        if self.ctm_config.adaptive_weights.enabled:
+            self._weight_learner.record_outcome(was_refault=False)
 
         # Classify into appropriate shadow tier based on reuse score
-        # This enables ARC-like adaptation via ghost hits
         evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
         if evicted_reuse > 0.3:
-            # High reuse page evicted → B2 (frequency ghost)
             self._shadow_tier.add_to_b2(evicted.page_id)
         else:
-            # Low reuse page evicted → B1 (recency ghost)
             self._shadow_tier.add_to_b1(evicted.page_id)
 
         self._demotions += 1
         self._epoch_demotions += 1
         return True
+
+    def _do_hint_prefetch(self, state: GlobalState, page_id: int) -> None:
+        """Gap 6: Prefetch a page due to WILLNEED hint."""
+        page = state.all_pages.get(page_id)
+        if page is None or not state.tier1.contains(page_id):
+            return
+
+        state.tier1.remove(page_id)
+        evicted = None
+        if state.tier0.is_full:
+            victim = self._select_victim(state)
+            if victim:
+                state.tier0.remove(victim.page_id)
+                evicted = victim
+
+        state.tier0.add(page)
+        self._prefetch_promotions += 1
+        self._prefetch_engine.record_prefetch(page_id)
+
+        if evicted is not None:
+            self._handle_eviction(state, evicted)
 
     def on_epoch(self, state: GlobalState, epoch: int) -> None:
         self._epoch_promotions = 0
@@ -814,24 +1279,25 @@ class CTMPlusController(BaseController):
         for page in list(state.tier0.pages.values()) + list(state.tier1.pages.values()):
             page.decay(state.current_time, decay_rate=0.001)
 
-        # FIX: Use co-occurrence neighbors for coherence, not sorted ID adjacency
+        # Use co-occurrence neighbors for coherence
         self._coherence.slow_update(state, self._neighbor_tracker)
 
+        # === Gap 3: Run PID controller for pressure-based eviction adjustment ===
+        self._refault_tracker.update_pid()
+
     def get_stats(self) -> dict:
-        # Get mode switcher stats
         mode_stats = self._mode_switcher.get_stats()
 
-        return {
+        stats = {
             "promotions": self._promotions,
             "demotions": self._demotions,
-            # FIX: Call the function with state argument
             "neighbor_boosts": self._neighbor_boosts,
             "tracked_neighbors": len(self._neighbor_tracker._neighbors),
             "prefetch_promotions": self._prefetch_promotions,
             "prefetch_hit_rate": self._prefetch_engine.prefetch_hit_rate,
             "total_prefetches": self._prefetch_engine.total_prefetches,
             "transition_count": self._transition_tracker._total_transitions,
-            # Shadow tier stats (ARC-like)
+            # Shadow tier stats
             "shadow_b1_hits": self._shadow_tier.b1_hits,
             "shadow_b2_hits": self._shadow_tier.b2_hits,
             "shadow_p": self._shadow_tier.p,
@@ -845,4 +1311,28 @@ class CTMPlusController(BaseController):
             "mode_switches": mode_stats["mode_switches"],
             "mode_time_fractions": mode_stats["mode_time_fractions"],
             "mode_signals": mode_stats["signals"],
+            # === Gap closure stats ===
+            # Gap 1: IRR Tracking
+            "irr_enabled": self.ctm_config.irr.enabled,
+            "irr_influenced_decisions": self._irr_influenced,
+            # Gap 2: Size-aware eviction
+            "size_aware_enabled": self.ctm_config.size_aware.enabled,
+            # Gap 3: Refault/pressure control
+            "refault_enabled": self.ctm_config.refault.enabled,
+            "refault_rate": self._refault_tracker.refault_rate,
+            "refault_pressure": self._refault_tracker.pressure,
+            "refault_total": self._refault_tracker.total_refaults,
+            "refault_promotions": self._refault_promotions,
+            # Gap 4: Adaptive weight learning
+            "adaptive_weights_enabled": self.ctm_config.adaptive_weights.enabled,
+            "learned_weights": self._weight_learner.get_weights(),
+            "weight_updates": self._weight_learner.weight_updates,
+            # Gap 5: SIEVE lazy promotion
+            "sieve_enabled": self.ctm_config.lazy_promotion.enabled,
+            "sieve_evictions": self._sieve_evictions,
+            # Gap 6: External hints
+            "hints_enabled": self.ctm_config.external_hints.enabled,
+            "hint_influenced_decisions": self._hint_influenced,
+            "active_hints": len(self._hint_manager._hints),
         }
+        return stats

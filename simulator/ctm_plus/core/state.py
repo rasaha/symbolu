@@ -16,7 +16,7 @@ Where:
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Deque
 from collections import deque
-from enum import IntEnum
+from enum import IntEnum, Enum
 import math
 
 
@@ -34,6 +34,17 @@ class OpType(IntEnum):
     READ = 0
     WRITE = 1
     PREFETCH = 2
+
+
+class PageHint(Enum):
+    """External application hints for page hotness (CXL CMM-H style)."""
+
+    NONE = 0        # No hint
+    HOT = 1         # Application expects frequent access
+    COLD = 2        # Application expects infrequent access
+    PINNED = 3      # Application wants page kept in tier0
+    WILLNEED = 4    # Application will access soon (prefetch hint)
+    DONTNEED = 5    # Application is done with this page
 
 
 @dataclass
@@ -66,6 +77,25 @@ class PageState:
     # Phase history for USE correlation
     phase_history: Deque[float] = field(default_factory=lambda: deque(maxlen=64))
 
+    # === Gap 1: IRR Tracking (LIRS) ===
+    # Inter-Reference Recency: number of unique pages accessed between
+    # two consecutive accesses to this page. High IRR = cold despite recent access.
+    irr: float = float('inf')  # Current IRR estimate (inf = never re-accessed)
+    prev_access_time: int = 0  # Previous access time (for IRR calculation)
+
+    # === Gap 2: Size-aware eviction (LHD) ===
+    # Size in bytes for variable-size objects. Enables hits-per-byte scoring.
+    size_bytes: int = 4096  # Default to standard page size
+
+    # === Gap 5: Lazy promotion (SIEVE) ===
+    # Visited bit: set on access, cleared on eviction scan.
+    # Defers expensive metadata updates to eviction time.
+    visited: bool = False
+
+    # === Gap 6: External hint API (CXL CMM-H) ===
+    hint: PageHint = PageHint.NONE
+    hint_priority: float = 0.0  # Application-provided priority [0, 1]
+
     def update_on_access(
         self,
         time: int,
@@ -83,8 +113,10 @@ class PageState:
             amplitude_boost: Boost to amplitude on access
         """
         # Update access metadata
+        self.prev_access_time = self.last_access_time
         self.last_access_time = time
         self.access_count += 1
+        self.visited = True  # SIEVE: mark as visited on access
 
         # Update amplitude (importance increases with access)
         self.amplitude = min(1.0, self.amplitude + amplitude_boost * (1 - self.amplitude))
