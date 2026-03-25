@@ -36,6 +36,7 @@ from .controllers.base import BaseController
 from .controllers.lru import LRUController
 from .controllers.arc import ARCController
 from .controllers.ctm_plus import CTMPlusController
+from .controllers.s3fifo import S3FIFOController
 from .simulator import Simulator
 from .traces.loader import load_trace, TraceEvent
 
@@ -61,6 +62,7 @@ __all__ = [
     "LRUController",
     "ARCController",
     "CTMPlusController",
+    "S3FIFOController",
     # Simulator
     "Simulator",
     # Traces
