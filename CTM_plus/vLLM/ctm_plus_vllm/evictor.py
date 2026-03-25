@@ -45,19 +45,25 @@ class LatencyStats:
 
     Uses insertion sort to maintain a sorted list, giving O(log n) insertion
     and O(1) percentile lookups instead of O(n log n) on every percentile call.
+
+    Thread-safe: record() is protected by a dedicated lock separate from
+    the evictor's write lock, so hot-path latency recording never contends
+    with cold-path operations.
     """
 
     def __init__(self, max_samples: int = 10000):
         self.max_samples = max_samples
         self._sorted: List[float] = []
         self._count = 0
+        self._lock = threading.Lock()
 
     def record(self, latency_us: float):
-        if len(self._sorted) >= self.max_samples:
-            # Remove oldest half (approximation: remove smallest values)
-            self._sorted = self._sorted[self.max_samples // 2:]
-        bisect.insort(self._sorted, latency_us)
-        self._count += 1
+        with self._lock:
+            if len(self._sorted) >= self.max_samples:
+                # Remove oldest half (approximation: remove smallest values)
+                self._sorted = self._sorted[self.max_samples // 2:]
+            bisect.insort(self._sorted, latency_us)
+            self._count += 1
 
     def percentile(self, p: float) -> float:
         if not self._sorted:
@@ -624,10 +630,11 @@ class CTMEvictionPolicy:
         max_time = max(times)
         time_range = max_time - min_time if max_time > min_time else 1.0
 
-        # Score each candidate
+        # Score each candidate (pass gpu_snap once, not per candidate)
         best_victim = None
         best_score = float('inf')
         adaptive_p = self.shadow_tier.p
+        gpu_snap_for_scoring = gpu_snap
 
         for block_id in sampled:
             block = self.blocks.get(block_id)
@@ -635,7 +642,8 @@ class CTMEvictionPolicy:
                 continue
 
             score = self._compute_victim_score(
-                block, min_time, time_range, adaptive_p
+                block, min_time, time_range, adaptive_p,
+                gpu_snap=gpu_snap_for_scoring,
             )
 
             if score < best_score:
@@ -650,8 +658,14 @@ class CTMEvictionPolicy:
         min_time: float,
         time_range: float,
         adaptive_p: float,
+        gpu_snap: Optional[Set[int]] = None,
     ) -> float:
-        """Compute victim score (lower = evict first)."""
+        """Compute victim score (lower = evict first).
+
+        Args:
+            gpu_snap: Pre-computed snapshot of gpu_blocks.  Passed in from
+                the caller's loop to avoid O(k×n) redundant snapshots.
+        """
         # Normalize recency to [0, 1]
         recency = (block.last_access_time - min_time) / time_range
 
@@ -661,8 +675,9 @@ class CTMEvictionPolicy:
         # Reuse score
         reuse = self.transition_tracker.get_reuse_score(block.block_id)
 
-        # Neighbor hotness (use snapshot for concurrent safety)
-        gpu_snap = self.gpu_blocks.snapshot()
+        # Neighbor hotness
+        if gpu_snap is None:
+            gpu_snap = self.gpu_blocks.snapshot()
         neighbor_hot = self.neighbor_tracker.get_hotness(
             block.block_id, gpu_snap
         )
@@ -747,11 +762,15 @@ class CTMEvictionPolicy:
         time_range = max_time - min_time if max_time > min_time else 1.0
         adaptive_p = self.shadow_tier.p
 
+        gpu_snap_for_scoring = self.gpu_blocks.snapshot()
         for block_id in candidates:
             block = self.blocks.get(block_id)
             if not block:
                 continue
-            score = self._compute_victim_score(block, min_time, time_range, adaptive_p)
+            score = self._compute_victim_score(
+                block, min_time, time_range, adaptive_p,
+                gpu_snap=gpu_snap_for_scoring,
+            )
             scored.append((block_id, score))
 
         # Sort by score and take lowest (worst candidates)
@@ -847,18 +866,27 @@ class CTMEvictionPolicy:
             self.transition_tracker.remove_block(block_id)
 
     def pin_block(self, block_id: int) -> None:
-        """Pin block to prevent eviction."""
-        self.blocks.update_in_place(
-            block_id, lambda b: setattr(b, "pinned", True)
-        )
-        self.pinned_blocks.add(block_id)
+        """Pin block to prevent eviction.
+
+        Acquires _write_lock to ensure a concurrent _batch_evict snapshot
+        sees the pinned state atomically (prevents evicting a just-pinned block).
+        """
+        with self._write_lock:
+            self.blocks.update_in_place(
+                block_id, lambda b: setattr(b, "pinned", True)
+            )
+            self.pinned_blocks.add(block_id)
 
     def unpin_block(self, block_id: int) -> None:
-        """Unpin block to allow eviction."""
-        self.blocks.update_in_place(
-            block_id, lambda b: setattr(b, "pinned", False)
-        )
-        self.pinned_blocks.discard(block_id)
+        """Unpin block to allow eviction.
+
+        Acquires _write_lock for consistency with pin_block.
+        """
+        with self._write_lock:
+            self.blocks.update_in_place(
+                block_id, lambda b: setattr(b, "pinned", False)
+            )
+            self.pinned_blocks.discard(block_id)
 
     def set_capacity(self, max_blocks: int) -> None:
         """Set the maximum block capacity for batch eviction threshold."""
