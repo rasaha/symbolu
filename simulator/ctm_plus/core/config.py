@@ -341,6 +341,59 @@ class NUMAConfig:
 
 
 @dataclass(frozen=True)
+class CostTieringConfig:
+    """
+    Cost-aware tiering configuration (CacheLib / CXL CMM-H inspired).
+
+    Models the economic cost of placing pages across memory tiers so the
+    controller can optimize $/GB-served, not just hit rate or latency.
+
+    Key insight: DRAM is ~10x more expensive per GB than NAND. A page that
+    is only accessed once per hour doesn't justify tier0 residency. The
+    cost-benefit ratio tells us whether promotion is "worth it":
+
+        benefit = expected_hits_in_window * (tier1_latency - tier0_latency)
+        cost    = tier0_cost_per_page_per_window + promotion_cost + demotion_cost
+
+    Promotion only proceeds when benefit / cost > min_cost_benefit_ratio.
+
+    Victim selection also factors cost:
+    - Write-heavy pages incur wear on NAND (tier1) → keep in DRAM if cheap
+    - Pages with low expected reuse waste expensive DRAM → evict to NAND
+    """
+
+    enabled: bool = False
+
+    # Per-tier cost in abstract units per page per epoch.
+    # Relative ratio matters more than absolute values.
+    # Default: DRAM is 10x costlier than NAND per GB.
+    tier0_cost_per_page: float = 10.0   # DRAM: expensive, fast
+    tier1_cost_per_page: float = 1.0    # NAND: cheap, slow
+
+    # One-time movement costs (amortized over residency window)
+    promotion_cost: float = 2.0   # Cost of moving page tier1 → tier0
+    demotion_cost: float = 3.0    # Cost of moving page tier0 → tier1 (write to NAND)
+
+    # Write amplification: extra cost for write-heavy pages in tier1.
+    # NAND has limited write endurance, so write-hot pages are cheaper to
+    # keep in DRAM than to repeatedly flush to NAND.
+    write_amp_weight: float = 0.1  # Per-write penalty in tier1
+
+    # Promotion gating: minimum cost-benefit ratio to justify promotion.
+    # < 1.0 means promote even if slightly unprofitable (favor hit rate).
+    # > 1.0 means only promote high-value pages (favor cost efficiency).
+    min_cost_benefit_ratio: float = 0.5
+
+    # Victim scoring: weight of cost signal in eviction decisions.
+    # Positive = prefer evicting low-value pages (low benefit/cost ratio).
+    cost_eviction_weight: float = 0.15
+
+    # Expected reuse horizon: how many future accesses to estimate benefit over.
+    # Uses access_count / time_in_tier as arrival rate, projected forward.
+    benefit_horizon_accesses: int = 100
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -377,6 +430,7 @@ class CTMPlusConfig:
     external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
     multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
     numa: NUMAConfig = field(default_factory=NUMAConfig)
+    cost_tiering: CostTieringConfig = field(default_factory=CostTieringConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

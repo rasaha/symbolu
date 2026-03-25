@@ -31,7 +31,7 @@ from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
-    NUMAConfig,
+    NUMAConfig, CostTieringConfig,
 )
 
 
@@ -1184,6 +1184,141 @@ class TenantManager:
         return tenant_stats
 
 
+class CostModel:
+    """
+    Cost-aware tiering model (CacheLib / CXL CMM-H inspired).
+
+    Computes cost-benefit ratios for promotion decisions and cost-adjusted
+    victim scores for eviction. Answers: "Is keeping this page in expensive
+    tier0 (DRAM) worth the cost vs. cheap tier1 (NAND)?"
+
+    Key formulas:
+        benefit(page) = expected_hits * latency_saved_per_hit
+        cost(page)    = tier0_cost - tier1_cost + write_amp_penalty
+        value(page)   = benefit / cost  (higher = more worth keeping in tier0)
+
+    Zero overhead when disabled.
+    """
+
+    def __init__(self, config: CostTieringConfig, sim_config: SimulatorConfig):
+        self._config = config
+        self._sim_config = sim_config
+
+        # Precompute latency benefit of tier0 vs tier1 (nanoseconds saved per hit)
+        self._latency_benefit = sim_config.tier1_latency_ns - sim_config.tier0_latency_ns
+
+        # Precompute cost differential
+        self._tier_cost_delta = config.tier0_cost_per_page - config.tier1_cost_per_page
+        self._movement_cost = config.promotion_cost + config.demotion_cost
+
+        # Stats
+        self._promotions_gated = 0
+        self._promotions_allowed = 0
+        self._cost_influenced = 0
+
+    @property
+    def enabled(self) -> bool:
+        return self._config.enabled
+
+    def compute_page_value(self, page: PageState, current_time: int) -> float:
+        """
+        Compute the cost-benefit value of keeping a page in tier0.
+
+        Returns a normalized value in [0, ~1+] where:
+        - > 1.0 = page is clearly worth keeping in tier0
+        - ~0.5  = borderline
+        - < 0.2 = page is wasting expensive DRAM
+
+        Uses access_count and time-in-tier to estimate future hit rate,
+        then compares latency benefit vs. tier cost differential.
+        """
+        if not self._config.enabled:
+            return 0.5  # Neutral
+
+        # Estimate hit rate: accesses / time_in_tier (avoid div by zero)
+        time_in_tier = max(1, current_time - max(page.last_promotion_time, 1))
+        hit_rate = page.access_count / time_in_tier
+
+        # Expected future benefit over horizon
+        expected_hits = hit_rate * self._config.benefit_horizon_accesses
+        benefit = expected_hits * self._latency_benefit
+
+        # Cost of keeping in tier0 for the horizon
+        cost = (
+            self._tier_cost_delta * self._config.benefit_horizon_accesses
+            + self._movement_cost
+        )
+
+        # Write amplification: write-heavy pages are expensive in NAND.
+        # Keeping them in DRAM avoids NAND wear → they get bonus value.
+        if page.write_count > 0 and page.access_count > 0:
+            write_ratio = page.write_count / page.access_count
+            # Write-heavy pages get a value boost (cheaper to keep in DRAM)
+            benefit += (
+                write_ratio * self._config.write_amp_weight
+                * self._config.benefit_horizon_accesses
+            )
+
+        # Normalize: value = benefit / cost, clamped to reasonable range
+        if cost <= 0:
+            return 1.0
+        value = benefit / cost
+        return max(0.0, min(2.0, value))
+
+    def should_promote(self, page: PageState, current_time: int) -> bool:
+        """
+        Cost-benefit gate for promotion decisions.
+
+        Returns True if the page's expected value in tier0 justifies
+        the cost of promotion. Always returns True when disabled.
+        """
+        if not self._config.enabled:
+            return True
+
+        value = self.compute_page_value(page, current_time)
+        if value >= self._config.min_cost_benefit_ratio:
+            self._promotions_allowed += 1
+            return True
+        else:
+            self._promotions_gated += 1
+            return False
+
+    def get_victim_score_adjustment(self, page: PageState, current_time: int) -> float:
+        """
+        Cost-based victim score adjustment.
+
+        Low-value pages (not worth tier0 cost) get a negative adjustment
+        → easier to evict. High-value pages get a positive adjustment
+        → harder to evict.
+
+        Returns positive = protect, negative = easier to evict.
+        """
+        if not self._config.enabled:
+            return 0.0
+
+        value = self.compute_page_value(page, current_time)
+
+        # Center around 0.5 (neutral value), scale by weight
+        # value > 0.5 → protect, value < 0.5 → penalize
+        adjustment = self._config.cost_eviction_weight * (value - 0.5)
+        if adjustment != 0.0:
+            self._cost_influenced += 1
+        return adjustment
+
+    def get_stats(self) -> Dict:
+        """Get cost model metrics."""
+        total = self._promotions_allowed + self._promotions_gated
+        return {
+            "promotions_allowed": self._promotions_allowed,
+            "promotions_gated": self._promotions_gated,
+            "gate_rate": self._promotions_gated / total if total > 0 else 0.0,
+            "cost_influenced_evictions": self._cost_influenced,
+            "tier0_cost": self._config.tier0_cost_per_page,
+            "tier1_cost": self._config.tier1_cost_per_page,
+            "latency_benefit_ns": self._latency_benefit,
+        }
+
+
 class NUMAManager:
     """
     NUMA-aware memory placement manager (Linux DAMON / CXL-inspired).
@@ -1395,6 +1530,7 @@ class CTMPlusController(BaseController):
         self._hint_manager = ExternalHintManager(self.ctm_config)
         self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
         self._numa_manager = NUMAManager(self.ctm_config.numa)
+        self._cost_model = CostModel(self.ctm_config.cost_tiering, config)
 
         # Stats
         self._promotions = 0
@@ -1411,6 +1547,7 @@ class CTMPlusController(BaseController):
         self._hint_influenced = 0
         self._refault_promotions = 0
         self._numa_influenced = 0
+        self._cost_influenced = 0
         self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
@@ -1581,6 +1718,12 @@ class CTMPlusController(BaseController):
                 score += numa_adj
                 self._numa_influenced += 1
 
+            # === Cost-aware: Low-value pages easier to evict ===
+            cost_adj = self._cost_model.get_victim_score_adjustment(page, state.current_time)
+            if cost_adj != 0.0:
+                score += cost_adj
+                self._cost_influenced += 1
+
             # Partition penalty based on adaptive p
             if p_val > 0.5 and frequency < 0.3:
                 score -= 0.10 * (p_val - 0.5) * 2
@@ -1670,6 +1813,11 @@ class CTMPlusController(BaseController):
     def get_tenant_stats(self) -> Dict:
         """External API: Get per-tenant metrics."""
         return self._tenant_manager.get_stats()
+
+    # === Cost-aware tiering public API ===
+    def get_cost_stats(self) -> Dict:
+        """External API: Get cost model metrics."""
+        return self._cost_model.get_stats()
 
     # === NUMA public API ===
     def get_numa_stats(self) -> Dict:
@@ -1794,12 +1942,14 @@ class CTMPlusController(BaseController):
             # Check shadow tier regret: page in B1/B2 means we demoted it too early
             self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
-            # Check promotion eligibility (includes tenant quota check)
+            # Check promotion eligibility (includes tenant quota + cost-benefit gate)
             tenant_can_admit = self._tenant_manager.should_admit(page.tenant_id, state)
+            cost_allows = self._cost_model.should_promote(page, state.current_time)
             can_promote = (
                 self._epoch_promotions < self.ctm_config.max_promotions_per_epoch and
                 state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown and
-                tenant_can_admit
+                tenant_can_admit and
+                cost_allows
             )
 
             should_promote = False
@@ -1878,6 +2028,9 @@ class CTMPlusController(BaseController):
             )
             # Multi-tenancy: check tenant quota
             if admit and not self._tenant_manager.should_admit(page.tenant_id, state):
+                admit = False
+            # Cost-aware: check cost-benefit ratio for new pages
+            if admit and not self._cost_model.should_promote(page, state.current_time):
                 admit = False
 
         if admit:
@@ -2117,5 +2270,9 @@ class CTMPlusController(BaseController):
             "numa_enabled": self.ctm_config.numa.enabled,
             "numa_influenced_decisions": self._numa_influenced,
             "numa_stats": self._numa_manager.get_stats() if self.ctm_config.numa.enabled else {},
+            # Cost-aware tiering
+            "cost_tiering_enabled": self.ctm_config.cost_tiering.enabled,
+            "cost_influenced_decisions": self._cost_influenced,
+            "cost_stats": self._cost_model.get_stats() if self.ctm_config.cost_tiering.enabled else {},
         }
         return stats
