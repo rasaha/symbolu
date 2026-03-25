@@ -1464,12 +1464,14 @@ class WritebackScheduler:
             if age < self._config.coalesce_window:
                 continue
 
-            # Flush: mark page clean in both our tracking and page state
+            # Flush: mark page clean in both our tracking and page state.
+            # Always remove from _dirty_pages even if page was evicted from
+            # tier0 between mark_dirty() and drain, to prevent memory leaks.
             page = state.tier0.pages.get(page_id)
+            self._dirty_pages.pop(page_id, None)
             if page is not None:
                 page.dirty = False
                 page.dirty_since = 0
-                self._dirty_pages.pop(page_id, None)
                 flushed += 1
 
         self._total_writebacks += flushed

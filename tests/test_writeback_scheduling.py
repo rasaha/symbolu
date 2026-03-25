@@ -265,6 +265,24 @@ class TestWritebackDrain:
         ws = WritebackScheduler(WritebackSchedulingConfig(enabled=False), 100)
         assert ws.drain_writebacks(state, 100) == 0
 
+    def test_drain_cleans_up_evicted_pages(self):
+        """Pages evicted from tier0 between mark_dirty and drain should not leak."""
+        state, ws = self._make_state_with_dirty_pages(20)
+        assert ws.dirty_count == 20
+
+        # Simulate 10 pages being evicted from tier0 (but still in _dirty_pages)
+        for i in range(10):
+            state.tier0.remove(i)
+
+        # Drain should clean up _dirty_pages entries for missing pages
+        current_time = 300
+        flushed = ws.drain_writebacks(state, current_time)
+
+        # Only 10 pages still in tier0, so only 10 can be "flushed"
+        assert flushed == 10
+        # All 20 entries should be cleaned from _dirty_pages (10 flushed + 10 evicted)
+        assert ws.dirty_count == 0
+
 
 # ── WritebackScheduler Stats Tests ───────────────────────────────────
 
