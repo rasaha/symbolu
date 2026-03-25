@@ -23,9 +23,10 @@ import math
 class Tier(IntEnum):
     """Memory tier identifiers."""
 
-    TIER0 = 0  # Fast tier (DRAM/HBM)
-    TIER1 = 1  # Slow tier (NAND/DDR)
-    NONE = -1  # Not in any tier
+    TIER0 = 0       # Fast tier (DRAM/HBM, uncompressed)
+    COMPRESSED = 2  # Compressed DRAM tier (zswap/zram-style)
+    TIER1 = 1       # Slow tier (NAND/DDR)
+    NONE = -1       # Not in any tier
 
 
 class OpType(IntEnum):
@@ -98,6 +99,10 @@ class PageState:
 
     # === Multi-tenancy: QoS isolation ===
     tenant_id: str = "default"  # Owning tenant for QoS-aware eviction
+
+    # === Compression tier ===
+    compressed_access_count: int = 0  # Accesses while in compression tier
+    last_compress_time: int = 0       # Time when page was compressed
 
     # === Writeback scheduling ===
     dirty: bool = False          # Page has unflushed writes in tier0
@@ -401,6 +406,7 @@ class GlobalState:
 
     tier0: TierState
     tier1: TierState
+    tier0c: Optional[TierState] = None  # Compression tier (zswap/zram)
     all_pages: Dict[int, PageState] = field(default_factory=dict)
 
     # Global metrics
@@ -422,6 +428,8 @@ class GlobalState:
         """Find which tier a page is in."""
         if self.tier0.contains(page_id):
             return Tier.TIER0
+        elif self.tier0c is not None and self.tier0c.contains(page_id):
+            return Tier.COMPRESSED
         elif self.tier1.contains(page_id):
             return Tier.TIER1
         return Tier.NONE
@@ -430,6 +438,8 @@ class GlobalState:
     def global_mean_phase(self) -> float:
         """Global mean phase across all active pages."""
         active_pages = list(self.tier0.pages.values()) + list(self.tier1.pages.values())
+        if self.tier0c is not None:
+            active_pages += list(self.tier0c.pages.values())
         if not active_pages:
             return 0.0
         sin_sum = sum(math.sin(p.phase) for p in active_pages)

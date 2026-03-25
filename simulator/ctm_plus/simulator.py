@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import time
 
 from .core.config import SimulatorConfig
-from .core.state import GlobalState, TierState, Tier, OpType
+from .core.state import GlobalState, TierState, Tier, OpType  # noqa: F401 - Tier used in tier0c init
 from .core.metrics import SimulationMetrics, MetricsCollector
 from .controllers.base import BaseController
 from .traces.loader import TraceEvent
@@ -88,9 +88,17 @@ class Simulator:
         controller.reset()
 
         # Initialize state
+        # Check if controller has compression tier enabled
+        tier0c = None
+        ctm_cfg = getattr(controller, 'ctm_config', None)
+        if ctm_cfg and hasattr(ctm_cfg, 'compression_tier') and ctm_cfg.compression_tier.enabled:
+            tier0c_capacity = int(self.config.tier0_size * ctm_cfg.compression_tier.capacity_multiplier)
+            tier0c = TierState(tier_id=Tier.COMPRESSED, capacity=tier0c_capacity)
+
         state = GlobalState(
             tier0=TierState(tier_id=Tier.TIER0, capacity=self.config.tier0_size),
             tier1=TierState(tier_id=Tier.TIER1, capacity=self.config.tier1_size),
+            tier0c=tier0c,
         )
 
         # Initialize metrics collector
@@ -122,7 +130,10 @@ class Simulator:
 
             # Record metrics
             tier0_hit = (tier == Tier.TIER0)
-            tier1_hit = (tier == Tier.TIER1)
+            tier0c_hit = (tier == Tier.COMPRESSED)
+            # Compressed tier hits count as tier1 hits in metrics
+            # (they serve from DRAM but not at full tier0 speed)
+            tier1_hit = (tier == Tier.TIER1) or tier0c_hit
 
             # Get coherence if available
             page = state.all_pages.get(event.page_id)

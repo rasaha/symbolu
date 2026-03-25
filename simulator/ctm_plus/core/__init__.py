@@ -6,6 +6,7 @@ from .config import (
     AdaptiveWeightConfig, LazyPromotionConfig, ExternalHintConfig,
     TenantPriority, TenantConfig, MultiTenancyConfig,
     NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
+    CompressionTierConfig,
 )
 from .state import PageState, TierState, PageHint
 from .metrics import SimulationMetrics, MetricsCollector
@@ -26,6 +27,7 @@ __all__ = [
     "NUMAConfig",
     "CostTieringConfig",
     "WritebackSchedulingConfig",
+    "CompressionTierConfig",
     "PageState",
     "TierState",
     "PageHint",

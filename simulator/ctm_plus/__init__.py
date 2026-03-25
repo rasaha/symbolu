@@ -28,6 +28,7 @@ __author__ = "Symbol-U Research"
 from .core.config import (
     SimulatorConfig, CTMPlusConfig, TenantPriority, TenantConfig,
     MultiTenancyConfig, NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
+    CompressionTierConfig,
 )
 from .core.state import PageState, TierState
 from .core.metrics import SimulationMetrics, MetricsCollector
@@ -48,6 +49,7 @@ __all__ = [
     "NUMAConfig",
     "CostTieringConfig",
     "WritebackSchedulingConfig",
+    "CompressionTierConfig",
     # State
     "PageState",
     "TierState",

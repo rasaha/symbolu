@@ -473,6 +473,89 @@ class WritebackSchedulingConfig:
 
 
 @dataclass(frozen=True)
+class CompressionTierConfig:
+    """
+    Compression tier configuration (Linux zswap / zram inspired).
+
+    Adds a compressed DRAM tier between Tier0 (hot, uncompressed DRAM) and
+    Tier1 (cold, NAND/NVMe). Pages evicted from Tier0 are compressed
+    in-place rather than immediately flushed to slow storage, effectively
+    multiplying DRAM capacity by the compression ratio.
+
+    Memory hierarchy with compression tier:
+        Tier0 (DRAM, uncompressed) → fastest, smallest
+        Tier0c (DRAM, compressed)  → fast, 2-3x Tier0 capacity
+        Tier1 (NAND/NVMe)         → slow, largest
+
+    Key insight from zswap: Most memory pages compress 2-3x with LZ4/zstd.
+    Decompression is ~100ns (negligible vs NAND's 10μs), so compressed DRAM
+    is a near-free capacity multiplier for warm pages that don't justify
+    hot-tier residency but are too active for cold storage.
+
+    Page lifecycle:
+        1. Miss → admit to Tier0 (hot)
+        2. Evict from Tier0 → compress into Tier0c (warm)
+        3. Hit in Tier0c → decompress, promote to Tier0 (if worthy)
+        4. Evict from Tier0c → demote to Tier1 (cold)
+
+    Victim selection for Tier0c uses simplified scoring (age + access count)
+    since compressed pages already proved they're not hot enough for Tier0.
+    """
+
+    enabled: bool = False
+
+    # Capacity as a multiplier of tier0_size.
+    # Represents the effective compressed capacity in page-equivalents.
+    # E.g., capacity_multiplier=2.0 with tier0_size=1000 → 2000 compressed slots.
+    capacity_multiplier: float = 2.0
+
+    # Average compression ratio (uncompressed_size / compressed_size).
+    # Used for capacity modeling. Real zswap achieves 2-3x on typical pages.
+    # Pages that don't compress well (ratio < min_compression_ratio) are
+    # sent directly to tier1 instead of the compression tier.
+    avg_compression_ratio: float = 2.5
+
+    # Minimum compression ratio to admit a page to the compression tier.
+    # Pages below this ratio waste compressed DRAM and should go to tier1.
+    min_compression_ratio: float = 1.5
+
+    # Latency model (nanoseconds)
+    compress_latency_ns: int = 500     # LZ4 compress ~500ns per 4KB page
+    decompress_latency_ns: int = 200   # LZ4 decompress ~200ns per 4KB page
+
+    # Access latency for compressed tier = decompress + DRAM access.
+    # Much faster than tier1 (NAND), slightly slower than tier0 (raw DRAM).
+    access_latency_ns: int = 300       # DRAM access + decompression overhead
+
+    # Promotion from Tier0c to Tier0: how many accesses in Tier0c before
+    # a page is considered hot enough to decompress back to Tier0.
+    # Higher = more selective (only truly hot pages re-promoted).
+    promotion_threshold_accesses: int = 2
+
+    # Demotion from Tier0c to Tier1: max age (time units) before a
+    # compressed page is evicted to tier1 to free compressed DRAM.
+    max_compressed_age: int = 2000
+
+    # Fraction of tier0c pages to age-check each epoch for demotion to tier1.
+    # Higher = more aggressive tier1 demotion, lower compressed occupancy.
+    epoch_scan_ratio: float = 0.25
+
+    def __post_init__(self) -> None:
+        if self.capacity_multiplier < 0.1:
+            raise ValueError("capacity_multiplier must be >= 0.1")
+        if self.avg_compression_ratio < 1.0:
+            raise ValueError("avg_compression_ratio must be >= 1.0")
+        if self.min_compression_ratio < 1.0:
+            raise ValueError("min_compression_ratio must be >= 1.0")
+        if self.promotion_threshold_accesses < 1:
+            raise ValueError("promotion_threshold_accesses must be >= 1")
+        if self.max_compressed_age < 1:
+            raise ValueError("max_compressed_age must be >= 1")
+        if not (0.0 < self.epoch_scan_ratio <= 1.0):
+            raise ValueError("epoch_scan_ratio must be in (0, 1]")
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -511,6 +594,7 @@ class CTMPlusConfig:
     numa: NUMAConfig = field(default_factory=NUMAConfig)
     cost_tiering: CostTieringConfig = field(default_factory=CostTieringConfig)
     writeback_scheduling: WritebackSchedulingConfig = field(default_factory=WritebackSchedulingConfig)
+    compression_tier: CompressionTierConfig = field(default_factory=CompressionTierConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

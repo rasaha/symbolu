@@ -31,7 +31,7 @@ from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
-    NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
+    NUMAConfig, CostTieringConfig, WritebackSchedulingConfig, CompressionTierConfig,
 )
 
 
@@ -1503,6 +1503,215 @@ class WritebackScheduler:
         }
 
 
+class CompressionTierManager:
+    """
+    Compression tier manager (Linux zswap / zram inspired).
+
+    Manages a compressed DRAM tier between Tier0 (hot DRAM) and Tier1
+    (cold NAND). Pages evicted from Tier0 are compressed and stored in
+    Tier0c rather than immediately demoted to slow storage.
+
+    Key behaviors:
+    - Compress on eviction: Tier0 evictions go to Tier0c (not Tier1)
+    - Decompress on hit: Tier0c hits promote back to Tier0
+    - Age-based demotion: Cold compressed pages eventually move to Tier1
+    - Compression gating: Incompressible pages skip Tier0c → go to Tier1
+    - Simulated compression ratio per page (deterministic from page_id)
+
+    Zero overhead when disabled (all methods short-circuit).
+    """
+
+    def __init__(self, config: CompressionTierConfig, tier0_size: int):
+        self._config = config
+        self._tier0_size = tier0_size
+
+        # Stats
+        self._compressions = 0
+        self._decompressions = 0
+        self._compression_bypasses = 0  # Pages too incompressible for tier0c
+        self._tier0c_demotions = 0      # tier0c → tier1
+        self._tier0c_promotions = 0     # tier0c → tier0
+        self._tier0c_hits = 0
+        self._epoch_demotions = 0
+
+    @property
+    def enabled(self) -> bool:
+        return self._config.enabled
+
+    def get_tier0c_capacity(self) -> int:
+        """Get compression tier capacity in page-equivalents."""
+        return int(self._tier0_size * self._config.capacity_multiplier)
+
+    def estimate_compression_ratio(self, page: PageState) -> float:
+        """
+        Estimate compression ratio for a page.
+
+        In a real system this would depend on page content. Here we use
+        a deterministic function of page_id and heat to simulate varying
+        compressibility. Write-hot pages tend to compress less well
+        (more entropy from frequent updates).
+        """
+        if not self._config.enabled:
+            return 1.0
+
+        # Deterministic pseudo-random based on page_id
+        base_ratio = self._config.avg_compression_ratio
+        # Pages with higher heat (write-heavy) compress less well
+        heat_penalty = page.heat * 0.5
+        # Vary by page_id for diversity
+        page_factor = 0.8 + 0.4 * ((page.page_id * 2654435761) % 1000) / 1000.0
+        ratio = base_ratio * page_factor - heat_penalty
+        return max(1.0, ratio)
+
+    def should_compress(self, page: PageState, state: 'GlobalState') -> bool:
+        """
+        Decide whether an evicted page should go to compression tier.
+
+        Returns False if:
+        - Compression tier is disabled
+        - Tier0c doesn't exist
+        - Page's compression ratio is too low (incompressible)
+
+        Note: Does NOT check capacity — compress_page() handles overflow
+        by evicting the coldest compressed page to tier1.
+        """
+        if not self._config.enabled or state.tier0c is None:
+            return False
+
+        # Check compressibility
+        ratio = self.estimate_compression_ratio(page)
+        if ratio < self._config.min_compression_ratio:
+            self._compression_bypasses += 1
+            return False
+
+        return True
+
+    def compress_page(self, page: PageState, state: 'GlobalState', current_time: int) -> bool:
+        """
+        Compress a page into the compression tier.
+
+        Called when a page is evicted from Tier0. Places it in Tier0c.
+        Returns True if successfully compressed.
+        """
+        if not self._config.enabled or state.tier0c is None:
+            return False
+
+        # Handle tier0c full: evict oldest compressed page to tier1
+        if state.tier0c.is_full:
+            victim = self._select_tier0c_victim(state, current_time)
+            if victim is not None:
+                state.tier0c.remove(victim.page_id)
+                state.tier1.add(victim)
+                victim.tier = Tier.TIER1
+                victim.compressed_access_count = 0
+                self._tier0c_demotions += 1
+
+        # Add to compression tier
+        page.compressed_access_count = 0
+        page.last_compress_time = current_time
+        state.tier0c.add(page)
+        page.tier = Tier.COMPRESSED
+        self._compressions += 1
+        return True
+
+    def on_tier0c_hit(self, page: PageState, current_time: int) -> bool:
+        """
+        Handle an access to a page in the compression tier.
+
+        Increments compressed access count and returns True if the page
+        should be promoted back to Tier0 (decompressed).
+        """
+        if not self._config.enabled:
+            return False
+
+        page.compressed_access_count += 1
+        self._tier0c_hits += 1
+
+        # Promote if accessed enough times in compressed tier
+        return page.compressed_access_count >= self._config.promotion_threshold_accesses
+
+    def decompress_page(self, page: PageState) -> None:
+        """Reset compression state when promoting from Tier0c to Tier0."""
+        page.compressed_access_count = 0
+        page.last_compress_time = 0
+        self._decompressions += 1
+        self._tier0c_promotions += 1
+
+    def _select_tier0c_victim(self, state: 'GlobalState', current_time: int) -> Optional[PageState]:
+        """
+        Select victim from compression tier for demotion to tier1.
+
+        Uses simplified scoring: oldest compressed pages with fewest
+        accesses are evicted first.
+        """
+        if state.tier0c is None or not state.tier0c.pages:
+            return None
+
+        best_victim = None
+        best_score = float('inf')
+
+        for page in state.tier0c.pages.values():
+            # Score: lower = evict first
+            # Age matters most (how long in compressed tier)
+            age = max(1, current_time - page.last_compress_time)
+            # Accesses in compressed tier = reuse evidence
+            access_bonus = page.compressed_access_count * 100
+
+            score = access_bonus - age
+            if score < best_score:
+                best_score = score
+                best_victim = page
+
+        return best_victim
+
+    def epoch_scan(self, state: 'GlobalState', current_time: int) -> int:
+        """
+        Epoch-based scan: demote old compressed pages to tier1.
+
+        Scans a fraction of tier0c and demotes pages that have been
+        compressed longer than max_compressed_age without access.
+        Returns number of pages demoted.
+        """
+        if not self._config.enabled or state.tier0c is None or not state.tier0c.pages:
+            return 0
+
+        pages = list(state.tier0c.pages.values())
+        scan_count = max(1, int(len(pages) * self._config.epoch_scan_ratio))
+        demoted = 0
+
+        # Sort by compress time (oldest first)
+        pages.sort(key=lambda p: p.last_compress_time)
+
+        for page in pages[:scan_count]:
+            age = current_time - page.last_compress_time
+            if age > self._config.max_compressed_age and page.compressed_access_count == 0:
+                state.tier0c.remove(page.page_id)
+                state.tier1.add(page)
+                page.tier = Tier.TIER1
+                page.compressed_access_count = 0
+                self._tier0c_demotions += 1
+                demoted += 1
+
+        self._epoch_demotions = demoted
+        return demoted
+
+    def get_stats(self) -> Dict:
+        """Get compression tier metrics."""
+        total_incoming = self._compressions + self._compression_bypasses
+        return {
+            "compressions": self._compressions,
+            "decompressions": self._decompressions,
+            "compression_bypasses": self._compression_bypasses,
+            "bypass_rate": (
+                self._compression_bypasses / total_incoming if total_incoming > 0 else 0.0
+            ),
+            "tier0c_hits": self._tier0c_hits,
+            "tier0c_promotions": self._tier0c_promotions,
+            "tier0c_demotions": self._tier0c_demotions,
+            "last_epoch_demotions": self._epoch_demotions,
+        }
+
+
 class NUMAManager:
     """
     NUMA-aware memory placement manager (Linux DAMON / CXL-inspired).
@@ -1683,6 +1892,7 @@ class CTMPlusController(BaseController):
     - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
     - NUMA-Aware Placement: Locality-aware latency, victim scoring, and migration
     - Writeback Scheduling: Proactive dirty page flushing, write coalescing, eviction cost reduction
+    - Compression Tier: zswap/zram-style compressed DRAM between Tier0 and Tier1
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
@@ -1719,6 +1929,9 @@ class CTMPlusController(BaseController):
         self._writeback_scheduler = WritebackScheduler(
             self.ctm_config.writeback_scheduling, config.tier0_size
         )
+        self._compression_manager = CompressionTierManager(
+            self.ctm_config.compression_tier, config.tier0_size
+        )
 
         # Stats
         self._promotions = 0
@@ -1737,6 +1950,7 @@ class CTMPlusController(BaseController):
         self._numa_influenced = 0
         self._cost_influenced = 0
         self._writeback_influenced = 0
+        self._tier0c_hits = 0
         self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
@@ -2024,6 +2238,17 @@ class CTMPlusController(BaseController):
         """External API: Get writeback scheduler metrics."""
         return self._writeback_scheduler.get_stats()
 
+    # === Compression tier public API ===
+    def get_compression_stats(self) -> Dict:
+        """External API: Get compression tier metrics."""
+        return self._compression_manager.get_stats()
+
+    def _config_compression_latency(self) -> int:
+        """Get access latency for compression tier."""
+        if self._compression_manager.enabled:
+            return self.ctm_config.compression_tier.access_latency_ns
+        return self.config.tier0_latency_ns + 200  # Fallback
+
     def on_access(
         self,
         state: GlobalState,
@@ -2078,8 +2303,9 @@ class CTMPlusController(BaseController):
         # A "refault" = a recently-demoted page is accessed in tier1,
         # meaning it should have stayed in tier0. Also check true misses
         # (page not in either tier) for pages evicted from tier1 too.
-        is_tier1_hit = state.tier1.contains(page_id) and not state.tier0.contains(page_id)
-        is_true_miss = not state.tier0.contains(page_id) and not state.tier1.contains(page_id)
+        is_in_tier0c = state.tier0c is not None and state.tier0c.contains(page_id)
+        is_tier1_hit = state.tier1.contains(page_id) and not state.tier0.contains(page_id) and not is_in_tier0c
+        is_true_miss = not state.tier0.contains(page_id) and not state.tier1.contains(page_id) and not is_in_tier0c
         should_check_refault = is_tier1_hit or is_true_miss
         is_refault = self._refault_tracker.check_refault(page_id) if should_check_refault else False
         if is_refault and self.ctm_config.adaptive_weights.enabled:
@@ -2137,6 +2363,46 @@ class CTMPlusController(BaseController):
             # === NUMA: Add cross-node latency penalty ===
             latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
             return (Tier.TIER0, latency, False, False)
+
+        # Case 1.5: Compression Tier Hit (decompress and maybe promote to Tier0)
+        if state.tier0c is not None and state.tier0c.contains(page_id):
+            state.tier0c.touch(page_id)
+            self._tier0c_hits += 1
+
+            should_promote = self._compression_manager.on_tier0c_hit(page, state.current_time)
+
+            if should_promote:
+                # Decompress: promote from Tier0c → Tier0
+                state.tier0c.remove(page_id)
+                self._compression_manager.decompress_page(page)
+
+                # === NUMA: Place on accessor's node ===
+                self._numa_manager.assign_node(page, accessor_node)
+
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
+                promoted = True
+                self._promotions += 1
+                self._epoch_promotions += 1
+                page.last_promotion_time = state.current_time
+
+                # === Writeback: Track dirty pages promoted via write ===
+                if op_type == OpType.WRITE:
+                    self._writeback_scheduler.mark_dirty(page_id, state.current_time)
+
+                if evicted is not None:
+                    demoted = self._handle_eviction(state, evicted)
+
+            # Compressed tier access latency (decompression cost)
+            latency = self._config_compression_latency()
+            latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
+            return (Tier.COMPRESSED, latency, promoted, demoted)
 
         # Case 2: Tier 1 Hit (Slow Path - consider promotion)
         if state.tier1.contains(page_id):
@@ -2350,8 +2616,6 @@ class CTMPlusController(BaseController):
         - Gap 5: Clear visited bit on eviction (SIEVE)
         - Multi-tenancy: Record per-tenant demotion/eviction
         """
-        # Demote to tier1
-        state.tier1.add(evicted)
         evicted.last_demotion_time = state.current_time
         evicted.visited = False  # Gap 5: Reset visited bit
 
@@ -2359,6 +2623,13 @@ class CTMPlusController(BaseController):
         self._writeback_scheduler.on_eviction(evicted.page_id)
         evicted.dirty = False
         evicted.dirty_since = 0
+
+        # === Compression tier: Try to compress instead of demoting to tier1 ===
+        if self._compression_manager.should_compress(evicted, state):
+            self._compression_manager.compress_page(evicted, state, state.current_time)
+        else:
+            # Demote directly to tier1 (incompressible or compression disabled)
+            state.tier1.add(evicted)
 
         # Multi-tenancy: record tenant eviction
         self._tenant_manager.record_demotion(evicted.tenant_id)
@@ -2413,7 +2684,10 @@ class CTMPlusController(BaseController):
         self._epoch_demotions = 0
 
         # Periodic decay
-        for page in list(state.tier0.pages.values()) + list(state.tier1.pages.values()):
+        all_tier_pages = list(state.tier0.pages.values()) + list(state.tier1.pages.values())
+        if state.tier0c is not None:
+            all_tier_pages += list(state.tier0c.pages.values())
+        for page in all_tier_pages:
             page.decay(state.current_time, decay_rate=0.001)
 
         # Use co-occurrence neighbors for coherence
@@ -2427,6 +2701,9 @@ class CTMPlusController(BaseController):
 
         # === Writeback: Drain dirty pages in background ===
         self._writeback_scheduler.drain_writebacks(state, state.current_time)
+
+        # === Compression tier: Age-scan and demote cold compressed pages ===
+        self._compression_manager.epoch_scan(state, state.current_time)
 
     def get_stats(self) -> dict:
         mode_stats = self._mode_switcher.get_stats()
@@ -2498,5 +2775,9 @@ class CTMPlusController(BaseController):
             "writeback_scheduling_enabled": self.ctm_config.writeback_scheduling.enabled,
             "writeback_influenced_decisions": self._writeback_influenced,
             "writeback_stats": self._writeback_scheduler.get_stats() if self.ctm_config.writeback_scheduling.enabled else {},
+            # Compression tier
+            "compression_tier_enabled": self.ctm_config.compression_tier.enabled,
+            "tier0c_hits": self._tier0c_hits,
+            "compression_stats": self._compression_manager.get_stats() if self.ctm_config.compression_tier.enabled else {},
         }
         return stats

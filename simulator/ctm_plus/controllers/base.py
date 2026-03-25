@@ -125,6 +125,10 @@ class BaseController(ABC):
         # Base latency from tier
         if tier == Tier.TIER0:
             latency = self.config.tier0_latency_ns
+        elif tier == Tier.COMPRESSED:
+            # Compressed DRAM: DRAM access + decompression overhead
+            # Default to halfway between tier0 and tier1 if no config
+            latency = self.config.tier0_latency_ns + 200  # ~300ns
         elif tier == Tier.TIER1:
             latency = self.config.tier1_latency_ns
         else:
