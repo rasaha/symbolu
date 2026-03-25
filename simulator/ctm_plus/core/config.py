@@ -392,6 +392,14 @@ class CostTieringConfig:
     # Uses access_count / time_in_tier as arrival rate, projected forward.
     benefit_horizon_accesses: int = 100
 
+    def __post_init__(self) -> None:
+        if self.tier0_cost_per_page < 0 or self.tier1_cost_per_page < 0:
+            raise ValueError("Tier costs must be non-negative")
+        if self.min_cost_benefit_ratio < 0:
+            raise ValueError("min_cost_benefit_ratio must be non-negative")
+        if self.benefit_horizon_accesses < 1:
+            raise ValueError("benefit_horizon_accesses must be >= 1")
+
 
 @dataclass(frozen=True)
 class CTMPlusConfig:

@@ -51,6 +51,18 @@ def make_cost_config(**kwargs):
 
 
 class TestCostTieringConfig:
+    def test_invalid_negative_cost(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            CostTieringConfig(tier0_cost_per_page=-1.0)
+
+    def test_invalid_negative_ratio(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            CostTieringConfig(min_cost_benefit_ratio=-0.5)
+
+    def test_invalid_zero_horizon(self):
+        with pytest.raises(ValueError, match="benefit_horizon"):
+            CostTieringConfig(benefit_horizon_accesses=0)
+
     def test_disabled_by_default(self):
         cfg = CTMPlusConfig.default()
         assert cfg.cost_tiering.enabled is False
