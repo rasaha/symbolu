@@ -162,7 +162,8 @@ class TestShadowEvictionPolicy:
         # At least one victim decision should be recorded
         assert policy.metrics.victim_decisions >= 1
 
-    def test_evict_mirrors_to_shadow(self):
+    def test_evict_only_affects_live(self):
+        """Shadow maintains independent state — live eviction is not mirrored."""
         policy = self._make_shadow()
 
         for i in range(10):
@@ -170,9 +171,10 @@ class TestShadowEvictionPolicy:
 
         policy.evict_block(0)
 
-        # Both should have evicted block 0
+        # Live should have evicted block 0
         assert 0 not in policy.live.gpu_blocks
-        assert 0 not in policy.shadow.gpu_blocks
+        # Shadow keeps its own state — block 0 is still in shadow's GPU
+        assert 0 in policy.shadow.gpu_blocks
 
     def test_free_mirrors_to_shadow(self):
         policy = self._make_shadow()

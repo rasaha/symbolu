@@ -108,7 +108,9 @@ class ShadowMetrics:
     ) -> None:
         """Record a victim selection decision from both policies."""
         with self._lock:
-            self._access_counter += 1
+            # Note: does NOT increment _access_counter.  Only check_refault
+            # increments it, so the refault window is measured in accesses,
+            # not in decisions (which is the correct unit).
             self.total_decisions += 1
             self.victim_decisions += 1
 
@@ -202,8 +204,7 @@ class ShadowMetrics:
 
     @property
     def live_regret_rate(self) -> float:
-        """Fraction of live evictions that were refaulted."""
-        total_live_evictions = self.victim_decisions - self.victim_agreements + self.victim_agreements
+        """Fraction of live victim decisions that led to a refault."""
         return self.live_regrets / self.victim_decisions if self.victim_decisions > 0 else 0.0
 
     @property
@@ -310,22 +311,35 @@ class ShadowEvictionPolicy:
         return live_victim  # Only live's victim is evicted
 
     def evict_block(self, block_id: int) -> None:
-        """Evict block.  Live executes; shadow mirrors the eviction.
+        """Evict block from live policy only.
 
-        The shadow must mirror live evictions to keep its internal state
-        consistent with reality (the block IS gone from GPU regardless
-        of what the shadow would have chosen).
+        The shadow maintains its own independent view of GPU occupancy.
+        When the live evicts block X, the shadow does NOT mirror this —
+        the shadow's state tracks what would happen if the shadow were
+        running live, which means it only evicts what *it* decides to
+        evict (via its own batch eviction in on_block_access).
+
+        The shadow's cache state will drift from reality.  This is
+        intentional: it measures "what would the shadow's hit rate be?"
         """
         self.live.evict_block(block_id)
-        self.shadow.evict_block(block_id)
+        # Shadow does NOT mirror: it manages its own evictions.
 
     def promote_block(self, block_id: int) -> None:
-        """Promote block.  Both policies must see it."""
+        """Promote block in live policy only.
+
+        Shadow manages its own promotions independently via on_block_access.
+        """
         self.live.promote_block(block_id)
-        self.shadow.promote_block(block_id)
+        # Shadow does NOT mirror: it manages its own promotions.
 
     def free_block(self, block_id: int) -> None:
-        """Free block.  Both policies must see it."""
+        """Free block in both policies.
+
+        When a sequence completes, blocks are genuinely freed in the
+        real system.  Both policies must see this because the physical
+        block is returned to the free pool.
+        """
         self.live.free_block(block_id)
         self.shadow.free_block(block_id)
 

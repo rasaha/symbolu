@@ -63,7 +63,7 @@ class ShadowState:
     def __init__(self, config: SimulatorConfig):
         self.state = GlobalState(
             tier0=TierState(tier_id=Tier.TIER0, capacity=config.tier0_size),
-            tier1=TierState(tier_id=Tier.TIER1, capacity=config.tier1_size * 10),
+            tier1=TierState(tier_id=Tier.TIER1, capacity=config.tier1_size),
         )
 
     def sync_time(self, current_time: int) -> None:
