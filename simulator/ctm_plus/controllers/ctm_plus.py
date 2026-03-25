@@ -404,6 +404,206 @@ class PrefetchEngine:
         return self.prefetch_hits / total if total > 0 else 0.0
 
 
+class FrequencySketch:
+    """
+    Top Gap 1: 4-bit Count-Min Sketch for O(1) frequency estimation (W-TinyLFU).
+
+    Tracks approximate access frequency for a population much larger than
+    the cache (10x default). Periodically halves all counters to age out
+    stale frequencies, preventing long-dead pages from dominating.
+
+    Used by AdmissionController to gate cache admission: new pages must
+    beat the eviction victim's frequency to be admitted.
+    """
+
+    def __init__(self, capacity: int, depth: int = 4):
+        self.width = self._next_power_of_2(max(64, capacity))
+        self.depth = depth
+        self.table = [[0] * self.width for _ in range(depth)]
+        self.size = 0
+        self.reset_threshold = capacity * 10
+        self._seeds = [0x9E3779B9, 0x517CC1B7, 0x6C62272E, 0x2E1B2138]
+
+    @staticmethod
+    def _next_power_of_2(n: int) -> int:
+        n -= 1
+        n |= n >> 1
+        n |= n >> 2
+        n |= n >> 4
+        n |= n >> 8
+        n |= n >> 16
+        return n + 1
+
+    def _hash(self, key: int, seed_idx: int) -> int:
+        h = key * self._seeds[seed_idx]
+        h ^= h >> 16
+        return h & (self.width - 1)
+
+    def increment(self, key: int) -> int:
+        """Increment frequency for key. Returns estimated frequency."""
+        self.size += 1
+        if self.size >= self.reset_threshold:
+            self._reset()
+
+        min_count = 15  # 4-bit max
+        for i in range(self.depth):
+            idx = self._hash(key, i)
+            self.table[i][idx] = min(15, self.table[i][idx] + 1)
+            min_count = min(min_count, self.table[i][idx])
+        return min_count
+
+    def estimate(self, key: int) -> int:
+        """Estimate frequency for key. O(1)."""
+        min_count = 15
+        for i in range(self.depth):
+            idx = self._hash(key, i)
+            min_count = min(min_count, self.table[i][idx])
+        return min_count
+
+    def _reset(self):
+        """Halve all counters (doorkeeper reset). Ages out stale frequencies."""
+        for i in range(self.depth):
+            for j in range(self.width):
+                self.table[i][j] >>= 1
+        self.size >>= 1
+
+
+class AdmissionController:
+    """
+    Top Gap 1: S3-FIFO-inspired admission control with frequency gating.
+
+    Prevents one-hit-wonders from polluting the cache:
+    - Small queue (10%): New pages enter here on first access
+    - Main queue (90%): Pages promoted from small on second access
+    - Ghost queue: Tracks recently evicted page IDs for regret detection
+
+    Combined with FrequencySketch for TinyLFU-style admission gating:
+    on miss, the new page must have frequency >= victim's frequency to
+    be admitted. Otherwise the miss is bypassed (page goes to tier1 only).
+
+    NOTE: The previous admission controller was removed because it confused
+    temporal locality with scans. This version is different:
+    - Uses frequency sketch (not heuristic thresholds)
+    - S3-FIFO naturally handles temporal patterns (ghost queue promotion)
+    - Scan resistance via small-queue filter (one-hit-wonders never enter main)
+    """
+
+    def __init__(self, config: CTMPlusConfig, tier0_size: int):
+        self._config = config.admission
+        self._tier0_size = tier0_size
+
+        # Frequency sketch tracks 10x more pages than cache can hold
+        sketch_cap = tier0_size * self._config.sketch_capacity_multiplier
+        self._sketch = FrequencySketch(sketch_cap, self._config.sketch_depth)
+
+        # S3-FIFO queue tracking (metadata only — actual pages live in tier0/tier1)
+        small_cap = max(1, int(tier0_size * self._config.small_queue_ratio))
+        ghost_cap = max(1, int(tier0_size * self._config.ghost_queue_ratio))
+        self._small: deque = deque()  # page_ids in small queue
+        self._small_set: set = set()
+        self._small_capacity = small_cap
+        self._main_set: set = set()  # page_ids in main queue
+        self._ghost: deque = deque()  # page_ids evicted from small
+        self._ghost_set: set = set()
+        self._ghost_capacity = ghost_cap
+
+        # Stats
+        self.admissions = 0
+        self.rejections = 0
+        self.ghost_hits = 0
+        self.small_promotions = 0
+
+    def record_access(self, page_id: int) -> None:
+        """Record every access in the frequency sketch."""
+        if not self._config.enabled:
+            return
+        self._sketch.increment(page_id)
+
+        # Mark visited in small queue (for S3-FIFO promotion)
+        # We don't need a visited bit since we track in sets
+
+    def should_admit(self, page_id: int, victim_id: Optional[int]) -> bool:
+        """
+        Decide if a new page should be admitted to tier0 on a miss.
+
+        Returns True if the page should be admitted, False if it should
+        be bypassed (goes to tier1 only).
+        """
+        if not self._config.enabled:
+            return True  # Always admit when disabled
+
+        # Ghost hit: page was evicted from small queue but came back → admit to main
+        if page_id in self._ghost_set:
+            self._ghost_set.discard(page_id)
+            # Remove from ghost deque (O(n) but ghost is small)
+            try:
+                self._ghost.remove(page_id)
+            except ValueError:
+                pass
+            self._main_set.add(page_id)
+            self.ghost_hits += 1
+            self.admissions += 1
+            return True
+
+        # Already in main queue → always re-admit
+        if page_id in self._main_set:
+            self.admissions += 1
+            return True
+
+        # Frequency gate: new page must beat victim's frequency
+        if self._config.frequency_gate and victim_id is not None:
+            new_freq = self._sketch.estimate(page_id)
+            victim_freq = self._sketch.estimate(victim_id)
+            if new_freq < victim_freq:
+                self.rejections += 1
+                return False
+
+        # Add to small queue
+        self._add_to_small(page_id)
+        self.admissions += 1
+        return True
+
+    def _add_to_small(self, page_id: int) -> None:
+        """Add page to small queue, evicting oldest if full."""
+        if page_id in self._small_set:
+            return
+
+        while len(self._small) >= self._small_capacity:
+            evicted_id = self._small.popleft()
+            self._small_set.discard(evicted_id)
+
+            # Check if page was accessed while in small (frequency > 1)
+            freq = self._sketch.estimate(evicted_id)
+            if freq > 1:
+                # Promoted to main (proved it's not a one-hit-wonder)
+                self._main_set.add(evicted_id)
+                self.small_promotions += 1
+            else:
+                # One-hit-wonder → evict to ghost
+                self._add_to_ghost(evicted_id)
+
+        self._small.append(page_id)
+        self._small_set.add(page_id)
+
+    def _add_to_ghost(self, page_id: int) -> None:
+        """Add to ghost queue (ID only, no data)."""
+        if len(self._ghost) >= self._ghost_capacity:
+            removed = self._ghost.popleft()
+            self._ghost_set.discard(removed)
+        self._ghost.append(page_id)
+        self._ghost_set.add(page_id)
+
+    def on_eviction(self, page_id: int) -> None:
+        """Called when a page is evicted from tier0."""
+        self._small_set.discard(page_id)
+        self._main_set.discard(page_id)
+        # Don't add to ghost here — ghost only tracks small-queue evictions
+
+    def get_frequency(self, page_id: int) -> int:
+        """Get estimated frequency for a page."""
+        return self._sketch.estimate(page_id)
+
+
 class IRRTracker:
     """
     Gap 1: Inter-Reference Recency tracker (LIRS-inspired).
@@ -807,6 +1007,7 @@ class CTMPlusController(BaseController):
         self._current_policy: ModePolicy = self._mode_switcher.current_policy
 
         # === Gap closure components ===
+        self._admission = AdmissionController(self.ctm_config, config.tier0_size)
         self._irr_tracker = IRRTracker(self.ctm_config)
         self._refault_tracker = RefaultTracker(self.ctm_config)
         self._weight_learner = AdaptiveWeightLearner(self.ctm_config)
@@ -1069,6 +1270,9 @@ class CTMPlusController(BaseController):
         self._prefetch_engine.record_access(page_id)
         self._neighbor_tracker.record_access(page_id)
 
+        # Top Gap 1: Record access in frequency sketch
+        self._admission.record_access(page_id)
+
         # Delta T
         delta_t = self._access_counter - self._last_access_time.get(page_id, 0)
         self._last_access_time[page_id] = self._access_counter
@@ -1143,6 +1347,9 @@ class CTMPlusController(BaseController):
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
 
+            # Check shadow tier regret: page in B1/B2 means we demoted it too early
+            self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
+
             # Check promotion eligibility
             can_promote = (
                 self._epoch_promotions < self.ctm_config.max_promotions_per_epoch and
@@ -1196,27 +1403,43 @@ class CTMPlusController(BaseController):
             latency = self._compute_latency(Tier.TIER1, promoted, demoted)
             return (Tier.TIER1, latency, promoted, demoted)
 
-        # Case 3: Miss - Always admit to Tier0
+        # Case 3: Miss
         self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
         # === Gap 3: Refault-boosted admission ===
         if is_refault:
             self._refault_promotions += 1
 
-        # EXPLICIT VICTIM SELECTION before admission
-        evicted = None
+        # === Top Gap 1: Admission control (TinyLFU + S3-FIFO) ===
+        # Select victim first so we can compare frequencies
+        victim = None
         if state.tier0.is_full:
             victim = self._select_victim(state)
-            if victim:
+
+        # Gate admission: new page must beat victim's frequency (unless refault)
+        admit = True
+        if not is_refault:  # Refaulted pages always re-admitted
+            admit = self._admission.should_admit(
+                page_id, victim.page_id if victim else None
+            )
+
+        if admit:
+            evicted = None
+            if victim and state.tier0.is_full:
                 state.tier0.remove(victim.page_id)
                 evicted = victim
+                self._admission.on_eviction(victim.page_id)
 
-        state.tier0.add(page)
-        promoted = True
-        self._promotions += 1
+            state.tier0.add(page)
+            promoted = True
+            self._promotions += 1
 
-        if evicted is not None:
-            demoted = self._handle_eviction(state, evicted)
+            if evicted is not None:
+                demoted = self._handle_eviction(state, evicted)
+        else:
+            # Admission rejected: page goes to tier1 only (bypass tier0)
+            state.tier1.add(page)
+            promoted = False
 
         # === Gap 6: Process WILLNEED prefetch hints ===
         willneed_pages = self._hint_manager.pop_willneed_pages()
@@ -1301,6 +1524,9 @@ class CTMPlusController(BaseController):
         # === Gap 3: Record eviction for refault tracking ===
         self._refault_tracker.record_eviction(evicted.page_id, state.current_time)
 
+        # Top Gap 1: Notify admission controller of eviction
+        self._admission.on_eviction(evicted.page_id)
+
         # Gap 4: Outcome will be determined later — if page is refaulted,
         # record_refault() is called in on_access. If not, pending evictions
         # expire via timeout in record_eviction().
@@ -1381,6 +1607,12 @@ class CTMPlusController(BaseController):
             "mode_time_fractions": mode_stats["mode_time_fractions"],
             "mode_signals": mode_stats["signals"],
             # === Gap closure stats ===
+            # Top Gap 1: Admission control
+            "admission_enabled": self.ctm_config.admission.enabled,
+            "admission_admissions": self._admission.admissions,
+            "admission_rejections": self._admission.rejections,
+            "admission_ghost_hits": self._admission.ghost_hits,
+            "admission_small_promotions": self._admission.small_promotions,
             # Gap 1: IRR Tracking
             "irr_enabled": self.ctm_config.irr.enabled,
             "irr_influenced_decisions": self._irr_influenced,

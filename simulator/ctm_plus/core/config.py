@@ -174,6 +174,31 @@ class ExternalHintConfig:
 
 
 @dataclass(frozen=True)
+class AdmissionConfig:
+    """
+    Admission control configuration (TinyLFU + S3-FIFO inspired).
+
+    Separates admission policy from eviction policy. New pages must "beat"
+    the eviction candidate's frequency to be admitted, preventing one-hit-
+    wonders from polluting the cache.
+
+    Components:
+    - FrequencySketch: Count-Min Sketch for compact frequency tracking
+    - S3-FIFO: Small/Main/Ghost three-queue admission structure
+    """
+
+    enabled: bool = True
+    # FrequencySketch (W-TinyLFU)
+    sketch_capacity_multiplier: int = 10  # Track 10x cache size in sketch
+    sketch_depth: int = 4  # Number of hash functions
+    # S3-FIFO
+    small_queue_ratio: float = 0.10  # 10% of tier0 as probation queue
+    ghost_queue_ratio: float = 1.0  # Ghost queue = 100% of tier0 size
+    # Admission gate: new page must beat victim's frequency to be admitted
+    frequency_gate: bool = True  # Require new page freq >= victim freq
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -200,7 +225,8 @@ class CTMPlusConfig:
     # Ablation switches
     enable_smart_victim: bool = True
 
-    # === New gap feature configs ===
+    # === Gap feature configs ===
+    admission: AdmissionConfig = field(default_factory=AdmissionConfig)
     irr: IRRConfig = field(default_factory=IRRConfig)
     size_aware: SizeAwareConfig = field(default_factory=SizeAwareConfig)
     refault: RefaultConfig = field(default_factory=RefaultConfig)
