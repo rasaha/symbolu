@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Tuple
 
-from .core.config import SimulatorConfig, CTMPlusConfig
+from .core.config import SimulatorConfig, CTMPlusConfig, GLCacheConfig
 from .core.metrics import SimulationMetrics
 from .simulator import Simulator, SimulationResult
 from .controllers.lru import LRUController
@@ -212,6 +212,7 @@ def run_benchmarks(
     verbose: bool = True,
     seed: int = 42,
     warmup_fraction: float = 0.0,
+    enable_glcache: bool = False,
 ) -> BenchmarkSuite:
     """
     Run standard trace benchmarks.
@@ -287,6 +288,14 @@ def run_benchmarks(
             ("S3-FIFO", S3FIFOController(config)),
             ("CTM+", CTMPlusController(config)),
         ]
+
+        if enable_glcache:
+            gl_ctm_config = CTMPlusConfig(
+                glcache=GLCacheConfig(enabled=True),
+            )
+            controllers.append(
+                ("CTM+GL", CTMPlusController(config, gl_ctm_config))
+            )
 
         results = {}
         for ctrl_name, controller in controllers:
@@ -394,6 +403,11 @@ Examples:
              "Example: --warmup 0.1 uses first 10%% as warmup.",
     )
     parser.add_argument(
+        "--glcache",
+        action="store_true",
+        help="Include CTM+ with GL-Cache learned eviction alongside Hedge",
+    )
+    parser.add_argument(
         "--trace-dir",
         type=str,
         default=None,
@@ -441,6 +455,7 @@ Examples:
         verbose=not args.quiet,
         seed=args.seed,
         warmup_fraction=args.warmup,
+        enable_glcache=args.glcache,
     )
 
     if args.json:

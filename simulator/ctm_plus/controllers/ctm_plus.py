@@ -32,6 +32,11 @@ from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
     NUMAConfig, CostTieringConfig, WritebackSchedulingConfig, CompressionTierConfig,
+    GLCacheConfig,
+)
+from .glcache import (
+    GLCacheLearner, GLCacheConfig as GLCacheRuntimeConfig,
+    extract_features, frequency_group, NUM_FEATURES,
 )
 
 
@@ -1922,6 +1927,18 @@ class CTMPlusController(BaseController):
         self._irr_tracker = IRRTracker(self.ctm_config)
         self._refault_tracker = RefaultTracker(self.ctm_config)
         self._weight_learner = AdaptiveWeightLearner(self.ctm_config)
+        # GL-Cache: group-level learned eviction (replaces Hedge when enabled)
+        gl_cfg = self.ctm_config.glcache
+        self._glcache = GLCacheLearner(GLCacheRuntimeConfig(
+            enabled=gl_cfg.enabled,
+            num_rounds=gl_cfg.num_rounds,
+            learning_rate=gl_cfg.learning_rate,
+            train_interval=gl_cfg.train_interval,
+            min_train_samples=gl_cfg.min_train_samples,
+            sample_size=gl_cfg.sample_size,
+            refault_window=gl_cfg.refault_window,
+            max_history=gl_cfg.max_history,
+        )) if gl_cfg.enabled else None
         self._hint_manager = ExternalHintManager(self.ctm_config)
         self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
         self._numa_manager = NUMAManager(self.ctm_config.numa)
@@ -2076,15 +2093,32 @@ class CTMPlusController(BaseController):
                 self._irr_influenced += 1
             else:
                 effective_recency = recency_rank
+                irr_cold = 0.0
 
-            # Base victim score with adaptive weights (lower = evict first)
-            score = (
-                weights[0] * effective_recency +  # Recency (IRR-adjusted)
-                weights[1] * frequency +           # Frequency
-                weights[2] * reuse +               # Predicted reuse
-                weights[3] * coherence -           # Structural coherence
-                weights[4] * neighbor_hot          # Cluster protection
-            )
+            # === GL-Cache: learned scoring (replaces Hedge when trained) ===
+            if self._glcache is not None and self._glcache.is_trained:
+                gl_features = extract_features(
+                    page,
+                    current_time=state.current_time,
+                    max_time=max_time,
+                    min_time=min_time,
+                    tier0_capacity=state.tier0.capacity,
+                    reuse_score=reuse,
+                    neighbor_hotness=neighbor_hot,
+                    irr_normalized=irr_cold,
+                )
+                group = frequency_group(page.access_count)
+                # GL-Cache score: higher = keep, lower = evict
+                score = self._glcache.score(gl_features, group)
+            else:
+                # Hedge-based scoring (fallback / default)
+                score = (
+                    weights[0] * effective_recency +  # Recency (IRR-adjusted)
+                    weights[1] * frequency +           # Frequency
+                    weights[2] * reuse +               # Predicted reuse
+                    weights[3] * coherence -           # Structural coherence
+                    weights[4] * neighbor_hot          # Cluster protection
+                )
 
             # === Gap 2: Size-aware adjustment (LHD hits-per-byte) ===
             # LHD: hit_density = expected_hits / size. Larger pages must justify
@@ -2156,6 +2190,27 @@ class CTMPlusController(BaseController):
                 self._weight_learner.record_eviction(victim.page_id, [
                     recency_rank, frequency, reuse, coherence, neighbor_hot
                 ])
+
+            # === GL-Cache: Record eviction with rich features ===
+            if self._glcache is not None:
+                irr_cold_v = 0.0
+                if self.ctm_config.irr.enabled:
+                    irr_cold_v = self._irr_tracker.get_normalized_irr(victim, state.tier0.capacity)
+                reuse_v = self._transition_tracker.get_reuse_score(victim.page_id)
+                neighbor_v = self._neighbor_tracker.get_neighbor_hotness(victim.page_id, state)
+                gl_feats = extract_features(
+                    victim,
+                    current_time=state.current_time,
+                    max_time=max_time,
+                    min_time=min_time,
+                    tier0_capacity=state.tier0.capacity,
+                    reuse_score=reuse_v,
+                    neighbor_hotness=neighbor_v,
+                    irr_normalized=irr_cold_v,
+                )
+                self._glcache.record_eviction(
+                    victim.page_id, gl_feats, frequency_group(victim.access_count)
+                )
 
         return victim
 
@@ -2310,6 +2365,8 @@ class CTMPlusController(BaseController):
         is_refault = self._refault_tracker.check_refault(page_id) if should_check_refault else False
         if is_refault and self.ctm_config.adaptive_weights.enabled:
             self._weight_learner.record_refault(page_id)
+        if is_refault and self._glcache is not None:
+            self._glcache.record_refault(page_id)
 
         # Get neighbor hotness early (needed for mode switcher)
         neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
@@ -2722,6 +2779,11 @@ class CTMPlusController(BaseController):
         # === Gap 4: Flush old pending evictions and check for weight update ===
         self._weight_learner.maybe_update()
 
+        # === GL-Cache: Flush old pending evictions and retrain model ===
+        if self._glcache is not None:
+            self._glcache.flush_old_pending(self._access_counter)
+            self._glcache.maybe_train()
+
         # === Writeback: Drain dirty pages in background ===
         self._writeback_scheduler.drain_writebacks(state, state.current_time)
 
@@ -2776,6 +2838,9 @@ class CTMPlusController(BaseController):
             "adaptive_weights_enabled": self.ctm_config.adaptive_weights.enabled,
             "learned_weights": self._weight_learner.get_weights(),
             "weight_updates": self._weight_learner.weight_updates,
+            # GL-Cache learned eviction
+            "glcache_enabled": self._glcache is not None,
+            "glcache_stats": self._glcache.get_stats() if self._glcache else {},
             # Gap 5: SIEVE lazy promotion
             "sieve_enabled": self.ctm_config.lazy_promotion.enabled,
             "sieve_evictions": self._sieve_evictions,

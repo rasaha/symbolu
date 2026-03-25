@@ -556,6 +556,26 @@ class CompressionTierConfig:
 
 
 @dataclass(frozen=True)
+class GLCacheConfig:
+    """
+    GL-Cache (NSDI'23) group-level learned eviction configuration.
+
+    When enabled, replaces the Hedge adaptive weight learner with a
+    gradient-boosted stump ensemble that learns eviction scores from
+    12 rich features.  Falls back to Hedge if not enough training data.
+    """
+
+    enabled: bool = False  # Off by default; opt-in
+    num_rounds: int = 10           # GBDT boosting rounds
+    learning_rate: float = 0.3     # GBDT step size
+    train_interval: int = 200      # Retrain every N completed records
+    min_train_samples: int = 50    # Minimum samples before first training
+    sample_size: int = 48          # Candidates to score per eviction
+    refault_window: int = 2000     # Accesses before assuming good eviction
+    max_history: int = 2000        # Rolling training window size
+
+
+@dataclass(frozen=True)
 class CTMPlusConfig:
     """
     Complete CTM+ configuration combining all sub-configs.
@@ -595,6 +615,7 @@ class CTMPlusConfig:
     cost_tiering: CostTieringConfig = field(default_factory=CostTieringConfig)
     writeback_scheduling: WritebackSchedulingConfig = field(default_factory=WritebackSchedulingConfig)
     compression_tier: CompressionTierConfig = field(default_factory=CompressionTierConfig)
+    glcache: GLCacheConfig = field(default_factory=GLCacheConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":
