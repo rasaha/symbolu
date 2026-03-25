@@ -416,20 +416,31 @@ class IRRTracker:
 
     def __init__(self, config: CTMPlusConfig):
         self._config = config.irr
-        self._unique_counter = 0  # Monotonic counter of unique page accesses
-        self._last_access_position: Dict[int, int] = {}  # page_id -> position in unique stream
-        self._unique_since: set = set()  # Pages seen since last epoch reset
+        self._access_counter = 0  # Monotonic counter of all accesses
+        self._unique_since_last: Dict[int, set] = {}  # page_id -> set of unique pages since last access
+        self._last_access_position: Dict[int, int] = {}  # page_id -> access counter at last access
+        self._recent_unique: set = set()  # Unique pages in current window
+        self._recent_unique_by_pos: Dict[int, set] = {}  # position -> cumulative unique set
 
     def record_access(self, page_id: int, page: PageState) -> float:
-        """Record access and return updated IRR for this page."""
+        """Record access and return updated IRR for this page.
+
+        IRR = number of distinct pages accessed between two consecutive
+        accesses to the same page. This is the true LIRS metric.
+        """
         if not self._config.enabled:
             return page.irr
 
-        self._unique_counter += 1
+        self._access_counter += 1
 
         if page_id in self._last_access_position:
-            # Compute IRR: unique pages between this access and previous
-            raw_irr = self._unique_counter - self._last_access_position[page_id]
+            # Count unique pages seen since this page's last access
+            last_pos = self._last_access_position[page_id]
+            if page_id in self._unique_since_last:
+                raw_irr = len(self._unique_since_last[page_id])
+            else:
+                raw_irr = self._access_counter - last_pos  # fallback
+
             # EMA smoothing to handle bursty patterns
             alpha = self._config.irr_ema_alpha
             if page.irr == float('inf'):
@@ -437,9 +448,25 @@ class IRRTracker:
             else:
                 page.irr = alpha * raw_irr + (1 - alpha) * page.irr
             page.irr = min(page.irr, self._config.max_irr)
-        # else: first access, IRR stays at inf
 
-        self._last_access_position[page_id] = self._unique_counter
+        # Reset unique tracking for this page (start counting again)
+        self._unique_since_last[page_id] = set()
+
+        # Add this page to all other pages' unique-since-last sets
+        for pid in self._last_access_position:
+            if pid != page_id and pid in self._unique_since_last:
+                self._unique_since_last[pid].add(page_id)
+
+        self._last_access_position[page_id] = self._access_counter
+
+        # Periodic cleanup: remove stale entries for pages not seen recently
+        if self._access_counter % 5000 == 0:
+            cutoff = self._access_counter - 10000
+            stale = [pid for pid, pos in self._last_access_position.items() if pos < cutoff]
+            for pid in stale:
+                self._last_access_position.pop(pid, None)
+                self._unique_since_last.pop(pid, None)
+
         return page.irr
 
     def get_normalized_irr(self, page: PageState, cache_size: int) -> float:
@@ -554,9 +581,11 @@ class AdaptiveWeightLearner:
         self._log_weights = [0.0] * n  # Log-space for numerical stability
         self._weights = [1.0 / n] * n  # Probability distribution
 
-        # Track eviction outcomes for learning
-        self._eviction_features: deque = deque(maxlen=config.adaptive_weights.update_interval)
-        self._eviction_outcomes: deque = deque(maxlen=config.adaptive_weights.update_interval)
+        # Track eviction records: list of (features, outcome) pairs
+        # Features are recorded at eviction time; outcome is filled in later
+        # when we know if it was a refault or not.
+        self._pending_evictions: Dict[int, List[float]] = {}  # page_id -> features
+        self._completed_records: deque = deque(maxlen=config.adaptive_weights.update_interval)
         self._eviction_count = 0
 
         # Stats
@@ -565,7 +594,6 @@ class AdaptiveWeightLearner:
     def get_weights(self) -> List[float]:
         """Return current scoring weights scaled to sum to ~1.0."""
         if not self._config.enabled:
-            # Return fixed weights when disabled
             return [0.40, 0.30, 0.15, 0.10, 0.10]
         # Scale weights so they sum to 1.05 (matching original total magnitude)
         total = sum(abs(w) for w in self._weights)
@@ -574,51 +602,83 @@ class AdaptiveWeightLearner:
         scale = 1.05 / total
         return [w * scale for w in self._weights]
 
-    def record_eviction(self, features: List[float]) -> None:
-        """Record feature vector of evicted page for later learning."""
+    def record_eviction(self, page_id: int, features: List[float]) -> None:
+        """Record feature vector of evicted page. Outcome determined later."""
         if not self._config.enabled:
             return
-        self._eviction_features.append(features)
+        self._pending_evictions[page_id] = features
         self._eviction_count += 1
 
-    def record_outcome(self, was_refault: bool) -> None:
-        """
-        Record whether an eviction was a mistake (refault = page needed again).
+        # Limit pending to prevent unbounded growth
+        if len(self._pending_evictions) > self._config.update_interval * 4:
+            # Assume old pending evictions were good (no refault observed)
+            oldest = list(self._pending_evictions.keys())[:len(self._pending_evictions) // 2]
+            for pid in oldest:
+                feats = self._pending_evictions.pop(pid)
+                self._completed_records.append((feats, 0.0))
 
-        If refault: the eviction was bad → penalize experts that ranked this page low.
-        If no refault: the eviction was good → reward experts that identified it as cold.
-        """
+    def record_refault(self, page_id: int) -> None:
+        """Record that an evicted page was refaulted (bad eviction)."""
         if not self._config.enabled:
             return
-        self._eviction_outcomes.append(1.0 if was_refault else 0.0)
+        if page_id in self._pending_evictions:
+            features = self._pending_evictions.pop(page_id)
+            self._completed_records.append((features, 1.0))
+        # If not in pending, the eviction was too old to track — ignore
 
-        # Update weights periodically
-        if len(self._eviction_outcomes) >= self._config.update_interval:
+    def record_no_refault(self, page_id: int) -> None:
+        """Record that a pending eviction expired without refault (good eviction)."""
+        if not self._config.enabled:
+            return
+        if page_id in self._pending_evictions:
+            features = self._pending_evictions.pop(page_id)
+            self._completed_records.append((features, 0.0))
+
+    def maybe_update(self) -> None:
+        """Flush old pending evictions as good outcomes and trigger weight update."""
+        if not self._config.enabled:
+            return
+
+        # Flush pending evictions older than update_interval as "no refault" (good)
+        # If a page hasn't been refaulted by now, the eviction was probably fine
+        if len(self._pending_evictions) > self._config.update_interval // 2:
+            flush_count = len(self._pending_evictions) // 2
+            oldest = list(self._pending_evictions.keys())[:flush_count]
+            for pid in oldest:
+                feats = self._pending_evictions.pop(pid)
+                self._completed_records.append((feats, 0.0))
+
+        if len(self._completed_records) >= self._config.update_interval:
             self._update_weights()
 
     def _update_weights(self) -> None:
-        """Hedge algorithm weight update from accumulated outcomes."""
-        if not self._eviction_features or not self._eviction_outcomes:
+        """Hedge algorithm weight update from paired (features, outcome) records."""
+        if not self._completed_records:
             return
 
         n = self._config.num_experts
         eta = self._config.learning_rate
 
-        # Compute per-expert loss: how well each expert predicted refaults
+        # Expert indices: 0=recency, 1=frequency, 2=reuse, 3=coherence, 4=neighbor_hot
+        # Expert 4 (neighbor_hot) is SUBTRACTED in scoring, so its sign is inverted.
+        # For loss computation: high neighbor_hot + refault means the expert's
+        # protection signal was correct but we evicted anyway → penalize.
+        sign = [1.0, 1.0, 1.0, 1.0, -1.0]  # Sign of each expert in score formula
+
         expert_losses = [0.0] * n
-        count = min(len(self._eviction_features), len(self._eviction_outcomes))
+        count = len(self._completed_records)
 
-        for i in range(count):
-            features = self._eviction_features[i]
-            outcome = self._eviction_outcomes[i]  # 1 = refault (bad eviction)
-
+        for features, outcome in self._completed_records:
             for j in range(min(n, len(features))):
-                # Loss: expert said "evict" (low feature) but page was needed (refault)
-                # High feature value + refault = expert was wrong to protect
-                # Low feature value + refault = expert was right to evict... but shouldn't have
-                expert_losses[j] += outcome * (1.0 - features[j])
+                if sign[j] > 0:
+                    # Positive expert: low feature → evict. Refault means we were wrong.
+                    expert_losses[j] += outcome * (1.0 - features[j])
+                else:
+                    # Negative expert (neighbor_hot): high feature → protect.
+                    # Refault of protected page = expert correctly warned us.
+                    # Refault of unprotected page = expert failed to warn.
+                    expert_losses[j] += outcome * features[j]
 
-        # Normalize losses
         if count > 0:
             expert_losses = [l / count for l in expert_losses]
 
@@ -637,8 +697,7 @@ class AdaptiveWeightLearner:
         self._weights = [w / total for w in self._weights]
 
         self.weight_updates += 1
-        self._eviction_features.clear()
-        self._eviction_outcomes.clear()
+        self._completed_records.clear()
 
 
 class ExternalHintManager:
@@ -903,10 +962,12 @@ class CTMPlusController(BaseController):
             )
 
             # === Gap 2: Size-aware adjustment (LHD hits-per-byte) ===
+            # LHD: hit_density = expected_hits / size. Larger pages must justify
+            # their space with proportionally more value. Smaller pages get a bonus.
             if self.ctm_config.size_aware.enabled:
                 size_ratio = page.size_bytes / self.ctm_config.size_aware.default_page_size
-                if size_ratio > 1.0:
-                    # Larger pages need proportionally higher score to stay
+                if size_ratio != 1.0:
+                    # Divide score by size ratio: large pages penalized, small pages boosted
                     score /= (1.0 + self.ctm_config.size_aware.size_weight * (size_ratio - 1.0))
 
             # === Gap 6: Hint-based score adjustment ===
@@ -943,7 +1004,7 @@ class CTMPlusController(BaseController):
                 reuse = self._transition_tracker.get_reuse_score(victim.page_id)
                 coherence = victim.coherence
                 neighbor_hot = self._neighbor_tracker.get_neighbor_hotness(victim.page_id, state)
-                self._weight_learner.record_eviction([
+                self._weight_learner.record_eviction(victim.page_id, [
                     recency_rank, frequency, reuse, coherence, neighbor_hot
                 ])
 
@@ -1029,10 +1090,17 @@ class CTMPlusController(BaseController):
         # === Gap 6: Apply external hints ===
         self._hint_manager.apply_to_page(page)
 
-        # === Gap 3: Check refault (was this page recently evicted?) ===
-        is_refault = self._refault_tracker.check_refault(page_id)
+        # === Gap 3: Check refault on tier1 hits and true misses ===
+        # In CTM+, evicted pages go to tier1 (demotion, not discard).
+        # A "refault" = a recently-demoted page is accessed in tier1,
+        # meaning it should have stayed in tier0. Also check true misses
+        # (page not in either tier) for pages evicted from tier1 too.
+        is_tier1_hit = state.tier1.contains(page_id) and not state.tier0.contains(page_id)
+        is_true_miss = not state.tier0.contains(page_id) and not state.tier1.contains(page_id)
+        should_check_refault = is_tier1_hit or is_true_miss
+        is_refault = self._refault_tracker.check_refault(page_id) if should_check_refault else False
         if is_refault and self.ctm_config.adaptive_weights.enabled:
-            self._weight_learner.record_outcome(was_refault=True)
+            self._weight_learner.record_refault(page_id)
 
         # Get neighbor hotness early (needed for mode switcher)
         neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
@@ -1233,11 +1301,9 @@ class CTMPlusController(BaseController):
         # === Gap 3: Record eviction for refault tracking ===
         self._refault_tracker.record_eviction(evicted.page_id, state.current_time)
 
-        # === Gap 4: Record good eviction outcome (not a refault... yet) ===
-        # The actual refault check happens later when the page is re-accessed
-        # For now, we record that an eviction happened without immediate regret
-        if self.ctm_config.adaptive_weights.enabled:
-            self._weight_learner.record_outcome(was_refault=False)
+        # Gap 4: Outcome will be determined later — if page is refaulted,
+        # record_refault() is called in on_access. If not, pending evictions
+        # expire via timeout in record_eviction().
 
         # Classify into appropriate shadow tier based on reuse score
         evicted_reuse = self._transition_tracker.get_reuse_score(evicted.page_id)
@@ -1284,6 +1350,9 @@ class CTMPlusController(BaseController):
 
         # === Gap 3: Run PID controller for pressure-based eviction adjustment ===
         self._refault_tracker.update_pid()
+
+        # === Gap 4: Flush old pending evictions and check for weight update ===
+        self._weight_learner.maybe_update()
 
     def get_stats(self) -> dict:
         mode_stats = self._mode_switcher.get_stats()
