@@ -33,6 +33,7 @@ class TraceEvent:
     page_id: int  # Page being accessed
     op_type: OpType  # READ, WRITE, or PREFETCH
     size_bytes: int = 4096  # Size of access (default = 1 page)
+    tenant_id: Optional[str] = None  # Owning tenant for multi-tenancy QoS
 
     @classmethod
     def from_csv_row(cls, row: dict) -> "TraceEvent":
@@ -42,6 +43,7 @@ class TraceEvent:
             page_id=int(row.get("page_id", row.get("page", row.get("address", 0)))),
             op_type=OpType(int(row.get("op_type", row.get("op", 0)))),
             size_bytes=int(row.get("size", 4096)),
+            tenant_id=row.get("tenant_id", row.get("tenant", None)),
         )
 
 

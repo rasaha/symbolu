@@ -29,7 +29,9 @@ if TYPE_CHECKING:
 from .base import BaseController
 from .mode_switch import ModeSwitchController, ModePolicy, WorkloadMode
 from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
-from ..core.config import SimulatorConfig, CTMPlusConfig
+from ..core.config import (
+    SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
+)
 
 
 class PhaseIntegrator:
@@ -971,6 +973,216 @@ class ExternalHintManager:
         page.hint_priority = priority
 
 
+class TenantManager:
+    """
+    Multi-tenancy and QoS isolation manager (CacheLib/DAMON-inspired).
+
+    Provides:
+    - Per-tenant tier0 quota enforcement (min/max share)
+    - Priority-weighted victim scoring (low-priority tenants evicted first)
+    - Noisy neighbor protection (hard cap on per-tenant tier0 usage)
+    - Per-tenant metrics (hit rate, occupancy, promotions/demotions)
+
+    Design principles:
+    - Zero overhead when disabled (all methods short-circuit)
+    - O(1) per-access overhead when enabled (dict lookups only)
+    - Quota enforcement is soft on min, hard on max
+    """
+
+    def __init__(self, config: MultiTenancyConfig, tier0_capacity: int):
+        self._config = config
+        self._tier0_capacity = tier0_capacity
+
+        # Registered tenants: tenant_id -> TenantConfig
+        self._tenants: Dict[str, TenantConfig] = {}
+
+        # Always register the default tenant
+        self._tenants[config.default_tenant_id] = TenantConfig(
+            tenant_id=config.default_tenant_id,
+            priority=TenantPriority.NORMAL,
+        )
+
+        # Per-tenant metrics
+        self._tenant_accesses: Dict[str, int] = {}
+        self._tenant_hits: Dict[str, int] = {}
+        self._tenant_promotions: Dict[str, int] = {}
+        self._tenant_demotions: Dict[str, int] = {}
+        self._tenant_evictions: Dict[str, int] = {}
+
+    @property
+    def enabled(self) -> bool:
+        return self._config.enabled
+
+    def register_tenant(self, config: TenantConfig) -> None:
+        """Register a tenant with QoS parameters."""
+        self._tenants[config.tenant_id] = config
+
+    def unregister_tenant(self, tenant_id: str) -> None:
+        """Unregister a tenant. Its pages become default tenant."""
+        self._tenants.pop(tenant_id, None)
+
+    def get_tenant_config(self, tenant_id: str) -> TenantConfig:
+        """Get config for a tenant, falling back to default."""
+        return self._tenants.get(tenant_id, self._tenants[self._config.default_tenant_id])
+
+    def assign_page_tenant(self, page: PageState, tenant_id: Optional[str] = None) -> None:
+        """Assign a page to a tenant."""
+        if not self._config.enabled:
+            return
+        page.tenant_id = tenant_id if tenant_id is not None else self._config.default_tenant_id
+
+    def record_access(self, tenant_id: str, is_hit: bool) -> None:
+        """Record an access for per-tenant metrics."""
+        if not self._config.enabled:
+            return
+        self._tenant_accesses[tenant_id] = self._tenant_accesses.get(tenant_id, 0) + 1
+        if is_hit:
+            self._tenant_hits[tenant_id] = self._tenant_hits.get(tenant_id, 0) + 1
+
+    def record_promotion(self, tenant_id: str) -> None:
+        if not self._config.enabled:
+            return
+        self._tenant_promotions[tenant_id] = self._tenant_promotions.get(tenant_id, 0) + 1
+
+    def record_demotion(self, tenant_id: str) -> None:
+        if not self._config.enabled:
+            return
+        self._tenant_demotions[tenant_id] = self._tenant_demotions.get(tenant_id, 0) + 1
+
+    def record_eviction(self, tenant_id: str) -> None:
+        if not self._config.enabled:
+            return
+        self._tenant_evictions[tenant_id] = self._tenant_evictions.get(tenant_id, 0) + 1
+
+    def get_tenant_tier0_share(self, tenant_id: str, state: GlobalState) -> float:
+        """Get current tier0 share for a tenant as fraction [0, 1]."""
+        count = state.tier0.get_tenant_page_count(tenant_id)
+        if self._tier0_capacity == 0:
+            return 0.0
+        return count / self._tier0_capacity
+
+    def is_over_quota(self, tenant_id: str, state: GlobalState) -> bool:
+        """Check if tenant exceeds its max tier0 share."""
+        tc = self.get_tenant_config(tenant_id)
+        return self.get_tenant_tier0_share(tenant_id, state) > tc.max_tier0_share
+
+    def is_under_quota(self, tenant_id: str, state: GlobalState) -> bool:
+        """Check if tenant is below its guaranteed min tier0 share."""
+        tc = self.get_tenant_config(tenant_id)
+        if tc.min_tier0_share == 0.0:
+            return False
+        return self.get_tenant_tier0_share(tenant_id, state) < tc.min_tier0_share
+
+    def should_admit(self, tenant_id: str, state: GlobalState) -> bool:
+        """
+        Check if a tenant's page should be admitted to tier0.
+
+        Returns False if the tenant is already at its hard max cap,
+        UNLESS no other tenant has slack (prevents deadlock).
+        """
+        if not self._config.enabled:
+            return True
+
+        tc = self.get_tenant_config(tenant_id)
+        current_share = self.get_tenant_tier0_share(tenant_id, state)
+
+        # Under hard cap → always allow
+        if current_share < tc.max_tier0_share:
+            return True
+
+        # At or over cap → only allow if tier0 is not full (no eviction needed)
+        if not state.tier0.is_full:
+            return True
+
+        # Over cap and tier0 full → check if we can evict from another tenant
+        # to make room. This prevents starvation when all tenants are at cap.
+        for other_tid, other_tc in self._tenants.items():
+            if other_tid == tenant_id:
+                continue
+            other_share = self.get_tenant_tier0_share(other_tid, state)
+            if other_share > other_tc.min_tier0_share and other_tc.priority < tc.priority:
+                return True  # Can evict from lower-priority tenant
+
+        return False
+
+    def get_victim_score_adjustment(self, page: PageState, state: GlobalState) -> float:
+        """
+        Compute QoS-based victim score adjustment for a page.
+
+        Returns a value added to the victim score:
+        - Positive = harder to evict (protect high-priority, under-quota tenants)
+        - Negative = easier to evict (penalize low-priority, over-quota tenants)
+        """
+        if not self._config.enabled:
+            return 0.0
+
+        tc = self.get_tenant_config(page.tenant_id)
+        adjustment = 0.0
+
+        # Priority-based protection: higher priority → harder to evict
+        # BACKGROUND=0, LOW=1, NORMAL=2, HIGH=3, CRITICAL=4
+        # Normalized: (priority - NORMAL) / CRITICAL gives [-0.5, 0, 0.25, 0.5]
+        priority_delta = (int(tc.priority) - int(TenantPriority.NORMAL)) / int(TenantPriority.CRITICAL)
+        adjustment += self._config.priority_weight_scale * priority_delta
+
+        # Over-quota penalty: tenants exceeding max share get evicted first
+        current_share = self.get_tenant_tier0_share(page.tenant_id, state)
+        if tc.max_tier0_share < 1.0 and current_share > tc.max_tier0_share:
+            overshoot = (current_share - tc.max_tier0_share) / max(0.01, 1.0 - tc.max_tier0_share)
+            adjustment -= self._config.over_quota_penalty * min(1.0, overshoot)
+
+        # Under-quota protection: tenants below min share are protected
+        if tc.min_tier0_share > 0.0 and current_share < tc.min_tier0_share:
+            undershoot = (tc.min_tier0_share - current_share) / max(0.01, tc.min_tier0_share)
+            adjustment += self._config.under_quota_boost * min(1.0, undershoot)
+
+        return adjustment
+
+    def get_preferred_victim_tenant(self, state: GlobalState) -> Optional[str]:
+        """
+        Get the tenant ID that should preferentially have pages evicted.
+
+        Returns the over-quota tenant with the lowest priority, or None.
+        Used as a hint for victim selection to bias sampling.
+        """
+        if not self._config.enabled:
+            return None
+
+        best_victim_tenant = None
+        best_score = float('inf')  # Lower = more evictable
+
+        for tid, tc in self._tenants.items():
+            share = self.get_tenant_tier0_share(tid, state)
+            if share <= 0:
+                continue
+            # Score: lower priority + higher over-quota = more evictable
+            score = int(tc.priority) - (max(0, share - tc.max_tier0_share) * 10)
+            if score < best_score:
+                best_score = score
+                best_victim_tenant = tid
+
+        return best_victim_tenant
+
+    def get_stats(self) -> Dict:
+        """Get per-tenant metrics."""
+        tenant_stats = {}
+        for tid in self._tenants:
+            accesses = self._tenant_accesses.get(tid, 0)
+            hits = self._tenant_hits.get(tid, 0)
+            tenant_stats[tid] = {
+                "priority": self._tenants[tid].priority.name,
+                "min_share": self._tenants[tid].min_tier0_share,
+                "max_share": self._tenants[tid].max_tier0_share,
+                "accesses": accesses,
+                "hits": hits,
+                "hit_rate": hits / accesses if accesses > 0 else 0.0,
+                "promotions": self._tenant_promotions.get(tid, 0),
+                "demotions": self._tenant_demotions.get(tid, 0),
+                "evictions": self._tenant_evictions.get(tid, 0),
+            }
+        return tenant_stats
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller with all state-of-the-art gap closures implemented.
@@ -982,6 +1194,7 @@ class CTMPlusController(BaseController):
     - Size-Aware Eviction (LHD): Hits-per-byte for variable-size objects
     - Lazy Promotion (SIEVE): Visited-bit deferred scoring
     - External Hint API (CXL CMM-H): Application-provided page hints
+    - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
@@ -1012,6 +1225,7 @@ class CTMPlusController(BaseController):
         self._refault_tracker = RefaultTracker(self.ctm_config)
         self._weight_learner = AdaptiveWeightLearner(self.ctm_config)
         self._hint_manager = ExternalHintManager(self.ctm_config)
+        self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
 
         # Stats
         self._promotions = 0
@@ -1185,6 +1399,11 @@ class CTMPlusController(BaseController):
             elif pressure < -0.1:
                 score += 0.05 * pressure  # Evict more aggressively when rate is low
 
+            # === Multi-tenancy: QoS-based victim score adjustment ===
+            tenant_adj = self._tenant_manager.get_victim_score_adjustment(page, state)
+            if tenant_adj != 0.0:
+                score += tenant_adj
+
             # Partition penalty based on adaptive p
             if p_val > 0.5 and frequency < 0.3:
                 score -= 0.10 * (p_val - 0.5) * 2
@@ -1262,7 +1481,26 @@ class CTMPlusController(BaseController):
         # Will be applied when page is next accessed/created
         self._page_sizes[page_id] = size_bytes
 
-    def on_access(self, state: GlobalState, page_id: int, op_type: OpType) -> Tuple[Tier, int, bool, bool]:
+    # === Multi-tenancy public API ===
+    def register_tenant(self, config: TenantConfig) -> None:
+        """External API: Register a tenant with QoS parameters."""
+        self._tenant_manager.register_tenant(config)
+
+    def unregister_tenant(self, tenant_id: str) -> None:
+        """External API: Unregister a tenant."""
+        self._tenant_manager.unregister_tenant(tenant_id)
+
+    def get_tenant_stats(self) -> Dict:
+        """External API: Get per-tenant metrics."""
+        return self._tenant_manager.get_stats()
+
+    def on_access(
+        self,
+        state: GlobalState,
+        page_id: int,
+        op_type: OpType,
+        tenant_id: Optional[str] = None,
+    ) -> Tuple[Tier, int, bool, bool]:
         self._access_counter += 1
 
         # Predictive updates
@@ -1282,6 +1520,10 @@ class CTMPlusController(BaseController):
         page = state.get_or_create_page(page_id)
         page.phase = phase
         page.amplitude = max(page.amplitude, amplitude)
+
+        # === Multi-tenancy: Assign tenant to page ===
+        if tenant_id is not None:
+            self._tenant_manager.assign_page_tenant(page, tenant_id)
         page.update_on_access(state.current_time, op_type)
 
         # === Gap 1: IRR tracking ===
@@ -1339,6 +1581,7 @@ class CTMPlusController(BaseController):
         if state.tier0.contains(page_id):
             state.tier0.touch(page_id)
             state.tier0.record_hit()
+            self._tenant_manager.record_access(page.tenant_id, is_hit=True)
             self._do_predictive_prefetch(state, page_id, policy)
             latency = self._compute_latency(Tier.TIER0, False, False)
             return (Tier.TIER0, latency, False, False)
@@ -1346,14 +1589,17 @@ class CTMPlusController(BaseController):
         # Case 2: Tier 1 Hit (Slow Path - consider promotion)
         if state.tier1.contains(page_id):
             state.tier1.touch(page_id)
+            self._tenant_manager.record_access(page.tenant_id, is_hit=False)
 
             # Check shadow tier regret: page in B1/B2 means we demoted it too early
             self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
-            # Check promotion eligibility
+            # Check promotion eligibility (includes tenant quota check)
+            tenant_can_admit = self._tenant_manager.should_admit(page.tenant_id, state)
             can_promote = (
                 self._epoch_promotions < self.ctm_config.max_promotions_per_epoch and
-                state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown
+                state.current_time - page.last_demotion_time > self.ctm_config.promotion_cooldown and
+                tenant_can_admit
             )
 
             should_promote = False
@@ -1393,6 +1639,7 @@ class CTMPlusController(BaseController):
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
+                self._tenant_manager.record_promotion(page.tenant_id)
                 page.last_promotion_time = state.current_time
 
                 if evicted is not None:
@@ -1404,6 +1651,7 @@ class CTMPlusController(BaseController):
             return (Tier.TIER1, latency, promoted, demoted)
 
         # Case 3: Miss
+        self._tenant_manager.record_access(page.tenant_id, is_hit=False)
         self._shadow_tier.check_and_record_regret(page_id, is_miss=True)
 
         # === Gap 3: Refault-boosted admission ===
@@ -1417,11 +1665,15 @@ class CTMPlusController(BaseController):
             victim = self._select_victim(state)
 
         # Gate admission: new page must beat victim's frequency (unless refault)
+        # Also gate by tenant quota (multi-tenancy)
         admit = True
         if not is_refault:  # Refaulted pages always re-admitted
             admit = self._admission.should_admit(
                 page_id, victim.page_id if victim else None
             )
+            # Multi-tenancy: check tenant quota
+            if admit and not self._tenant_manager.should_admit(page.tenant_id, state):
+                admit = False
 
         if admit:
             evicted = None
@@ -1433,6 +1685,7 @@ class CTMPlusController(BaseController):
             state.tier0.add(page)
             promoted = True
             self._promotions += 1
+            self._tenant_manager.record_promotion(page.tenant_id)
 
             if evicted is not None:
                 demoted = self._handle_eviction(state, evicted)
@@ -1515,11 +1768,16 @@ class CTMPlusController(BaseController):
         - Gap 3: Record eviction for refault tracking
         - Gap 4: Record non-refault outcome for weight learning
         - Gap 5: Clear visited bit on eviction (SIEVE)
+        - Multi-tenancy: Record per-tenant demotion/eviction
         """
         # Demote to tier1
         state.tier1.add(evicted)
         evicted.last_demotion_time = state.current_time
         evicted.visited = False  # Gap 5: Reset visited bit
+
+        # Multi-tenancy: record tenant eviction
+        self._tenant_manager.record_demotion(evicted.tenant_id)
+        self._tenant_manager.record_eviction(evicted.tenant_id)
 
         # === Gap 3: Record eviction for refault tracking ===
         self._refault_tracker.record_eviction(evicted.page_id, state.current_time)
@@ -1635,5 +1893,8 @@ class CTMPlusController(BaseController):
             "hints_enabled": self.ctm_config.external_hints.enabled,
             "hint_influenced_decisions": self._hint_influenced,
             "active_hints": len(self._hint_manager._hints),
+            # Multi-tenancy & QoS isolation
+            "multi_tenancy_enabled": self.ctm_config.multi_tenancy.enabled,
+            "tenant_stats": self._tenant_manager.get_stats() if self.ctm_config.multi_tenancy.enabled else {},
         }
         return stats

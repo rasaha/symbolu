@@ -25,7 +25,7 @@ Usage:
 __version__ = "0.1.0"
 __author__ = "Symbol-U Research"
 
-from .core.config import SimulatorConfig, CTMPlusConfig
+from .core.config import SimulatorConfig, CTMPlusConfig, TenantPriority, TenantConfig, MultiTenancyConfig
 from .core.state import PageState, TierState
 from .core.metrics import SimulationMetrics, MetricsCollector
 from .controllers.base import BaseController
@@ -39,6 +39,9 @@ __all__ = [
     # Config
     "SimulatorConfig",
     "CTMPlusConfig",
+    "TenantPriority",
+    "TenantConfig",
+    "MultiTenancyConfig",
     # State
     "PageState",
     "TierState",

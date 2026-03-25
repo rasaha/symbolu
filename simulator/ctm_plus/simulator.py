@@ -112,12 +112,11 @@ class Simulator:
         for i, event in enumerate(trace):
             state.current_time = i
 
-            # Process access
-            tier, latency_ns, promoted, demoted = controller.on_access(
-                state=state,
-                page_id=event.page_id,
-                op_type=event.op_type,
-            )
+            # Process access (pass tenant_id if available for multi-tenancy QoS)
+            kwargs = dict(state=state, page_id=event.page_id, op_type=event.op_type)
+            if event.tenant_id is not None:
+                kwargs["tenant_id"] = event.tenant_id
+            tier, latency_ns, promoted, demoted = controller.on_access(**kwargs)
 
             # Record metrics
             tier0_hit = (tier == Tier.TIER0)

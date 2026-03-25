@@ -4,6 +4,7 @@ from .config import (
     SimulatorConfig, CTMPlusConfig,
     AdmissionConfig, IRRConfig, SizeAwareConfig, RefaultConfig,
     AdaptiveWeightConfig, LazyPromotionConfig, ExternalHintConfig,
+    TenantPriority, TenantConfig, MultiTenancyConfig,
 )
 from .state import PageState, TierState, PageHint
 from .metrics import SimulationMetrics, MetricsCollector
@@ -18,6 +19,9 @@ __all__ = [
     "AdaptiveWeightConfig",
     "LazyPromotionConfig",
     "ExternalHintConfig",
+    "TenantPriority",
+    "TenantConfig",
+    "MultiTenancyConfig",
     "PageState",
     "TierState",
     "PageHint",

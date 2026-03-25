@@ -96,6 +96,9 @@ class PageState:
     hint: PageHint = PageHint.NONE
     hint_priority: float = 0.0  # Application-provided priority [0, 1]
 
+    # === Multi-tenancy: QoS isolation ===
+    tenant_id: str = "default"  # Owning tenant for QoS-aware eviction
+
     def update_on_access(
         self,
         time: int,
@@ -210,6 +213,9 @@ class TierState:
     total_promotions: int = 0
     total_demotions: int = 0
 
+    # Per-tenant occupancy tracking: tenant_id -> page count in this tier
+    tenant_occupancy: Dict[str, int] = field(default_factory=dict)
+
     @property
     def size(self) -> int:
         """Current number of pages in tier."""
@@ -268,9 +274,21 @@ class TierState:
         if self.is_full and page.page_id not in self.pages:
             evicted = self._evict_lru()
 
-        # Add page
+        # Track tenant occupancy change for evicted page
+        if evicted is not None:
+            tid = evicted.tenant_id
+            self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+
+        # Add page (if replacing existing, adjust occupancy)
+        if page.page_id in self.pages:
+            old_tid = self.pages[page.page_id].tenant_id
+            self.tenant_occupancy[old_tid] = max(0, self.tenant_occupancy.get(old_tid, 0) - 1)
+
         self.pages[page.page_id] = page
         page.tier = self.tier_id
+
+        # Track tenant occupancy for new page
+        self.tenant_occupancy[page.tenant_id] = self.tenant_occupancy.get(page.tenant_id, 0) + 1
 
         # Update access order
         if page.page_id in self.access_order:
@@ -295,6 +313,10 @@ class TierState:
         page = self.pages.pop(page_id)
         page.tier = Tier.NONE
 
+        # Track tenant occupancy
+        tid = page.tenant_id
+        self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+
         if page_id in self.access_order:
             self.access_order.remove(page_id)
 
@@ -318,6 +340,10 @@ class TierState:
 
         lru_page_id = self.access_order.popleft()
         return self.pages.pop(lru_page_id, None)
+
+    def get_tenant_page_count(self, tenant_id: str) -> int:
+        """Get number of pages owned by a tenant in this tier."""
+        return self.tenant_occupancy.get(tenant_id, 0)
 
     def get_lru_candidates(self, n: int) -> list:
         """Get N least recently used pages as eviction candidates."""

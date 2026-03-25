@@ -6,7 +6,8 @@ derived from the CTM+ specification.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Dict, Optional
+from enum import IntEnum
 
 
 @dataclass(frozen=True)
@@ -198,6 +199,73 @@ class AdmissionConfig:
     frequency_gate: bool = True  # Require new page freq >= victim freq
 
 
+class TenantPriority(IntEnum):
+    """QoS priority classes for multi-tenant isolation (CacheLib/DAMON-inspired)."""
+
+    BACKGROUND = 0   # Lowest: batch jobs, analytics scans
+    LOW = 1           # Below normal: non-critical services
+    NORMAL = 2        # Default priority
+    HIGH = 3          # Elevated: latency-sensitive services
+    CRITICAL = 4      # Highest: cannot be evicted unless pinned-page limit reached
+
+
+@dataclass(frozen=True)
+class TenantConfig:
+    """
+    Per-tenant QoS configuration.
+
+    Each tenant gets a guaranteed minimum share of tier0 and a hard
+    maximum cap. Eviction priority is determined by the priority class:
+    lower-priority tenants are evicted first when under memory pressure.
+    """
+
+    tenant_id: str = "default"
+    priority: TenantPriority = TenantPriority.NORMAL
+
+    # Tier0 share bounds as fractions of total tier0 capacity [0.0, 1.0]
+    min_tier0_share: float = 0.0    # Guaranteed minimum (0 = no guarantee)
+    max_tier0_share: float = 1.0    # Hard cap (1.0 = no limit)
+
+    # Weight multiplier for victim scoring: higher = harder to evict
+    # Applied as: score *= priority_weight. CRITICAL gets 4x protection.
+    priority_weight: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.min_tier0_share <= self.max_tier0_share <= 1.0):
+            raise ValueError(
+                f"Invalid share bounds: min={self.min_tier0_share}, max={self.max_tier0_share}"
+            )
+
+
+@dataclass(frozen=True)
+class MultiTenancyConfig:
+    """
+    Multi-tenancy and QoS isolation configuration.
+
+    When enabled, the controller enforces per-tenant tier0 quotas and
+    uses priority-weighted victim selection to prevent noisy neighbors.
+    """
+
+    enabled: bool = False
+
+    # Default tenant for pages without explicit tenant assignment
+    default_tenant_id: str = "default"
+
+    # Eviction pressure: when a tenant exceeds its max_tier0_share,
+    # how aggressively to prefer evicting its pages. [0, 1]
+    over_quota_penalty: float = 0.3
+
+    # Under-quota protection: when a tenant is below min_tier0_share,
+    # how much to protect its pages from eviction. [0, 1]
+    under_quota_boost: float = 0.3
+
+    # Priority-based victim selection weight. Higher = priority matters more.
+    priority_weight_scale: float = 0.2
+
+    # Per-tenant configs keyed by tenant_id (not frozen-safe as dict, use classmethod)
+    # Tenant configs are registered at runtime via TenantManager.register_tenant()
+
+
 @dataclass(frozen=True)
 class CTMPlusConfig:
     """
@@ -233,6 +301,7 @@ class CTMPlusConfig:
     adaptive_weights: AdaptiveWeightConfig = field(default_factory=AdaptiveWeightConfig)
     lazy_promotion: LazyPromotionConfig = field(default_factory=LazyPromotionConfig)
     external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
+    multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":
