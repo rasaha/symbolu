@@ -10,6 +10,7 @@ from collections import deque
 import logging
 
 from .evictor import CTMEvictionPolicy
+from .shadow import ShadowEvictionPolicy
 from .config import CTMvLLMConfig
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ class CTMBlockSpaceManager:
         num_cpu_blocks: int,
         watermark: float = 0.1,
         ctm_config: Optional[CTMvLLMConfig] = None,
+        shadow_config: Optional[CTMvLLMConfig] = None,
     ):
         """
         Initialize block space manager.
@@ -91,15 +93,26 @@ class CTMBlockSpaceManager:
             num_gpu_blocks: Total GPU blocks available.
             num_cpu_blocks: Total CPU blocks available.
             watermark: Fraction of GPU blocks to keep free.
-            ctm_config: CTM+ configuration.
+            ctm_config: CTM+ configuration for the live policy.
+            shadow_config: If provided, enables shadow mode with a second
+                policy using this config.  The shadow policy observes all
+                accesses and makes its own decisions, but only the live
+                policy's decisions are executed.
         """
         self.block_size = block_size
         self.num_gpu_blocks = num_gpu_blocks
         self.num_cpu_blocks = num_cpu_blocks
         self.watermark = watermark
 
-        # CTM+ eviction policy
-        self.ctm = CTMEvictionPolicy(ctm_config)
+        # CTM+ eviction policy (optionally wrapped in shadow mode)
+        live = CTMEvictionPolicy(ctm_config)
+        if shadow_config is not None:
+            shadow = CTMEvictionPolicy(shadow_config)
+            self.ctm = ShadowEvictionPolicy(live, shadow)
+            self.shadow_enabled = True
+        else:
+            self.ctm = live
+            self.shadow_enabled = False
         self.ctm.set_capacity(num_gpu_blocks)
 
         # Physical blocks
@@ -376,3 +389,9 @@ class CTMBlockSpaceManager:
 
         for block_id in self.block_tables[sequence_id].blocks:
             self.ctm.unpin_block(block_id)
+
+    def get_shadow_report(self) -> Optional[str]:
+        """Get shadow mode report.  Returns None if shadow mode is not enabled."""
+        if self.shadow_enabled and isinstance(self.ctm, ShadowEvictionPolicy):
+            return self.ctm.get_shadow_report()
+        return None
