@@ -556,6 +556,25 @@ class CompressionTierConfig:
 
 
 @dataclass(frozen=True)
+class AutoFallbackConfig:
+    """
+    Automatic LRU fallback for recency-dominated workloads.
+
+    When enabled, the controller tracks whether CTM+'s multi-signal
+    scoring actually beats pure LRU.  If LRU has fewer refaults over
+    a sliding window, the controller falls back to LRU eviction.
+    Periodically re-probes with CTM+ scoring to detect workload changes.
+    """
+
+    enabled: bool = True  # On by default
+    window_size: int = 200       # Sliding window of eviction decisions
+    switch_threshold: float = 0.0  # Switch to LRU if CTM+ regret - LRU regret > threshold
+    probe_interval: int = 50     # While in LRU mode, try CTM+ every N evictions
+    probe_count: int = 20        # Number of CTM+ probes before re-evaluating
+    min_decisions: int = 30      # Minimum decisions before first switch
+
+
+@dataclass(frozen=True)
 class GLCacheConfig:
     """
     GL-Cache (NSDI'23) group-level learned eviction configuration.
@@ -616,6 +635,7 @@ class CTMPlusConfig:
     writeback_scheduling: WritebackSchedulingConfig = field(default_factory=WritebackSchedulingConfig)
     compression_tier: CompressionTierConfig = field(default_factory=CompressionTierConfig)
     glcache: GLCacheConfig = field(default_factory=GLCacheConfig)
+    auto_fallback: AutoFallbackConfig = field(default_factory=AutoFallbackConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

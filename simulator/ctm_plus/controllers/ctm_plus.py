@@ -32,7 +32,7 @@ from ..core.state import GlobalState, PageState, Tier, OpType, PageHint
 from ..core.config import (
     SimulatorConfig, CTMPlusConfig, TenantConfig, TenantPriority, MultiTenancyConfig,
     NUMAConfig, CostTieringConfig, WritebackSchedulingConfig, CompressionTierConfig,
-    GLCacheConfig,
+    GLCacheConfig, AutoFallbackConfig,
 )
 from .glcache import (
     GLCacheLearner, GLCacheConfig as GLCacheRuntimeConfig,
@@ -1883,6 +1883,161 @@ class NUMAManager:
         }
 
 
+class LRUFallbackDetector:
+    """Detects recency-dominated workloads and falls back to pure LRU.
+
+    Tracks two eviction "arms":
+      - **CTM+ arm**: the multi-signal scored victim
+      - **LRU arm**: the simple oldest-page victim
+
+    For each eviction where the two arms disagree, we record both page IDs
+    and later check which one was refaulted sooner.  Over a sliding window,
+    if LRU's refault rate is equal or lower than CTM+'s, we switch to LRU.
+
+    Periodically probes with CTM+ scoring while in LRU mode to detect
+    workload changes (e.g., a scan burst ends and locality returns).
+
+    State machine::
+
+        ┌───────────┐   CTM+ losing    ┌───────────┐
+        │ CTM+ mode │ ───────────────▶  │ LRU mode  │
+        └───────────┘                   └───────────┘
+              ▲                               │
+              │  probe_count probes show       │
+              │  CTM+ is better                │
+              └────────────────────────────────┘
+    """
+
+    def __init__(self, config):
+        self._config = config
+        self._window_size = config.window_size
+        self._switch_threshold = config.switch_threshold
+        self._probe_interval = config.probe_interval
+        self._probe_count = config.probe_count
+        self._min_decisions = config.min_decisions
+
+        # Current mode
+        self.using_lru = False
+
+        # Sliding window: deque of (ctm_victim_id, lru_victim_id, diverged)
+        # Only divergent decisions are tracked for regret.
+        self._decisions: deque = deque(maxlen=self._window_size)
+
+        # Refault tracking: page_id → "ctm" | "lru" | "both"
+        self._pending_ctm: Dict[int, int] = {}   # page_id → decision_index
+        self._pending_lru: Dict[int, int] = {}
+
+        # Regret counters (within current window)
+        self._ctm_refaults = 0
+        self._lru_refaults = 0
+        self._total_divergent = 0
+
+        # Probe state (used when in LRU mode)
+        self._since_last_probe = 0
+        self._probe_ctm_refaults = 0
+        self._probe_lru_refaults = 0
+        self._probe_decisions = 0
+
+        # Stats
+        self.total_decisions = 0
+        self.switches_to_lru = 0
+        self.switches_to_ctm = 0
+        self._decision_idx = 0
+
+    def record_decision(self, ctm_victim_id: int, lru_victim_id: int) -> None:
+        """Record a victim selection where both CTM+ and LRU were evaluated."""
+        self.total_decisions += 1
+        self._decision_idx += 1
+
+        diverged = (ctm_victim_id != lru_victim_id)
+        self._decisions.append((ctm_victim_id, lru_victim_id, diverged))
+
+        if diverged:
+            self._total_divergent += 1
+            # Track pending refaults for divergent decisions
+            self._pending_ctm[ctm_victim_id] = self._decision_idx
+            self._pending_lru[lru_victim_id] = self._decision_idx
+
+        if self.using_lru:
+            self._since_last_probe += 1
+
+    def check_refault(self, page_id: int) -> None:
+        """Called when a page is accessed that might have been recently evicted."""
+        if page_id in self._pending_ctm:
+            self._ctm_refaults += 1
+            if self.using_lru:
+                self._probe_ctm_refaults += 1
+            del self._pending_ctm[page_id]
+
+        if page_id in self._pending_lru:
+            self._lru_refaults += 1
+            if self.using_lru:
+                self._probe_lru_refaults += 1
+            del self._pending_lru[page_id]
+
+    def should_use_lru(self) -> bool:
+        """Return True if we should use pure LRU for this eviction."""
+        if not self._config.enabled:
+            return False
+
+        # Not enough data yet — use CTM+ (give it a chance)
+        if self.total_decisions < self._min_decisions:
+            return False
+
+        if self.using_lru:
+            # In LRU mode: check if it's time to probe CTM+
+            if self._since_last_probe >= self._probe_interval:
+                return False  # Let CTM+ run for one eviction (probe)
+            return True
+
+        # In CTM+ mode: check if LRU is winning
+        if self._total_divergent >= self._min_decisions:
+            # CTM+ is losing if its refaults >= LRU's refaults
+            # (i.e., the extra scoring complexity isn't helping)
+            ctm_worse = self._ctm_refaults >= self._lru_refaults + self._switch_threshold
+            if ctm_worse:
+                self.using_lru = True
+                self.switches_to_lru += 1
+                self._since_last_probe = 0
+                self._probe_ctm_refaults = 0
+                self._probe_lru_refaults = 0
+                self._probe_decisions = 0
+                return True
+
+        return False
+
+    def end_probe(self) -> None:
+        """Called after a CTM+ probe eviction while in LRU mode."""
+        if not self.using_lru:
+            return
+
+        self._since_last_probe = 0
+        self._probe_decisions += 1
+
+        # After enough probes, check if CTM+ is now better
+        if self._probe_decisions >= self._probe_count:
+            if self._probe_ctm_refaults < self._probe_lru_refaults:
+                # CTM+ is doing better now — switch back
+                self.using_lru = False
+                self.switches_to_ctm += 1
+
+            # Reset probe counters either way
+            self._probe_ctm_refaults = 0
+            self._probe_lru_refaults = 0
+            self._probe_decisions = 0
+
+    def get_stats(self) -> Dict:
+        return {
+            "using_lru": self.using_lru,
+            "total_decisions": self.total_decisions,
+            "total_divergent": self._total_divergent,
+            "ctm_refaults": self._ctm_refaults,
+            "lru_refaults": self._lru_refaults,
+            "switches_to_lru": self.switches_to_lru,
+            "switches_to_ctm": self.switches_to_ctm,
+        }
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller with all state-of-the-art gap closures implemented.
@@ -1940,6 +2095,8 @@ class CTMPlusController(BaseController):
             max_history=gl_cfg.max_history,
         )) if gl_cfg.enabled else None
         self._hint_manager = ExternalHintManager(self.ctm_config)
+        # Auto LRU fallback: detects when CTM+ scoring hurts vs pure LRU
+        self._lru_fallback = LRUFallbackDetector(self.ctm_config.auto_fallback)
         self._tenant_manager = TenantManager(self.ctm_config.multi_tenancy, config.tier0_size)
         self._numa_manager = NUMAManager(self.ctm_config.numa)
         self._cost_model = CostModel(self.ctm_config.cost_tiering, config)
@@ -2029,6 +2186,16 @@ class CTMPlusController(BaseController):
         if not self.ctm_config.enable_smart_victim:
             return min(pages, key=lambda p: p.last_access_time)
 
+        # === Auto LRU fallback: bypass ALL scoring (including SIEVE) ===
+        # Must come before SIEVE because SIEVE's visited-bit eviction is
+        # also suboptimal on recency-dominated workloads — it evicts
+        # unvisited pages regardless of recency, which can miss pages
+        # that LRU would correctly identify as coldest.
+        if self._lru_fallback.using_lru:
+            lru_page = min(pages, key=lambda p: p.last_access_time)
+            self._lru_fallback.record_decision(lru_page.page_id, lru_page.page_id)
+            return lru_page
+
         # === Gap 5: SIEVE-style lazy eviction (try first for low overhead) ===
         if self.ctm_config.lazy_promotion.enabled and n > 16:
             sieve_victim = self._sieve_scan(state)
@@ -2072,9 +2239,17 @@ class CTMPlusController(BaseController):
         if n <= 16:
             return min(pages, key=lambda p: p.last_access_time)
 
+        # Always find the LRU victim (needed for comparison tracking)
+        lru_page = min(pages, key=lambda p: p.last_access_time)
+
+        # Check if the detector says we should switch to LRU
+        # (first-time switch happens here; subsequent evictions caught above)
+        if self._lru_fallback.should_use_lru():
+            self._lru_fallback.record_decision(lru_page.page_id, lru_page.page_id)
+            return lru_page
+
         # SAMPLING: Pick k random candidates + always include LRU victim
         sample_size = min(self.ctm_config.victim_sample_size, n)
-        lru_page = min(pages, key=lambda p: p.last_access_time)
 
         if n > sample_size:
             sampled = random.sample(pages, sample_size - 1)
@@ -2211,6 +2386,12 @@ class CTMPlusController(BaseController):
 
         if victim is not None:
             self._smart_victim_selections += 1
+
+            # === Auto LRU fallback: record this decision for regret tracking ===
+            self._lru_fallback.record_decision(victim.page_id, lru_page.page_id)
+            if self._lru_fallback.using_lru:
+                # We were probing — end the probe
+                self._lru_fallback.end_probe()
 
             # === Gap 4: Record features for weight learning ===
             if self.ctm_config.adaptive_weights.enabled:
@@ -2399,6 +2580,10 @@ class CTMPlusController(BaseController):
             self._weight_learner.record_refault(page_id)
         if is_refault and self._glcache is not None:
             self._glcache.record_refault(page_id)
+
+        # Auto LRU fallback: check if this page was a pending eviction from either arm
+        if should_check_refault:
+            self._lru_fallback.check_refault(page_id)
 
         # Get neighbor hotness early (needed for mode switcher)
         neighbor_hotness = self._neighbor_tracker.get_neighbor_hotness(page_id, state)
@@ -2873,6 +3058,8 @@ class CTMPlusController(BaseController):
             # GL-Cache learned eviction
             "glcache_enabled": self._glcache is not None,
             "glcache_stats": self._glcache.get_stats() if self._glcache else {},
+            # Auto LRU fallback
+            "auto_fallback": self._lru_fallback.get_stats(),
             # Gap 5: SIEVE lazy promotion
             "sieve_enabled": self.ctm_config.lazy_promotion.enabled,
             "sieve_evictions": self._sieve_evictions,
