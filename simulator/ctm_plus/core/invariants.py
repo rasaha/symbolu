@@ -73,7 +73,7 @@ class InvariantChecker:
         self.check_hit_access_monotonicity()      # INV-6
         self.check_timing_monotonicity()          # INV-7
         self.check_dirty_page_consistency()       # INV-8
-        self.check_sieve_semantics()              # INV-9
+        self.check_s3fifo_fast_path_semantics()              # INV-9
         self.check_compression_tier_integrity()   # INV-10
         self.check_all_pages_registry()           # INV-11
         self.check_no_orphan_pages()              # INV-12
@@ -241,10 +241,10 @@ class InvariantChecker:
                     self._add("INV-8", "WARNING", pid,
                                f"Page is clean but dirty_since={page.dirty_since} > 0")
 
-    # ── INV-9: SIEVE Visited Semantics ──
+    # ── INV-9: S3-FIFO Fast Path Semantics (replaces SIEVE visited check) ──
 
-    def check_sieve_semantics(self) -> None:
-        """Pages not in tier0 should not have visited=True (stale bit)."""
+    def check_s3fifo_fast_path_semantics(self) -> None:
+        """Pages not in tier0 should not have visited=True (legacy stale bit)."""
         for pid, page in self.state.all_pages.items():
             if page.visited and page.tier != Tier.TIER0:
                 # A visited page outside tier0 is a stale bit — not harmful

@@ -3,7 +3,7 @@
 from .config import (
     SimulatorConfig, CTMPlusConfig,
     AdmissionConfig, IRRConfig, SizeAwareConfig, RefaultConfig,
-    AdaptiveWeightConfig, LazyPromotionConfig, ExternalHintConfig,
+    AdaptiveWeightConfig, S3FIFOFastPathConfig, ExternalHintConfig,
     TenantPriority, TenantConfig, MultiTenancyConfig,
     NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
     CompressionTierConfig,
@@ -19,7 +19,7 @@ __all__ = [
     "SizeAwareConfig",
     "RefaultConfig",
     "AdaptiveWeightConfig",
-    "LazyPromotionConfig",
+    "S3FIFOFastPathConfig",
     "ExternalHintConfig",
     "TenantPriority",
     "TenantConfig",

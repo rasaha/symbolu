@@ -88,9 +88,9 @@ class PageState:
     # Size in bytes for variable-size objects. Enables hits-per-byte scoring.
     size_bytes: int = 4096  # Default to standard page size
 
-    # === Gap 5: Lazy promotion (SIEVE) ===
-    # Visited bit: set on access, cleared on eviction scan.
-    # Defers expensive metadata updates to eviction time.
+    # === Gap 5: S3-FIFO fast path (replaces SIEVE) ===
+    # Visited bit: retained for compatibility (set on access, cleared on eviction).
+    # S3-FIFO fast path now handles eviction via frequency-based Small/Main/Ghost queues.
     visited: bool = False
 
     # === Gap 6: External hint API (CXL CMM-H) ===
@@ -135,7 +135,7 @@ class PageState:
         self.prev_access_time = self.last_access_time
         self.last_access_time = time
         self.access_count += 1
-        self.visited = True  # SIEVE: mark as visited on access
+        self.visited = True  # Legacy visited bit (S3-FIFO fast path uses frequency tracking)
 
         # Update amplitude (importance increases with access)
         self.amplitude = min(1.0, self.amplitude + amplitude_boost * (1 - self.amplitude))

@@ -146,16 +146,32 @@ class AdaptiveWeightConfig:
 
 
 @dataclass(frozen=True)
-class LazyPromotionConfig:
+class S3FIFOFastPathConfig:
     """
-    Lazy promotion configuration (SIEVE-inspired).
+    S3-FIFO fast-path eviction configuration (replaces SIEVE).
 
-    Defers metadata updates to eviction time. On access, only set a visited bit.
-    At eviction scan, skip visited pages (clear their bit) and evict unvisited ones.
+    Uses S3-FIFO's three-queue structure (Small/Main/Ghost) as the eviction
+    fast path in CTM+. Pages entering tier0 go to the Small queue. On eviction,
+    pages with frequency >= 1 are promoted to Main; zero-frequency pages are
+    evicted immediately. Main queue uses second-chance (frequency decrement).
+    Ghost queue tracks recently evicted IDs for regret-based readmission.
+
+    Advantages over SIEVE:
+    - Scan resistance: one-hit-wonders filtered by Small queue (never enter Main)
+    - Frequency awareness: promotion based on access count, not just visited bit
+    - Ghost-based regret: pages that return after eviction get fast-tracked
+    - O(1) per-access overhead (same as SIEVE), better eviction quality
+
+    Reference: "FIFO Queues are All You Need for Cache Eviction"
+               Yang et al., SOSP 2023
     """
 
     enabled: bool = True
-    sieve_scan_limit: int = 8  # Max pages to scan before falling back to scoring
+    small_queue_ratio: float = 0.10  # Small queue = 10% of tier0
+    main_queue_ratio: float = 0.90   # Main queue = 90% of tier0
+    ghost_queue_ratio: float = 1.0   # Ghost queue = 100% of tier0 size
+    max_freq: int = 3                # Saturating frequency cap
+    scan_limit: int = 8              # Max pages to scan in Main before fallback
 
 
 @dataclass(frozen=True)
@@ -627,7 +643,7 @@ class CTMPlusConfig:
     size_aware: SizeAwareConfig = field(default_factory=SizeAwareConfig)
     refault: RefaultConfig = field(default_factory=RefaultConfig)
     adaptive_weights: AdaptiveWeightConfig = field(default_factory=AdaptiveWeightConfig)
-    lazy_promotion: LazyPromotionConfig = field(default_factory=LazyPromotionConfig)
+    s3fifo_fast_path: S3FIFOFastPathConfig = field(default_factory=S3FIFOFastPathConfig)
     external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
     multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
     numa: NUMAConfig = field(default_factory=NUMAConfig)
@@ -658,9 +674,9 @@ class CTMPlusConfig:
 
     @classmethod
     def minimal_overhead(cls) -> "CTMPlusConfig":
-        """Minimal per-access overhead (SIEVE-like behavior)."""
+        """Minimal per-access overhead (S3-FIFO fast-path behavior)."""
         return cls(
-            lazy_promotion=LazyPromotionConfig(enabled=True, sieve_scan_limit=16),
+            s3fifo_fast_path=S3FIFOFastPathConfig(enabled=True, scan_limit=16),
             irr=IRRConfig(enabled=False),
             adaptive_weights=AdaptiveWeightConfig(enabled=False),
         )

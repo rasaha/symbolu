@@ -14,7 +14,7 @@ Gap closure components (state-of-the-art techniques):
 8.  RefaultTracker (TMO/MGLRU): PID-controlled refault feedback loop.
 9.  AdaptiveWeightLearner (CACHEUS/LeCaR): Hedge-algorithm online weight learning.
 10. Size-aware eviction (LHD): Hits-per-byte metric for variable-size objects.
-11. Lazy promotion (SIEVE): Visited-bit deferred scoring, O(1) per-access overhead.
+11. S3-FIFO Fast Path: Three-queue (Small/Main/Ghost) eviction fast path (replaces SIEVE).
 12. ExternalHintManager (CXL CMM-H): Application hint API for page hotness.
 """
 
@@ -610,6 +610,205 @@ class AdmissionController:
     def get_frequency(self, page_id: int) -> int:
         """Get estimated frequency for a page."""
         return self._sketch.estimate(page_id)
+
+
+class S3FIFOFastPath:
+    """
+    Gap 5 (replaces SIEVE): S3-FIFO three-queue eviction fast path.
+
+    Maintains Small/Main/Ghost FIFO queues as a lightweight eviction filter
+    inside CTM+. On eviction, the Small queue is checked first: pages with
+    freq >= 1 are promoted to Main, zero-frequency pages are evicted.
+    Main uses second-chance with frequency decrement. Ghost tracks recently
+    evicted IDs for regret detection.
+
+    This replaces the SIEVE visited-bit scan with a more effective filter:
+    - SIEVE: binary visited/not-visited → single second chance
+    - S3-FIFO: frequency tracking with ghost regret → scan-resistant eviction
+
+    All operations are O(1) amortized, same as SIEVE.
+
+    Reference: "FIFO Queues are All You Need for Cache Eviction"
+               Yang et al., SOSP 2023
+    """
+
+    def __init__(self, config: CTMPlusConfig, tier0_size: int):
+        from ..core.config import S3FIFOFastPathConfig
+        self._config: S3FIFOFastPathConfig = config.s3fifo_fast_path
+        self._tier0_size = tier0_size
+
+        small_cap = max(1, int(tier0_size * self._config.small_queue_ratio))
+        main_cap = tier0_size - small_cap
+        ghost_cap = max(1, int(tier0_size * self._config.ghost_queue_ratio))
+
+        # FIFO queues: appendleft = enqueue (newest), pop = dequeue (oldest)
+        self._small: deque = deque()
+        self._small_set: set = set()
+        self._small_cap = small_cap
+
+        self._main: deque = deque()
+        self._main_set: set = set()
+        self._main_cap = main_cap
+
+        self._ghost: deque = deque()
+        self._ghost_set: set = set()
+        self._ghost_cap = ghost_cap
+
+        # Per-page frequency (saturating at max_freq)
+        self._freq: Dict[int, int] = {}
+
+        # Stats
+        self.evictions = 0
+        self.small_promotions = 0
+        self.ghost_hits = 0
+
+    def record_access(self, page_id: int) -> None:
+        """Record a tier0 hit — increment frequency (saturating)."""
+        if not self._config.enabled:
+            return
+        max_freq = self._config.max_freq
+        self._freq[page_id] = min(max_freq, self._freq.get(page_id, 0) + 1)
+
+    def on_admit(self, page_id: int) -> None:
+        """Called when a page is newly admitted to tier0. Enters Small queue."""
+        if not self._config.enabled:
+            return
+
+        # Ghost hit → skip Small, go straight to Main
+        if page_id in self._ghost_set:
+            self._ghost_set.discard(page_id)
+            self.ghost_hits += 1
+            self._main.appendleft(page_id)
+            self._main_set.add(page_id)
+            self._freq[page_id] = 1
+            return
+
+        # Normal admission → enter Small queue
+        self._small.appendleft(page_id)
+        self._small_set.add(page_id)
+        self._freq[page_id] = 0
+
+    def on_eviction(self, page_id: int) -> None:
+        """Called when a page is evicted from tier0 by the full scoring path."""
+        self._small_set.discard(page_id)
+        self._main_set.discard(page_id)
+        self._freq.pop(page_id, None)
+
+    def select_victim(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """
+        S3-FIFO fast-path victim selection.
+
+        Try evicting from Small queue first (zero-frequency pages).
+        If Small is empty or all have freq >= 1, try Main queue (second-chance).
+        Returns None if no victim found (fall back to full scoring).
+        """
+        if not self._config.enabled:
+            return None
+
+        # Phase 1: Evict from Small queue
+        victim = self._try_evict_small(state, hint_manager)
+        if victim is not None:
+            self.evictions += 1
+            return victim
+
+        # Phase 2: Evict from Main queue (second-chance with freq decrement)
+        victim = self._try_evict_main(state, hint_manager)
+        if victim is not None:
+            self.evictions += 1
+            return victim
+
+        return None  # Fall back to full scoring
+
+    def _try_evict_small(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """Try to evict a zero-frequency page from Small, promoting freq>=1 to Main."""
+        attempts = len(self._small)
+        for _ in range(attempts):
+            if not self._small:
+                break
+            page_id = self._small.pop()  # Oldest in Small
+            if page_id not in self._small_set:
+                continue  # Lazy deletion
+            self._small_set.discard(page_id)
+
+            # Skip pinned pages
+            if hint_manager.is_pinned(page_id):
+                # Re-insert at front (keep in Small)
+                self._small.appendleft(page_id)
+                self._small_set.add(page_id)
+                continue
+
+            freq = self._freq.get(page_id, 0)
+            if freq >= 1:
+                # Promote to Main — page proved it's not a one-hit-wonder
+                self._main.appendleft(page_id)
+                self._main_set.add(page_id)
+                self.small_promotions += 1
+            else:
+                # Zero frequency → evict
+                page = state.tier0.pages.get(page_id)
+                if page is not None:
+                    self._add_to_ghost(page_id)
+                    self._freq.pop(page_id, None)
+                    return page
+                # Page already gone from tier0, clean up
+                self._freq.pop(page_id, None)
+
+        return None
+
+    def _try_evict_main(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """Second-chance eviction from Main queue. Decrement freq and re-insert if > 0."""
+        scan_limit = self._config.scan_limit
+        scanned = 0
+        for _ in range(min(len(self._main), scan_limit)):
+            if not self._main:
+                break
+            page_id = self._main.pop()  # Oldest in Main
+            if page_id not in self._main_set:
+                continue  # Lazy deletion
+            scanned += 1
+
+            # Skip pinned pages
+            if hint_manager.is_pinned(page_id):
+                self._main.appendleft(page_id)
+                continue
+
+            freq = self._freq.get(page_id, 0)
+            if freq > 0:
+                # Second chance: decrement and re-insert
+                self._freq[page_id] = freq - 1
+                self._main.appendleft(page_id)
+            else:
+                # freq == 0 → evict
+                self._main_set.discard(page_id)
+                page = state.tier0.pages.get(page_id)
+                if page is not None:
+                    self._freq.pop(page_id, None)
+                    return page
+                self._freq.pop(page_id, None)
+
+        return None
+
+    def _add_to_ghost(self, page_id: int) -> None:
+        """Add evicted page ID to ghost queue."""
+        while len(self._ghost) >= self._ghost_cap:
+            old = self._ghost.pop()
+            self._ghost_set.discard(old)
+        self._ghost.appendleft(page_id)
+        self._ghost_set.add(page_id)
+
+    def is_ghost_hit(self, page_id: int) -> bool:
+        """Check if page_id is in the ghost queue (was recently evicted)."""
+        return page_id in self._ghost_set
+
+    def get_stats(self) -> dict:
+        return {
+            "evictions": self.evictions,
+            "small_promotions": self.small_promotions,
+            "ghost_hits": self.ghost_hits,
+            "small_size": len(self._small),
+            "main_size": len(self._main),
+            "ghost_size": len(self._ghost),
+        }
 
 
 class IRRTracker:
@@ -2047,7 +2246,7 @@ class CTMPlusController(BaseController):
     - Refault/Pressure Control (TMO/MGLRU): PID-based eviction feedback
     - Adaptive Weight Learning (CACHEUS/LeCaR): Hedge-algorithm online weights
     - Size-Aware Eviction (LHD): Hits-per-byte for variable-size objects
-    - Lazy Promotion (SIEVE): Visited-bit deferred scoring
+    - S3-FIFO Fast Path: Three-queue eviction fast path (replaces SIEVE)
     - External Hint API (CXL CMM-H): Application-provided page hints
     - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
     - NUMA-Aware Placement: Locality-aware latency, victim scoring, and migration
@@ -2117,7 +2316,7 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
         self._smart_victim_selections = 0
-        self._sieve_evictions = 0
+        self._s3fifo_fast_path = S3FIFOFastPath(self.ctm_config, config.tier0_size)
         self._irr_influenced = 0
         self._hint_influenced = 0
         self._refault_promotions = 0
@@ -2169,7 +2368,7 @@ class CTMPlusController(BaseController):
         Score Tier0 pages and return the worst victim for eviction.
 
         Integrates all gap closures:
-        - SIEVE scan (Gap 5): Try visited-bit eviction first for O(1) amortized
+        - S3-FIFO fast path (Gap 5): Three-queue eviction filter for O(1) amortized
         - IRR (Gap 1): Use inter-reference recency instead of raw recency for scans
         - Adaptive weights (Gap 4): Learned weights via Hedge algorithm
         - Size-aware (Gap 2): Hits-per-byte for variable-size objects
@@ -2186,24 +2385,21 @@ class CTMPlusController(BaseController):
         if not self.ctm_config.enable_smart_victim:
             return min(pages, key=lambda p: p.last_access_time)
 
-        # === Auto LRU fallback: bypass ALL scoring (including SIEVE) ===
-        # Must come before SIEVE because SIEVE's visited-bit eviction is
-        # also suboptimal on recency-dominated workloads — it evicts
-        # unvisited pages regardless of recency, which can miss pages
-        # that LRU would correctly identify as coldest.
+        # === Auto LRU fallback: bypass ALL scoring (including S3-FIFO fast path) ===
+        # Must come before S3-FIFO because S3-FIFO's frequency-based eviction is
+        # also suboptimal on recency-dominated workloads — it may evict
+        # zero-frequency pages that LRU would correctly identify as coldest.
         if self._lru_fallback.using_lru:
             lru_page = min(pages, key=lambda p: p.last_access_time)
             self._lru_fallback.record_decision(lru_page.page_id, lru_page.page_id)
             return lru_page
 
-        # === Gap 5: SIEVE-style lazy eviction (try first for low overhead) ===
-        if self.ctm_config.lazy_promotion.enabled and n > 16:
-            sieve_victim = self._sieve_scan(state)
-            if sieve_victim is not None:
-                self._sieve_evictions += 1
-
-                # Record SIEVE eviction for GL-Cache learning.
-                # Without this, SIEVE-evicted pages are invisible to the
+        # === Gap 5: S3-FIFO fast-path eviction (try first for low overhead) ===
+        if self.ctm_config.s3fifo_fast_path.enabled and n > 16:
+            s3fifo_victim = self._s3fifo_fast_path.select_victim(state, self._hint_manager)
+            if s3fifo_victim is not None:
+                # Record S3-FIFO eviction for GL-Cache learning.
+                # Without this, fast-path-evicted pages are invisible to the
                 # model and their refault outcomes are never learned from.
                 if self._glcache is not None:
                     max_t = max(p.last_access_time for p in pages)
@@ -2211,29 +2407,29 @@ class CTMPlusController(BaseController):
                     irr_v = 0.0
                     if self.ctm_config.irr.enabled:
                         irr_v = self._irr_tracker.get_normalized_irr(
-                            sieve_victim, state.tier0.capacity
+                            s3fifo_victim, state.tier0.capacity
                         )
                     gl_feats = extract_features(
-                        sieve_victim,
+                        s3fifo_victim,
                         current_time=state.current_time,
                         max_time=max_t,
                         min_time=min_t,
                         tier0_capacity=state.tier0.capacity,
                         reuse_score=self._transition_tracker.get_reuse_score(
-                            sieve_victim.page_id
+                            s3fifo_victim.page_id
                         ),
                         neighbor_hotness=self._neighbor_tracker.get_neighbor_hotness(
-                            sieve_victim.page_id, state
+                            s3fifo_victim.page_id, state
                         ),
                         irr_normalized=irr_v,
                     )
                     self._glcache.record_eviction(
-                        sieve_victim.page_id,
+                        s3fifo_victim.page_id,
                         gl_feats,
-                        frequency_group(sieve_victim.access_count),
+                        frequency_group(s3fifo_victim.access_count),
                     )
 
-                return sieve_victim
+                return s3fifo_victim
 
         # For small caches, just use LRU (fast path)
         if n <= 16:
@@ -2427,42 +2623,7 @@ class CTMPlusController(BaseController):
 
         return victim
 
-    def _sieve_scan(self, state: GlobalState) -> Optional[PageState]:
-        """
-        Gap 5: SIEVE-style lazy eviction scan.
-
-        Scan from LRU end: if visited=True, clear it and skip (retain in place).
-        If visited=False, evict. This gives new pages a chance to prove themselves.
-
-        Key insight from SIEVE: retained objects stay in original position (no reinsertion),
-        naturally preserving age ordering.
-        """
-        scan_limit = self.ctm_config.lazy_promotion.sieve_scan_limit
-        access_order = state.tier0.access_order
-        scanned = 0
-
-        for page_id in list(access_order):
-            if scanned >= scan_limit:
-                break
-
-            page = state.tier0.pages.get(page_id)
-            if page is None:
-                continue
-
-            # Skip pinned pages
-            if self._hint_manager.is_pinned(page_id):
-                continue
-
-            scanned += 1
-
-            if page.visited:
-                # Clear visited bit, give second chance (lazy promotion)
-                page.visited = False
-            else:
-                # Not visited since last scan → evict
-                return page
-
-        return None  # All scanned pages were visited; fall back to full scoring
+    # _sieve_scan removed: replaced by S3FIFOFastPath.select_victim()
 
     # === Gap 6: Public hint API ===
     def set_page_hint(self, page_id: int, hint: PageHint, priority: float = 0.5) -> None:
@@ -2620,6 +2781,9 @@ class CTMPlusController(BaseController):
             state.tier0.record_hit()
             self._tenant_manager.record_access(page.tenant_id, is_hit=True)
 
+            # === Gap 5: S3-FIFO fast path — increment frequency on tier0 hit ===
+            self._s3fifo_fast_path.record_access(page_id)
+
             # === Writeback: Track dirty pages on write ===
             if op_type == OpType.WRITE:
                 self._writeback_scheduler.mark_dirty(page_id, state.current_time)
@@ -2661,6 +2825,7 @@ class CTMPlusController(BaseController):
                         evicted = victim
 
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(page_id)
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
@@ -2740,6 +2905,7 @@ class CTMPlusController(BaseController):
                         evicted = victim
 
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(page_id)
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
@@ -2799,6 +2965,7 @@ class CTMPlusController(BaseController):
                 self._admission.on_eviction(victim.page_id)
 
             state.tier0.add(page)
+            self._s3fifo_fast_path.on_admit(page_id)
             promoted = True
             self._promotions += 1
             self._tenant_manager.record_promotion(page.tenant_id)
@@ -2887,6 +3054,7 @@ class CTMPlusController(BaseController):
                 # NUMA: Place prefetched page on accessor's node
                 self._numa_manager.assign_node(page, accessor_node)
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(next_page)
                 self._prefetch_promotions += 1
                 self._prefetch_engine.record_prefetch(next_page)
                 prefetched += 1
@@ -2902,11 +3070,14 @@ class CTMPlusController(BaseController):
         Integrates:
         - Gap 3: Record eviction for refault tracking
         - Gap 4: Record non-refault outcome for weight learning
-        - Gap 5: Clear visited bit on eviction (SIEVE)
+        - Gap 5: S3-FIFO fast path queue cleanup on eviction
         - Multi-tenancy: Record per-tenant demotion/eviction
         """
         evicted.last_demotion_time = state.current_time
-        evicted.visited = False  # Gap 5: Reset visited bit
+        evicted.visited = False  # Clear visited bit (legacy, harmless)
+
+        # Gap 5: Notify S3-FIFO fast path of eviction (clean up queue metadata)
+        self._s3fifo_fast_path.on_eviction(evicted.page_id)
 
         # === Writeback: Track dirty eviction and clear dirty state ===
         self._writeback_scheduler.on_eviction(evicted.page_id)
@@ -2970,6 +3141,7 @@ class CTMPlusController(BaseController):
         # NUMA: Place prefetched page on accessor's node
         self._numa_manager.assign_node(page, accessor_node)
         state.tier0.add(page)
+        self._s3fifo_fast_path.on_admit(page_id)
         self._prefetch_promotions += 1
         self._prefetch_engine.record_prefetch(page_id)
 
@@ -3060,9 +3232,9 @@ class CTMPlusController(BaseController):
             "glcache_stats": self._glcache.get_stats() if self._glcache else {},
             # Auto LRU fallback
             "auto_fallback": self._lru_fallback.get_stats(),
-            # Gap 5: SIEVE lazy promotion
-            "sieve_enabled": self.ctm_config.lazy_promotion.enabled,
-            "sieve_evictions": self._sieve_evictions,
+            # Gap 5: S3-FIFO fast path (replaces SIEVE)
+            "s3fifo_fast_path_enabled": self.ctm_config.s3fifo_fast_path.enabled,
+            "s3fifo_fast_path_stats": self._s3fifo_fast_path.get_stats(),
             # Gap 6: External hints
             "hints_enabled": self.ctm_config.external_hints.enabled,
             "hint_influenced_decisions": self._hint_influenced,
