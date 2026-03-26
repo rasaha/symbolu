@@ -28,7 +28,8 @@ __author__ = "Symbol-U Research"
 from .core.config import (
     SimulatorConfig, CTMPlusConfig, TenantPriority, TenantConfig,
     MultiTenancyConfig, NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
-    CompressionTierConfig,
+    CompressionTierConfig, CXL3PoolConfig,
+    PhaseIntegratorConfig, CoherenceConfig, AutoFallbackConfig, GLCacheConfig,
 )
 from .core.state import PageState, TierState
 from .core.metrics import SimulationMetrics, MetricsCollector
@@ -51,6 +52,11 @@ __all__ = [
     "CostTieringConfig",
     "WritebackSchedulingConfig",
     "CompressionTierConfig",
+    "CXL3PoolConfig",
+    "PhaseIntegratorConfig",
+    "CoherenceConfig",
+    "AutoFallbackConfig",
+    "GLCacheConfig",
     # State
     "PageState",
     "TierState",
