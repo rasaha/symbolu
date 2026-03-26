@@ -25,6 +25,7 @@ class Tier(IntEnum):
 
     TIER0 = 0       # Fast tier (DRAM/HBM, uncompressed)
     COMPRESSED = 2  # Compressed DRAM tier (zswap/zram-style)
+    POOL = 3        # CXL 3.0 shared memory pool
     TIER1 = 1       # Slow tier (NAND/DDR)
     NONE = -1       # Not in any tier
 
@@ -107,6 +108,13 @@ class PageState:
     # === Writeback scheduling ===
     dirty: bool = False          # Page has unflushed writes in tier0
     dirty_since: int = 0         # Time when page was first dirtied (0 = clean)
+
+    # === CXL 3.0 shared memory pool ===
+    owner_host: int = 0              # Host that owns/originated this page
+    pool_resident: bool = False      # True if page is in CXL shared pool
+    sharer_hosts: Set[int] = field(default_factory=set)  # Hosts caching this page
+    last_pool_access_time: int = 0   # Last time page was accessed via pool
+    pool_access_count: int = 0       # Number of accesses while in pool
 
     # === NUMA-aware placement ===
     numa_node: int = 0           # Current NUMA node where page is placed
@@ -419,6 +427,7 @@ class GlobalState:
     tier0: TierState
     tier1: TierState
     tier0c: Optional[TierState] = None  # Compression tier (zswap/zram)
+    pool: Optional[TierState] = None    # CXL 3.0 shared memory pool
     all_pages: Dict[int, PageState] = field(default_factory=dict)
 
     # Global metrics
@@ -442,6 +451,8 @@ class GlobalState:
             return Tier.TIER0
         elif self.tier0c is not None and self.tier0c.contains(page_id):
             return Tier.COMPRESSED
+        elif self.pool is not None and self.pool.contains(page_id):
+            return Tier.POOL
         elif self.tier1.contains(page_id):
             return Tier.TIER1
         return Tier.NONE

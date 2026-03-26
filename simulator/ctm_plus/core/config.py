@@ -591,6 +591,80 @@ class AutoFallbackConfig:
 
 
 @dataclass(frozen=True)
+class CXL3PoolConfig:
+    """
+    CXL 3.0 shared memory pool configuration.
+
+    Models CXL 3.0's shared memory pooling across multiple hosts (type-3 devices).
+    Enables cross-host coherence tracking, dynamic capacity expansion/contraction,
+    and memory pool management for disaggregated memory architectures.
+
+    CXL 3.0 key capabilities modeled:
+    1. Shared Memory Pools: Multiple hosts share a CXL-attached memory pool.
+       Each host gets a portion of the pool, but pages can be shared/migrated.
+    2. Cross-Host Coherence: CXL.cache protocol ensures coherence for shared
+       pages. Tracking which hosts have cached copies and invalidation costs.
+    3. Dynamic Capacity: Pool can expand/contract per-host allocations based
+       on demand (hot-add/hot-remove of memory regions).
+    4. Back-Invalidation: When a shared page is modified, other hosts'
+       cached copies must be invalidated (bi-directional coherence).
+
+    Memory hierarchy with CXL 3.0 pool:
+        Host-local DRAM (Tier0)  → fastest, per-host
+        CXL Pool (shared)       → slightly slower, shared across hosts
+        Host-local NAND (Tier1) → slowest, per-host
+
+    Reference: CXL 3.0 Specification, Chapter 11 (Memory Pooling)
+    """
+
+    enabled: bool = False
+
+    # Pool topology
+    num_hosts: int = 2              # Number of hosts sharing the pool
+    pool_size: int = 2000           # Total shared pool capacity (pages)
+    per_host_min_share: float = 0.1 # Minimum guaranteed share per host [0, 1]
+    per_host_max_share: float = 0.8 # Maximum share any single host can use [0, 1]
+
+    # Latency model (nanoseconds)
+    pool_access_latency_ns: int = 250       # CXL pool access (~2-3x local DRAM)
+    coherence_invalidation_ns: int = 500    # Back-invalidation latency
+    pool_promotion_latency_ns: int = 400    # Local DRAM → CXL pool migration
+    pool_demotion_latency_ns: int = 400     # CXL pool → local tier1 demotion
+
+    # Coherence protocol
+    max_sharers: int = 4            # Max hosts caching same page (CXL.cache limit)
+    invalidation_batch_size: int = 8 # Batch invalidations to amortize overhead
+
+    # Dynamic capacity
+    expansion_threshold: float = 0.85    # Pool utilization to trigger expansion request
+    contraction_threshold: float = 0.30  # Pool utilization to consider releasing capacity
+    rebalance_interval: int = 500        # Accesses between rebalance checks
+    capacity_step_pages: int = 100       # Pages added/removed per expansion/contraction
+
+    # Eviction scoring
+    shared_page_penalty: float = 0.2     # Penalty for evicting shared pages (invalidation cost)
+    remote_page_boost: float = 0.1       # Boost for keeping frequently-shared pages in pool
+
+    def __post_init__(self) -> None:
+        if self.num_hosts < 1:
+            raise ValueError("num_hosts must be >= 1")
+        if self.pool_size < 1:
+            raise ValueError("pool_size must be >= 1")
+        if not (0.0 <= self.per_host_min_share <= self.per_host_max_share <= 1.0):
+            raise ValueError(
+                f"Invalid host share bounds: min={self.per_host_min_share}, "
+                f"max={self.per_host_max_share}"
+            )
+        if self.max_sharers < 1:
+            raise ValueError("max_sharers must be >= 1")
+        if not (0.0 < self.contraction_threshold < self.expansion_threshold <= 1.0):
+            raise ValueError(
+                f"Thresholds must satisfy 0 < contraction ({self.contraction_threshold}) "
+                f"< expansion ({self.expansion_threshold}) <= 1"
+            )
+
+
+@dataclass(frozen=True)
 class GLCacheConfig:
     """
     GL-Cache (NSDI'23) group-level learned eviction configuration.
@@ -652,6 +726,7 @@ class CTMPlusConfig:
     compression_tier: CompressionTierConfig = field(default_factory=CompressionTierConfig)
     glcache: GLCacheConfig = field(default_factory=GLCacheConfig)
     auto_fallback: AutoFallbackConfig = field(default_factory=AutoFallbackConfig)
+    cxl3_pool: CXL3PoolConfig = field(default_factory=CXL3PoolConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":

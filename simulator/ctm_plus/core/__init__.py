@@ -6,7 +6,7 @@ from .config import (
     AdaptiveWeightConfig, S3FIFOFastPathConfig, ExternalHintConfig,
     TenantPriority, TenantConfig, MultiTenancyConfig,
     NUMAConfig, CostTieringConfig, WritebackSchedulingConfig,
-    CompressionTierConfig,
+    CompressionTierConfig, CXL3PoolConfig,
 )
 from .state import PageState, TierState, PageHint
 from .metrics import SimulationMetrics, MetricsCollector
@@ -28,6 +28,7 @@ __all__ = [
     "CostTieringConfig",
     "WritebackSchedulingConfig",
     "CompressionTierConfig",
+    "CXL3PoolConfig",
     "PageState",
     "TierState",
     "PageHint",

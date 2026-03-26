@@ -77,6 +77,7 @@ class InvariantChecker:
         self.check_compression_tier_integrity()   # INV-10
         self.check_all_pages_registry()           # INV-11
         self.check_no_orphan_pages()              # INV-12
+        self.check_cxl_pool_integrity()           # INV-13
 
         return self.violations
 
@@ -88,6 +89,7 @@ class InvariantChecker:
         tier0_ids = set(s.tier0.pages.keys())
         tier1_ids = set(s.tier1.pages.keys())
         tier0c_ids = set(s.tier0c.pages.keys()) if s.tier0c else set()
+        pool_ids = set(s.pool.pages.keys()) if s.pool else set()
 
         # Check pairwise intersections
         t0_t1 = tier0_ids & tier1_ids
@@ -104,6 +106,21 @@ class InvariantChecker:
         for pid in t1_tc:
             self._add("INV-1", "CRITICAL", pid,
                        "Page in BOTH tier1 and tier0c")
+
+        t0_pool = tier0_ids & pool_ids
+        for pid in t0_pool:
+            self._add("INV-1", "CRITICAL", pid,
+                       "Page in BOTH tier0 and CXL pool")
+
+        t1_pool = tier1_ids & pool_ids
+        for pid in t1_pool:
+            self._add("INV-1", "CRITICAL", pid,
+                       "Page in BOTH tier1 and CXL pool")
+
+        tc_pool = tier0c_ids & pool_ids
+        for pid in tc_pool:
+            self._add("INV-1", "CRITICAL", pid,
+                       "Page in BOTH tier0c and CXL pool")
 
     # ── INV-2: Tier Field Consistency ──
 
@@ -311,12 +328,37 @@ class InvariantChecker:
                     self._add("INV-12", "CRITICAL", pid,
                                "page.tier=COMPRESSED but page not in tier0c.pages")
 
+            elif page.tier == Tier.POOL:
+                if s.pool is None:
+                    self._add("INV-12", "CRITICAL", pid,
+                               "page.tier=POOL but pool is None")
+                elif pid not in s.pool.pages:
+                    self._add("INV-12", "CRITICAL", pid,
+                               "page.tier=POOL but page not in pool.pages")
+
+    # ── INV-13: CXL Pool Integrity ──
+
+    def check_cxl_pool_integrity(self) -> None:
+        """CXL shared memory pool pages must have valid pool metadata."""
+        if not self.state.pool:
+            return
+
+        for pid, page in self.state.pool.pages.items():
+            if page.tier != Tier.POOL:
+                self._add("INV-13", "CRITICAL", pid,
+                           f"Page in pool but tier={page.tier.name}")
+            if not page.pool_resident:
+                self._add("INV-13", "ERROR", pid,
+                           "Page in pool but pool_resident=False")
+
     # ── Helpers ──
 
     def _all_tiers(self) -> List[Tuple[str, TierState]]:
         result = [("tier0", self.state.tier0), ("tier1", self.state.tier1)]
         if self.state.tier0c:
             result.append(("tier0c", self.state.tier0c))
+        if self.state.pool:
+            result.append(("pool", self.state.pool))
         return result
 
 
