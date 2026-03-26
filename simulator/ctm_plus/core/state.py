@@ -340,6 +340,14 @@ class TierState:
             return None
 
         page = self.pages.pop(page_id)
+
+        # Clear dirty flag on removal from tier0 (implicit writeback).
+        # Dirty pages only make sense in tier0 (DRAM); removal means
+        # demotion/eviction requiring writeback.  Ensures INV-8.
+        if self.tier_id == Tier.TIER0 and page.dirty:
+            page.dirty = False
+            page.dirty_since = 0
+
         page.tier = Tier.NONE
 
         # Track tenant occupancy
@@ -366,12 +374,16 @@ class TierState:
         self.total_hits += 1
 
     def _evict_lru(self) -> Optional[PageState]:
-        """Evict least recently used page."""
+        """Evict least recently used page.
+
+        Uses remove() to ensure dirty flags and occupancy are updated
+        consistently (INV-8 compliance).
+        """
         if not self.access_order:
             return None
 
-        lru_page_id = self.access_order.popleft()
-        return self.pages.pop(lru_page_id, None)
+        lru_page_id = self.access_order[0]  # Peek (remove() will popleft)
+        return self.remove(lru_page_id)
 
     def get_tenant_page_count(self, tenant_id: str) -> int:
         """Get number of pages owned by a tenant in this tier."""
