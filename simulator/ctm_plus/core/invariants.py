@@ -144,6 +144,12 @@ class InvariantChecker:
                     self._add("INV-2", "CRITICAL", pid,
                                f"Page in tier0c.pages but page.tier={page.tier.name}")
 
+        if s.pool:
+            for pid, page in s.pool.pages.items():
+                if page.tier != Tier.POOL:
+                    self._add("INV-2", "CRITICAL", pid,
+                               f"Page in pool.pages but page.tier={page.tier.name}")
+
     # ── INV-3: Capacity ──
 
     def check_capacity(self) -> None:
