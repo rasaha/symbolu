@@ -16,16 +16,17 @@ Where:
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Deque
 from collections import deque
-from enum import IntEnum
+from enum import IntEnum, Enum
 import math
 
 
 class Tier(IntEnum):
     """Memory tier identifiers."""
 
-    TIER0 = 0  # Fast tier (DRAM/HBM)
-    TIER1 = 1  # Slow tier (NAND/DDR)
-    NONE = -1  # Not in any tier
+    TIER0 = 0       # Fast tier (DRAM/HBM, uncompressed)
+    COMPRESSED = 2  # Compressed DRAM tier (zswap/zram-style)
+    TIER1 = 1       # Slow tier (NAND/DDR)
+    NONE = -1       # Not in any tier
 
 
 class OpType(IntEnum):
@@ -34,6 +35,17 @@ class OpType(IntEnum):
     READ = 0
     WRITE = 1
     PREFETCH = 2
+
+
+class PageHint(Enum):
+    """External application hints for page hotness (CXL CMM-H style)."""
+
+    NONE = 0        # No hint
+    HOT = 1         # Application expects frequent access
+    COLD = 2        # Application expects infrequent access
+    PINNED = 3      # Application wants page kept in tier0
+    WILLNEED = 4    # Application will access soon (prefetch hint)
+    DONTNEED = 5    # Application is done with this page
 
 
 @dataclass
@@ -66,6 +78,43 @@ class PageState:
     # Phase history for USE correlation
     phase_history: Deque[float] = field(default_factory=lambda: deque(maxlen=64))
 
+    # === Gap 1: IRR Tracking (LIRS) ===
+    # Inter-Reference Recency: number of unique pages accessed between
+    # two consecutive accesses to this page. High IRR = cold despite recent access.
+    irr: float = float('inf')  # Current IRR estimate (inf = never re-accessed)
+    prev_access_time: int = 0  # Previous access time (for IRR calculation)
+
+    # === Gap 2: Size-aware eviction (LHD) ===
+    # Size in bytes for variable-size objects. Enables hits-per-byte scoring.
+    size_bytes: int = 4096  # Default to standard page size
+
+    # === Gap 5: Lazy promotion (SIEVE) ===
+    # Visited bit: set on access, cleared on eviction scan.
+    # Defers expensive metadata updates to eviction time.
+    visited: bool = False
+
+    # === Gap 6: External hint API (CXL CMM-H) ===
+    hint: PageHint = PageHint.NONE
+    hint_priority: float = 0.0  # Application-provided priority [0, 1]
+
+    # === Multi-tenancy: QoS isolation ===
+    tenant_id: str = "default"  # Owning tenant for QoS-aware eviction
+
+    # === Compression tier ===
+    compressed_access_count: int = 0  # Accesses while in compression tier
+    last_compress_time: int = 0       # Time when page was compressed
+
+    # === Writeback scheduling ===
+    dirty: bool = False          # Page has unflushed writes in tier0
+    dirty_since: int = 0         # Time when page was first dirtied (0 = clean)
+
+    # === NUMA-aware placement ===
+    numa_node: int = 0           # Current NUMA node where page is placed
+    preferred_node: int = 0      # NUMA node of most frequent accessor
+    last_accessor_node: int = 0  # NUMA node of most recent accessor
+    node_access_counts: Dict[int, int] = field(default_factory=dict)  # per-node access counts
+    last_migration_time: int = 0  # Last time page was migrated between nodes
+
     def update_on_access(
         self,
         time: int,
@@ -83,8 +132,10 @@ class PageState:
             amplitude_boost: Boost to amplitude on access
         """
         # Update access metadata
+        self.prev_access_time = self.last_access_time
         self.last_access_time = time
         self.access_count += 1
+        self.visited = True  # SIEVE: mark as visited on access
 
         # Update amplitude (importance increases with access)
         self.amplitude = min(1.0, self.amplitude + amplitude_boost * (1 - self.amplitude))
@@ -93,6 +144,10 @@ class PageState:
         if op_type == OpType.WRITE:
             self.write_count += 1
             self.heat = min(1.0, self.heat + 0.2)  # Writes increase heat
+            # Writeback scheduling: mark page dirty on write
+            if not self.dirty:
+                self.dirty = True
+                self.dirty_since = time
         else:
             self.heat *= heat_decay  # Heat decays over time
 
@@ -178,6 +233,12 @@ class TierState:
     total_promotions: int = 0
     total_demotions: int = 0
 
+    # Per-tenant occupancy tracking: tenant_id -> page count in this tier
+    tenant_occupancy: Dict[str, int] = field(default_factory=dict)
+
+    # Per-NUMA-node occupancy tracking: node_id -> page count in this tier
+    numa_occupancy: Dict[int, int] = field(default_factory=dict)
+
     @property
     def size(self) -> int:
         """Current number of pages in tier."""
@@ -236,9 +297,27 @@ class TierState:
         if self.is_full and page.page_id not in self.pages:
             evicted = self._evict_lru()
 
-        # Add page
+        # Track tenant/NUMA occupancy change for evicted page
+        if evicted is not None:
+            tid = evicted.tenant_id
+            self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+            nid = evicted.numa_node
+            self.numa_occupancy[nid] = max(0, self.numa_occupancy.get(nid, 0) - 1)
+
+        # Add page (if replacing existing, adjust occupancy)
+        if page.page_id in self.pages:
+            old_page = self.pages[page.page_id]
+            old_tid = old_page.tenant_id
+            self.tenant_occupancy[old_tid] = max(0, self.tenant_occupancy.get(old_tid, 0) - 1)
+            old_nid = old_page.numa_node
+            self.numa_occupancy[old_nid] = max(0, self.numa_occupancy.get(old_nid, 0) - 1)
+
         self.pages[page.page_id] = page
         page.tier = self.tier_id
+
+        # Track tenant/NUMA occupancy for new page
+        self.tenant_occupancy[page.tenant_id] = self.tenant_occupancy.get(page.tenant_id, 0) + 1
+        self.numa_occupancy[page.numa_node] = self.numa_occupancy.get(page.numa_node, 0) + 1
 
         # Update access order
         if page.page_id in self.access_order:
@@ -261,7 +340,22 @@ class TierState:
             return None
 
         page = self.pages.pop(page_id)
+
+        # Clear dirty flag on removal from tier0 (implicit writeback).
+        # Dirty pages only make sense in tier0 (DRAM); removal means
+        # demotion/eviction requiring writeback.  Ensures INV-8.
+        if self.tier_id == Tier.TIER0 and page.dirty:
+            page.dirty = False
+            page.dirty_since = 0
+
         page.tier = Tier.NONE
+
+        # Track tenant occupancy
+        tid = page.tenant_id
+        self.tenant_occupancy[tid] = max(0, self.tenant_occupancy.get(tid, 0) - 1)
+        # Track NUMA occupancy
+        nid = page.numa_node
+        self.numa_occupancy[nid] = max(0, self.numa_occupancy.get(nid, 0) - 1)
 
         if page_id in self.access_order:
             self.access_order.remove(page_id)
@@ -280,12 +374,24 @@ class TierState:
         self.total_hits += 1
 
     def _evict_lru(self) -> Optional[PageState]:
-        """Evict least recently used page."""
+        """Evict least recently used page.
+
+        Uses remove() to ensure dirty flags and occupancy are updated
+        consistently (INV-8 compliance).
+        """
         if not self.access_order:
             return None
 
-        lru_page_id = self.access_order.popleft()
-        return self.pages.pop(lru_page_id, None)
+        lru_page_id = self.access_order[0]  # Peek (remove() will popleft)
+        return self.remove(lru_page_id)
+
+    def get_tenant_page_count(self, tenant_id: str) -> int:
+        """Get number of pages owned by a tenant in this tier."""
+        return self.tenant_occupancy.get(tenant_id, 0)
+
+    def get_numa_node_page_count(self, node_id: int) -> int:
+        """Get number of pages placed on a NUMA node in this tier."""
+        return self.numa_occupancy.get(node_id, 0)
 
     def get_lru_candidates(self, n: int) -> list:
         """Get N least recently used pages as eviction candidates."""
@@ -312,6 +418,7 @@ class GlobalState:
 
     tier0: TierState
     tier1: TierState
+    tier0c: Optional[TierState] = None  # Compression tier (zswap/zram)
     all_pages: Dict[int, PageState] = field(default_factory=dict)
 
     # Global metrics
@@ -333,6 +440,8 @@ class GlobalState:
         """Find which tier a page is in."""
         if self.tier0.contains(page_id):
             return Tier.TIER0
+        elif self.tier0c is not None and self.tier0c.contains(page_id):
+            return Tier.COMPRESSED
         elif self.tier1.contains(page_id):
             return Tier.TIER1
         return Tier.NONE
@@ -341,6 +450,8 @@ class GlobalState:
     def global_mean_phase(self) -> float:
         """Global mean phase across all active pages."""
         active_pages = list(self.tier0.pages.values()) + list(self.tier1.pages.values())
+        if self.tier0c is not None:
+            active_pages += list(self.tier0c.pages.values())
         if not active_pages:
             return 0.0
         sin_sum = sum(math.sin(p.phase) for p in active_pages)

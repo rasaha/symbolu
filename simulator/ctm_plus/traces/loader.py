@@ -33,15 +33,20 @@ class TraceEvent:
     page_id: int  # Page being accessed
     op_type: OpType  # READ, WRITE, or PREFETCH
     size_bytes: int = 4096  # Size of access (default = 1 page)
+    tenant_id: Optional[str] = None  # Owning tenant for multi-tenancy QoS
+    numa_node: Optional[int] = None  # NUMA node of the accessing CPU
 
     @classmethod
     def from_csv_row(cls, row: dict) -> "TraceEvent":
         """Create from CSV row."""
+        numa_raw = row.get("numa_node", row.get("node", None))
         return cls(
             timestamp=int(row.get("timestamp", row.get("time", 0))),
             page_id=int(row.get("page_id", row.get("page", row.get("address", 0)))),
             op_type=OpType(int(row.get("op_type", row.get("op", 0)))),
             size_bytes=int(row.get("size", 4096)),
+            tenant_id=row.get("tenant_id", row.get("tenant", None)),
+            numa_node=int(numa_raw) if numa_raw is not None else None,
         )
 
 

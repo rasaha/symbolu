@@ -10,8 +10,9 @@ from dataclasses import dataclass
 import time
 
 from .core.config import SimulatorConfig
-from .core.state import GlobalState, TierState, Tier, OpType
+from .core.state import GlobalState, TierState, Tier, OpType  # noqa: F401 - Tier used in tier0c init
 from .core.metrics import SimulationMetrics, MetricsCollector
+from .core.invariants import check_invariants, assert_invariants
 from .controllers.base import BaseController
 from .traces.loader import TraceEvent
 
@@ -70,6 +71,8 @@ class Simulator:
         trace_name: str = "unknown",
         progress_interval: int = 10000,
         verbose: bool = True,
+        warmup_events: int = 0,
+        check_invariants_every: int = 0,
     ) -> SimulationResult:
         """
         Run simulation with given trace and controller.
@@ -80,6 +83,14 @@ class Simulator:
             trace_name: Name of trace (for reporting)
             progress_interval: Print progress every N events
             verbose: Whether to print progress
+            warmup_events: Number of initial events to use as warmup.
+                During warmup the cache and controller state are populated
+                normally, but metrics are reset afterwards so that only
+                steady-state performance is measured.
+            check_invariants_every: If > 0, run invariant checks every N
+                accesses.  Raises AssertionError on CRITICAL/ERROR
+                violations.  Useful for debugging but adds O(n) overhead
+                per check.  Use 0 to disable (default).
 
         Returns:
             SimulationResult with metrics and timing
@@ -88,9 +99,17 @@ class Simulator:
         controller.reset()
 
         # Initialize state
+        # Check if controller has compression tier enabled
+        tier0c = None
+        ctm_cfg = getattr(controller, 'ctm_config', None)
+        if ctm_cfg and hasattr(ctm_cfg, 'compression_tier') and ctm_cfg.compression_tier.enabled:
+            tier0c_capacity = int(self.config.tier0_size * ctm_cfg.compression_tier.capacity_multiplier)
+            tier0c = TierState(tier_id=Tier.COMPRESSED, capacity=tier0c_capacity)
+
         state = GlobalState(
             tier0=TierState(tier_id=Tier.TIER0, capacity=self.config.tier0_size),
             tier1=TierState(tier_id=Tier.TIER1, capacity=self.config.tier1_size),
+            tier0c=tier0c,
         )
 
         # Initialize metrics collector
@@ -112,16 +131,20 @@ class Simulator:
         for i, event in enumerate(trace):
             state.current_time = i
 
-            # Process access
-            tier, latency_ns, promoted, demoted = controller.on_access(
-                state=state,
-                page_id=event.page_id,
-                op_type=event.op_type,
-            )
+            # Process access (pass tenant_id/numa_node if available)
+            kwargs = dict(state=state, page_id=event.page_id, op_type=event.op_type)
+            if event.tenant_id is not None:
+                kwargs["tenant_id"] = event.tenant_id
+            if event.numa_node is not None:
+                kwargs["numa_node"] = event.numa_node
+            tier, latency_ns, promoted, demoted = controller.on_access(**kwargs)
 
             # Record metrics
             tier0_hit = (tier == Tier.TIER0)
-            tier1_hit = (tier == Tier.TIER1)
+            tier0c_hit = (tier == Tier.COMPRESSED)
+            # Compressed tier hits count as tier1 hits in metrics
+            # (they serve from DRAM but not at full tier0 speed)
+            tier1_hit = (tier == Tier.TIER1) or tier0c_hit
 
             # Get coherence if available
             page = state.all_pages.get(event.page_id)
@@ -140,6 +163,24 @@ class Simulator:
                 metrics.record_promotion()
             if demoted:
                 metrics.record_demotion()
+
+            # Warmup phase: reset metrics once warmup is complete
+            if warmup_events > 0 and i + 1 == warmup_events:
+                metrics.reset_stats()
+                start_time = time.time()  # restart timing for steady-state
+                if verbose:
+                    print(
+                        f"  [{controller.name}] Warmup complete: "
+                        f"{warmup_events:,} events, metrics reset"
+                    )
+
+            # Invariant checking (opt-in, debug mode)
+            if check_invariants_every > 0 and (i + 1) % check_invariants_every == 0:
+                assert_invariants(
+                    state,
+                    context=f"after access #{i+1} (page={event.page_id}, "
+                            f"controller={controller.name})",
+                )
 
             # End of epoch processing
             if (i + 1) % epoch_size == 0:

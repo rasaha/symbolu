@@ -48,6 +48,14 @@ class SimulationMetrics:
     hit_rate_over_time: List[float] = field(default_factory=list)
     coherence_over_time: List[float] = field(default_factory=list)
 
+    # === Gap closure metrics ===
+    refault_rate: float = 0.0  # Gap 3: Final refault rate
+    refault_total: int = 0  # Gap 3: Total refaults
+    learned_weights: List[float] = field(default_factory=list)  # Gap 4: Final learned weights
+    sieve_evictions: int = 0  # Gap 5: SIEVE-style evictions
+    irr_influenced: int = 0  # Gap 1: IRR-influenced decisions
+    hint_influenced: int = 0  # Gap 6: Hint-influenced decisions
+
     @property
     def hit_rate(self) -> float:
         """Overall hit rate (tier0 hits / total accesses)."""
@@ -139,11 +147,23 @@ class SimulationMetrics:
             lines.append(f"BCVF rejections:   {self.bcvf_rejections:,} ({self.bcvf_rejection_rate:.1%})")
         if self.coherence_samples:
             lines.append(f"Mean coherence:    {self.mean_coherence:.3f} (σ={self.coherence_std:.3f})")
+        # Gap closure metrics
+        if self.refault_total > 0:
+            lines.append(f"Refault rate:      {self.refault_rate:.2%} ({self.refault_total:,} total)")
+        if self.sieve_evictions > 0:
+            lines.append(f"SIEVE evictions:   {self.sieve_evictions:,}")
+        if self.learned_weights:
+            w_str = ", ".join(f"{w:.3f}" for w in self.learned_weights)
+            lines.append(f"Learned weights:   [{w_str}]")
+        if self.irr_influenced > 0:
+            lines.append(f"IRR-influenced:    {self.irr_influenced:,}")
+        if self.hint_influenced > 0:
+            lines.append(f"Hint-influenced:   {self.hint_influenced:,}")
         return "\n".join(lines)
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
-        return {
+        d = {
             "controller": self.controller_name,
             "trace": self.trace_name,
             "total_accesses": self.total_accesses,
@@ -161,7 +181,15 @@ class SimulationMetrics:
             "bcvf_rejections": self.bcvf_rejections,
             "bcvf_rejection_rate": self.bcvf_rejection_rate,
             "mean_coherence": self.mean_coherence,
+            # Gap closure metrics
+            "refault_rate": self.refault_rate,
+            "refault_total": self.refault_total,
+            "learned_weights": self.learned_weights,
+            "sieve_evictions": self.sieve_evictions,
+            "irr_influenced": self.irr_influenced,
+            "hint_influenced": self.hint_influenced,
         }
+        return d
 
     def to_json(self) -> str:
         """Serialize to JSON."""
@@ -254,6 +282,27 @@ class MetricsCollector:
     def record_bcvf_rejection(self) -> None:
         """Record a BCVF rejection."""
         self.bcvf_rejections += 1
+
+    def reset_stats(self) -> None:
+        """Reset all counters/samples, keeping collector identity.
+
+        Used after a warmup phase: the controller and cache state are
+        preserved, but metrics start fresh so that only steady-state
+        performance is measured.
+        """
+        self.total_accesses = 0
+        self.tier0_hits = 0
+        self.tier1_hits = 0
+        self.total_misses = 0
+        self.promotions = 0
+        self.demotions = 0
+        self.bcvf_rejections = 0
+        self.total_latency_ns = 0
+        self.latencies.clear()
+        self.coherence_samples.clear()
+        self.phase_samples.clear()
+        self.hit_rate_over_time.clear()
+        self._hits_window.clear()
 
     def finalize(self) -> SimulationMetrics:
         """Convert to immutable SimulationMetrics."""
