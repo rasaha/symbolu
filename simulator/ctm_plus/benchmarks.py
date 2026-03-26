@@ -213,6 +213,7 @@ def run_benchmarks(
     seed: int = 42,
     warmup_fraction: float = 0.0,
     enable_glcache: bool = False,
+    check_invariants_every: int = 0,
 ) -> BenchmarkSuite:
     """
     Run standard trace benchmarks.
@@ -305,6 +306,7 @@ def run_benchmarks(
                 trace_name=profile.name,
                 verbose=verbose,
                 warmup_events=warmup_events,
+                check_invariants_every=check_invariants_every,
             )
             results[ctrl_name] = result
 
@@ -408,6 +410,15 @@ Examples:
         help="Include CTM+ with GL-Cache learned eviction alongside Hedge",
     )
     parser.add_argument(
+        "--check-invariants",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Check all 12 formal invariants every N accesses. "
+             "Raises on CRITICAL/ERROR violations. 0 = disabled (default). "
+             "Try --check-invariants 100 for thorough checking.",
+    )
+    parser.add_argument(
         "--trace-dir",
         type=str,
         default=None,
@@ -456,6 +467,7 @@ Examples:
         seed=args.seed,
         warmup_fraction=args.warmup,
         enable_glcache=args.glcache,
+        check_invariants_every=args.check_invariants,
     )
 
     if args.json:

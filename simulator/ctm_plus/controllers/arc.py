@@ -192,7 +192,9 @@ class ARCController(BaseController):
         # Add to T1
         self._t1[page_id] = True
 
-        # Add to tier0 or tier1
+        # Add to tier0 (remove from tier1 first to maintain mutual exclusivity)
+        if state.tier1.contains(page_id):
+            state.tier1.remove(page_id)
         if not state.tier0.is_full:
             state.tier0.add(page)
         else:

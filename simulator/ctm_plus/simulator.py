@@ -12,6 +12,7 @@ import time
 from .core.config import SimulatorConfig
 from .core.state import GlobalState, TierState, Tier, OpType  # noqa: F401 - Tier used in tier0c init
 from .core.metrics import SimulationMetrics, MetricsCollector
+from .core.invariants import check_invariants, assert_invariants
 from .controllers.base import BaseController
 from .traces.loader import TraceEvent
 
@@ -71,6 +72,7 @@ class Simulator:
         progress_interval: int = 10000,
         verbose: bool = True,
         warmup_events: int = 0,
+        check_invariants_every: int = 0,
     ) -> SimulationResult:
         """
         Run simulation with given trace and controller.
@@ -85,6 +87,10 @@ class Simulator:
                 During warmup the cache and controller state are populated
                 normally, but metrics are reset afterwards so that only
                 steady-state performance is measured.
+            check_invariants_every: If > 0, run invariant checks every N
+                accesses.  Raises AssertionError on CRITICAL/ERROR
+                violations.  Useful for debugging but adds O(n) overhead
+                per check.  Use 0 to disable (default).
 
         Returns:
             SimulationResult with metrics and timing
@@ -167,6 +173,14 @@ class Simulator:
                         f"  [{controller.name}] Warmup complete: "
                         f"{warmup_events:,} events, metrics reset"
                     )
+
+            # Invariant checking (opt-in, debug mode)
+            if check_invariants_every > 0 and (i + 1) % check_invariants_every == 0:
+                assert_invariants(
+                    state,
+                    context=f"after access #{i+1} (page={event.page_id}, "
+                            f"controller={controller.name})",
+                )
 
             # End of epoch processing
             if (i + 1) % epoch_size == 0:
