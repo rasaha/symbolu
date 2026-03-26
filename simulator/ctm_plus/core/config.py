@@ -146,16 +146,32 @@ class AdaptiveWeightConfig:
 
 
 @dataclass(frozen=True)
-class LazyPromotionConfig:
+class S3FIFOFastPathConfig:
     """
-    Lazy promotion configuration (SIEVE-inspired).
+    S3-FIFO fast-path eviction configuration (replaces SIEVE).
 
-    Defers metadata updates to eviction time. On access, only set a visited bit.
-    At eviction scan, skip visited pages (clear their bit) and evict unvisited ones.
+    Uses S3-FIFO's three-queue structure (Small/Main/Ghost) as the eviction
+    fast path in CTM+. Pages entering tier0 go to the Small queue. On eviction,
+    pages with frequency >= 1 are promoted to Main; zero-frequency pages are
+    evicted immediately. Main queue uses second-chance (frequency decrement).
+    Ghost queue tracks recently evicted IDs for regret-based readmission.
+
+    Advantages over SIEVE:
+    - Scan resistance: one-hit-wonders filtered by Small queue (never enter Main)
+    - Frequency awareness: promotion based on access count, not just visited bit
+    - Ghost-based regret: pages that return after eviction get fast-tracked
+    - O(1) per-access overhead (same as SIEVE), better eviction quality
+
+    Reference: "FIFO Queues are All You Need for Cache Eviction"
+               Yang et al., SOSP 2023
     """
 
     enabled: bool = True
-    sieve_scan_limit: int = 8  # Max pages to scan before falling back to scoring
+    small_queue_ratio: float = 0.10  # Small queue = 10% of tier0
+    main_queue_ratio: float = 0.90   # Main queue = 90% of tier0
+    ghost_queue_ratio: float = 1.0   # Ghost queue = 100% of tier0 size
+    max_freq: int = 3                # Saturating frequency cap
+    scan_limit: int = 8              # Max pages to scan in Main before fallback
 
 
 @dataclass(frozen=True)
@@ -575,6 +591,80 @@ class AutoFallbackConfig:
 
 
 @dataclass(frozen=True)
+class CXL3PoolConfig:
+    """
+    CXL 3.0 shared memory pool configuration.
+
+    Models CXL 3.0's shared memory pooling across multiple hosts (type-3 devices).
+    Enables cross-host coherence tracking, dynamic capacity expansion/contraction,
+    and memory pool management for disaggregated memory architectures.
+
+    CXL 3.0 key capabilities modeled:
+    1. Shared Memory Pools: Multiple hosts share a CXL-attached memory pool.
+       Each host gets a portion of the pool, but pages can be shared/migrated.
+    2. Cross-Host Coherence: CXL.cache protocol ensures coherence for shared
+       pages. Tracking which hosts have cached copies and invalidation costs.
+    3. Dynamic Capacity: Pool can expand/contract per-host allocations based
+       on demand (hot-add/hot-remove of memory regions).
+    4. Back-Invalidation: When a shared page is modified, other hosts'
+       cached copies must be invalidated (bi-directional coherence).
+
+    Memory hierarchy with CXL 3.0 pool:
+        Host-local DRAM (Tier0)  → fastest, per-host
+        CXL Pool (shared)       → slightly slower, shared across hosts
+        Host-local NAND (Tier1) → slowest, per-host
+
+    Reference: CXL 3.0 Specification, Chapter 11 (Memory Pooling)
+    """
+
+    enabled: bool = False
+
+    # Pool topology
+    num_hosts: int = 2              # Number of hosts sharing the pool
+    pool_size: int = 2000           # Total shared pool capacity (pages)
+    per_host_min_share: float = 0.1 # Minimum guaranteed share per host [0, 1]
+    per_host_max_share: float = 0.8 # Maximum share any single host can use [0, 1]
+
+    # Latency model (nanoseconds)
+    pool_access_latency_ns: int = 250       # CXL pool access (~2-3x local DRAM)
+    coherence_invalidation_ns: int = 500    # Back-invalidation latency
+    pool_promotion_latency_ns: int = 400    # Local DRAM → CXL pool migration
+    pool_demotion_latency_ns: int = 400     # CXL pool → local tier1 demotion
+
+    # Coherence protocol
+    max_sharers: int = 4            # Max hosts caching same page (CXL.cache limit)
+    invalidation_batch_size: int = 8 # Batch invalidations to amortize overhead
+
+    # Dynamic capacity
+    expansion_threshold: float = 0.85    # Pool utilization to trigger expansion request
+    contraction_threshold: float = 0.30  # Pool utilization to consider releasing capacity
+    rebalance_interval: int = 500        # Accesses between rebalance checks
+    capacity_step_pages: int = 100       # Pages added/removed per expansion/contraction
+
+    # Eviction scoring
+    shared_page_penalty: float = 0.2     # Penalty for evicting shared pages (invalidation cost)
+    remote_page_boost: float = 0.1       # Boost for keeping frequently-shared pages in pool
+
+    def __post_init__(self) -> None:
+        if self.num_hosts < 1:
+            raise ValueError("num_hosts must be >= 1")
+        if self.pool_size < 1:
+            raise ValueError("pool_size must be >= 1")
+        if not (0.0 <= self.per_host_min_share <= self.per_host_max_share <= 1.0):
+            raise ValueError(
+                f"Invalid host share bounds: min={self.per_host_min_share}, "
+                f"max={self.per_host_max_share}"
+            )
+        if self.max_sharers < 1:
+            raise ValueError("max_sharers must be >= 1")
+        if not (0.0 < self.contraction_threshold < self.expansion_threshold <= 1.0):
+            raise ValueError(
+                f"Thresholds must satisfy 0 < contraction ({self.contraction_threshold}) "
+                f"< expansion ({self.expansion_threshold}) <= 1"
+            )
+
+
+@dataclass(frozen=True)
 class GLCacheConfig:
     """
     GL-Cache (NSDI'23) group-level learned eviction configuration.
@@ -627,7 +717,7 @@ class CTMPlusConfig:
     size_aware: SizeAwareConfig = field(default_factory=SizeAwareConfig)
     refault: RefaultConfig = field(default_factory=RefaultConfig)
     adaptive_weights: AdaptiveWeightConfig = field(default_factory=AdaptiveWeightConfig)
-    lazy_promotion: LazyPromotionConfig = field(default_factory=LazyPromotionConfig)
+    s3fifo_fast_path: S3FIFOFastPathConfig = field(default_factory=S3FIFOFastPathConfig)
     external_hints: ExternalHintConfig = field(default_factory=ExternalHintConfig)
     multi_tenancy: MultiTenancyConfig = field(default_factory=MultiTenancyConfig)
     numa: NUMAConfig = field(default_factory=NUMAConfig)
@@ -636,6 +726,7 @@ class CTMPlusConfig:
     compression_tier: CompressionTierConfig = field(default_factory=CompressionTierConfig)
     glcache: GLCacheConfig = field(default_factory=GLCacheConfig)
     auto_fallback: AutoFallbackConfig = field(default_factory=AutoFallbackConfig)
+    cxl3_pool: CXL3PoolConfig = field(default_factory=CXL3PoolConfig)
 
     @classmethod
     def default(cls) -> "CTMPlusConfig":
@@ -658,9 +749,9 @@ class CTMPlusConfig:
 
     @classmethod
     def minimal_overhead(cls) -> "CTMPlusConfig":
-        """Minimal per-access overhead (SIEVE-like behavior)."""
+        """Minimal per-access overhead (S3-FIFO fast-path behavior)."""
         return cls(
-            lazy_promotion=LazyPromotionConfig(enabled=True, sieve_scan_limit=16),
+            s3fifo_fast_path=S3FIFOFastPathConfig(enabled=True, scan_limit=16),
             irr=IRRConfig(enabled=False),
             adaptive_weights=AdaptiveWeightConfig(enabled=False),
         )

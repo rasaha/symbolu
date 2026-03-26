@@ -14,7 +14,7 @@ Gap closure components (state-of-the-art techniques):
 8.  RefaultTracker (TMO/MGLRU): PID-controlled refault feedback loop.
 9.  AdaptiveWeightLearner (CACHEUS/LeCaR): Hedge-algorithm online weight learning.
 10. Size-aware eviction (LHD): Hits-per-byte metric for variable-size objects.
-11. Lazy promotion (SIEVE): Visited-bit deferred scoring, O(1) per-access overhead.
+11. S3-FIFO Fast Path: Three-queue (Small/Main/Ghost) eviction fast path (replaces SIEVE).
 12. ExternalHintManager (CXL CMM-H): Application hint API for page hotness.
 """
 
@@ -610,6 +610,205 @@ class AdmissionController:
     def get_frequency(self, page_id: int) -> int:
         """Get estimated frequency for a page."""
         return self._sketch.estimate(page_id)
+
+
+class S3FIFOFastPath:
+    """
+    Gap 5 (replaces SIEVE): S3-FIFO three-queue eviction fast path.
+
+    Maintains Small/Main/Ghost FIFO queues as a lightweight eviction filter
+    inside CTM+. On eviction, the Small queue is checked first: pages with
+    freq >= 1 are promoted to Main, zero-frequency pages are evicted.
+    Main uses second-chance with frequency decrement. Ghost tracks recently
+    evicted IDs for regret detection.
+
+    This replaces the SIEVE visited-bit scan with a more effective filter:
+    - SIEVE: binary visited/not-visited → single second chance
+    - S3-FIFO: frequency tracking with ghost regret → scan-resistant eviction
+
+    All operations are O(1) amortized, same as SIEVE.
+
+    Reference: "FIFO Queues are All You Need for Cache Eviction"
+               Yang et al., SOSP 2023
+    """
+
+    def __init__(self, config: CTMPlusConfig, tier0_size: int):
+        from ..core.config import S3FIFOFastPathConfig
+        self._config: S3FIFOFastPathConfig = config.s3fifo_fast_path
+        self._tier0_size = tier0_size
+
+        small_cap = max(1, int(tier0_size * self._config.small_queue_ratio))
+        main_cap = tier0_size - small_cap
+        ghost_cap = max(1, int(tier0_size * self._config.ghost_queue_ratio))
+
+        # FIFO queues: appendleft = enqueue (newest), pop = dequeue (oldest)
+        self._small: deque = deque()
+        self._small_set: set = set()
+        self._small_cap = small_cap
+
+        self._main: deque = deque()
+        self._main_set: set = set()
+        self._main_cap = main_cap
+
+        self._ghost: deque = deque()
+        self._ghost_set: set = set()
+        self._ghost_cap = ghost_cap
+
+        # Per-page frequency (saturating at max_freq)
+        self._freq: Dict[int, int] = {}
+
+        # Stats
+        self.evictions = 0
+        self.small_promotions = 0
+        self.ghost_hits = 0
+
+    def record_access(self, page_id: int) -> None:
+        """Record a tier0 hit — increment frequency (saturating)."""
+        if not self._config.enabled:
+            return
+        max_freq = self._config.max_freq
+        self._freq[page_id] = min(max_freq, self._freq.get(page_id, 0) + 1)
+
+    def on_admit(self, page_id: int) -> None:
+        """Called when a page is newly admitted to tier0. Enters Small queue."""
+        if not self._config.enabled:
+            return
+
+        # Ghost hit → skip Small, go straight to Main
+        if page_id in self._ghost_set:
+            self._ghost_set.discard(page_id)
+            self.ghost_hits += 1
+            self._main.appendleft(page_id)
+            self._main_set.add(page_id)
+            self._freq[page_id] = 1
+            return
+
+        # Normal admission → enter Small queue
+        self._small.appendleft(page_id)
+        self._small_set.add(page_id)
+        self._freq[page_id] = 0
+
+    def on_eviction(self, page_id: int) -> None:
+        """Called when a page is evicted from tier0 by the full scoring path."""
+        self._small_set.discard(page_id)
+        self._main_set.discard(page_id)
+        self._freq.pop(page_id, None)
+
+    def select_victim(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """
+        S3-FIFO fast-path victim selection.
+
+        Try evicting from Small queue first (zero-frequency pages).
+        If Small is empty or all have freq >= 1, try Main queue (second-chance).
+        Returns None if no victim found (fall back to full scoring).
+        """
+        if not self._config.enabled:
+            return None
+
+        # Phase 1: Evict from Small queue
+        victim = self._try_evict_small(state, hint_manager)
+        if victim is not None:
+            self.evictions += 1
+            return victim
+
+        # Phase 2: Evict from Main queue (second-chance with freq decrement)
+        victim = self._try_evict_main(state, hint_manager)
+        if victim is not None:
+            self.evictions += 1
+            return victim
+
+        return None  # Fall back to full scoring
+
+    def _try_evict_small(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """Try to evict a zero-frequency page from Small, promoting freq>=1 to Main."""
+        attempts = len(self._small)
+        for _ in range(attempts):
+            if not self._small:
+                break
+            page_id = self._small.pop()  # Oldest in Small
+            if page_id not in self._small_set:
+                continue  # Lazy deletion
+            self._small_set.discard(page_id)
+
+            # Skip pinned pages
+            if hint_manager.is_pinned(page_id):
+                # Re-insert at front (keep in Small)
+                self._small.appendleft(page_id)
+                self._small_set.add(page_id)
+                continue
+
+            freq = self._freq.get(page_id, 0)
+            if freq >= 1:
+                # Promote to Main — page proved it's not a one-hit-wonder
+                self._main.appendleft(page_id)
+                self._main_set.add(page_id)
+                self.small_promotions += 1
+            else:
+                # Zero frequency → evict
+                page = state.tier0.pages.get(page_id)
+                if page is not None:
+                    self._add_to_ghost(page_id)
+                    self._freq.pop(page_id, None)
+                    return page
+                # Page already gone from tier0, clean up
+                self._freq.pop(page_id, None)
+
+        return None
+
+    def _try_evict_main(self, state: 'GlobalState', hint_manager: 'ExternalHintManager') -> Optional[PageState]:
+        """Second-chance eviction from Main queue. Decrement freq and re-insert if > 0."""
+        scan_limit = self._config.scan_limit
+        scanned = 0
+        for _ in range(min(len(self._main), scan_limit)):
+            if not self._main:
+                break
+            page_id = self._main.pop()  # Oldest in Main
+            if page_id not in self._main_set:
+                continue  # Lazy deletion
+            scanned += 1
+
+            # Skip pinned pages
+            if hint_manager.is_pinned(page_id):
+                self._main.appendleft(page_id)
+                continue
+
+            freq = self._freq.get(page_id, 0)
+            if freq > 0:
+                # Second chance: decrement and re-insert
+                self._freq[page_id] = freq - 1
+                self._main.appendleft(page_id)
+            else:
+                # freq == 0 → evict
+                self._main_set.discard(page_id)
+                page = state.tier0.pages.get(page_id)
+                if page is not None:
+                    self._freq.pop(page_id, None)
+                    return page
+                self._freq.pop(page_id, None)
+
+        return None
+
+    def _add_to_ghost(self, page_id: int) -> None:
+        """Add evicted page ID to ghost queue."""
+        while len(self._ghost) >= self._ghost_cap:
+            old = self._ghost.pop()
+            self._ghost_set.discard(old)
+        self._ghost.appendleft(page_id)
+        self._ghost_set.add(page_id)
+
+    def is_ghost_hit(self, page_id: int) -> bool:
+        """Check if page_id is in the ghost queue (was recently evicted)."""
+        return page_id in self._ghost_set
+
+    def get_stats(self) -> dict:
+        return {
+            "evictions": self.evictions,
+            "small_promotions": self.small_promotions,
+            "ghost_hits": self.ghost_hits,
+            "small_size": len(self._small),
+            "main_size": len(self._main),
+            "ghost_size": len(self._ghost),
+        }
 
 
 class IRRTracker:
@@ -2038,6 +2237,419 @@ class LRUFallbackDetector:
         }
 
 
+class CXLSharedMemoryPool:
+    """
+    CXL 3.0 shared memory pool manager.
+
+    Manages a shared pool of CXL-attached memory accessible by multiple hosts.
+    Pages evicted from a host's local tier0 can be placed in the pool instead
+    of being demoted to slow tier1, providing a warm intermediate tier that
+    other hosts can also access.
+
+    Pool hierarchy per host:
+        Host-local DRAM (Tier0) → CXL Pool (shared) → Host-local NAND (Tier1)
+
+    The pool tracks per-host allocations, enforces min/max share bounds,
+    and provides an API for the coherence tracker and capacity manager.
+
+    Reference: CXL 3.0 Specification, Chapter 11 (Memory Pooling)
+    """
+
+    def __init__(self, config: CTMPlusConfig, tier0_size: int):
+        self._config = config.cxl3_pool
+        self._tier0_size = tier0_size
+        self._pool_size = self._config.pool_size
+
+        # Per-host allocation tracking: host_id -> set of page_ids in pool
+        self._host_pages: Dict[int, set] = {
+            h: set() for h in range(self._config.num_hosts)
+        }
+
+        # Stats
+        self.pool_admissions = 0
+        self.pool_evictions = 0
+        self.pool_hits = 0
+        self.cross_host_accesses = 0
+
+    def get_host_usage(self, host_id: int) -> int:
+        """Get number of pages host_id has in the pool."""
+        return len(self._host_pages.get(host_id, set()))
+
+    def get_total_usage(self) -> int:
+        """Get total pages across all hosts in the pool."""
+        return sum(len(pages) for pages in self._host_pages.values())
+
+    def get_host_share(self, host_id: int) -> float:
+        """Get host's fraction of pool capacity."""
+        if self._pool_size == 0:
+            return 0.0
+        return self.get_host_usage(host_id) / self._pool_size
+
+    def can_admit(self, host_id: int) -> bool:
+        """Check if host can admit another page to the pool."""
+        if not self._config.enabled:
+            return False
+        # Check pool capacity
+        if self.get_total_usage() >= self._pool_size:
+            return False
+        # Check per-host max share
+        if self.get_host_share(host_id) >= self._config.per_host_max_share:
+            return False
+        return True
+
+    def should_use_pool(self, page: PageState, host_id: int) -> bool:
+        """
+        Decide if a page evicted from tier0 should go to the pool vs tier1.
+
+        Pages go to pool if:
+        - Pool is enabled and has capacity for this host
+        - Page has been accessed more than once (not a one-hit-wonder)
+        - Page is shared or frequently accessed
+        """
+        if not self._config.enabled or not self.can_admit(host_id):
+            return False
+        # Heuristic: warm pages go to pool, cold pages go straight to tier1
+        return page.access_count >= 2
+
+    def admit_to_pool(self, page: PageState, state: GlobalState, host_id: int) -> bool:
+        """
+        Place a page into the CXL shared pool.
+
+        Returns True if successful, False if pool is full or host is over quota.
+        """
+        if not self.can_admit(host_id):
+            return False
+
+        if state.pool is None:
+            return False
+
+        page.pool_resident = True
+        page.owner_host = host_id
+        state.pool.add(page)
+        self._host_pages[host_id].add(page.page_id)
+        self.pool_admissions += 1
+        return True
+
+    def remove_from_pool(self, page: PageState, state: GlobalState) -> bool:
+        """Remove a page from the pool (promotion back to tier0 or demotion to tier1)."""
+        if state.pool is None or not state.pool.contains(page.page_id):
+            return False
+
+        state.pool.remove(page.page_id)
+        host_id = page.owner_host
+        self._host_pages.get(host_id, set()).discard(page.page_id)
+        page.pool_resident = False
+        self.pool_evictions += 1
+        return True
+
+    def on_pool_hit(self, page: PageState, accessor_host: int) -> None:
+        """Record a hit on a page in the pool."""
+        self.pool_hits += 1
+        page.pool_access_count += 1
+        if accessor_host != page.owner_host:
+            self.cross_host_accesses += 1
+
+    def select_pool_victim(self, host_id: int, state: GlobalState) -> Optional[PageState]:
+        """Select a victim page from the pool to make room for host_id."""
+        if state.pool is None or not state.pool.pages:
+            return None
+
+        # Prefer evicting pages from the host that is most over its share
+        best_victim = None
+        best_score = float('inf')
+        for pid, page in state.pool.pages.items():
+            # Score: lower = more evictable
+            score = page.pool_access_count * 0.5
+            # Penalize shared pages (high invalidation cost)
+            if len(page.sharer_hosts) > 1:
+                score += self._config.shared_page_penalty * len(page.sharer_hosts)
+            # Prefer evicting pages from over-quota hosts
+            owner = page.owner_host
+            if self.get_host_share(owner) > self._config.per_host_max_share * 0.9:
+                score -= 0.3  # Make it more evictable
+            if score < best_score:
+                best_score = score
+                best_victim = page
+        return best_victim
+
+    def get_stats(self) -> dict:
+        host_usage = {h: len(pages) for h, pages in self._host_pages.items()}
+        return {
+            "pool_admissions": self.pool_admissions,
+            "pool_evictions": self.pool_evictions,
+            "pool_hits": self.pool_hits,
+            "cross_host_accesses": self.cross_host_accesses,
+            "total_pool_usage": self.get_total_usage(),
+            "pool_capacity": self._pool_size,
+            "host_usage": host_usage,
+        }
+
+
+class CXLCoherenceTracker:
+    """
+    CXL 3.0 cross-host coherence tracker.
+
+    Implements CXL.cache-style coherence for shared pages in the memory pool.
+    When multiple hosts cache the same page, the tracker ensures that:
+    1. All hosts with cached copies are tracked (sharer list)
+    2. On write/modification, back-invalidation is sent to all sharers
+    3. Invalidation cost is factored into eviction scoring
+
+    CXL 3.0 coherence states modeled:
+    - Invalid (I): Host has no copy
+    - Shared (S): Host has read-only copy, others may too
+    - Exclusive (E): Host has sole modifiable copy
+    - Modified (M): Host has modified copy (dirty)
+
+    For simulation, we track sharers and invalidation counts rather than
+    full MESI protocol states, since we care about cost modeling, not
+    bit-level correctness.
+
+    Reference: CXL 3.0 Specification, Chapter 4 (CXL.cache)
+    """
+
+    def __init__(self, config: CTMPlusConfig):
+        self._config = config.cxl3_pool
+        # page_id -> set of host_ids that have cached copies
+        self._sharers: Dict[int, set] = {}
+        # page_id -> host_id that has exclusive/modified access
+        self._exclusive_owner: Dict[int, Optional[int]] = {}
+
+        # Stats
+        self.invalidations_sent = 0
+        self.sharers_added = 0
+        self.exclusive_grants = 0
+
+    def add_sharer(self, page_id: int, host_id: int, page: PageState) -> None:
+        """Record that host_id has a cached copy of page_id."""
+        if not self._config.enabled:
+            return
+        if page_id not in self._sharers:
+            self._sharers[page_id] = set()
+        if len(self._sharers[page_id]) < self._config.max_sharers:
+            self._sharers[page_id].add(host_id)
+            page.sharer_hosts.add(host_id)
+            self.sharers_added += 1
+
+    def remove_sharer(self, page_id: int, host_id: int, page: PageState) -> None:
+        """Remove host_id from sharers of page_id."""
+        if page_id in self._sharers:
+            self._sharers[page_id].discard(host_id)
+            page.sharer_hosts.discard(host_id)
+            if not self._sharers[page_id]:
+                del self._sharers[page_id]
+        if self._exclusive_owner.get(page_id) == host_id:
+            self._exclusive_owner.pop(page_id, None)
+
+    def get_sharers(self, page_id: int) -> set:
+        """Get set of hosts with cached copies of page_id."""
+        return self._sharers.get(page_id, set()).copy()
+
+    def get_sharer_count(self, page_id: int) -> int:
+        """Get number of hosts sharing this page."""
+        return len(self._sharers.get(page_id, set()))
+
+    def request_exclusive(self, page_id: int, host_id: int, page: PageState) -> int:
+        """
+        Host requests exclusive access (for write). Invalidates other sharers.
+
+        Returns the number of invalidations sent (latency cost).
+        """
+        if not self._config.enabled:
+            return 0
+
+        sharers = self._sharers.get(page_id, set())
+        others = sharers - {host_id}
+        invalidation_count = len(others)
+
+        # Invalidate all other sharers
+        for other_host in others:
+            sharers.discard(other_host)
+            page.sharer_hosts.discard(other_host)
+            self.invalidations_sent += 1
+
+        # Grant exclusive
+        self._exclusive_owner[page_id] = host_id
+        self.exclusive_grants += 1
+
+        return invalidation_count
+
+    def on_eviction(self, page_id: int, host_id: int, page: PageState) -> int:
+        """
+        Page evicted from host. Remove from sharers, send invalidation if needed.
+
+        Returns number of invalidations sent.
+        """
+        if not self._config.enabled:
+            return 0
+
+        self.remove_sharer(page_id, host_id, page)
+        return 0  # No invalidation needed when a host voluntarily evicts
+
+    def compute_invalidation_cost_ns(self, page_id: int) -> int:
+        """Compute the latency cost of invalidating all sharers of a page."""
+        sharer_count = self.get_sharer_count(page_id)
+        if sharer_count <= 1:
+            return 0  # No other sharers to invalidate
+        # Batch invalidations
+        batches = (sharer_count - 1 + self._config.invalidation_batch_size - 1) // self._config.invalidation_batch_size
+        return batches * self._config.coherence_invalidation_ns
+
+    def get_eviction_penalty(self, page_id: int) -> float:
+        """Get eviction score penalty for shared pages (higher = harder to evict)."""
+        sharer_count = self.get_sharer_count(page_id)
+        if sharer_count <= 1:
+            return 0.0
+        return self._config.shared_page_penalty * (sharer_count - 1)
+
+    def get_stats(self) -> dict:
+        total_shared = sum(1 for s in self._sharers.values() if len(s) > 1)
+        return {
+            "invalidations_sent": self.invalidations_sent,
+            "sharers_added": self.sharers_added,
+            "exclusive_grants": self.exclusive_grants,
+            "total_tracked_pages": len(self._sharers),
+            "shared_pages": total_shared,
+        }
+
+
+class CXLCapacityManager:
+    """
+    CXL 3.0 dynamic capacity manager.
+
+    Manages expansion and contraction of the shared memory pool based on
+    demand. When pool utilization exceeds the expansion threshold, the
+    manager grows the pool. When utilization drops below the contraction
+    threshold, the manager shrinks it to free physical resources.
+
+    CXL 3.0 dynamic capacity features modeled:
+    - Hot-add: Expand pool capacity when hosts are under memory pressure
+    - Hot-remove: Contract pool when utilization is low (release to fabric)
+    - Per-host rebalancing: Shift share bounds based on host demand
+    - Capacity events: Track expansion/contraction history
+
+    Reference: CXL 3.0 Specification, Chapter 11.3 (Dynamic Capacity Device)
+    """
+
+    def __init__(self, config: CTMPlusConfig, pool_manager: CXLSharedMemoryPool):
+        self._config = config.cxl3_pool
+        self._pool = pool_manager
+        self._current_capacity = self._config.pool_size
+        self._access_since_rebalance = 0
+
+        # Per-host demand tracking
+        self._host_demand: Dict[int, int] = {
+            h: 0 for h in range(self._config.num_hosts)
+        }
+
+        # Stats
+        self.expansions = 0
+        self.contractions = 0
+        self.total_expanded_pages = 0
+        self.total_contracted_pages = 0
+        self.rebalances = 0
+
+    def record_demand(self, host_id: int) -> None:
+        """Record a pool access/request from a host (tracks demand pressure)."""
+        if not self._config.enabled:
+            return
+        self._host_demand[host_id] = self._host_demand.get(host_id, 0) + 1
+        self._access_since_rebalance += 1
+
+    def should_rebalance(self) -> bool:
+        """Check if it's time for a rebalance check."""
+        return (self._config.enabled and
+                self._access_since_rebalance >= self._config.rebalance_interval)
+
+    def rebalance(self, state: GlobalState) -> dict:
+        """
+        Check pool utilization and expand/contract as needed.
+
+        Returns a dict describing the action taken.
+        """
+        if not self._config.enabled or state.pool is None:
+            return {"action": "none"}
+
+        self._access_since_rebalance = 0
+        self.rebalances += 1
+
+        utilization = self._pool.get_total_usage() / max(1, self._current_capacity)
+
+        # Expansion: pool is running hot
+        if utilization >= self._config.expansion_threshold:
+            return self._expand(state)
+
+        # Contraction: pool is underutilized
+        if utilization <= self._config.contraction_threshold and self._current_capacity > self._config.capacity_step_pages:
+            return self._contract(state)
+
+        return {"action": "none", "utilization": utilization}
+
+    def _expand(self, state: GlobalState) -> dict:
+        """Expand pool capacity by capacity_step_pages."""
+        step = self._config.capacity_step_pages
+        old_cap = self._current_capacity
+        self._current_capacity += step
+        if state.pool is not None:
+            state.pool.capacity = self._current_capacity
+        self._pool._pool_size = self._current_capacity
+        self.expansions += 1
+        self.total_expanded_pages += step
+        return {
+            "action": "expand",
+            "old_capacity": old_cap,
+            "new_capacity": self._current_capacity,
+            "step": step,
+        }
+
+    def _contract(self, state: GlobalState) -> dict:
+        """Contract pool capacity by capacity_step_pages."""
+        step = self._config.capacity_step_pages
+        # Don't shrink below current usage
+        min_cap = self._pool.get_total_usage() + 1
+        new_cap = max(min_cap, self._current_capacity - step)
+        actual_step = self._current_capacity - new_cap
+        if actual_step <= 0:
+            return {"action": "none", "reason": "cannot_shrink_below_usage"}
+
+        old_cap = self._current_capacity
+        self._current_capacity = new_cap
+        if state.pool is not None:
+            state.pool.capacity = self._current_capacity
+        self._pool._pool_size = self._current_capacity
+        self.contractions += 1
+        self.total_contracted_pages += actual_step
+        return {
+            "action": "contract",
+            "old_capacity": old_cap,
+            "new_capacity": self._current_capacity,
+            "step": actual_step,
+        }
+
+    def get_host_demand_share(self, host_id: int) -> float:
+        """Get host's share of total demand."""
+        total = sum(self._host_demand.values())
+        if total == 0:
+            return 1.0 / max(1, self._config.num_hosts)
+        return self._host_demand.get(host_id, 0) / total
+
+    @property
+    def current_capacity(self) -> int:
+        return self._current_capacity
+
+    def get_stats(self) -> dict:
+        return {
+            "current_capacity": self._current_capacity,
+            "base_capacity": self._config.pool_size,
+            "expansions": self.expansions,
+            "contractions": self.contractions,
+            "total_expanded_pages": self.total_expanded_pages,
+            "total_contracted_pages": self.total_contracted_pages,
+            "rebalances": self.rebalances,
+            "host_demand": dict(self._host_demand),
+        }
+
+
 class CTMPlusController(BaseController):
     """
     CTM+ Controller with all state-of-the-art gap closures implemented.
@@ -2047,12 +2659,13 @@ class CTMPlusController(BaseController):
     - Refault/Pressure Control (TMO/MGLRU): PID-based eviction feedback
     - Adaptive Weight Learning (CACHEUS/LeCaR): Hedge-algorithm online weights
     - Size-Aware Eviction (LHD): Hits-per-byte for variable-size objects
-    - Lazy Promotion (SIEVE): Visited-bit deferred scoring
+    - S3-FIFO Fast Path: Three-queue eviction fast path (replaces SIEVE)
     - External Hint API (CXL CMM-H): Application-provided page hints
     - Multi-Tenancy & QoS Isolation: Per-tenant quotas and priority-weighted eviction
     - NUMA-Aware Placement: Locality-aware latency, victim scoring, and migration
     - Writeback Scheduling: Proactive dirty page flushing, write coalescing, eviction cost reduction
     - Compression Tier: zswap/zram-style compressed DRAM between Tier0 and Tier1
+    - CXL 3.0 Pool: Cross-host shared memory pooling, coherence, and dynamic capacity
     """
 
     def __init__(self, config: SimulatorConfig, ctm_config: Optional[CTMPlusConfig] = None):
@@ -2107,6 +2720,11 @@ class CTMPlusController(BaseController):
             self.ctm_config.compression_tier, config.tier0_size
         )
 
+        # === CXL 3.0 shared memory pool ===
+        self._cxl_pool = CXLSharedMemoryPool(self.ctm_config, config.tier0_size)
+        self._cxl_coherence = CXLCoherenceTracker(self.ctm_config)
+        self._cxl_capacity = CXLCapacityManager(self.ctm_config, self._cxl_pool)
+
         # Stats
         self._promotions = 0
         self._demotions = 0
@@ -2117,7 +2735,7 @@ class CTMPlusController(BaseController):
         self._epoch_promotions = 0
         self._epoch_demotions = 0
         self._smart_victim_selections = 0
-        self._sieve_evictions = 0
+        self._s3fifo_fast_path = S3FIFOFastPath(self.ctm_config, config.tier0_size)
         self._irr_influenced = 0
         self._hint_influenced = 0
         self._refault_promotions = 0
@@ -2125,6 +2743,8 @@ class CTMPlusController(BaseController):
         self._cost_influenced = 0
         self._writeback_influenced = 0
         self._tier0c_hits = 0
+        self._pool_hits = 0
+        self._pool_promotions = 0
         self._page_sizes: Dict[int, int] = {}  # External size overrides
 
     @property
@@ -2169,7 +2789,7 @@ class CTMPlusController(BaseController):
         Score Tier0 pages and return the worst victim for eviction.
 
         Integrates all gap closures:
-        - SIEVE scan (Gap 5): Try visited-bit eviction first for O(1) amortized
+        - S3-FIFO fast path (Gap 5): Three-queue eviction filter for O(1) amortized
         - IRR (Gap 1): Use inter-reference recency instead of raw recency for scans
         - Adaptive weights (Gap 4): Learned weights via Hedge algorithm
         - Size-aware (Gap 2): Hits-per-byte for variable-size objects
@@ -2186,24 +2806,21 @@ class CTMPlusController(BaseController):
         if not self.ctm_config.enable_smart_victim:
             return min(pages, key=lambda p: p.last_access_time)
 
-        # === Auto LRU fallback: bypass ALL scoring (including SIEVE) ===
-        # Must come before SIEVE because SIEVE's visited-bit eviction is
-        # also suboptimal on recency-dominated workloads — it evicts
-        # unvisited pages regardless of recency, which can miss pages
-        # that LRU would correctly identify as coldest.
+        # === Auto LRU fallback: bypass ALL scoring (including S3-FIFO fast path) ===
+        # Must come before S3-FIFO because S3-FIFO's frequency-based eviction is
+        # also suboptimal on recency-dominated workloads — it may evict
+        # zero-frequency pages that LRU would correctly identify as coldest.
         if self._lru_fallback.using_lru:
             lru_page = min(pages, key=lambda p: p.last_access_time)
             self._lru_fallback.record_decision(lru_page.page_id, lru_page.page_id)
             return lru_page
 
-        # === Gap 5: SIEVE-style lazy eviction (try first for low overhead) ===
-        if self.ctm_config.lazy_promotion.enabled and n > 16:
-            sieve_victim = self._sieve_scan(state)
-            if sieve_victim is not None:
-                self._sieve_evictions += 1
-
-                # Record SIEVE eviction for GL-Cache learning.
-                # Without this, SIEVE-evicted pages are invisible to the
+        # === Gap 5: S3-FIFO fast-path eviction (try first for low overhead) ===
+        if self.ctm_config.s3fifo_fast_path.enabled and n > 16:
+            s3fifo_victim = self._s3fifo_fast_path.select_victim(state, self._hint_manager)
+            if s3fifo_victim is not None:
+                # Record S3-FIFO eviction for GL-Cache learning.
+                # Without this, fast-path-evicted pages are invisible to the
                 # model and their refault outcomes are never learned from.
                 if self._glcache is not None:
                     max_t = max(p.last_access_time for p in pages)
@@ -2211,29 +2828,29 @@ class CTMPlusController(BaseController):
                     irr_v = 0.0
                     if self.ctm_config.irr.enabled:
                         irr_v = self._irr_tracker.get_normalized_irr(
-                            sieve_victim, state.tier0.capacity
+                            s3fifo_victim, state.tier0.capacity
                         )
                     gl_feats = extract_features(
-                        sieve_victim,
+                        s3fifo_victim,
                         current_time=state.current_time,
                         max_time=max_t,
                         min_time=min_t,
                         tier0_capacity=state.tier0.capacity,
                         reuse_score=self._transition_tracker.get_reuse_score(
-                            sieve_victim.page_id
+                            s3fifo_victim.page_id
                         ),
                         neighbor_hotness=self._neighbor_tracker.get_neighbor_hotness(
-                            sieve_victim.page_id, state
+                            s3fifo_victim.page_id, state
                         ),
                         irr_normalized=irr_v,
                     )
                     self._glcache.record_eviction(
-                        sieve_victim.page_id,
+                        s3fifo_victim.page_id,
                         gl_feats,
-                        frequency_group(sieve_victim.access_count),
+                        frequency_group(s3fifo_victim.access_count),
                     )
 
-                return sieve_victim
+                return s3fifo_victim
 
         # For small caches, just use LRU (fast path)
         if n <= 16:
@@ -2427,42 +3044,7 @@ class CTMPlusController(BaseController):
 
         return victim
 
-    def _sieve_scan(self, state: GlobalState) -> Optional[PageState]:
-        """
-        Gap 5: SIEVE-style lazy eviction scan.
-
-        Scan from LRU end: if visited=True, clear it and skip (retain in place).
-        If visited=False, evict. This gives new pages a chance to prove themselves.
-
-        Key insight from SIEVE: retained objects stay in original position (no reinsertion),
-        naturally preserving age ordering.
-        """
-        scan_limit = self.ctm_config.lazy_promotion.sieve_scan_limit
-        access_order = state.tier0.access_order
-        scanned = 0
-
-        for page_id in list(access_order):
-            if scanned >= scan_limit:
-                break
-
-            page = state.tier0.pages.get(page_id)
-            if page is None:
-                continue
-
-            # Skip pinned pages
-            if self._hint_manager.is_pinned(page_id):
-                continue
-
-            scanned += 1
-
-            if page.visited:
-                # Clear visited bit, give second chance (lazy promotion)
-                page.visited = False
-            else:
-                # Not visited since last scan → evict
-                return page
-
-        return None  # All scanned pages were visited; fall back to full scoring
+    # _sieve_scan removed: replaced by S3FIFOFastPath.select_victim()
 
     # === Gap 6: Public hint API ===
     def set_page_hint(self, page_id: int, hint: PageHint, priority: float = 0.5) -> None:
@@ -2477,6 +3059,24 @@ class CTMPlusController(BaseController):
         """External API: Set variable size for a page (for size-aware eviction)."""
         # Will be applied when page is next accessed/created
         self._page_sizes[page_id] = size_bytes
+
+    # === CXL 3.0 public API ===
+    def init_cxl_pool(self, state: GlobalState) -> None:
+        """Initialize the CXL shared memory pool tier in the state."""
+        if self.ctm_config.cxl3_pool.enabled and state.pool is None:
+            from ..core.state import TierState
+            state.pool = TierState(
+                tier_id=Tier.POOL,
+                capacity=self.ctm_config.cxl3_pool.pool_size,
+            )
+
+    def get_cxl_pool_stats(self) -> dict:
+        """Get CXL pool, coherence, and capacity statistics."""
+        return {
+            "pool": self._cxl_pool.get_stats(),
+            "coherence": self._cxl_coherence.get_stats(),
+            "capacity": self._cxl_capacity.get_stats(),
+        }
 
     # === Multi-tenancy public API ===
     def register_tenant(self, config: TenantConfig) -> None:
@@ -2620,6 +3220,9 @@ class CTMPlusController(BaseController):
             state.tier0.record_hit()
             self._tenant_manager.record_access(page.tenant_id, is_hit=True)
 
+            # === Gap 5: S3-FIFO fast path — increment frequency on tier0 hit ===
+            self._s3fifo_fast_path.record_access(page_id)
+
             # === Writeback: Track dirty pages on write ===
             if op_type == OpType.WRITE:
                 self._writeback_scheduler.mark_dirty(page_id, state.current_time)
@@ -2661,6 +3264,7 @@ class CTMPlusController(BaseController):
                         evicted = victim
 
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(page_id)
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
@@ -2684,6 +3288,53 @@ class CTMPlusController(BaseController):
                 latency = self._config_compression_latency()
                 latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
                 return (Tier.COMPRESSED, latency, False, False)
+
+        # Case 1.75: CXL Pool Hit (shared memory pool)
+        if state.pool is not None and state.pool.contains(page_id):
+            state.pool.touch(page_id)
+            self._pool_hits += 1
+            self._cxl_pool.on_pool_hit(page, accessor_host=page.owner_host)
+            self._cxl_coherence.add_sharer(page_id, page.owner_host, page)
+            self._cxl_capacity.record_demand(page.owner_host)
+
+            # Consider promoting hot pool pages back to tier0
+            should_promote = page.pool_access_count >= 2
+
+            if should_promote:
+                self._cxl_pool.remove_from_pool(page, state)
+                self._cxl_coherence.on_eviction(page_id, page.owner_host, page)
+
+                self._numa_manager.assign_node(page, accessor_node)
+
+                evicted = None
+                if state.tier0.is_full:
+                    victim = self._select_victim(state)
+                    if victim:
+                        state.tier0.remove(victim.page_id)
+                        evicted = victim
+
+                state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(page_id)
+                promoted = True
+                self._promotions += 1
+                self._pool_promotions += 1
+                self._epoch_promotions += 1
+                page.last_promotion_time = state.current_time
+
+                if op_type == OpType.WRITE:
+                    self._writeback_scheduler.mark_dirty(page_id, state.current_time)
+
+                if evicted is not None:
+                    demoted = self._handle_eviction(state, evicted)
+
+            if promoted:
+                latency = self.ctm_config.cxl3_pool.pool_promotion_latency_ns
+                latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
+                return (Tier.POOL, latency, True, demoted)
+            else:
+                latency = self.ctm_config.cxl3_pool.pool_access_latency_ns
+                latency += self._numa_manager.compute_latency_penalty(accessor_node, page.numa_node)
+                return (Tier.POOL, latency, False, False)
 
         # Case 2: Tier 1 Hit (Slow Path - consider promotion)
         if state.tier1.contains(page_id):
@@ -2740,6 +3391,7 @@ class CTMPlusController(BaseController):
                         evicted = victim
 
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(page_id)
                 promoted = True
                 self._promotions += 1
                 self._epoch_promotions += 1
@@ -2799,6 +3451,7 @@ class CTMPlusController(BaseController):
                 self._admission.on_eviction(victim.page_id)
 
             state.tier0.add(page)
+            self._s3fifo_fast_path.on_admit(page_id)
             promoted = True
             self._promotions += 1
             self._tenant_manager.record_promotion(page.tenant_id)
@@ -2887,6 +3540,7 @@ class CTMPlusController(BaseController):
                 # NUMA: Place prefetched page on accessor's node
                 self._numa_manager.assign_node(page, accessor_node)
                 state.tier0.add(page)
+                self._s3fifo_fast_path.on_admit(next_page)
                 self._prefetch_promotions += 1
                 self._prefetch_engine.record_prefetch(next_page)
                 prefetched += 1
@@ -2902,19 +3556,34 @@ class CTMPlusController(BaseController):
         Integrates:
         - Gap 3: Record eviction for refault tracking
         - Gap 4: Record non-refault outcome for weight learning
-        - Gap 5: Clear visited bit on eviction (SIEVE)
+        - Gap 5: S3-FIFO fast path queue cleanup on eviction
         - Multi-tenancy: Record per-tenant demotion/eviction
         """
         evicted.last_demotion_time = state.current_time
-        evicted.visited = False  # Gap 5: Reset visited bit
+        evicted.visited = False  # Clear visited bit (legacy, harmless)
+
+        # Gap 5: Notify S3-FIFO fast path of eviction (clean up queue metadata)
+        self._s3fifo_fast_path.on_eviction(evicted.page_id)
 
         # === Writeback: Track dirty eviction and clear dirty state ===
         self._writeback_scheduler.on_eviction(evicted.page_id)
         evicted.dirty = False
         evicted.dirty_since = 0
 
-        # === Compression tier: Try to compress instead of demoting to tier1 ===
-        if self._compression_manager.should_compress(evicted, state):
+        # === CXL 3.0: Try shared pool before compression/tier1 ===
+        if self._cxl_pool.should_use_pool(evicted, evicted.owner_host):
+            if self._cxl_pool.admit_to_pool(evicted, state, evicted.owner_host):
+                self._cxl_coherence.add_sharer(evicted.page_id, evicted.owner_host, evicted)
+                evicted.last_pool_access_time = state.current_time
+                # Skip compression and tier1 — page is in pool
+            else:
+                # Pool full: try compression, then tier1
+                if self._compression_manager.should_compress(evicted, state):
+                    self._compression_manager.compress_page(evicted, state, state.current_time)
+                else:
+                    state.tier1.add(evicted)
+        elif self._compression_manager.should_compress(evicted, state):
+            # === Compression tier: Try to compress instead of demoting to tier1 ===
             self._compression_manager.compress_page(evicted, state, state.current_time)
         else:
             # Demote directly to tier1 (incompressible or compression disabled)
@@ -2970,6 +3639,7 @@ class CTMPlusController(BaseController):
         # NUMA: Place prefetched page on accessor's node
         self._numa_manager.assign_node(page, accessor_node)
         state.tier0.add(page)
+        self._s3fifo_fast_path.on_admit(page_id)
         self._prefetch_promotions += 1
         self._prefetch_engine.record_prefetch(page_id)
 
@@ -3006,6 +3676,10 @@ class CTMPlusController(BaseController):
 
         # === Compression tier: Age-scan and demote cold compressed pages ===
         self._compression_manager.epoch_scan(state, state.current_time)
+
+        # === CXL 3.0: Dynamic capacity rebalancing ===
+        if self._cxl_capacity.should_rebalance():
+            self._cxl_capacity.rebalance(state)
 
     def get_stats(self) -> dict:
         mode_stats = self._mode_switcher.get_stats()
@@ -3060,9 +3734,9 @@ class CTMPlusController(BaseController):
             "glcache_stats": self._glcache.get_stats() if self._glcache else {},
             # Auto LRU fallback
             "auto_fallback": self._lru_fallback.get_stats(),
-            # Gap 5: SIEVE lazy promotion
-            "sieve_enabled": self.ctm_config.lazy_promotion.enabled,
-            "sieve_evictions": self._sieve_evictions,
+            # Gap 5: S3-FIFO fast path (replaces SIEVE)
+            "s3fifo_fast_path_enabled": self.ctm_config.s3fifo_fast_path.enabled,
+            "s3fifo_fast_path_stats": self._s3fifo_fast_path.get_stats(),
             # Gap 6: External hints
             "hints_enabled": self.ctm_config.external_hints.enabled,
             "hint_influenced_decisions": self._hint_influenced,
@@ -3086,5 +3760,12 @@ class CTMPlusController(BaseController):
             "compression_tier_enabled": self.ctm_config.compression_tier.enabled,
             "tier0c_hits": self._tier0c_hits,
             "compression_stats": self._compression_manager.get_stats() if self.ctm_config.compression_tier.enabled else {},
+            # CXL 3.0 shared memory pool
+            "cxl3_pool_enabled": self.ctm_config.cxl3_pool.enabled,
+            "cxl3_pool_hits": self._pool_hits,
+            "cxl3_pool_promotions": self._pool_promotions,
+            "cxl3_pool_stats": self._cxl_pool.get_stats() if self.ctm_config.cxl3_pool.enabled else {},
+            "cxl3_coherence_stats": self._cxl_coherence.get_stats() if self.ctm_config.cxl3_pool.enabled else {},
+            "cxl3_capacity_stats": self._cxl_capacity.get_stats() if self.ctm_config.cxl3_pool.enabled else {},
         }
         return stats

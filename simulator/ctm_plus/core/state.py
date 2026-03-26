@@ -25,6 +25,7 @@ class Tier(IntEnum):
 
     TIER0 = 0       # Fast tier (DRAM/HBM, uncompressed)
     COMPRESSED = 2  # Compressed DRAM tier (zswap/zram-style)
+    POOL = 3        # CXL 3.0 shared memory pool
     TIER1 = 1       # Slow tier (NAND/DDR)
     NONE = -1       # Not in any tier
 
@@ -88,9 +89,9 @@ class PageState:
     # Size in bytes for variable-size objects. Enables hits-per-byte scoring.
     size_bytes: int = 4096  # Default to standard page size
 
-    # === Gap 5: Lazy promotion (SIEVE) ===
-    # Visited bit: set on access, cleared on eviction scan.
-    # Defers expensive metadata updates to eviction time.
+    # === Gap 5: S3-FIFO fast path (replaces SIEVE) ===
+    # Visited bit: retained for compatibility (set on access, cleared on eviction).
+    # S3-FIFO fast path now handles eviction via frequency-based Small/Main/Ghost queues.
     visited: bool = False
 
     # === Gap 6: External hint API (CXL CMM-H) ===
@@ -107,6 +108,13 @@ class PageState:
     # === Writeback scheduling ===
     dirty: bool = False          # Page has unflushed writes in tier0
     dirty_since: int = 0         # Time when page was first dirtied (0 = clean)
+
+    # === CXL 3.0 shared memory pool ===
+    owner_host: int = 0              # Host that owns/originated this page
+    pool_resident: bool = False      # True if page is in CXL shared pool
+    sharer_hosts: Set[int] = field(default_factory=set)  # Hosts caching this page
+    last_pool_access_time: int = 0   # Last time page was accessed via pool
+    pool_access_count: int = 0       # Number of accesses while in pool
 
     # === NUMA-aware placement ===
     numa_node: int = 0           # Current NUMA node where page is placed
@@ -135,7 +143,7 @@ class PageState:
         self.prev_access_time = self.last_access_time
         self.last_access_time = time
         self.access_count += 1
-        self.visited = True  # SIEVE: mark as visited on access
+        self.visited = True  # Legacy visited bit (S3-FIFO fast path uses frequency tracking)
 
         # Update amplitude (importance increases with access)
         self.amplitude = min(1.0, self.amplitude + amplitude_boost * (1 - self.amplitude))
@@ -419,6 +427,7 @@ class GlobalState:
     tier0: TierState
     tier1: TierState
     tier0c: Optional[TierState] = None  # Compression tier (zswap/zram)
+    pool: Optional[TierState] = None    # CXL 3.0 shared memory pool
     all_pages: Dict[int, PageState] = field(default_factory=dict)
 
     # Global metrics
@@ -442,6 +451,8 @@ class GlobalState:
             return Tier.TIER0
         elif self.tier0c is not None and self.tier0c.contains(page_id):
             return Tier.COMPRESSED
+        elif self.pool is not None and self.pool.contains(page_id):
+            return Tier.POOL
         elif self.tier1.contains(page_id):
             return Tier.TIER1
         return Tier.NONE
