@@ -512,11 +512,11 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.9.5: Warn if decorr_loss_weight is set but model type doesn't support it
     if hasattr(config, 'decorr_loss_weight') and config.decorr_loss_weight > 0:
-        if config.model_type in ('hybrid', 'ontological_hybrid'):
+        if config.model_type in ('hybrid', 'ontological_hybrid', 'mistral_hybrid'):
             print(f"  Decorrelation Loss: ENABLED (weight={config.decorr_loss_weight})")
         else:
             print(f"\n  ⚠️  WARNING: --decorr_loss_weight={config.decorr_loss_weight} IGNORED!")
-            print(f"     Decorrelation loss only works with --model_type hybrid or ontological_hybrid")
+            print(f"     Decorrelation loss only works with --model_type hybrid, ontological_hybrid, or mistral_hybrid")
             print(f"     Current model_type: {config.model_type}")
             print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
@@ -557,22 +557,22 @@ def train(config: UnifiedTrainingConfig):
                 _ablation_count += 1
         print(f"  [Stage 9] Ablation config applied to {_ablation_count} module(s): {_ablation_cfg.label()}")
 
-    # For mistral_cg, use the backbone's own tokenizer so token IDs match
-    # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
-    if config.model_type == "mistral_cg" and hasattr(model, "tokenizer") and model.tokenizer is not None:
+    # For mistral_cg/mistral_hybrid, use the backbone's own tokenizer so token IDs
+    # match the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
+    if config.model_type in ("mistral_cg", "mistral_hybrid") and hasattr(model, "tokenizer") and model.tokenizer is not None:
         tokenizer = model.tokenizer
         tokenizer.model_max_length = int(1e12)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         config.vocab_size = len(tokenizer)
-        print(f"  [Mistral CG] Using Mistral tokenizer (vocab_size={config.vocab_size})")
+        print(f"  [{config.model_type}] Using Mistral tokenizer (vocab_size={config.vocab_size})")
 
     # Knowledge Distillation: Load frozen Mistral teacher
     mistral_teacher = None
     distill_tokenizer = None
     if config.distill_from_mistral:
-        if config.model_type == "mistral_cg":
-            print("  [Distillation] WARNING: distill_from_mistral with model_type=mistral_cg "
+        if config.model_type in ("mistral_cg", "mistral_hybrid"):
+            print(f"  [Distillation] WARNING: distill_from_mistral with model_type={config.model_type} "
                   "is redundant — Mistral is already the backbone. Skipping teacher.")
         else:
             from symbolu.training.unified.mistral_teacher import MistralTeacher
@@ -5928,8 +5928,8 @@ def train(config: UnifiedTrainingConfig):
                     if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
 
-                    # Mistral CG adapter diagnostics: gate value, adapter output norm, state norm
-                    if config.model_type == "mistral_cg":
+                    # Mistral adapter diagnostics: gate value, adapter output norm, state norm
+                    if config.model_type in ("mistral_cg", "mistral_hybrid"):
                         _cg_model = getattr(model, 'module', model)  # unwrap DDP
                         if hasattr(_cg_model, 'adapter_gate'):
                             _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
@@ -7745,13 +7745,14 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg", "mistral_hybrid"],
                        help="Model architecture type (standard = O(n²) baseline, "
                             "gct = Gated Coherence Transformer [pre-softmax coherence routing], "
                             "ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
                             "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State], "
-                            "mistral_cg = Frozen Mistral backbone + trainable CG modules)")
+                            "mistral_cg = Frozen Mistral backbone + trainable CG modules, "
+                            "mistral_hybrid = Frozen Mistral backbone + trainable Phase layers [no CG])")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -8213,6 +8214,12 @@ def main():
                        help="Trust remote code when loading Mistral model")
     parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
                        help="Hidden dimension for phase-conditioned adapter MLP")
+
+    # Mistral Hybrid Wrapper (--model_type mistral_hybrid)
+    parser.add_argument("--mistral_hybrid_num_phase_layers", type=int, default=4,
+                       help="Number of Phase attention layers on top of Mistral backbone")
+    parser.add_argument("--mistral_hybrid_local_layers", type=int, default=2,
+                       help="First N Phase layers use local attention only (rest are hybrid)")
 
     # Knowledge Distillation from Mistral
     parser.add_argument("--distill_from_mistral", action="store_true",
