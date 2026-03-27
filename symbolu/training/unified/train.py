@@ -5953,6 +5953,50 @@ def train(config: UnifiedTrainingConfig):
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
 
+                    # Phase layer training metrics (mistral_hybrid specific)
+                    if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):
+                        _ph_corr = outputs.get('phase_correction_norm', 0.0)
+                        _ph_rel = outputs.get('phase_relative_correction', 0.0)
+                        _ph_cos = outputs.get('phase_cosine_sim', 0.0)
+                        metrics['phase_correction_norm'] = _ph_corr
+                        metrics['phase_relative_correction'] = _ph_rel
+                        metrics['phase_cosine_sim'] = _ph_cos
+                        log_msg += f" | PhCorr:{_ph_corr:.4f} Rel:{_ph_rel:.4f} Cos:{_ph_cos:.3f}"
+                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                            writer.add_scalar('phase/correction_norm', _ph_corr, global_step)
+                            writer.add_scalar('phase/relative_correction', _ph_rel, global_step)
+                            writer.add_scalar('phase/cosine_similarity', _ph_cos, global_step)
+
+                        # Phase PPL delta: measure every phase_ppl_delta_interval steps
+                        _ppl_interval = getattr(config, 'phase_ppl_delta_interval', 500)
+                        if _ppl_interval > 0 and global_step % _ppl_interval == 0 and global_step > 0:
+                            # Re-run forward with measure_phase_delta=True to get backbone logits
+                            with torch.no_grad():
+                                _delta_out = model(x, attention_mask=None, measure_phase_delta=True)
+                            if 'backbone_logits' in _delta_out:
+                                import torch.nn.functional as F
+                                _bb_logits = _delta_out['backbone_logits']
+                                _ph_logits = _delta_out['logits']
+                                # Compute per-token CE loss for both
+                                _shift_bb = _bb_logits[:, :-1, :].contiguous().view(-1, _bb_logits.size(-1))
+                                _shift_ph = _ph_logits[:, :-1, :].contiguous().view(-1, _ph_logits.size(-1))
+                                _shift_y = y[:, 1:].contiguous().view(-1)
+                                _bb_ce = F.cross_entropy(_shift_bb, _shift_y, reduction='mean')
+                                _ph_ce = F.cross_entropy(_shift_ph, _shift_y, reduction='mean')
+                                _bb_ppl = _bb_ce.exp().item()
+                                _ph_ppl = _ph_ce.exp().item()
+                                _ppl_delta = _bb_ppl - _ph_ppl  # positive = Phase helps
+                                metrics['backbone_ppl'] = _bb_ppl
+                                metrics['phase_ppl'] = _ph_ppl
+                                metrics['phase_ppl_delta'] = _ppl_delta
+                                _delta_pct = 100.0 * _ppl_delta / max(_bb_ppl, 1e-8)
+                                print(f"  [Phase PPL] backbone={_bb_ppl:.2f} | +phase={_ph_ppl:.2f} | "
+                                      f"delta={_ppl_delta:+.2f} ({_delta_pct:+.1f}%)")
+                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                    writer.add_scalar('phase/backbone_ppl', _bb_ppl, global_step)
+                                    writer.add_scalar('phase/adapted_ppl', _ph_ppl, global_step)
+                                    writer.add_scalar('phase/ppl_delta', _ppl_delta, global_step)
+
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
                     if friction_alignment != 0.0 or friction_dominance != 1.0:
                         # Color-code alignment
@@ -8220,6 +8264,8 @@ def main():
                        help="Number of Phase attention layers on top of Mistral backbone")
     parser.add_argument("--mistral_hybrid_local_layers", type=int, default=2,
                        help="First N Phase layers use local attention only (rest are hybrid)")
+    parser.add_argument("--phase_ppl_delta_interval", type=int, default=500,
+                       help="Steps between Phase PPL delta measurement (0=disable)")
 
     # Knowledge Distillation from Mistral
     parser.add_argument("--distill_from_mistral", action="store_true",

@@ -1088,6 +1088,7 @@ class UnifiedTrainingConfig:
     # ==========================================================================
     mistral_hybrid_num_phase_layers: int = 4                # Number of Phase layers on top of Mistral
     mistral_hybrid_local_layers: int = 2                    # First N Phase layers use local attention only
+    phase_ppl_delta_interval: int = 500                     # Steps between Phase PPL delta measurement (0=off)
 
     # ==========================================================================
     # Knowledge Distillation from Mistral Teacher

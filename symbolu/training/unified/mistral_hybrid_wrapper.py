@@ -263,7 +263,11 @@ class MistralHybridWrapper(nn.Module):
             - 'last_hidden_state': [B, T, D] (if return_last_hidden=True)
             - 'hidden_states': list (if return_hidden=True)
             - 'decorr_loss': scalar (if return_decorr_loss=True)
+            - 'phase_correction_norm': scalar (Phase output magnitude)
+            - 'phase_cosine_sim': scalar (cosine similarity of Phase correction to hidden)
+            - 'backbone_logits': [B, T, V] (if measure_phase_delta=True)
         """
+        measure_phase_delta = kwargs.get('measure_phase_delta', False)
         # ── Pass through frozen Mistral backbone ─────────────────────
         with torch.no_grad():
             backbone_out = self.backbone(
@@ -306,7 +310,22 @@ class MistralHybridWrapper(nn.Module):
 
         # Gated residual addition
         gate = torch.sigmoid(self.adapter_gate)
-        adapted_hidden = hidden + gate * phase_correction  # [B, T, D]
+        gated_correction = gate * phase_correction
+        adapted_hidden = hidden + gated_correction  # [B, T, D]
+
+        # ── Phase-specific training metrics ──────────────────────────
+        with torch.no_grad():
+            # How much Phase is changing the hidden states (absolute magnitude)
+            _corr_norm = gated_correction.norm(dim=-1).mean().item()
+            _hidden_norm = hidden.norm(dim=-1).mean().item()
+            # Relative correction: ratio of Phase correction to backbone hidden
+            _relative_correction = _corr_norm / max(_hidden_norm, 1e-8)
+            # Cosine similarity: is Phase pushing in same or orthogonal direction?
+            _cos_sim = torch.nn.functional.cosine_similarity(
+                gated_correction.reshape(-1, D),
+                hidden.reshape(-1, D),
+                dim=-1,
+            ).mean().item()
 
         # ── Compute logits through Mistral's LM head (frozen) ────────
         if hasattr(self.backbone, 'lm_head'):
@@ -319,7 +338,21 @@ class MistralHybridWrapper(nn.Module):
         result = {
             'logits': logits,
             'adapter_gate': gate.item() if isinstance(gate, torch.Tensor) else gate,
+            # Phase-specific metrics (always available, zero overhead)
+            'phase_correction_norm': _corr_norm,
+            'phase_relative_correction': _relative_correction,
+            'phase_cosine_sim': _cos_sim,
         }
+
+        # ── Optional: Phase PPL delta measurement ────────────────────
+        # When measure_phase_delta=True, also return backbone-only logits
+        # so the training loop can compute PPL_backbone vs PPL_phase
+        if measure_phase_delta:
+            with torch.no_grad():
+                if hasattr(self.backbone, 'lm_head'):
+                    result['backbone_logits'] = self.backbone.lm_head(hidden)
+                else:
+                    result['backbone_logits'] = backbone_out.logits
 
         if hidden_states is not None:
             result['hidden_states'] = hidden_states
