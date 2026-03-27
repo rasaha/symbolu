@@ -33,7 +33,7 @@ from torch.utils.checkpoint import checkpoint as torch_checkpoint
 
 from symbolu.phase_transformer import (
     TransformerConfig,
-    HybridBlock,
+    HybridTransformerBlock,
     LocalTransformerBlock,
 )
 
@@ -126,7 +126,7 @@ class MistralHybridWrapper(nn.Module):
             else:
                 # Later phase layers: Hybrid (Local + Phase) attention
                 self.phase_blocks.append(
-                    HybridBlock(
+                    HybridTransformerBlock(
                         phase_config,
                         window_size=window_size,
                         local_backend=local_backend,
@@ -149,6 +149,12 @@ class MistralHybridWrapper(nn.Module):
         )
         nn.init.zeros_(self.phase_output_proj[-1].weight)
         nn.init.zeros_(self.phase_output_proj[-1].bias)
+
+        # Output norm: re-normalize after Phase correction before LM head.
+        # Backbone's hidden_states[-1] is already post-norm, but Phase layers
+        # shift the distribution.  Without this, lm_head sees un-normalized
+        # inputs → logit scale drift → unstable training.
+        self.output_norm = nn.LayerNorm(self.mistral_hidden_dim)
 
         # Adapter gate (learnable scalar)
         # sigmoid(-2) ≈ 0.12: starts with minimal Phase influence
@@ -280,6 +286,17 @@ class MistralHybridWrapper(nn.Module):
         hidden = backbone_out.hidden_states[-1]  # [B, T, D_mistral]
         B, T, D = hidden.shape
 
+        # ── Ensure Phase layers are on same device as backbone output ─
+        # With device_map="auto", backbone output may be on any GPU.
+        # Move Phase layers to match on first forward pass.
+        if hidden.device != self.phase_input_norm.weight.device:
+            target_device = hidden.device
+            self.phase_input_norm = self.phase_input_norm.to(target_device)
+            self.phase_blocks = self.phase_blocks.to(target_device)
+            self.phase_output_proj = self.phase_output_proj.to(target_device)
+            self.output_norm = self.output_norm.to(target_device)
+            self.adapter_gate = nn.Parameter(self.adapter_gate.data.to(target_device))
+
         # ── Trainable Phase attention layers ─────────────────────────
         phase_input = self.phase_input_norm(hidden)
 
@@ -327,9 +344,13 @@ class MistralHybridWrapper(nn.Module):
                 dim=-1,
             ).mean().item()
 
-        # ── Compute logits through Mistral's LM head (frozen) ────────
+        # ── Re-normalize then compute logits via Mistral's LM head ────
+        # Backbone hidden_states[-1] is post-norm, but Phase correction
+        # shifts the distribution.  Re-normalize so lm_head sees stable input.
+        normed_hidden = self.output_norm(adapted_hidden)
+
         if hasattr(self.backbone, 'lm_head'):
-            logits = self.backbone.lm_head(adapted_hidden)  # [B, T, V]
+            logits = self.backbone.lm_head(normed_hidden)  # [B, T, V]
         else:
             # Fallback: use backbone's own logits (no Phase adaptation)
             logits = backbone_out.logits
@@ -358,7 +379,7 @@ class MistralHybridWrapper(nn.Module):
             result['hidden_states'] = hidden_states
 
         if return_last_hidden:
-            result['last_hidden_state'] = adapted_hidden
+            result['last_hidden_state'] = normed_hidden
 
         if return_decorr_loss and decorr_losses:
             result['decorr_loss'] = torch.stack(decorr_losses).mean()
@@ -389,6 +410,7 @@ class MistralHybridWrapper(nn.Module):
             ("phase_blocks", self.phase_blocks),
             ("phase_input_norm", self.phase_input_norm),
             ("phase_output_proj", self.phase_output_proj),
+            ("output_norm", self.output_norm),
         ]:
             params = sum(p.numel() for p in module.parameters())
             print(f"      {name}: {params/1e3:.1f}K params")

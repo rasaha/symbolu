@@ -2882,7 +2882,7 @@ def train(config: UnifiedTrainingConfig):
                 enable_decorr = (
                     hasattr(config, 'decorr_loss_weight') and
                     config.decorr_loss_weight > 0 and
-                    config.model_type in ('hybrid', 'ontological_hybrid')
+                    config.model_type in ('hybrid', 'ontological_hybrid', 'mistral_hybrid')
                 )
 
                 # V10.2.2: Chunked training for long sequences
