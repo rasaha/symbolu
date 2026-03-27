@@ -12,16 +12,23 @@ to FSCS (Frequency-Stratified Coherence Scoring) where different layers of
 the signal carry different kinds of error, and loss at one frequency
 resonates into others.
 
-Loss Bands:
-    - Semantic band (high frequency): token-level prediction error
-    - Temporal band (mid frequency): sequence-level coherence error
-    - Somatic band (low frequency): global state consistency error
+Loss Bands (explicit decomposition):
+    L_token  = CE(logits, targets)               — semantic (high freq)
+    L_temporal = ||smooth(h_t) - smooth(h_{t+1})||^2  — temporal (mid freq)
+    L_coherence = 1 - cos(band_i, band_j)         — somatic (low freq)
 
-Cross-Frequency Coupling:
-    L_experiential = Σ_b w_b * L_b + λ_cross * Σ_{i≠j} C(L_i, L_j)
+Total:
+    L_exp = w_s * L_semantic + w_t * L_temporal + w_c * L_somatic
+          + λ_cross * Σ_{i≠j} C(L_i, L_j)
+          + λ_latent * L_latent_alignment
 
-Where C(L_i, L_j) is a learned coupling function that forces error in one
-band to resonate into others, preventing isolated optimization.
+Where C(L_i, L_j) is a low-rank bilinear coupling that forces error in one
+band to resonate into others, and L_latent_alignment integrates feedback
+from the model's coherence/latent state (CSR alignment).
+
+State Feedback: The loss accepts optional coherence_state input from the
+existing chitta-vritti / coherence pipeline, closing the feedback loop
+between state estimation and loss computation.
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
@@ -56,6 +63,7 @@ class ExperientialLossConfig:
     coupling_rank: int = 16
     interference_decay: float = 0.9
     min_loss_texture: float = 1e-4
+    latent_alignment_weight: float = 0.1
 
 
 class FrequencyBandProjector(nn.Module):
@@ -216,6 +224,14 @@ class ExperientialLossSignal(nn.Module):
             "somatic": config.somatic_weight,
         }
 
+        # Latent alignment projection (state feedback)
+        d_band = config.d_model // config.num_bands
+        self.latent_alignment_proj = nn.Sequential(
+            nn.Linear(config.d_model, d_band),
+            nn.GELU(),
+            nn.Linear(d_band, d_band),
+        )
+
         # Running interference history (for temporal texture)
         self.register_buffer(
             "interference_ema",
@@ -227,6 +243,7 @@ class ExperientialLossSignal(nn.Module):
         hidden: torch.Tensor,
         target_hidden: torch.Tensor,
         base_loss: Optional[torch.Tensor] = None,
+        coherence_state: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """Compute experiential loss across frequency bands.
 
@@ -234,6 +251,9 @@ class ExperientialLossSignal(nn.Module):
             hidden: [B, T, D] predicted hidden states
             target_hidden: [B, T, D] target hidden states (or shifted)
             base_loss: Optional scalar base loss to modulate
+            coherence_state: Optional [B, T, D] or [B, D] latent state from
+                coherence/CSR pipeline. Closes the feedback loop between
+                state estimation and loss computation.
 
         Returns:
             Dict with:
@@ -242,6 +262,7 @@ class ExperientialLossSignal(nn.Module):
                 'coupling_losses': {pair: scalar} cross-band coupling losses
                 'loss_texture': [num_bands] per-band loss magnitudes
                 'interference_magnitude': scalar cross-band interference
+                'latent_alignment_loss': scalar latent alignment loss
         """
         # Compute error signal (difference between predicted and target)
         error = hidden - target_hidden  # [B, T, D]
@@ -281,8 +302,26 @@ class ExperientialLossSignal(nn.Module):
             for name in self.BAND_NAMES
         )
 
+        # Latent alignment loss (state feedback from coherence pipeline)
+        latent_alignment_loss = torch.tensor(0.0, device=hidden.device)
+        if coherence_state is not None:
+            # Project coherence state and compare with somatic band
+            if coherence_state.dim() == 2:
+                # [B, D] -> [B, 1, D] -> expand
+                coherence_state = coherence_state.unsqueeze(1).expand_as(hidden)
+            latent_proj = self.latent_alignment_proj(coherence_state)
+            somatic_repr = band_reprs["somatic"]
+            # Alignment: somatic error should agree with coherence state
+            latent_alignment_loss = (1.0 - torch.cosine_similarity(
+                latent_proj, somatic_repr, dim=-1
+            )).mean()
+
         # Total experiential loss
-        total_loss = total_band_loss + self.config.coupling_lambda * total_coupling
+        total_loss = (
+            total_band_loss
+            + self.config.coupling_lambda * total_coupling
+            + self.config.latent_alignment_weight * latent_alignment_loss
+        )
 
         # Add base loss modulation if provided
         if base_loss is not None:
@@ -307,4 +346,5 @@ class ExperientialLossSignal(nn.Module):
             "loss_texture": texture_tensor,
             "interference_magnitude": total_coupling.detach(),
             "interference_ema": self.interference_ema.clone(),
+            "latent_alignment_loss": latent_alignment_loss.detach(),
         }

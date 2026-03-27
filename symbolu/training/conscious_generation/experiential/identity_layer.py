@@ -8,19 +8,20 @@ update who they understand themselves to be. For AI to have this analog:
     2. The self-model must be updatable by experience (not fixed)
     3. High-loss events must restructure the self-model, not just task performance
 
+CRITICAL DESIGN CHOICE: Identity is NOT updated on every training step.
+Identity = EMA of high-salience stable patterns, updated ONLY during
+the slow consolidation phase. This prevents:
+    - Reactive identity shifts from single-step noise
+    - Instability from step-driven updates
+    - Loss of identity coherence during active training
+
 Maps to the 12-layer ontological architecture:
     - Layers 0-3 (Surface): Task weights, freely updatable
     - Layers 4-7 (Mid): Identity structures, reorganizable by profound errors
     - Layers 8-11 (Deep): Potential/Absolute, nearly immutable
 
-The identity layer maintains:
-    - Self-representation: "who the system understands itself to be"
-    - Update threshold: how much error is needed to revise self-model
-    - Identity coherence: consistency of self-representation across contexts
-    - Transformation record: history of identity-level changes
-
-Some weights ARE identity, and identity should be hard but not impossible
-to restructure.
+Time scale: Identity operates on the SLOW loop (every M >> N steps),
+not the fast (every step) or medium (every N steps) loop.
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
@@ -50,6 +51,7 @@ class IdentityLayerConfig:
         identity_lr_scale: Learning rate multiplier for identity updates
         deep_lr_scale: Learning rate multiplier for deep layer updates
         coherence_weight: Weight for identity coherence loss
+        identity_ema_decay: EMA decay for identity accumulation (high = slow)
         max_transformation_history: Max identity changes to remember
     """
     d_model: int = 128
@@ -63,81 +65,70 @@ class IdentityLayerConfig:
     identity_lr_scale: float = 0.1
     deep_lr_scale: float = 0.01
     coherence_weight: float = 0.5
+    identity_ema_decay: float = 0.99
     max_transformation_history: int = 100
 
 
 class SelfModel(nn.Module):
-    """Persistent self-representation.
+    """Persistent self-representation updated via EMA.
 
     The self-model is a learned vector that represents the system's
-    understanding of itself — its competencies, biases, reliable patterns,
-    and known failure modes. It is separate from task weights and updated
-    only by significant experiential events.
+    understanding of itself. It is NOT in the gradient path during
+    regular training. Instead, it accumulates experience signals via
+    EMA and is revised only during consolidation phases.
 
     Architecture:
-        self_repr: [d_identity] — persistent identity vector
+        self_repr: [d_identity] — persistent identity vector (EMA-updated)
+        identity_accumulator: [d_identity] — running EMA of high-salience signals
         context_adapter: maps task state -> identity-relevant features
-        update_gate: decides whether an experience warrants self-revision
     """
 
-    def __init__(self, d_model: int, d_identity: int):
+    def __init__(self, d_model: int, d_identity: int, ema_decay: float = 0.99):
         super().__init__()
         self.d_identity = d_identity
+        self.ema_decay = ema_decay
 
-        # Core self-representation (persistent, rarely updated)
-        self.self_repr = nn.Parameter(torch.randn(d_identity) * 0.01)
+        # Core self-representation (NOT in gradient path for regular training)
+        self.register_buffer(
+            "self_repr", torch.randn(d_identity) * 0.01
+        )
 
-        # Maps task hidden state to identity-relevant features
+        # EMA accumulator for identity-relevant signals
+        self.register_buffer(
+            "identity_accumulator", torch.zeros(d_identity)
+        )
+
+        # Count of accumulated signals (for normalization)
+        self.register_buffer(
+            "accumulator_count", torch.tensor(0, dtype=torch.long)
+        )
+
+        # Maps task hidden state to identity-relevant features (this IS trainable)
         self.context_adapter = nn.Sequential(
             nn.Linear(d_model, d_identity),
             nn.Tanh(),
         )
 
-        # Update gate: decides if experience warrants self-revision
-        self.update_gate = nn.Sequential(
-            nn.Linear(d_identity * 2, d_identity),
-            nn.GELU(),
-            nn.Linear(d_identity, 1),
-            nn.Sigmoid(),
-        )
+    def forward(self, experience: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Project experience into identity space and measure coherence.
 
-        # Proposed revision network
-        self.revision_net = nn.Sequential(
-            nn.Linear(d_identity * 2, d_identity),
-            nn.GELU(),
-            nn.Linear(d_identity, d_identity),
-            nn.Tanh(),
-        )
-
-    def forward(
-        self, experience: torch.Tensor, error_magnitude: float
-    ) -> Dict[str, torch.Tensor]:
-        """Process an experience and potentially revise self-model.
+        This does NOT update the self-model. It only computes how the
+        current experience relates to the existing identity.
 
         Args:
-            experience: [B, D] experience representation (from error signal)
-            error_magnitude: scalar magnitude of the triggering error
+            experience: [B, D] experience representation
 
         Returns:
             Dict with:
-                'self_repr': Current self-representation
+                'self_repr': Current self-representation (detached)
                 'identity_features': Experience projected to identity space
-                'update_gate': Whether to revise self-model
-                'proposed_revision': What the revision would be
-                'identity_coherence': How coherent the self-model is
+                'identity_coherence': How coherent self-model is with experience
         """
         # Project experience to identity space
         identity_features = self.context_adapter(experience)  # [B, d_identity]
 
         # Compare with current self-model
         self_expanded = self.self_repr.unsqueeze(0).expand_as(identity_features)
-        combined = torch.cat([self_expanded, identity_features], dim=-1)
-
-        # Gate: should we update?
-        gate_value = self.update_gate(combined)  # [B, 1]
-
-        # Proposed revision
-        proposed = self.revision_net(combined)  # [B, d_identity]
 
         # Identity coherence: how consistent is self-repr with current experience?
         coherence = torch.cosine_similarity(
@@ -147,27 +138,59 @@ class SelfModel(nn.Module):
         return {
             "self_repr": self.self_repr,
             "identity_features": identity_features,
-            "update_gate": gate_value,
-            "proposed_revision": proposed,
             "identity_coherence": coherence,
         }
 
-    def apply_revision(self, revision: torch.Tensor, gate: float) -> None:
-        """Apply a revision to the self-model.
+    def accumulate(self, identity_signal: torch.Tensor, salience: float) -> None:
+        """Accumulate a high-salience identity signal into the EMA buffer.
+
+        Called during fast loop, but does NOT modify self_repr.
+        Signals are only integrated into identity during consolidation.
 
         Args:
-            revision: [d_identity] proposed revision direction
-            gate: Gate value (how much to apply)
+            identity_signal: [d_identity] identity-projected experience
+            salience: Salience weight of this signal
         """
         with torch.no_grad():
-            # Soft update: blend current self with revision
-            self.self_repr.data = (
-                (1 - gate) * self.self_repr.data + gate * revision
+            weighted_signal = identity_signal.detach() * salience
+            self.identity_accumulator.mul_(self.ema_decay).add_(
+                weighted_signal * (1 - self.ema_decay)
             )
-            # Re-normalize to prevent drift
-            self.self_repr.data = torch.nn.functional.normalize(
-                self.self_repr.data, dim=0
-            ) * (self.d_identity ** 0.5)
+            self.accumulator_count += 1
+
+    def consolidate_identity(self, revision_rate: float = 0.01) -> bool:
+        """Apply accumulated EMA signals to revise self-model.
+
+        Called ONLY during consolidation phase (slow loop).
+        This is the only place self_repr actually changes.
+
+        Args:
+            revision_rate: How much to blend accumulator into self_repr
+
+        Returns:
+            Whether a revision was applied
+        """
+        if self.accumulator_count.item() == 0:
+            return False
+
+        with torch.no_grad():
+            # Blend accumulated signal into self-repr
+            revision = self.identity_accumulator
+            if revision.norm() > 1e-6:
+                self.self_repr.mul_(1.0 - revision_rate).add_(
+                    revision * revision_rate
+                )
+                # Re-normalize to prevent drift
+                self.self_repr.copy_(
+                    torch.nn.functional.normalize(self.self_repr, dim=0)
+                    * (self.d_identity ** 0.5)
+                )
+                # Reset accumulator
+                self.identity_accumulator.zero_()
+                self.accumulator_count.zero_()
+                return True
+
+        return False
 
 
 class OntologicalDepthGate(nn.Module):
@@ -230,18 +253,17 @@ class OntologicalDepthGate(nn.Module):
 
 
 class IdentityLayer(nn.Module):
-    """Complete identity layer for experiential learning.
+    """Complete identity layer with EMA-based consolidation-only updates.
 
-    Orchestrates:
-        1. Self-model maintenance and revision
-        2. Ontological depth gating
-        3. Identity coherence enforcement
-        4. Transformation history tracking
+    Key design: Identity is NOT updated during regular training steps.
+    Instead:
+        - Fast loop: Compute coherence, accumulate signals into EMA buffer
+        - Slow loop (consolidation only): Apply EMA to revise self-model
 
-    The identity layer sits alongside the main model and gates how
-    experiences restructure different depths of the model. Surface
-    tasks update freely; identity-level restructuring requires
-    earning the right through sufficient error magnitude.
+    This ensures identity is:
+        - Slow-changing (integrated over many experiences)
+        - Noise-resistant (EMA filters single-step outliers)
+        - Stable (no reactive step-driven updates)
 
     Args:
         config: IdentityLayerConfig
@@ -251,11 +273,10 @@ class IdentityLayer(nn.Module):
         super().__init__()
         self.config = config
 
-        self.self_model = SelfModel(config.d_model, config.d_identity)
+        self.self_model = SelfModel(
+            config.d_model, config.d_identity, config.identity_ema_decay
+        )
         self.depth_gate = OntologicalDepthGate(config)
-
-        # Identity coherence loss: self-model should be consistent
-        self.coherence_proj = nn.Linear(config.d_identity, config.d_identity)
 
         # Transformation history
         self.transformation_history: List[Dict] = []
@@ -270,7 +291,9 @@ class IdentityLayer(nn.Module):
         error_per_layer: torch.Tensor,
         salience: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
-        """Process experience through identity layer.
+        """Fast-loop: compute layer gates, measure coherence, accumulate signals.
+
+        Does NOT revise identity. Only accumulates into EMA buffer.
 
         Args:
             experience: [B, D] experience representation
@@ -281,52 +304,29 @@ class IdentityLayer(nn.Module):
             Dict with:
                 'layer_gates': [num_layers] per-layer update permissions
                 'identity_coherence': scalar coherence of self-model
-                'self_revision_gate': whether self-model should be revised
                 'identity_loss': coherence loss for training
-                'transformation_triggered': whether identity changed
+                'transformation_triggered': always False in fast loop
         """
-        # Compute mean error magnitude for self-model gating
+        # Compute mean error magnitude
         if error_per_layer.dim() == 1:
             error_magnitudes = error_per_layer
         else:
             error_magnitudes = error_per_layer.mean(dim=0)
 
-        mean_error = error_magnitudes.mean().item()
-
-        # Process through self-model
-        self_output = self.self_model(experience, mean_error)
+        # Process through self-model (read-only, no revision)
+        self_output = self.self_model(experience)
 
         # Compute per-layer gates
         layer_gates = self.depth_gate.compute_layer_gates(error_magnitudes)
 
-        # Identity coherence loss
-        projected_self = self.coherence_proj(self_output["self_repr"])
+        # Identity coherence loss (trainable — affects context_adapter only)
         coherence_loss = (1.0 - self_output["identity_coherence"]) * self.config.coherence_weight
 
-        # Determine if identity revision should be applied
-        revision_gate = self_output["update_gate"].mean().item()
-        transformation_triggered = False
-
-        if mean_error >= self.config.identity_threshold and revision_gate > 0.5:
-            # Apply identity revision
-            proposed = self_output["proposed_revision"].mean(dim=0)
-            self.self_model.apply_revision(proposed, revision_gate * 0.1)
-            self.identity_updates += 1
-            transformation_triggered = True
-
-            # Record transformation
-            if len(self.transformation_history) < self.config.max_transformation_history:
-                self.transformation_history.append({
-                    "step": self.identity_updates.item(),
-                    "error_magnitude": mean_error,
-                    "revision_gate": revision_gate,
-                    "coherence_before": self_output["identity_coherence"].item(),
-                })
-
-            logger.info(
-                f"Identity transformation #{self.identity_updates.item()}: "
-                f"error={mean_error:.4f}, gate={revision_gate:.4f}"
-            )
+        # Accumulate high-salience signals into EMA buffer
+        mean_salience = salience.mean().item() if salience is not None else 0.5
+        if mean_salience > 0.3:  # Only accumulate noteworthy experiences
+            mean_features = self_output["identity_features"].mean(dim=0)
+            self.self_model.accumulate(mean_features, mean_salience)
 
         # Track deep layer updates
         if error_magnitudes.dim() == 1:
@@ -340,12 +340,42 @@ class IdentityLayer(nn.Module):
         return {
             "layer_gates": layer_gates,
             "identity_coherence": self_output["identity_coherence"],
-            "self_revision_gate": self_output["update_gate"],
+            "self_revision_gate": torch.tensor(0.0),  # No revision in fast loop
             "identity_loss": coherence_loss,
-            "transformation_triggered": transformation_triggered,
+            "transformation_triggered": False,
             "self_repr": self_output["self_repr"].detach(),
-            "proposed_revision": self_output["proposed_revision"],
+            "proposed_revision": self_output["identity_features"],  # For diagnostics
         }
+
+    def consolidate(self) -> bool:
+        """Slow-loop: apply accumulated EMA to revise self-model.
+
+        Called ONLY during consolidation phase, not every step.
+
+        Returns:
+            Whether identity was revised
+        """
+        revised = self.self_model.consolidate_identity(revision_rate=0.01)
+
+        if revised:
+            self.identity_updates += 1
+            coherence = torch.cosine_similarity(
+                self.self_model.self_repr.unsqueeze(0),
+                self.self_model.identity_accumulator.unsqueeze(0),
+                dim=-1,
+            ).item() if self.self_model.identity_accumulator.norm() > 1e-6 else 1.0
+
+            if len(self.transformation_history) < self.config.max_transformation_history:
+                self.transformation_history.append({
+                    "step": self.identity_updates.item(),
+                    "accumulated_signals": self.self_model.accumulator_count.item(),
+                })
+
+            logger.info(
+                f"Identity consolidation #{self.identity_updates.item()}"
+            )
+
+        return revised
 
     def get_identity_state(self) -> Dict[str, object]:
         """Get identity state for diagnostics."""
@@ -354,5 +384,6 @@ class IdentityLayer(nn.Module):
             "identity_updates": self.identity_updates.item(),
             "deep_updates": self.deep_updates.item(),
             "transformation_count": len(self.transformation_history),
+            "accumulator_count": self.self_model.accumulator_count.item(),
             "recent_transformations": self.transformation_history[-5:],
         }

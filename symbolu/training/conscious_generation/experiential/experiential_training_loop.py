@@ -1,27 +1,30 @@
 """
 ExperientialTrainingLoop: Orchestrator for experiential CG training.
 
-Unifies all five experiential learning analogs into a single training
-loop that processes each batch through the complete experiential pipeline:
+Explicit time-scale separation:
 
-    Input -> Prediction
-         |
-    Error Signal (multi-modal via ExperientialLossSignal)
-         |
-    Salience Gate (via SalienceWeighter — is this consequential?)
-         |
-    Vritti Resistance Field (via VrittiResistanceGate — resist this update?)
-         |
-    If resistance overcome -> propagate to identity layer
-    If resistance holds -> queue for offline consolidation
-         |
-    Offline Cycle (via OfflineConsolidationCycle — sleep analog)
-         |
-    Emergent reorganization — self-model revision via IdentityLayer
+    FAST loop (every step):
+        1. Compute multi-modal experiential loss (L_token + L_temporal + L_coherence)
+        2. Compute salience (independent signal)
+        3. Compute resistance (independent signal)
+        4. Apply: g_eff = clamp(salience * resistance_openness, 0, max_gain) * g
+        5. Accumulate high-salience signals into identity EMA buffer
 
-This is not one paper. This is a research program. But the components
-are individually tractable and several are present in the existing
-patent portfolio in nascent form.
+    MEDIUM loop (every N steps):
+        1. Replay high-salience deferred samples
+        2. Prune stale/low-salience entries from buffer
+
+    SLOW loop (every M >> N steps):
+        1. Consolidate identity (apply EMA to self-model)
+
+Stability constraints:
+    - Bounded gain: plasticity clamped to [0, max_gain]
+    - EMA damping on resistance: prevents discontinuous state changes
+    - No binary branching: all updates flow through continuous scaling
+    - Identity updates only via EMA consolidation (no step-driven revision)
+
+Salience and resistance are INDEPENDENT signals composed multiplicatively.
+Neither determines the other.
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
@@ -70,7 +73,9 @@ class ExperientialTrainingConfig:
         enable_identity: Enable identity layer
         experiential_loss_weight: Weight for experiential loss component
         identity_loss_weight: Weight for identity coherence loss
-        consolidation_interval: Steps between consolidation cycles
+        consolidation_interval: Steps between medium-loop consolidation
+        identity_interval: Steps between slow-loop identity consolidation
+        max_gain: Maximum plasticity gain (stability constraint)
         log_interval: Steps between detailed logging
     """
     d_model: int = 128
@@ -83,28 +88,29 @@ class ExperientialTrainingConfig:
     experiential_loss_weight: float = 0.1
     identity_loss_weight: float = 0.05
     consolidation_interval: int = 100
+    identity_interval: int = 1000
+    max_gain: float = 3.0
     log_interval: int = 50
 
 
 class ExperientialTrainingLoop(nn.Module):
-    """Complete experiential training orchestrator.
+    """Complete experiential training with explicit time-scale separation.
 
-    Wires together all five experiential analogs into a coherent
-    training pipeline. Each training step:
+    Three nested loops:
 
-    1. Compute multi-modal experiential loss (embodiment analog)
-    2. Estimate salience of errors (consequence modeling)
-    3. Gate updates through vritti resistance field
-    4. Route high-stakes updates to identity layer
-    5. Queue blocked updates for consolidation
-    6. Periodically run offline consolidation
+    FAST (every step):
+        loss -> salience -> resistance -> g_eff = s * r * g
+        (continuous scaling, no branching)
 
-    The result is a training process where the system:
-    - Resists easy updates (vritti resistance)
-    - Consolidates offline (sleep analog)
-    - Weights errors by consequence (salience)
-    - Can restructure its self-model (identity)
-    - Experiences loss as textured, not scalar (embodiment)
+    MEDIUM (every N steps):
+        replay deferred + prune stale
+
+    SLOW (every M >> N steps):
+        identity EMA consolidation
+
+    Salience and resistance are INDEPENDENT signals composed as:
+        plasticity = salience * resistance_openness
+        g_eff = clamp(plasticity, 0, max_gain) * g
 
     Args:
         config: ExperientialTrainingConfig
@@ -117,12 +123,10 @@ class ExperientialTrainingLoop(nn.Module):
         # 1. Multi-modal experiential loss
         if config.enable_experiential_loss:
             self.experiential_loss = ExperientialLossSignal(
-                ExperientialLossConfig(
-                    d_model=config.d_model,
-                )
+                ExperientialLossConfig(d_model=config.d_model)
             )
 
-        # 2. Salience weighting
+        # 2. Salience weighting (independent signal)
         if config.enable_salience:
             self.salience_weighter = SalienceWeighter(
                 SalienceConfig(
@@ -131,26 +135,28 @@ class ExperientialTrainingLoop(nn.Module):
                 )
             )
 
-        # 3. Vritti resistance gate
+        # 3. Vritti resistance gate (independent signal, continuous)
         if config.enable_resistance_gate:
             self.resistance_gate = VrittiResistanceGate(
                 VrittiResistanceConfig(
                     d_model=config.d_model,
                     num_regions=config.num_regions,
+                    max_gain=config.max_gain,
                 )
             )
 
-        # 4. Offline consolidation
+        # 4. Offline consolidation (medium + slow loop)
         if config.enable_consolidation:
             self.consolidation = OfflineConsolidationCycle(
                 ConsolidationConfig(
                     d_model=config.d_model,
                     num_regions=config.num_regions,
                     consolidation_interval=config.consolidation_interval,
+                    identity_interval=config.identity_interval,
                 )
             )
 
-        # 5. Identity layer
+        # 5. Identity layer (accumulates in fast loop, consolidates in slow loop)
         if config.enable_identity:
             self.identity_layer = IdentityLayer(
                 IdentityLayerConfig(
@@ -168,26 +174,20 @@ class ExperientialTrainingLoop(nn.Module):
         target_hidden: torch.Tensor,
         region_states: Optional[torch.Tensor] = None,
         base_loss: Optional[torch.Tensor] = None,
-        layer_states: Optional[List[torch.Tensor]] = None,
+        coherence_state: Optional[torch.Tensor] = None,
     ) -> Dict[str, Any]:
-        """Run one experiential training step.
+        """Run one experiential training step (fast loop + conditionally medium/slow).
 
         Args:
             hidden: [B, T, D] predicted hidden states
             target_hidden: [B, T, D] target hidden states
-            region_states: Optional [B, num_regions, D] per-region states.
-                           If None, derived from hidden by chunking.
+            region_states: Optional [B, num_regions, D] per-region states
             base_loss: Optional scalar base loss (e.g., cross-entropy)
-            layer_states: Optional list of per-layer hidden states
+            coherence_state: Optional [B, T, D] or [B, D] coherence/CSR
+                latent state for feedback into loss computation
 
         Returns:
-            Dict with all loss components and diagnostics:
-                'total_loss': Final training loss
-                'experiential_loss': Multi-modal loss breakdown
-                'salience': Salience weights and diagnostics
-                'resistance': Gate values and vritti distributions
-                'identity': Identity layer outputs
-                'consolidation': Consolidation metrics (if triggered)
+            Dict with all loss components and diagnostics
         """
         B, T, D = hidden.shape
         device = hidden.device
@@ -199,10 +199,13 @@ class ExperientialTrainingLoop(nn.Module):
             region_states = self._derive_region_states(hidden)
 
         # ================================================================
-        # Step 1: Multi-modal experiential loss (embodiment)
+        # FAST LOOP — Step 1: Multi-modal experiential loss
         # ================================================================
         if self.config.enable_experiential_loss:
-            exp_loss_output = self.experiential_loss(hidden, target_hidden, base_loss)
+            exp_loss_output = self.experiential_loss(
+                hidden, target_hidden, base_loss,
+                coherence_state=coherence_state,
+            )
             total_loss = total_loss + (
                 self.config.experiential_loss_weight * exp_loss_output["loss"]
             )
@@ -211,20 +214,18 @@ class ExperientialTrainingLoop(nn.Module):
             total_loss = total_loss + base_loss
 
         # ================================================================
-        # Step 2: Compute error signal per region
+        # FAST LOOP — Step 2: Compute error signal per region
         # ================================================================
         error_signal = self._compute_region_errors(hidden, target_hidden)
 
         # ================================================================
-        # Step 3: Salience weighting (consequence modeling)
+        # FAST LOOP — Step 3: Salience (independent signal)
         # ================================================================
         if self.config.enable_salience:
             cross_modal = None
             if self.config.enable_experiential_loss:
-                # Use loss texture as cross-modal impact indicator
                 texture = exp_loss_output["loss_texture"]
                 cross_modal = texture.unsqueeze(0).expand(B, -1)
-                # Pad/trim to num_regions
                 if cross_modal.shape[1] < self.config.num_regions:
                     pad = torch.zeros(
                         B, self.config.num_regions - cross_modal.shape[1],
@@ -236,47 +237,40 @@ class ExperientialTrainingLoop(nn.Module):
 
             salience_output = self.salience_weighter(error_signal, cross_modal)
             result["salience"] = salience_output
+            salience_weights = salience_output["salience_weights"]
         else:
             salience_output = None
+            salience_weights = None
 
         # ================================================================
-        # Step 4: Vritti resistance gate
+        # FAST LOOP — Step 4: Resistance gate (independent signal, continuous)
+        #   g_eff = clamp(salience * resistance_openness, 0, max_gain) * g
         # ================================================================
         if self.config.enable_resistance_gate:
-            # Propose update direction (simplified: negative error)
             proposed_update = -error_signal
 
-            # Weight proposed update by salience
-            if salience_output is not None:
-                proposed_update = proposed_update * salience_output[
-                    "salience_weights"
-                ].unsqueeze(-1)
-
             resistance_output = self.resistance_gate(
-                region_states, error_signal, proposed_update
+                region_states, error_signal, proposed_update,
+                salience_weights=salience_weights,
             )
             result["resistance"] = resistance_output
-
-            # Use gated update for downstream processing
             effective_update = resistance_output["gated_update"]
         else:
             effective_update = -error_signal
 
         # ================================================================
-        # Step 5: Identity layer (self-model revision)
+        # FAST LOOP — Step 5: Identity accumulation (EMA buffer only)
         # ================================================================
         if self.config.enable_identity:
-            # Summarize experience for identity processing
-            experience = effective_update.mean(dim=1)  # [B, num_regions, D] -> [B, D]
-            # Average across regions
+            experience = effective_update.mean(dim=1)
             if experience.dim() == 3:
                 experience = experience.mean(dim=1)
 
-            # Error per layer (use region errors as proxy)
             error_per_layer = error_signal.norm(dim=-1).mean(dim=0)
+            mean_salience = salience_weights.mean(dim=0) if salience_weights is not None else None
 
             identity_output = self.identity_layer(
-                experience, error_per_layer
+                experience, error_per_layer, salience=mean_salience
             )
             total_loss = total_loss + (
                 self.config.identity_loss_weight * identity_output["identity_loss"]
@@ -284,27 +278,28 @@ class ExperientialTrainingLoop(nn.Module):
             result["identity"] = identity_output
 
         # ================================================================
-        # Step 6: Offline consolidation (sleep analog)
+        # MEDIUM LOOP — Replay + prune (every N steps)
         # ================================================================
         if self.config.enable_consolidation:
             self.consolidation.step()
 
-            # Drain resistance gate queue into consolidation buffer
+            # Feed deferred samples into buffer
             if self.config.enable_resistance_gate:
-                queued = self.resistance_gate.drain_consolidation_queue()
-                if queued:
-                    self.consolidation.ingest_queue(queued)
+                deferred = self.resistance_gate.drain_deferred_buffer()
+                if deferred:
+                    self.consolidation.ingest(deferred)
 
-            # Run consolidation if it's time
             if self.consolidation.should_consolidate():
-                consolidation_output = self.consolidation.consolidate(layer_states)
+                consolidation_output = self.consolidation.consolidate()
                 result["consolidation"] = consolidation_output
 
-                # Add coherence loss from consolidation
-                if isinstance(consolidation_output.get("coherence_loss"), torch.Tensor):
-                    total_loss = total_loss + (
-                        0.01 * consolidation_output["coherence_loss"]
-                    )
+            # ============================================================
+            # SLOW LOOP — Identity consolidation (every M >> N steps)
+            # ============================================================
+            if (self.config.enable_identity
+                    and self.consolidation.should_consolidate_identity()):
+                identity_revised = self.identity_layer.consolidate()
+                result["identity_consolidated"] = identity_revised
 
         # ================================================================
         # Finalize
@@ -312,21 +307,13 @@ class ExperientialTrainingLoop(nn.Module):
         result["total_loss"] = total_loss
         self.global_step += 1
 
-        # Periodic logging
         if self.global_step.item() % self.config.log_interval == 0:
             self._log_diagnostics(result)
 
         return result
 
     def _derive_region_states(self, hidden: torch.Tensor) -> torch.Tensor:
-        """Derive per-region states from hidden states by chunking.
-
-        Args:
-            hidden: [B, T, D]
-
-        Returns:
-            [B, num_regions, D] — mean-pooled chunks of the sequence
-        """
+        """Derive per-region states from hidden states by chunking."""
         B, T, D = hidden.shape
         R = self.config.num_regions
 
@@ -337,27 +324,16 @@ class ExperientialTrainingLoop(nn.Module):
                 start = i * chunk_size
                 end = start + chunk_size if i < R - 1 else T
                 chunks.append(hidden[:, start:end, :].mean(dim=1))
-            return torch.stack(chunks, dim=1)  # [B, R, D]
+            return torch.stack(chunks, dim=1)
         else:
-            # Pad with mean if sequence shorter than regions
-            mean_hidden = hidden.mean(dim=1, keepdim=True)  # [B, 1, D]
-            padded = mean_hidden.expand(B, R, D).clone()
-            padded[:, :T, :] = hidden.mean(dim=1, keepdim=True).expand(B, T, D)
-            return padded
+            mean_hidden = hidden.mean(dim=1, keepdim=True)
+            return mean_hidden.expand(B, R, D).clone()
 
     def _compute_region_errors(
         self, hidden: torch.Tensor, target_hidden: torch.Tensor
     ) -> torch.Tensor:
-        """Compute per-region error signals.
-
-        Args:
-            hidden: [B, T, D] predicted
-            target_hidden: [B, T, D] target
-
-        Returns:
-            [B, num_regions, D] error signal per region
-        """
-        error = hidden - target_hidden  # [B, T, D]
+        """Compute per-region error signals."""
+        error = hidden - target_hidden
         return self._derive_region_states(error)
 
     def _log_diagnostics(self, result: Dict[str, Any]) -> None:
@@ -372,25 +348,25 @@ class ExperientialTrainingLoop(nn.Module):
 
         if "resistance" in result:
             res = result["resistance"]
-            mean_gate = res["gate_values"].mean().item()
-            parts.append(f"mean_gate={mean_gate:.3f}")
-            parts.append(f"queued={res['queued_count']}")
+            mean_plasticity = res["plasticity"].mean().item()
+            parts.append(f"plasticity={mean_plasticity:.3f}")
+            parts.append(f"deferred={res['deferred_count']}")
 
         if "salience" in result:
             sal = result["salience"]
-            parts.append(f"mean_salience={sal['salience_weights'].mean().item():.3f}")
+            parts.append(f"salience={sal['salience_weights'].mean().item():.3f}")
 
         if "identity" in result:
             ident = result["identity"]
             parts.append(f"coherence={ident['identity_coherence'].item():.3f}")
-            if ident["transformation_triggered"]:
-                parts.append("IDENTITY_CHANGED")
+
+        if "identity_consolidated" in result:
+            parts.append(f"IDENTITY_CONSOLIDATED={result['identity_consolidated']}")
 
         if "consolidation" in result:
             con = result["consolidation"]
             parts.append(
-                f"consolidated(replay={con['replayed']}, "
-                f"prune={con['pruned']}, deep={con['deepened']})"
+                f"replay={con['replayed']}, prune={con['pruned_low_salience']}"
             )
 
         parts.append(f"total_loss={result['total_loss'].item():.4f}")

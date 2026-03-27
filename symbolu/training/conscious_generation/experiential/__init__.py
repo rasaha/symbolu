@@ -8,39 +8,32 @@ Models the five analogs of natural experience in AI training:
    FSCS frequency-stratified coherence where error at one frequency resonates
    into others.
 
-2. VrittiResistanceGate — Vritti-gated update mechanism that introduces
-   resistance fields regulating how much a gradient update restructures a
-   given region. Gates are state-dependent, stake-sensitive, and temporally
-   variable.
+2. VrittiResistanceGate — Continuous plasticity scaling via vritti field.
+   NO binary branching. g_eff = clamp(salience * resistance_openness, 0, max_gain) * g.
+   Salience and resistance are independent signals composed multiplicatively.
 
-3. OfflineConsolidationCycle — Sleep analog that replays high-loss events,
-   reconciles contradictory updates, prunes low-salience memories, and
-   enforces cross-layer coherence during mandatory offline phases.
+3. OfflineConsolidationCycle — Simplified sleep analog: replay high-salience
+   deferred samples + prune stale/low-salience entries. No overloaded
+   reconciliation logic.
 
 4. SalienceWeighter — Consequence-based error weighting that develops
    "scar tissue" in regions that have experienced cascade failures.
    Errors that propagate downstream leave deeper traces.
 
-5. IdentityLayer — Persistent self-model separate from task weights,
-   updatable only by sufficiently profound error signals. Maps to the
-   12-layer ontological architecture where deeper layers resist surface
-   task errors.
+5. IdentityLayer — Persistent self-model updated via EMA during consolidation
+   phase ONLY (slow loop). NOT updated on every step. Maps to the 12-layer
+   ontological architecture where deeper layers resist surface task errors.
 
-Flow:
-    Input -> Prediction
-         |
-    Error Signal (multi-modal, not scalar)
-         |
-    Salience Gate (is this consequential?)
-         |
-    Vritti Resistance Field (does the system resist this update?)
-         |
-    If resistance overcome -> propagate to identity layer
-    If resistance holds -> queue for offline consolidation
-         |
-    Offline Cycle (sleep analog) -> reconcile, prune, deepen
-         |
-    Emergent reorganization (self-model revision)
+Time-scale separation:
+    FAST (every step): loss -> salience -> resistance -> g_eff = s * r * g
+    MEDIUM (every N steps): replay deferred + prune stale
+    SLOW (every M >> N steps): identity EMA consolidation
+
+Stability constraints:
+    - Bounded gain (max_gain)
+    - EMA damping on resistance
+    - No binary branching
+    - Identity via EMA only
 
 Reference: docs/design/EXPERIENTIAL_LEARNING_DESIGN.md
 """

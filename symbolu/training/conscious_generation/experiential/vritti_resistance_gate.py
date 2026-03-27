@@ -1,28 +1,26 @@
 """
 VrittiResistanceGate: Vritti-gated update mechanism for CG training.
 
-The most radical analog — instead of loss propagating freely through all
-weights, resistance fields gate how much a given update restructures a
-given region.
+Continuous plasticity scaling — no binary branching. Gradients are scaled
+by the product of salience and resistance openness:
+
+    g_eff = s_t * r_t * g
+
+Where:
+    s_t = salience (computed independently)
+    r_t = resistance openness in [0, 1] (from vritti field)
+    g = raw gradient
 
 Gates are:
     - State-dependent: High vritti activation in a region resists update
     - Stake-sensitive: Consequential errors force gates open
     - Temporally variable: Resistance rises and falls like emotional states
+    - Damped: Bounded gain prevents oscillation/instability
 
-This extends the Reflective Latent Block (RLB) concept — the reflection
-loop before committing an update mirrors the pause before a human
-integrates a difficult truth. The missing piece: gates must be EARNED
-open by sufficient error magnitude, not just architecturally present.
-
-Gate Mechanics:
-    r_t = vritti_field(region_state)           # Current resistance
-    s_t = salience(error_magnitude)            # Stakes of this error
-    gate = sigmoid((s_t - r_t) / temperature)  # Open only if stakes > resistance
-    effective_grad = gate * raw_grad            # Gated gradient
-
-Temporal Dynamics:
-    r_{t+1} = decay * r_t + (1-decay) * update_impact  # Resistance evolves
+Stability Constraints:
+    - Max gain clamped to prevent gradient explosion
+    - EMA smoothing on resistance prevents discontinuities
+    - Damping coefficient ensures bounded control loop behavior
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
@@ -45,9 +43,9 @@ class VrittiResistanceConfig:
         resistance_decay: Temporal decay of resistance state
         resistance_floor: Minimum resistance (prevents zero-resistance)
         resistance_ceiling: Maximum resistance (prevents total lockout)
-        stakes_threshold: Minimum stakes to attempt gate opening
         adaptation_rate: How fast resistance adapts to update patterns
-        queue_capacity: Max items in consolidation queue
+        max_gain: Maximum plasticity gain (stability constraint)
+        damping: Damping coefficient for resistance dynamics
     """
     d_model: int = 128
     num_regions: int = 12
@@ -56,9 +54,9 @@ class VrittiResistanceConfig:
     resistance_decay: float = 0.95
     resistance_floor: float = 0.05
     resistance_ceiling: float = 0.95
-    stakes_threshold: float = 0.1
     adaptation_rate: float = 0.01
-    queue_capacity: int = 256
+    max_gain: float = 3.0
+    damping: float = 0.1
 
 
 class VrittiFieldEstimator(nn.Module):
@@ -181,23 +179,22 @@ class StakesEstimator(nn.Module):
 
 
 class VrittiResistanceGate(nn.Module):
-    """Vritti-gated gradient modulation for experiential learning.
+    """Continuous plasticity scaling via vritti resistance field.
 
-    Core idea: gradients must overcome the system's own resistance to
-    propagate. The resistance is not arbitrary — it emerges from the
-    system's current cognitive state (vritti field). High-stakes errors
-    can force gates open; low-stakes errors are queued for offline
-    consolidation.
+    NO binary branching. All updates flow through — scaled by the
+    product of independent salience and resistance signals:
 
-    Architecture:
-        region_state -> VrittiFieldEstimator -> resistance_field
-        error_signal -> StakesEstimator -> stakes_field
-        gate = sigmoid((stakes - resistance) / temperature)
-        effective_update = gate * proposed_update
+        plasticity = s_t * r_t
+        g_eff = clamp(plasticity, 0, max_gain) * g
 
-    Items that fail to pass the gate are queued for offline consolidation
-    (sleep analog), implementing the "pause before integration" that
-    characterizes deep experiential learning.
+    Stability constraints:
+        - Max gain bounded to prevent gradient explosion
+        - EMA smoothing on resistance prevents discontinuities
+        - Damping term prevents oscillation in the control loop
+
+    The deferred sample buffer records high-salience, low-plasticity
+    samples for periodic replay — but this is a SECONDARY diagnostic
+    mechanism, not a branching decision.
 
     Args:
         config: VrittiResistanceConfig
@@ -212,7 +209,7 @@ class VrittiResistanceGate(nn.Module):
         )
         self.stakes_estimator = StakesEstimator(config.d_model, config.num_regions)
 
-        # Persistent resistance state (evolves across training steps)
+        # Persistent resistance state (EMA-smoothed, evolves across steps)
         self.register_buffer(
             "persistent_resistance",
             torch.full((config.num_regions,), 0.5),
@@ -224,40 +221,54 @@ class VrittiResistanceGate(nn.Module):
             torch.zeros(config.num_regions),
         )
 
-        # Consolidation queue: items that failed to pass the gate
-        self.consolidation_queue: list = []
+        # Deferred sample buffer: high-salience, low-plasticity samples
+        # for periodic replay (not a branching mechanism)
+        self.deferred_buffer: list = []
+        self._deferred_capacity = 256
 
     def forward(
         self,
         region_states: torch.Tensor,
         error_signal: torch.Tensor,
         proposed_update: torch.Tensor,
+        salience_weights: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
-        """Gate proposed updates through vritti resistance field.
+        """Scale proposed updates via continuous plasticity field.
+
+        The effective gradient is:
+            g_eff = plasticity * proposed_update
+
+        Where plasticity = clamp(salience * resistance_openness, 0, max_gain)
+
+        Salience and resistance are computed INDEPENDENTLY and composed
+        multiplicatively — neither determines the other.
 
         Args:
             region_states: [B, num_regions, D] current state per region
             error_signal: [B, num_regions, D] error signal per region
             proposed_update: [B, num_regions, D] proposed gradient update
+            salience_weights: Optional [B, num_regions] external salience
+                              (if None, stakes estimator is used)
 
         Returns:
             Dict with:
-                'gated_update': [B, num_regions, D] modulated update
-                'gate_values': [B, num_regions] gate openness in [0, 1]
+                'gated_update': [B, num_regions, D] plasticity-scaled update
+                'plasticity': [B, num_regions] effective plasticity in [0, max_gain]
                 'resistance': [B, num_regions] resistance per region
+                'resistance_openness': [B, num_regions] 1 - resistance (gate values)
                 'stakes': [B, num_regions] stakes per region
                 'vritti_dist': [B, num_regions, num_vritti] vritti probs
-                'queued_count': number of items queued for consolidation
+                'deferred_count': items added to deferred buffer this step
         """
         B = region_states.shape[0]
 
-        # Estimate vritti field and resistance
+        # === Independent signal 1: Resistance field ===
         vritti_dist, instantaneous_resistance = self.vritti_estimator(region_states)
 
-        # Blend instantaneous with persistent resistance
+        # EMA-smooth with persistent state (prevents discontinuities)
         resistance = (
-            0.7 * instantaneous_resistance
-            + 0.3 * self.persistent_resistance.unsqueeze(0)
+            (1 - self.config.damping) * instantaneous_resistance
+            + self.config.damping * self.persistent_resistance.unsqueeze(0)
         )
 
         # Clamp resistance to [floor, ceiling]
@@ -265,37 +276,51 @@ class VrittiResistanceGate(nn.Module):
             self.config.resistance_floor, self.config.resistance_ceiling
         )
 
-        # Estimate stakes of this error
+        # Resistance openness: how much this region allows updates
+        resistance_openness = 1.0 - resistance  # [B, num_regions] in [0, 1]
+
+        # === Independent signal 2: Stakes/Salience ===
         stakes = self.stakes_estimator(error_signal, self.error_history)
 
-        # Gate computation: open when stakes exceed resistance
-        gate_logit = (stakes - resistance) / self.config.gate_temperature
-        gate_values = torch.sigmoid(gate_logit)  # [B, num_regions]
+        if salience_weights is not None:
+            # Use externally-provided salience (from SalienceWeighter)
+            effective_salience = salience_weights
+        else:
+            effective_salience = stakes
 
-        # Apply gate to proposed update
-        gated_update = proposed_update * gate_values.unsqueeze(-1)
+        # === Compose: continuous plasticity = salience * openness ===
+        # Both signals are independent; neither determines the other
+        plasticity = effective_salience * resistance_openness
 
-        # Queue items that failed to pass gate for consolidation
+        # Stability constraint: bound the gain
+        plasticity = plasticity.clamp(0.0, self.config.max_gain)
+
+        # Apply plasticity scaling to proposed update
+        gated_update = proposed_update * plasticity.unsqueeze(-1)
+
+        # === Secondary: record deferred samples for replay ===
+        deferred_count = 0
         with torch.no_grad():
-            blocked_mask = gate_values < 0.3  # Substantially blocked
-            queued_count = 0
-            if blocked_mask.any() and len(self.consolidation_queue) < self.config.queue_capacity:
-                # Store the blocked error signals for offline processing
-                for b in range(B):
-                    blocked_regions = blocked_mask[b].nonzero(as_tuple=True)[0]
-                    if len(blocked_regions) > 0:
-                        self.consolidation_queue.append({
-                            "error": error_signal[b, blocked_regions].detach().cpu(),
-                            "regions": blocked_regions.detach().cpu(),
-                            "stakes": stakes[b, blocked_regions].detach().cpu(),
-                            "resistance": resistance[b, blocked_regions].detach().cpu(),
-                        })
-                        queued_count += len(blocked_regions)
+            # High salience but low plasticity = worth replaying later
+            high_salience = effective_salience > 0.5
+            low_plasticity = plasticity < 0.2
+            defer_mask = high_salience & low_plasticity
 
-            # Update persistent resistance (temporal dynamics)
-            update_impact = gate_values.mean(dim=0).detach()
+            if defer_mask.any() and len(self.deferred_buffer) < self._deferred_capacity:
+                for b in range(B):
+                    defer_regions = defer_mask[b].nonzero(as_tuple=True)[0]
+                    if len(defer_regions) > 0:
+                        self.deferred_buffer.append({
+                            "error": error_signal[b, defer_regions].detach().cpu(),
+                            "regions": defer_regions.detach().cpu(),
+                            "salience": effective_salience[b, defer_regions].mean().item(),
+                        })
+                        deferred_count += len(defer_regions)
+
+            # Update persistent resistance (EMA dynamics)
+            mean_resistance = resistance.mean(dim=0).detach()
             self.persistent_resistance.mul_(self.config.resistance_decay).add_(
-                update_impact * (1 - self.config.resistance_decay)
+                mean_resistance * (1 - self.config.resistance_decay)
             )
 
             # Update error history (scar tissue)
@@ -304,21 +329,22 @@ class VrittiResistanceGate(nn.Module):
 
         return {
             "gated_update": gated_update,
-            "gate_values": gate_values,
+            "plasticity": plasticity,
             "resistance": resistance,
+            "resistance_openness": resistance_openness,
             "stakes": stakes,
             "vritti_dist": vritti_dist,
-            "queued_count": queued_count,
+            "deferred_count": deferred_count,
         }
 
-    def drain_consolidation_queue(self) -> list:
-        """Drain and return all items queued for offline consolidation.
+    def drain_deferred_buffer(self) -> list:
+        """Drain and return deferred samples for periodic replay.
 
         Returns:
-            List of queued items (dicts with error, regions, stakes, resistance)
+            List of deferred items (dicts with error, regions, salience)
         """
-        items = list(self.consolidation_queue)
-        self.consolidation_queue.clear()
+        items = list(self.deferred_buffer)
+        self.deferred_buffer.clear()
         return items
 
     def get_resistance_state(self) -> Dict[str, torch.Tensor]:
@@ -326,5 +352,5 @@ class VrittiResistanceGate(nn.Module):
         return {
             "persistent_resistance": self.persistent_resistance.clone(),
             "error_history": self.error_history.clone(),
-            "queue_depth": len(self.consolidation_queue),
+            "deferred_depth": len(self.deferred_buffer),
         }

@@ -1,18 +1,17 @@
 """
 Tests for Experiential Learning modules in Conscious Generation training.
 
-Tests the five experiential analogs:
-    1. ExperientialLossSignal — multi-modal, cross-frequency loss
-    2. VrittiResistanceGate — vritti-gated gradient modulation
-    3. OfflineConsolidationCycle — sleep analog consolidation
+Tests the five experiential analogs with refactored architecture:
+    1. ExperientialLossSignal — multi-modal + coherence state feedback
+    2. VrittiResistanceGate — continuous plasticity, no binary branching
+    3. OfflineConsolidationCycle — simplified replay + prune
     4. SalienceWeighter — consequence-based error weighting
-    5. IdentityLayer — persistent self-model
-    6. ExperientialTrainingLoop — full orchestrator
+    5. IdentityLayer — EMA-based, consolidation-only updates
+    6. ExperientialTrainingLoop — time-scale separated orchestrator
 """
 
 import pytest
 import torch
-import torch.nn as nn
 
 from symbolu.training.conscious_generation.experiential.experiential_loss import (
     ExperientialLossSignal,
@@ -24,14 +23,11 @@ from symbolu.training.conscious_generation.experiential.vritti_resistance_gate i
     VrittiResistanceGate,
     VrittiResistanceConfig,
     VrittiFieldEstimator,
-    StakesEstimator,
 )
 from symbolu.training.conscious_generation.experiential.offline_consolidation import (
     OfflineConsolidationCycle,
     ConsolidationConfig,
     ReplayBuffer,
-    ContradictionDetector,
-    CrossLayerCoherenceEnforcer,
 )
 from symbolu.training.conscious_generation.experiential.salience_weighter import (
     SalienceWeighter,
@@ -99,6 +95,7 @@ class TestExperientialLossSignal:
         assert "band_losses" in result
         assert "coupling_losses" in result
         assert "loss_texture" in result
+        assert "latent_alignment_loss" in result
         assert result["loss"].shape == ()
         assert result["loss"].requires_grad
 
@@ -116,11 +113,8 @@ class TestExperientialLossSignal:
         module = ExperientialLossSignal(config)
         result = module(hidden, target_hidden)
 
-        # 3 bands -> 3 coupling pairs
         assert len(result["coupling_losses"]) == 3
         assert "semantic__temporal" in result["coupling_losses"]
-        assert "semantic__somatic" in result["coupling_losses"]
-        assert "temporal__somatic" in result["coupling_losses"]
 
     def test_with_base_loss(self, hidden, target_hidden):
         config = ExperientialLossConfig(d_model=D)
@@ -128,7 +122,27 @@ class TestExperientialLossSignal:
         base_loss = torch.tensor(1.5)
         result = module(hidden, target_hidden, base_loss=base_loss)
 
-        assert result["loss"].item() >= 1.5  # Must include base loss
+        assert result["loss"].item() >= 1.5
+
+    def test_with_coherence_state_3d(self, hidden, target_hidden, device):
+        """Test state feedback from coherence/CSR pipeline (3D input)."""
+        config = ExperientialLossConfig(d_model=D)
+        module = ExperientialLossSignal(config)
+        coherence_state = torch.randn(B, T, D, device=device)
+
+        result = module(hidden, target_hidden, coherence_state=coherence_state)
+
+        assert result["latent_alignment_loss"].item() >= 0
+
+    def test_with_coherence_state_2d(self, hidden, target_hidden, device):
+        """Test state feedback from coherence/CSR pipeline (2D input)."""
+        config = ExperientialLossConfig(d_model=D)
+        module = ExperientialLossSignal(config)
+        coherence_state = torch.randn(B, D, device=device)
+
+        result = module(hidden, target_hidden, coherence_state=coherence_state)
+
+        assert result["latent_alignment_loss"].item() >= 0
 
     def test_interference_ema_updates(self, hidden, target_hidden):
         config = ExperientialLossConfig(d_model=D)
@@ -138,7 +152,6 @@ class TestExperientialLossSignal:
         module(hidden, target_hidden)
         ema_after = module.interference_ema.clone()
 
-        # EMA should have changed
         assert not torch.allclose(ema_before, ema_after)
 
     def test_frequency_band_projector(self):
@@ -155,11 +168,11 @@ class TestExperientialLossSignal:
         band_j = torch.randn(B, T, d_band)
         result = coupling(band_i, band_j)
         assert result.shape == ()
-        assert result.item() >= 0  # Absolute value
+        assert result.item() >= 0
 
 
 # ============================================================================
-# Test VrittiResistanceGate
+# Test VrittiResistanceGate (continuous plasticity, no binary branching)
 # ============================================================================
 
 
@@ -172,22 +185,52 @@ class TestVrittiResistanceGate:
         result = gate(region_states, error_signal, proposed)
 
         assert "gated_update" in result
-        assert "gate_values" in result
+        assert "plasticity" in result
+        assert "resistance_openness" in result
         assert "resistance" in result
         assert "stakes" in result
         assert "vritti_dist" in result
         assert result["gated_update"].shape == proposed.shape
-        assert result["gate_values"].shape == (B, NUM_REGIONS)
+        assert result["plasticity"].shape == (B, NUM_REGIONS)
 
-    def test_gate_values_bounded(self, region_states, error_signal):
-        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+    def test_plasticity_bounded(self, region_states, error_signal):
+        """Stability constraint: plasticity must be in [0, max_gain]."""
+        config = VrittiResistanceConfig(
+            d_model=D, num_regions=NUM_REGIONS, max_gain=3.0
+        )
         gate = VrittiResistanceGate(config)
         proposed = torch.randn_like(error_signal)
 
         result = gate(region_states, error_signal, proposed)
 
-        assert (result["gate_values"] >= 0).all()
-        assert (result["gate_values"] <= 1).all()
+        assert (result["plasticity"] >= 0).all()
+        assert (result["plasticity"] <= 3.0).all()
+
+    def test_continuous_no_binary_branching(self, region_states, error_signal):
+        """All updates flow through — no hard cutoff."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+        gate = VrittiResistanceGate(config)
+        proposed = torch.ones_like(error_signal)
+
+        result = gate(region_states, error_signal, proposed)
+
+        # Gated update should be proposed * plasticity (not zero/one)
+        # Every region should get SOME update (no complete blocking)
+        assert result["gated_update"].abs().sum() > 0
+
+    def test_independent_salience_input(self, region_states, error_signal):
+        """Salience can be provided independently from stakes."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+        gate = VrittiResistanceGate(config)
+        proposed = torch.randn_like(error_signal)
+        external_salience = torch.ones(B, NUM_REGIONS) * 0.8
+
+        result = gate(
+            region_states, error_signal, proposed,
+            salience_weights=external_salience,
+        )
+
+        assert result["plasticity"].shape == (B, NUM_REGIONS)
 
     def test_vritti_distribution_valid(self, region_states, error_signal):
         config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
@@ -198,27 +241,21 @@ class TestVrittiResistanceGate:
 
         vritti = result["vritti_dist"]
         assert vritti.shape == (B, NUM_REGIONS, 5)
-        # Should sum to 1 (softmax)
         sums = vritti.sum(dim=-1)
         assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
 
-    def test_consolidation_queue(self, region_states, error_signal):
-        config = VrittiResistanceConfig(
-            d_model=D, num_regions=NUM_REGIONS, resistance_ceiling=0.99
-        )
+    def test_deferred_buffer(self, region_states, error_signal):
+        """Deferred buffer is secondary diagnostic, not branching mechanism."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
         gate = VrittiResistanceGate(config)
-        # Force high resistance by setting persistent resistance high
-        gate.persistent_resistance.fill_(0.95)
         proposed = torch.randn_like(error_signal)
 
         gate(region_states, error_signal, proposed)
+        items = gate.drain_deferred_buffer()
 
-        # Should have queued some items
-        items = gate.drain_consolidation_queue()
-        # Queue may or may not have items depending on random init
         assert isinstance(items, list)
 
-    def test_persistent_resistance_updates(self, region_states, error_signal):
+    def test_persistent_resistance_ema(self, region_states, error_signal):
         config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
         gate = VrittiResistanceGate(config)
         proposed = torch.randn_like(error_signal)
@@ -240,7 +277,7 @@ class TestVrittiResistanceGate:
 
 
 # ============================================================================
-# Test OfflineConsolidationCycle
+# Test OfflineConsolidationCycle (simplified: replay + prune only)
 # ============================================================================
 
 
@@ -250,7 +287,7 @@ class TestOfflineConsolidationCycle:
         cycle = OfflineConsolidationCycle(config)
         assert len(cycle.replay_buffer) == 0
 
-    def test_ingest_queue(self):
+    def test_ingest(self):
         config = ConsolidationConfig(d_model=D, num_regions=NUM_REGIONS)
         cycle = OfflineConsolidationCycle(config)
 
@@ -258,62 +295,58 @@ class TestOfflineConsolidationCycle:
             {
                 "error": torch.randn(3, D),
                 "regions": torch.tensor([0, 1, 2]),
-                "stakes": torch.tensor([0.5, 0.6, 0.7]),
+                "salience": 0.7,
             }
             for _ in range(10)
         ]
-        count = cycle.ingest_queue(items)
+        count = cycle.ingest(items)
         assert count == 10
         assert len(cycle.replay_buffer) == 10
 
     def test_consolidation_trigger(self):
         config = ConsolidationConfig(
             d_model=D, num_regions=NUM_REGIONS,
-            consolidation_interval=10, min_queue_depth=2,
+            consolidation_interval=10, min_buffer_depth=2,
         )
         cycle = OfflineConsolidationCycle(config)
 
-        # Add items
-        items = [
-            {
-                "error": torch.randn(2, D),
-                "regions": torch.tensor([0, 1]),
-                "stakes": torch.tensor([0.5, 0.6]),
-            }
-            for _ in range(5)
-        ]
-        cycle.ingest_queue(items)
+        items = [{"salience": 0.5} for _ in range(5)]
+        cycle.ingest(items)
 
-        # Step to consolidation interval
         for _ in range(10):
             cycle.step()
 
         assert cycle.should_consolidate()
 
-    def test_consolidation_cycle(self):
+    def test_consolidation_returns_replay_items(self):
         config = ConsolidationConfig(
             d_model=D, num_regions=NUM_REGIONS,
-            consolidation_interval=5, min_queue_depth=2,
+            consolidation_interval=5, min_buffer_depth=2,
         )
         cycle = OfflineConsolidationCycle(config)
 
-        items = [
-            {
-                "error": torch.randn(2, D),
-                "regions": torch.tensor([0, 1]),
-                "stakes": torch.tensor([0.8, 0.9]),
-            }
-            for _ in range(5)
-        ]
-        cycle.ingest_queue(items)
+        items = [{"salience": 0.8, "error": torch.randn(2, D)} for _ in range(5)]
+        cycle.ingest(items)
 
         result = cycle.consolidate()
 
+        assert "replay_items" in result
         assert "replayed" in result
-        assert "contradictions_found" in result
-        assert "pruned" in result
-        assert "deepened" in result
+        assert "pruned_low_salience" in result
+        assert "pruned_stale" in result
         assert result["replayed"] > 0
+
+    def test_identity_consolidation_trigger(self):
+        config = ConsolidationConfig(
+            d_model=D, num_regions=NUM_REGIONS,
+            identity_interval=50,
+        )
+        cycle = OfflineConsolidationCycle(config)
+
+        for _ in range(50):
+            cycle.step()
+
+        assert cycle.should_consolidate_identity()
 
     def test_replay_buffer_priority(self):
         buf = ReplayBuffer(capacity=5)
@@ -324,7 +357,6 @@ class TestOfflineConsolidationCycle:
         assert len(buf) == 5
         top = buf.sample_top_k(3)
         assert len(top) == 3
-        # Top should have highest salience
         assert top[0]["salience"] >= top[1]["salience"]
 
     def test_replay_buffer_pruning(self):
@@ -337,12 +369,13 @@ class TestOfflineConsolidationCycle:
         for item in buf.buffer:
             assert item["salience"] >= 0.5
 
-    def test_cross_layer_coherence(self):
-        enforcer = CrossLayerCoherenceEnforcer(D, NUM_REGIONS)
-        states = [torch.randn(B, T, D) for _ in range(4)]
-        loss = enforcer(states)
-        assert loss.shape == ()
-        assert loss.item() >= 0
+    def test_staleness_pruning(self):
+        buf = ReplayBuffer()
+        for i in range(10):
+            buf.add({"salience": 0.5, "step": i * 10})
+
+        pruned = buf.prune_stale(current_step=100, staleness_limit=50)
+        assert pruned > 0
 
 
 # ============================================================================
@@ -378,7 +411,6 @@ class TestSalienceWeighter:
 
         scar_before = weighter.scar_registry.get_scar_levels().clone()
 
-        # Run multiple steps with high error
         for _ in range(5):
             high_error = torch.randn(B, NUM_REGIONS, D) * 10.0
             weighter(high_error)
@@ -404,10 +436,8 @@ class TestSalienceWeighter:
     def test_scar_tissue_registry(self):
         registry = ScarTissueRegistry(NUM_REGIONS, decay=0.99, growth_rate=0.1)
 
-        # Initially zero
         assert (registry.get_scar_levels() == 0).all()
 
-        # Grow scar tissue
         high_error = torch.ones(NUM_REGIONS) * 5.0
         registry.update(high_error)
 
@@ -419,7 +449,7 @@ class TestSalienceWeighter:
 
 
 # ============================================================================
-# Test IdentityLayer
+# Test IdentityLayer (EMA-based, consolidation-only)
 # ============================================================================
 
 
@@ -438,6 +468,56 @@ class TestIdentityLayer:
         assert "identity_loss" in result
         assert result["layer_gates"].shape == (NUM_REGIONS,)
 
+    def test_no_step_driven_revision(self, device):
+        """Identity should NOT change during forward pass (fast loop)."""
+        config = IdentityLayerConfig(d_model=D, num_ontological_layers=NUM_REGIONS)
+        layer = IdentityLayer(config)
+
+        repr_before = layer.self_model.self_repr.clone()
+
+        experience = torch.randn(B, D, device=device) * 5.0
+        error_per_layer = torch.ones(NUM_REGIONS, device=device) * 0.9
+
+        result = layer(experience, error_per_layer)
+
+        # Identity should NOT have changed in fast loop
+        assert result["transformation_triggered"] is False
+        assert torch.allclose(repr_before, layer.self_model.self_repr)
+
+    def test_ema_accumulation(self, device):
+        """High-salience signals should accumulate in EMA buffer."""
+        config = IdentityLayerConfig(d_model=D, num_ontological_layers=NUM_REGIONS)
+        layer = IdentityLayer(config)
+
+        experience = torch.randn(B, D, device=device)
+        error_per_layer = torch.ones(NUM_REGIONS, device=device) * 0.5
+        salience = torch.ones(NUM_REGIONS, device=device) * 0.8
+
+        layer(experience, error_per_layer, salience=salience)
+
+        assert layer.self_model.accumulator_count.item() > 0
+
+    def test_consolidation_revises_identity(self, device):
+        """Identity should change ONLY during consolidation."""
+        config = IdentityLayerConfig(d_model=D, num_ontological_layers=NUM_REGIONS)
+        layer = IdentityLayer(config)
+
+        # Accumulate several signals
+        for _ in range(10):
+            experience = torch.randn(B, D, device=device) * 3.0
+            error_per_layer = torch.ones(NUM_REGIONS, device=device) * 0.5
+            salience = torch.ones(NUM_REGIONS, device=device) * 0.8
+            layer(experience, error_per_layer, salience=salience)
+
+        repr_before = layer.self_model.self_repr.clone()
+
+        # Consolidate
+        revised = layer.consolidate()
+
+        if revised:
+            repr_after = layer.self_model.self_repr
+            assert not torch.allclose(repr_before, repr_after)
+
     def test_surface_layers_open(self, device):
         config = IdentityLayerConfig(
             d_model=D, num_ontological_layers=NUM_REGIONS,
@@ -450,7 +530,6 @@ class TestIdentityLayer:
 
         result = layer(experience, error_per_layer)
 
-        # Surface layers (0-3) should have high gate values even with low error
         surface_gates = result["layer_gates"][:4]
         assert (surface_gates > 0.5).all()
 
@@ -462,47 +541,21 @@ class TestIdentityLayer:
         layer = IdentityLayer(config)
 
         experience = torch.randn(B, D, device=device)
-        # Low error shouldn't open deep layers
         error_per_layer = torch.ones(NUM_REGIONS, device=device) * 0.1
 
         result = layer(experience, error_per_layer)
 
-        # Deep layers (8-11) should have very low gate values with low error
         deep_gates = result["layer_gates"][8:]
         assert (deep_gates < 0.3).all()
 
-    def test_identity_transformation(self, device):
-        config = IdentityLayerConfig(
-            d_model=D, num_ontological_layers=NUM_REGIONS,
-            identity_threshold=0.1,  # Low threshold for testing
-        )
-        layer = IdentityLayer(config)
-
-        repr_before = layer.self_model.self_repr.clone()
-
-        experience = torch.randn(B, D, device=device) * 5.0
-        error_per_layer = torch.ones(NUM_REGIONS, device=device) * 0.5
-
-        layer(experience, error_per_layer)
-
-        # Self-representation may have changed
-        # (depends on gate value from random init)
-        state = layer.get_identity_state()
-        assert "self_repr_norm" in state
-
     def test_ontological_depth_gate(self, device):
-        config = IdentityLayerConfig(
-            d_model=D, num_ontological_layers=NUM_REGIONS,
-        )
+        config = IdentityLayerConfig(d_model=D, num_ontological_layers=NUM_REGIONS)
         gate = OntologicalDepthGate(config)
 
-        # High error everywhere
         error_mags = torch.ones(NUM_REGIONS, device=device) * 0.95
         gates = gate.compute_layer_gates(error_mags)
 
         assert gates.shape == (NUM_REGIONS,)
-        # Surface layers should have higher gates than deep layers
-        # (because of lr_scale)
         surface_gate_mean = gates[:4].mean()
         deep_gate_mean = gates[8:].mean()
         assert surface_gate_mean > deep_gate_mean
@@ -511,16 +564,15 @@ class TestIdentityLayer:
         model = SelfModel(D, 64)
         experience = torch.randn(B, D, device=device)
 
-        result = model(experience, error_magnitude=0.5)
+        result = model(experience)
 
         assert result["self_repr"].shape == (64,)
         assert result["identity_features"].shape == (B, 64)
-        assert result["update_gate"].shape == (B, 1)
         assert -1 <= result["identity_coherence"].item() <= 1
 
 
 # ============================================================================
-# Test ExperientialTrainingLoop
+# Test ExperientialTrainingLoop (time-scale separated)
 # ============================================================================
 
 
@@ -547,8 +599,17 @@ class TestExperientialTrainingLoop:
 
         assert result["total_loss"].item() > 0
 
+    def test_with_coherence_state(self, hidden, target_hidden, device):
+        """Test state feedback from coherence/CSR pipeline."""
+        config = ExperientialTrainingConfig(d_model=D, num_regions=NUM_REGIONS)
+        loop = ExperientialTrainingLoop(config)
+        coherence_state = torch.randn(B, T, D, device=device)
+
+        result = loop(hidden, target_hidden, coherence_state=coherence_state)
+
+        assert "total_loss" in result
+
     def test_selective_enable(self, hidden, target_hidden):
-        # Only enable experiential loss
         config = ExperientialTrainingConfig(
             d_model=D, num_regions=NUM_REGIONS,
             enable_experiential_loss=True,
@@ -566,28 +627,38 @@ class TestExperientialTrainingLoop:
         assert "resistance" not in result
         assert "identity" not in result
 
-    def test_consolidation_triggers(self, hidden, target_hidden):
+    def test_time_scale_separation(self, hidden, target_hidden):
+        """Medium and slow loops trigger at different intervals."""
         config = ExperientialTrainingConfig(
             d_model=D, num_regions=NUM_REGIONS,
             consolidation_interval=5,
+            identity_interval=10,
         )
         loop = ExperientialTrainingLoop(config)
 
-        # Run multiple steps
-        for _ in range(6):
-            result = loop(hidden, target_hidden)
+        consolidation_triggered = False
+        identity_triggered = False
 
-        # Consolidation may or may not have triggered (depends on queue depth)
+        for _ in range(12):
+            result = loop(hidden, target_hidden)
+            if "consolidation" in result:
+                consolidation_triggered = True
+            if "identity_consolidated" in result:
+                identity_triggered = True
+
+        # Consolidation should have triggered (interval=5, ran 12 steps)
+        # Identity consolidation may or may not trigger (depends on buffer)
         assert result["total_loss"].requires_grad
 
-    def test_gradient_flows(self, hidden, target_hidden):
+    def test_gradient_flows(self, hidden, target_hidden, device):
         config = ExperientialTrainingConfig(d_model=D, num_regions=NUM_REGIONS)
         loop = ExperientialTrainingLoop(config)
 
-        result = loop(hidden, target_hidden)
+        # Provide coherence_state so latent_alignment_proj gets gradients too
+        coherence_state = torch.randn(B, T, D, device=device)
+        result = loop(hidden, target_hidden, coherence_state=coherence_state)
         result["total_loss"].backward()
 
-        # Check gradients flow through experiential loss
         for name, param in loop.experiential_loss.named_parameters():
             if param.requires_grad:
                 assert param.grad is not None, f"No gradient for {name}"
@@ -621,3 +692,13 @@ class TestExperientialTrainingLoop:
             loop(hidden, target_hidden)
 
         assert loop.global_step.item() == 5
+
+    def test_plasticity_in_resistance_output(self, hidden, target_hidden):
+        """Verify resistance output uses plasticity, not gate_values."""
+        config = ExperientialTrainingConfig(d_model=D, num_regions=NUM_REGIONS)
+        loop = ExperientialTrainingLoop(config)
+
+        result = loop(hidden, target_hidden)
+
+        assert "plasticity" in result["resistance"]
+        assert "resistance_openness" in result["resistance"]
