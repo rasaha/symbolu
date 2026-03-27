@@ -1083,6 +1083,14 @@ class UnifiedTrainingConfig:
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
 
     # ==========================================================================
+    # Mistral Hybrid Wrapper (--model_type mistral_hybrid)
+    # Frozen Mistral backbone + trainable Phase attention layers (no CG)
+    # ==========================================================================
+    mistral_hybrid_num_phase_layers: int = 4                # Number of Phase layers on top of Mistral
+    mistral_hybrid_local_layers: int = 2                    # First N Phase layers use local attention only
+    phase_ppl_delta_interval: int = 500                     # Steps between Phase PPL delta measurement (0=off)
+
+    # ==========================================================================
     # Knowledge Distillation from Mistral Teacher
     # Use frozen Mistral as teacher for hybrid / ontological_hybrid students
     # ==========================================================================

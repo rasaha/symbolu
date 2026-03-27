@@ -512,11 +512,11 @@ def train(config: UnifiedTrainingConfig):
 
     # V9.9.5: Warn if decorr_loss_weight is set but model type doesn't support it
     if hasattr(config, 'decorr_loss_weight') and config.decorr_loss_weight > 0:
-        if config.model_type in ('hybrid', 'ontological_hybrid'):
+        if config.model_type in ('hybrid', 'ontological_hybrid', 'mistral_hybrid'):
             print(f"  Decorrelation Loss: ENABLED (weight={config.decorr_loss_weight})")
         else:
             print(f"\n  ⚠️  WARNING: --decorr_loss_weight={config.decorr_loss_weight} IGNORED!")
-            print(f"     Decorrelation loss only works with --model_type hybrid or ontological_hybrid")
+            print(f"     Decorrelation loss only works with --model_type hybrid, ontological_hybrid, or mistral_hybrid")
             print(f"     Current model_type: {config.model_type}")
             print(f"     To enable decorrelation loss, use: --model_type hybrid --decorr_loss_weight {config.decorr_loss_weight}\n")
 
@@ -557,22 +557,22 @@ def train(config: UnifiedTrainingConfig):
                 _ablation_count += 1
         print(f"  [Stage 9] Ablation config applied to {_ablation_count} module(s): {_ablation_cfg.label()}")
 
-    # For mistral_cg, use the backbone's own tokenizer so token IDs match
-    # the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
-    if config.model_type == "mistral_cg" and hasattr(model, "tokenizer") and model.tokenizer is not None:
+    # For mistral_cg/mistral_hybrid, use the backbone's own tokenizer so token IDs
+    # match the Mistral embedding table (GPT-2 vocab=50257 > Mistral vocab=32768)
+    if config.model_type in ("mistral_cg", "mistral_hybrid") and hasattr(model, "tokenizer") and model.tokenizer is not None:
         tokenizer = model.tokenizer
         tokenizer.model_max_length = int(1e12)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         config.vocab_size = len(tokenizer)
-        print(f"  [Mistral CG] Using Mistral tokenizer (vocab_size={config.vocab_size})")
+        print(f"  [{config.model_type}] Using Mistral tokenizer (vocab_size={config.vocab_size})")
 
     # Knowledge Distillation: Load frozen Mistral teacher
     mistral_teacher = None
     distill_tokenizer = None
     if config.distill_from_mistral:
-        if config.model_type == "mistral_cg":
-            print("  [Distillation] WARNING: distill_from_mistral with model_type=mistral_cg "
+        if config.model_type in ("mistral_cg", "mistral_hybrid"):
+            print(f"  [Distillation] WARNING: distill_from_mistral with model_type={config.model_type} "
                   "is redundant — Mistral is already the backbone. Skipping teacher.")
         else:
             from symbolu.training.unified.mistral_teacher import MistralTeacher
@@ -2882,7 +2882,7 @@ def train(config: UnifiedTrainingConfig):
                 enable_decorr = (
                     hasattr(config, 'decorr_loss_weight') and
                     config.decorr_loss_weight > 0 and
-                    config.model_type in ('hybrid', 'ontological_hybrid')
+                    config.model_type in ('hybrid', 'ontological_hybrid', 'mistral_hybrid')
                 )
 
                 # V10.2.2: Chunked training for long sequences
@@ -5928,8 +5928,8 @@ def train(config: UnifiedTrainingConfig):
                     if "phase" in config.model_type or "hybrid" in config.model_type:
                         log_msg += f" | α_phase: {current_alpha:.2f}"
 
-                    # Mistral CG adapter diagnostics: gate value, adapter output norm, state norm
-                    if config.model_type == "mistral_cg":
+                    # Mistral adapter diagnostics: gate value, adapter output norm, state norm
+                    if config.model_type in ("mistral_cg", "mistral_hybrid"):
                         _cg_model = getattr(model, 'module', model)  # unwrap DDP
                         if hasattr(_cg_model, 'adapter_gate'):
                             _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
@@ -5952,6 +5952,50 @@ def train(config: UnifiedTrainingConfig):
                                 log_msg += f" | StN:{_state_norm:.2f}"
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
+
+                    # Phase layer training metrics (mistral_hybrid specific)
+                    if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):
+                        _ph_corr = outputs.get('phase_correction_norm', 0.0)
+                        _ph_rel = outputs.get('phase_relative_correction', 0.0)
+                        _ph_cos = outputs.get('phase_cosine_sim', 0.0)
+                        metrics['phase_correction_norm'] = _ph_corr
+                        metrics['phase_relative_correction'] = _ph_rel
+                        metrics['phase_cosine_sim'] = _ph_cos
+                        log_msg += f" | PhCorr:{_ph_corr:.4f} Rel:{_ph_rel:.4f} Cos:{_ph_cos:.3f}"
+                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                            writer.add_scalar('phase/correction_norm', _ph_corr, global_step)
+                            writer.add_scalar('phase/relative_correction', _ph_rel, global_step)
+                            writer.add_scalar('phase/cosine_similarity', _ph_cos, global_step)
+
+                        # Phase PPL delta: measure every phase_ppl_delta_interval steps
+                        _ppl_interval = getattr(config, 'phase_ppl_delta_interval', 500)
+                        if _ppl_interval > 0 and global_step % _ppl_interval == 0 and global_step > 0:
+                            # Re-run forward with measure_phase_delta=True to get backbone logits
+                            with torch.no_grad():
+                                _delta_out = model(x, attention_mask=None, measure_phase_delta=True)
+                            if 'backbone_logits' in _delta_out:
+                                import torch.nn.functional as F
+                                _bb_logits = _delta_out['backbone_logits']
+                                _ph_logits = _delta_out['logits']
+                                # Compute per-token CE loss for both
+                                _shift_bb = _bb_logits[:, :-1, :].contiguous().view(-1, _bb_logits.size(-1))
+                                _shift_ph = _ph_logits[:, :-1, :].contiguous().view(-1, _ph_logits.size(-1))
+                                _shift_y = y[:, 1:].contiguous().view(-1)
+                                _bb_ce = F.cross_entropy(_shift_bb, _shift_y, reduction='mean')
+                                _ph_ce = F.cross_entropy(_shift_ph, _shift_y, reduction='mean')
+                                _bb_ppl = _bb_ce.exp().item()
+                                _ph_ppl = _ph_ce.exp().item()
+                                _ppl_delta = _bb_ppl - _ph_ppl  # positive = Phase helps
+                                metrics['backbone_ppl'] = _bb_ppl
+                                metrics['phase_ppl'] = _ph_ppl
+                                metrics['phase_ppl_delta'] = _ppl_delta
+                                _delta_pct = 100.0 * _ppl_delta / max(_bb_ppl, 1e-8)
+                                print(f"  [Phase PPL] backbone={_bb_ppl:.2f} | +phase={_ph_ppl:.2f} | "
+                                      f"delta={_ppl_delta:+.2f} ({_delta_pct:+.1f}%)")
+                                if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                    writer.add_scalar('phase/backbone_ppl', _bb_ppl, global_step)
+                                    writer.add_scalar('phase/adapted_ppl', _ph_ppl, global_step)
+                                    writer.add_scalar('phase/ppl_delta', _ppl_delta, global_step)
 
                     # V9.4.5: Add friction metrics (for 6/6 hybrid architecture)
                     if friction_alignment != 0.0 or friction_dominance != 1.0:
@@ -7745,13 +7789,14 @@ def main():
 
     # Model
     parser.add_argument("--model_type", type=str, default="ontological",
-                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg"],
+                       choices=["ontological", "phase", "hybrid", "gen2", "standard", "gct", "ontological_hybrid", "binding_cache", "ontological_binding_cache", "mistral_cg", "mistral_hybrid"],
                        help="Model architecture type (standard = O(n²) baseline, "
                             "gct = Gated Coherence Transformer [pre-softmax coherence routing], "
                             "ontological_hybrid = Two-Tier AGI, "
                             "binding_cache = Protected Phase + Top-K Query [V10.0], "
                             "ontological_binding_cache = AGI Architecture [Binding Cache + 32D Sovereign State], "
-                            "mistral_cg = Frozen Mistral backbone + trainable CG modules)")
+                            "mistral_cg = Frozen Mistral backbone + trainable CG modules, "
+                            "mistral_hybrid = Frozen Mistral backbone + trainable Phase layers [no CG])")
     parser.add_argument("--model_size", type=str, default="small",
                        choices=["tiny", "small", "medium", "large"],
                        help="Model size preset")
@@ -8213,6 +8258,14 @@ def main():
                        help="Trust remote code when loading Mistral model")
     parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
                        help="Hidden dimension for phase-conditioned adapter MLP")
+
+    # Mistral Hybrid Wrapper (--model_type mistral_hybrid)
+    parser.add_argument("--mistral_hybrid_num_phase_layers", type=int, default=4,
+                       help="Number of Phase attention layers on top of Mistral backbone")
+    parser.add_argument("--mistral_hybrid_local_layers", type=int, default=2,
+                       help="First N Phase layers use local attention only (rest are hybrid)")
+    parser.add_argument("--phase_ppl_delta_interval", type=int, default=500,
+                       help="Steps between Phase PPL delta measurement (0=disable)")
 
     # Knowledge Distillation from Mistral
     parser.add_argument("--distill_from_mistral", action="store_true",

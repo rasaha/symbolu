@@ -2,7 +2,7 @@
 Model factory for creating different model architectures.
 
 Supports ontological, phase, hybrid, gen2, standard, gct, ontological_hybrid,
-binding_cache, and ontological_binding_cache model types.
+binding_cache, ontological_binding_cache, mistral_cg, and mistral_hybrid model types.
 
 Extracted from train_unified_llm.py
 """
@@ -52,6 +52,13 @@ try:
     MISTRAL_CG_AVAILABLE = True
 except ImportError:
     MISTRAL_CG_AVAILABLE = False
+
+# Import Mistral Hybrid wrapper (optional)
+try:
+    from symbolu.training.unified.mistral_hybrid_wrapper import MistralHybridWrapper
+    MISTRAL_HYBRID_AVAILABLE = True
+except ImportError:
+    MISTRAL_HYBRID_AVAILABLE = False
 
 # Import Conscious Generation modules (optional)
 try:
@@ -500,6 +507,43 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"      Clean separation: Attention=physics, Annotator=semantics")
         else:
             print(f"    Binding Annotator: DISABLED (pure attention, no semantic selection)")
+
+    elif config.model_type == "mistral_hybrid":
+        # Frozen Mistral backbone + trainable Phase attention layers (no CG)
+        if not MISTRAL_HYBRID_AVAILABLE:
+            raise ImportError(
+                "MistralHybridWrapper not available. Check: pip install transformers"
+            )
+        quantize = config.mistral_quantize if config.mistral_quantize != "none" else None
+        model = MistralHybridWrapper(
+            model_name=config.mistral_model_name,
+            quantize=quantize,
+            num_phase_layers=config.mistral_hybrid_num_phase_layers,
+            local_layers=config.mistral_hybrid_local_layers,
+            window_size=config.window_size,
+            local_backend=config.local_backend,
+            alpha_local=config.alpha_local,
+            alpha_phase=config.alpha_phase,
+            decay_gamma=config.decay_gamma,
+            learned_decay=config.learned_decay,
+            protected_phase=config.protected_phase and not config.no_protected_phase,
+            phase_adapter_hidden=config.mistral_phase_adapter_hidden,
+            device_map=config.mistral_device_map,
+            trust_remote_code=config.mistral_trust_remote_code,
+        )
+        # Override dims to match backbone
+        embed_dim = model.mistral_hidden_dim
+        num_heads = model.num_heads
+        config.vocab_size = model.vocab_size
+        print(f"\n  [Mistral Hybrid] Frozen Backbone + Trainable Phase Layers (no CG)")
+        print(f"    Model: {config.mistral_model_name}")
+        print(f"    Quantization: {config.mistral_quantize}")
+        print(f"    Backbone hidden_dim: {embed_dim}")
+        print(f"    Phase layers: {config.mistral_hybrid_num_phase_layers} "
+              f"({config.mistral_hybrid_local_layers} local + "
+              f"{config.mistral_hybrid_num_phase_layers - config.mistral_hybrid_local_layers} hybrid)")
+        print(f"    Phase adapter hidden: {config.mistral_phase_adapter_hidden}")
+        model.print_trainable_summary()
 
     elif config.model_type == "mistral_cg":
         # Frozen Mistral backbone + trainable CG adapter modules
