@@ -511,6 +511,13 @@ class ExperientialController(nn.Module):
         device = hidden.device
         current_step = self.step.item()
 
+        # Validate input dimension matches config
+        if D != self.config.d_model:
+            raise ValueError(
+                f"Hidden dimension {D} != config.d_model {self.config.d_model}. "
+                f"Project input to d_model before calling controller."
+            )
+
         # Derive region states if not provided
         if region_states is None:
             region_states = self._derive_regions(hidden)
@@ -525,7 +532,7 @@ class ExperientialController(nn.Module):
         # === Stage 4: Plasticity controller ===
         # Compute misalignment from coherence signals
         misalignment = None
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 0:
             c_tok = coherence_signals.get("c_tok", 0.5)
             c_conv = coherence_signals.get("c_conv", 0.5)
             # M_t = 1 - mean(coherence) — normalized mismatch
@@ -539,7 +546,7 @@ class ExperientialController(nn.Module):
 
         # Coherence for gain
         coherence_val = None
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 0:
             coherence_val = sum(coherence_signals.values()) / len(coherence_signals)
 
         G_t = self.gain.compute(coherence=coherence_val, step=current_step)
@@ -547,7 +554,7 @@ class ExperientialController(nn.Module):
         # Gradient variance for damping
         grad_var = hidden.var().item()
         coherence_instab = 0.0
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 1:
             c_vec = list(coherence_signals.values())
             if len(c_vec) > 1:
                 coherence_instab = torch.tensor(c_vec).var().item()
@@ -570,7 +577,13 @@ class ExperientialController(nn.Module):
 
         # === Identity accumulation (fast loop) ===
         with torch.no_grad():
-            identity_signal = hidden.mean(dim=(0, 1))[:64] if D >= 64 else hidden.mean(dim=(0, 1))
+            _id_raw = hidden.mean(dim=(0, 1))  # [D]
+            _id_dim = self.identity.d_identity
+            if _id_raw.shape[0] >= _id_dim:
+                identity_signal = _id_raw[:_id_dim]
+            else:
+                # Pad to identity dimension when D < d_identity
+                identity_signal = F.pad(_id_raw, (0, _id_dim - _id_raw.shape[0]))
             mean_salience = P_t.mean().item()
             self.identity.accumulate(identity_signal, mean_salience)
 
