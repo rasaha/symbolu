@@ -551,8 +551,11 @@ class ExperientialController(nn.Module):
 
         G_t = self.gain.compute(coherence=coherence_val, step=current_step)
 
-        # Gradient variance for damping
-        grad_var = hidden.var().item()
+        # Gradient variance for damping — normalize by d_model to keep
+        # the damping parameters (k_dv, k_dc) scale-independent.
+        # Raw hidden.var() scales with activation magnitude; dividing by D
+        # gives a per-dimension variance that's comparable across model sizes.
+        grad_var = hidden.var().item() / max(D, 1)
         coherence_instab = 0.0
         if coherence_signals and len(coherence_signals) > 1:
             c_vec = list(coherence_signals.values())

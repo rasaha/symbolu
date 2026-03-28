@@ -5288,14 +5288,31 @@ def train(config: UnifiedTrainingConfig):
                         # Target: use shifted hidden as target (next-step prediction)
                         _exp_target = _exp_input.detach().clone()
 
-                        # Extract coherence signals from gen2 outputs or metrics
+                        # Extract coherence signals from model outputs or CG metrics
                         _exp_coherence = None
                         if isinstance(outputs, dict) and 'coherence' in outputs:
+                            # Gen2 models provide coherence directly
                             _c_val = outputs['coherence'].mean().item()
                             _exp_coherence = {
                                 'c_tok': _c_val,
                                 'c_lat': _c_val,
                                 'c_conv': _c_val,
+                            }
+                        else:
+                            # Derive coherence from available CG signals:
+                            # c_tok: ontology margin (pos_sim - neg_sim), higher = more coherent
+                            # c_lat: 1 - normalized loss (higher = model converging)
+                            # c_conv: adapter gate (how much CG is engaged)
+                            _c_tok = 0.5  # default
+                            if 'cg_ont_pos_sim' in metrics and 'cg_ont_neg_sim' in metrics:
+                                _c_tok = min(1.0, max(0.0,
+                                    metrics['cg_ont_pos_sim'] - metrics['cg_ont_neg_sim']))
+                            _c_lat = min(1.0, max(0.0, 1.0 - loss.item() / 3.0))  # normalize ~[0,3] → [0,1]
+                            _c_conv = metrics.get('adapter_gate', 0.5)
+                            _exp_coherence = {
+                                'c_tok': _c_tok,
+                                'c_lat': _c_lat,
+                                'c_conv': _c_conv,
                             }
 
                         # Forward through controller
