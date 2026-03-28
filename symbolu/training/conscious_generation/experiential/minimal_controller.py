@@ -140,9 +140,11 @@ class ExperientialLoss(nn.Module):
             c_tok = coherence_signals.get("c_tok", 0.5)
             c_lat = coherence_signals.get("c_lat", 0.5)
             c_conv = coherence_signals.get("c_conv", 0.5)
-            # Coherence loss = variance across signals (disagreement)
             c_vec = torch.tensor([c_tok, c_lat, c_conv], device=device)
-            L_coherence = c_vec.var()
+            # Two-term coherence loss:
+            #   1. Low overall coherence → high loss (penalize incoherence)
+            #   2. Disagreement across signals → high loss (penalize inconsistency)
+            L_coherence = (1.0 - c_vec.mean()).pow(2) + c_vec.var()
 
         # L_latent: alignment between latent state and hidden
         L_latent = torch.tensor(0.0, device=device)
@@ -539,6 +541,13 @@ class ExperientialController(nn.Module):
         # Clamp effective gain
         g_eff = g_eff.clamp(self.config.G_min, self.config.G_max)
 
+        # === Scale loss by g_eff ===
+        # This is the core integration: g_eff modulates gradient magnitude.
+        # Detach g_eff to avoid second-order gradients through the gate —
+        # the gate learns from its own inputs, not from loss backprop.
+        loss_scale = g_eff.detach().mean()
+        total_loss = loss_scale * loss_output["loss"]
+
         # === Identity accumulation (fast loop) ===
         with torch.no_grad():
             identity_signal = hidden.mean(dim=(0, 1))[:64] if D >= 64 else hidden.mean(dim=(0, 1))
@@ -559,7 +568,7 @@ class ExperientialController(nn.Module):
         self.step += 1
 
         return {
-            "total_loss": loss_output["loss"],
+            "total_loss": total_loss,
             "loss_components": {
                 "L_token": loss_output["L_token"],
                 "L_temporal": loss_output["L_temporal"],
