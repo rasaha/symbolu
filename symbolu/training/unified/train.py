@@ -9364,6 +9364,10 @@ def main():
                        help="Aggressive LR decay factor for emergencies")
     parser.add_argument("--adaptive_consecutive_spike_limit", type=int, default=3,
                        help="After N consecutive loss spikes, block LR boosts")
+    parser.add_argument("--adaptive_max_boost_from_base", type=float, default=2.0,
+                       help="Max LR = base_lr * this (caps compounding boosts)")
+    parser.add_argument("--adaptive_boost_cooldown_steps", type=int, default=400,
+                       help="Minimum steps between consecutive LR boosts")
 
     # Auto Batch Sizing (VRAM-based startup probing)
     parser.add_argument("--enable_auto_batch", action="store_true",
@@ -10403,6 +10407,8 @@ def main():
         adaptive_grad_norm_spike=args.adaptive_grad_norm_spike,
         adaptive_emergency_decay=args.adaptive_emergency_decay,
         adaptive_consecutive_spike_limit=args.adaptive_consecutive_spike_limit,
+        adaptive_max_boost_from_base=args.adaptive_max_boost_from_base,
+        adaptive_boost_cooldown_steps=args.adaptive_boost_cooldown_steps,
         # Auto Batch Sizing
         enable_auto_batch=args.enable_auto_batch,
         auto_batch_target_utilization=args.auto_batch_target_utilization,
