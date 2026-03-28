@@ -2506,6 +2506,44 @@ def train(config: UnifiedTrainingConfig):
         except ImportError as e:
             print(f"  [Stage 0 Tracer] Import failed: {e}")
 
+    # Experiential Controller (training-time plasticity modulation)
+    experiential_controller = None
+    if config.enable_experiential_controller:
+        try:
+            from symbolu.training.conscious_generation.experiential.minimal_controller import (
+                ExperientialController,
+                ExperientialControllerConfig,
+            )
+            _exp_cfg = ExperientialControllerConfig(
+                d_model=config.experiential_d_model,
+                num_regions=config.experiential_num_regions,
+                lambda_temporal=config.experiential_lambda_temporal,
+                lambda_coherence=config.experiential_lambda_coherence,
+                lambda_latent=config.experiential_lambda_latent,
+                k_r=config.experiential_k_r,
+                k_m=config.experiential_k_m,
+                b_p=config.experiential_b_p,
+                G_base=config.experiential_G_base,
+                G_min=config.experiential_G_min,
+                G_max=config.experiential_G_max,
+                k_dv=config.experiential_k_dv,
+                k_dc=config.experiential_k_dc,
+                alpha_base=config.experiential_alpha_base,
+            )
+            experiential_controller = ExperientialController(_exp_cfg).to(device)
+            print(f"\n  [Experiential Controller] ENABLED — 12-parameter plasticity modulation")
+            print(f"    d_model={_exp_cfg.d_model}, regions={_exp_cfg.num_regions}")
+            print(f"    Loss weights: λ_temp={_exp_cfg.lambda_temporal}, "
+                  f"λ_coh={_exp_cfg.lambda_coherence}, λ_lat={_exp_cfg.lambda_latent}")
+            print(f"    Plasticity: k_r={_exp_cfg.k_r}, k_m={_exp_cfg.k_m}, b_p={_exp_cfg.b_p}")
+            print(f"    Gain: G_base={_exp_cfg.G_base}, G_min={_exp_cfg.G_min}, G_max={_exp_cfg.G_max}")
+            print(f"    Damping: k_dv={_exp_cfg.k_dv}, k_dc={_exp_cfg.k_dc}")
+            print(f"    Identity: α_base={_exp_cfg.alpha_base}")
+            print(f"    Loops: replay every {config.experiential_replay_interval}, "
+                  f"consolidation every {config.experiential_consolidation_interval}")
+        except ImportError as e:
+            print(f"  [Experiential Controller] Import failed: {e}")
+
     # PPL-Gated Alpha Curriculum (phase dominates early, local refines later)
     ppl_alpha_curriculum = None
     if config.enable_ppl_alpha_curriculum:
@@ -5205,6 +5243,99 @@ def train(config: UnifiedTrainingConfig):
                     if global_step % 500 == 0:
                         print(f"  [Conscious Gen] Error at step {global_step}: {e}")
 
+            # =====================================================================
+            # Experiential Controller: resistance-modulated plasticity
+            # Sits after forward + CG loss, before backward. Scales loss by g_eff.
+            # =====================================================================
+            if experiential_controller is not None:
+                try:
+                    # Get hidden states from model outputs
+                    _exp_hidden = None
+                    if isinstance(outputs, dict):
+                        _exp_hidden = outputs.get('last_hidden_state', None)
+                    if _exp_hidden is None and logits is not None:
+                        # Use logits as proxy hidden states (projected space)
+                        _exp_hidden = logits
+
+                    if _exp_hidden is not None and _exp_hidden.dim() == 3:
+                        B_exp, T_exp, D_exp = _exp_hidden.shape
+
+                        # Project to controller d_model if dimensions differ
+                        _exp_d = experiential_controller.config.d_model
+                        if D_exp != _exp_d:
+                            # Adaptive pooling to match controller dimension
+                            _exp_input = F.adaptive_avg_pool1d(
+                                _exp_hidden.transpose(1, 2), _exp_d
+                            ).transpose(1, 2)
+                        else:
+                            _exp_input = _exp_hidden
+
+                        # Target: use shifted hidden as target (next-step prediction)
+                        _exp_target = _exp_input.detach().clone()
+
+                        # Extract coherence signals from gen2 outputs or metrics
+                        _exp_coherence = None
+                        if isinstance(outputs, dict) and 'coherence' in outputs:
+                            _c_val = outputs['coherence'].mean().item()
+                            _exp_coherence = {
+                                'c_tok': _c_val,
+                                'c_lat': _c_val,
+                                'c_conv': _c_val,
+                            }
+
+                        # Forward through controller
+                        _exp_result = experiential_controller(
+                            _exp_input.detach(),  # don't backprop through hidden extraction
+                            _exp_target,
+                            base_loss=loss.detach(),
+                            coherence_signals=_exp_coherence,
+                        )
+
+                        # Scale original loss by g_eff
+                        _exp_scale = _exp_result['g_eff'].detach().mean()
+                        loss = _exp_scale * loss
+
+                        # Track metrics
+                        metrics['exp_g_eff'] = _exp_scale.item()
+                        metrics['exp_plasticity'] = _exp_result['plasticity'].mean().item()
+                        metrics['exp_gain'] = _exp_result['gain'].item()
+                        metrics['exp_damping'] = _exp_result['damping'].item()
+                        metrics['exp_total_loss'] = _exp_result['total_loss'].item()
+                        for _lk in ('L_token', 'L_temporal', 'L_coherence', 'L_latent'):
+                            metrics[f'exp_{_lk}'] = _exp_result['loss_components'][_lk].item()
+
+                        # Medium loop: replay
+                        if (global_step > 0 and
+                                global_step % config.experiential_replay_interval == 0):
+                            _exp_replay = experiential_controller.get_replay_items(k=4)
+
+                        # Slow loop: identity consolidation
+                        if (global_step > 0 and
+                                global_step % config.experiential_consolidation_interval == 0):
+                            _exp_consolidated = experiential_controller.consolidate_identity()
+                            if _exp_consolidated:
+                                print(f"  [Experiential] Step {global_step}: Identity consolidated")
+
+                        # Periodic diagnostics
+                        if (global_step % config.experiential_log_interval == 0 and
+                                global_step > 0 and
+                                (accumulation_step + 1) % config.gradient_accumulation == 0):
+                            print(f"  [Experiential] Step {global_step} | "
+                                  f"g_eff={_exp_scale.item():.3f} | "
+                                  f"P={metrics['exp_plasticity']:.3f} | "
+                                  f"G={metrics['exp_gain']:.3f} | "
+                                  f"d={metrics['exp_damping']:.3f} | "
+                                  f"L_exp={metrics['exp_total_loss']:.4f}")
+
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                for _ek, _ev in metrics.items():
+                                    if _ek.startswith('exp_') and isinstance(_ev, (int, float)):
+                                        writer.add_scalar(f'experiential/{_ek[4:]}', _ev, global_step)
+
+                except Exception as _exp_err:
+                    if global_step % 500 == 0:
+                        print(f"  [Experiential] Error at step {global_step}: {_exp_err}")
+
             # Stage 0: Binding Cache + CTM+ generation tracer (observation only)
             if generation_tracer is not None and logits is not None:
                 try:
@@ -7501,6 +7632,244 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+            # =============================================================
+            # Conscious Generation Progress Snapshot
+            # Independent of text quality samples. Controlled by --cg_sample_every.
+            # Shows all active CG phases, governance, and experiential state.
+            # =============================================================
+            if config.cg_sample_every > 0 and global_step % config.cg_sample_every == 0 and global_step > 0:
+                _cg_snapshot_active = (
+                    config.enable_conscious_generation
+                    or experiential_controller is not None
+                )
+                if _cg_snapshot_active:
+                    try:
+                        print("")
+                        print("=" * 70)
+                        print(f"  CONSCIOUS GENERATION PROGRESS (Step {global_step})")
+                        print("=" * 70)
+                        _cg_sections = 0
+
+                        # --- Phase 1: Ontological Foundation ---
+                        if metrics.get('cg_ont_loss') is not None:
+                            _cg_sections += 1
+                            _ont_loss = metrics['cg_ont_loss']
+                            _ont_pos = metrics.get('cg_ont_pos_sim', 0)
+                            _ont_neg = metrics.get('cg_ont_neg_sim', 0)
+                            _ont_margin = _ont_pos - _ont_neg
+                            print(f"  Phase 1 - Ontology:")
+                            print(f"    L_ont={_ont_loss:.4f}  "
+                                  f"pos_sim={_ont_pos:.3f}  neg_sim={_ont_neg:.3f}  "
+                                  f"margin={_ont_margin:.3f}")
+                            if _ont_margin > 0.3:
+                                print(f"    -> GOOD: clear separation between similar/dissimilar tokens")
+                            elif _ont_margin > 0.1:
+                                print(f"    -> DEVELOPING: ontological structure emerging")
+                            else:
+                                print(f"    -> EARLY: margin too small, structure not yet learned")
+
+                        # --- Phase 2: Primitive Scoring Heads ---
+                        _p2_norms = {}
+                        if hasattr(model, 'conscious_gen') and 'token_cache' in getattr(model, 'conscious_gen', {}):
+                            _p2_diag = model.conscious_gen['token_cache'].get_diagnostics()
+                            for _buf in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                _nk = f"{_buf}_mean_norm"
+                                if _nk in _p2_diag and _p2_diag[_nk] > 0:
+                                    _p2_norms[_buf] = _p2_diag[_nk]
+                        if _p2_norms:
+                            _cg_sections += 1
+                            _p2_str = "  ".join([f"{k}={v:.3f}" for k, v in _p2_norms.items()])
+                            print(f"  Phase 2 - Primitive Buffers:")
+                            print(f"    {_p2_str}")
+                            _active_bufs = sum(1 for v in _p2_norms.values() if v > 0.01)
+                            print(f"    -> {_active_bufs}/{len(_p2_norms)} buffers active")
+
+                        # --- Phase 3: Governance Integration ---
+                        _has_p3 = any(metrics.get(k) is not None for k in
+                                      ['cg_alpha_entropy', 'cg_bliss_mean', 'cg_kosha_routing_loss'])
+                        if _has_p3:
+                            _cg_sections += 1
+                            print(f"  Phase 3 - Governance:")
+                            _p3_parts = []
+                            if metrics.get('cg_alpha_entropy') is not None:
+                                _p3_parts.append(f"alpha_H={metrics['cg_alpha_entropy']:.3f}")
+                            if metrics.get('cg_bliss_mean') is not None:
+                                _p3_parts.append(f"B={metrics['cg_bliss_mean']:.3f}")
+                            if metrics.get('cg_disagree_mean') is not None:
+                                _p3_parts.append(f"D={metrics['cg_disagree_mean']:.3f}")
+                            if metrics.get('cg_kosha_routing_loss') is not None:
+                                _p3_parts.append(f"L_kosha={metrics['cg_kosha_routing_loss']:.4f}")
+                            if metrics.get('cg_bliss_loss') is not None:
+                                _p3_parts.append(f"L_bliss={metrics['cg_bliss_loss']:.4f}")
+                            print(f"    {' | '.join(_p3_parts)}")
+                            # Primitive aux losses
+                            _prim_parts = []
+                            for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                _pk = f'cg_L_{_pn}'
+                                if metrics.get(_pk) is not None:
+                                    _prim_parts.append(f"L_{_pn}={metrics[_pk]:.4f}")
+                            if _prim_parts:
+                                print(f"    Primitives: {' | '.join(_prim_parts)}")
+                            # Interpret governance health
+                            _alpha_h = metrics.get('cg_alpha_entropy', 0)
+                            if _alpha_h > 1.5:
+                                print(f"    -> HEALTHY: high routing entropy (exploring all koshas)")
+                            elif _alpha_h > 0.5:
+                                print(f"    -> SPECIALIZING: koshas differentiating")
+                            elif _alpha_h > 0:
+                                print(f"    -> COLLAPSED: one kosha dominating, check routing")
+
+                        # --- Phase 4: Field-Integrated Generation ---
+                        if metrics.get('cg_field_lm_loss') is not None:
+                            _cg_sections += 1
+                            print(f"  Phase 4 - Field Integration:")
+                            _f_loss = metrics['cg_field_lm_loss']
+                            _f_active = metrics.get('cg_phase4_active', 0)
+                            _f_coverage = metrics.get('cg_shortlist_coverage', 0)
+                            _f_fallback = metrics.get('cg_phase4_fallback', 0)
+                            print(f"    L_field={_f_loss:.4f}  active={_f_active:.0f}  "
+                                  f"coverage={_f_coverage:.3f}  fallback={_f_fallback:.0f}")
+                            if _f_coverage > 0.8:
+                                print(f"    -> GOOD: field covers target tokens well")
+                            elif _f_coverage > 0.5:
+                                print(f"    -> PARTIAL: field missing some targets")
+                            else:
+                                print(f"    -> WEAK: field not yet capturing target distribution")
+
+                        # --- Phase 5: Curriculum Stage ---
+                        if cg_stage_manager is not None:
+                            _cg_sections += 1
+                            _cs_diag = cg_stage_manager.get_diagnostics()
+                            _cs_stage = _cs_diag.get('current_stage', '?')
+                            _cs_progress = _cs_diag.get('stage_progress', 0)
+                            print(f"  Phase 5 - Curriculum:")
+                            print(f"    Stage={_cs_stage}  progress={_cs_progress:.1%}  "
+                                  f"field_integrated={cg_stage_manager.use_field_integrated_softmax}")
+
+                        # --- Governance Diagnostics Summary ---
+                        if cg_governance_diag is not None:
+                            _gov_sum = cg_governance_diag.get_summary()
+                            if _gov_sum:
+                                _cg_sections += 1
+                                print(f"  Governance Diagnostics:")
+                                _gov_parts = []
+                                for _gk, _gv in _gov_sum.items():
+                                    if isinstance(_gv, float):
+                                        _gov_parts.append(f"{_gk}={_gv:.3f}")
+                                    elif isinstance(_gv, int):
+                                        _gov_parts.append(f"{_gk}={_gv}")
+                                if _gov_parts:
+                                    # Show in rows of 4
+                                    for i in range(0, len(_gov_parts), 4):
+                                        print(f"    {' | '.join(_gov_parts[i:i+4])}")
+
+                        # --- Stage 0: Generation Tracer ---
+                        if generation_tracer is not None:
+                            _gt_sum = generation_tracer.summary()
+                            if _gt_sum.get('num_tokens', 0) > 0:
+                                _cg_sections += 1
+                                print(f"  Stage 0 - Binding Cache Tracer:")
+                                print(f"    tokens={_gt_sum.get('num_tokens', 0)}  "
+                                      f"H={_gt_sum.get('mean_logit_entropy', 0):.3f}  "
+                                      f"intent_drift={_gt_sum.get('mean_intent_drift', 0):.4f}  "
+                                      f"cache_hit={_gt_sum.get('mean_cache_hit_rate', 0):.3f}")
+
+                        # --- Stage 8: Perspective Synthesizer ---
+                        if metrics.get('stage8_gate') is not None:
+                            _cg_sections += 1
+                            print(f"  Stage 8 - Perspective Synthesizer:")
+                            print(f"    gate={metrics['stage8_gate']:.4f}  "
+                                  f"cond_norm={metrics.get('stage8_cond_norm', 0):.4f}")
+                            if metrics['stage8_gate'] < 0.01:
+                                print(f"    -> COLD START: gate near zero (safe, no modification)")
+                            elif metrics['stage8_gate'] > 0.5:
+                                print(f"    -> ACTIVE: perspective conditioning influencing output")
+                            else:
+                                print(f"    -> WARMING: gate opening gradually")
+
+                        # --- Experiential Controller ---
+                        if experiential_controller is not None:
+                            _cg_sections += 1
+                            _ec = experiential_controller
+                            _ec_ids = _ec.identity.get_state()
+                            _ec_resist = _ec.plasticity_gate.persistent_resistance
+                            _ec_replay_len = len(_ec.replay)
+
+                            print(f"  Experiential Controller:")
+
+                            # Resistance
+                            _r_mean = _ec_resist.mean().item()
+                            _r_std = _ec_resist.std().item() if _ec_resist.numel() > 1 else 0.0
+                            print(f"    Resistance: mean={_r_mean:.4f}  std={_r_std:.4f}")
+
+                            # g_eff breakdown
+                            _exp_geff = metrics.get('exp_g_eff', None)
+                            if _exp_geff is not None:
+                                print(f"    g_eff={_exp_geff:.4f}  "
+                                      f"(P={metrics.get('exp_plasticity', 0):.3f} x "
+                                      f"G={metrics.get('exp_gain', 0):.3f} x "
+                                      f"d={metrics.get('exp_damping', 0):.3f})")
+                                if _exp_geff < 0.5:
+                                    print(f"    -> CAUTIOUS: high resistance or instability")
+                                elif _exp_geff > 2.0:
+                                    print(f"    -> AGGRESSIVE: learning fast")
+                                else:
+                                    print(f"    -> BALANCED: moderate plasticity")
+
+                            # Loss components
+                            _lt = metrics.get('exp_L_token', None)
+                            if _lt is not None:
+                                print(f"    L_tok={_lt:.4f}  L_temp={metrics.get('exp_L_temporal', 0):.4f}  "
+                                      f"L_coh={metrics.get('exp_L_coherence', 0):.4f}  "
+                                      f"L_lat={metrics.get('exp_L_latent', 0):.4f}")
+
+                            # Identity
+                            _id_norm = _ec_ids['identity_norm']
+                            _id_count = _ec_ids['accumulator_count']
+                            _id_consol = _ec_ids.get('consolidation_count', 0)
+                            print(f"    Identity: norm={_id_norm:.4f}  accum={_id_count}  "
+                                  f"consol={_id_consol}", end="")
+                            if _id_norm < 0.01:
+                                print(f" (COLD)")
+                            elif _id_norm > 0.5:
+                                print(f" (STABLE)")
+                            else:
+                                print(f" (FORMING)")
+
+                            # Replay + per-region
+                            print(f"    Replay: {_ec_replay_len} items")
+                            if _ec_resist.dim() >= 1 and _ec_resist.shape[0] > 1:
+                                _r_vals = _ec_resist.detach().cpu().tolist()
+                                _r_str = " ".join([f"{v:.2f}" for v in _r_vals[:12]])
+                                print(f"    Regions: [{_r_str}]")
+
+                            # TensorBoard
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('experiential/resistance_mean', _r_mean, global_step)
+                                writer.add_scalar('experiential/resistance_std', _r_std, global_step)
+                                writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
+                                writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+
+                        # --- Embedding Diagnostics Trend ---
+                        if 'cg_embedding_diag' in dir() and cg_embedding_diag is not None:
+                            if len(cg_embedding_diag.history) >= 2:
+                                _cg_sections += 1
+                                _ed_trend = cg_embedding_diag.get_trend_summary()
+                                print(f"  Embedding Diagnostics:")
+                                for _tk, _tv in _ed_trend.items():
+                                    print(f"    {_tk}: {_tv}")
+
+                        # Footer
+                        if _cg_sections == 0:
+                            print(f"  (No CG modules active yet — check lambda weights)")
+                        else:
+                            print(f"  ----")
+                            print(f"  Active CG sections: {_cg_sections}")
+                        print("=" * 70)
+                        print("")
+                    except Exception as _cg_snap_err:
+                        print(f"  [CG Snapshot] Error: {_cg_snap_err}")
+
             # CG Factual Eval — verify JEPA/Vritti distinguish facts from hallucinations
             if cg_factual_eval is not None and tokenizer is not None:
                 _fe_cache = None
@@ -9362,6 +9731,50 @@ def main():
     parser.add_argument("--factual_eval_start_step", type=int, default=0,
                        help="Delay factual evaluation until this training step")
 
+    # CG Progress Snapshot (separate from text quality samples)
+    parser.add_argument("--cg_sample_every", type=int, default=0,
+                       help="CG progress snapshot interval in steps (0 = disabled). "
+                            "Independent of --sample_every. Shows all active CG phases, "
+                            "governance, and experiential controller state.")
+
+    # Experiential Controller: 12-parameter resistance-driven plasticity
+    parser.add_argument("--enable_experiential_controller", action="store_true",
+                       help="Enable experiential controller (training-time plasticity modulation)")
+    parser.add_argument("--experiential_d_model", type=int, default=128,
+                       help="Internal d_model for experiential controller")
+    parser.add_argument("--experiential_num_regions", type=int, default=12,
+                       help="Number of plasticity regions")
+    parser.add_argument("--experiential_lambda_temporal", type=float, default=0.5,
+                       help="Temporal consistency loss weight")
+    parser.add_argument("--experiential_lambda_coherence", type=float, default=0.3,
+                       help="Cross-signal coherence loss weight")
+    parser.add_argument("--experiential_lambda_latent", type=float, default=0.1,
+                       help="Latent alignment loss weight")
+    parser.add_argument("--experiential_k_r", type=float, default=2.0,
+                       help="Resistance openness scaling")
+    parser.add_argument("--experiential_k_m", type=float, default=2.0,
+                       help="Misalignment suppression scaling")
+    parser.add_argument("--experiential_b_p", type=float, default=-1.0,
+                       help="Bias floor for plasticity gate")
+    parser.add_argument("--experiential_G_base", type=float, default=3.0,
+                       help="Base adaptive gain")
+    parser.add_argument("--experiential_G_min", type=float, default=0.1,
+                       help="Minimum gain clamp")
+    parser.add_argument("--experiential_G_max", type=float, default=5.0,
+                       help="Maximum gain clamp")
+    parser.add_argument("--experiential_k_dv", type=float, default=1.0,
+                       help="Gradient variance damping sensitivity")
+    parser.add_argument("--experiential_k_dc", type=float, default=0.5,
+                       help="Coherence instability damping sensitivity")
+    parser.add_argument("--experiential_alpha_base", type=float, default=0.01,
+                       help="Identity EMA base learning rate")
+    parser.add_argument("--experiential_replay_interval", type=int, default=100,
+                       help="Medium loop: replay buffer sample every N steps")
+    parser.add_argument("--experiential_consolidation_interval", type=int, default=1000,
+                       help="Slow loop: identity consolidation every N steps")
+    parser.add_argument("--experiential_log_interval", type=int, default=100,
+                       help="Experiential controller diagnostics log interval")
+
     # Stage 8: Perspective Synthesizer (representation conditioning)
     parser.add_argument("--enable_perspective_synthesizer", action="store_true",
                        help="Enable Stage 8 Perspective Synthesizer (representation conditioning before lm_head)")
@@ -10159,6 +10572,27 @@ def main():
         embedding_diag_neighbors=args.embedding_diag_neighbors,
         embedding_diag_no_samples=args.embedding_diag_no_samples,
         embedding_diag_start_step=args.embedding_diag_start_step,
+        # CG Snapshot
+        cg_sample_every=args.cg_sample_every,
+        # Experiential Controller
+        enable_experiential_controller=args.enable_experiential_controller,
+        experiential_d_model=args.experiential_d_model,
+        experiential_num_regions=args.experiential_num_regions,
+        experiential_lambda_temporal=args.experiential_lambda_temporal,
+        experiential_lambda_coherence=args.experiential_lambda_coherence,
+        experiential_lambda_latent=args.experiential_lambda_latent,
+        experiential_k_r=args.experiential_k_r,
+        experiential_k_m=args.experiential_k_m,
+        experiential_b_p=args.experiential_b_p,
+        experiential_G_base=args.experiential_G_base,
+        experiential_G_min=args.experiential_G_min,
+        experiential_G_max=args.experiential_G_max,
+        experiential_k_dv=args.experiential_k_dv,
+        experiential_k_dc=args.experiential_k_dc,
+        experiential_alpha_base=args.experiential_alpha_base,
+        experiential_replay_interval=args.experiential_replay_interval,
+        experiential_consolidation_interval=args.experiential_consolidation_interval,
+        experiential_log_interval=args.experiential_log_interval,
         # Stage 8: Perspective Synthesizer
         enable_perspective_synthesizer=args.enable_perspective_synthesizer,
         perspective_d_synthesis=args.perspective_d_synthesis,
