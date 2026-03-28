@@ -1036,6 +1036,8 @@ class UnifiedTrainingConfig:
     # Reference: experiential/minimal_controller.py
     # Training-time only — does NOT modify inference path.
     # ==========================================================================
+    cg_sample_every: int = 0                         # CG progress snapshot interval (0 = disabled, independent of sample_every)
+
     enable_experiential_controller: bool = False     # Master toggle
     experiential_d_model: int = 128                  # Internal d_model for controller
     experiential_num_regions: int = 12               # Number of plasticity regions

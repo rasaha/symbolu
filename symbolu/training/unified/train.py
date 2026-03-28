@@ -7632,93 +7632,243 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
-                # Experiential Controller: CG progress snapshot at sample time
-                if experiential_controller is not None:
+            # =============================================================
+            # Conscious Generation Progress Snapshot
+            # Independent of text quality samples. Controlled by --cg_sample_every.
+            # Shows all active CG phases, governance, and experiential state.
+            # =============================================================
+            if config.cg_sample_every > 0 and global_step % config.cg_sample_every == 0 and global_step > 0:
+                _cg_snapshot_active = (
+                    config.enable_conscious_generation
+                    or experiential_controller is not None
+                )
+                if _cg_snapshot_active:
                     try:
-                        _ec = experiential_controller
-                        _ec_step = _ec.step.item()
-                        _ec_ids = _ec.identity.get_state()
-                        _ec_resist = _ec.plasticity_gate.persistent_resistance
-                        _ec_replay_len = len(_ec.replay)
-
                         print("")
-                        print("=" * 60)
-                        print(f"  EXPERIENTIAL CONTROLLER SNAPSHOT (Step {global_step})")
-                        print("=" * 60)
+                        print("=" * 70)
+                        print(f"  CONSCIOUS GENERATION PROGRESS (Step {global_step})")
+                        print("=" * 70)
+                        _cg_sections = 0
 
-                        # Plasticity gate state
-                        _r_mean = _ec_resist.mean().item()
-                        _r_std = _ec_resist.std().item() if _ec_resist.numel() > 1 else 0.0
-                        print(f"  Resistance:  mean={_r_mean:.4f}  std={_r_std:.4f}  "
-                              f"(higher = more selective learning)")
-
-                        # Current g_eff components from most recent metrics
-                        _exp_geff = metrics.get('exp_g_eff', None)
-                        _exp_p = metrics.get('exp_plasticity', None)
-                        _exp_g = metrics.get('exp_gain', None)
-                        _exp_d = metrics.get('exp_damping', None)
-                        if _exp_geff is not None:
-                            print(f"  g_eff:       {_exp_geff:.4f}  "
-                                  f"(P={_exp_p:.3f} x G={_exp_g:.3f} x d={_exp_d:.3f})")
-                            # Interpret g_eff for the user
-                            if _exp_geff < 0.5:
-                                print(f"               -> LOW: model is cautious, "
-                                      f"high resistance or instability")
-                            elif _exp_geff > 2.0:
-                                print(f"               -> HIGH: model is learning aggressively")
+                        # --- Phase 1: Ontological Foundation ---
+                        if metrics.get('cg_ont_loss') is not None:
+                            _cg_sections += 1
+                            _ont_loss = metrics['cg_ont_loss']
+                            _ont_pos = metrics.get('cg_ont_pos_sim', 0)
+                            _ont_neg = metrics.get('cg_ont_neg_sim', 0)
+                            _ont_margin = _ont_pos - _ont_neg
+                            print(f"  Phase 1 - Ontology:")
+                            print(f"    L_ont={_ont_loss:.4f}  "
+                                  f"pos_sim={_ont_pos:.3f}  neg_sim={_ont_neg:.3f}  "
+                                  f"margin={_ont_margin:.3f}")
+                            if _ont_margin > 0.3:
+                                print(f"    -> GOOD: clear separation between similar/dissimilar tokens")
+                            elif _ont_margin > 0.1:
+                                print(f"    -> DEVELOPING: ontological structure emerging")
                             else:
-                                print(f"               -> MODERATE: balanced plasticity")
+                                print(f"    -> EARLY: margin too small, structure not yet learned")
 
-                        # Loss breakdown
-                        _lt = metrics.get('exp_L_token', None)
-                        _ltemp = metrics.get('exp_L_temporal', None)
-                        _lcoh = metrics.get('exp_L_coherence', None)
-                        _llat = metrics.get('exp_L_latent', None)
-                        if _lt is not None:
-                            print(f"  Loss:        L_tok={_lt:.4f}  L_temp={_ltemp:.4f}  "
-                                  f"L_coh={_lcoh:.4f}  L_lat={_llat:.4f}")
-                            _ltotal = metrics.get('exp_total_loss', 0)
-                            print(f"               L_exp={_ltotal:.4f} (weighted sum x g_eff)")
+                        # --- Phase 2: Primitive Scoring Heads ---
+                        _p2_norms = {}
+                        if hasattr(model, 'conscious_gen') and 'token_cache' in getattr(model, 'conscious_gen', {}):
+                            _p2_diag = model.conscious_gen['token_cache'].get_diagnostics()
+                            for _buf in ('P_tok', 'R_tok', 'V_tok', 'G_tok'):
+                                _nk = f"{_buf}_mean_norm"
+                                if _nk in _p2_diag and _p2_diag[_nk] > 0:
+                                    _p2_norms[_buf] = _p2_diag[_nk]
+                        if _p2_norms:
+                            _cg_sections += 1
+                            _p2_str = "  ".join([f"{k}={v:.3f}" for k, v in _p2_norms.items()])
+                            print(f"  Phase 2 - Primitive Buffers:")
+                            print(f"    {_p2_str}")
+                            _active_bufs = sum(1 for v in _p2_norms.values() if v > 0.01)
+                            print(f"    -> {_active_bufs}/{len(_p2_norms)} buffers active")
 
-                        # Identity EMA health
-                        _id_norm = _ec_ids['identity_norm']
-                        _id_count = _ec_ids['accumulator_count']
-                        _id_consol = _ec_ids.get('consolidation_count', 0)
-                        print(f"  Identity:    norm={_id_norm:.4f}  "
-                              f"accumulations={_id_count}  "
-                              f"consolidations={_id_consol}")
-                        if _id_norm < 0.01:
-                            print(f"               -> COLD: identity not yet formed")
-                        elif _id_norm > 0.5:
-                            print(f"               -> STABLE: strong self-representation")
+                        # --- Phase 3: Governance Integration ---
+                        _has_p3 = any(metrics.get(k) is not None for k in
+                                      ['cg_alpha_entropy', 'cg_bliss_mean', 'cg_kosha_routing_loss'])
+                        if _has_p3:
+                            _cg_sections += 1
+                            print(f"  Phase 3 - Governance:")
+                            _p3_parts = []
+                            if metrics.get('cg_alpha_entropy') is not None:
+                                _p3_parts.append(f"alpha_H={metrics['cg_alpha_entropy']:.3f}")
+                            if metrics.get('cg_bliss_mean') is not None:
+                                _p3_parts.append(f"B={metrics['cg_bliss_mean']:.3f}")
+                            if metrics.get('cg_disagree_mean') is not None:
+                                _p3_parts.append(f"D={metrics['cg_disagree_mean']:.3f}")
+                            if metrics.get('cg_kosha_routing_loss') is not None:
+                                _p3_parts.append(f"L_kosha={metrics['cg_kosha_routing_loss']:.4f}")
+                            if metrics.get('cg_bliss_loss') is not None:
+                                _p3_parts.append(f"L_bliss={metrics['cg_bliss_loss']:.4f}")
+                            print(f"    {' | '.join(_p3_parts)}")
+                            # Primitive aux losses
+                            _prim_parts = []
+                            for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                _pk = f'cg_L_{_pn}'
+                                if metrics.get(_pk) is not None:
+                                    _prim_parts.append(f"L_{_pn}={metrics[_pk]:.4f}")
+                            if _prim_parts:
+                                print(f"    Primitives: {' | '.join(_prim_parts)}")
+                            # Interpret governance health
+                            _alpha_h = metrics.get('cg_alpha_entropy', 0)
+                            if _alpha_h > 1.5:
+                                print(f"    -> HEALTHY: high routing entropy (exploring all koshas)")
+                            elif _alpha_h > 0.5:
+                                print(f"    -> SPECIALIZING: koshas differentiating")
+                            elif _alpha_h > 0:
+                                print(f"    -> COLLAPSED: one kosha dominating, check routing")
+
+                        # --- Phase 4: Field-Integrated Generation ---
+                        if metrics.get('cg_field_lm_loss') is not None:
+                            _cg_sections += 1
+                            print(f"  Phase 4 - Field Integration:")
+                            _f_loss = metrics['cg_field_lm_loss']
+                            _f_active = metrics.get('cg_phase4_active', 0)
+                            _f_coverage = metrics.get('cg_shortlist_coverage', 0)
+                            _f_fallback = metrics.get('cg_phase4_fallback', 0)
+                            print(f"    L_field={_f_loss:.4f}  active={_f_active:.0f}  "
+                                  f"coverage={_f_coverage:.3f}  fallback={_f_fallback:.0f}")
+                            if _f_coverage > 0.8:
+                                print(f"    -> GOOD: field covers target tokens well")
+                            elif _f_coverage > 0.5:
+                                print(f"    -> PARTIAL: field missing some targets")
+                            else:
+                                print(f"    -> WEAK: field not yet capturing target distribution")
+
+                        # --- Phase 5: Curriculum Stage ---
+                        if cg_stage_manager is not None:
+                            _cg_sections += 1
+                            _cs_diag = cg_stage_manager.get_diagnostics()
+                            _cs_stage = _cs_diag.get('current_stage', '?')
+                            _cs_progress = _cs_diag.get('stage_progress', 0)
+                            print(f"  Phase 5 - Curriculum:")
+                            print(f"    Stage={_cs_stage}  progress={_cs_progress:.1%}  "
+                                  f"field_integrated={cg_stage_manager.use_field_integrated_softmax}")
+
+                        # --- Governance Diagnostics Summary ---
+                        if cg_governance_diag is not None:
+                            _gov_sum = cg_governance_diag.get_summary()
+                            if _gov_sum:
+                                _cg_sections += 1
+                                print(f"  Governance Diagnostics:")
+                                _gov_parts = []
+                                for _gk, _gv in _gov_sum.items():
+                                    if isinstance(_gv, float):
+                                        _gov_parts.append(f"{_gk}={_gv:.3f}")
+                                    elif isinstance(_gv, int):
+                                        _gov_parts.append(f"{_gk}={_gv}")
+                                if _gov_parts:
+                                    # Show in rows of 4
+                                    for i in range(0, len(_gov_parts), 4):
+                                        print(f"    {' | '.join(_gov_parts[i:i+4])}")
+
+                        # --- Stage 0: Generation Tracer ---
+                        if generation_tracer is not None:
+                            _gt_sum = generation_tracer.summary()
+                            if _gt_sum.get('num_tokens', 0) > 0:
+                                _cg_sections += 1
+                                print(f"  Stage 0 - Binding Cache Tracer:")
+                                print(f"    tokens={_gt_sum.get('num_tokens', 0)}  "
+                                      f"H={_gt_sum.get('mean_logit_entropy', 0):.3f}  "
+                                      f"intent_drift={_gt_sum.get('mean_intent_drift', 0):.4f}  "
+                                      f"cache_hit={_gt_sum.get('mean_cache_hit_rate', 0):.3f}")
+
+                        # --- Stage 8: Perspective Synthesizer ---
+                        if metrics.get('stage8_gate') is not None:
+                            _cg_sections += 1
+                            print(f"  Stage 8 - Perspective Synthesizer:")
+                            print(f"    gate={metrics['stage8_gate']:.4f}  "
+                                  f"cond_norm={metrics.get('stage8_cond_norm', 0):.4f}")
+                            if metrics['stage8_gate'] < 0.01:
+                                print(f"    -> COLD START: gate near zero (safe, no modification)")
+                            elif metrics['stage8_gate'] > 0.5:
+                                print(f"    -> ACTIVE: perspective conditioning influencing output")
+                            else:
+                                print(f"    -> WARMING: gate opening gradually")
+
+                        # --- Experiential Controller ---
+                        if experiential_controller is not None:
+                            _cg_sections += 1
+                            _ec = experiential_controller
+                            _ec_ids = _ec.identity.get_state()
+                            _ec_resist = _ec.plasticity_gate.persistent_resistance
+                            _ec_replay_len = len(_ec.replay)
+
+                            print(f"  Experiential Controller:")
+
+                            # Resistance
+                            _r_mean = _ec_resist.mean().item()
+                            _r_std = _ec_resist.std().item() if _ec_resist.numel() > 1 else 0.0
+                            print(f"    Resistance: mean={_r_mean:.4f}  std={_r_std:.4f}")
+
+                            # g_eff breakdown
+                            _exp_geff = metrics.get('exp_g_eff', None)
+                            if _exp_geff is not None:
+                                print(f"    g_eff={_exp_geff:.4f}  "
+                                      f"(P={metrics.get('exp_plasticity', 0):.3f} x "
+                                      f"G={metrics.get('exp_gain', 0):.3f} x "
+                                      f"d={metrics.get('exp_damping', 0):.3f})")
+                                if _exp_geff < 0.5:
+                                    print(f"    -> CAUTIOUS: high resistance or instability")
+                                elif _exp_geff > 2.0:
+                                    print(f"    -> AGGRESSIVE: learning fast")
+                                else:
+                                    print(f"    -> BALANCED: moderate plasticity")
+
+                            # Loss components
+                            _lt = metrics.get('exp_L_token', None)
+                            if _lt is not None:
+                                print(f"    L_tok={_lt:.4f}  L_temp={metrics.get('exp_L_temporal', 0):.4f}  "
+                                      f"L_coh={metrics.get('exp_L_coherence', 0):.4f}  "
+                                      f"L_lat={metrics.get('exp_L_latent', 0):.4f}")
+
+                            # Identity
+                            _id_norm = _ec_ids['identity_norm']
+                            _id_count = _ec_ids['accumulator_count']
+                            _id_consol = _ec_ids.get('consolidation_count', 0)
+                            print(f"    Identity: norm={_id_norm:.4f}  accum={_id_count}  "
+                                  f"consol={_id_consol}", end="")
+                            if _id_norm < 0.01:
+                                print(f" (COLD)")
+                            elif _id_norm > 0.5:
+                                print(f" (STABLE)")
+                            else:
+                                print(f" (FORMING)")
+
+                            # Replay + per-region
+                            print(f"    Replay: {_ec_replay_len} items")
+                            if _ec_resist.dim() >= 1 and _ec_resist.shape[0] > 1:
+                                _r_vals = _ec_resist.detach().cpu().tolist()
+                                _r_str = " ".join([f"{v:.2f}" for v in _r_vals[:12]])
+                                print(f"    Regions: [{_r_str}]")
+
+                            # TensorBoard
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('experiential/resistance_mean', _r_mean, global_step)
+                                writer.add_scalar('experiential/resistance_std', _r_std, global_step)
+                                writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
+                                writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+
+                        # --- Embedding Diagnostics Trend ---
+                        if 'cg_embedding_diag' in dir() and cg_embedding_diag is not None:
+                            if len(cg_embedding_diag.history) >= 2:
+                                _cg_sections += 1
+                                _ed_trend = cg_embedding_diag.get_trend_summary()
+                                print(f"  Embedding Diagnostics:")
+                                for _tk, _tv in _ed_trend.items():
+                                    print(f"    {_tk}: {_tv}")
+
+                        # Footer
+                        if _cg_sections == 0:
+                            print(f"  (No CG modules active yet — check lambda weights)")
                         else:
-                            print(f"               -> FORMING: identity developing")
-
-                        # Replay buffer
-                        print(f"  Replay:      {_ec_replay_len} items buffered "
-                              f"(high-misalignment, low-plasticity moments)")
-
-                        # Per-region resistance breakdown (condensed)
-                        if _ec_resist.dim() >= 1 and _ec_resist.shape[0] > 1:
-                            _r_vals = _ec_resist.detach().cpu().tolist()
-                            _r_str = " ".join([f"{v:.2f}" for v in _r_vals[:12]])
-                            print(f"  Regions:     [{_r_str}]")
-                            _r_max_idx = _r_vals.index(max(_r_vals))
-                            _r_min_idx = _r_vals.index(min(_r_vals))
-                            print(f"               most resistant: region {_r_max_idx} ({_r_vals[_r_max_idx]:.3f}), "
-                                  f"most open: region {_r_min_idx} ({_r_vals[_r_min_idx]:.3f})")
-
-                        print("=" * 60)
+                            print(f"  ----")
+                            print(f"  Active CG sections: {_cg_sections}")
+                        print("=" * 70)
                         print("")
-
-                        # TensorBoard snapshot
-                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
-                            writer.add_scalar('experiential/resistance_mean', _r_mean, global_step)
-                            writer.add_scalar('experiential/resistance_std', _r_std, global_step)
-                            writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
-                            writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
-                    except Exception as _ec_snap_err:
-                        print(f"  [Experiential Snapshot] Error: {_ec_snap_err}")
+                    except Exception as _cg_snap_err:
+                        print(f"  [CG Snapshot] Error: {_cg_snap_err}")
 
             # CG Factual Eval — verify JEPA/Vritti distinguish facts from hallucinations
             if cg_factual_eval is not None and tokenizer is not None:
@@ -9581,6 +9731,12 @@ def main():
     parser.add_argument("--factual_eval_start_step", type=int, default=0,
                        help="Delay factual evaluation until this training step")
 
+    # CG Progress Snapshot (separate from text quality samples)
+    parser.add_argument("--cg_sample_every", type=int, default=0,
+                       help="CG progress snapshot interval in steps (0 = disabled). "
+                            "Independent of --sample_every. Shows all active CG phases, "
+                            "governance, and experiential controller state.")
+
     # Experiential Controller: 12-parameter resistance-driven plasticity
     parser.add_argument("--enable_experiential_controller", action="store_true",
                        help="Enable experiential controller (training-time plasticity modulation)")
@@ -10416,6 +10572,8 @@ def main():
         embedding_diag_neighbors=args.embedding_diag_neighbors,
         embedding_diag_no_samples=args.embedding_diag_no_samples,
         embedding_diag_start_step=args.embedding_diag_start_step,
+        # CG Snapshot
+        cg_sample_every=args.cg_sample_every,
         # Experiential Controller
         enable_experiential_controller=args.enable_experiential_controller,
         experiential_d_model=args.experiential_d_model,
