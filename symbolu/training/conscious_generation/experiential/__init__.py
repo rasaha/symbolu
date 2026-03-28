@@ -62,8 +62,16 @@ from symbolu.training.conscious_generation.experiential.experiential_training_lo
     ExperientialTrainingLoop,
     ExperientialTrainingConfig,
 )
+from symbolu.training.conscious_generation.experiential.minimal_controller import (
+    ExperientialController,
+    ExperientialControllerConfig,
+)
 
 __all__ = [
+    # Minimal 12-parameter controller (production path)
+    "ExperientialController",
+    "ExperientialControllerConfig",
+    # Full framework (reference implementation)
     "ExperientialLossSignal",
     "ExperientialLossConfig",
     "VrittiResistanceGate",
