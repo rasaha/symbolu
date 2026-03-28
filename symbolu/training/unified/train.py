@@ -2531,8 +2531,20 @@ def train(config: UnifiedTrainingConfig):
                 alpha_base=config.experiential_alpha_base,
             )
             experiential_controller = ExperientialController(_exp_cfg).to(device)
+
+            # Add controller's learnable projections to optimizer
+            _exp_params = list(experiential_controller.parameters())
+            _exp_param_count = sum(p.numel() for p in _exp_params)
+            if _exp_params:
+                optimizer.add_param_group({
+                    'params': _exp_params,
+                    'lr': config.learning_rate,
+                    'weight_decay': 0.01,
+                })
+
             print(f"\n  [Experiential Controller] ENABLED — 12-parameter plasticity modulation")
-            print(f"    d_model={_exp_cfg.d_model}, regions={_exp_cfg.num_regions}")
+            print(f"    d_model={_exp_cfg.d_model}, regions={_exp_cfg.num_regions}, "
+                  f"learnable params={_exp_param_count:,}")
             print(f"    Loss weights: λ_temp={_exp_cfg.lambda_temporal}, "
                   f"λ_coh={_exp_cfg.lambda_coherence}, λ_lat={_exp_cfg.lambda_latent}")
             print(f"    Plasticity: k_r={_exp_cfg.k_r}, k_m={_exp_cfg.k_m}, b_p={_exp_cfg.b_p}")
@@ -5263,37 +5275,62 @@ def train(config: UnifiedTrainingConfig):
                         # Project to controller d_model if dimensions differ
                         _exp_d = experiential_controller.config.d_model
                         if D_exp != _exp_d:
-                            # Adaptive pooling to match controller dimension
+                            # Pool feature dimension: [B, T, D] → [B, T, d_model]
+                            # adaptive_avg_pool1d pools the last dim, so reshape
+                            # [B, T, D] → [B*T, 1, D] → pool → [B*T, 1, d_model] → [B, T, d_model]
+                            _exp_flat = _exp_hidden.reshape(B_exp * T_exp, 1, D_exp)
                             _exp_input = F.adaptive_avg_pool1d(
-                                _exp_hidden.transpose(1, 2), _exp_d
-                            ).transpose(1, 2)
+                                _exp_flat, _exp_d
+                            ).reshape(B_exp, T_exp, _exp_d)
                         else:
                             _exp_input = _exp_hidden
 
                         # Target: use shifted hidden as target (next-step prediction)
                         _exp_target = _exp_input.detach().clone()
 
-                        # Extract coherence signals from gen2 outputs or metrics
+                        # Extract coherence signals from model outputs or CG metrics
                         _exp_coherence = None
                         if isinstance(outputs, dict) and 'coherence' in outputs:
+                            # Gen2 models provide coherence directly
                             _c_val = outputs['coherence'].mean().item()
                             _exp_coherence = {
                                 'c_tok': _c_val,
                                 'c_lat': _c_val,
                                 'c_conv': _c_val,
                             }
+                        else:
+                            # Derive coherence from available CG signals:
+                            # c_tok: ontology margin (pos_sim - neg_sim), higher = more coherent
+                            # c_lat: 1 - normalized loss (higher = model converging)
+                            # c_conv: adapter gate (how much CG is engaged)
+                            _c_tok = 0.5  # default
+                            if 'cg_ont_pos_sim' in metrics and 'cg_ont_neg_sim' in metrics:
+                                _c_tok = min(1.0, max(0.0,
+                                    metrics['cg_ont_pos_sim'] - metrics['cg_ont_neg_sim']))
+                            _c_lat = min(1.0, max(0.0, 1.0 - loss.item() / 3.0))  # normalize ~[0,3] → [0,1]
+                            _c_conv = metrics.get('adapter_gate', 0.5)
+                            _exp_coherence = {
+                                'c_tok': _c_tok,
+                                'c_lat': _c_lat,
+                                'c_conv': _c_conv,
+                            }
 
                         # Forward through controller
+                        # Input NOT detached: gradients flow through controller's
+                        # temporal_proj and latent_proj for learning.
+                        # base_loss detached: controller doesn't backprop through main CE.
                         _exp_result = experiential_controller(
-                            _exp_input.detach(),  # don't backprop through hidden extraction
+                            _exp_input,
                             _exp_target,
                             base_loss=loss.detach(),
                             coherence_signals=_exp_coherence,
                         )
 
-                        # Scale original loss by g_eff
+                        # Scale original loss by g_eff (detached: no second-order grads)
                         _exp_scale = _exp_result['g_eff'].detach().mean()
-                        loss = _exp_scale * loss
+                        # Add controller's experiential loss so its projections get gradients
+                        _exp_loss_weight = 0.1
+                        loss = _exp_scale * loss + _exp_loss_weight * _exp_result['total_loss']
 
                         # Track metrics
                         metrics['exp_g_eff'] = _exp_scale.item()
@@ -6105,7 +6142,6 @@ def train(config: UnifiedTrainingConfig):
                             with torch.no_grad():
                                 _delta_out = model(x, attention_mask=None, measure_phase_delta=True)
                             if 'backbone_logits' in _delta_out:
-                                import torch.nn.functional as F
                                 _bb_logits = _delta_out['backbone_logits']
                                 _ph_logits = _delta_out['logits']
                                 # Compute per-token CE loss for both
@@ -6308,6 +6344,14 @@ def train(config: UnifiedTrainingConfig):
                     align = metrics['vritti_alignment']
                     res_status = "🎓ACT" if vritti_resonance.active else "👁️OBS"
                     log_msg += f"\n    {res_status} [VRITTI] P-Pram:{align.get('physical_pramana', 0):.2f} | M-Vikal:{align.get('mental_vikalpa', 0):.2f} | I-Smrit:{align.get('intellect_smriti', 0):.2f}"
+
+                # Experiential controller metrics on main step line
+                if experiential_controller is not None and 'exp_g_eff' in metrics:
+                    _eg = metrics['exp_g_eff']
+                    _ep = metrics['exp_plasticity']
+                    _eG = metrics['exp_gain']
+                    _ed = metrics['exp_damping']
+                    log_msg += f" | g_eff:{_eg:.2f} P:{_ep:.2f} G:{_eG:.2f} d:{_ed:.2f}"
 
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
@@ -9320,6 +9364,10 @@ def main():
                        help="Aggressive LR decay factor for emergencies")
     parser.add_argument("--adaptive_consecutive_spike_limit", type=int, default=3,
                        help="After N consecutive loss spikes, block LR boosts")
+    parser.add_argument("--adaptive_max_boost_from_base", type=float, default=2.0,
+                       help="Max LR = base_lr * this (caps compounding boosts)")
+    parser.add_argument("--adaptive_boost_cooldown_steps", type=int, default=400,
+                       help="Minimum steps between consecutive LR boosts")
 
     # Auto Batch Sizing (VRAM-based startup probing)
     parser.add_argument("--enable_auto_batch", action="store_true",
@@ -10359,6 +10407,8 @@ def main():
         adaptive_grad_norm_spike=args.adaptive_grad_norm_spike,
         adaptive_emergency_decay=args.adaptive_emergency_decay,
         adaptive_consecutive_spike_limit=args.adaptive_consecutive_spike_limit,
+        adaptive_max_boost_from_base=args.adaptive_max_boost_from_base,
+        adaptive_boost_cooldown_steps=args.adaptive_boost_cooldown_steps,
         # Auto Batch Sizing
         enable_auto_batch=args.enable_auto_batch,
         auto_batch_target_utilization=args.auto_batch_target_utilization,

@@ -341,13 +341,21 @@ class IdentityEMA:
         self.identity = torch.randn(d_identity) * 0.01
         self.accumulator = torch.zeros(d_identity)
         self.count = 0
+        self.consolidation_count = 0
+
+    def to(self, device: torch.device) -> 'IdentityEMA':
+        """Move identity tensors to device."""
+        self.identity = self.identity.to(device)
+        self.accumulator = self.accumulator.to(device)
+        return self
 
     def accumulate(self, signal: torch.Tensor, salience: float = 0.5) -> None:
         """Fast loop: accumulate identity-relevant signals."""
         if salience > 0.3:
             with torch.no_grad():
+                _signal = signal.detach().to(self.accumulator.device)
                 self.accumulator.mul_(0.99).add_(
-                    signal.detach().cpu() * (1 - 0.99) * salience
+                    _signal * (1 - 0.99) * salience
                 )
                 self.count += 1
 
@@ -371,12 +379,14 @@ class IdentityEMA:
 
         self.accumulator.zero_()
         self.count = 0
+        self.consolidation_count += 1
         return True
 
     def get_state(self) -> Dict[str, object]:
         return {
             "identity_norm": self.identity.norm().item(),
             "accumulator_count": self.count,
+            "consolidation_count": self.consolidation_count,
         }
 
 
@@ -397,19 +407,21 @@ class ReplayBuffer:
             self.buffer.pop(0)
 
     def sample(self, k: int) -> list:
-        """Probability-proportional sampling."""
+        """Probability-proportional sampling without replacement."""
         if not self.buffer:
             return []
         import random
-        priorities = [item.get("priority", 0.01) for item in self.buffer]
         k = min(k, len(self.buffer))
-        selected = random.choices(range(len(self.buffer)), weights=priorities, k=k)
-        seen = set()
+        priorities = [item.get("priority", 0.01) for item in self.buffer]
+        # Use weighted sampling without replacement
+        indices = list(range(len(self.buffer)))
         result = []
-        for idx in selected:
-            if idx not in seen:
-                seen.add(idx)
-                result.append(self.buffer[idx])
+        for _ in range(k):
+            if not indices:
+                break
+            selected = random.choices(indices, weights=[priorities[i] for i in indices], k=1)[0]
+            result.append(self.buffer[selected])
+            indices.remove(selected)
         return result
 
     def prune(self, current_step: int) -> int:
@@ -458,6 +470,14 @@ class ExperientialController(nn.Module):
         # Step counter
         self.register_buffer("step", torch.tensor(0, dtype=torch.long))
 
+    def to(self, *args, **kwargs):
+        """Override to propagate device to non-Module components."""
+        result = super().to(*args, **kwargs)
+        # IdentityEMA is not an nn.Module, so move it explicitly
+        device = next(self.parameters()).device
+        self.identity.to(device)
+        return result
+
     def forward(
         self,
         hidden: torch.Tensor,
@@ -491,6 +511,13 @@ class ExperientialController(nn.Module):
         device = hidden.device
         current_step = self.step.item()
 
+        # Validate input dimension matches config
+        if D != self.config.d_model:
+            raise ValueError(
+                f"Hidden dimension {D} != config.d_model {self.config.d_model}. "
+                f"Project input to d_model before calling controller."
+            )
+
         # Derive region states if not provided
         if region_states is None:
             region_states = self._derive_regions(hidden)
@@ -505,7 +532,7 @@ class ExperientialController(nn.Module):
         # === Stage 4: Plasticity controller ===
         # Compute misalignment from coherence signals
         misalignment = None
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 0:
             c_tok = coherence_signals.get("c_tok", 0.5)
             c_conv = coherence_signals.get("c_conv", 0.5)
             # M_t = 1 - mean(coherence) — normalized mismatch
@@ -519,15 +546,18 @@ class ExperientialController(nn.Module):
 
         # Coherence for gain
         coherence_val = None
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 0:
             coherence_val = sum(coherence_signals.values()) / len(coherence_signals)
 
         G_t = self.gain.compute(coherence=coherence_val, step=current_step)
 
-        # Gradient variance for damping
-        grad_var = hidden.var().item()
+        # Gradient variance for damping — normalize by d_model to keep
+        # the damping parameters (k_dv, k_dc) scale-independent.
+        # Raw hidden.var() scales with activation magnitude; dividing by D
+        # gives a per-dimension variance that's comparable across model sizes.
+        grad_var = hidden.var().item() / max(D, 1)
         coherence_instab = 0.0
-        if coherence_signals is not None:
+        if coherence_signals and len(coherence_signals) > 1:
             c_vec = list(coherence_signals.values())
             if len(c_vec) > 1:
                 coherence_instab = torch.tensor(c_vec).var().item()
@@ -550,7 +580,13 @@ class ExperientialController(nn.Module):
 
         # === Identity accumulation (fast loop) ===
         with torch.no_grad():
-            identity_signal = hidden.mean(dim=(0, 1))[:64] if D >= 64 else hidden.mean(dim=(0, 1))
+            _id_raw = hidden.mean(dim=(0, 1))  # [D]
+            _id_dim = self.identity.d_identity
+            if _id_raw.shape[0] >= _id_dim:
+                identity_signal = _id_raw[:_id_dim]
+            else:
+                # Pad to identity dimension when D < d_identity
+                identity_signal = F.pad(_id_raw, (0, _id_dim - _id_raw.shape[0]))
             mean_salience = P_t.mean().item()
             self.identity.accumulate(identity_signal, mean_salience)
 

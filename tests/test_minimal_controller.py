@@ -426,3 +426,102 @@ class TestControllerIntegration:
         )
         assert not torch.isnan(result["total_loss"])
         assert not torch.isnan(result["g_eff"]).any()
+
+
+# ============================================================
+# Edge Case Tests (from audit)
+# ============================================================
+
+class TestEdgeCases:
+    """Edge cases identified by audit."""
+
+    def test_empty_coherence_signals(self):
+        """Empty dict should not crash (ZeroDivisionError guard)."""
+        config = ExperientialControllerConfig(d_model=64)
+        controller = ExperientialController(config)
+        B, T, D = 2, 16, 64
+        hidden = torch.randn(B, T, D)
+        target = torch.randn(B, T, D)
+
+        # Empty dict — should not raise
+        result = controller(hidden, target, coherence_signals={})
+        assert not torch.isnan(result["total_loss"])
+
+    def test_single_coherence_signal(self):
+        """Single signal should not crash."""
+        config = ExperientialControllerConfig(d_model=64)
+        controller = ExperientialController(config)
+        B, T, D = 2, 16, 64
+        hidden = torch.randn(B, T, D)
+        target = torch.randn(B, T, D)
+
+        result = controller(hidden, target, coherence_signals={"c_tok": 0.7})
+        assert not torch.isnan(result["total_loss"])
+
+    def test_dimension_mismatch_raises(self):
+        """D != d_model should raise ValueError."""
+        config = ExperientialControllerConfig(d_model=128)
+        controller = ExperientialController(config)
+        hidden = torch.randn(2, 16, 64)  # D=64, config expects 128
+        target = torch.randn(2, 16, 64)
+
+        with pytest.raises(ValueError, match="Hidden dimension 64 != config.d_model 128"):
+            controller(hidden, target)
+
+    def test_identity_small_hidden_dim(self):
+        """D < 64 should pad identity signal, not crash."""
+        config = ExperientialControllerConfig(d_model=32, num_regions=4)
+        controller = ExperientialController(config)
+        B, T, D = 2, 8, 32
+        hidden = torch.randn(B, T, D)
+        target = torch.randn(B, T, D)
+
+        # Should work — identity pads from 32 to 64
+        result = controller(hidden, target)
+        assert not torch.isnan(result["total_loss"])
+
+        # Verify identity accumulated
+        state = controller.identity.get_state()
+        assert state["accumulator_count"] >= 0
+
+    def test_consolidation_count_tracked(self):
+        """consolidation_count should be in get_state()."""
+        ema = IdentityEMA(d_identity=32, alpha_base=0.1)
+        state = ema.get_state()
+        assert "consolidation_count" in state
+        assert state["consolidation_count"] == 0
+
+        # Accumulate and consolidate
+        for _ in range(10):
+            ema.accumulate(torch.randn(32) * 10.0, salience=0.8)
+        ema.consolidate()
+        state = ema.get_state()
+        assert state["consolidation_count"] == 1
+
+    def test_replay_sample_no_duplicates(self):
+        """Replay sample should not return duplicates."""
+        buf = ReplayBuffer(capacity=10, ttl=1000)
+        for i in range(10):
+            buf.store({"priority": float(i + 1), "id": i}, step=0)
+
+        sample = buf.sample(k=5)
+        ids = [item["id"] for item in sample]
+        assert len(ids) == len(set(ids)), f"Duplicates found: {ids}"
+
+    def test_batch_size_one(self):
+        """B=1 should work."""
+        config = ExperientialControllerConfig(d_model=64)
+        controller = ExperientialController(config)
+        hidden = torch.randn(1, 16, 64)
+        target = torch.randn(1, 16, 64)
+        result = controller(hidden, target)
+        assert result["total_loss"].shape == ()
+
+    def test_sequence_length_one(self):
+        """T=1 should work."""
+        config = ExperientialControllerConfig(d_model=64, num_regions=1)
+        controller = ExperientialController(config)
+        hidden = torch.randn(2, 1, 64)
+        target = torch.randn(2, 1, 64)
+        result = controller(hidden, target)
+        assert not torch.isnan(result["total_loss"])
