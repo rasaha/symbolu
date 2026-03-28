@@ -312,9 +312,17 @@ class Damping:
         coherence_instability: float = 0.0,
     ) -> float:
         """Compute damping factor in (0, 1]."""
-        # EMA smooth inputs
-        self._V_ema = 0.95 * self._V_ema + 0.05 * grad_variance
-        self._U_ema = 0.95 * self._U_ema + 0.05 * coherence_instability
+        # Asymmetric EMA: fast rise (detect spikes) but fast decay (recover quickly).
+        # Rise: 0.90 (10% of spike absorbed immediately)
+        # Decay: 0.80 (20% decay per step → halves in ~3 steps, not ~14)
+        if grad_variance > self._V_ema:
+            self._V_ema = 0.90 * self._V_ema + 0.10 * grad_variance
+        else:
+            self._V_ema = 0.80 * self._V_ema + 0.20 * grad_variance
+        if coherence_instability > self._U_ema:
+            self._U_ema = 0.90 * self._U_ema + 0.10 * coherence_instability
+        else:
+            self._U_ema = 0.80 * self._U_ema + 0.20 * coherence_instability
 
         # d_t = exp(-k_dv · V - k_dc · U)
         exponent = -(self.config.k_dv * self._V_ema + self.config.k_dc * self._U_ema)
