@@ -337,8 +337,8 @@ class TestControlTheoryAblations:
         # This effectively kills the bias, making sigmoid ≈ 0 for low inputs
         with torch.no_grad():
             loop.resistance_gate.coupling_bias.fill_(-10.0)
-            loop.resistance_gate.coupling_a.fill_(0.1)
-            loop.resistance_gate.coupling_b.fill_(0.1)
+            loop.resistance_gate.coupling_k.fill_(0.1)
+            loop.resistance_gate.coupling_w_s.fill_(0.0)
 
         floor_hits = 0
         for _ in range(N_STEPS):
@@ -382,10 +382,10 @@ class TestControlTheoryAblations:
         )
 
     def test_ablate_latent_misalignment_coupling(self, baseline):
-        """Set latent_dominance to 0 (no misalignment feedback into resistance).
+        """Set misalignment_strength to 0 (no misalignment feedback into resistance).
         Expected: resistance no longer responds to latent misalignment."""
         config = VrittiResistanceConfig(
-            d_model=D, num_regions=NUM_REGIONS, latent_dominance=0.0,
+            d_model=D, num_regions=NUM_REGIONS, misalignment_strength=0.0,
         )
         gate = VrittiResistanceGate(config)
 
@@ -402,10 +402,10 @@ class TestControlTheoryAblations:
         r_with = gate2(region_states, error_signal, proposed,
                        latent_misalignment=high_misalignment)
 
-        # With dominance=0, misalignment should have NO effect on resistance
+        # With strength=0, exp(-0*m) = 1 always, so no effect
         assert torch.allclose(
             r_without["resistance"], r_with["resistance"], atol=1e-3
-        ), "latent_dominance=0 should make resistance ignore misalignment"
+        ), "misalignment_strength=0 should make resistance ignore misalignment"
 
 
 # ============================================================================

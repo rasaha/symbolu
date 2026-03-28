@@ -1,41 +1,39 @@
 """
 Experiential Learning for Conscious Generation (CG) Training.
 
-Models the five analogs of natural experience in AI training:
+A constrained adaptive optimizer with resistance-modulated plasticity.
 
-1. ExperientialLossSignal — Multi-modal, cross-frequency loss that propagates
-   differently across modalities (semantic, temporal, somatic-analog). Maps to
-   FSCS frequency-stratified coherence where error at one frequency resonates
-   into others.
+Post-ablation architecture (5 commits of refinement + ablation):
 
-2. VrittiResistanceGate — Continuous plasticity scaling via vritti field.
-   NO binary branching. g_eff = clamp(salience * resistance_openness, 0, max_gain) * g.
-   Salience and resistance are independent signals composed multiplicatively.
+Core equation:
+    resistance_eff = resistance * exp(-k_m * misalignment)
+    openness = (1 - resistance_eff) + w_s * salience
+    plasticity = sigmoid(k * openness + bias)
+    g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
-3. OfflineConsolidationCycle — Simplified sleep analog: replay high-salience
-   deferred samples + prune stale/low-salience entries. No overloaded
-   reconciliation logic.
+Load-bearing components (ablation-validated):
+    - Resistance gate — primary control signal
+    - Biased sigmoid — prevents dead zones
+    - Damping — protects against gradient noise
+    - Adaptive gain — tracks training dynamics
+    - Experiential loss — multi-modal error signal
 
-4. SalienceWeighter — Consequence-based error weighting that develops
-   "scar tissue" in regions that have experienced cascade failures.
-   Errors that propagate downstream leave deeper traces.
+Modulation components (not primary control):
+    - Salience — merged into openness (modulation, not competing signal)
+    - Historical consistency — diagnostics only
+    - Identity layer — slow-loop EMA consolidation with adaptive alpha
 
-5. IdentityLayer — Persistent self-model updated via EMA during consolidation
-   phase ONLY (slow loop). NOT updated on every step. Maps to the 12-layer
-   ontological architecture where deeper layers resist surface task errors.
+Modules:
+    1. ExperientialLossSignal — Multi-modal cross-frequency loss (load-bearing)
+    2. VrittiResistanceGate — Resistance-driven plasticity controller (load-bearing)
+    3. OfflineConsolidationCycle — Sleep analog: stochastic replay + prune
+    4. SalienceWeighter — Consequence-based weighting (modulation)
+    5. IdentityLayer — EMA self-model, consolidation-only updates
 
 Time-scale separation:
-    FAST (every step): loss -> salience -> resistance -> g_eff = s * r * g
-    MEDIUM (every N steps): replay deferred + prune stale
-    SLOW (every M >> N steps): identity EMA consolidation
-
-Stability constraints:
-    - Bounded gain with rate limiting (max_gain, max_delta_fraction)
-    - EMA damping on resistance with rate-limited damping changes
-    - No binary branching
-    - Identity via EMA only with adaptive alpha (modulated by stability/agreement)
-    - Configurable latent dominance coefficient
-    - Stochastic priority sampling in replay buffer
+    FAST (every step): loss → merged openness → plasticity → g_eff
+    MEDIUM (every N steps): stochastic replay + prune
+    SLOW (every M >> N steps): identity EMA consolidation (adaptive alpha)
 
 Reference: docs/design/EXPERIENTIAL_LEARNING_DESIGN.md
 """

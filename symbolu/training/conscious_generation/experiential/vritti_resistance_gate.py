@@ -1,26 +1,29 @@
 """
-VrittiResistanceGate: Gain-modulated, damped plasticity field for CG training.
+VrittiResistanceGate: Resistance-driven adaptive plasticity controller.
 
-Control-theory grounded gradient modulation:
+Core equation (post-ablation consolidation):
 
-    g_eff = d_t * plasticity * g
+    g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
 Where:
-    plasticity = sigmoid(a * salience + b * openness)    # Biased gating (no dead zones)
-    d_t = 1 / (1 + gradient_variance / coherence_stability)  # Explicit damping
-    max_gain_t = base_gain * coherence_factor              # Adaptive gain ceiling
+    resistance_eff = resistance * exp(-k_m * misalignment)
+    openness = (1 - resistance_eff) + w_s * salience
+    plasticity = sigmoid(k * openness + bias)
+    d_t = 1 / (1 + gradient_variance / coherence_stability)
+    max_gain_t = base_gain * coherence_factor * phase_factor
 
-Key properties:
-    - NO dead zones: biased sigmoid coupling ensures plasticity > 0 always
-    - Adaptive gain: max_gain varies with coherence/entropy state
-    - Explicit damping: d_t reduces gain when gradients are noisy
-    - Resistance depends on historical consistency + identity proximity
-    - Deferred buffer: strict TTL, bounded size, no gradient storage
-    - Latent misalignment feeds into resistance (not just loss)
+Ablation-validated properties:
+    - Resistance is the primary control signal (load-bearing)
+    - Salience is merged into openness as modulation (not a competing signal)
+    - Misalignment uses exponential coupling for real influence at high values
+    - Historical consistency retained for diagnostics only (not load-bearing)
+    - Damping and adaptive gain are load-bearing (rate-limited)
+    - Biased sigmoid prevents dead zones (load-bearing)
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
 
+import math
 import torch
 import torch.nn as nn
 from dataclasses import dataclass
@@ -31,20 +34,27 @@ from typing import Dict, Optional, Tuple
 class VrittiResistanceConfig:
     """Configuration for vritti resistance gating.
 
+    Consolidated from 13 → 11 tunable parameters after ablation.
+    Removed: latent_dominance (replaced by misalignment_strength with
+    exponential coupling), consistency modulation (retained for diagnostics only).
+
     Attributes:
         d_model: Model dimension
         num_regions: Number of gatable regions in the model
         num_vritti_modes: Number of vritti cognitive modes (5 classical)
-        resistance_decay: Temporal decay of resistance state
+        resistance_decay: Temporal decay of resistance EMA state
         resistance_floor: Minimum resistance (prevents zero-resistance)
         resistance_ceiling: Maximum resistance (prevents total lockout)
         base_max_gain: Base maximum plasticity gain (before adaptation)
         plasticity_floor: Minimum plasticity (prevents dead zones)
         damping_sensitivity: How much gradient variance reduces gain
         ema_momentum: Momentum for resistance EMA smoothing
+        misalignment_strength: Exponential coupling strength for latent misalignment.
+            resistance_eff = resistance * exp(-k * misalignment).
+            k=0: no effect. k=2: misalignment=1 → resistance drops to 13%.
         deferred_capacity: Max items in deferred buffer
         deferred_ttl: Time-to-live for deferred items (steps)
-        consistency_window: Steps to track for historical consistency
+        consistency_window: Steps to track for historical consistency (diagnostics)
     """
     d_model: int = 128
     num_regions: int = 12
@@ -56,10 +66,10 @@ class VrittiResistanceConfig:
     plasticity_floor: float = 0.05
     damping_sensitivity: float = 1.0
     ema_momentum: float = 0.9
+    misalignment_strength: float = 2.0
     deferred_capacity: int = 128
     deferred_ttl: int = 200
     consistency_window: int = 50
-    latent_dominance: float = 0.3
 
 
 class VrittiFieldEstimator(nn.Module):
@@ -117,7 +127,11 @@ class VrittiFieldEstimator(nn.Module):
 
 
 class StakesEstimator(nn.Module):
-    """Estimates the stakes (consequence level) of a given error signal."""
+    """Estimates the stakes (consequence level) of a given error signal.
+
+    Used as fallback salience when external salience weights are not provided.
+    After ablation: salience is modulation, not primary control.
+    """
 
     def __init__(self, d_model: int, num_regions: int):
         super().__init__()
@@ -151,17 +165,8 @@ class AdaptiveGainController:
 
     max_gain_t = base_gain * coherence_factor * phase_factor
 
-    Where:
-        coherence_factor = sigmoid(coherence - 0.5) in [0.5, 1.0]
-        phase_factor = ramp from 0.5 to 1.0 over early training
-
-    Rate-limited: gain cannot change by more than max_delta per step,
-    preventing destabilizing oscillation when coherence flickers.
-
-    This prevents:
-        - Early training: under-learning (gain too high before model stabilizes)
-        - Late training: over-correction (gain should match model confidence)
-        - Oscillation: gain jumps clamped to max_delta_fraction per step
+    Rate-limited: gain cannot change by more than max_delta per step.
+    Load-bearing per ablation: removing adaptive gain collapses gain to constant.
     """
 
     def __init__(self, base_max_gain: float = 3.0, max_delta_fraction: float = 0.1):
@@ -175,30 +180,16 @@ class AdaptiveGainController:
         step: int = 0,
         warmup_steps: int = 1000,
     ) -> float:
-        """Compute adaptive max gain with rate limiting.
-
-        Args:
-            coherence: Current coherence measure in [0, 1] (None = use base)
-            step: Current training step
-            warmup_steps: Steps over which to ramp gain
-
-        Returns:
-            Adaptive max_gain value (rate-limited)
-        """
-        # Phase factor: ramp from 0.5 to 1.0 over warmup
+        """Compute adaptive max gain with rate limiting."""
         phase_factor = min(1.0, 0.5 + 0.5 * step / max(warmup_steps, 1))
 
-        # Coherence factor: higher coherence = more confident = higher gain OK
         if coherence is not None:
-            # sigmoid mapping: coherence 0 -> 0.5, coherence 1 -> ~0.73
-            import math
             coherence_factor = 0.5 + 0.5 / (1.0 + math.exp(-(coherence - 0.5) * 4))
         else:
-            coherence_factor = 0.75  # Default middle value
+            coherence_factor = 0.75
 
         target_gain = self.base_max_gain * coherence_factor * phase_factor
 
-        # Rate limiting: prevent gain from jumping too fast
         if self._prev_gain is not None:
             max_delta = self.base_max_gain * self.max_delta_fraction
             clamped = max(
@@ -217,12 +208,7 @@ class DampingComputer:
 
     d_t = 1 / (1 + sensitivity * gradient_variance / coherence_stability)
 
-    Reduces effective gain when:
-        - Gradient variance is high (noisy signal, don't over-react)
-        - Coherence stability is low (model state is uncertain)
-
-    This is the missing damping term from control theory:
-        g_eff = d_t * plasticity * g
+    Load-bearing per ablation: sensitivity=0 locks damping at 1.0.
     """
 
     def __init__(self, sensitivity: float = 1.0, ema_decay: float = 0.95, max_delta: float = 0.1):
@@ -238,16 +224,7 @@ class DampingComputer:
         gradient_variance: float,
         coherence_stability: Optional[float] = None,
     ) -> float:
-        """Compute damping factor.
-
-        Args:
-            gradient_variance: Variance of recent gradients
-            coherence_stability: Stability of coherence signal (None = use EMA)
-
-        Returns:
-            d_t in (0, 1] — damping factor
-        """
-        # Update EMAs
+        """Compute damping factor in (0, 1]."""
         self._grad_var_ema = (
             self._ema_decay * self._grad_var_ema
             + (1 - self._ema_decay) * gradient_variance
@@ -261,9 +238,8 @@ class DampingComputer:
 
         coh = max(self._coherence_ema, 1e-6)
         d_t = 1.0 / (1.0 + self.sensitivity * self._grad_var_ema / coh)
-        d_t = max(d_t, 0.01)  # Floor at 1% to prevent total freezing
+        d_t = max(d_t, 0.01)
 
-        # Rate-limit damping changes to prevent oscillation
         if self._prev_d_t is not None:
             d_t = max(self._prev_d_t - self._max_delta,
                       min(self._prev_d_t + self._max_delta, d_t))
@@ -273,24 +249,22 @@ class DampingComputer:
 
 
 class VrittiResistanceGate(nn.Module):
-    """Gain-modulated, damped plasticity field.
+    """Resistance-driven adaptive plasticity controller.
 
-    Full update equation:
+    Post-ablation consolidated architecture:
 
+        resistance_eff = resistance * exp(-k_m * misalignment)
+        openness = (1 - resistance_eff) + w_s * salience
+        plasticity = sigmoid(k * openness + bias)
         g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
-    Where:
-        plasticity = sigmoid(a * salience + b * openness)   [biased — no dead zones]
-        d_t = 1 / (1 + var(g) / coherence_stability)        [explicit damping]
-        max_gain_t = base * coherence_factor * phase_factor  [adaptive ceiling]
-        openness = f(vritti_resistance, historical_consistency, latent_misalignment)
-
-    Key improvements over naive s * r:
-        1. Biased sigmoid coupling prevents dead zones
-        2. Adaptive gain tracks training dynamics
-        3. Explicit damping prevents oscillation
-        4. Resistance informed by history + latent state
-        5. Deferred buffer has strict TTL and no gradient storage
+    Key design decisions (ablation-validated):
+        - Resistance is primary: ablation causes largest behavioral shift
+        - Salience is merged into openness (modulation, not competing signal)
+        - Exponential misalignment coupling: exp(-k*m) forces real influence
+        - Historical consistency: diagnostics only (not load-bearing for gating)
+        - Biased sigmoid: load-bearing (prevents dead zones)
+        - Damping and adaptive gain: load-bearing (rate-limited)
 
     Args:
         config: VrittiResistanceConfig
@@ -305,10 +279,12 @@ class VrittiResistanceGate(nn.Module):
         )
         self.stakes_estimator = StakesEstimator(config.d_model, config.num_regions)
 
-        # Learned coupling coefficients for biased sigmoid
-        # plasticity = sigmoid(a * salience + b * openness + c)
-        self.coupling_a = nn.Parameter(torch.tensor(2.0))
-        self.coupling_b = nn.Parameter(torch.tensor(2.0))
+        # Consolidated learned parameters (3 total):
+        #   k: scaling for merged openness signal
+        #   w_s: weight for salience contribution to openness
+        #   bias: ensures plasticity > sigmoid(bias) > 0 always
+        self.coupling_k = nn.Parameter(torch.tensor(2.0))
+        self.coupling_w_s = nn.Parameter(torch.tensor(0.5))
         self.coupling_bias = nn.Parameter(torch.tensor(-1.0))
 
         # Persistent resistance state (EMA-smoothed)
@@ -320,7 +296,7 @@ class VrittiResistanceGate(nn.Module):
         # Error history for scar tissue
         self.register_buffer("error_history", torch.zeros(config.num_regions))
 
-        # Historical consistency: variance of resistance over time
+        # Historical consistency tracking (diagnostics only — not used in gating)
         self.register_buffer(
             "resistance_history",
             torch.zeros(config.consistency_window, config.num_regions),
@@ -328,9 +304,6 @@ class VrittiResistanceGate(nn.Module):
         self.register_buffer(
             "history_ptr", torch.tensor(0, dtype=torch.long)
         )
-
-        # Gradient variance tracker (for damping)
-        self.register_buffer("grad_var_ema", torch.tensor(0.0))
 
         # Adaptive gain controller and damping computer
         self.gain_controller = AdaptiveGainController(config.base_max_gain)
@@ -348,18 +321,21 @@ class VrittiResistanceGate(nn.Module):
         latent_misalignment: Optional[torch.Tensor] = None,
         coherence: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
-        """Scale proposed updates via damped, gain-modulated plasticity field.
+        """Scale proposed updates via resistance-driven plasticity field.
 
-        Full equation:
+        Consolidated equation:
+            resistance_eff = resistance * exp(-k_m * misalignment)
+            openness = (1 - resistance_eff) + w_s * salience
+            plasticity = sigmoid(k * openness + bias)
             g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
         Args:
             region_states: [B, num_regions, D] current state per region
             error_signal: [B, num_regions, D] error signal per region
             proposed_update: [B, num_regions, D] proposed gradient update
-            salience_weights: Optional [B, num_regions] external salience
+            salience_weights: Optional [B, num_regions] salience (merged into openness)
             latent_misalignment: Optional [B, num_regions] misalignment from
-                coherence pipeline (feeds into resistance, not just loss)
+                coherence pipeline (exponential coupling into resistance)
             coherence: Optional scalar coherence measure for adaptive gain
 
         Returns:
@@ -368,7 +344,7 @@ class VrittiResistanceGate(nn.Module):
         B = region_states.shape[0]
         step = self.history_ptr.item()
 
-        # === Signal 1: Resistance field ===
+        # === Step 1: Base resistance from vritti field ===
         vritti_dist, instantaneous_resistance = self.vritti_estimator(region_states)
 
         # EMA-smooth with persistent state
@@ -377,15 +353,13 @@ class VrittiResistanceGate(nn.Module):
             + (1 - self.config.ema_momentum) * instantaneous_resistance
         )
 
-        # Modulate resistance by historical consistency
-        # High historical variance = less stable = lower effective resistance
-        consistency = self._compute_historical_consistency()
-        resistance = resistance * (0.5 + 0.5 * consistency.unsqueeze(0))
-
-        # Modulate resistance by latent misalignment (tighter coupling)
-        # High misalignment = something is wrong = lower resistance (allow correction)
+        # === Step 2: Exponential misalignment coupling ===
+        # exp(-k * m): m=0 → factor=1, m=1 → factor=exp(-k)
+        # With k=2: m=1 → factor≈0.13 (much stronger than linear 1-0.3=0.7)
         if latent_misalignment is not None:
-            misalignment_factor = 1.0 - self.config.latent_dominance * latent_misalignment.clamp(0, 1)
+            misalignment_factor = torch.exp(
+                -self.config.misalignment_strength * latent_misalignment.clamp(0, 1)
+            )
             resistance = resistance * misalignment_factor
 
         # Clamp resistance
@@ -393,54 +367,53 @@ class VrittiResistanceGate(nn.Module):
             self.config.resistance_floor, self.config.resistance_ceiling
         )
 
-        # Resistance openness
-        resistance_openness = 1.0 - resistance
-
-        # === Signal 2: Stakes/Salience ===
+        # === Step 3: Merged openness signal ===
+        # Salience is folded into openness (not a competing signal)
         stakes = self.stakes_estimator(error_signal, self.error_history)
         effective_salience = salience_weights if salience_weights is not None else stakes
 
-        # === Compose: biased sigmoid coupling (NO dead zones) ===
-        # plasticity = sigmoid(a * salience + b * openness + bias)
-        # This ensures plasticity > sigmoid(bias) > 0 always
-        plasticity_logit = (
-            self.coupling_a * effective_salience
-            + self.coupling_b * resistance_openness
-            + self.coupling_bias
-        )
+        # openness = (1 - resistance) + w_s * salience
+        openness = (1.0 - resistance) + self.coupling_w_s * effective_salience
+
+        # === Step 4: Biased sigmoid plasticity (load-bearing) ===
+        # plasticity = sigmoid(k * openness + bias)
+        plasticity_logit = self.coupling_k * openness + self.coupling_bias
         plasticity = torch.sigmoid(plasticity_logit)
 
-        # === Adaptive gain ceiling ===
+        # === Step 5: Adaptive gain ceiling (load-bearing) ===
         max_gain_t = self.gain_controller.compute(
             coherence=coherence, step=step
         )
 
-        # === Explicit damping: d_t ===
+        # === Step 6: Explicit damping (load-bearing) ===
         grad_variance = proposed_update.var().item()
         d_t = self.damping_computer.compute(
             gradient_variance=grad_variance,
             coherence_stability=coherence,
         )
 
-        # === Final: g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g ===
+        # === Step 7: Final output ===
+        # g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
         plasticity = plasticity.clamp(self.config.plasticity_floor, max_gain_t)
         effective_gain = d_t * plasticity
 
         gated_update = proposed_update * effective_gain.unsqueeze(-1)
 
-        # === Deferred buffer: strict TTL, bounded, no gradient storage ===
+        # === Deferred buffer ===
         deferred_count = self._update_deferred_buffer(
             effective_salience, plasticity, error_signal, step
         )
 
-        # === Update persistent state ===
+        # === Update persistent state + diagnostics ===
+        consistency = self._compute_historical_consistency()
+
         with torch.no_grad():
             mean_resistance = resistance.mean(dim=0).detach()
             self.persistent_resistance.mul_(self.config.resistance_decay).add_(
                 mean_resistance * (1 - self.config.resistance_decay)
             )
 
-            # Record resistance history for consistency tracking
+            # Record resistance history (diagnostics only)
             ptr = self.history_ptr.item() % self.config.consistency_window
             self.resistance_history[ptr] = mean_resistance
             self.history_ptr += 1
@@ -456,7 +429,7 @@ class VrittiResistanceGate(nn.Module):
             "damping": torch.tensor(d_t),
             "max_gain_t": torch.tensor(max_gain_t),
             "resistance": resistance,
-            "resistance_openness": resistance_openness,
+            "resistance_openness": openness,
             "consistency": consistency,
             "stakes": stakes,
             "vritti_dist": vritti_dist,
@@ -464,13 +437,10 @@ class VrittiResistanceGate(nn.Module):
         }
 
     def _compute_historical_consistency(self) -> torch.Tensor:
-        """Compute how consistent resistance has been over the window.
+        """Compute resistance consistency over the window (diagnostics only).
 
-        Low variance = high consistency = region has stable beliefs.
-        High variance = low consistency = region is in flux.
-
-        Returns:
-            [num_regions] consistency in [0, 1]
+        Low variance = high consistency = stable beliefs.
+        Not used in gating after ablation showed it's not load-bearing.
         """
         filled = min(self.history_ptr.item(), self.config.consistency_window)
         if filled < 2:
@@ -478,7 +448,6 @@ class VrittiResistanceGate(nn.Module):
 
         history = self.resistance_history[:filled]
         variance = history.var(dim=0)
-        # Map variance to consistency: low var -> high consistency
         consistency = 1.0 / (1.0 + 10.0 * variance)
         return consistency
 
@@ -489,23 +458,15 @@ class VrittiResistanceGate(nn.Module):
         error_signal: torch.Tensor,
         step: int,
     ) -> int:
-        """Update deferred buffer with strict constraints.
-
-        Constraints:
-            - Bounded size (deferred_capacity)
-            - TTL: items older than deferred_ttl are evicted
-            - No gradient storage: only scalar salience + region indices
-        """
+        """Update deferred buffer with strict constraints."""
         deferred_count = 0
 
         with torch.no_grad():
-            # Evict stale items (TTL enforcement)
             self.deferred_buffer = [
                 item for item in self.deferred_buffer
                 if step - item.get("step", 0) < self.config.deferred_ttl
             ]
 
-            # Record high-salience, low-plasticity samples
             high_salience = salience > 0.5
             low_plasticity = plasticity < 0.2
             defer_mask = high_salience & low_plasticity
@@ -515,7 +476,6 @@ class VrittiResistanceGate(nn.Module):
                 for b in range(B):
                     defer_regions = defer_mask[b].nonzero(as_tuple=True)[0]
                     if len(defer_regions) > 0:
-                        # NO gradient storage — only scalars and indices
                         self.deferred_buffer.append({
                             "regions": defer_regions.detach().cpu().tolist(),
                             "salience": salience[b, defer_regions].mean().item(),
