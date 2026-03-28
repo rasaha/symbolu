@@ -415,3 +415,50 @@ class ExperientialTrainingLoop(nn.Module):
             }
 
         return state
+
+    def summary(self) -> str:
+        """One-call system health report across all components.
+
+        Returns a human-readable string summarizing:
+            - Global step and loop counters
+            - Resistance: mean persistent resistance, consistency, deferred depth
+            - Salience: mean scar tissue, most scarred regions
+            - Identity: coherence, update count, accumulator depth
+            - Consolidation: buffer depth, consolidation count
+        """
+        lines = [f"=== Experiential System Summary (step {self.global_step.item()}) ==="]
+
+        if self.config.enable_resistance_gate:
+            rs = self.resistance_gate.get_resistance_state()
+            lines.append(
+                f"Resistance: mean={rs['persistent_resistance'].mean().item():.3f}, "
+                f"consistency={rs['consistency'].mean().item():.3f}, "
+                f"deferred={rs['deferred_depth']}"
+            )
+
+        if self.config.enable_salience:
+            scars = self.salience_weighter.scar_registry.get_scar_levels()
+            top = self.salience_weighter.scar_registry.get_most_scarred(k=3)
+            lines.append(
+                f"Salience: mean_scar={scars.mean().item():.4f}, "
+                f"top_scarred={[(r, f'{v:.3f}') for r, v in top]}"
+            )
+
+        if self.config.enable_identity:
+            ids = self.identity_layer.get_identity_state()
+            lines.append(
+                f"Identity: repr_norm={ids['self_repr_norm']:.3f}, "
+                f"updates={ids['identity_updates']}, "
+                f"deep_updates={ids['deep_updates']}, "
+                f"accumulator={ids['accumulator_count']}"
+            )
+
+        if self.config.enable_consolidation:
+            cs = self.consolidation.get_state()
+            lines.append(
+                f"Consolidation: buffer={cs['buffer_depth']}, "
+                f"mean_salience={cs['buffer_mean_salience']:.3f}, "
+                f"consolidations={cs['consolidation_count']}"
+            )
+
+        return "\n".join(lines)

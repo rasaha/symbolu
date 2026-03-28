@@ -78,11 +78,48 @@ class ReplayBuffer:
             self.add(item)
 
     def sample_top_k(self, k: int) -> List[Dict]:
-        """Sample top-k items by salience."""
-        sorted_items = sorted(
-            self.buffer, key=lambda x: x.get("salience", 0.0), reverse=True
-        )
-        return sorted_items[:k]
+        """Sample k items with probability proportional to salience.
+
+        Uses softmax over salience scores for stochastic priority sampling,
+        ensuring diversity while still favoring high-salience items.
+        Falls back to deterministic top-k if all saliences are equal.
+        """
+        if len(self.buffer) <= k:
+            return sorted(
+                self.buffer, key=lambda x: x.get("salience", 0.0), reverse=True
+            )
+
+        import random
+        saliences = [item.get("salience", 0.0) for item in self.buffer]
+        min_s = min(saliences)
+        max_s = max(saliences)
+
+        if max_s - min_s < 1e-8:
+            # Uniform — just shuffle and take k
+            indices = list(range(len(self.buffer)))
+            random.shuffle(indices)
+            return [self.buffer[i] for i in indices[:k]]
+
+        # Probability proportional to salience (shifted to be non-negative)
+        weights = [s - min_s + 1e-6 for s in saliences]
+        selected = random.choices(range(len(self.buffer)), weights=weights, k=k)
+        # Deduplicate while preserving order
+        seen = set()
+        unique_indices = []
+        for idx in selected:
+            if idx not in seen:
+                seen.add(idx)
+                unique_indices.append(idx)
+        # If dedup reduced count, fill from remaining highest-salience
+        if len(unique_indices) < k:
+            remaining = sorted(
+                set(range(len(self.buffer))) - seen,
+                key=lambda i: saliences[i], reverse=True,
+            )
+            unique_indices.extend(remaining[:k - len(unique_indices)])
+
+        result = [self.buffer[i] for i in unique_indices]
+        return sorted(result, key=lambda x: x.get("salience", 0.0), reverse=True)
 
     def prune_below(self, threshold: float) -> int:
         """Remove items with salience below threshold. Returns count pruned."""

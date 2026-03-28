@@ -164,18 +164,20 @@ class SelfModel(nn.Module):
         """Apply accumulated EMA signals to revise self-model.
 
         Precise update rule (slow loop ONLY):
-            I_t = (1 - alpha) * I_{t-1} + alpha * normalize(A_t)
+            I_t = (1 - α_eff) * I_{t-1} + α_eff * normalize(A_t)
 
         Where:
+            α_eff = base_α * stability * agreement  (adaptive)
+            stability = 1 / (1 + var(accumulator_history))  — stable signal → higher α
+            agreement = cosine_similarity(A_t, I_{t-1})  — aligned signal → higher α
             I_t = self_repr at time t
             A_t = identity_accumulator (EMA of high-salience stable states)
-            alpha = revision rate (small: identity changes slowly)
 
         After update, accumulator is reset. Self_repr is re-normalized
         to prevent magnitude drift.
 
         Args:
-            alpha: Revision rate. I_t = (1-alpha)*I_{t-1} + alpha*A_t
+            alpha: Base revision rate. Actual α is modulated by stability/agreement.
 
         Returns:
             Whether a revision was applied
@@ -189,8 +191,22 @@ class SelfModel(nn.Module):
                 # Normalize accumulator before blending
                 A_normalized = torch.nn.functional.normalize(A_t, dim=0) * (self.d_identity ** 0.5)
 
-                # I_t = (1 - alpha) * I_{t-1} + alpha * A_normalized
-                self.self_repr.mul_(1.0 - alpha).add_(A_normalized * alpha)
+                # Adaptive alpha: modulate by stability and agreement
+                # Agreement: how aligned is the accumulated signal with current identity?
+                agreement = torch.cosine_similarity(
+                    A_normalized.unsqueeze(0), self.self_repr.unsqueeze(0), dim=-1
+                ).item()
+                agreement = max(0.0, (agreement + 1.0) / 2.0)  # Map [-1,1] -> [0,1]
+
+                # Stability: low variance in accumulator = stable signal
+                accumulator_var = A_t.var().item()
+                stability = 1.0 / (1.0 + accumulator_var)
+
+                # Effective alpha: base * stability * agreement, floored to prevent zero
+                alpha_eff = max(alpha * stability * agreement, alpha * 0.1)
+
+                # I_t = (1 - alpha_eff) * I_{t-1} + alpha_eff * A_normalized
+                self.self_repr.mul_(1.0 - alpha_eff).add_(A_normalized * alpha_eff)
 
                 # Re-normalize to prevent drift
                 self.self_repr.copy_(

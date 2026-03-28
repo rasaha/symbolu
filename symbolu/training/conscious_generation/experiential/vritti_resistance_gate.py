@@ -59,6 +59,7 @@ class VrittiResistanceConfig:
     deferred_capacity: int = 128
     deferred_ttl: int = 200
     consistency_window: int = 50
+    latent_dominance: float = 0.3
 
 
 class VrittiFieldEstimator(nn.Module):
@@ -154,13 +155,19 @@ class AdaptiveGainController:
         coherence_factor = sigmoid(coherence - 0.5) in [0.5, 1.0]
         phase_factor = ramp from 0.5 to 1.0 over early training
 
+    Rate-limited: gain cannot change by more than max_delta per step,
+    preventing destabilizing oscillation when coherence flickers.
+
     This prevents:
         - Early training: under-learning (gain too high before model stabilizes)
         - Late training: over-correction (gain should match model confidence)
+        - Oscillation: gain jumps clamped to max_delta_fraction per step
     """
 
-    def __init__(self, base_max_gain: float = 3.0):
+    def __init__(self, base_max_gain: float = 3.0, max_delta_fraction: float = 0.1):
         self.base_max_gain = base_max_gain
+        self.max_delta_fraction = max_delta_fraction
+        self._prev_gain: Optional[float] = None
 
     def compute(
         self,
@@ -168,7 +175,7 @@ class AdaptiveGainController:
         step: int = 0,
         warmup_steps: int = 1000,
     ) -> float:
-        """Compute adaptive max gain.
+        """Compute adaptive max gain with rate limiting.
 
         Args:
             coherence: Current coherence measure in [0, 1] (None = use base)
@@ -176,7 +183,7 @@ class AdaptiveGainController:
             warmup_steps: Steps over which to ramp gain
 
         Returns:
-            Adaptive max_gain value
+            Adaptive max_gain value (rate-limited)
         """
         # Phase factor: ramp from 0.5 to 1.0 over warmup
         phase_factor = min(1.0, 0.5 + 0.5 * step / max(warmup_steps, 1))
@@ -189,7 +196,20 @@ class AdaptiveGainController:
         else:
             coherence_factor = 0.75  # Default middle value
 
-        return self.base_max_gain * coherence_factor * phase_factor
+        target_gain = self.base_max_gain * coherence_factor * phase_factor
+
+        # Rate limiting: prevent gain from jumping too fast
+        if self._prev_gain is not None:
+            max_delta = self.base_max_gain * self.max_delta_fraction
+            clamped = max(
+                self._prev_gain - max_delta,
+                min(self._prev_gain + max_delta, target_gain),
+            )
+            self._prev_gain = clamped
+            return clamped
+        else:
+            self._prev_gain = target_gain
+            return target_gain
 
 
 class DampingComputer:
@@ -205,11 +225,13 @@ class DampingComputer:
         g_eff = d_t * plasticity * g
     """
 
-    def __init__(self, sensitivity: float = 1.0):
+    def __init__(self, sensitivity: float = 1.0, ema_decay: float = 0.95, max_delta: float = 0.1):
         self.sensitivity = sensitivity
         self._grad_var_ema = 0.0
         self._coherence_ema = 0.5
-        self._ema_decay = 0.95
+        self._ema_decay = ema_decay
+        self._max_delta = max_delta
+        self._prev_d_t: Optional[float] = None
 
     def compute(
         self,
@@ -239,7 +261,15 @@ class DampingComputer:
 
         coh = max(self._coherence_ema, 1e-6)
         d_t = 1.0 / (1.0 + self.sensitivity * self._grad_var_ema / coh)
-        return max(d_t, 0.01)  # Floor at 1% to prevent total freezing
+        d_t = max(d_t, 0.01)  # Floor at 1% to prevent total freezing
+
+        # Rate-limit damping changes to prevent oscillation
+        if self._prev_d_t is not None:
+            d_t = max(self._prev_d_t - self._max_delta,
+                      min(self._prev_d_t + self._max_delta, d_t))
+        self._prev_d_t = d_t
+
+        return d_t
 
 
 class VrittiResistanceGate(nn.Module):
@@ -355,7 +385,7 @@ class VrittiResistanceGate(nn.Module):
         # Modulate resistance by latent misalignment (tighter coupling)
         # High misalignment = something is wrong = lower resistance (allow correction)
         if latent_misalignment is not None:
-            misalignment_factor = 1.0 - 0.3 * latent_misalignment.clamp(0, 1)
+            misalignment_factor = 1.0 - self.config.latent_dominance * latent_misalignment.clamp(0, 1)
             resistance = resistance * misalignment_factor
 
         # Clamp resistance

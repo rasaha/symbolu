@@ -30,10 +30,12 @@ Time-scale separation:
     SLOW (every M >> N steps): identity EMA consolidation
 
 Stability constraints:
-    - Bounded gain (max_gain)
-    - EMA damping on resistance
+    - Bounded gain with rate limiting (max_gain, max_delta_fraction)
+    - EMA damping on resistance with rate-limited damping changes
     - No binary branching
-    - Identity via EMA only
+    - Identity via EMA only with adaptive alpha (modulated by stability/agreement)
+    - Configurable latent dominance coefficient
+    - Stochastic priority sampling in replay buffer
 
 Reference: docs/design/EXPERIENTIAL_LEARNING_DESIGN.md
 """
