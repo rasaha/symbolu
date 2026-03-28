@@ -7632,6 +7632,94 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+                # Experiential Controller: CG progress snapshot at sample time
+                if experiential_controller is not None:
+                    try:
+                        _ec = experiential_controller
+                        _ec_step = _ec.step.item()
+                        _ec_ids = _ec.identity.get_state()
+                        _ec_resist = _ec.plasticity_gate.persistent_resistance
+                        _ec_replay_len = len(_ec.replay)
+
+                        print("")
+                        print("=" * 60)
+                        print(f"  EXPERIENTIAL CONTROLLER SNAPSHOT (Step {global_step})")
+                        print("=" * 60)
+
+                        # Plasticity gate state
+                        _r_mean = _ec_resist.mean().item()
+                        _r_std = _ec_resist.std().item() if _ec_resist.numel() > 1 else 0.0
+                        print(f"  Resistance:  mean={_r_mean:.4f}  std={_r_std:.4f}  "
+                              f"(higher = more selective learning)")
+
+                        # Current g_eff components from most recent metrics
+                        _exp_geff = metrics.get('exp_g_eff', None)
+                        _exp_p = metrics.get('exp_plasticity', None)
+                        _exp_g = metrics.get('exp_gain', None)
+                        _exp_d = metrics.get('exp_damping', None)
+                        if _exp_geff is not None:
+                            print(f"  g_eff:       {_exp_geff:.4f}  "
+                                  f"(P={_exp_p:.3f} x G={_exp_g:.3f} x d={_exp_d:.3f})")
+                            # Interpret g_eff for the user
+                            if _exp_geff < 0.5:
+                                print(f"               -> LOW: model is cautious, "
+                                      f"high resistance or instability")
+                            elif _exp_geff > 2.0:
+                                print(f"               -> HIGH: model is learning aggressively")
+                            else:
+                                print(f"               -> MODERATE: balanced plasticity")
+
+                        # Loss breakdown
+                        _lt = metrics.get('exp_L_token', None)
+                        _ltemp = metrics.get('exp_L_temporal', None)
+                        _lcoh = metrics.get('exp_L_coherence', None)
+                        _llat = metrics.get('exp_L_latent', None)
+                        if _lt is not None:
+                            print(f"  Loss:        L_tok={_lt:.4f}  L_temp={_ltemp:.4f}  "
+                                  f"L_coh={_lcoh:.4f}  L_lat={_llat:.4f}")
+                            _ltotal = metrics.get('exp_total_loss', 0)
+                            print(f"               L_exp={_ltotal:.4f} (weighted sum x g_eff)")
+
+                        # Identity EMA health
+                        _id_norm = _ec_ids['identity_norm']
+                        _id_count = _ec_ids['accumulator_count']
+                        _id_consol = _ec_ids.get('consolidation_count', 0)
+                        print(f"  Identity:    norm={_id_norm:.4f}  "
+                              f"accumulations={_id_count}  "
+                              f"consolidations={_id_consol}")
+                        if _id_norm < 0.01:
+                            print(f"               -> COLD: identity not yet formed")
+                        elif _id_norm > 0.5:
+                            print(f"               -> STABLE: strong self-representation")
+                        else:
+                            print(f"               -> FORMING: identity developing")
+
+                        # Replay buffer
+                        print(f"  Replay:      {_ec_replay_len} items buffered "
+                              f"(high-misalignment, low-plasticity moments)")
+
+                        # Per-region resistance breakdown (condensed)
+                        if _ec_resist.dim() >= 1 and _ec_resist.shape[0] > 1:
+                            _r_vals = _ec_resist.detach().cpu().tolist()
+                            _r_str = " ".join([f"{v:.2f}" for v in _r_vals[:12]])
+                            print(f"  Regions:     [{_r_str}]")
+                            _r_max_idx = _r_vals.index(max(_r_vals))
+                            _r_min_idx = _r_vals.index(min(_r_vals))
+                            print(f"               most resistant: region {_r_max_idx} ({_r_vals[_r_max_idx]:.3f}), "
+                                  f"most open: region {_r_min_idx} ({_r_vals[_r_min_idx]:.3f})")
+
+                        print("=" * 60)
+                        print("")
+
+                        # TensorBoard snapshot
+                        if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                            writer.add_scalar('experiential/resistance_mean', _r_mean, global_step)
+                            writer.add_scalar('experiential/resistance_std', _r_std, global_step)
+                            writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
+                            writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+                    except Exception as _ec_snap_err:
+                        print(f"  [Experiential Snapshot] Error: {_ec_snap_err}")
+
             # CG Factual Eval — verify JEPA/Vritti distinguish facts from hallucinations
             if cg_factual_eval is not None and tokenizer is not None:
                 _fe_cache = None
