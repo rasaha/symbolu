@@ -626,6 +626,73 @@ class ExperientialController(nn.Module):
         """Medium loop: get items for replay."""
         return self.replay.sample(k)
 
+    def get_full_state(self) -> Dict[str, object]:
+        """Return complete controller state for checkpoint persistence.
+
+        Captures both nn.Module parameters (via state_dict) and non-Module
+        state (IdentityEMA, Damping EMA, AdaptiveGain, ReplayBuffer).
+        """
+        return {
+            "module_state_dict": self.state_dict(),
+            "identity": {
+                "identity": self.identity.identity.detach().cpu(),
+                "accumulator": self.identity.accumulator.detach().cpu(),
+                "count": self.identity.count,
+                "consolidation_count": self.identity.consolidation_count,
+            },
+            "damping": {
+                "V_ema": self.damping._V_ema,
+                "U_ema": self.damping._U_ema,
+                "prev_d_t": self.damping._prev_d_t,
+            },
+            "gain": {
+                "prev_gain": self.gain._prev_gain,
+            },
+            "replay_buffer": self.replay.buffer.copy(),
+            "persistent_resistance": self.plasticity_gate.persistent_resistance.detach().cpu(),
+        }
+
+    def load_full_state(self, state: Dict[str, object], device: torch.device = None) -> None:
+        """Restore complete controller state from checkpoint.
+
+        Args:
+            state: Dict from get_full_state()
+            device: Target device for tensors
+        """
+        # Restore nn.Module parameters
+        if "module_state_dict" in state:
+            self.load_state_dict(state["module_state_dict"])
+
+        # Restore IdentityEMA
+        if "identity" in state:
+            ids = state["identity"]
+            self.identity.identity = ids["identity"].to(device) if device else ids["identity"]
+            self.identity.accumulator = ids["accumulator"].to(device) if device else ids["accumulator"]
+            self.identity.count = ids["count"]
+            self.identity.consolidation_count = ids["consolidation_count"]
+
+        # Restore Damping EMA
+        if "damping" in state:
+            ds = state["damping"]
+            self.damping._V_ema = ds["V_ema"]
+            self.damping._U_ema = ds["U_ema"]
+            self.damping._prev_d_t = ds["prev_d_t"]
+
+        # Restore AdaptiveGain
+        if "gain" in state:
+            self.gain._prev_gain = state["gain"]["prev_gain"]
+
+        # Restore ReplayBuffer
+        if "replay_buffer" in state:
+            self.replay.buffer = state["replay_buffer"]
+
+        # Restore persistent resistance
+        if "persistent_resistance" in state:
+            pr = state["persistent_resistance"]
+            if device:
+                pr = pr.to(device)
+            self.plasticity_gate.persistent_resistance.copy_(pr)
+
     def summary(self) -> str:
         """One-call system health report."""
         step = self.step.item()

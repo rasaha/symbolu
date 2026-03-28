@@ -1580,6 +1580,7 @@ def train(config: UnifiedTrainingConfig):
     resumed_sattvic_state = None
     resumed_srk_state = None
     resumed_scaler_state = None  # V9.8.1: AMP GradScaler state
+    resumed_experiential_controller_state = None
     if config.resume:
         resume_path = Path(config.resume)
         # Check both single-file and split-file format existence
@@ -1612,6 +1613,7 @@ def train(config: UnifiedTrainingConfig):
                 resumed_kv_supervisor_state = resume_result.get("kv_supervisor_state")
                 resumed_jepa_injection_projector_state = resume_result.get("jepa_injection_projector_state")
                 resumed_cg_stage_manager_state = resume_result.get("cg_stage_manager_state")
+                resumed_experiential_controller_state = resume_result.get("experiential_controller_state")
             except RuntimeError as e:
                 # Checkpoint is corrupted - start from scratch
                 print(f"\n  ⚠️  Failed to load checkpoint due to corruption")
@@ -2553,6 +2555,17 @@ def train(config: UnifiedTrainingConfig):
             print(f"    Identity: α_base={_exp_cfg.alpha_base}")
             print(f"    Loops: replay every {config.experiential_replay_interval}, "
                   f"consolidation every {config.experiential_consolidation_interval}")
+
+            # Restore from checkpoint if available
+            if resumed_experiential_controller_state is not None:
+                experiential_controller.load_full_state(
+                    resumed_experiential_controller_state, device=device
+                )
+                _restored_step = experiential_controller.step.item()
+                print(f"    ✓ Experiential Controller restored from checkpoint (step {_restored_step})")
+            elif resume_step > 0:
+                print(f"    ⚠ Experiential Controller initialized fresh (no state in checkpoint)")
+                print(f"      Loss warmup will ramp from 0 over {config.experiential_warmup_steps} steps")
         except ImportError as e:
             print(f"  [Experiential Controller] Import failed: {e}")
 
@@ -5328,9 +5341,24 @@ def train(config: UnifiedTrainingConfig):
 
                         # Scale original loss by g_eff (detached: no second-order grads)
                         _exp_scale = _exp_result['g_eff'].detach().mean()
-                        # Add controller's experiential loss so its projections get gradients
-                        _exp_loss_weight = 0.1
-                        loss = _exp_scale * loss + _exp_loss_weight * _exp_result['total_loss']
+
+                        # Experiential loss weight with warmup ramp:
+                        # Ramp from 0 → configured weight over warmup_steps.
+                        # This prevents freshly initialized (or un-checkpointed) controller
+                        # projections from injecting huge loss into a mid-training model.
+                        _exp_base_weight = config.experiential_loss_weight
+                        _exp_warmup = config.experiential_warmup_steps
+                        if _exp_warmup > 0 and experiential_controller.step.item() < _exp_warmup:
+                            _exp_progress = experiential_controller.step.item() / _exp_warmup
+                            _exp_loss_weight = _exp_base_weight * _exp_progress
+                        else:
+                            _exp_loss_weight = _exp_base_weight
+
+                        # Clamp experiential loss to prevent divergence
+                        _exp_raw_loss = _exp_result['total_loss']
+                        _exp_clamped_loss = torch.clamp(_exp_raw_loss, max=config.experiential_loss_clamp)
+
+                        loss = _exp_scale * loss + _exp_loss_weight * _exp_clamped_loss
 
                         # Track metrics
                         metrics['exp_g_eff'] = _exp_scale.item()
@@ -5338,6 +5366,8 @@ def train(config: UnifiedTrainingConfig):
                         metrics['exp_gain'] = _exp_result['gain'].item()
                         metrics['exp_damping'] = _exp_result['damping'].item()
                         metrics['exp_total_loss'] = _exp_result['total_loss'].item()
+                        metrics['exp_loss_weight'] = _exp_loss_weight
+                        metrics['exp_loss_contrib'] = (_exp_loss_weight * _exp_clamped_loss).item()
                         for _lk in ('L_token', 'L_temporal', 'L_coherence', 'L_latent'):
                             metrics[f'exp_{_lk}'] = _exp_result['loss_components'][_lk].item()
 
@@ -5357,12 +5387,14 @@ def train(config: UnifiedTrainingConfig):
                         if (global_step % config.experiential_log_interval == 0 and
                                 global_step > 0 and
                                 (accumulation_step + 1) % config.gradient_accumulation == 0):
+                            _exp_wstr = f" w={_exp_loss_weight:.4f}" if _exp_loss_weight < _exp_base_weight else ""
                             print(f"  [Experiential] Step {global_step} | "
                                   f"g_eff={_exp_scale.item():.3f} | "
                                   f"P={metrics['exp_plasticity']:.3f} | "
                                   f"G={metrics['exp_gain']:.3f} | "
                                   f"d={metrics['exp_damping']:.3f} | "
-                                  f"L_exp={metrics['exp_total_loss']:.4f}")
+                                  f"L_exp={metrics['exp_total_loss']:.4f} | "
+                                  f"contrib={metrics['exp_loss_contrib']:.4f}{_exp_wstr}")
 
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 for _ek, _ev in metrics.items():
@@ -7593,6 +7625,7 @@ def train(config: UnifiedTrainingConfig):
                             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                             cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                            experiential_controller_state=experiential_controller.get_full_state() if experiential_controller is not None else None,
                             training_config=_build_training_config_snapshot(config),
                         )
                         print(f"  --> New best! Saved to {ckpt_dir / 'best_*.pt'}", flush=True)
@@ -7965,6 +7998,7 @@ def train(config: UnifiedTrainingConfig):
                     kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
                     jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
                     cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+                    experiential_controller_state=experiential_controller.get_full_state() if experiential_controller is not None else None,
                     training_config=_build_training_config_snapshot(config),
                 )
                 print(f"  💾 Checkpoint saved: last_*.pt (step {global_step})")
@@ -7995,6 +8029,7 @@ def train(config: UnifiedTrainingConfig):
             kv_supervisor_state=kv_supervisor.state_dict() if kv_supervisor else None,
             jepa_injection_projector_state=jepa_injection_projector.state_dict() if jepa_injection_projector else None,
             cg_stage_manager_state=cg_stage_manager.get_state() if cg_stage_manager else None,
+            experiential_controller_state=experiential_controller.get_full_state() if experiential_controller is not None else None,
             training_config=_build_training_config_snapshot(config),
         )
         # v2.7 Training State Tracker: Save final state
@@ -9822,6 +9857,12 @@ def main():
                        help="Slow loop: identity consolidation every N steps")
     parser.add_argument("--experiential_log_interval", type=int, default=100,
                        help="Experiential controller diagnostics log interval")
+    parser.add_argument("--experiential_loss_weight", type=float, default=0.1,
+                       help="Weight for experiential loss contribution to main loss")
+    parser.add_argument("--experiential_warmup_steps", type=int, default=200,
+                       help="Ramp experiential loss weight from 0 to full over N steps")
+    parser.add_argument("--experiential_loss_clamp", type=float, default=5.0,
+                       help="Max experiential loss contribution (prevents divergence on resume)")
 
     # Stage 8: Perspective Synthesizer (representation conditioning)
     parser.add_argument("--enable_perspective_synthesizer", action="store_true",
@@ -10643,6 +10684,9 @@ def main():
         experiential_replay_interval=args.experiential_replay_interval,
         experiential_consolidation_interval=args.experiential_consolidation_interval,
         experiential_log_interval=args.experiential_log_interval,
+        experiential_loss_weight=args.experiential_loss_weight,
+        experiential_warmup_steps=args.experiential_warmup_steps,
+        experiential_loss_clamp=args.experiential_loss_clamp,
         # Stage 8: Perspective Synthesizer
         enable_perspective_synthesizer=args.enable_perspective_synthesizer,
         perspective_d_synthesis=args.perspective_d_synthesis,
