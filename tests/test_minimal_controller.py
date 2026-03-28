@@ -525,3 +525,49 @@ class TestEdgeCases:
         target = torch.randn(2, 1, 64)
         result = controller(hidden, target)
         assert not torch.isnan(result["total_loss"])
+
+    def test_checkpoint_save_restore(self):
+        """get_full_state/load_full_state should round-trip perfectly."""
+        config = ExperientialControllerConfig(d_model=64, num_regions=4)
+        ctrl = ExperientialController(config)
+
+        # Run a few steps to build up state
+        for _ in range(5):
+            h = torch.randn(2, 8, 64)
+            t = torch.randn(2, 8, 64)
+            ctrl(h, t, coherence_signals={'c_tok': 0.6, 'c_lat': 0.7, 'c_conv': 0.5})
+        ctrl.consolidate_identity()
+
+        # Save state
+        state = ctrl.get_full_state()
+
+        # Create a fresh controller and restore
+        ctrl2 = ExperientialController(config)
+        ctrl2.load_full_state(state)
+
+        # Verify step counter
+        assert ctrl2.step.item() == ctrl.step.item()
+
+        # Verify identity EMA state
+        assert ctrl2.identity.consolidation_count == ctrl.identity.consolidation_count
+        assert torch.allclose(ctrl2.identity.identity, ctrl.identity.identity)
+
+        # Verify damping EMA
+        assert ctrl2.damping._V_ema == ctrl.damping._V_ema
+        assert ctrl2.damping._U_ema == ctrl.damping._U_ema
+
+        # Verify gain
+        assert ctrl2.gain._prev_gain == ctrl.gain._prev_gain
+
+        # Verify persistent resistance
+        assert torch.allclose(
+            ctrl2.plasticity_gate.persistent_resistance,
+            ctrl.plasticity_gate.persistent_resistance,
+        )
+
+        # Verify module parameters match
+        for (n1, p1), (n2, p2) in zip(
+            ctrl.named_parameters(), ctrl2.named_parameters()
+        ):
+            assert n1 == n2
+            assert torch.allclose(p1, p2), f"Parameter {n1} mismatch"

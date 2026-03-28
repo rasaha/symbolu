@@ -46,6 +46,8 @@ def save_checkpoint(
     dataloader_position: Optional[dict] = None,
     # CG Curriculum Stage Manager state (Stages A-D)
     cg_stage_manager_state: Optional[dict] = None,
+    # Experiential Controller state (plasticity modulation)
+    experiential_controller_state: Optional[dict] = None,
     # Training config snapshot (for ablation audit / reproducibility)
     training_config: Optional[dict] = None,
 ):
@@ -112,6 +114,8 @@ def save_checkpoint(
         meta["dataloader_position"] = dataloader_position
     if cg_stage_manager_state is not None:
         meta["cg_stage_manager_state"] = cg_stage_manager_state
+    if experiential_controller_state is not None:
+        meta["experiential_controller_state"] = experiential_controller_state
     if training_config is not None:
         meta["training_config"] = training_config
 
@@ -474,6 +478,11 @@ def load_checkpoint(
     if "jepa_injection_projector_state" in checkpoint:
         result["jepa_injection_projector_state"] = checkpoint["jepa_injection_projector_state"]
         print(f"    \u2713 JEPA injection projector state available for restoration")
+
+    # Experiential Controller state
+    if "experiential_controller_state" in checkpoint:
+        result["experiential_controller_state"] = checkpoint["experiential_controller_state"]
+        print(f"    ✓ Experiential Controller state available for restoration")
 
     # V9.8.6: Return dataloader position for restoration
     if "dataloader_position" in checkpoint:
