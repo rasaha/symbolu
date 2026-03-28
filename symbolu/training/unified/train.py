@@ -2531,8 +2531,20 @@ def train(config: UnifiedTrainingConfig):
                 alpha_base=config.experiential_alpha_base,
             )
             experiential_controller = ExperientialController(_exp_cfg).to(device)
+
+            # Add controller's learnable projections to optimizer
+            _exp_params = list(experiential_controller.parameters())
+            _exp_param_count = sum(p.numel() for p in _exp_params)
+            if _exp_params:
+                optimizer.add_param_group({
+                    'params': _exp_params,
+                    'lr': config.learning_rate,
+                    'weight_decay': 0.01,
+                })
+
             print(f"\n  [Experiential Controller] ENABLED — 12-parameter plasticity modulation")
-            print(f"    d_model={_exp_cfg.d_model}, regions={_exp_cfg.num_regions}")
+            print(f"    d_model={_exp_cfg.d_model}, regions={_exp_cfg.num_regions}, "
+                  f"learnable params={_exp_param_count:,}")
             print(f"    Loss weights: λ_temp={_exp_cfg.lambda_temporal}, "
                   f"λ_coh={_exp_cfg.lambda_coherence}, λ_lat={_exp_cfg.lambda_latent}")
             print(f"    Plasticity: k_r={_exp_cfg.k_r}, k_m={_exp_cfg.k_m}, b_p={_exp_cfg.b_p}")
@@ -5263,10 +5275,13 @@ def train(config: UnifiedTrainingConfig):
                         # Project to controller d_model if dimensions differ
                         _exp_d = experiential_controller.config.d_model
                         if D_exp != _exp_d:
-                            # Adaptive pooling to match controller dimension
+                            # Pool feature dimension: [B, T, D] → [B, T, d_model]
+                            # adaptive_avg_pool1d pools the last dim, so reshape
+                            # [B, T, D] → [B*T, 1, D] → pool → [B*T, 1, d_model] → [B, T, d_model]
+                            _exp_flat = _exp_hidden.reshape(B_exp * T_exp, 1, D_exp)
                             _exp_input = F.adaptive_avg_pool1d(
-                                _exp_hidden.transpose(1, 2), _exp_d
-                            ).transpose(1, 2)
+                                _exp_flat, _exp_d
+                            ).reshape(B_exp, T_exp, _exp_d)
                         else:
                             _exp_input = _exp_hidden
 
@@ -5284,16 +5299,21 @@ def train(config: UnifiedTrainingConfig):
                             }
 
                         # Forward through controller
+                        # Input NOT detached: gradients flow through controller's
+                        # temporal_proj and latent_proj for learning.
+                        # base_loss detached: controller doesn't backprop through main CE.
                         _exp_result = experiential_controller(
-                            _exp_input.detach(),  # don't backprop through hidden extraction
+                            _exp_input,
                             _exp_target,
                             base_loss=loss.detach(),
                             coherence_signals=_exp_coherence,
                         )
 
-                        # Scale original loss by g_eff
+                        # Scale original loss by g_eff (detached: no second-order grads)
                         _exp_scale = _exp_result['g_eff'].detach().mean()
-                        loss = _exp_scale * loss
+                        # Add controller's experiential loss so its projections get gradients
+                        _exp_loss_weight = 0.1
+                        loss = _exp_scale * loss + _exp_loss_weight * _exp_result['total_loss']
 
                         # Track metrics
                         metrics['exp_g_eff'] = _exp_scale.item()

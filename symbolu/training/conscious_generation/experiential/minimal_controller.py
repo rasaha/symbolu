@@ -341,13 +341,21 @@ class IdentityEMA:
         self.identity = torch.randn(d_identity) * 0.01
         self.accumulator = torch.zeros(d_identity)
         self.count = 0
+        self.consolidation_count = 0
+
+    def to(self, device: torch.device) -> 'IdentityEMA':
+        """Move identity tensors to device."""
+        self.identity = self.identity.to(device)
+        self.accumulator = self.accumulator.to(device)
+        return self
 
     def accumulate(self, signal: torch.Tensor, salience: float = 0.5) -> None:
         """Fast loop: accumulate identity-relevant signals."""
         if salience > 0.3:
             with torch.no_grad():
+                _signal = signal.detach().to(self.accumulator.device)
                 self.accumulator.mul_(0.99).add_(
-                    signal.detach().cpu() * (1 - 0.99) * salience
+                    _signal * (1 - 0.99) * salience
                 )
                 self.count += 1
 
@@ -371,12 +379,14 @@ class IdentityEMA:
 
         self.accumulator.zero_()
         self.count = 0
+        self.consolidation_count += 1
         return True
 
     def get_state(self) -> Dict[str, object]:
         return {
             "identity_norm": self.identity.norm().item(),
             "accumulator_count": self.count,
+            "consolidation_count": self.consolidation_count,
         }
 
 
@@ -397,19 +407,21 @@ class ReplayBuffer:
             self.buffer.pop(0)
 
     def sample(self, k: int) -> list:
-        """Probability-proportional sampling."""
+        """Probability-proportional sampling without replacement."""
         if not self.buffer:
             return []
         import random
-        priorities = [item.get("priority", 0.01) for item in self.buffer]
         k = min(k, len(self.buffer))
-        selected = random.choices(range(len(self.buffer)), weights=priorities, k=k)
-        seen = set()
+        priorities = [item.get("priority", 0.01) for item in self.buffer]
+        # Use weighted sampling without replacement
+        indices = list(range(len(self.buffer)))
         result = []
-        for idx in selected:
-            if idx not in seen:
-                seen.add(idx)
-                result.append(self.buffer[idx])
+        for _ in range(k):
+            if not indices:
+                break
+            selected = random.choices(indices, weights=[priorities[i] for i in indices], k=1)[0]
+            result.append(self.buffer[selected])
+            indices.remove(selected)
         return result
 
     def prune(self, current_step: int) -> int:
@@ -457,6 +469,14 @@ class ExperientialController(nn.Module):
 
         # Step counter
         self.register_buffer("step", torch.tensor(0, dtype=torch.long))
+
+    def to(self, *args, **kwargs):
+        """Override to propagate device to non-Module components."""
+        result = super().to(*args, **kwargs)
+        # IdentityEMA is not an nn.Module, so move it explicitly
+        device = next(self.parameters()).device
+        self.identity.to(device)
+        return result
 
     def forward(
         self,
