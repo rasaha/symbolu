@@ -6125,7 +6125,6 @@ def train(config: UnifiedTrainingConfig):
                             with torch.no_grad():
                                 _delta_out = model(x, attention_mask=None, measure_phase_delta=True)
                             if 'backbone_logits' in _delta_out:
-                                import torch.nn.functional as F
                                 _bb_logits = _delta_out['backbone_logits']
                                 _ph_logits = _delta_out['logits']
                                 # Compute per-token CE loss for both
