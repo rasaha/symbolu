@@ -1031,6 +1031,30 @@ class UnifiedTrainingConfig:
     embedding_diag_no_samples: bool = False         # Disable vocab sampling (only grad norms + adapter gate)
     embedding_diag_start_step: int = 0              # Delay diagnostics until this step
 
+    # ==========================================================================
+    # Experiential Controller: 12-parameter resistance-driven plasticity
+    # Reference: experiential/minimal_controller.py
+    # Training-time only — does NOT modify inference path.
+    # ==========================================================================
+    enable_experiential_controller: bool = False     # Master toggle
+    experiential_d_model: int = 128                  # Internal d_model for controller
+    experiential_num_regions: int = 12               # Number of plasticity regions
+    experiential_lambda_temporal: float = 0.5        # Temporal consistency weight
+    experiential_lambda_coherence: float = 0.3       # Cross-signal coherence weight
+    experiential_lambda_latent: float = 0.1          # Latent alignment weight
+    experiential_k_r: float = 2.0                    # Resistance openness scaling
+    experiential_k_m: float = 2.0                    # Misalignment suppression scaling
+    experiential_b_p: float = -1.0                   # Bias floor for plasticity gate
+    experiential_G_base: float = 3.0                 # Base gain
+    experiential_G_min: float = 0.1                  # Minimum gain
+    experiential_G_max: float = 5.0                  # Maximum gain
+    experiential_k_dv: float = 1.0                   # Gradient variance damping
+    experiential_k_dc: float = 0.5                   # Coherence instability damping
+    experiential_alpha_base: float = 0.01            # Identity EMA base rate
+    experiential_replay_interval: int = 100          # Medium loop: replay every N steps
+    experiential_consolidation_interval: int = 1000  # Slow loop: identity consolidation every N steps
+    experiential_log_interval: int = 100             # Diagnostics logging interval
+
     # Factual Eval — verify CG primitives distinguish facts from hallucinations
     enable_factual_eval: bool = False               # Master toggle for CG factual evaluation
     factual_eval_interval: int = 500                # Steps between eval runs
