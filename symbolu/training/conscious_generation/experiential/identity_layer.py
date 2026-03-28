@@ -144,12 +144,14 @@ class SelfModel(nn.Module):
     def accumulate(self, identity_signal: torch.Tensor, salience: float) -> None:
         """Accumulate a high-salience identity signal into the EMA buffer.
 
-        Called during fast loop, but does NOT modify self_repr.
-        Signals are only integrated into identity during consolidation.
+        Accumulation rule (fast loop, does NOT modify self_repr):
+            A_t = decay * A_{t-1} + (1 - decay) * salience * signal
+
+        Only signals with salience > 0.3 are accumulated (caller filters).
 
         Args:
             identity_signal: [d_identity] identity-projected experience
-            salience: Salience weight of this signal
+            salience: Salience weight of this signal in [0, 1]
         """
         with torch.no_grad():
             weighted_signal = identity_signal.detach() * salience
@@ -158,14 +160,22 @@ class SelfModel(nn.Module):
             )
             self.accumulator_count += 1
 
-    def consolidate_identity(self, revision_rate: float = 0.01) -> bool:
+    def consolidate_identity(self, alpha: float = 0.01) -> bool:
         """Apply accumulated EMA signals to revise self-model.
 
-        Called ONLY during consolidation phase (slow loop).
-        This is the only place self_repr actually changes.
+        Precise update rule (slow loop ONLY):
+            I_t = (1 - alpha) * I_{t-1} + alpha * normalize(A_t)
+
+        Where:
+            I_t = self_repr at time t
+            A_t = identity_accumulator (EMA of high-salience stable states)
+            alpha = revision rate (small: identity changes slowly)
+
+        After update, accumulator is reset. Self_repr is re-normalized
+        to prevent magnitude drift.
 
         Args:
-            revision_rate: How much to blend accumulator into self_repr
+            alpha: Revision rate. I_t = (1-alpha)*I_{t-1} + alpha*A_t
 
         Returns:
             Whether a revision was applied
@@ -174,17 +184,20 @@ class SelfModel(nn.Module):
             return False
 
         with torch.no_grad():
-            # Blend accumulated signal into self-repr
-            revision = self.identity_accumulator
-            if revision.norm() > 1e-6:
-                self.self_repr.mul_(1.0 - revision_rate).add_(
-                    revision * revision_rate
-                )
+            A_t = self.identity_accumulator
+            if A_t.norm() > 1e-6:
+                # Normalize accumulator before blending
+                A_normalized = torch.nn.functional.normalize(A_t, dim=0) * (self.d_identity ** 0.5)
+
+                # I_t = (1 - alpha) * I_{t-1} + alpha * A_normalized
+                self.self_repr.mul_(1.0 - alpha).add_(A_normalized * alpha)
+
                 # Re-normalize to prevent drift
                 self.self_repr.copy_(
                     torch.nn.functional.normalize(self.self_repr, dim=0)
                     * (self.d_identity ** 0.5)
                 )
+
                 # Reset accumulator
                 self.identity_accumulator.zero_()
                 self.accumulator_count.zero_()
@@ -355,7 +368,7 @@ class IdentityLayer(nn.Module):
         Returns:
             Whether identity was revised
         """
-        revised = self.self_model.consolidate_identity(revision_rate=0.01)
+        revised = self.self_model.consolidate_identity(alpha=0.01)
 
         if revised:
             self.identity_updates += 1

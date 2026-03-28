@@ -135,13 +135,13 @@ class ExperientialTrainingLoop(nn.Module):
                 )
             )
 
-        # 3. Vritti resistance gate (independent signal, continuous)
+        # 3. Vritti resistance gate (gain-modulated, damped)
         if config.enable_resistance_gate:
             self.resistance_gate = VrittiResistanceGate(
                 VrittiResistanceConfig(
                     d_model=config.d_model,
                     num_regions=config.num_regions,
-                    max_gain=config.max_gain,
+                    base_max_gain=config.max_gain,
                 )
             )
 
@@ -243,15 +243,34 @@ class ExperientialTrainingLoop(nn.Module):
             salience_weights = None
 
         # ================================================================
-        # FAST LOOP — Step 4: Resistance gate (independent signal, continuous)
-        #   g_eff = clamp(salience * resistance_openness, 0, max_gain) * g
+        # FAST LOOP — Step 4: Resistance gate (damped, gain-modulated)
+        #   g_eff = d_t * clamp(sigmoid(a*s + b*r + c), floor, max_gain_t) * g
         # ================================================================
         if self.config.enable_resistance_gate:
             proposed_update = -error_signal
 
+            # Compute latent misalignment from experiential loss (if available)
+            latent_misalignment = None
+            if (self.config.enable_experiential_loss
+                    and exp_loss_output["latent_alignment_loss"].item() > 0):
+                # Broadcast scalar misalignment to per-region
+                misalign_val = exp_loss_output["latent_alignment_loss"].item()
+                latent_misalignment = torch.full(
+                    (B, self.config.num_regions), misalign_val, device=device
+                )
+
+            # Coherence from experiential loss interference EMA
+            coherence_val = None
+            if self.config.enable_experiential_loss:
+                # Use mean interference EMA as proxy for coherence
+                ema = exp_loss_output["interference_ema"]
+                coherence_val = 1.0 - ema.mean().item()  # Low interference = high coherence
+
             resistance_output = self.resistance_gate(
                 region_states, error_signal, proposed_update,
                 salience_weights=salience_weights,
+                latent_misalignment=latent_misalignment,
+                coherence=coherence_val,
             )
             result["resistance"] = resistance_output
             effective_update = resistance_output["gated_update"]
@@ -350,6 +369,8 @@ class ExperientialTrainingLoop(nn.Module):
             res = result["resistance"]
             mean_plasticity = res["plasticity"].mean().item()
             parts.append(f"plasticity={mean_plasticity:.3f}")
+            parts.append(f"damping={res['damping'].item():.3f}")
+            parts.append(f"max_gain={res['max_gain_t'].item():.2f}")
             parts.append(f"deferred={res['deferred_count']}")
 
         if "salience" in result:

@@ -1,26 +1,22 @@
 """
-VrittiResistanceGate: Vritti-gated update mechanism for CG training.
+VrittiResistanceGate: Gain-modulated, damped plasticity field for CG training.
 
-Continuous plasticity scaling — no binary branching. Gradients are scaled
-by the product of salience and resistance openness:
+Control-theory grounded gradient modulation:
 
-    g_eff = s_t * r_t * g
+    g_eff = d_t * plasticity * g
 
 Where:
-    s_t = salience (computed independently)
-    r_t = resistance openness in [0, 1] (from vritti field)
-    g = raw gradient
+    plasticity = sigmoid(a * salience + b * openness)    # Biased gating (no dead zones)
+    d_t = 1 / (1 + gradient_variance / coherence_stability)  # Explicit damping
+    max_gain_t = base_gain * coherence_factor              # Adaptive gain ceiling
 
-Gates are:
-    - State-dependent: High vritti activation in a region resists update
-    - Stake-sensitive: Consequential errors force gates open
-    - Temporally variable: Resistance rises and falls like emotional states
-    - Damped: Bounded gain prevents oscillation/instability
-
-Stability Constraints:
-    - Max gain clamped to prevent gradient explosion
-    - EMA smoothing on resistance prevents discontinuities
-    - Damping coefficient ensures bounded control loop behavior
+Key properties:
+    - NO dead zones: biased sigmoid coupling ensures plasticity > 0 always
+    - Adaptive gain: max_gain varies with coherence/entropy state
+    - Explicit damping: d_t reduces gain when gradients are noisy
+    - Resistance depends on historical consistency + identity proximity
+    - Deferred buffer: strict TTL, bounded size, no gradient storage
+    - Latent misalignment feeds into resistance (not just loss)
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Experiential Learning Extension
 """
@@ -39,43 +35,41 @@ class VrittiResistanceConfig:
         d_model: Model dimension
         num_regions: Number of gatable regions in the model
         num_vritti_modes: Number of vritti cognitive modes (5 classical)
-        gate_temperature: Temperature for gate sigmoid (lower = sharper)
         resistance_decay: Temporal decay of resistance state
         resistance_floor: Minimum resistance (prevents zero-resistance)
         resistance_ceiling: Maximum resistance (prevents total lockout)
-        adaptation_rate: How fast resistance adapts to update patterns
-        max_gain: Maximum plasticity gain (stability constraint)
-        damping: Damping coefficient for resistance dynamics
+        base_max_gain: Base maximum plasticity gain (before adaptation)
+        plasticity_floor: Minimum plasticity (prevents dead zones)
+        damping_sensitivity: How much gradient variance reduces gain
+        ema_momentum: Momentum for resistance EMA smoothing
+        deferred_capacity: Max items in deferred buffer
+        deferred_ttl: Time-to-live for deferred items (steps)
+        consistency_window: Steps to track for historical consistency
     """
     d_model: int = 128
     num_regions: int = 12
     num_vritti_modes: int = 5
-    gate_temperature: float = 0.5
     resistance_decay: float = 0.95
     resistance_floor: float = 0.05
     resistance_ceiling: float = 0.95
-    adaptation_rate: float = 0.01
-    max_gain: float = 3.0
-    damping: float = 0.1
+    base_max_gain: float = 3.0
+    plasticity_floor: float = 0.05
+    damping_sensitivity: float = 1.0
+    ema_momentum: float = 0.9
+    deferred_capacity: int = 128
+    deferred_ttl: int = 200
+    consistency_window: int = 50
 
 
 class VrittiFieldEstimator(nn.Module):
     """Estimates the current vritti (cognitive mode) field for each region.
 
-    The vritti field represents the cognitive state of a model region —
-    akin to the psychological resistance a human experiences when
-    confronted with information that challenges their current understanding.
-
-    High vritti activation = the region is in a coherent cognitive state
-    and resists perturbation. Low activation = the region is in flux
-    and more receptive to updates.
-
     Maps to Patanjali's 5 vrittis:
-        0: Pramana (valid cognition) - high resistance, correctly configured
-        1: Viparyaya (misperception) - low resistance, needs correction
-        2: Vikalpa (conceptual branching) - medium resistance, exploring
-        3: Smrti (memory) - high resistance, consolidated pattern
-        4: Nidra (dormancy) - low resistance, inactive region
+        0: Pramana (valid cognition) - high resistance
+        1: Viparyaya (misperception) - low resistance
+        2: Vikalpa (conceptual branching) - medium resistance
+        3: Smrti (memory) - high resistance
+        4: Nidra (dormancy) - low resistance
     """
 
     def __init__(self, d_model: int, num_regions: int, num_vritti: int = 5):
@@ -83,7 +77,6 @@ class VrittiFieldEstimator(nn.Module):
         self.num_regions = num_regions
         self.num_vritti = num_vritti
 
-        # Per-region vritti classifier: region_state -> vritti distribution
         self.vritti_classifier = nn.Sequential(
             nn.Linear(d_model, d_model // 2),
             nn.GELU(),
@@ -91,7 +84,6 @@ class VrittiFieldEstimator(nn.Module):
         )
 
         # Vritti-to-resistance mapping (learned, initialized with priors)
-        # Pramana/Smrti = high resistance, Viparyaya/Nidra = low
         default_resistance = torch.tensor([0.8, 0.2, 0.5, 0.8, 0.2])
         self.vritti_resistance = nn.Parameter(
             default_resistance[:num_vritti].clone()
@@ -117,27 +109,14 @@ class VrittiFieldEstimator(nn.Module):
             vritti_dist: [B, num_regions, num_vritti] vritti probabilities
             resistance: [B, num_regions] resistance level per region
         """
-        # Classify each region's cognitive mode
         vritti_logits = self.vritti_classifier(region_states)
         vritti_dist = torch.softmax(vritti_logits, dim=-1)
-
-        # Compute resistance as weighted sum of vritti-specific resistances
         resistance = (vritti_dist * self.vritti_resistance.unsqueeze(0).unsqueeze(0)).sum(dim=-1)
-
         return vritti_dist, resistance
 
 
 class StakesEstimator(nn.Module):
-    """Estimates the stakes (consequence level) of a given error signal.
-
-    High-stakes errors = errors that, if not corrected, would cause
-    downstream cascade failures. These should force resistance gates open.
-
-    Stakes are estimated from:
-        1. Error magnitude (absolute size of gradient)
-        2. Error coherence (is the error consistent across the batch?)
-        3. Historical error pattern (is this a recurring error?)
-    """
+    """Estimates the stakes (consequence level) of a given error signal."""
 
     def __init__(self, d_model: int, num_regions: int):
         super().__init__()
@@ -158,43 +137,130 @@ class StakesEstimator(nn.Module):
     def forward(
         self, error_signal: torch.Tensor, error_history: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        """Estimate stakes from error signal.
-
-        Args:
-            error_signal: [B, num_regions, D] per-region error
-            error_history: Optional [num_regions] historical error magnitude
-
-        Returns:
-            stakes: [B, num_regions] stakes level per region in [0, 1]
-        """
         stakes = self.stakes_proj(error_signal).squeeze(-1)
-
-        # Boost stakes for historically problematic regions
         if error_history is not None:
-            history_boost = error_history.unsqueeze(0)  # [1, num_regions]
+            history_boost = error_history.unsqueeze(0)
             stakes = stakes + 0.1 * history_boost
             stakes = stakes.clamp(0.0, 1.0)
-
         return stakes
 
 
+class AdaptiveGainController:
+    """Computes adaptive max_gain based on training state.
+
+    max_gain_t = base_gain * coherence_factor * phase_factor
+
+    Where:
+        coherence_factor = sigmoid(coherence - 0.5) in [0.5, 1.0]
+        phase_factor = ramp from 0.5 to 1.0 over early training
+
+    This prevents:
+        - Early training: under-learning (gain too high before model stabilizes)
+        - Late training: over-correction (gain should match model confidence)
+    """
+
+    def __init__(self, base_max_gain: float = 3.0):
+        self.base_max_gain = base_max_gain
+
+    def compute(
+        self,
+        coherence: Optional[float] = None,
+        step: int = 0,
+        warmup_steps: int = 1000,
+    ) -> float:
+        """Compute adaptive max gain.
+
+        Args:
+            coherence: Current coherence measure in [0, 1] (None = use base)
+            step: Current training step
+            warmup_steps: Steps over which to ramp gain
+
+        Returns:
+            Adaptive max_gain value
+        """
+        # Phase factor: ramp from 0.5 to 1.0 over warmup
+        phase_factor = min(1.0, 0.5 + 0.5 * step / max(warmup_steps, 1))
+
+        # Coherence factor: higher coherence = more confident = higher gain OK
+        if coherence is not None:
+            # sigmoid mapping: coherence 0 -> 0.5, coherence 1 -> ~0.73
+            import math
+            coherence_factor = 0.5 + 0.5 / (1.0 + math.exp(-(coherence - 0.5) * 4))
+        else:
+            coherence_factor = 0.75  # Default middle value
+
+        return self.base_max_gain * coherence_factor * phase_factor
+
+
+class DampingComputer:
+    """Computes explicit damping factor d_t.
+
+    d_t = 1 / (1 + sensitivity * gradient_variance / coherence_stability)
+
+    Reduces effective gain when:
+        - Gradient variance is high (noisy signal, don't over-react)
+        - Coherence stability is low (model state is uncertain)
+
+    This is the missing damping term from control theory:
+        g_eff = d_t * plasticity * g
+    """
+
+    def __init__(self, sensitivity: float = 1.0):
+        self.sensitivity = sensitivity
+        self._grad_var_ema = 0.0
+        self._coherence_ema = 0.5
+        self._ema_decay = 0.95
+
+    def compute(
+        self,
+        gradient_variance: float,
+        coherence_stability: Optional[float] = None,
+    ) -> float:
+        """Compute damping factor.
+
+        Args:
+            gradient_variance: Variance of recent gradients
+            coherence_stability: Stability of coherence signal (None = use EMA)
+
+        Returns:
+            d_t in (0, 1] — damping factor
+        """
+        # Update EMAs
+        self._grad_var_ema = (
+            self._ema_decay * self._grad_var_ema
+            + (1 - self._ema_decay) * gradient_variance
+        )
+
+        if coherence_stability is not None:
+            self._coherence_ema = (
+                self._ema_decay * self._coherence_ema
+                + (1 - self._ema_decay) * coherence_stability
+            )
+
+        coh = max(self._coherence_ema, 1e-6)
+        d_t = 1.0 / (1.0 + self.sensitivity * self._grad_var_ema / coh)
+        return max(d_t, 0.01)  # Floor at 1% to prevent total freezing
+
+
 class VrittiResistanceGate(nn.Module):
-    """Continuous plasticity scaling via vritti resistance field.
+    """Gain-modulated, damped plasticity field.
 
-    NO binary branching. All updates flow through — scaled by the
-    product of independent salience and resistance signals:
+    Full update equation:
 
-        plasticity = s_t * r_t
-        g_eff = clamp(plasticity, 0, max_gain) * g
+        g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
-    Stability constraints:
-        - Max gain bounded to prevent gradient explosion
-        - EMA smoothing on resistance prevents discontinuities
-        - Damping term prevents oscillation in the control loop
+    Where:
+        plasticity = sigmoid(a * salience + b * openness)   [biased — no dead zones]
+        d_t = 1 / (1 + var(g) / coherence_stability)        [explicit damping]
+        max_gain_t = base * coherence_factor * phase_factor  [adaptive ceiling]
+        openness = f(vritti_resistance, historical_consistency, latent_misalignment)
 
-    The deferred sample buffer records high-salience, low-plasticity
-    samples for periodic replay — but this is a SECONDARY diagnostic
-    mechanism, not a branching decision.
+    Key improvements over naive s * r:
+        1. Biased sigmoid coupling prevents dead zones
+        2. Adaptive gain tracks training dynamics
+        3. Explicit damping prevents oscillation
+        4. Resistance informed by history + latent state
+        5. Deferred buffer has strict TTL and no gradient storage
 
     Args:
         config: VrittiResistanceConfig
@@ -209,22 +275,39 @@ class VrittiResistanceGate(nn.Module):
         )
         self.stakes_estimator = StakesEstimator(config.d_model, config.num_regions)
 
-        # Persistent resistance state (EMA-smoothed, evolves across steps)
+        # Learned coupling coefficients for biased sigmoid
+        # plasticity = sigmoid(a * salience + b * openness + c)
+        self.coupling_a = nn.Parameter(torch.tensor(2.0))
+        self.coupling_b = nn.Parameter(torch.tensor(2.0))
+        self.coupling_bias = nn.Parameter(torch.tensor(-1.0))
+
+        # Persistent resistance state (EMA-smoothed)
         self.register_buffer(
             "persistent_resistance",
             torch.full((config.num_regions,), 0.5),
         )
 
-        # Error history for scar tissue effect
+        # Error history for scar tissue
+        self.register_buffer("error_history", torch.zeros(config.num_regions))
+
+        # Historical consistency: variance of resistance over time
         self.register_buffer(
-            "error_history",
-            torch.zeros(config.num_regions),
+            "resistance_history",
+            torch.zeros(config.consistency_window, config.num_regions),
+        )
+        self.register_buffer(
+            "history_ptr", torch.tensor(0, dtype=torch.long)
         )
 
-        # Deferred sample buffer: high-salience, low-plasticity samples
-        # for periodic replay (not a branching mechanism)
+        # Gradient variance tracker (for damping)
+        self.register_buffer("grad_var_ema", torch.tensor(0.0))
+
+        # Adaptive gain controller and damping computer
+        self.gain_controller = AdaptiveGainController(config.base_max_gain)
+        self.damping_computer = DampingComputer(config.damping_sensitivity)
+
+        # Deferred buffer: strict constraints
         self.deferred_buffer: list = []
-        self._deferred_capacity = 256
 
     def forward(
         self,
@@ -232,96 +315,105 @@ class VrittiResistanceGate(nn.Module):
         error_signal: torch.Tensor,
         proposed_update: torch.Tensor,
         salience_weights: Optional[torch.Tensor] = None,
+        latent_misalignment: Optional[torch.Tensor] = None,
+        coherence: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
-        """Scale proposed updates via continuous plasticity field.
+        """Scale proposed updates via damped, gain-modulated plasticity field.
 
-        The effective gradient is:
-            g_eff = plasticity * proposed_update
-
-        Where plasticity = clamp(salience * resistance_openness, 0, max_gain)
-
-        Salience and resistance are computed INDEPENDENTLY and composed
-        multiplicatively — neither determines the other.
+        Full equation:
+            g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g
 
         Args:
             region_states: [B, num_regions, D] current state per region
             error_signal: [B, num_regions, D] error signal per region
             proposed_update: [B, num_regions, D] proposed gradient update
             salience_weights: Optional [B, num_regions] external salience
-                              (if None, stakes estimator is used)
+            latent_misalignment: Optional [B, num_regions] misalignment from
+                coherence pipeline (feeds into resistance, not just loss)
+            coherence: Optional scalar coherence measure for adaptive gain
 
         Returns:
-            Dict with:
-                'gated_update': [B, num_regions, D] plasticity-scaled update
-                'plasticity': [B, num_regions] effective plasticity in [0, max_gain]
-                'resistance': [B, num_regions] resistance per region
-                'resistance_openness': [B, num_regions] 1 - resistance (gate values)
-                'stakes': [B, num_regions] stakes per region
-                'vritti_dist': [B, num_regions, num_vritti] vritti probs
-                'deferred_count': items added to deferred buffer this step
+            Dict with all signals and diagnostics
         """
         B = region_states.shape[0]
+        step = self.history_ptr.item()
 
-        # === Independent signal 1: Resistance field ===
+        # === Signal 1: Resistance field ===
         vritti_dist, instantaneous_resistance = self.vritti_estimator(region_states)
 
-        # EMA-smooth with persistent state (prevents discontinuities)
+        # EMA-smooth with persistent state
         resistance = (
-            (1 - self.config.damping) * instantaneous_resistance
-            + self.config.damping * self.persistent_resistance.unsqueeze(0)
+            self.config.ema_momentum * self.persistent_resistance.unsqueeze(0)
+            + (1 - self.config.ema_momentum) * instantaneous_resistance
         )
 
-        # Clamp resistance to [floor, ceiling]
+        # Modulate resistance by historical consistency
+        # High historical variance = less stable = lower effective resistance
+        consistency = self._compute_historical_consistency()
+        resistance = resistance * (0.5 + 0.5 * consistency.unsqueeze(0))
+
+        # Modulate resistance by latent misalignment (tighter coupling)
+        # High misalignment = something is wrong = lower resistance (allow correction)
+        if latent_misalignment is not None:
+            misalignment_factor = 1.0 - 0.3 * latent_misalignment.clamp(0, 1)
+            resistance = resistance * misalignment_factor
+
+        # Clamp resistance
         resistance = resistance.clamp(
             self.config.resistance_floor, self.config.resistance_ceiling
         )
 
-        # Resistance openness: how much this region allows updates
-        resistance_openness = 1.0 - resistance  # [B, num_regions] in [0, 1]
+        # Resistance openness
+        resistance_openness = 1.0 - resistance
 
-        # === Independent signal 2: Stakes/Salience ===
+        # === Signal 2: Stakes/Salience ===
         stakes = self.stakes_estimator(error_signal, self.error_history)
+        effective_salience = salience_weights if salience_weights is not None else stakes
 
-        if salience_weights is not None:
-            # Use externally-provided salience (from SalienceWeighter)
-            effective_salience = salience_weights
-        else:
-            effective_salience = stakes
+        # === Compose: biased sigmoid coupling (NO dead zones) ===
+        # plasticity = sigmoid(a * salience + b * openness + bias)
+        # This ensures plasticity > sigmoid(bias) > 0 always
+        plasticity_logit = (
+            self.coupling_a * effective_salience
+            + self.coupling_b * resistance_openness
+            + self.coupling_bias
+        )
+        plasticity = torch.sigmoid(plasticity_logit)
 
-        # === Compose: continuous plasticity = salience * openness ===
-        # Both signals are independent; neither determines the other
-        plasticity = effective_salience * resistance_openness
+        # === Adaptive gain ceiling ===
+        max_gain_t = self.gain_controller.compute(
+            coherence=coherence, step=step
+        )
 
-        # Stability constraint: bound the gain
-        plasticity = plasticity.clamp(0.0, self.config.max_gain)
+        # === Explicit damping: d_t ===
+        grad_variance = proposed_update.var().item()
+        d_t = self.damping_computer.compute(
+            gradient_variance=grad_variance,
+            coherence_stability=coherence,
+        )
 
-        # Apply plasticity scaling to proposed update
-        gated_update = proposed_update * plasticity.unsqueeze(-1)
+        # === Final: g_eff = d_t * clamp(plasticity, floor, max_gain_t) * g ===
+        plasticity = plasticity.clamp(self.config.plasticity_floor, max_gain_t)
+        effective_gain = d_t * plasticity
 
-        # === Secondary: record deferred samples for replay ===
-        deferred_count = 0
+        gated_update = proposed_update * effective_gain.unsqueeze(-1)
+
+        # === Deferred buffer: strict TTL, bounded, no gradient storage ===
+        deferred_count = self._update_deferred_buffer(
+            effective_salience, plasticity, error_signal, step
+        )
+
+        # === Update persistent state ===
         with torch.no_grad():
-            # High salience but low plasticity = worth replaying later
-            high_salience = effective_salience > 0.5
-            low_plasticity = plasticity < 0.2
-            defer_mask = high_salience & low_plasticity
-
-            if defer_mask.any() and len(self.deferred_buffer) < self._deferred_capacity:
-                for b in range(B):
-                    defer_regions = defer_mask[b].nonzero(as_tuple=True)[0]
-                    if len(defer_regions) > 0:
-                        self.deferred_buffer.append({
-                            "error": error_signal[b, defer_regions].detach().cpu(),
-                            "regions": defer_regions.detach().cpu(),
-                            "salience": effective_salience[b, defer_regions].mean().item(),
-                        })
-                        deferred_count += len(defer_regions)
-
-            # Update persistent resistance (EMA dynamics)
             mean_resistance = resistance.mean(dim=0).detach()
             self.persistent_resistance.mul_(self.config.resistance_decay).add_(
                 mean_resistance * (1 - self.config.resistance_decay)
             )
+
+            # Record resistance history for consistency tracking
+            ptr = self.history_ptr.item() % self.config.consistency_window
+            self.resistance_history[ptr] = mean_resistance
+            self.history_ptr += 1
 
             # Update error history (scar tissue)
             error_magnitude = error_signal.norm(dim=-1).mean(dim=0).detach()
@@ -330,19 +422,81 @@ class VrittiResistanceGate(nn.Module):
         return {
             "gated_update": gated_update,
             "plasticity": plasticity,
+            "effective_gain": effective_gain,
+            "damping": torch.tensor(d_t),
+            "max_gain_t": torch.tensor(max_gain_t),
             "resistance": resistance,
             "resistance_openness": resistance_openness,
+            "consistency": consistency,
             "stakes": stakes,
             "vritti_dist": vritti_dist,
             "deferred_count": deferred_count,
         }
 
-    def drain_deferred_buffer(self) -> list:
-        """Drain and return deferred samples for periodic replay.
+    def _compute_historical_consistency(self) -> torch.Tensor:
+        """Compute how consistent resistance has been over the window.
+
+        Low variance = high consistency = region has stable beliefs.
+        High variance = low consistency = region is in flux.
 
         Returns:
-            List of deferred items (dicts with error, regions, salience)
+            [num_regions] consistency in [0, 1]
         """
+        filled = min(self.history_ptr.item(), self.config.consistency_window)
+        if filled < 2:
+            return torch.ones(self.config.num_regions, device=self.persistent_resistance.device)
+
+        history = self.resistance_history[:filled]
+        variance = history.var(dim=0)
+        # Map variance to consistency: low var -> high consistency
+        consistency = 1.0 / (1.0 + 10.0 * variance)
+        return consistency
+
+    def _update_deferred_buffer(
+        self,
+        salience: torch.Tensor,
+        plasticity: torch.Tensor,
+        error_signal: torch.Tensor,
+        step: int,
+    ) -> int:
+        """Update deferred buffer with strict constraints.
+
+        Constraints:
+            - Bounded size (deferred_capacity)
+            - TTL: items older than deferred_ttl are evicted
+            - No gradient storage: only scalar salience + region indices
+        """
+        deferred_count = 0
+
+        with torch.no_grad():
+            # Evict stale items (TTL enforcement)
+            self.deferred_buffer = [
+                item for item in self.deferred_buffer
+                if step - item.get("step", 0) < self.config.deferred_ttl
+            ]
+
+            # Record high-salience, low-plasticity samples
+            high_salience = salience > 0.5
+            low_plasticity = plasticity < 0.2
+            defer_mask = high_salience & low_plasticity
+
+            if defer_mask.any() and len(self.deferred_buffer) < self.config.deferred_capacity:
+                B = salience.shape[0]
+                for b in range(B):
+                    defer_regions = defer_mask[b].nonzero(as_tuple=True)[0]
+                    if len(defer_regions) > 0:
+                        # NO gradient storage — only scalars and indices
+                        self.deferred_buffer.append({
+                            "regions": defer_regions.detach().cpu().tolist(),
+                            "salience": salience[b, defer_regions].mean().item(),
+                            "step": step,
+                        })
+                        deferred_count += len(defer_regions)
+
+        return deferred_count
+
+    def drain_deferred_buffer(self) -> list:
+        """Drain and return deferred samples for periodic replay."""
         items = list(self.deferred_buffer)
         self.deferred_buffer.clear()
         return items
@@ -353,4 +507,5 @@ class VrittiResistanceGate(nn.Module):
             "persistent_resistance": self.persistent_resistance.clone(),
             "error_history": self.error_history.clone(),
             "deferred_depth": len(self.deferred_buffer),
+            "consistency": self._compute_historical_consistency(),
         }

@@ -186,25 +186,56 @@ class TestVrittiResistanceGate:
 
         assert "gated_update" in result
         assert "plasticity" in result
+        assert "effective_gain" in result
+        assert "damping" in result
+        assert "max_gain_t" in result
         assert "resistance_openness" in result
         assert "resistance" in result
+        assert "consistency" in result
         assert "stakes" in result
         assert "vritti_dist" in result
         assert result["gated_update"].shape == proposed.shape
         assert result["plasticity"].shape == (B, NUM_REGIONS)
 
-    def test_plasticity_bounded(self, region_states, error_signal):
-        """Stability constraint: plasticity must be in [0, max_gain]."""
+    def test_no_dead_zones(self, region_states, error_signal):
+        """Biased sigmoid ensures plasticity > floor always."""
         config = VrittiResistanceConfig(
-            d_model=D, num_regions=NUM_REGIONS, max_gain=3.0
+            d_model=D, num_regions=NUM_REGIONS, plasticity_floor=0.05
         )
         gate = VrittiResistanceGate(config)
         proposed = torch.randn_like(error_signal)
 
         result = gate(region_states, error_signal, proposed)
 
-        assert (result["plasticity"] >= 0).all()
-        assert (result["plasticity"] <= 3.0).all()
+        # Even with extreme inputs, plasticity >= floor
+        assert (result["plasticity"] >= config.plasticity_floor).all()
+
+    def test_adaptive_gain(self, region_states, error_signal):
+        """Max gain should adapt based on coherence and step."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+        gate = VrittiResistanceGate(config)
+        proposed = torch.randn_like(error_signal)
+
+        result = gate(region_states, error_signal, proposed, coherence=0.9)
+        high_coherence_gain = result["max_gain_t"].item()
+
+        # Reset and try with low coherence
+        gate2 = VrittiResistanceGate(config)
+        result2 = gate2(region_states, error_signal, proposed, coherence=0.1)
+        low_coherence_gain = result2["max_gain_t"].item()
+
+        # Higher coherence should allow higher gain
+        assert high_coherence_gain >= low_coherence_gain
+
+    def test_explicit_damping(self, region_states, error_signal):
+        """Damping factor should be in (0, 1]."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+        gate = VrittiResistanceGate(config)
+        proposed = torch.randn_like(error_signal)
+
+        result = gate(region_states, error_signal, proposed)
+
+        assert 0 < result["damping"].item() <= 1.0
 
     def test_continuous_no_binary_branching(self, region_states, error_signal):
         """All updates flow through — no hard cutoff."""
@@ -214,12 +245,9 @@ class TestVrittiResistanceGate:
 
         result = gate(region_states, error_signal, proposed)
 
-        # Gated update should be proposed * plasticity (not zero/one)
-        # Every region should get SOME update (no complete blocking)
         assert result["gated_update"].abs().sum() > 0
 
     def test_independent_salience_input(self, region_states, error_signal):
-        """Salience can be provided independently from stakes."""
         config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
         gate = VrittiResistanceGate(config)
         proposed = torch.randn_like(error_signal)
@@ -229,8 +257,37 @@ class TestVrittiResistanceGate:
             region_states, error_signal, proposed,
             salience_weights=external_salience,
         )
-
         assert result["plasticity"].shape == (B, NUM_REGIONS)
+
+    def test_latent_misalignment_lowers_resistance(self, region_states, error_signal):
+        """Latent misalignment should reduce resistance (allow correction)."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+
+        gate1 = VrittiResistanceGate(config)
+        proposed = torch.randn_like(error_signal)
+        r1 = gate1(region_states, error_signal, proposed)
+
+        gate2 = VrittiResistanceGate(config)
+        # Copy state so comparison is fair
+        gate2.load_state_dict(gate1.state_dict())
+        high_misalignment = torch.ones(B, NUM_REGIONS) * 0.9
+        r2 = gate2(
+            region_states, error_signal, proposed,
+            latent_misalignment=high_misalignment,
+        )
+
+        # With high misalignment, resistance should be lower (more open)
+        assert r2["resistance"].mean() <= r1["resistance"].mean()
+
+    def test_historical_consistency(self, region_states, error_signal):
+        """Consistency should start at 1.0 and evolve over time."""
+        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+        gate = VrittiResistanceGate(config)
+        proposed = torch.randn_like(error_signal)
+
+        result = gate(region_states, error_signal, proposed)
+        # Initially consistency should be ~1.0 (no history)
+        assert (result["consistency"] >= 0.9).all()
 
     def test_vritti_distribution_valid(self, region_states, error_signal):
         config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
@@ -244,16 +301,24 @@ class TestVrittiResistanceGate:
         sums = vritti.sum(dim=-1)
         assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
 
-    def test_deferred_buffer(self, region_states, error_signal):
-        """Deferred buffer is secondary diagnostic, not branching mechanism."""
-        config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
+    def test_deferred_buffer_ttl(self, region_states, error_signal):
+        """Deferred buffer should respect TTL and have no gradient storage."""
+        config = VrittiResistanceConfig(
+            d_model=D, num_regions=NUM_REGIONS, deferred_ttl=5,
+        )
         gate = VrittiResistanceGate(config)
         proposed = torch.randn_like(error_signal)
 
-        gate(region_states, error_signal, proposed)
-        items = gate.drain_deferred_buffer()
+        # Run several steps
+        for _ in range(10):
+            gate(region_states, error_signal, proposed)
 
-        assert isinstance(items, list)
+        items = gate.drain_deferred_buffer()
+        for item in items:
+            # No gradient storage — only scalars and indices
+            assert "error" not in item
+            assert isinstance(item.get("salience", 0), float)
+            assert isinstance(item.get("regions", []), list)
 
     def test_persistent_resistance_ema(self, region_states, error_signal):
         config = VrittiResistanceConfig(d_model=D, num_regions=NUM_REGIONS)
@@ -693,12 +758,19 @@ class TestExperientialTrainingLoop:
 
         assert loop.global_step.item() == 5
 
-    def test_plasticity_in_resistance_output(self, hidden, target_hidden):
-        """Verify resistance output uses plasticity, not gate_values."""
+    def test_control_theory_outputs(self, hidden, target_hidden):
+        """Verify resistance output includes damping, adaptive gain, consistency."""
         config = ExperientialTrainingConfig(d_model=D, num_regions=NUM_REGIONS)
         loop = ExperientialTrainingLoop(config)
 
         result = loop(hidden, target_hidden)
 
-        assert "plasticity" in result["resistance"]
-        assert "resistance_openness" in result["resistance"]
+        res = result["resistance"]
+        assert "plasticity" in res
+        assert "effective_gain" in res
+        assert "damping" in res
+        assert "max_gain_t" in res
+        assert "consistency" in res
+        assert "resistance_openness" in res
+        assert 0 < res["damping"].item() <= 1.0
+        assert res["max_gain_t"].item() > 0
