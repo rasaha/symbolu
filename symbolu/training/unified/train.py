@@ -6328,6 +6328,14 @@ def train(config: UnifiedTrainingConfig):
                     res_status = "🎓ACT" if vritti_resonance.active else "👁️OBS"
                     log_msg += f"\n    {res_status} [VRITTI] P-Pram:{align.get('physical_pramana', 0):.2f} | M-Vikal:{align.get('mental_vikalpa', 0):.2f} | I-Smrit:{align.get('intellect_smriti', 0):.2f}"
 
+                # Experiential controller metrics on main step line
+                if experiential_controller is not None and 'exp_g_eff' in metrics:
+                    _eg = metrics['exp_g_eff']
+                    _ep = metrics['exp_plasticity']
+                    _eG = metrics['exp_gain']
+                    _ed = metrics['exp_damping']
+                    log_msg += f" | g_eff:{_eg:.2f} P:{_ep:.2f} G:{_eG:.2f} d:{_ed:.2f}"
+
                 print(log_msg, flush=True)  # V9.7.0: Flush for real-time output when piped to tee
 
                 # Kosha-Vritti Diagnostic System (Read-Only)
