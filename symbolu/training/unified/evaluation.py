@@ -878,7 +878,34 @@ def run_quality_samples(
             sample_count += 1
 
             log(f"  Prompt: \"{prompt}\"")
-            log(f"  Output: \"{generated}\"")
+            log(f"  [CG ON]  \"{generated}\"")
+
+            # A/B comparison: generate without CG if model supports ablation
+            if hasattr(model, 'set_ablation_config') and hasattr(model, 'ablation_config'):
+                try:
+                    from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+                    _saved_abl = model.ablation_config
+                    model.set_ablation_config(AttentionAblationConfig.all_off())
+                    generated_no_cg = generate_sample(
+                        model, tokenizer, prompt, device,
+                        max_new_tokens=128,
+                        temperature=0.9,
+                        top_p=0.95,
+                        top_k=50,
+                        repetition_penalty=1.15,
+                        no_repeat_ngram_size=3,
+                        autocast_dtype=_autocast_dtype,
+                    )
+                    generated_no_cg = generated_no_cg.strip().replace('\n', ' ')
+                    if _CLEAN_WIKITEXT_AVAILABLE:
+                        generated_no_cg = clean_wikitext_artifacts(generated_no_cg)
+                    generated_no_cg = generated_no_cg[:200]
+                    log(f"  [CG OFF] \"{generated_no_cg}\"")
+                    model.set_ablation_config(_saved_abl)
+                except Exception as e:
+                    log(f"  [CG OFF] comparison failed: {e}")
+                    model.set_ablation_config(_saved_abl if '_saved_abl' in dir() else None)
+
             log("")
         except Exception as e:
             log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
