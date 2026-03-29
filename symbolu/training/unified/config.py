@@ -1058,7 +1058,7 @@ class UnifiedTrainingConfig:
     experiential_log_interval: int = 100             # Diagnostics logging interval
     experiential_loss_weight: float = 0.01           # Weight for experiential loss contribution (0.1 saturates clamp)
     experiential_warmup_steps: int = 200             # Ramp loss weight from 0 to full over N steps
-    experiential_loss_clamp: float = 5.0             # Max experiential loss contribution (prevents divergence)
+    experiential_loss_clamp: float = 20.0            # Max experiential loss contribution (raised: 0.01 × 20 = 0.2 max)
 
     # Factual Eval — verify CG primitives distinguish facts from hallucinations
     enable_factual_eval: bool = False               # Master toggle for CG factual evaluation
