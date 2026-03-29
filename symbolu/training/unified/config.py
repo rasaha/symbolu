@@ -1056,7 +1056,7 @@ class UnifiedTrainingConfig:
     experiential_replay_interval: int = 100          # Medium loop: replay every N steps
     experiential_consolidation_interval: int = 1000  # Slow loop: identity consolidation every N steps
     experiential_log_interval: int = 100             # Diagnostics logging interval
-    experiential_loss_weight: float = 0.1            # Weight for experiential loss contribution
+    experiential_loss_weight: float = 0.01           # Weight for experiential loss contribution (0.1 saturates clamp)
     experiential_warmup_steps: int = 200             # Ramp loss weight from 0 to full over N steps
     experiential_loss_clamp: float = 5.0             # Max experiential loss contribution (prevents divergence)
 
