@@ -94,10 +94,20 @@ class ExperientialLoss(nn.Module):
         self.config = config
 
         # Temporal smoothing: 1D conv for trajectory consistency
+        # Groups=16 for efficiency. Initialize as near-identity so
+        # L_temporal starts near L_token (not ~60 from random weights).
         self.temporal_proj = nn.Conv1d(
             config.d_model, config.d_model, kernel_size=5, padding=2,
             groups=min(config.d_model, 16),
         )
+        # Identity init: zero all weights, set center tap to 1
+        with torch.no_grad():
+            self.temporal_proj.weight.zero_()
+            # kernel_size=5, center is index 2. groups=16, so each group
+            # has shape [d_model/groups, 1, 5]. Set [:, 0, 2] = 1.0
+            self.temporal_proj.weight[:, 0, 2] = 1.0
+            if self.temporal_proj.bias is not None:
+                self.temporal_proj.bias.zero_()
 
         # Latent alignment projection
         self.latent_proj = nn.Linear(config.d_model, config.d_model)
