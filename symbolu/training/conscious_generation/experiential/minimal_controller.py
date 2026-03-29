@@ -316,6 +316,7 @@ class Damping:
         self._V_baseline = 0.0  # Slow-moving variance baseline
         self._baseline_initialized = False
         self._prev_d_t: Optional[float] = None
+        self._warmup_remaining = 0  # Steps to hold d=1.0 after resume
 
     def compute(
         self,
@@ -341,6 +342,12 @@ class Damping:
 
         # Update slow baseline (0.999 decay = adapts over ~1000 steps)
         self._V_baseline = 0.999 * self._V_baseline + 0.001 * grad_variance
+
+        # Warmup after resume: hold d=1.0 while EMAs stabilize
+        if self._warmup_remaining > 0:
+            self._warmup_remaining -= 1
+            self._prev_d_t = 1.0
+            return 1.0
 
         # Adaptive damping: respond to variance *relative* to baseline.
         # At baseline: V_ratio=1, excess=0, d=1.0 (no damping)
@@ -714,6 +721,8 @@ class ExperientialController(nn.Module):
             self.damping._V_baseline = ds.get("V_baseline", ds["V_ema"])
             self.damping._baseline_initialized = ds.get("baseline_initialized", True)
             self.damping._prev_d_t = ds["prev_d_t"]
+            # Hold d=1.0 for 50 steps after resume to let gradients stabilize
+            self.damping._warmup_remaining = 50
 
         # Restore AdaptiveGain
         if "gain" in state:
