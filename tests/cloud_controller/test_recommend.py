@@ -708,15 +708,335 @@ class TestRecommendEngine:
             assert result.recommendation is not None
             assert result.recommendation.webhooks_sent == 1
 
-    def test_pending_list(self):
-        """Should track multiple pending recommendations."""
+    def test_duplicate_suppressed(self):
+        """Second evaluate for same service should be suppressed (dedup)."""
+        engine = RecommendEngine(RecommendConfig(
+            service="api-gw",
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+            safety=SafetyConfig(cooldown_seconds=0),
+        ))
+        action = _make_action(delta=1, score=0.5, coherence=0.7)
+        r1 = engine.evaluate(action, current_replicas=5)
+        r2 = engine.evaluate(action, current_replicas=5)
+
+        assert r1.recommendation is not None
+        assert r2.recommendation is None
+        assert r2.suppressed is True
+        assert "already exists" in r2.suppress_reason
+        assert engine.pending_count == 1
+
+    def test_dedup_allows_after_approval(self):
+        """After approving, a new recommendation can be created (post-cooldown)."""
+        engine = RecommendEngine(RecommendConfig(
+            service="api-gw",
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+            safety=SafetyConfig(cooldown_seconds=0),
+        ))
+        action = _make_action(delta=1, score=0.5, coherence=0.7)
+        r1 = engine.evaluate(action, current_replicas=5)
+        engine.approve(r1.recommendation.id)
+
+        r2 = engine.evaluate(action, current_replicas=5)
+        assert r2.recommendation is not None
+
+    def test_current_replicas_clamped_to_one(self):
+        """current_replicas=0 should be clamped to 1."""
         engine = RecommendEngine(RecommendConfig(
             confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
-            safety=SafetyConfig(cooldown_seconds=0),  # No cooldown
         ))
-        for _ in range(3):
-            action = _make_action(delta=1, score=0.5, coherence=0.7)
-            engine.evaluate(action, current_replicas=5)
+        action = _make_action(delta=1, score=0.5, coherence=0.7)
+        result = engine.evaluate(action, current_replicas=0)
+        # Should not crash; replicas clamped to 1
+        assert result is not None
 
-        assert engine.pending_count == 3
-        assert len(engine.pending) == 3
+    def test_webhook_gets_real_recommendation_id(self):
+        """Webhook should receive the actual recommendation ID, not 'pending'."""
+        config = RecommendConfig(
+            service="api-gw", namespace="prod",
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+            webhooks=[
+                WebhookConfig(target=WebhookTarget.SLACK, url="http://localhost:9999"),
+            ],
+        )
+        engine = RecommendEngine(config)
+
+        with patch.object(WebhookDispatcher, '_post', return_value=True) as mock_post:
+            action = _make_action(delta=2, score=0.8, coherence=0.9)
+            result = engine.evaluate(action, current_replicas=5)
+            # Get the payload sent to webhook
+            payload = mock_post.call_args[0][1]
+            # The recommendation_id in the webhook should match the real ID
+            assert result.recommendation.id in payload["text"]
+            assert "pending" not in payload["text"]
+
+    def test_webhook_signals_include_derived(self):
+        """Webhook signals should include coherence, stability, etc."""
+        config = RecommendConfig(
+            service="api-gw", namespace="prod",
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+            webhooks=[
+                WebhookConfig(target=WebhookTarget.GENERIC, url="http://localhost:9999"),
+            ],
+        )
+        engine = RecommendEngine(config)
+
+        with patch.object(WebhookDispatcher, '_post', return_value=True) as mock_post:
+            action = _make_action(delta=2, score=0.8, coherence=0.9)
+            result = engine.evaluate(action, current_replicas=5)
+            payload = mock_post.call_args[0][1]
+            signals = payload["signals"]
+            assert "coherence" in signals
+            assert "stability" in signals
+            assert "plasticity" in signals
+            assert "gain" in signals
+            assert "damping" in signals
+
+    def test_safety_clamps_to_zero_suppressed(self):
+        """If safety clamps delta to zero, recommendation should be suppressed."""
+        engine = RecommendEngine(RecommendConfig(
+            safety=SafetyConfig(min_replicas=5),
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+        ))
+        action = _make_action(delta=-1, score=-0.5, coherence=0.7)
+        result = engine.evaluate(action, current_replicas=5)
+        assert result.recommendation is None
+        assert result.suppressed is True
+        assert "zero" in result.suppress_reason.lower()
+
+    def test_webhook_failure_still_creates_recommendation(self):
+        """Webhook failure should not prevent recommendation creation."""
+        config = RecommendConfig(
+            service="api-gw",
+            confidence=ConfidenceConfig(action_threshold=0.1, coherence_threshold=0.1),
+            webhooks=[
+                WebhookConfig(target=WebhookTarget.SLACK, url="http://localhost:9999"),
+            ],
+        )
+        engine = RecommendEngine(config)
+
+        with patch.object(WebhookDispatcher, '_post', return_value=False):
+            action = _make_action(delta=2, score=0.8, coherence=0.9)
+            result = engine.evaluate(action, current_replicas=5)
+            assert result.recommendation is not None
+            assert result.recommendation.webhooks_sent == 0
+
+
+# ============================================================
+# Audit Fix Tests
+# ============================================================
+
+class TestConfidenceThresholdBoundary:
+    """Verify strict > threshold per spec (not >=)."""
+
+    def test_score_exactly_at_threshold_rejected(self):
+        """Score exactly at threshold should NOT recommend (strict >)."""
+        scorer = ConfidenceScorer(ConfidenceConfig(action_threshold=0.3))
+        action = _make_action(delta=1, score=0.3, coherence=0.9)
+        result = scorer.evaluate(action)
+        assert result.should_recommend is False
+
+    def test_coherence_exactly_at_threshold_rejected(self):
+        """Coherence exactly at threshold should NOT recommend (strict >)."""
+        scorer = ConfidenceScorer(ConfidenceConfig(coherence_threshold=0.5))
+        action = _make_action(delta=1, score=0.8, coherence=0.5)
+        result = scorer.evaluate(action)
+        assert result.should_recommend is False
+
+    def test_just_above_threshold_accepted(self):
+        """Score just above threshold should recommend."""
+        scorer = ConfidenceScorer(ConfidenceConfig(
+            action_threshold=0.3, coherence_threshold=0.5,
+        ))
+        action = _make_action(delta=1, score=0.31, coherence=0.51)
+        result = scorer.evaluate(action)
+        assert result.should_recommend is True
+
+
+class TestApprovalLeak:
+    """Verify resolved recommendations are cleaned from pending dict."""
+
+    def test_approved_removed_from_pending(self):
+        """Approved recommendation should not be in pending dict."""
+        manager = ApprovalManager()
+        action = _make_action(delta=2, score=0.8)
+        rec = manager.create(
+            service="api-gw", namespace="prod",
+            current_replicas=5, original_delta=2,
+            clamped_delta=2, target_replicas=7,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        manager.approve(rec.id)
+        assert manager.pending_count == 0
+        assert len(manager.history) == 1
+
+    def test_expired_removed_from_pending(self):
+        """Expired recommendations should be removed from pending dict."""
+        manager = ApprovalManager(ttl_seconds=0.01)
+        action = _make_action(delta=2, score=0.8)
+        manager.create(
+            service="api-gw", namespace="prod",
+            current_replicas=5, original_delta=2,
+            clamped_delta=2, target_replicas=7,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        time.sleep(0.02)
+        manager.expire_stale()
+        assert manager.pending_count == 0
+        assert len(manager.history) == 1
+
+    def test_get_finds_resolved_in_history(self):
+        """get() should find resolved recommendations via history."""
+        manager = ApprovalManager()
+        action = _make_action(delta=2, score=0.8)
+        rec = manager.create(
+            service="api-gw", namespace="prod",
+            current_replicas=5, original_delta=2,
+            clamped_delta=2, target_replicas=7,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        manager.approve(rec.id)
+        found = manager.get(rec.id)
+        assert found is not None
+        assert found.state == ApprovalState.APPROVED
+
+    def test_dismiss_after_expire_returns_none(self):
+        """Dismissing an expired recommendation should return None."""
+        manager = ApprovalManager(ttl_seconds=0.01)
+        action = _make_action(delta=2, score=0.8)
+        rec = manager.create(
+            service="api-gw", namespace="prod",
+            current_replicas=5, original_delta=2,
+            clamped_delta=2, target_replicas=7,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        time.sleep(0.02)
+        manager.expire_stale()
+        assert manager.dismiss(rec.id) is None
+
+    def test_pending_for_service(self):
+        """pending_for_service should filter by service name."""
+        manager = ApprovalManager()
+        action = _make_action(delta=2, score=0.8)
+        manager.create(
+            service="api-gw", namespace="prod",
+            current_replicas=5, original_delta=2,
+            clamped_delta=2, target_replicas=7,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        manager.create(
+            service="worker", namespace="prod",
+            current_replicas=3, original_delta=1,
+            clamped_delta=1, target_replicas=4,
+            confidence=_make_confidence_result(),
+            safety=_make_safety_result(),
+            action=action, explanation="test",
+        )
+        assert len(manager.pending_for_service("api-gw")) == 1
+        assert len(manager.pending_for_service("worker")) == 1
+        assert len(manager.pending_for_service("unknown")) == 0
+
+    def test_history_trimming(self):
+        """History should be trimmed to max_history."""
+        manager = ApprovalManager(max_history=5)
+        action = _make_action(delta=2, score=0.8)
+        for i in range(10):
+            rec = manager.create(
+                service=f"svc-{i}", namespace="prod",
+                current_replicas=5, original_delta=2,
+                clamped_delta=2, target_replicas=7,
+                confidence=_make_confidence_result(),
+                safety=_make_safety_result(),
+                action=action, explanation="test",
+            )
+            manager.approve(rec.id)
+        assert len(manager.history) == 5
+
+
+class TestWebhookValidation:
+    """Webhook config validation tests."""
+
+    def test_invalid_min_confidence_raises(self):
+        """Invalid min_confidence should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid min_confidence"):
+            WebhookConfig(
+                target=WebhookTarget.SLACK,
+                url="http://localhost",
+                min_confidence="INVALID",
+            )
+
+    def test_slack_includes_explanation(self):
+        """Slack formatter should include explanation."""
+        fmt = SlackFormatter()
+        payload = fmt.format_recommendation(
+            service="api-gw", namespace="prod",
+            current_replicas=5, recommended_delta=2, target_replicas=7,
+            confidence="high", signals={},
+            explanation="Decision: SCALE OUT 2",
+            recommendation_id="abc123",
+        )
+        assert "SCALE OUT 2" in payload["text"]
+        assert "Reasoning" in payload["text"]
+
+    def test_pagerduty_includes_explanation(self):
+        """PagerDuty formatter should include explanation in custom_details."""
+        fmt = PagerDutyFormatter()
+        payload = fmt.format_recommendation(
+            service="api-gw", namespace="prod",
+            current_replicas=5, recommended_delta=2, target_replicas=7,
+            confidence="high", signals={},
+            explanation="test explanation",
+            recommendation_id="abc123",
+        )
+        assert payload["payload"]["custom_details"]["explanation"] == "test explanation"
+
+    def test_pagerduty_dedup_includes_service(self):
+        """PagerDuty dedup_key should include namespace/service for multi-service."""
+        fmt = PagerDutyFormatter()
+        payload = fmt.format_recommendation(
+            service="api-gw", namespace="prod",
+            current_replicas=5, recommended_delta=2, target_replicas=7,
+            confidence="high", signals={},
+            explanation="test",
+            recommendation_id="abc123",
+        )
+        assert "prod/api-gw" in payload["dedup_key"]
+
+
+class TestSafetyEdgeCases:
+    """Safety bounds edge cases from audit."""
+
+    def test_min_replicas_no_spurious_reason(self):
+        """No clamp_reason when floor doesn't actually change delta."""
+        bounds = SafetyBounds(SafetyConfig(min_replicas=1))
+        result = bounds.check(current_replicas=10, proposed_delta=-2)
+        # 10 - 2 = 8, well above min 1, no floor needed
+        assert "Floor" not in result.clamp_reason
+
+    def test_dual_clamp_scale_in_plus_floor(self):
+        """Scale-in clamped by both percentage and min_replicas."""
+        bounds = SafetyBounds(SafetyConfig(
+            max_scale_in_fraction=0.25,
+            min_replicas=4,
+        ))
+        # 5 replicas, want to scale in by 3
+        # 25% of 5 = 1.25 → max_in = max(1,1) = 1 → clamped to -1
+        # target = 5 - 1 = 4 >= min_replicas=4, OK
+        result = bounds.check(current_replicas=5, proposed_delta=-3)
+        assert result.clamped_delta == -1
+        assert result.target_replicas == 4
+
+    def test_zero_replicas_scale_out(self):
+        """current_replicas=0 should still allow scale-out of at least 1."""
+        bounds = SafetyBounds(SafetyConfig(min_replicas=1))
+        result = bounds.check(current_replicas=0, proposed_delta=3)
+        assert result.clamped_delta >= 1

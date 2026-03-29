@@ -79,24 +79,24 @@ class ConfidenceScorer:
                 reason="No scaling action recommended",
             )
 
-        # Check minimum thresholds
-        if score < self.config.action_threshold:
+        # Check minimum thresholds (strictly greater-than per spec)
+        if score <= self.config.action_threshold:
             return ConfidenceResult(
                 level=ConfidenceLevel.NONE,
                 action_score=score,
                 coherence=coherence,
                 should_recommend=False,
-                reason=f"Action score {score:.3f} below threshold "
+                reason=f"Action score {score:.3f} at or below threshold "
                        f"{self.config.action_threshold}",
             )
 
-        if coherence < self.config.coherence_threshold:
+        if coherence <= self.config.coherence_threshold:
             return ConfidenceResult(
                 level=ConfidenceLevel.NONE,
                 action_score=score,
                 coherence=coherence,
                 should_recommend=False,
-                reason=f"Coherence {coherence:.2f} below threshold "
+                reason=f"Coherence {coherence:.2f} at or below threshold "
                        f"{self.config.coherence_threshold}",
             )
 

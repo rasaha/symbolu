@@ -117,13 +117,19 @@ class SafetyBounds:
         target = current_replicas + clamped
         if target < self.config.min_replicas:
             old_clamped = clamped
-            clamped = self.config.min_replicas - current_replicas
-            if clamped >= 0:
-                clamped = 0  # Can't scale in if already at or below min
-            reasons.append(
-                f"Floor applied: target {current_replicas + old_clamped} "
-                f"below min {self.config.min_replicas}"
-            )
+            # How much can we actually scale in while staying at/above min?
+            allowed_delta = self.config.min_replicas - current_replicas
+            if allowed_delta >= 0:
+                # Already at or below min — can't scale in at all
+                clamped = 0
+            else:
+                clamped = allowed_delta
+            if clamped != old_clamped:
+                reasons.append(
+                    f"Floor applied: target {current_replicas + old_clamped} "
+                    f"below min {self.config.min_replicas}, "
+                    f"clamped to {current_replicas + clamped}"
+                )
 
         target = current_replicas + clamped
         was_clamped = clamped != proposed_delta

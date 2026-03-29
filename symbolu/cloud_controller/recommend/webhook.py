@@ -26,6 +26,11 @@ class WebhookTarget(Enum):
     GENERIC = "generic"
 
 
+# Confidence level ordering for min_confidence filtering
+VALID_CONFIDENCE_LEVELS = {"none", "low", "medium", "high"}
+_CONFIDENCE_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3}
+
+
 @dataclass
 class WebhookConfig:
     """Configuration for a single webhook endpoint."""
@@ -35,8 +40,15 @@ class WebhookConfig:
     headers: Dict[str, str] = field(default_factory=dict)
     # Timeout for HTTP requests (seconds)
     timeout_seconds: float = 10.0
-    # Only send for these confidence levels (empty = all)
+    # Only send for these confidence levels
     min_confidence: str = "low"  # "low", "medium", "high"
+
+    def __post_init__(self):
+        if self.min_confidence not in VALID_CONFIDENCE_LEVELS:
+            raise ValueError(
+                f"Invalid min_confidence '{self.min_confidence}'. "
+                f"Must be one of: {', '.join(sorted(VALID_CONFIDENCE_LEVELS))}"
+            )
 
 
 class WebhookFormatter(Protocol):
@@ -90,6 +102,7 @@ class SlackFormatter:
             f"Recommended: {target_replicas} ({recommended_delta:+d})\n"
             f"Confidence: *{confidence.upper()}*\n\n"
             f"Signals:\n```\n{signal_text}\n```\n"
+            f"Reasoning:\n```\n{explanation}\n```\n"
             f"ID: `{recommendation_id}`"
         )
 
@@ -132,10 +145,11 @@ class PagerDutyFormatter:
                     "delta": recommended_delta,
                     "confidence": confidence,
                     "signals": signals,
+                    "explanation": explanation,
                     "recommendation_id": recommendation_id,
                 },
             },
-            "dedup_key": recommendation_id,
+            "dedup_key": f"{namespace}/{service}/{recommendation_id}",
         }
 
 
@@ -183,9 +197,6 @@ _FORMATTERS: Dict[WebhookTarget, WebhookFormatter] = {
     WebhookTarget.PAGERDUTY: PagerDutyFormatter(),
     WebhookTarget.OPSGENIE: OpsGenieFormatter(),
 }
-
-# Confidence level ordering for min_confidence filtering
-_CONFIDENCE_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
 
 class WebhookDispatcher:

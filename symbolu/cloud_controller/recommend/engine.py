@@ -7,17 +7,24 @@ Wires together:
 Each cycle:
 1. Receive ActionResult from the controller (via shadow runner or pipeline)
 2. Score confidence — skip if below threshold
-3. Apply safety bounds — clamp delta, check cooldown
-4. Send webhook notifications
+3. Check for existing pending recommendation (dedup)
+4. Apply safety bounds — clamp delta, check cooldown
 5. Create pending recommendation for human approval
-6. Expire stale recommendations
+6. Send webhook notifications (with real recommendation ID)
+7. Expire stale recommendations
 
 The engine does NOT execute actions — that's Stage 5.
+
+NOTE — Cooldown timing:
+Cooldown starts when a recommendation is *approved*, not when the
+scaling action is actually *executed* by the action layer (Stage 5).
+This is intentionally conservative — Stage 5 should extend cooldown
+if execution is delayed. See SafetyBounds.record_action().
 """
 
 import logging
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from symbolu.cloud_controller.controller import ActionResult
 from symbolu.cloud_controller.recommend.confidence import (
@@ -74,6 +81,19 @@ class RecommendCycleResult:
     suppress_reason: str = ""
 
 
+def _build_signals(action: ActionResult) -> Dict[str, Any]:
+    """Build signals dict with both raw metrics and derived controller signals."""
+    signals = dict(action.metrics_snapshot)
+    # Add derived signals for operator context
+    if action.coherence is not None:
+        signals["coherence"] = action.coherence.coherence
+    signals["stability"] = action.plasticity.resistance
+    signals["plasticity"] = action.plasticity.plasticity
+    signals["gain"] = action.gain.gain
+    signals["damping"] = action.damping.damping
+    return signals
+
+
 class RecommendEngine:
     """Orchestrates the recommendation pipeline.
 
@@ -109,11 +129,16 @@ class RecommendEngine:
 
         Args:
             action: Controller's ActionResult.
-            current_replicas: Current replica count.
+            current_replicas: Current replica count (must be >= 1).
 
         Returns:
             RecommendCycleResult with confidence, safety, and recommendation.
         """
+        # Guard invalid replica count
+        if current_replicas < 1:
+            logger.warning("current_replicas=%d < 1, clamping to 1", current_replicas)
+            current_replicas = 1
+
         # 1. Expire stale recommendations
         expired = self.approvals.expire_stale()
 
@@ -128,7 +153,18 @@ class RecommendEngine:
                 suppress_reason=confidence.reason,
             )
 
-        # 3. Apply safety bounds
+        # 3. Deduplicate — skip if there's already a pending recommendation
+        #    for this service to avoid flooding operators
+        existing = self.approvals.pending_for_service(self.config.service)
+        if existing:
+            return RecommendCycleResult(
+                confidence=confidence,
+                expired=expired,
+                suppressed=True,
+                suppress_reason=f"Pending recommendation already exists: {existing[0].id}",
+            )
+
+        # 4. Apply safety bounds
         safety = self.safety.check(
             current_replicas=current_replicas,
             proposed_delta=action.replica_delta,
@@ -154,23 +190,11 @@ class RecommendEngine:
                 suppress_reason="Safety bounds reduced delta to zero",
             )
 
-        # 4. Build explanation
+        # 5. Build explanation and signals
         explanation = action.explain()
+        signals = _build_signals(action)
 
-        # 5. Send webhooks
-        webhooks_sent = self.dispatcher.send(
-            service=self.config.service,
-            namespace=self.config.namespace,
-            current_replicas=current_replicas,
-            recommended_delta=safety.clamped_delta,
-            target_replicas=safety.target_replicas,
-            confidence=confidence.level.value,
-            signals=dict(action.metrics_snapshot),
-            explanation=explanation,
-            recommendation_id="pending",  # Updated after creation
-        )
-
-        # 6. Create recommendation
+        # 6. Create recommendation FIRST (so we have the real ID for webhooks)
         rec = self.approvals.create(
             service=self.config.service,
             namespace=self.config.namespace,
@@ -182,12 +206,25 @@ class RecommendEngine:
             safety=safety,
             action=action,
             explanation=explanation,
-            webhooks_sent=webhooks_sent,
         )
 
+        # 7. Send webhooks with the real recommendation ID
+        webhooks_sent = self.dispatcher.send(
+            service=self.config.service,
+            namespace=self.config.namespace,
+            current_replicas=current_replicas,
+            recommended_delta=safety.clamped_delta,
+            target_replicas=safety.target_replicas,
+            confidence=confidence.level.value,
+            signals=signals,
+            explanation=explanation,
+            recommendation_id=rec.id,
+        )
+        rec.webhooks_sent = webhooks_sent
+
         logger.info(
-            "Recommendation created: %s (%+d replicas, %s confidence)",
-            rec.id, safety.clamped_delta, confidence.level.value,
+            "Recommendation created: %s (%+d replicas, %s confidence, %d webhooks)",
+            rec.id, safety.clamped_delta, confidence.level.value, webhooks_sent,
         )
 
         return RecommendCycleResult(

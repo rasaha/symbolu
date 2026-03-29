@@ -72,7 +72,7 @@ class Recommendation:
         direction = "OUT" if self.clamped_delta > 0 else "IN"
         return (
             f"[{self.id[:8]}] {self.service}: SCALE {direction} "
-            f"{self.clamped_delta:+d} ({self.current_replicas}→{self.target_replicas}) "
+            f"{self.clamped_delta:+d} ({self.current_replicas}\u2192{self.target_replicas}) "
             f"confidence={self.confidence.level.value} "
             f"state={self.state.value}"
         )
@@ -93,7 +93,7 @@ class ApprovalManager:
     def __init__(self, ttl_seconds: float = 600.0, max_history: int = 1000):
         self._ttl = ttl_seconds
         self._max_history = max_history
-        self._recommendations: Dict[str, Recommendation] = {}
+        self._pending: Dict[str, Recommendation] = {}
         self._history: List[Recommendation] = []
         self._lock = threading.Lock()
 
@@ -134,7 +134,7 @@ class ApprovalManager:
         )
 
         with self._lock:
-            self._recommendations[rec.id] = rec
+            self._pending[rec.id] = rec
 
         logger.info("Recommendation created: %s", rec.format_summary())
         return rec
@@ -151,7 +151,7 @@ class ApprovalManager:
             The approved Recommendation, or None if not found/not pending.
         """
         with self._lock:
-            rec = self._recommendations.get(recommendation_id)
+            rec = self._pending.get(recommendation_id)
             if rec is None:
                 logger.warning("Approve failed: recommendation %s not found", recommendation_id)
                 return None
@@ -166,7 +166,7 @@ class ApprovalManager:
             rec.resolved_at = time.time()
             rec.resolved_by = by
             rec.resolve_reason = reason
-            self._archive(rec)
+            self._resolve(rec)
 
         logger.info("Recommendation approved: %s by=%s", rec.id, by)
         return rec
@@ -183,7 +183,7 @@ class ApprovalManager:
             The dismissed Recommendation, or None if not found/not pending.
         """
         with self._lock:
-            rec = self._recommendations.get(recommendation_id)
+            rec = self._pending.get(recommendation_id)
             if rec is None:
                 logger.warning("Dismiss failed: recommendation %s not found", recommendation_id)
                 return None
@@ -198,7 +198,7 @@ class ApprovalManager:
             rec.resolved_at = time.time()
             rec.resolved_by = by
             rec.resolve_reason = reason
-            self._archive(rec)
+            self._resolve(rec)
 
         logger.info("Recommendation dismissed: %s by=%s reason=%s", rec.id, by, reason)
         return rec
@@ -214,7 +214,7 @@ class ApprovalManager:
 
         expired = []
         with self._lock:
-            for rec in list(self._recommendations.values()):
+            for rec in list(self._pending.values()):
                 if rec.state != ApprovalState.PENDING:
                     continue
                 if current_time - rec.created_at > self._ttl:
@@ -222,7 +222,7 @@ class ApprovalManager:
                     rec.resolved_at = current_time
                     rec.resolve_reason = f"Expired after {self._ttl:.0f}s TTL"
                     expired.append(rec)
-                    self._archive(rec)
+                    self._resolve(rec)
 
         for rec in expired:
             logger.info("Recommendation expired: %s", rec.id)
@@ -230,15 +230,28 @@ class ApprovalManager:
         return expired
 
     def get(self, recommendation_id: str) -> Optional[Recommendation]:
-        """Look up a recommendation by ID."""
+        """Look up a recommendation by ID (pending or in history)."""
         with self._lock:
-            return self._recommendations.get(recommendation_id)
+            rec = self._pending.get(recommendation_id)
+            if rec is not None:
+                return rec
+            # Search history for resolved recommendations
+            for r in reversed(self._history):
+                if r.id == recommendation_id:
+                    return r
+            return None
+
+    def pending_for_service(self, service: str) -> List[Recommendation]:
+        """Get all pending recommendations for a specific service."""
+        with self._lock:
+            return [r for r in self._pending.values()
+                    if r.state == ApprovalState.PENDING and r.service == service]
 
     @property
     def pending(self) -> List[Recommendation]:
         """All currently pending recommendations."""
         with self._lock:
-            return [r for r in self._recommendations.values()
+            return [r for r in self._pending.values()
                     if r.state == ApprovalState.PENDING]
 
     @property
@@ -250,18 +263,18 @@ class ApprovalManager:
     @property
     def pending_count(self) -> int:
         with self._lock:
-            return sum(1 for r in self._recommendations.values()
+            return sum(1 for r in self._pending.values()
                        if r.state == ApprovalState.PENDING)
 
-    def _archive(self, rec: Recommendation) -> None:
-        """Move resolved recommendation to history. Caller must hold lock."""
+    def _resolve(self, rec: Recommendation) -> None:
+        """Move resolved recommendation from pending to history. Caller must hold lock."""
+        self._pending.pop(rec.id, None)
         self._history.append(rec)
         if len(self._history) > self._max_history:
             self._history = self._history[-self._max_history:]
-        # Keep in active dict for lookups; will be cleaned on next expire_stale
 
     def reset(self) -> None:
         """Clear all state."""
         with self._lock:
-            self._recommendations.clear()
+            self._pending.clear()
             self._history.clear()
