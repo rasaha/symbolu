@@ -295,16 +295,28 @@ class AdaptiveGain:
 class Damping:
     """Minimal damping: d_t = exp(-k_dv · V_t - k_dc · U_t).
 
-    Smooth, bounded, interpretable.
+    Smooth, bounded, interpretable. Adaptive k_dv: damping responds to
+    *relative* variance above a learned baseline, not absolute values.
+    This auto-calibrates to any model size and training phase.
+
     V_t = gradient variance estimate (EMA)
     U_t = coherence instability estimate (EMA)
+    V_baseline = slow-moving variance baseline (EMA, decay=0.999)
+
+    Effective exponent: -k_dv · max(0, V_ema/V_baseline - 1) - k_dc · U_ema
+    At baseline variance: d=1.0 (no damping)
+    At 2x baseline: d=exp(-k_dv)
+    At 5x baseline: d=exp(-4·k_dv)
     """
 
     def __init__(self, config: ExperientialControllerConfig):
         self.config = config
         self._V_ema = 0.0
         self._U_ema = 0.0
+        self._V_baseline = 0.0  # Slow-moving variance baseline
+        self._baseline_initialized = False
         self._prev_d_t: Optional[float] = None
+        self._warmup_remaining = 0  # Steps to hold d=1.0 after resume
 
     def compute(
         self,
@@ -312,9 +324,13 @@ class Damping:
         coherence_instability: float = 0.0,
     ) -> float:
         """Compute damping factor in (0, 1]."""
+        # Initialize baseline from first observation
+        if not self._baseline_initialized:
+            self._V_baseline = grad_variance
+            self._V_ema = grad_variance
+            self._baseline_initialized = True
+
         # Asymmetric EMA: fast rise (detect spikes) but fast decay (recover quickly).
-        # Rise: 0.90 (10% of spike absorbed immediately)
-        # Decay: 0.80 (20% decay per step → halves in ~3 steps, not ~14)
         if grad_variance > self._V_ema:
             self._V_ema = 0.90 * self._V_ema + 0.10 * grad_variance
         else:
@@ -324,8 +340,24 @@ class Damping:
         else:
             self._U_ema = 0.80 * self._U_ema + 0.20 * coherence_instability
 
-        # d_t = exp(-k_dv · V - k_dc · U)
-        exponent = -(self.config.k_dv * self._V_ema + self.config.k_dc * self._U_ema)
+        # Update slow baseline (0.999 decay = adapts over ~1000 steps)
+        self._V_baseline = 0.999 * self._V_baseline + 0.001 * grad_variance
+
+        # Warmup after resume: hold d=1.0 while EMAs stabilize
+        if self._warmup_remaining > 0:
+            self._warmup_remaining -= 1
+            self._prev_d_t = 1.0
+            return 1.0
+
+        # Adaptive damping: respond to variance *relative* to baseline.
+        # At baseline: V_ratio=1, excess=0, d=1.0 (no damping)
+        # At 2x baseline: excess=1, d=exp(-k_dv)
+        # At 5x baseline: excess=4, d=exp(-4*k_dv)
+        V_base = max(self._V_baseline, 1e-8)
+        V_ratio = self._V_ema / V_base
+        V_excess = max(0.0, V_ratio - 1.0)
+
+        exponent = -(self.config.k_dv * V_excess + self.config.k_dc * self._U_ema)
         d_t = math.exp(max(exponent, -10.0))  # Floor at exp(-10) ≈ 4.5e-5
         d_t = max(d_t, 0.01)  # Hard floor
 
@@ -651,6 +683,8 @@ class ExperientialController(nn.Module):
             "damping": {
                 "V_ema": self.damping._V_ema,
                 "U_ema": self.damping._U_ema,
+                "V_baseline": self.damping._V_baseline,
+                "baseline_initialized": self.damping._baseline_initialized,
                 "prev_d_t": self.damping._prev_d_t,
             },
             "gain": {
@@ -684,7 +718,11 @@ class ExperientialController(nn.Module):
             ds = state["damping"]
             self.damping._V_ema = ds["V_ema"]
             self.damping._U_ema = ds["U_ema"]
+            self.damping._V_baseline = ds.get("V_baseline", ds["V_ema"])
+            self.damping._baseline_initialized = ds.get("baseline_initialized", True)
             self.damping._prev_d_t = ds["prev_d_t"]
+            # Hold d=1.0 for 50 steps after resume to let gradients stabilize
+            self.damping._warmup_remaining = 50
 
         # Restore AdaptiveGain
         if "gain" in state:

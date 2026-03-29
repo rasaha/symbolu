@@ -878,7 +878,34 @@ def run_quality_samples(
             sample_count += 1
 
             log(f"  Prompt: \"{prompt}\"")
-            log(f"  Output: \"{generated}\"")
+            log(f"  [CG ON]  \"{generated}\"")
+
+            # A/B comparison: generate without CG if model supports ablation
+            if hasattr(model, 'set_ablation_config') and hasattr(model, 'ablation_config'):
+                try:
+                    from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+                    _saved_abl = model.ablation_config
+                    model.set_ablation_config(AttentionAblationConfig.all_off())
+                    generated_no_cg = generate_sample(
+                        model, tokenizer, prompt, device,
+                        max_new_tokens=128,
+                        temperature=0.9,
+                        top_p=0.95,
+                        top_k=50,
+                        repetition_penalty=1.15,
+                        no_repeat_ngram_size=3,
+                        autocast_dtype=_autocast_dtype,
+                    )
+                    generated_no_cg = generated_no_cg.strip().replace('\n', ' ')
+                    if _CLEAN_WIKITEXT_AVAILABLE:
+                        generated_no_cg = clean_wikitext_artifacts(generated_no_cg)
+                    generated_no_cg = generated_no_cg[:200]
+                    log(f"  [CG OFF] \"{generated_no_cg}\"")
+                    model.set_ablation_config(_saved_abl)
+                except Exception as e:
+                    log(f"  [CG OFF] comparison failed: {e}")
+                    model.set_ablation_config(_saved_abl if '_saved_abl' in dir() else None)
+
             log("")
         except Exception as e:
             log(f"  ⚠️ Sampling failed for prompt '{prompt[:30]}...': {e}")
@@ -1231,13 +1258,86 @@ def run_factual_eval(
         c = correct_by_cat.get(cat, 0)
         t = total_by_cat[cat]
         cat_summary.append(f"{cat}={c}/{t}")
-    print(f"  📊 Factual Accuracy: {correct_total}/{total} ({overall_acc*100:.0f}%) | {', '.join(cat_summary)}")
+    print(f"  📊 Factual Accuracy [CG ON]: {correct_total}/{total} ({overall_acc*100:.0f}%) | {', '.join(cat_summary)}")
+
+    # --- CG OFF comparison (A/B diagnostic) ---
+    cg_off_correct = 0
+    cg_off_by_cat: Dict[str, int] = {}
+    _can_ablate = hasattr(model, 'set_ablation_config') and hasattr(model, 'ablation_config')
+    if _can_ablate:
+        try:
+            from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+            _saved_abl = model.ablation_config
+            model.set_ablation_config(AttentionAblationConfig.all_off())
+
+            print(f"  📋 FACTUAL EVAL [CG OFF] (Step {step})")
+            for prompt, expected_answers, category in FACTUAL_EVAL_PROMPTS:
+                try:
+                    generated = generate_sample(
+                        model, tokenizer, prompt, device,
+                        max_new_tokens=32,
+                        temperature=0.01,
+                        top_p=1.0, top_k=0,
+                        repetition_penalty=1.0,
+                        no_repeat_ngram_size=0,
+                        autocast_dtype=amp_dtype,
+                    )
+                    gen_lower = generated.lower()
+                    hit = any(ans.lower() in gen_lower for ans in expected_answers)
+                    if hit:
+                        cg_off_by_cat[category] = cg_off_by_cat.get(category, 0) + 1
+                        cg_off_correct += 1
+                    mark = "✓" if hit else "✗"
+                    gen_short = generated.strip().replace('\n', ' ')[:80]
+                    print(f"     {mark} [{category}] \"{prompt}\" → \"{gen_short}\"")
+                except Exception as e:
+                    print(f"     ✗ [{category}] \"{prompt}\" → ERROR: {e}")
+
+            model.set_ablation_config(_saved_abl)
+
+            off_acc = cg_off_correct / total if total > 0 else 0.0
+            off_cat_summary = []
+            for cat in sorted(total_by_cat.keys()):
+                c = cg_off_by_cat.get(cat, 0)
+                t = total_by_cat[cat]
+                off_cat_summary.append(f"{cat}={c}/{t}")
+            print(f"  📊 Factual Accuracy [CG OFF]: {cg_off_correct}/{total} ({off_acc*100:.0f}%) | {', '.join(off_cat_summary)}")
+
+            # Delta summary
+            delta = correct_total - cg_off_correct
+            if delta > 0:
+                print(f"  📈 CG Impact: +{delta} correct (CG helps factual accuracy)")
+            elif delta < 0:
+                print(f"  📉 CG Impact: {delta} correct (CG hurts factual accuracy)")
+            else:
+                print(f"  📊 CG Impact: ±0 (no difference)")
+
+            # Per-category delta
+            cat_deltas = []
+            for cat in sorted(total_by_cat.keys()):
+                on_c = correct_by_cat.get(cat, 0)
+                off_c = cg_off_by_cat.get(cat, 0)
+                d = on_c - off_c
+                if d != 0:
+                    cat_deltas.append(f"{cat}: {'+'if d>0 else ''}{d}")
+            if cat_deltas:
+                print(f"  📊 Per-category delta: {', '.join(cat_deltas)}")
+
+        except Exception as e:
+            print(f"  [CG OFF factual eval failed: {e}]")
+            if '_saved_abl' in dir():
+                model.set_ablation_config(_saved_abl)
+
     print("")
 
-    return {
+    result = {
         'factual_accuracy': overall_acc,
         'factual_correct': correct_total,
         'factual_total': total,
     }
+    if _can_ablate:
+        result['factual_accuracy_cg_off'] = cg_off_correct / total if total > 0 else 0.0
+        result['factual_correct_cg_off'] = cg_off_correct
+    return result
 
 

@@ -5093,6 +5093,27 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # --- CG Primitive Loss Attribution ---
+                                # Track weighted contribution of each primitive to total CG loss.
+                                # This tells you which primitive is driving adapter weight changes.
+                                _cg_contribs = {}
+                                if 'cg_ont_loss' in metrics and config.lambda_ont > 0:
+                                    _cg_contribs['ont'] = config.lambda_ont * metrics['cg_ont_loss']
+                                if 'cg_kosha_routing_loss' in metrics and config.lambda_kosha_routing > 0:
+                                    _cg_contribs['kosha'] = config.lambda_kosha_routing * metrics['cg_kosha_routing_loss']
+                                if 'cg_bliss_loss' in metrics and config.lambda_bliss_token > 0:
+                                    _cg_contribs['bliss'] = config.lambda_bliss_token * metrics['cg_bliss_loss']
+                                for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                    _pk = f'cg_L_{_pn}'
+                                    _lam = getattr(config, f'lambda_{_pn}_token', 0)
+                                    if _pk in metrics and _lam > 0:
+                                        _cg_contribs[_pn] = _lam * metrics[_pk]
+                                _cg_total_contrib = sum(_cg_contribs.values()) if _cg_contribs else 0.0
+                                if _cg_total_contrib > 0:
+                                    for _cn, _cv in _cg_contribs.items():
+                                        metrics[f'cg_attr_{_cn}'] = _cv / _cg_total_contrib
+                                    metrics['cg_total_aux_loss'] = _cg_total_contrib
+
                                 # Log Kosha routing diagnostics
                                 if global_step % config.log_every == 0 and global_step > 0:
                                     _cg_alpha_mean = _cg_alpha.mean(dim=(0, 1))
@@ -6145,6 +6166,16 @@ def train(config: UnifiedTrainingConfig):
                             log_msg += f" | AdpN:{_adapter_norm:.1f}"
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/weight_norm', _adapter_norm, global_step)
+                        # Capture adapter output norm from model forward outputs
+                        if isinstance(outputs, dict) and 'adapter_output_norm' in outputs:
+                            _aon = outputs['adapter_output_norm']
+                            metrics['adapter_output_norm'] = _aon
+                            # Effective influence = gate × adapter_output_norm
+                            _eff_inf = metrics.get('adapter_gate', 0) * _aon
+                            metrics['cg_effective_influence'] = _eff_inf
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/output_norm', _aon, global_step)
+                                writer.add_scalar('cg_adapter/effective_influence', _eff_inf, global_step)
                         if isinstance(outputs, dict) and 'state' in outputs and outputs['state'] is not None:
                             _state_norm = outputs['state'].detach().norm(dim=-1).mean().item()
                             metrics['state_norm'] = _state_norm
@@ -7705,6 +7736,15 @@ def train(config: UnifiedTrainingConfig):
                     )
                     for k, v in factual_metrics.items():
                         metrics[k] = v
+                    # TensorBoard: factual accuracy CG ON vs CG OFF
+                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                        writer.add_scalar('factual/accuracy_cg_on',
+                                          factual_metrics.get('factual_accuracy', 0), global_step)
+                        if 'factual_accuracy_cg_off' in factual_metrics:
+                            writer.add_scalar('factual/accuracy_cg_off',
+                                              factual_metrics['factual_accuracy_cg_off'], global_step)
+                            _delta = factual_metrics['factual_accuracy'] - factual_metrics['factual_accuracy_cg_off']
+                            writer.add_scalar('factual/cg_delta', _delta, global_step)
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
@@ -7926,6 +7966,78 @@ def train(config: UnifiedTrainingConfig):
                                 writer.add_scalar('experiential/resistance_std', _r_std, global_step)
                                 writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
                                 writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+
+                        # --- CG Primitive Loss Attribution ---
+                        _cg_attr_keys = [k for k in metrics if k.startswith('cg_attr_')]
+                        if _cg_attr_keys:
+                            _cg_sections += 1
+                            _cg_total_aux = metrics.get('cg_total_aux_loss', 0)
+                            print(f"  CG Primitive Attribution (weighted loss %):")
+                            _attr_parts = []
+                            for _ak in sorted(_cg_attr_keys):
+                                _name = _ak.replace('cg_attr_', '')
+                                _pct = metrics[_ak] * 100
+                                _attr_parts.append(f"{_name}={_pct:.1f}%")
+                            print(f"    {' | '.join(_attr_parts)}")
+                            print(f"    total_aux_loss={_cg_total_aux:.4f}")
+                            # Identify dominant primitive
+                            _dom = max(_cg_attr_keys, key=lambda k: metrics[k])
+                            _dom_name = _dom.replace('cg_attr_', '')
+                            _dom_pct = metrics[_dom] * 100
+                            if _dom_pct > 60:
+                                print(f"    -> DOMINATED by {_dom_name} ({_dom_pct:.0f}%) — "
+                                      f"other primitives have weak influence")
+                            elif _dom_pct > 40:
+                                print(f"    -> LED by {_dom_name} ({_dom_pct:.0f}%)")
+                            else:
+                                print(f"    -> BALANCED: no single primitive dominates")
+                            # TensorBoard
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                for _ak in _cg_attr_keys:
+                                    _name = _ak.replace('cg_attr_', '')
+                                    writer.add_scalar(f'cg_attribution/{_name}',
+                                                      metrics[_ak], global_step)
+                                writer.add_scalar('cg_attribution/total_aux_loss',
+                                                  _cg_total_aux, global_step)
+
+                        # --- CG Adapter Influence Diagnostics ---
+                        _cg_model = getattr(model, 'module', model)
+                        if hasattr(_cg_model, 'adapter_gate'):
+                            _cg_sections += 1
+                            _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
+                            _gate_raw = _cg_model.adapter_gate.item()
+                            _adp_norm = metrics.get('adapter_output_norm', 0)
+                            _adp_wnorm = 0.0
+                            if hasattr(_cg_model, 'phase_adapter'):
+                                _adp_wnorm = sum(
+                                    p.detach().norm().item()
+                                    for p in _cg_model.phase_adapter.parameters()
+                                )
+                            print(f"  CG Adapter Diagnostics:")
+                            print(f"    gate={_gate_val:.4f} (raw={_gate_raw:.3f})  "
+                                  f"adapter_out_norm={_adp_norm:.3f}  "
+                                  f"adapter_weight_norm={_adp_wnorm:.1f}")
+                            # Effective influence: gate * adapter_output_norm
+                            _eff_influence = _gate_val * _adp_norm if _adp_norm > 0 else 0.0
+                            print(f"    effective_influence={_eff_influence:.4f} "
+                                  f"(gate × adapter_norm)")
+                            if _eff_influence < 5.0:
+                                print(f"    -> SUBTLE: small CG perturbation")
+                            elif _eff_influence < 20.0:
+                                print(f"    -> MODERATE: CG actively shaping representations")
+                            elif _eff_influence < 50.0:
+                                print(f"    -> STRONG: CG significantly modifying hidden states")
+                            else:
+                                print(f"    -> DOMINANT: CG overwhelming residual stream — check gate")
+                            # Damping health
+                            _d_val = metrics.get('exp_damping', None)
+                            if _d_val is not None:
+                                if _d_val < 0.05:
+                                    print(f"    ⚠ Damping collapsed (d={_d_val:.3f}) — "
+                                          f"controller effectively OFF")
+                                elif _d_val < 0.3:
+                                    print(f"    ⚡ Damping suppressed (d={_d_val:.3f}) — "
+                                          f"recovering from variance spike")
 
                         # --- Embedding Diagnostics Trend ---
                         if 'cg_embedding_diag' in dir() and cg_embedding_diag is not None:

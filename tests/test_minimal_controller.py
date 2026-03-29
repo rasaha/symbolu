@@ -227,14 +227,21 @@ class TestDamping:
             assert 0.01 <= d <= 1.0
 
     def test_high_variance_reduces_damping(self, config):
-        damp_low = Damping(config)
-        damp_high = Damping(config)
+        """A variance spike above baseline should reduce damping."""
+        damp = Damping(config)
 
-        for _ in range(20):
-            d_low = damp_low.compute(grad_variance=0.01)
-            d_high = damp_high.compute(grad_variance=10.0)
+        # Establish baseline at low variance
+        for _ in range(50):
+            d = damp.compute(grad_variance=0.01)
 
-        assert d_low > d_high
+        d_baseline = d
+        assert d_baseline > 0.9  # Should be near 1.0 at baseline
+
+        # Spike to 100x baseline — damping should drop
+        for _ in range(5):
+            d_spike = damp.compute(grad_variance=1.0)
+
+        assert d_spike < d_baseline
 
     def test_exponential_form(self, config):
         """Damping uses exp(-k·V - k·U), which is smooth and interpretable."""
