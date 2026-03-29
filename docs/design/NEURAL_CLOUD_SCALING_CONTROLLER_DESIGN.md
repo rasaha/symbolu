@@ -377,22 +377,239 @@ Every decision produces a human-readable breakdown:
 
 ---
 
-## 8. Implementation Sequence
+## 8. Implementation Stages
 
-### Phase 1: Core Library (no cloud dependency)
-Extract domain-agnostic math from `minimal_controller.py` into standalone Python module.
-No PyTorch — pure stdlib `math` + `numpy`.
+### Stage 1 — Core Library Extraction
 
-### Phase 2: Prometheus Connector
-Single integration. Read metrics via `/api/v1/query`. Normalize to state vector.
+**Goal**: Standalone controller with zero cloud dependencies.
 
-### Phase 3: Shadow Mode
-Run alongside existing HPA. Log what controller would do vs. what HPA did.
-Produce delta report: "controller would have prevented N thrash events, caught M incidents earlier."
+**What to build**:
+- Extract `PlasticityGate`, `AdaptiveGain`, `Damping`, `IdentityEMA`, `ReplayBuffer` from `minimal_controller.py` and `identity_layer.py`
+- Remove all PyTorch dependencies — pure stdlib `math` + `numpy` (or stdlib-only)
+- Create `InfraControllerConfig` dataclass with the 12 cloud-adapted parameters
+- Wire them into a single `Controller.step(state_vector) → ActionResult` function
 
-### Phase 4: Active Mode
-Replace HPA decision logic. Either custom metrics adapter or direct replica patching.
-Start Mode A (observe), graduate to Mode B (approve), then Mode C (autonomous).
+**Source → Target mapping**:
+
+| CG Source | Cloud Target | What changes |
+|-----------|-------------|-------------|
+| `PlasticityGate.forward()` (lines 211-261) | `core/plasticity_gate.py` | Remove `nn.Module`, `nn.Sequential` resistance projector. R_t becomes a plain float input instead of neural network output. Keep double-smoothed EMA, sigmoid gate, all constants |
+| `AdaptiveGain.compute()` (lines 274-302) | `core/adaptive_gain.py` | Direct port — already pure math, no torch dependency. Replace training warmup with time-of-day phase |
+| `Damping.compute()` (lines 331-379) | `core/damping.py` | Direct port — already pure math. Rename `grad_variance` → `metric_variance` |
+| `SelfModel.consolidate_identity()` (lines 163-222) | `core/identity_ema.py` | Replace torch tensors with numpy arrays. Keep conditional α_eff, re-normalization, accumulator pattern |
+| `ReplayBuffer` (lines 443-487) | `core/replay_buffer.py` | Direct port — already plain Python. Change entry schema from ML states to infra states |
+| `ExperientialControllerConfig` (lines 42-78) | `config.py` | Swap λ_temporal/coherence/latent → w_infra/w_app/w_business. Adjust G_base from 3.0→1.0, G_max from 5.0→3.0 |
+
+**Deliverable**: A Python package that can be tested with synthetic signals in a unit test. No cluster needed.
+
+```python
+# Stage 1 test: synthetic signal → decision
+from cloud_controller import Controller, InfraControllerConfig
+
+ctrl = Controller(InfraControllerConfig())
+result = ctrl.step(
+    metrics={"cpu": 0.82, "latency_p99": 0.45, "error_rate": 0.12,
+             "queue_depth": 0.38, "memory": 0.55, "request_rate": 0.71},
+    deploy_active=False,
+    time_phase="peak"
+)
+# result.action_score = 0.34
+# result.recommendation = "scale +1"
+# result.explanation = "Moderate coherent pressure, system stable..."
+```
+
+**Validation**: Unit tests with known input/output pairs. Verify:
+- Plasticity gate closes when R_t=0, M_t=1 (P_t ≈ 0.007)
+- Damping suppresses when variance is 5x baseline (d_t < 0.4)
+- Gain rate-limits to ±10% per step
+- Identity EMA doesn't update when stability < 0.2
+
+**Estimated scope**: ~800 lines of Python across 7 files.
+
+---
+
+### Stage 2 — Prometheus Integration & Signal Pipeline
+
+**Goal**: Read real metrics from a Kubernetes cluster, normalize to state vector.
+
+**What to build**:
+- Prometheus HTTP client (`/api/v1/query` and `/api/v1/query_range`)
+- Signal normalizer: raw metric values → [0, 1] via rolling z-score + sigmoid
+- Coherence calculator: pairwise agreement across signal groups
+- Resistance estimator: variance + recent scaling events + deploy status → R_t
+- State vector assembler: combine all signals into `X_t`
+
+**Prometheus queries (MVP set)**:
+
+| Signal | PromQL | Normalization |
+|--------|--------|---------------|
+| CPU utilization | `rate(node_cpu_seconds_total{mode!="idle"}[2m])` | z-score against 1h rolling mean |
+| Memory pressure | `1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)` | Direct ratio [0,1] |
+| Latency p99 | `histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[2m]))` | z-score against 1h rolling |
+| Error rate | `rate(http_requests_total{code=~"5.."}[2m]) / rate(http_requests_total[2m])` | Direct ratio [0,1] |
+| Queue depth | `queue_messages_ready` or `kube_pod_container_resource_requests` | z-score against 1h rolling |
+| Request rate | `rate(http_requests_total[2m])` | z-score for delta detection |
+| Pod restarts | `rate(kube_pod_container_status_restarts_total[10m])` | > 0 = instability signal |
+| HPA current replicas | `kube_hpa_status_current_replicas` | Used for misalignment calc |
+
+**Polling interval**: Every 15 seconds (configurable). Controller runs `step()` each poll.
+
+**Deliverable**: Controller running against a real or simulated Prometheus endpoint, producing decision logs to stdout/file.
+
+```
+[14:23:01] X_t=[cpu=0.78, mem=0.42, lat=0.65, err=0.08, queue=0.31, req=0.72]
+[14:23:01] Coherence=0.61, Resistance=0.73, Misalignment=0.15
+[14:23:01] P_t=0.65, G_t=0.82, d_t=0.91 → A_t=0.49 → RECOMMEND: scale +1
+```
+
+**Validation**: Run against a test cluster with `k6` or `locust` generating load patterns:
+- Steady load → controller says "no action" (correct)
+- Ramp up → controller recommends scale-out before HPA threshold fires
+- Spike + recover → controller damps, HPA would thrash
+
+---
+
+### Stage 3 — Shadow Mode (Proof of Value)
+
+**Goal**: Run controller alongside existing HPA, log divergence, prove value.
+
+**What to build**:
+- Shadow runner: polls metrics, runs controller, records recommendation
+- HPA watcher: polls `kube_hpa_status_desired_replicas` to see what HPA actually did
+- Delta logger: records every divergence between controller and HPA
+- Summary reporter: daily/weekly report of avoided thrash, early detections, false positives
+
+**Shadow log format**:
+```
+[14:23:01] DIVERGENCE
+  HPA action:        scale 5 → 8 (CPU 82% > threshold 70%)
+  Controller action:  HOLD (coherence=0.31 — only CPU elevated)
+  Reason:            Incoherent pressure — latency flat, queue flat, errors flat
+  Verdict:           PENDING (check if CPU returned to normal within 5 min)
+
+[14:28:01] VERDICT for [14:23:01]
+  CPU returned to 54% within 4 minutes (single process spike)
+  Controller was CORRECT — HPA would have wasted 3 pods for 4 minutes
+  Estimated cost saved: $0.12 (3 pods × 4 min × $0.03/pod-min)
+```
+
+**Delta report** (weekly):
+```
+Neural Cloud Controller — Shadow Report (Week 13, 2026)
+  Total decisions:              2,016
+  Agreements with HPA:          1,847 (91.6%)
+  Controller caught earlier:       43 (controller scaled 2-5 min before HPA)
+  Controller prevented thrash:     89 (HPA scaled unnecessarily)
+  Controller too conservative:     37 (should have scaled, didn't)
+  Net improvement:                 95 better decisions
+  Estimated cost savings:         $847/week
+```
+
+**This report is the sales demo.** Run it against a prospect's cluster for 2 weeks.
+
+**Deployment**: Kubernetes Deployment or DaemonSet, read-only access to Prometheus and K8s API. Zero write permissions — purely observational.
+
+**Validation**: Run for 2+ weeks on a real cluster. Manual review of all divergences. Tune parameters based on false positives/negatives.
+
+---
+
+### Stage 4 — Recommend Mode (Human-in-the-Loop)
+
+**Goal**: Controller sends actionable recommendations, human approves.
+
+**What to build**:
+- Webhook integration: Slack / PagerDuty / OpsGenie notification on high-confidence recommendations
+- Approval API: human clicks "approve" → controller executes the action
+- Explanation UI: web dashboard showing current state, controller reasoning, history
+- Confidence scoring: only recommend when action score > threshold AND coherence > 0.5
+
+**Notification example** (Slack):
+```
+⚠️ Neural Cloud Controller — Scale Recommendation
+Service: api-gateway (prod)
+Current replicas: 5
+Recommended: 7 (+2)
+Confidence: HIGH
+
+Signals:
+  CPU: 84% ↑ (sustained 8 min)
+  Latency p99: 340ms ↑ (was 120ms baseline)
+  Error rate: 2.1% ↑ (was 0.3%)
+  Queue depth: 1,247 ↑ (was 200)
+  Coherence: 0.89 (all signals agree)
+  System stability: 0.81 (stable)
+
+[Approve] [Dismiss] [Details]
+```
+
+**Safety bounds** (always enforced, even on approval):
+- Max scale-out: +50% of current replicas per action
+- Max scale-in: -25% of current replicas per action
+- Minimum replicas: never below the HPA minReplicas setting
+- Cooldown after action: controller enters observation mode for 2 minutes
+
+**Deliverable**: Operator receives recommendations, can approve/dismiss, sees full reasoning.
+
+---
+
+### Stage 5 — Active Mode (Bounded Autonomous Control)
+
+**Goal**: Controller directly manages scaling within strict policy bounds.
+
+**What to build**:
+- K8s actuator: PATCH `apps/v1/deployments/{name}/scale` or set HPA custom metric
+- Policy engine: customer-configurable safety limits (max replicas, max change rate, blackout windows)
+- Rollback trigger: if metrics degrade within 3 minutes of action, auto-revert
+- Audit log: every action recorded with full state snapshot and reasoning
+
+**Two integration options**:
+
+Option A — Custom Metrics Adapter:
+```
+Controller → exposes action_score as Prometheus metric
+HPA → configured to scale on controller_action_score metric
+HPA still manages pod lifecycle — controller provides the signal
+```
+
+Option B — Direct Replica Patching:
+```
+Controller → PATCH deployment replicas directly
+HPA → disabled or set to very wide min/max as safety net
+Controller owns scaling — HPA is emergency fallback only
+```
+
+Recommend Option A for initial active mode (less risk, HPA as safety net).
+
+**Deployment gate integration**:
+- ArgoCD: controller exposes `/api/readiness` endpoint
+- ArgoCD Sync pre-hook calls endpoint: if P_t < 0.3 → block sync, return reason
+- Operator sees: "Deployment blocked: system stability 0.34, recent scaling oscillation detected. Retry in ~10 min."
+
+**Validation**: Run in active mode on staging first (2 weeks), then canary on one production service, then expand.
+
+---
+
+### Stage 6 — Learning Loop & Multi-Service
+
+**Goal**: Controller improves over time, scales to multiple services.
+
+**What to build**:
+- Outcome attribution: after each action, measure whether metrics improved within 5 minutes
+- Replay-driven tuning: use replay buffer to identify systematic errors (e.g., consistently too conservative during morning traffic ramp)
+- Parameter auto-tuning: Bayesian optimization over the 12 parameters using outcome data
+- Multi-service support: one controller instance per service, shared identity EMA for cluster-wide patterns
+- Cross-service coherence: detect correlated scaling needs across services (if API gateway scales, downstream services likely need to scale too)
+
+**Parameter tuning loop**:
+```
+Weekly:
+  1. Sample 50 replay entries (priority-weighted)
+  2. For each: what would different parameters have produced?
+  3. Optimize parameters to maximize: correct_decisions / total_decisions
+  4. Apply new parameters with warmup ramp (don't jump to new values)
+```
+
+This stage is where the controller becomes customer-specific and the moat deepens.
 
 ---
 
