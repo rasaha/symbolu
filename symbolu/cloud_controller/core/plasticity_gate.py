@@ -59,16 +59,25 @@ class PlasticityGate:
         # Matches minimal_controller.py line 231
         r_smoothed = 0.9 * self._persistent_resistance + 0.1 * resistance
 
-        # Second smoothing: slow update of persistent state
-        # Matches minimal_controller.py lines 253-254
+        # Second smoothing: slow update of persistent state from RAW r_smoothed
+        # CG (line 254) updates from R_t.mean(dim=0), not from the already-smoothed value.
+        # Using r_smoothed here (not self._persistent_resistance blended again)
+        # prevents triple-smoothing that would over-dampen responsiveness.
         self._persistent_resistance = (
-            0.95 * self._persistent_resistance + 0.05 * r_smoothed
+            0.95 * self._persistent_resistance + 0.05 * resistance
         )
 
         # P_t = sigmoid(k_r * R_t - k_m * M_t + b_p)
         # Matches minimal_controller.py lines 244-249
         logit = self.k_r * r_smoothed - self.k_m * misalignment + self.b_p
-        plasticity = 1.0 / (1.0 + math.exp(-logit))
+
+        # Numerically stable sigmoid — avoids overflow for large negative logits
+        # (torch.sigmoid handles this internally; we must do it explicitly)
+        if logit >= 0:
+            plasticity = 1.0 / (1.0 + math.exp(-logit))
+        else:
+            exp_logit = math.exp(logit)
+            plasticity = exp_logit / (1.0 + exp_logit)
 
         return PlasticityResult(
             plasticity=plasticity,

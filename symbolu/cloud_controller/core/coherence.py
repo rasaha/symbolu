@@ -114,11 +114,15 @@ class CoherenceModel:
         Returns value in [0, 1].
         """
         values = [metrics[k] for k in keys if k in metrics]
-        if len(values) < 2:
-            # Single signal or missing — assume moderate agreement
-            return 0.5 if not values else (0.8 if values[0] > self.elevation_threshold else 0.5)
+        if not values:
+            return 0.5  # No data — neutral
+        if len(values) == 1:
+            # Single signal = incomplete information, not "agreement"
+            # Return neutral 0.5 regardless of value — one signal can't agree with itself
+            return 0.5
 
-        arr = np.array(values)
+        # Clamp to [0, 1] to prevent variance formula from breaking on non-normalized input
+        arr = np.clip(np.array(values), 0.0, 1.0)
 
         # Agreement = 1 - normalized variance
         # When all signals are similar (all high or all low), variance is low -> agreement high
@@ -126,10 +130,5 @@ class CoherenceModel:
         variance = float(np.var(arr))
         # Max possible variance for [0,1] signals is 0.25 (half at 0, half at 1)
         agreement = 1.0 - min(variance / 0.25, 1.0)
-
-        # Boost agreement when all signals are elevated (coherent pressure)
-        all_elevated = all(v > self.elevation_threshold for v in values)
-        if all_elevated:
-            agreement = min(1.0, agreement + 0.2)
 
         return agreement

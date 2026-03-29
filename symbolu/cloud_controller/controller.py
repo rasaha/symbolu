@@ -9,6 +9,7 @@ Core equation:
 """
 
 import math
+import threading
 import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -117,6 +118,7 @@ class Controller:
 
         self._step = 0
         self._recent_scale_times: List[int] = []
+        self._lock = threading.Lock()
 
     def step(
         self,
@@ -140,6 +142,20 @@ class Controller:
         Returns:
             ActionResult with decision, component breakdown, and explanation.
         """
+        with self._lock:
+            return self._step_inner(
+                metrics, current_replicas, deploy_active, phase, recent_pod_restarts,
+            )
+
+    def _step_inner(
+        self,
+        metrics: Dict[str, float],
+        current_replicas: int,
+        deploy_active: bool,
+        phase: str,
+        recent_pod_restarts: int,
+    ) -> ActionResult:
+        """Inner step logic, called under lock."""
         self._step += 1
 
         # === SENSE ===
@@ -165,7 +181,8 @@ class Controller:
         misalignment = estimated_delta / max(current_replicas, 1)
 
         # Identity accumulation (fast loop)
-        if len(metrics) >= self.config.identity_dim:
+        # _metrics_to_identity_vector pads to identity_dim, so any metrics count works
+        if len(metrics) > 0:
             state_vec = self._metrics_to_identity_vector(metrics)
             salience = coherence_result.coherence  # High coherence = high salience
             self.identity.accumulate(state_vec, salience)
@@ -294,16 +311,21 @@ class Controller:
         """Compute system stability score in [0, 1].
 
         1.0 = fully stable, 0.0 = highly fragile.
+
+        Uses multiplicative penalties to prevent stacking beyond 1.0:
+        each penalty reduces remaining resistance rather than subtracting
+        from a fixed budget.
         """
-        penalties = 0.0
+        resistance = 1.0
 
         # Penalty for active deployment
         if deploy_active:
-            penalties += 0.3
+            resistance *= 0.6  # 40% penalty
 
         # Penalty for recent pod restarts
         if recent_pod_restarts > 0:
-            penalties += min(0.3, recent_pod_restarts * 0.1)
+            restart_factor = max(0.5, 1.0 - recent_pod_restarts * 0.1)
+            resistance *= restart_factor
 
         # Penalty for recent scaling actions (thrash detection)
         recent_scales = sum(
@@ -311,15 +333,17 @@ class Controller:
             if self._step - t < 20  # Within last 20 cycles (~5 min at 15s intervals)
         )
         if recent_scales > 0:
-            penalties += min(0.3, recent_scales * 0.1)
+            thrash_factor = max(0.5, 1.0 - recent_scales * 0.1)
+            resistance *= thrash_factor
 
         # Penalty for high metric variance (signals are noisy)
         values = list(metrics.values())
         if len(values) >= 2:
             variance = float(np.var(values))
-            penalties += min(0.2, variance)
+            variance_factor = max(0.7, 1.0 - variance * 2.0)
+            resistance *= variance_factor
 
-        return max(0.0, 1.0 - penalties)
+        return max(0.0, min(1.0, resistance))
 
     def _metrics_to_identity_vector(self, metrics: Dict[str, float]) -> np.ndarray:
         """Convert metrics dict to fixed-dimension identity vector.
