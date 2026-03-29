@@ -8021,12 +8021,14 @@ def train(config: UnifiedTrainingConfig):
                             _eff_influence = _gate_val * _adp_norm if _adp_norm > 0 else 0.0
                             print(f"    effective_influence={_eff_influence:.4f} "
                                   f"(gate × adapter_norm)")
-                            if _eff_influence < 1.0:
-                                print(f"    -> SUBTLE: CG modifying <1 unit of hidden norm")
-                            elif _eff_influence < 5.0:
+                            if _eff_influence < 5.0:
+                                print(f"    -> SUBTLE: small CG perturbation")
+                            elif _eff_influence < 20.0:
                                 print(f"    -> MODERATE: CG actively shaping representations")
+                            elif _eff_influence < 50.0:
+                                print(f"    -> STRONG: CG significantly modifying hidden states")
                             else:
-                                print(f"    -> STRONG: CG dominating residual stream")
+                                print(f"    -> DOMINANT: CG overwhelming residual stream — check gate")
                             # Damping health
                             _d_val = metrics.get('exp_damping', None)
                             if _d_val is not None:
