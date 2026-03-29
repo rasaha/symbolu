@@ -6145,6 +6145,16 @@ def train(config: UnifiedTrainingConfig):
                             log_msg += f" | AdpN:{_adapter_norm:.1f}"
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/weight_norm', _adapter_norm, global_step)
+                        # Capture adapter output norm from model forward outputs
+                        if isinstance(outputs, dict) and 'adapter_output_norm' in outputs:
+                            _aon = outputs['adapter_output_norm']
+                            metrics['adapter_output_norm'] = _aon
+                            # Effective influence = gate × adapter_output_norm
+                            _eff_inf = metrics.get('adapter_gate', 0) * _aon
+                            metrics['cg_effective_influence'] = _eff_inf
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                writer.add_scalar('cg_adapter/output_norm', _aon, global_step)
+                                writer.add_scalar('cg_adapter/effective_influence', _eff_inf, global_step)
                         if isinstance(outputs, dict) and 'state' in outputs and outputs['state'] is not None:
                             _state_norm = outputs['state'].detach().norm(dim=-1).mean().item()
                             metrics['state_norm'] = _state_norm
@@ -7705,6 +7715,15 @@ def train(config: UnifiedTrainingConfig):
                     )
                     for k, v in factual_metrics.items():
                         metrics[k] = v
+                    # TensorBoard: factual accuracy CG ON vs CG OFF
+                    if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                        writer.add_scalar('factual/accuracy_cg_on',
+                                          factual_metrics.get('factual_accuracy', 0), global_step)
+                        if 'factual_accuracy_cg_off' in factual_metrics:
+                            writer.add_scalar('factual/accuracy_cg_off',
+                                              factual_metrics['factual_accuracy_cg_off'], global_step)
+                            _delta = factual_metrics['factual_accuracy'] - factual_metrics['factual_accuracy_cg_off']
+                            writer.add_scalar('factual/cg_delta', _delta, global_step)
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
@@ -7926,6 +7945,43 @@ def train(config: UnifiedTrainingConfig):
                                 writer.add_scalar('experiential/resistance_std', _r_std, global_step)
                                 writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
                                 writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+
+                        # --- CG Adapter Influence Diagnostics ---
+                        _cg_model = getattr(model, 'module', model)
+                        if hasattr(_cg_model, 'adapter_gate'):
+                            _cg_sections += 1
+                            _gate_val = torch.sigmoid(_cg_model.adapter_gate).item()
+                            _gate_raw = _cg_model.adapter_gate.item()
+                            _adp_norm = metrics.get('adapter_output_norm', 0)
+                            _adp_wnorm = 0.0
+                            if hasattr(_cg_model, 'phase_adapter'):
+                                _adp_wnorm = sum(
+                                    p.detach().norm().item()
+                                    for p in _cg_model.phase_adapter.parameters()
+                                )
+                            print(f"  CG Adapter Diagnostics:")
+                            print(f"    gate={_gate_val:.4f} (raw={_gate_raw:.3f})  "
+                                  f"adapter_out_norm={_adp_norm:.3f}  "
+                                  f"adapter_weight_norm={_adp_wnorm:.1f}")
+                            # Effective influence: gate * adapter_output_norm
+                            _eff_influence = _gate_val * _adp_norm if _adp_norm > 0 else 0.0
+                            print(f"    effective_influence={_eff_influence:.4f} "
+                                  f"(gate × adapter_norm)")
+                            if _eff_influence < 1.0:
+                                print(f"    -> SUBTLE: CG modifying <1 unit of hidden norm")
+                            elif _eff_influence < 5.0:
+                                print(f"    -> MODERATE: CG actively shaping representations")
+                            else:
+                                print(f"    -> STRONG: CG dominating residual stream")
+                            # Damping health
+                            _d_val = metrics.get('exp_damping', None)
+                            if _d_val is not None:
+                                if _d_val < 0.05:
+                                    print(f"    ⚠ Damping collapsed (d={_d_val:.3f}) — "
+                                          f"controller effectively OFF")
+                                elif _d_val < 0.3:
+                                    print(f"    ⚡ Damping suppressed (d={_d_val:.3f}) — "
+                                          f"recovering from variance spike")
 
                         # --- Embedding Diagnostics Trend ---
                         if 'cg_embedding_diag' in dir() and cg_embedding_diag is not None:
