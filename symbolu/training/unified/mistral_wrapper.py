@@ -132,6 +132,11 @@ class MistralCGWrapper(nn.Module):
         nn.init.zeros_(self.phase_adapter[-1].weight)
         nn.init.zeros_(self.phase_adapter[-1].bias)
 
+        # Output normalization: prevents adapter_output_norm from growing
+        # unbounded while preserving direction. RMSNorm is lightweight (no
+        # learnable params beyond a scale) and matches Mistral's internal norm.
+        self.adapter_output_norm = nn.RMSNorm(self.mistral_hidden_dim)
+
         # Adapter gate (learnable scalar)
         # sigmoid(-2) ≈ 0.12: adapter starts with minimal influence,
         # ramps up as CG losses teach meaningful phase/state signals.
@@ -368,6 +373,7 @@ class MistralCGWrapper(nn.Module):
         # This forces the adapter to produce corrections driven by CG
         # phase information, not by learning Mistral feature shortcuts.
         adapter_output = self.phase_adapter(phase_expanded)  # [B, T, D]
+        adapter_output = self.adapter_output_norm(adapter_output)  # normalize magnitude
 
         # Gated residual
         if _use_gate:
