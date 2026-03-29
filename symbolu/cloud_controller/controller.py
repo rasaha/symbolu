@@ -41,12 +41,18 @@ class ActionResult:
     damping: DampingResult
     coherence: CoherenceResult
 
+    # Identity
+    identity_deviation: float       # How far current state is from learned baseline
+
     # Context
     step: int
     metrics_snapshot: Dict[str, float]
 
     def explain(self) -> str:
         """Human-readable decision explanation."""
+        drift_label = "normal" if self.identity_deviation < 0.3 else (
+            "drifting" if self.identity_deviation < 0.6 else "anomalous"
+        )
         lines = [
             f"Decision: {self.recommendation.upper().replace('_', ' ')}",
             f"  Pressure (S_t):      {self.pressure:.2f}",
@@ -61,6 +67,7 @@ class ActionResult:
             f"{' [rate-limited]' if self.gain.rate_limited else ''}",
             f"  Damping (d_t):       {self.damping.damping:.2f}"
             f"{' [rate-limited]' if self.damping.rate_limited else ''}",
+            f"  Identity Drift:      {self.identity_deviation:.2f} ({drift_label})",
             f"  Action Score (A_t):  {self.action_score:.3f}"
             f" → {self.recommendation.upper().replace('_', ' ')}",
         ]
@@ -101,6 +108,7 @@ class Controller:
         self.damping = Damping(
             k_dv=self.config.k_dv,
             k_dc=self.config.k_dc,
+            warmup_steps=self.config.damping_warmup_steps,
         )
         self.identity = IdentityEMA(
             dim=self.config.identity_dim,
@@ -156,6 +164,11 @@ class Controller:
         recent_pod_restarts: int,
     ) -> ActionResult:
         """Inner step logic, called under lock."""
+        # Input validation — clamp metrics to [0, 1] and sanitize args
+        metrics = {k: max(0.0, min(1.0, v)) for k, v in metrics.items()}
+        current_replicas = max(1, current_replicas)
+        recent_pod_restarts = max(0, recent_pod_restarts)
+
         self._step += 1
 
         # === SENSE ===
@@ -182,8 +195,10 @@ class Controller:
 
         # Identity accumulation (fast loop)
         # _metrics_to_identity_vector pads to identity_dim, so any metrics count works
+        identity_deviation = 0.0
         if len(metrics) > 0:
             state_vec = self._metrics_to_identity_vector(metrics)
+            identity_deviation = self.identity.deviation(state_vec)
             salience = coherence_result.coherence  # High coherence = high salience
             self.identity.accumulate(state_vec, salience)
 
@@ -203,7 +218,7 @@ class Controller:
             coherence=coherence_result.coherence,
             phase=phase,
             step=self._step,
-            warmup_steps=100,
+            warmup_steps=self.config.warmup_steps,
         )
 
         # Damping: suppress if volatile
@@ -260,6 +275,7 @@ class Controller:
             gain=gain_result,
             damping=damping_result,
             coherence=coherence_result,
+            identity_deviation=identity_deviation,
             step=self._step,
             metrics_snapshot=dict(metrics),
         )

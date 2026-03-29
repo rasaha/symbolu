@@ -25,6 +25,7 @@ class CoherenceResult:
     c_infra: float          # Infrastructure signal agreement
     c_app: float            # Application signal agreement
     c_business: float       # Business signal agreement
+    c_cross: float          # Cross-group agreement (infra vs app vs business)
     instability: float      # 1 - coherence (for damping input)
     elevated_count: int     # How many signals are above baseline
 
@@ -71,20 +72,36 @@ class CoherenceModel:
         c_app = self._group_agreement(metrics, app_keys)
         c_business = self._group_agreement(metrics, business_keys)
 
-        # Weighted coherence
+        # Cross-group coherence: do infra and app signals agree in direction?
+        # E.g., if infra says high load but app says latency is fine, cross-group
+        # coherence is low — signals are contradicting across layers.
+        group_means = []
+        for keys_group in (infra_keys, app_keys, business_keys):
+            vals = [metrics[k] for k in keys_group if k in metrics]
+            if vals:
+                group_means.append(sum(vals) / len(vals))
+        if len(group_means) >= 2:
+            c_cross = 1.0 - min(float(np.var(group_means)) / 0.25, 1.0)
+        else:
+            c_cross = 0.5
+
+        # Weighted coherence — includes both within-group and cross-group
         total_weight = self.w_infra + self.w_app
         if any(k in metrics for k in business_keys):
             total_weight += self.w_business
-            coherence = (
+            within_coherence = (
                 self.w_infra * c_infra
                 + self.w_app * c_app
                 + self.w_business * c_business
             ) / total_weight
         else:
-            coherence = (
+            within_coherence = (
                 self.w_infra * c_infra
                 + self.w_app * c_app
             ) / total_weight
+
+        # Blend within-group (70%) and cross-group (30%) for final coherence
+        coherence = 0.7 * within_coherence + 0.3 * c_cross
 
         # Count elevated signals
         elevated = sum(
@@ -97,6 +114,7 @@ class CoherenceModel:
             c_infra=c_infra,
             c_app=c_app,
             c_business=c_business,
+            c_cross=c_cross,
             instability=1.0 - coherence,
             elevated_count=elevated,
         )

@@ -41,7 +41,7 @@ class Damping:
     - Falling signal: alpha=0.20 (recover in ~5 cycles)
     """
 
-    def __init__(self, k_dv: float = 1.0, k_dc: float = 0.5):
+    def __init__(self, k_dv: float = 1.0, k_dc: float = 0.5, warmup_steps: int = 0):
         self.k_dv = k_dv
         self.k_dc = k_dc
         self._V_ema = 0.0
@@ -49,6 +49,7 @@ class Damping:
         self._V_baseline = 0.0
         self._baseline_initialized = False
         self._prev_d_t: Optional[float] = None
+        self._warmup_remaining = warmup_steps  # Hold d=1.0 to let EMAs stabilize
 
     def compute(
         self,
@@ -88,6 +89,20 @@ class Damping:
         # Matches minimal_controller.py line 354
         self._V_baseline = 0.999 * self._V_baseline + 0.001 * metric_variance
 
+        # Warmup after startup/resume: hold d=1.0 while EMAs stabilize
+        # Matches minimal_controller.py lines 357-360
+        if self._warmup_remaining > 0:
+            self._warmup_remaining -= 1
+            self._prev_d_t = 1.0
+            return DampingResult(
+                damping=1.0,
+                v_ema=self._V_ema,
+                v_baseline=self._V_baseline,
+                v_excess=0.0,
+                u_ema=self._U_ema,
+                rate_limited=False,
+            )
+
         # Baseline-relative damping
         # Matches minimal_controller.py lines 366-372
         V_base = max(self._V_baseline, 1e-8)
@@ -121,9 +136,10 @@ class Damping:
             rate_limited=rate_limited,
         )
 
-    def reset(self) -> None:
+    def reset(self, warmup_steps: int = 0) -> None:
         self._V_ema = 0.0
         self._U_ema = 0.0
         self._V_baseline = 0.0
         self._baseline_initialized = False
         self._prev_d_t = None
+        self._warmup_remaining = warmup_steps

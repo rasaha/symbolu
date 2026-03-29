@@ -41,11 +41,13 @@ class InfraControllerConfig:
     # --- Auxiliary (not in core 12) ---
     replay_buffer_size: int = 256
     replay_ttl: int = 200       # Cycles before entries expire
-    identity_dim: int = 16      # Dimension of baseline state vector
+    identity_dim: int = 8       # Dimension of baseline state vector (matches typical metric count)
 
     # --- Operational ---
     cycle_interval_seconds: float = 15.0   # How often to evaluate
-    consolidation_interval: int = 1000     # Cycles between identity updates
+    warmup_steps: int = 100                # Cycles for initial controller warmup
+    damping_warmup_steps: int = 50         # Cycles to hold d=1.0 after startup (let EMAs stabilize)
+    consolidation_interval: int = 240      # Cycles between identity updates (~1 hour at 15s)
     replay_interval: int = 100             # Cycles between replay sampling
 
     # --- Action thresholds ---

@@ -176,7 +176,7 @@ class TestDamping:
 class TestIdentityEMA:
     def test_no_update_when_empty(self):
         """Consolidation should not update when no signals accumulated."""
-        identity = IdentityEMA(dim=8, alpha_base=0.01)
+        identity = IdentityEMA(dim=8)
         result = identity.consolidate()
         assert result.updated is False
 
@@ -204,7 +204,7 @@ class TestIdentityEMA:
 
     def test_alpha_eff_modulated(self):
         """Effective alpha should be between 0.1*alpha_base and alpha_base."""
-        identity = IdentityEMA(dim=8, alpha_base=0.01)
+        identity = IdentityEMA(dim=8)
         for _ in range(50):
             identity.accumulate(np.random.randn(8), salience=0.8)
         result = identity.consolidate()
@@ -403,6 +403,7 @@ class TestController:
         assert "Plasticity" in explanation
         assert "Gain" in explanation
         assert "Damping" in explanation
+        assert "Identity Drift" in explanation
 
     def test_replay_buffer_stores_stressed_moments(self):
         """High misalignment + low plasticity should populate replay buffer."""
@@ -436,3 +437,116 @@ class TestController:
         )
         # Max +50% of 4 = +2
         assert result.replica_delta <= 2
+
+    def test_negative_pressure_scale_in(self):
+        """Low metrics should produce negative pressure (over-provisioned)."""
+        ctrl = Controller(InfraControllerConfig())
+        # Warm up with moderate load
+        for _ in range(100):
+            ctrl.step(
+                metrics={"cpu": 0.5, "memory": 0.5, "latency_p99": 0.5,
+                         "error_rate": 0.5, "queue_depth": 0.5},
+                current_replicas=10,
+            )
+        # Now system is over-provisioned — all metrics very low
+        result = ctrl.step(
+            metrics={"cpu": 0.10, "memory": 0.15, "latency_p99": 0.08,
+                     "error_rate": 0.02, "queue_depth": 0.05},
+            current_replicas=10,
+        )
+        assert result.pressure < 0  # Negative pressure = over-provisioned
+        assert result.action_score <= 0  # Should suggest scale-in or no action
+
+    def test_input_validation_clamps_metrics(self):
+        """Metrics outside [0, 1] should be clamped, not crash."""
+        ctrl = Controller()
+        result = ctrl.step(
+            metrics={"cpu": 1.5, "memory": -0.3, "latency_p99": 0.7, "error_rate": 0.3},
+            current_replicas=3,
+        )
+        # Should not crash, metrics should be clamped
+        assert result.metrics_snapshot["cpu"] == 1.0
+        assert result.metrics_snapshot["memory"] == 0.0
+
+    def test_input_validation_zero_replicas(self):
+        """Zero replicas should be clamped to 1."""
+        ctrl = Controller()
+        result = ctrl.step(
+            metrics={"cpu": 0.5, "memory": 0.5},
+            current_replicas=0,
+        )
+        # Should not crash (division by zero prevented)
+        assert result.recommendation is not None
+
+    def test_identity_deviation_in_result(self):
+        """ActionResult should include identity deviation."""
+        ctrl = Controller()
+        result = ctrl.step(
+            metrics={"cpu": 0.5, "memory": 0.5, "latency_p99": 0.5, "error_rate": 0.5},
+            current_replicas=5,
+        )
+        assert 0.0 <= result.identity_deviation <= 1.0
+
+
+# ============================================================
+# Damping — Warmup
+# ============================================================
+
+class TestDampingWarmup:
+    def test_warmup_holds_damping_at_one(self):
+        """During warmup, d_t should be 1.0 regardless of input."""
+        d = Damping(k_dv=1.0, k_dc=0.5, warmup_steps=10)
+        for i in range(10):
+            result = d.compute(metric_variance=10.0, coherence_instability=5.0)
+            assert result.damping == 1.0
+
+    def test_after_warmup_damping_responds(self):
+        """After warmup expires, damping should respond to signals."""
+        d = Damping(k_dv=1.0, k_dc=0.5, warmup_steps=5)
+        # Exhaust warmup
+        for _ in range(5):
+            d.compute(metric_variance=0.1)
+        # Now spike — damping should engage
+        for _ in range(20):
+            result = d.compute(metric_variance=1.0, coherence_instability=0.5)
+        assert result.damping < 0.9
+
+
+# ============================================================
+# Coherence — Cross-Group
+# ============================================================
+
+class TestCoherenceCrossGroup:
+    def test_cross_group_agreement_when_aligned(self):
+        """When infra and app both elevated, cross-group coherence should be high."""
+        model = CoherenceModel()
+        result = model.compute({
+            "cpu": 0.85, "memory": 0.80,
+            "latency_p99": 0.82, "error_rate": 0.78,
+        })
+        assert result.c_cross > 0.7
+
+    def test_cross_group_disagreement_detected(self):
+        """When infra says high but app says low, cross-group should be lower."""
+        model = CoherenceModel()
+        result_aligned = model.compute({
+            "cpu": 0.85, "memory": 0.80,
+            "latency_p99": 0.82, "error_rate": 0.78,
+        })
+        result_misaligned = model.compute({
+            "cpu": 0.90, "memory": 0.85,
+            "latency_p99": 0.15, "error_rate": 0.10,
+        })
+        assert result_misaligned.c_cross < result_aligned.c_cross
+
+    def test_cross_group_affects_overall_coherence(self):
+        """Cross-group disagreement should lower overall coherence."""
+        model = CoherenceModel()
+        # Infra high, app low — within-group might be high but cross is low
+        result = model.compute({
+            "cpu": 0.90, "memory": 0.88,
+            "latency_p99": 0.10, "error_rate": 0.08,
+        })
+        # Overall coherence should be reduced by cross-group disagreement
+        # even though within-group agreement is high for both groups
+        assert result.coherence < 0.85
