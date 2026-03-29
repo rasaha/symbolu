@@ -23,6 +23,7 @@ for human review, not ground truth.
 import math
 import time
 import logging
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
@@ -148,6 +149,7 @@ class DivergenceTracker:
         self.config = config or DivergenceConfig()
         self._records: List[DivergenceRecord] = []
         self._max_history = 10000
+        self._lock = threading.Lock()
 
     def compare(
         self,
@@ -190,9 +192,10 @@ class DivergenceTracker:
             metrics_snapshot=dict(metrics),
         )
 
-        self._records.append(record)
-        if len(self._records) > self._max_history:
-            self._records = self._records[-self._max_history:]
+        with self._lock:
+            self._records.append(record)
+            if len(self._records) > self._max_history:
+                self._records = self._records[-self._max_history:]
 
         if record.is_divergence:
             logger.info("Divergence: %s", divergence_type.value)
@@ -244,12 +247,12 @@ class DivergenceTracker:
             current_time = time.time()
 
         newly_evaluated = []
-        for record in self._records:
-            if record.verdict != Verdict.PENDING:
-                continue
-            if current_time - record.timestamp < self.config.verdict_lookback_seconds:
-                continue
+        with self._lock:
+            pending = [r for r in self._records
+                       if r.verdict == Verdict.PENDING
+                       and current_time - r.timestamp >= self.config.verdict_lookback_seconds]
 
+        for record in pending:
             verdict, reason, cost = self._evaluate_one(record, current_metrics)
             record.verdict = verdict
             record.verdict_timestamp = current_time
@@ -386,17 +389,21 @@ class DivergenceTracker:
 
     @property
     def records(self) -> List[DivergenceRecord]:
-        return list(self._records)
+        with self._lock:
+            return list(self._records)
 
     @property
     def divergences(self) -> List[DivergenceRecord]:
         """Only actual divergences (excludes agreements)."""
-        return [r for r in self._records if r.is_divergence]
+        with self._lock:
+            return [r for r in self._records if r.is_divergence]
 
     @property
     def pending_count(self) -> int:
         """Count of divergences awaiting verdict (agreements are excluded)."""
-        return sum(1 for r in self._records if r.is_divergence and r.verdict == Verdict.PENDING)
+        with self._lock:
+            return sum(1 for r in self._records if r.is_divergence and r.verdict == Verdict.PENDING)
 
     def reset(self) -> None:
-        self._records.clear()
+        with self._lock:
+            self._records.clear()

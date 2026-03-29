@@ -33,6 +33,11 @@ from symbolu.cloud_controller.shadow.divergence import (
     DivergenceRecord,
 )
 from symbolu.cloud_controller.shadow.reporter import ShadowReporter, ShadowReport
+from symbolu.cloud_controller.recommend.engine import (
+    RecommendEngine,
+    RecommendConfig,
+    RecommendCycleResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +49,8 @@ class ShadowConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     # Divergence tracking
     divergence: DivergenceConfig = field(default_factory=DivergenceConfig)
+    # Recommend engine (None = disabled)
+    recommend: Optional[RecommendConfig] = None
     # How often to log a periodic status summary (in cycles, 0 = never)
     status_interval_cycles: int = 100
 
@@ -55,6 +62,7 @@ class ShadowCycleResult:
     hpa: Optional[HPASnapshot]
     divergence: Optional[DivergenceRecord]
     newly_evaluated: List[DivergenceRecord]
+    recommend: Optional[RecommendCycleResult] = None
 
 
 class ShadowRunner:
@@ -87,10 +95,14 @@ class ShadowRunner:
         )
         self.divergence_tracker = DivergenceTracker(self.config.divergence)
         self.reporter = ShadowReporter()
+        self.recommend_engine: Optional[RecommendEngine] = None
+        if self.config.recommend is not None:
+            self.recommend_engine = RecommendEngine(self.config.recommend)
         self._cycle_count = 0
         self._failed_cycles = 0
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._counter_lock = threading.Lock()
 
     def step(self) -> Optional[ShadowCycleResult]:
         """Execute one shadow mode cycle.
@@ -101,11 +113,15 @@ class ShadowRunner:
         # 1. Run pipeline (Prometheus → normalize → controller)
         cycle = self.pipeline.poll_once()
         if cycle is None:
-            self._failed_cycles += 1
-            logger.warning("Pipeline poll failed (total failures: %d)", self._failed_cycles)
+            with self._counter_lock:
+                self._failed_cycles += 1
+                failed = self._failed_cycles
+            logger.warning("Pipeline poll failed (total failures: %d)", failed)
             return None
 
-        self._cycle_count += 1
+        with self._counter_lock:
+            self._cycle_count += 1
+            cycle_num = self._cycle_count
 
         # 2. Poll HPA state
         hpa = self.hpa_watcher.poll()
@@ -126,10 +142,18 @@ class ShadowRunner:
             current_metrics=cycle.normalized_metrics,
         )
 
-        # 5. Periodic status log
+        # 5. Run recommend engine if configured
+        recommend_result = None
+        if self.recommend_engine is not None:
+            recommend_result = self.recommend_engine.evaluate(
+                action=cycle.action,
+                current_replicas=cycle.current_replicas,
+            )
+
+        # 6. Periodic status log
         if (
             self.config.status_interval_cycles > 0
-            and self._cycle_count % self.config.status_interval_cycles == 0
+            and cycle_num % self.config.status_interval_cycles == 0
         ):
             self._log_status()
 
@@ -138,6 +162,7 @@ class ShadowRunner:
             hpa=hpa,
             divergence=divergence,
             newly_evaluated=newly_evaluated,
+            recommend=recommend_result,
         )
 
     def run(
@@ -177,7 +202,12 @@ class ShadowRunner:
         callback: Optional[Callable[[ShadowCycleResult], None]] = None,
         max_cycles: Optional[int] = None,
     ) -> threading.Thread:
-        """Run shadow mode in a background thread."""
+        """Run shadow mode in a background thread.
+
+        Raises RuntimeError if already running.
+        """
+        if self._running or (self._thread is not None and self._thread.is_alive()):
+            raise RuntimeError("ShadowRunner is already running")
         self._thread = threading.Thread(
             target=self.run,
             args=(callback, max_cycles),
@@ -189,10 +219,13 @@ class ShadowRunner:
     def stop(self) -> None:
         """Stop the shadow mode loop."""
         self._running = False
-        if self._thread is not None:
-            self._thread.join(timeout=self.config.pipeline.poll_interval + 5)
-            if self._thread.is_alive():
-                logger.warning("Shadow runner thread did not stop within timeout")
+        thread = self._thread
+        if thread is not None:
+            # Generous timeout: poll interval + Prometheus query timeout + buffer
+            timeout = self.config.pipeline.poll_interval + 15
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                logger.warning("Shadow runner thread did not stop within %.0fs timeout", timeout)
 
     def generate_report(
         self,
@@ -240,11 +273,13 @@ class ShadowRunner:
 
     @property
     def cycle_count(self) -> int:
-        return self._cycle_count
+        with self._counter_lock:
+            return self._cycle_count
 
     @property
     def failed_cycles(self) -> int:
-        return self._failed_cycles
+        with self._counter_lock:
+            return self._failed_cycles
 
     def reset(self) -> None:
         """Reset all internal state."""
@@ -252,13 +287,21 @@ class ShadowRunner:
         self.pipeline.normalizer.reset()
         self.hpa_watcher.reset()
         self.divergence_tracker.reset()
-        self._cycle_count = 0
-        self._failed_cycles = 0
+        if self.recommend_engine is not None:
+            self.recommend_engine.reset()
+        with self._counter_lock:
+            self._cycle_count = 0
+            self._failed_cycles = 0
 
     def close(self) -> None:
-        """Stop and clean up."""
+        """Stop and clean up.
+
+        Waits for the background thread to finish before closing the
+        pipeline to avoid racing with an in-flight polling cycle.
+        """
         self.stop()
-        self.pipeline.close()
+        # Only close pipeline resources after thread has stopped
+        self.pipeline.prometheus.close()
 
     def __enter__(self):
         return self

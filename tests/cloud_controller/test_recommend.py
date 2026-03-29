@@ -1040,3 +1040,55 @@ class TestSafetyEdgeCases:
         bounds = SafetyBounds(SafetyConfig(min_replicas=1))
         result = bounds.check(current_replicas=0, proposed_delta=3)
         assert result.clamped_delta >= 1
+
+
+# ============================================================
+# Thread Safety — Cross-Stage Fixes
+# ============================================================
+
+class TestSafetyBoundsLock:
+    """SafetyBounds should have a lock protecting _last_action_time."""
+
+    def test_has_lock(self):
+        bounds = SafetyBounds()
+        assert hasattr(bounds, "_lock")
+
+    def test_concurrent_record_and_check(self):
+        """Concurrent record_action and check should not raise."""
+        import threading
+        bounds = SafetyBounds(SafetyConfig(cooldown_seconds=0.01))
+        errors = []
+
+        def recorder():
+            try:
+                for _ in range(50):
+                    bounds.record_action()
+            except Exception as e:
+                errors.append(e)
+
+        def checker():
+            try:
+                for _ in range(50):
+                    bounds.check(current_replicas=5, proposed_delta=2)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=recorder), threading.Thread(target=checker)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+
+
+class TestRecommendEngineLock:
+    """RecommendEngine should have a lock for atomic evaluate."""
+
+    def test_has_eval_lock(self):
+        engine = RecommendEngine()
+        assert hasattr(engine, "_eval_lock")
+
+    def test_webhook_async_method_exists(self):
+        engine = RecommendEngine()
+        assert hasattr(engine, "_send_webhooks_async")

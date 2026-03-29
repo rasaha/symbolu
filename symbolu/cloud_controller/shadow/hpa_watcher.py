@@ -8,6 +8,7 @@ Purely observational — no K8s write access needed.
 
 import time
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -78,6 +79,7 @@ class HPAWatcher:
         self._snapshots: List[HPASnapshot] = []
         # Keep at most 2000 actions/snapshots (~8 hours at 15s intervals)
         self._max_history = 2000
+        self._lock = threading.Lock()
 
     def poll(self) -> Optional[HPASnapshot]:
         """Poll current HPA state from Prometheus.
@@ -111,52 +113,58 @@ class HPAWatcher:
             desired_replicas=desired,
         )
 
-        # Detect scaling action: desired changed from previous snapshot
-        # NOTE: If HPA changes desired multiple times between polls,
-        # intermediate actions are lost — only the net change is captured.
-        if self._prev_snapshot is not None:
-            prev_desired = self._prev_snapshot.desired_replicas
-            if desired != prev_desired:
-                action = HPAAction(
-                    timestamp=now,
-                    from_replicas=prev_desired,
-                    to_replicas=desired,
-                    delta=desired - prev_desired,
-                )
-                self._actions.append(action)
-                logger.info(
-                    "HPA scaling detected: %d → %d (%+d)",
-                    prev_desired, desired, action.delta,
-                )
+        with self._lock:
+            # Detect scaling action: desired changed from previous snapshot
+            # NOTE: If HPA changes desired multiple times between polls,
+            # intermediate actions are lost — only the net change is captured.
+            if self._prev_snapshot is not None:
+                prev_desired = self._prev_snapshot.desired_replicas
+                if desired != prev_desired:
+                    action = HPAAction(
+                        timestamp=now,
+                        from_replicas=prev_desired,
+                        to_replicas=desired,
+                        delta=desired - prev_desired,
+                    )
+                    self._actions.append(action)
+                    logger.info(
+                        "HPA scaling detected: %d → %d (%+d)",
+                        prev_desired, desired, action.delta,
+                    )
 
-        self._prev_snapshot = snapshot
-        self._snapshots.append(snapshot)
+            self._prev_snapshot = snapshot
+            self._snapshots.append(snapshot)
 
-        # Trim history
-        if len(self._actions) > self._max_history:
-            self._actions = self._actions[-self._max_history:]
-        if len(self._snapshots) > self._max_history:
-            self._snapshots = self._snapshots[-self._max_history:]
+            # Trim history
+            if len(self._actions) > self._max_history:
+                self._actions = self._actions[-self._max_history:]
+            if len(self._snapshots) > self._max_history:
+                self._snapshots = self._snapshots[-self._max_history:]
 
         return snapshot
 
     def get_recent_actions(self, since: float) -> List[HPAAction]:
         """Get HPA actions since a given timestamp."""
-        return [a for a in self._actions if a.timestamp >= since]
+        with self._lock:
+            return [a for a in self._actions if a.timestamp >= since]
 
     def get_latest_snapshot(self) -> Optional[HPASnapshot]:
         """Get the most recent HPA snapshot."""
-        return self._prev_snapshot
+        with self._lock:
+            return self._prev_snapshot
 
     @property
     def total_actions(self) -> int:
-        return len(self._actions)
+        with self._lock:
+            return len(self._actions)
 
     @property
     def actions(self) -> List[HPAAction]:
-        return list(self._actions)
+        with self._lock:
+            return list(self._actions)
 
     def reset(self) -> None:
-        self._prev_snapshot = None
-        self._actions.clear()
-        self._snapshots.clear()
+        with self._lock:
+            self._prev_snapshot = None
+            self._actions.clear()
+            self._snapshots.clear()

@@ -981,3 +981,114 @@ class TestCoherenceNullSafety:
         hpa = HPASnapshot(timestamp=time.time(), current_replicas=5, desired_replicas=8)
         record = tracker.compare(action, hpa, {"cpu": 0.5})
         assert record.controller_coherence == 0.0
+
+
+# ============================================================
+# Thread Safety Tests
+# ============================================================
+
+class TestDivergenceTrackerThreadSafety:
+    """Verify DivergenceTracker has a threading lock."""
+
+    def test_has_lock(self):
+        tracker = DivergenceTracker()
+        assert hasattr(tracker, "_lock")
+
+    def test_concurrent_compare(self):
+        """Multiple threads calling compare should not corrupt records."""
+        import threading
+        tracker = DivergenceTracker()
+        errors = []
+
+        def worker(n):
+            try:
+                for i in range(20):
+                    action = _make_action_result(delta=1)
+                    hpa = HPASnapshot(timestamp=time.time(), current_replicas=5, desired_replicas=6)
+                    tracker.compare(action, hpa, {"cpu": 0.5})
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert len(tracker.records) == 80  # 4 threads × 20 iterations
+
+
+class TestHPAWatcherThreadSafety:
+    """Verify HPAWatcher has a threading lock."""
+
+    def test_has_lock(self):
+        prom = _mock_prom_k8s(current=5.0, desired=5.0)
+        watcher = HPAWatcher(prom)
+        assert hasattr(watcher, "_lock")
+
+
+# ============================================================
+# Run Async Guard Tests
+# ============================================================
+
+class TestRunAsyncGuard:
+    """Verify double-start prevention for ShadowRunner.run_async."""
+
+    def test_double_start_raises(self):
+        config = ShadowConfig(pipeline=PipelineConfig(poll_interval=0.01))
+        runner = ShadowRunner(config)
+        # Mock pipeline so it doesn't actually poll Prometheus
+        runner.pipeline.poll_once = MagicMock(return_value=None)
+        runner.run_async(max_cycles=100)
+        try:
+            with pytest.raises(RuntimeError, match="already running"):
+                runner.run_async(max_cycles=100)
+        finally:
+            runner.stop()
+
+
+# ============================================================
+# ShadowRunner + RecommendEngine Wiring
+# ============================================================
+
+class TestShadowRunnerRecommendWiring:
+    """Verify RecommendEngine is wired into ShadowRunner when configured."""
+
+    def test_no_recommend_engine_by_default(self):
+        config = ShadowConfig()
+        runner = ShadowRunner(config)
+        assert runner.recommend_engine is None
+
+    def test_recommend_engine_created_when_configured(self):
+        from symbolu.cloud_controller.recommend.engine import RecommendConfig
+        config = ShadowConfig(
+            recommend=RecommendConfig(service="test-svc", namespace="test-ns"),
+        )
+        runner = ShadowRunner(config)
+        assert runner.recommend_engine is not None
+
+    def test_step_calls_recommend_engine(self):
+        from symbolu.cloud_controller.recommend.engine import RecommendConfig, RecommendCycleResult
+        from symbolu.cloud_controller.recommend.confidence import ConfidenceResult, ConfidenceLevel
+
+        config = ShadowConfig(
+            recommend=RecommendConfig(service="test-svc", namespace="test-ns"),
+        )
+        runner = ShadowRunner(config)
+
+        # Mock pipeline to return a valid cycle result
+        mock_cycle = MagicMock()
+        mock_cycle.action = _make_action_result(delta=0)
+        mock_cycle.normalized_metrics = {"cpu": 0.5}
+        mock_cycle.current_replicas = 5
+        runner.pipeline.poll_once = MagicMock(return_value=mock_cycle)
+        runner.hpa_watcher.poll = MagicMock(return_value=None)
+
+        result = runner.step()
+        assert result is not None
+        assert result.recommend is not None
+
+    def test_counter_lock_exists(self):
+        runner = ShadowRunner()
+        assert hasattr(runner, "_counter_lock")

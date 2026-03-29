@@ -23,6 +23,7 @@ if execution is delayed. See SafetyBounds.record_action().
 """
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -119,6 +120,7 @@ class RecommendEngine:
         self.approvals = ApprovalManager(
             ttl_seconds=self.config.approval_ttl_seconds,
         )
+        self._eval_lock = threading.Lock()
 
     def evaluate(
         self,
@@ -139,92 +141,85 @@ class RecommendEngine:
             logger.warning("current_replicas=%d < 1, clamping to 1", current_replicas)
             current_replicas = 1
 
-        # 1. Expire stale recommendations
-        expired = self.approvals.expire_stale()
+        # Lock the entire evaluate path to prevent check-then-act races
+        # (e.g. two threads both pass dedup check and create duplicate recs)
+        with self._eval_lock:
+            # 1. Expire stale recommendations
+            expired = self.approvals.expire_stale()
 
-        # 2. Score confidence
-        confidence = self.scorer.evaluate(action)
+            # 2. Score confidence
+            confidence = self.scorer.evaluate(action)
 
-        if not confidence.should_recommend:
-            return RecommendCycleResult(
-                confidence=confidence,
-                expired=expired,
-                suppressed=True,
-                suppress_reason=confidence.reason,
+            if not confidence.should_recommend:
+                return RecommendCycleResult(
+                    confidence=confidence,
+                    expired=expired,
+                    suppressed=True,
+                    suppress_reason=confidence.reason,
+                )
+
+            # 3. Deduplicate — skip if there's already a pending recommendation
+            #    for this service to avoid flooding operators
+            existing = self.approvals.pending_for_service(self.config.service)
+            if existing:
+                return RecommendCycleResult(
+                    confidence=confidence,
+                    expired=expired,
+                    suppressed=True,
+                    suppress_reason=f"Pending recommendation already exists: {existing[0].id}",
+                )
+
+            # 4. Apply safety bounds
+            safety = self.safety.check(
+                current_replicas=current_replicas,
+                proposed_delta=action.replica_delta,
             )
 
-        # 3. Deduplicate — skip if there's already a pending recommendation
-        #    for this service to avoid flooding operators
-        existing = self.approvals.pending_for_service(self.config.service)
-        if existing:
-            return RecommendCycleResult(
-                confidence=confidence,
-                expired=expired,
-                suppressed=True,
-                suppress_reason=f"Pending recommendation already exists: {existing[0].id}",
-            )
+            # Suppress if in cooldown
+            if safety.in_cooldown:
+                return RecommendCycleResult(
+                    confidence=confidence,
+                    safety=safety,
+                    expired=expired,
+                    suppressed=True,
+                    suppress_reason=f"In cooldown ({safety.cooldown_remaining:.0f}s remaining)",
+                )
 
-        # 4. Apply safety bounds
-        safety = self.safety.check(
-            current_replicas=current_replicas,
-            proposed_delta=action.replica_delta,
-        )
+            # Suppress if safety clamped to zero
+            if safety.clamped_delta == 0:
+                return RecommendCycleResult(
+                    confidence=confidence,
+                    safety=safety,
+                    expired=expired,
+                    suppressed=True,
+                    suppress_reason="Safety bounds reduced delta to zero",
+                )
 
-        # Suppress if in cooldown
-        if safety.in_cooldown:
-            return RecommendCycleResult(
+            # 5. Build explanation and signals
+            explanation = action.explain()
+            signals = _build_signals(action)
+
+            # 6. Create recommendation FIRST (so we have the real ID for webhooks)
+            rec = self.approvals.create(
+                service=self.config.service,
+                namespace=self.config.namespace,
+                current_replicas=current_replicas,
+                original_delta=action.replica_delta,
+                clamped_delta=safety.clamped_delta,
+                target_replicas=safety.target_replicas,
                 confidence=confidence,
                 safety=safety,
-                expired=expired,
-                suppressed=True,
-                suppress_reason=f"In cooldown ({safety.cooldown_remaining:.0f}s remaining)",
+                action=action,
+                explanation=explanation,
             )
 
-        # Suppress if safety clamped to zero
-        if safety.clamped_delta == 0:
-            return RecommendCycleResult(
-                confidence=confidence,
-                safety=safety,
-                expired=expired,
-                suppressed=True,
-                suppress_reason="Safety bounds reduced delta to zero",
-            )
-
-        # 5. Build explanation and signals
-        explanation = action.explain()
-        signals = _build_signals(action)
-
-        # 6. Create recommendation FIRST (so we have the real ID for webhooks)
-        rec = self.approvals.create(
-            service=self.config.service,
-            namespace=self.config.namespace,
-            current_replicas=current_replicas,
-            original_delta=action.replica_delta,
-            clamped_delta=safety.clamped_delta,
-            target_replicas=safety.target_replicas,
-            confidence=confidence,
-            safety=safety,
-            action=action,
-            explanation=explanation,
-        )
-
-        # 7. Send webhooks with the real recommendation ID
-        webhooks_sent = self.dispatcher.send(
-            service=self.config.service,
-            namespace=self.config.namespace,
-            current_replicas=current_replicas,
-            recommended_delta=safety.clamped_delta,
-            target_replicas=safety.target_replicas,
-            confidence=confidence.level.value,
-            signals=signals,
-            explanation=explanation,
-            recommendation_id=rec.id,
-        )
-        rec.webhooks_sent = webhooks_sent
+        # 7. Send webhooks OUTSIDE the lock — fire-and-forget in background
+        #    thread to avoid blocking the polling loop with HTTP I/O
+        self._send_webhooks_async(rec, current_replicas, safety, confidence, signals, explanation)
 
         logger.info(
-            "Recommendation created: %s (%+d replicas, %s confidence, %d webhooks)",
-            rec.id, safety.clamped_delta, confidence.level.value, webhooks_sent,
+            "Recommendation created: %s (%+d replicas, %s confidence)",
+            rec.id, safety.clamped_delta, confidence.level.value,
         )
 
         return RecommendCycleResult(
@@ -233,6 +228,41 @@ class RecommendEngine:
             recommendation=rec,
             expired=expired,
         )
+
+    def _send_webhooks_async(
+        self,
+        rec: Recommendation,
+        current_replicas: int,
+        safety: SafetyResult,
+        confidence: ConfidenceResult,
+        signals: Dict[str, Any],
+        explanation: str,
+    ) -> None:
+        """Send webhook notifications in a background thread."""
+        if not self.dispatcher.targets:
+            return
+
+        def _send():
+            try:
+                webhooks_sent = self.dispatcher.send(
+                    service=self.config.service,
+                    namespace=self.config.namespace,
+                    current_replicas=current_replicas,
+                    recommended_delta=safety.clamped_delta,
+                    target_replicas=safety.target_replicas,
+                    confidence=confidence.level.value,
+                    signals=signals,
+                    explanation=explanation,
+                    recommendation_id=rec.id,
+                )
+                rec.webhooks_sent = webhooks_sent
+                if webhooks_sent:
+                    logger.info("Webhooks sent for %s: %d", rec.id, webhooks_sent)
+            except Exception:
+                logger.exception("Webhook dispatch failed for %s", rec.id)
+
+        thread = threading.Thread(target=_send, daemon=True)
+        thread.start()
 
     def approve(
         self,

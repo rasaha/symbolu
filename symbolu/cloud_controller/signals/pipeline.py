@@ -230,9 +230,13 @@ class SignalPipeline:
     ) -> threading.Thread:
         """Run the polling loop in a background thread.
 
+        Raises RuntimeError if already running.
+
         Returns:
             The background thread (already started).
         """
+        if self._running or (self._thread is not None and self._thread.is_alive()):
+            raise RuntimeError("SignalPipeline is already running")
         self._thread = threading.Thread(
             target=self.run,
             args=(callback, max_cycles),
@@ -244,8 +248,11 @@ class SignalPipeline:
     def stop(self) -> None:
         """Signal the polling loop to stop."""
         self._running = False
-        if self._thread is not None:
-            self._thread.join(timeout=self.config.poll_interval + 5)
+        thread = self._thread
+        if thread is not None:
+            # Generous timeout: poll interval + Prometheus query timeout + buffer
+            timeout = self.config.poll_interval + 15
+            thread.join(timeout=timeout)
 
     # Valid phase values that the controller/adaptive gain understand
     _VALID_PHASES = {"peak", "normal", "off_peak", "maintenance"}
@@ -303,8 +310,13 @@ class SignalPipeline:
         return "\n".join(lines)
 
     def close(self) -> None:
-        """Stop polling and close connections."""
+        """Stop polling and close connections.
+
+        Waits for the background thread to finish before closing
+        Prometheus to avoid racing with an in-flight cycle.
+        """
         self.stop()
+        # Only close after thread has stopped
         self.prometheus.close()
 
     def __enter__(self):

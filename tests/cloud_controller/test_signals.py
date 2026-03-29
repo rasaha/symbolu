@@ -605,3 +605,18 @@ class TestPipelineSafeInt:
         """Invalid values should return default without crashing."""
         assert SignalPipeline._safe_int("abc", default=3) == 3
         assert SignalPipeline._safe_int("", default=1) == 1
+
+
+class TestPipelineRunAsyncGuard:
+    """Pipeline.run_async should reject double starts."""
+
+    def test_double_start_raises(self):
+        pipeline = SignalPipeline(PipelineConfig(poll_interval=0.01))
+        # Mock so it doesn't actually hit Prometheus
+        pipeline.poll_once = MagicMock(return_value=None)
+        pipeline.run_async(max_cycles=100)
+        try:
+            with pytest.raises(RuntimeError, match="already running"):
+                pipeline.run_async(max_cycles=100)
+        finally:
+            pipeline.stop()

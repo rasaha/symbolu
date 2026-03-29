@@ -9,6 +9,7 @@ Always enforced, even after human approval:
 
 import time
 import logging
+import threading
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class SafetyBounds:
     def __init__(self, config: SafetyConfig | None = None):
         self.config = config or SafetyConfig()
         self._last_action_time: float | None = None
+        self._lock = threading.Lock()
 
     def check(
         self,
@@ -74,8 +76,10 @@ class SafetyBounds:
         # Check cooldown
         in_cooldown = False
         cooldown_remaining = 0.0
-        if self._last_action_time is not None:
-            elapsed = current_time - self._last_action_time
+        with self._lock:
+            last_action = self._last_action_time
+        if last_action is not None:
+            elapsed = current_time - last_action
             if elapsed < self.config.cooldown_seconds:
                 in_cooldown = True
                 cooldown_remaining = self.config.cooldown_seconds - elapsed
@@ -152,12 +156,15 @@ class SafetyBounds:
 
     def record_action(self, timestamp: float | None = None) -> None:
         """Record that an action was executed (starts cooldown)."""
-        self._last_action_time = timestamp or time.time()
+        with self._lock:
+            self._last_action_time = timestamp or time.time()
 
     @property
     def last_action_time(self) -> float | None:
-        return self._last_action_time
+        with self._lock:
+            return self._last_action_time
 
     def reset(self) -> None:
         """Clear cooldown state."""
-        self._last_action_time = None
+        with self._lock:
+            self._last_action_time = None
