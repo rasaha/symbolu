@@ -6,7 +6,14 @@ Gain defaults reduced for conservative cloud scaling.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Tuple
+
+
+# Canonical metric group definitions — shared between controller, coherence,
+# and pipeline to avoid duplication.
+INFRA_KEYS: Tuple[str, ...] = ("cpu", "memory")
+APP_KEYS: Tuple[str, ...] = ("latency_p99", "error_rate")
+BUSINESS_KEYS: Tuple[str, ...] = ("queue_depth",)
 
 
 @dataclass
@@ -41,7 +48,7 @@ class InfraControllerConfig:
     # --- Auxiliary (not in core 12) ---
     replay_buffer_size: int = 256
     replay_ttl: int = 200       # Cycles before entries expire
-    identity_dim: int = 8       # Dimension of baseline state vector (matches typical metric count)
+    identity_dim: int = 5       # Dimension of baseline state vector (matches 5 MVP metrics)
 
     # --- Operational ---
     cycle_interval_seconds: float = 15.0   # How often to evaluate

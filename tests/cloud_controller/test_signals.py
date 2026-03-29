@@ -12,11 +12,14 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
+from symbolu.cloud_controller.config import INFRA_KEYS, APP_KEYS, BUSINESS_KEYS
+from symbolu.cloud_controller.controller import Controller
 from symbolu.cloud_controller.signals.normalizer import (
     SignalNormalizer,
     NormalizerConfig,
     MetricSpec,
     NormalizationResult,
+    DEFAULT_METRIC_SPECS,
 )
 from symbolu.cloud_controller.signals.prometheus import (
     PrometheusClient,
@@ -364,7 +367,6 @@ def _make_mock_prometheus_client(metrics=None, k8s_state=None):
             "latency_p99": 0.340,
             "error_rate": 0.08,
             "queue_depth": 247.0,
-            "request_rate": 1200.0,
         }
     if k8s_state is None:
         k8s_state = {
@@ -490,7 +492,7 @@ class TestSignalPipeline:
         # Steady state
         pipeline.prometheus = _make_mock_prometheus_client(
             metrics={"cpu": 0.30, "memory": 0.40, "latency_p99": 0.100,
-                     "error_rate": 0.01, "queue_depth": 50.0, "request_rate": 500.0},
+                     "error_rate": 0.01, "queue_depth": 50.0},
         )
         for _ in range(30):
             pipeline.poll_once()
@@ -498,9 +500,108 @@ class TestSignalPipeline:
         # Now spike CPU and latency
         pipeline.prometheus = _make_mock_prometheus_client(
             metrics={"cpu": 0.90, "memory": 0.40, "latency_p99": 0.500,
-                     "error_rate": 0.01, "queue_depth": 50.0, "request_rate": 500.0},
+                     "error_rate": 0.01, "queue_depth": 50.0},
         )
         result = pipeline.poll_once()
         # CPU and latency should normalize high (> 0.5), others near 0.5
         assert result.normalized_metrics["cpu"] > 0.6
         assert result.normalized_metrics["latency_p99"] > 0.6
+
+
+# ============================================================
+# Audit Round — Integration & Edge Cases
+# ============================================================
+
+class TestQuerySpecAlignment:
+    def test_prometheus_query_names_match_normalizer_specs(self):
+        """All Prometheus query names should have a matching normalizer spec."""
+        query_names = {name for name, _, _ in DEFAULT_QUERIES}
+        spec_names = set(DEFAULT_METRIC_SPECS.keys())
+        unknown = query_names - spec_names
+        assert not unknown, f"Prometheus queries without normalizer specs: {unknown}"
+
+    def test_prometheus_query_names_match_controller_groups(self):
+        """All controller metric group keys should be covered by Prometheus queries."""
+        query_names = {name for name, _, _ in DEFAULT_QUERIES}
+        controller_keys = set(INFRA_KEYS + APP_KEYS + BUSINESS_KEYS)
+        missing = controller_keys - query_names
+        assert not missing, f"Controller expects metrics not in Prometheus queries: {missing}"
+
+
+class TestPromQLInjection:
+    def test_valid_labels_accepted(self):
+        """Normal K8s labels should pass validation."""
+        client = PrometheusClient()
+        assert client._validate_label("default") is True
+        assert client._validate_label("my-app-v2") is True
+        assert client._validate_label("kube-system") is True
+        assert client._validate_label("app.kubernetes.io/name") is True
+
+    def test_injection_attempt_rejected(self):
+        """Labels with PromQL injection should be rejected."""
+        client = PrometheusClient()
+        assert client._validate_label('myapp"} or 1=1 #') is False
+        assert client._validate_label("default{}") is False
+        assert client._validate_label("ns\ninjection") is False
+
+    def test_nan_from_prometheus_filtered(self):
+        """NaN values from Prometheus should be filtered to None."""
+        client = PrometheusClient(PrometheusConfig(url="http://fake:9090"))
+        # Prometheus returns "NaN" as string in JSON
+        mock_resp = _mock_prom_response("vector", [
+            {"metric": {}, "value": [123, "NaN"]},
+        ])
+        with patch.object(client._session, "get", return_value=mock_resp):
+            value = client.instant_query("test")
+        assert value is None  # NaN should be filtered
+
+
+class TestPipelineControllerInjection:
+    def test_pipeline_accepts_external_controller(self):
+        """Pipeline should use injected controller instead of creating one."""
+        ctrl = Controller()
+        pipeline = SignalPipeline(PipelineConfig(), controller=ctrl)
+        assert pipeline.controller is ctrl
+
+    def test_pipeline_creates_controller_when_not_injected(self):
+        """Without injection, pipeline creates its own controller."""
+        pipeline = SignalPipeline(PipelineConfig())
+        assert pipeline.controller is not None
+        assert isinstance(pipeline.controller, Controller)
+
+
+class TestPipelinePhaseValidation:
+    def test_invalid_phase_falls_back_to_normal(self):
+        """Unknown phase in schedule should fall back to 'normal'."""
+        config = PipelineConfig(
+            phase_schedule={h: "invalid_phase" for h in range(24)},
+        )
+        pipeline = SignalPipeline(config)
+        phase = pipeline._get_phase()
+        assert phase == "normal"
+
+    def test_valid_phases_accepted(self):
+        """All valid phase values should be accepted."""
+        for phase_name in ("peak", "normal", "off_peak", "maintenance"):
+            config = PipelineConfig(
+                phase_schedule={h: phase_name for h in range(24)},
+            )
+            pipeline = SignalPipeline(config)
+            assert pipeline._get_phase() == phase_name
+
+
+class TestPipelineSafeInt:
+    def test_safe_int_normal(self):
+        """Normal float values should convert correctly."""
+        assert SignalPipeline._safe_int(5.0) == 5
+        assert SignalPipeline._safe_int(5.4) == 5
+        assert SignalPipeline._safe_int(5.6) == 6
+
+    def test_safe_int_none(self):
+        """None should return default."""
+        assert SignalPipeline._safe_int(None, default=1) == 1
+
+    def test_safe_int_invalid(self):
+        """Invalid values should return default without crashing."""
+        assert SignalPipeline._safe_int("abc", default=3) == 3
+        assert SignalPipeline._safe_int("", default=1) == 1

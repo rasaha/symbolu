@@ -7,6 +7,8 @@ Designed for polling at 15-second intervals. Each query returns the most
 recent value (instant query) or a time series (range query).
 """
 
+import math
+import re
 import time
 import logging
 from dataclasses import dataclass, field
@@ -44,23 +46,18 @@ DEFAULT_QUERIES: List[Tuple[str, str, str]] = [
     ),
     (
         "latency_p99",
-        'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[2m])) by (le))',
+        'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[2m])) by (le, job))',
         "HTTP request latency p99 in seconds",
     ),
     (
         "error_rate",
-        'sum(rate(http_requests_total{code=~"5.."}[2m])) / sum(rate(http_requests_total[2m]))',
-        "5xx error rate as fraction of total requests",
+        'sum(rate(http_requests_total{code=~"5.."}[2m])) / clamp_min(sum(rate(http_requests_total[2m])), 0.001)',
+        "5xx error rate as fraction of total requests (safe division)",
     ),
     (
         "queue_depth",
         "sum(queue_messages_ready)",
         "Total messages waiting in queues",
-    ),
-    (
-        "request_rate",
-        "sum(rate(http_requests_total[2m]))",
-        "Total HTTP request rate (req/s)",
     ),
 ]
 
@@ -116,7 +113,11 @@ class PrometheusClient:
         if data is None:
             return None
 
-        return self._extract_scalar(data)
+        value = self._extract_scalar(data)
+        if value is not None and not math.isfinite(value):
+            logger.warning("Query returned non-finite value (%s): %s", value, query)
+            return None
+        return value
 
     def range_query(
         self,
@@ -170,6 +171,14 @@ class PrometheusClient:
 
         return results
 
+    # Label value validation: only allow safe characters to prevent PromQL injection
+    _LABEL_RE = re.compile(r'^[a-zA-Z0-9._/-]+$')
+
+    @classmethod
+    def _validate_label(cls, value: str) -> bool:
+        """Validate a Prometheus label value is safe for query injection."""
+        return bool(cls._LABEL_RE.match(value))
+
     def query_k8s_state(
         self,
         namespace: Optional[str] = None,
@@ -184,6 +193,14 @@ class PrometheusClient:
         Returns:
             Dict of state_name → value.
         """
+        # Validate label values to prevent PromQL injection
+        if namespace and not self._validate_label(namespace):
+            logger.warning("Invalid namespace label rejected: %s", namespace)
+            namespace = None
+        if deployment and not self._validate_label(deployment):
+            logger.warning("Invalid deployment label rejected: %s", deployment)
+            deployment = None
+
         results: Dict[str, Optional[float]] = {}
         for name, promql, _ in K8S_QUERIES:
             # Append label filters if specified

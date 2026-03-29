@@ -14,7 +14,12 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
 from symbolu.cloud_controller.controller import Controller, ActionResult
-from symbolu.cloud_controller.config import InfraControllerConfig
+from symbolu.cloud_controller.config import (
+    InfraControllerConfig,
+    INFRA_KEYS,
+    APP_KEYS,
+    BUSINESS_KEYS,
+)
 from symbolu.cloud_controller.signals.prometheus import (
     PrometheusClient,
     PrometheusConfig,
@@ -83,13 +88,20 @@ class SignalPipeline:
         pipeline.run(callback=lambda r: print(r.action.explain()))
     """
 
-    def __init__(self, config: Optional[PipelineConfig] = None):
+    # Expected metric keys that the controller uses for pressure/coherence
+    EXPECTED_KEYS = set(INFRA_KEYS + APP_KEYS + BUSINESS_KEYS)
+
+    def __init__(
+        self,
+        config: Optional[PipelineConfig] = None,
+        controller: Optional[Controller] = None,
+    ):
         self.config = config or PipelineConfig()
         self.prometheus = PrometheusClient(self.config.prometheus)
         self.normalizer = SignalNormalizer(
             config=self.config.normalizer,
         )
-        self.controller = Controller(self.config.controller)
+        self.controller = controller or Controller(self.config.controller)
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -107,6 +119,11 @@ class SignalPipeline:
         # 1. Query Prometheus for metrics
         raw_metrics = self.prometheus.query_metrics()
 
+        # Log which metrics failed individually
+        failed = {k for k, v in raw_metrics.items() if v is None}
+        if failed:
+            logger.warning("Metrics failed to query: %s", failed)
+
         # Filter out failed queries (None values)
         valid_raw = {k: v for k, v in raw_metrics.items() if v is not None}
         if not valid_raw:
@@ -119,20 +136,24 @@ class SignalPipeline:
             deployment=self.config.deployment,
         )
 
-        # Extract K8s context for controller
-        current_replicas = int(k8s_state.get("current_replicas") or 1)
+        # Extract K8s context for controller (safe conversion)
+        current_replicas = self._safe_int(k8s_state.get("current_replicas"), default=1)
         desired_replicas = k8s_state.get("desired_replicas")
-        pod_restarts_raw = k8s_state.get("pod_restarts")
-        pod_restarts = int(pod_restarts_raw) if pod_restarts_raw is not None else 0
+        pod_restarts = self._safe_int(k8s_state.get("pod_restarts"), default=0)
         # Deploy is active if desired != current (HPA is actively scaling)
         deploy_active = (
             desired_replicas is not None
-            and current_replicas != int(desired_replicas)
+            and current_replicas != self._safe_int(desired_replicas, default=current_replicas)
         )
 
         # 3. Normalize metrics
         normalization_details = self.normalizer.normalize_detailed(valid_raw, timestamp=now)
         normalized = {name: r.normalized for name, r in normalization_details.items()}
+
+        # 3b. Warn if expected controller metrics are missing
+        missing = self.EXPECTED_KEYS - set(normalized.keys())
+        if missing:
+            logger.warning("Missing expected metrics after normalization: %s", missing)
 
         # 4. Determine time phase
         phase = self._get_phase()
@@ -226,10 +247,28 @@ class SignalPipeline:
         if self._thread is not None:
             self._thread.join(timeout=self.config.poll_interval + 5)
 
+    # Valid phase values that the controller/adaptive gain understand
+    _VALID_PHASES = {"peak", "normal", "off_peak", "maintenance"}
+
+    @staticmethod
+    def _safe_int(value, default: int = 1) -> int:
+        """Safely convert a value to int, returning default on failure."""
+        if value is None:
+            return default
+        try:
+            return int(round(float(value)))
+        except (ValueError, TypeError):
+            logger.warning("Could not convert to int: %s, using default %d", value, default)
+            return default
+
     def _get_phase(self) -> str:
         """Determine current time phase from schedule."""
         hour = time.localtime().tm_hour
-        return self.config.phase_schedule.get(hour, "normal")
+        phase = self.config.phase_schedule.get(hour, "normal")
+        if phase not in self._VALID_PHASES:
+            logger.warning("Unknown phase '%s' in schedule, using 'normal'", phase)
+            return "normal"
+        return phase
 
     def format_cycle_log(self, result: CycleResult) -> str:
         """Format a cycle result as a human-readable log entry."""

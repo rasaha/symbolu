@@ -14,7 +14,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from symbolu.cloud_controller.config import InfraControllerConfig
+from symbolu.cloud_controller.config import InfraControllerConfig, INFRA_KEYS, APP_KEYS, BUSINESS_KEYS
 from symbolu.cloud_controller.core.plasticity_gate import PlasticityGate, PlasticityResult
 from symbolu.cloud_controller.core.adaptive_gain import AdaptiveGain, GainResult
 from symbolu.cloud_controller.core.damping import Damping, DampingResult
@@ -286,16 +286,12 @@ class Controller:
         Pressure is positive when system needs more resources,
         negative when over-provisioned.
         """
-        infra_keys = ["cpu", "memory"]
-        app_keys = ["latency_p99", "error_rate"]
-        business_keys = ["queue_depth"]
-
-        infra_pressure = self._group_pressure(metrics, infra_keys)
-        app_pressure = self._group_pressure(metrics, app_keys)
-        business_pressure = self._group_pressure(metrics, business_keys)
+        infra_pressure = self._group_pressure(metrics, INFRA_KEYS)
+        app_pressure = self._group_pressure(metrics, APP_KEYS)
+        business_pressure = self._group_pressure(metrics, BUSINESS_KEYS)
 
         total_weight = self.config.w_infra + self.config.w_app
-        if any(k in metrics for k in business_keys):
+        if any(k in metrics for k in BUSINESS_KEYS):
             total_weight += self.config.w_business
             pressure = (
                 self.config.w_infra * infra_pressure

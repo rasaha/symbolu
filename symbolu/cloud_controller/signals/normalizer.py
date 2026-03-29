@@ -79,11 +79,6 @@ DEFAULT_METRIC_SPECS: Dict[str, MetricSpec] = {
         method="zscore",
         sigmoid_k=0.8,  # Softer — queue depth varies more naturally
     ),
-    "request_rate": MetricSpec(
-        name="request_rate",
-        method="zscore",
-        sigmoid_k=1.0,
-    ),
 }
 
 

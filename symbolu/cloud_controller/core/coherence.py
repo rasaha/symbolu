@@ -16,7 +16,9 @@ Three signal groups:
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
+
+from symbolu.cloud_controller.config import INFRA_KEYS, APP_KEYS, BUSINESS_KEYS
 
 
 @dataclass
@@ -53,9 +55,9 @@ class CoherenceModel:
     def compute(
         self,
         metrics: Dict[str, float],
-        infra_keys: tuple = ("cpu", "memory"),
-        app_keys: tuple = ("latency_p99", "error_rate"),
-        business_keys: tuple = ("queue_depth",),
+        infra_keys: Tuple[str, ...] = INFRA_KEYS,
+        app_keys: Tuple[str, ...] = APP_KEYS,
+        business_keys: Tuple[str, ...] = BUSINESS_KEYS,
     ) -> CoherenceResult:
         """Compute coherence across signal groups.
 
